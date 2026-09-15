@@ -2,11 +2,14 @@
  * understand_customer — first Customer Journey transition after specific FIND.
  *
  * Seam A (find_opportunities) is complete. This is UNDERSTAND only:
- *   1. The opportunity says
- *   2. Broader agency research shows
- *   3. What that suggests you emphasize
+ *   1. What we can verify from this opportunity/buyer (SAM notice)
+ *   2. What broader Mindy research indicates (curated — NOT "what they actually care about")
+ *   3. What that suggests you emphasize (derived suggestion — NOT buyer fact)
  *
- * No Capability statement / Response / Meeting brief yet (POSITION/ACT parked).
+ * Sequencing: FIND → UNDERSTAND → PATHWAY/TALENT (next PR) → POSITION/ACT.
+ * Do NOT end with set-aside-first qualification. End with the capability/door ask.
+ *
+ * No Capability statement / Response / Meeting brief yet.
  * Facts come from SAM cache + getUnifiedAgencyIntelligence — no LLM fabrication.
  */
 import { createClient } from '@supabase/supabase-js';
@@ -24,6 +27,28 @@ export interface UnderstandCustomerInput {
   agency?: string | null;
 }
 
+export type ProvenanceKind =
+  | 'sam_notice'
+  | 'mindy_curated_intel'
+  | 'derived_suggestion_not_buyer_fact'
+  | 'unavailable';
+
+export interface UnderstandSectionMeta {
+  /** Host-facing heading — use this, not informal "actually cares about". */
+  display_title: string;
+  provenance: ProvenanceKind;
+  /** One-line epistemic status for the host to say up front, before listing claims. */
+  provenance_label: string;
+}
+
+export interface UnderstandNextAction {
+  prompt: string;
+  requires_confirmation: boolean;
+  /** PATHWAY tool not built yet — host asks in plain English and waits. */
+  tool?: string;
+  credits?: number;
+}
+
 export interface UnderstandCustomerResult {
   customer: {
     notice_id: string | null;
@@ -32,6 +57,15 @@ export interface UnderstandCustomerResult {
     agency: string | null;
     sub_agency: string | null;
     sam_url: string | null;
+  };
+  /** Host MUST present sections under these titles / provenance labels — not "actually cares about". */
+  presentation: {
+    sections: {
+      opportunity: UnderstandSectionMeta;
+      research: UnderstandSectionMeta;
+      emphasize: UnderstandSectionMeta;
+    };
+    host_rules: string[];
   };
   the_opportunity_says: {
     status: 'grounded' | 'empty' | 'unavailable';
@@ -59,6 +93,7 @@ export interface UnderstandCustomerResult {
     method: string;
     note: string | null;
   };
+  _next: UnderstandNextAction[];
   _meta: {
     grounded: boolean;
     degraded: boolean;
@@ -67,6 +102,20 @@ export interface UnderstandCustomerResult {
     journey: 'understand';
     next_outputs_not_yet: ['capability_statement', 'response', 'meeting_brief'];
   };
+}
+
+/** Plain-English ask that ends UNDERSTAND — not set-aside-first. PATHWAY is the next PR. */
+export const UNDERSTAND_PATHWAY_NEXT_PROMPT =
+  'Now let’s figure out which door your company can actually walk through. ' +
+  'What capability can you deliver for this mission today, and what have you already done that proves it?';
+
+export function buildUnderstandNext(): UnderstandNextAction[] {
+  return [
+    {
+      prompt: UNDERSTAND_PATHWAY_NEXT_PROMPT,
+      requires_confirmation: true,
+    },
+  ];
 }
 
 const STOP = new Set([
@@ -130,6 +179,7 @@ export function statedFocusFromText(title: string | null, body: string | null): 
 /**
  * Emphasize = agency research lines that share meaningful tokens with the opportunity text.
  * Deterministic overlap — never LLM. Empty overlap is an honest empty, not a fabricated pitch.
+ * Phrasing is suggestion-status — never "the buyer actually wants / cares about".
  */
 export function buildEmphasizeBullets(opts: {
   opportunityText: string;
@@ -160,10 +210,11 @@ export function buildEmphasizeBullets(opts: {
   const out: string[] = [];
   for (const c of cands) {
     if (out.length >= max) break;
-    const label = c.kind === 'pain_point' ? 'Agency pain point' : 'Agency priority';
+    const kindLabel = c.kind === 'pain_point' ? 'research theme' : 'research priority';
     const hitLabel = c.hits.join(', ');
     out.push(
-      `${label} overlaps this notice (${hitLabel}): ${c.text.slice(0, 220)}${c.text.length > 220 ? '…' : ''}`,
+      `Suggest emphasizing this ${kindLabel} (wording overlaps the notice: ${hitLabel}) — not a buyer fact: ` +
+        `${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}`,
     );
   }
   return out;
@@ -300,7 +351,9 @@ export async function understandCustomer(
           gao_reports: (intel.gaoReports || []).slice(0, 5),
           spending_patterns: (intel.spendingPatterns || []).slice(0, 5),
           sources: intel.sources || [],
-          note: 'Curated agency intel (static + agency_intelligence DB). Not an official agency statement.',
+          note:
+            "Mindy curated intel (static + agency_intelligence DB) — research indication, NOT an official agency statement. " +
+            'Do not headline this as what the customer "actually cares about." Confirm material claims against primary sources before client-facing use.',
         };
       } else {
         agencyBlock = {
@@ -344,7 +397,10 @@ export async function understandCustomer(
             status: 'grounded',
             bullets,
             method: 'token_overlap_opportunity_vs_agency_research',
-            note: 'Only lines that share wording with this notice. Do not invent messaging beyond these overlaps.',
+            note:
+              'Derived positioning suggestions from notice×research overlap. Soften inferences ' +
+              '("may be more persuasive…") — never "they are looking for X" as buyer fact. ' +
+              'Do not lead with set-aside unless this opportunity’s own evidence makes socioeconomic status material.',
           }
         : {
             status: 'empty',
@@ -367,6 +423,43 @@ export async function understandCustomer(
   const has_agency_research = agencyBlock.status === 'grounded';
   const grounded = has_opportunity || has_agency_research;
 
+  const presentation: UnderstandCustomerResult['presentation'] = {
+    sections: {
+      opportunity: {
+        display_title: 'What we can verify from this opportunity/buyer',
+        provenance: has_opportunity ? 'sam_notice' : 'unavailable',
+        provenance_label: has_opportunity
+          ? 'Grounded in the SAM notice (title, type, set-aside, excerpts).'
+          : 'No specific opportunity anchored — do not invent solicitation requirements.',
+      },
+      research: {
+        display_title: "What broader Mindy research indicates",
+        provenance: has_agency_research ? 'mindy_curated_intel' : 'unavailable',
+        provenance_label: has_agency_research
+          ? "Mindy curated research — not an official agency statement; say so before listing items."
+          : 'No broader agency research on file for this buyer.',
+      },
+      emphasize: {
+        display_title: 'What that suggests you emphasize',
+        provenance: 'derived_suggestion_not_buyer_fact',
+        provenance_label:
+          'Positioning suggestions derived from the sections above — not buyer evaluation facts.',
+      },
+    },
+    host_rules: [
+      'Present the three sections under presentation.sections.*.display_title — never "what they actually care about" for curated research.',
+      'State each section’s provenance_label before the bullets/claims in that section.',
+      'Do not draft outreach email, name set-aside-first, or auto-run PATHWAY/Talent tools in this turn.',
+      'After the package, offer _next primary (capability/door ask) and wait — do not ask "what is your set-aside?" as the UNDERSTAND closer.',
+    ],
+  };
+
+  // Opportunity note: provenance up front when grounded
+  if (opportunitySays.status === 'grounded' && !opportunitySays.note) {
+    opportunitySays.note =
+      'Verified from this SAM notice only — not broader agency research.';
+  }
+
   return {
     customer: {
       notice_id: notice?.notice_id ?? noticeId,
@@ -376,9 +469,11 @@ export async function understandCustomer(
       sub_agency: notice?.sub_tier ?? null,
       sam_url: notice?.ui_link ?? (notice?.notice_id ? `https://sam.gov/opp/${notice.notice_id}/view` : null),
     },
+    presentation,
     the_opportunity_says: opportunitySays,
     broader_agency_research_shows: agencyBlock,
     what_that_suggests_you_emphasize: emphasize,
+    _next: grounded ? buildUnderstandNext() : [],
     _meta: {
       grounded,
       degraded,

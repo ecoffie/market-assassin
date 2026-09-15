@@ -234,10 +234,10 @@ don't re-derive.
 ### Customer Journey — UNDERSTAND active (FIND Seam A COMPLETE 2026-09-15)
 - **Seam A FIND:** `#1535` merged + live Claude host PASS (`find_opportunities` @ 10cr). Mark **complete** — do not reopen for ordering soft-nits.
 - **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge; search→monitor assumptions partially superseded by unified FIND.
-- **Sequencing (locked):** `FIND → UNDERSTAND → QUALIFY → POSITION`. Understand the **buyer** first; only then ask about the **seller** (capability / set-aside).
-- **Active:** UNDERSTAND → `understand_customer` (PR #1537 HOLD until host surfaces opportunity says / agency research / emphasize). Do **not** add Capability statement · Response · Meeting brief until UNDERSTAND is proven.
-- **Parked after UNDERSTAND:** QUALIFY (seller profile) → POSITION → ACT. Do not jump QUALIFY immediately after FIND.
-- **Separate ticket:** FIND relevance `security ≠ cybersecurity` (noisy matches) — not in #1537.
+- **Sequencing (locked):** `FIND → UNDERSTAND → PATHWAY/TALENT → POSITION/ACT`. Understand the **buyer** first; then ask what capability/door the **seller** can walk through (not set-aside-first). Set-aside only when opportunity evidence makes socioeconomic status material.
+- **Active:** UNDERSTAND → `understand_customer` (PR #1537 HOLD — provenance + inference + `_next` capability closer). Do **not** add Capability statement · Response · Meeting brief until UNDERSTAND is proven.
+- **Parked after UNDERSTAND:** PATHWAY (which door) → TALENT (verifiable record) → POSITION → ACT. Do not jump set-aside qualification immediately after FIND or UNDERSTAND.
+- **Separate ticket:** FIND relevance `security ≠ cybersecurity` (#1538) — not in #1537.
 
 
 Concise pointers to the living records so a new session doesn't spend an hour

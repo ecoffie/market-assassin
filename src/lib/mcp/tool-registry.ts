@@ -598,11 +598,12 @@ const UNDERSTAND_CUSTOMER_TOOL_DEF = {
   function: {
     name: 'understand_customer',
     description:
-      'UNDERSTAND journey after a specific FIND hit: what this customer cares about and what you should say. ' +
-      'Returns a customer-friendly package with three grounded sections — (1) The opportunity says, (2) Broader ' +
-      'agency research shows, (3) What that suggests you emphasize. Pass notice_id from find_opportunities ' +
-      'open_now items (and optional agency). Does NOT draft a capability statement, response, or meeting brief yet. ' +
-      'Credits: 5. For agency-only lookup without a notice use get_agency_intel.',
+      'UNDERSTAND journey after a specific FIND hit. Returns three provenance-labeled sections: ' +
+      '(1) What we can verify from this opportunity/buyer (SAM), (2) What broader Mindy research indicates ' +
+      '(curated — not "what they actually care about"), (3) What that suggests you emphasize (suggestion, not buyer fact). ' +
+      'Pass notice_id from find_opportunities. Ends with a capability/door ask — NOT set-aside-first. ' +
+      'Does NOT draft capability statements, emails, responses, or meeting briefs. Credits: 5. ' +
+      'For agency-only lookup without a notice use get_agency_intel.',
     parameters: {
       type: 'object',
       properties: {

@@ -571,9 +571,10 @@ server.registerTool(
     title: 'Understand This Customer (Opportunity · Agency · Emphasize)',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'UNDERSTAND after specific FIND: what this customer cares about and what you should say. ' +
-      'Three grounded sections — opportunity says / broader agency research / what to emphasize. ' +
-      'Pass notice_id from find_opportunities. Does not draft capability statements, responses, or meeting briefs yet.',
+      'UNDERSTAND after specific FIND. Three provenance-labeled sections: what we can verify from ' +
+      'this opportunity/buyer; what broader Mindy research indicates; what that suggests you emphasize. ' +
+      'Never present curated research as what they "actually care about." Ends with a capability/door ask ' +
+      '(not set-aside-first). Does not draft emails, capability statements, responses, or meeting briefs.',
     inputSchema: {
       notice_id: z.string().optional().describe('SAM notice UUID from find_opportunities open_now item.'),
       agency: z.string().optional().describe('Buying agency if known.'),
