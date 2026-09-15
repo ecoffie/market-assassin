@@ -306,4 +306,36 @@ const handler = withMcpAuth(
   },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+/**
+ * Map the Next App Router file path onto the mcp-handler pathname match.
+ *
+ * On mcp.getmindy.ai the client posts to `/mcp` and next.config rewrites the
+ * *destination* to `/mcp/mcp` without changing `request.url` — so the handler
+ * correctly sees `/mcp`.
+ *
+ * On preview / apex (`*.vercel.app/mcp/mcp`, `getmindy.ai/mcp/mcp`) the client
+ * posts straight at the file route, so `request.url` is `/mcp/mcp` and the
+ * strict `/mcp` match 404s after auth. Rewrite those direct paths here so
+ * preview MCP proof (and any lingering apex clients) work without breaking
+ * the canonical subdomain.
+ */
+function acceptDirectTransportPath(
+  h: (req: Request) => Response | Promise<Response>,
+): (req: Request) => Promise<Response> {
+  return async (req) => {
+    const url = new URL(req.url);
+    const map: Record<string, string> = {
+      '/mcp/mcp': '/mcp',
+      '/mcp/sse': '/sse',
+      '/mcp/message': '/message',
+    };
+    const mapped = map[url.pathname];
+    if (!mapped) return h(req);
+    url.pathname = mapped;
+    return h(new Request(url.toString(), req));
+  };
+}
+
+export const GET = acceptDirectTransportPath(handler);
+export const POST = acceptDirectTransportPath(handler);
+export const DELETE = acceptDirectTransportPath(handler);
