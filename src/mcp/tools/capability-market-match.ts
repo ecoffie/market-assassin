@@ -111,8 +111,11 @@ export interface CapabilityMarketMatchResult {
   };
 }
 
-/** Soft wall for the whole tool — under MCP maxDuration 60s with headroom for transport. */
-export const CAPABILITY_MARKET_MATCH_BUDGET_MS = 22_000;
+/** Soft wall for the whole tool — under MCP maxDuration 60s.
+ * Measured 2026-09-15 on preview: get_keyword_coverage('drones') alone ≈29s cold.
+ * 22s made every representative call deadline_exceeded. 48s leaves ~12s for
+ * transport + optional enrichment after a slow coverage. */
+export const CAPABILITY_MARKET_MATCH_BUDGET_MS = 48_000;
 
 /** Minimum remaining budget before we even start an optional enrichment section. */
 const MIN_SECTION_MS = 500;
