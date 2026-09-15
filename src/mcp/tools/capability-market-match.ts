@@ -296,10 +296,27 @@ async function capabilityMarketMatchInner(
   }
 
   // Propagate remaining deadline into keywordCoverage — every USASpending fetch aborts.
+  // Also race the await: if a fetch ignores AbortSignal, we still stop waiting.
   let coverage: KeywordCoverage | null = null;
   let covFailed = false;
   try {
-    coverage = await keywordCoverage(lead, 0.9, { signal });
+    const covBudget = remainingMs();
+    let covTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      coverage = await Promise.race([
+        keywordCoverage(lead, 0.9, { signal }),
+        new Promise<never>((_, reject) => {
+          covTimer = setTimeout(() => reject(new CoverageDeadlineError()), covBudget);
+          signal.addEventListener(
+            'abort',
+            () => reject(new CoverageDeadlineError()),
+            { once: true },
+          );
+        }),
+      ]);
+    } finally {
+      if (covTimer) clearTimeout(covTimer);
+    }
   } catch (err) {
     if (err instanceof CoverageDeadlineError || signal.aborted) {
       return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
