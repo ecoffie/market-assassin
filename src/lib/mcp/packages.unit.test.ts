@@ -3,7 +3,8 @@ import { CREDIT_PACKAGES, creditsForPackage } from './packages';
 
 describe('mcp credit packages', () => {
   it('maps the single top-up package id to its credit amount (GOS #015)', () => {
-    expect(creditsForPackage('refill')).toBe(500);
+    // PHASE 3 (Eric, 2026-09-15): $119 buys 1,000 credits. Price unchanged, pack doubled.
+    expect(creditsForPackage('refill')).toBe(1000);
   });
 
   it('retired packs are no longer granted (starter/plus/scale removed by 2026-07-19)', () => {

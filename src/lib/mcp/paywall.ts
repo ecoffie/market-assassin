@@ -32,7 +32,9 @@ export const RESUME_BASE = 'https://getmindy.ai/mcp/continue';
  * and the answer is unrecoverable after the fact, because the row does not remember what
  * it showed. Stamped at write time on every attempt.
  */
-export const PAYWALL_OFFER_VERSION = 'v2';
+// v3 (2026-09-15): the one-time pack became 1,000 credits at the same $119. The offer
+// COPY changed, so the version bumps — funnel rates from v2 are not comparable to v3.
+export const PAYWALL_OFFER_VERSION = 'v3';
 
 export type PaywallReason = 'insufficient_credits' | 'requires_pro';
 

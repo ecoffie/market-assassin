@@ -20,6 +20,13 @@ export interface CreditPackage {
   label: string;
   /** Stripe payment-link URL — the dashboard Buy button appends ?client_reference_id=<email>. */
   checkoutUrl: string;
+  /**
+   * Stripe PRICE id. Required for server-created Checkout Sessions, which are the only
+   * way a purchase can carry attempt attribution (payment LINKS do not forward query
+   * params, so `?attempt=` never reaches the webhook). Its absence is why /api/mcp/checkout
+   * returned 400 for `refill` while working for subscription plans.
+   */
+  priceId?: string;
 }
 
 /**
@@ -49,7 +56,12 @@ export interface CreditPackage {
  * quantities before then would make the comparison worse, not better.
  */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' },
+  // PHASE 3 (Eric, 2026-09-15): $119 buys 1,000 credits. Price UNCHANGED; the pack
+  // doubled. Credits are non-expiring and preserved through renewal — enforced by the
+  // purchased/allowance pool split, not by copy.
+  { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits',
+    priceId: 'price_1UFvuQK5zyiZ50PBga7mejqu',
+    checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
@@ -58,6 +70,21 @@ const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
  * Credits for a package id, or null if unknown. Returning null (not a default) is the
  * tamper guard: an unrecognized/forged `package` grants NOTHING.
  */
+/**
+ * Credits for a HISTORICAL price id. Fulfilment resolves by the price the customer
+ * actually bought, so a session created against the old 500-credit price still grants
+ * 500 after the pack becomes 1,000. Resolving by the current package config instead
+ * would retroactively re-price completed purchases.
+ */
+const CREDITS_BY_PRICE_ID: Readonly<Record<string, number>> = {
+  price_1TuxArK5zyiZ50PB6WvZ7ZT2: 500,   // retired 2026-09-15; old sessions still fulfil
+  price_1UFvuQK5zyiZ50PBga7mejqu: 1000,  // Phase 3 — $119 / 1,000 credits
+};
+
+export function creditsForPriceId(priceId: string | null | undefined): number | null {
+  return priceId && priceId in CREDITS_BY_PRICE_ID ? CREDITS_BY_PRICE_ID[priceId] : null;
+}
+
 export function creditsForPackage(packageId: string | null | undefined): number | null {
   const p = packageId ? BY_ID.get(packageId) : undefined;
   return p ? p.credits : null;

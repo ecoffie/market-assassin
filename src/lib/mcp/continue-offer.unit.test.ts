@@ -12,7 +12,7 @@
  *   - prices come from packages.ts, never hardcoded in the page
  */
 import { describe, it, expect } from 'vitest';
-import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES } from './packages';
+import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES, PRO_MONTHLY_CREDITS } from './packages';
 
 /** Mirrors the page: affordable only when the balance is KNOWN and sufficient. */
 function canAfford(balance: number | null, cost: number): boolean {
@@ -65,13 +65,36 @@ describe('the offer is wired to the real ladder', () => {
     expect(topup.checkoutUrl).toMatch(/^https:\/\/buy\.stripe\.com\//);
   });
 
-  it('the top-up stays pricier per credit than subscribing — it must not undercut the ladder', () => {
-    // GOS #015: the one-time valve is deliberately the priciest per credit so it can never
-    // substitute for a subscription. If this flips, the ladder cannibalizes itself.
-    const entry = SUBSCRIPTION_PLANS.find((p) => p.id === 'entry') ?? SUBSCRIPTION_PLANS[0];
+  it('the refill stays pricier per credit than PRO — the subscription must remain the best rate', () => {
+    // REWRITTEN 2026-09-15 (Eric), not silently edited — the old assertion compared the
+    // refill against ENTRY and would now fail. Recording why, per the precedent set when
+    // Pro moved 250 -> 1,500 (tier-credits.unit.test.ts).
+    //
+    //   Entry  $99  / 500/mo    = 19.8c   <- the OUTLIER (see the exception test below)
+    //   Refill $119 / 1,000     = 11.9c   <- one-time, ~20% premium over Pro
+    //   Pro    $149 / 1,500/mo  =  9.9c   <- the best rate, as it should be
+    //
+    // The invariant is the refill-vs-PRO relationship: a one-time pack must never be the
+    // cheapest credit in the catalog, or the recurring plan cannibalizes itself. It is
+    // NOT "top-ups beat subscriptions" generally — the refill does not beat Pro.
+    const pro = PRO_MONTHLY_CREDITS;
     const topupRate = CREDIT_PACKAGES[0].usd / CREDIT_PACKAGES[0].credits;
+    const proRate = 149 / pro;
+    expect(topupRate).toBeGreaterThan(proRate);
+    // And the premium is meaningful, not a rounding artifact.
+    expect(topupRate / proRate).toBeGreaterThan(1.1);
+  });
+
+  it('KNOWN EXCEPTION: Entry is priced above the refill per credit', () => {
+    // Deliberately asserted so the anomaly is visible rather than forgotten. Entry
+    // ($99/500 = 19.8c) is the oldest offer in the ladder and is now the most expensive
+    // credit we sell — above both the refill and Pro. Eric, 2026-09-15: existing Entry
+    // subscriptions are UNCHANGED; whether Entry should stay available to NEW buyers is a
+    // separate pricing decision, not settled here. When it is, update this test with it.
+    const entry = SUBSCRIPTION_PLANS.find((p) => p.id === 'entry') ?? SUBSCRIPTION_PLANS[0];
     const entryRate = entry.monthly.usd / entry.creditsPerMonth;
-    expect(topupRate).toBeGreaterThan(entryRate);
+    const topupRate = CREDIT_PACKAGES[0].usd / CREDIT_PACKAGES[0].credits;
+    expect(entryRate).toBeGreaterThan(topupRate);
   });
 
   it('Entry buys meaningfully more than one flagship run', () => {
