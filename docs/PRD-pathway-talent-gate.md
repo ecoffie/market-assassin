@@ -77,6 +77,64 @@ For a real company + a CAI package with `pathways.observed`:
 
 ---
 
+## Inventory verdict (2026-09-15) — answer to the product question
+
+> **Can Mindy already match a company's actual proof to the acquisition doors CAI has established, without falling back to “what set-aside are you?”**
+
+### Short answer
+
+**Partially — enough for a thin, honest matcher on some doors; not enough to claim full Morehouse Talent.**  
+There is **no company→door compose today**. CAI establishes **buyer-scope doors only**. Company evidence exists in a **public vs vault split**. A PATHWAY surface that over-claims Talent (what broke / measurable result / speed / stranger-verifiable narrative) would fabricate.
+
+### Doors Mindy can establish (CAI `pathways.observed`)
+
+| Door | Establishable now? | Evidence |
+|------|--------------------|----------|
+| Conventional solicitation | Yes | SAM notice_type / solicitation labels |
+| IDV / task-order / BPA language | Yes (text-weak) | Phrase match on SAM/recompete — **not** IDV API / vehicle family query |
+| CSO | Yes | CSO language on scoped notices |
+| Other transaction | Yes | OT/OTA language with guards |
+| Set-aside | Yes | Explicit set-aside labels on scoped notices/awards |
+| Consortium / rapid office / PAE / other | **No** | Always `potential_not_established` — do not invent |
+
+### Company proof Mindy already has
+
+| Talent question | Best existing source | Stranger-verifiable? |
+|-----------------|----------------------|----------------------|
+| What did you do? | BQ/USASpending award titles (+ thin descriptions); vault `scope_description` | Public titles **yes**; vault narrative **no** |
+| For whom? | Award agencies / vault agency fields | Public **yes** |
+| What broke? | **Nothing modeled** | — |
+| Measurable result? | Vault `outcomes` / `cpars_rating` (rare, self-asserted) | **No** |
+| How quickly? | Award/period dates only | **Weak** |
+| Can a stranger verify? | UEI → `history-by-uei` / awards; SAM `recipient_certifications` (SBA vs self provenance) | **Yes** for obligations + certs |
+| On a vehicle? | Appear as IDV recipient in search / parent IDV on an award; vault `contract_vehicles[]` | Portfolio-by-UEI **missing**; vault **unverified** |
+
+Tools already adjacent (not a matcher): `get_contractor_award_history`, `lookup_sam_entity`, `search_idv_contracts`, `capability_market_match` (caller text, not vault auto-load), vault APIs.
+
+### Matchability by door shape (without set-aside-first)
+
+| Shape | Earnable with current evidence? | Honest route |
+|-------|---------------------------------|--------------|
+| **Set-aside door** | **Yes** when CAI observes restriction on *this* scope **and** SAM-backed certs qualify (honor self vs SBA provenance) | Socioeconomic route — **never** the opener |
+| **Vehicle / task-order door** | **Partial** — can support “past awards fit this work → teaming” from public awards; **cannot** reliably assert “you hold vehicle X” | Teaming / fit route; refuse vehicle-hold claims without UEI-on-vehicle proof |
+| **CSO door** | **Partial** — CSO on records + related public award/capability profile → “demonstrable related work”; **no** stored demo/pitch artifact | Pitch/demo *candidate*; not “you win CSOs” |
+| **Full Talent (Morehouse 6 questions)** | **No** | Missing: what broke, verified outcomes, speed, stranger-verifiable narrative |
+| **No proven door** | Always available | Required default when unmatched |
+
+### Exit decision
+
+1. **Do not ship** a PATHWAY tool that claims full Talent or vehicle membership portfolios.
+2. **Thin matcher is justified** if and only if it:
+   - Inputs: CAI `pathways.observed` + company UEI (public proof primary; vault optional and labeled owner-asserted).
+   - Outputs: per-door **fit / teaming / socioeconomic / no proven door** with citations.
+   - Talent block: **only** stranger-verifiable award + SAM cert facts — empty when thin.
+   - Never opens with set-aside; set-aside only when that door is observed on the opportunity/scope.
+3. **Minimum evidence still required** before claiming full PATHWAY/TALENT: (a) UEI→vehicles-held index or equivalent, (b) stranger-verifiable outcome/“what broke”/speed fields or an explicit “Talent incomplete” class that blocks over-claim.
+
+**Status after inventory:** gate answered — **thin matcher allowed; full Morehouse Talent blocked until evidence classes exist.**
+
+---
+
 ## Explicit non-goals (this gate)
 
 - No CAI polishing or new CAI sources.
