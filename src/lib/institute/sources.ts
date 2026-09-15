@@ -24,7 +24,12 @@
  * AT MOST ONE canonical agency, or to none.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { resolveAgency, type AgencyResolution } from '@/lib/strategic-intel/agency-resolver';
+import type { AgencyResolution } from '@/lib/strategic-intel/agency-resolver';
+import {
+  resolveDocumentAgencyWithPhrases,
+  classifyDocumentAgency,
+  type DocumentAgencyAudit,
+} from './document-agency';
 
 /** A government-authored document, normalized. Source-type agnostic on purpose. */
 export interface InstituteDocument {
@@ -97,21 +102,23 @@ export async function fetchGaoReports(fetchImpl: typeof fetch = fetch): Promise<
  *
  * A GAO title reads "Subject: Finding"; the agency is usually named in the subject or
  * the opening line of the abstract ("a component within the Department of Homeland
- * Security"). We match a canonical agency NAME as a whole, word-bounded phrase.
+ * Security"). Matching uses canonical toptier names PLUS curated high-confidence
+ * phrases (FAA→DOT, NPS→Interior, …) — see document-agency.ts.
  *
  * TWO REFUSALS, both deliberate:
  *   • zero names found   -> unresolved
  *   • two or more names  -> unresolved (ambiguous is NOT a coin flip, and it is
  *                          exactly how one report ended up under four agencies)
+ *
+ * MULTI_AGENCY candidates are preserved on the audit path; they are NEVER coerced
+ * into a single department.
  */
 export function resolveDocumentAgency(doc: InstituteDocument, canonicalNames: string[]): AgencyResolution {
-  const haystack = `${doc.title}\n${doc.abstract ?? ''}`;
-  const hits = new Set<string>();
-  for (const name of canonicalNames) {
-    const re = new RegExp(`(?:^|[^A-Za-z])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[^A-Za-z]|$)`, 'i');
-    if (re.test(haystack)) hits.add(name);
-  }
-  return resolveAgency({ agencyName: hits.size === 1 ? [...hits][0] : '' });
+  return resolveDocumentAgencyWithPhrases(doc, canonicalNames);
+}
+
+export function auditDocumentAgency(doc: InstituteDocument, canonicalNames: string[]): DocumentAgencyAudit {
+  return classifyDocumentAgency(doc, canonicalNames);
 }
 
 /**
@@ -125,7 +132,8 @@ export async function ingestInstituteDocument(
   doc: InstituteDocument,
   canonicalNames: string[],
 ): Promise<IngestResult> {
-  const resolution = resolveDocumentAgency(doc, canonicalNames);
+  const audit = auditDocumentAgency(doc, canonicalNames);
+  const resolution = audit.resolution;
 
   const { data: existing } = await db
     .from('institute_sources')
@@ -150,7 +158,14 @@ export async function ingestInstituteDocument(
     resolution_confidence: resolution.confidence,
     source_watermark: doc.sourceWatermark ?? doc.publicationDate,
     abstract: doc.abstract,
-    raw: { title: doc.title, url: doc.url, publicationDate: doc.publicationDate },
+    raw: {
+      title: doc.title,
+      url: doc.url,
+      publicationDate: doc.publicationDate,
+      agencyClassification: audit.classification,
+      agencyCandidates: audit.candidates,
+      agencyNote: audit.note,
+    },
   }).select('id').maybeSingle();
 
   if (error) {
@@ -163,4 +178,99 @@ export async function ingestInstituteDocument(
   }
 
   return { documentNumber: doc.documentNumber, instituteSourceId: (data?.id as string) ?? null, inserted: true, resolution };
+}
+
+export interface ReconcileAgencyResult {
+  scanned: number;
+  newlyResolved: number;
+  stillUnresolved: number;
+  multiAgency: number;
+  noAgency: number;
+  details: Array<{
+    documentNumber: string;
+    classification: string;
+    canonicalAgency: string | null;
+    candidates: string[];
+  }>;
+}
+
+/**
+ * Re-run agency resolution on held unresolved GAO rows. Only WRITES when evidence
+ * newly supports a single canonical agency — never force-maps MULTI/NO/UNKNOWN.
+ *
+ * Existing rows were frozen at insert-time resolution; improving the phrase map
+ * would otherwise leave them stuck. Idempotent.
+ */
+export async function reconcileUnresolvedGaoAgencies(
+  db: SupabaseClient,
+  canonicalNames: string[],
+): Promise<ReconcileAgencyResult> {
+  const { data: rows, error } = await db
+    .from('institute_sources')
+    .select('id,document_number,title,abstract,source_url,publication_date,raw,resolution_method')
+    .eq('source_type', 'gao_report')
+    .or('canonical_agency.is.null,resolution_method.eq.unresolved');
+  if (error) throw new Error(`reconcileUnresolvedGaoAgencies: ${error.message}`);
+
+  const result: ReconcileAgencyResult = {
+    scanned: rows?.length ?? 0,
+    newlyResolved: 0,
+    stillUnresolved: 0,
+    multiAgency: 0,
+    noAgency: 0,
+    details: [],
+  };
+
+  for (const row of rows ?? []) {
+    const doc: InstituteDocument = {
+      sourceOrg: 'GAO',
+      sourceType: 'gao_report',
+      documentNumber: row.document_number as string,
+      title: row.title as string,
+      url: (row.source_url as string) || '',
+      publicationDate: (row.publication_date as string) || null,
+      abstract: (row.abstract as string) || null,
+    };
+    const audit = auditDocumentAgency(doc, canonicalNames);
+    result.details.push({
+      documentNumber: doc.documentNumber,
+      classification: audit.classification,
+      canonicalAgency: audit.resolution.canonicalAgency,
+      candidates: audit.candidates,
+    });
+
+    if (audit.classification === 'MULTI_AGENCY') { result.multiAgency++; result.stillUnresolved++; continue; }
+    if (audit.classification === 'NO_AGENCY') { result.noAgency++; result.stillUnresolved++; 
+      // Persist classification provenance without inventing an agency.
+      const priorRaw = (row.raw && typeof row.raw === 'object') ? row.raw as Record<string, unknown> : {};
+      await db.from('institute_sources').update({
+        raw: { ...priorRaw, agencyClassification: audit.classification, agencyCandidates: audit.candidates, agencyNote: audit.note },
+        updated_at: new Date().toISOString(),
+      }).eq('id', row.id);
+      continue;
+    }
+    if (!audit.resolution.resolved || !audit.resolution.canonicalAgency) {
+      result.stillUnresolved++;
+      continue;
+    }
+
+    const priorRaw = (row.raw && typeof row.raw === 'object') ? row.raw as Record<string, unknown> : {};
+    const { error: upErr } = await db.from('institute_sources').update({
+      canonical_agency: audit.resolution.canonicalAgency,
+      toptier_code: audit.resolution.toptierCode,
+      resolution_method: audit.resolution.method,
+      resolution_confidence: audit.resolution.confidence,
+      raw: {
+        ...priorRaw,
+        agencyClassification: audit.classification,
+        agencyCandidates: audit.candidates,
+        agencyNote: audit.note,
+      },
+      updated_at: new Date().toISOString(),
+    }).eq('id', row.id);
+    if (upErr) throw new Error(`reconcile update ${doc.documentNumber}: ${upErr.message}`);
+    result.newlyResolved++;
+  }
+
+  return result;
 }

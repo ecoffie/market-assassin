@@ -234,23 +234,28 @@ export async function POST(request: NextRequest) {
 
           const result = await generatePrioritiesForAgency(agency.name, context, existingPriorities, targetCount);
 
+          // Tag AI outputs as INTERPRETATION — never present as source facts.
+          const taggedPriorities = result.priorities.map((p) =>
+            /MINDY_INTERPRETATION/i.test(p) ? p : `${p} [MINDY_INTERPRETATION]`,
+          );
+
           // Preserve existing pain points, add/update priorities
           if (!outputDB[agency.name]) {
-            outputDB[agency.name] = { painPoints: [], priorities: result.priorities };
+            outputDB[agency.name] = { painPoints: [], priorities: taggedPriorities };
           } else {
-            outputDB[agency.name] = { ...outputDB[agency.name], priorities: result.priorities };
+            outputDB[agency.name] = { ...outputDB[agency.name], priorities: taggedPriorities };
           }
 
-          const newCount = result.priorities.length - existingPriorities.length;
+          const newCount = taggedPriorities.length - existingPriorities.length;
           generated++;
           results.push({
             agency: agency.name,
-            count: result.priorities.length,
-            source: result.source,
-            newItems: result.priorities.slice(existingPriorities.length),
+            count: taggedPriorities.length,
+            source: `${result.source}|MINDY_INTERPRETATION`,
+            newItems: taggedPriorities.slice(existingPriorities.length),
           });
 
-          console.log(`[build-priorities] ${agency.name}: ${existingPriorities.length} existing + ${newCount} new = ${result.priorities.length} total`);
+          console.log(`[build-priorities] ${agency.name}: ${existingPriorities.length} existing + ${newCount} new = ${taggedPriorities.length} total (INTERPRETATION)`);
         } else {
           // Pain points (original behavior)
           const existingPainPoints = existing?.painPoints || [];
@@ -263,22 +268,28 @@ export async function POST(request: NextRequest) {
 
           const result = await generatePainPointsForAgency(agency.name, context, existingPainPoints, targetCount);
 
+          // Tag AI outputs as INTERPRETATION — never present as GAO/source facts.
+          // This builder must NOT write customer-canonical claims without lineage.
+          const taggedPainPoints = result.painPoints.map((p) =>
+            /MINDY_INTERPRETATION/i.test(p) ? p : `${p} [MINDY_INTERPRETATION]`,
+          );
+
           if (!outputDB[agency.name]) {
-            outputDB[agency.name] = { painPoints: result.painPoints };
+            outputDB[agency.name] = { painPoints: taggedPainPoints };
           } else {
-            outputDB[agency.name] = { ...outputDB[agency.name], painPoints: result.painPoints };
+            outputDB[agency.name] = { ...outputDB[agency.name], painPoints: taggedPainPoints };
           }
 
-          const newCount = result.painPoints.length - existingPainPoints.length;
+          const newCount = taggedPainPoints.length - existingPainPoints.length;
           generated++;
           results.push({
             agency: agency.name,
-            count: result.painPoints.length,
-            source: result.source,
-            newItems: result.painPoints.slice(existingPainPoints.length),
+            count: taggedPainPoints.length,
+            source: `${result.source}|MINDY_INTERPRETATION`,
+            newItems: taggedPainPoints.slice(existingPainPoints.length),
           });
 
-          console.log(`[build-pain-points] ${agency.name}: ${existingPainPoints.length} existing + ${newCount} new = ${result.painPoints.length} total`);
+          console.log(`[build-pain-points] ${agency.name}: ${existingPainPoints.length} existing + ${newCount} new = ${taggedPainPoints.length} total (INTERPRETATION)`);
         }
 
         // Rate limit between Grok API calls (2 seconds)
@@ -313,6 +324,9 @@ export async function POST(request: NextRequest) {
         averagePerAgency: buildType === 'priorities'
           ? (totalPriorities / totalAgencies).toFixed(1)
           : (totalPainPoints / totalAgencies).toFixed(1),
+        provenance: 'MINDY_INTERPRETATION',
+        warning:
+          'AI builder outputs are INTERPRETATION, not evidence. They must not overwrite living Institute/GAO SOURCE_FACT rows. Living authority: data_source_instances.institute_gao + agency_pain_points_db.',
       },
       results,
       database: finalOutput,

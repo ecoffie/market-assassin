@@ -89,6 +89,8 @@ export async function syncAllSources(
   // no longer resolves in DNS and it had contributed 0 records since Apr 2026.
   // See fetchers/it-dashboard.ts for the re-sourcing note.
   await runSource('USASpending', () => fetchAgencySpendingPatterns({ fiscalYear, dryRun }));
+  // GovInfo GAOREPORTS is QUARANTINED — living GAO authority is institute_gao (RSS).
+  // Default fetchGAOReports returns []. Do not re-enable without allowLegacyGovInfo.
   await runSource('GovInfo', () => fetchGAOReports({ fiscalYear, dryRun }));
 
   console.log(`[AgencyIntel] Fetched ${allIntelligence.length} total items`, bySource);
@@ -307,20 +309,34 @@ export async function recordSyncRun(run: SyncRun): Promise<void> {
  */
 export interface UnifiedAgencyIntel {
   agencyName: string;
+  /** Display strings — sourced first, legacy labeled. Prefer painPointCitations. */
   painPoints: string[];
   priorities: string[];
-  gaoReports: string[];       // From database (gao_high_risk type)
+  gaoReports: string[];       // From database (gao_high_risk type) — LEGACY GovInfo path
   spendingPatterns: string[]; // From database (contract_pattern type)
-  sources: ('static' | 'database')[];
+  sources: ('static' | 'database' | 'institute_gao')[];
+  /** Structured citations from the shared sourced reader. */
+  painPointCitations?: Array<{
+    claim: string;
+    provenance: 'SOURCE_FACT' | 'MINDY_INTERPRETATION' | 'LEGACY_MANUAL';
+    source_url: string | null;
+    document_number: string | null;
+    published_at: string | null;
+    institute_source_id: string | null;
+  }>;
+  hasSourcedIntelligence?: boolean;
 }
 
 /**
  * Get unified intelligence for a specific agency
- * Combines static JSON with database records
+ * Living sourced GAO first via shared reader; legacy JSON / agency_intelligence second.
  */
 export async function getUnifiedAgencyIntelligence(
   agencyName: string
 ): Promise<UnifiedAgencyIntel | null> {
+  const { getAgencySourcedIntelligence, formatPainPointForDisplay, toCitation } =
+    await import('@/lib/strategic-intel/sourced-pain-points');
+
   const result: UnifiedAgencyIntel = {
     agencyName,
     painPoints: [],
@@ -330,15 +346,36 @@ export async function getUnifiedAgencyIntelligence(
     sources: [],
   };
 
-  // 1. Check static JSON (exact match first, then partial)
-  const staticAgency = findStaticAgency(agencyName);
-  if (staticAgency) {
-    result.painPoints.push(...staticAgency.painPoints);
-    result.priorities.push(...staticAgency.priorities);
-    result.sources.push('static');
+  // 1. Shared sourced-first reader (institute_sources + agency_pain_points_db + legacy JSON)
+  try {
+    const bundle = await getAgencySourcedIntelligence(agencyName);
+    if (bundle.painPoints.length > 0 || bundle.priorities.length > 0) {
+      result.painPoints = bundle.painPoints.map(formatPainPointForDisplay);
+      result.priorities = bundle.priorities.map(formatPainPointForDisplay);
+      result.painPointCitations = bundle.painPoints.map(toCitation);
+      result.hasSourcedIntelligence = bundle.meta.sourcedCount > 0;
+      if (bundle.meta.sourcedCount > 0) result.sources.push('institute_gao');
+      if (bundle.meta.legacyCount > 0) result.sources.push('static');
+    }
+  } catch (err) {
+    console.error('[getUnifiedAgencyIntelligence] sourced reader failed:', err);
   }
 
-  // 2. Check database
+  // 2. Fallback: static JSON alone if reader returned nothing
+  if (result.painPoints.length === 0) {
+    const staticAgency = findStaticAgency(agencyName);
+    if (staticAgency) {
+      result.painPoints.push(
+        ...staticAgency.painPoints.map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`),
+      );
+      result.priorities.push(
+        ...staticAgency.priorities.map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`),
+      );
+      result.sources.push('static');
+    }
+  }
+
+  // 3. Legacy agency_intelligence table (GovInfo GAOREPORTS etc.) — labeled, not authoritative
   const dbRecords = await getAgencyIntelligence(agencyName);
   if (dbRecords.length > 0) {
     result.sources.push('database');
@@ -347,33 +384,26 @@ export async function getUnifiedAgencyIntelligence(
       if (record.intelligence_type === 'gao_high_risk') {
         const gaoEntry = `${record.title}`;
         if (!result.gaoReports.includes(gaoEntry)) {
-          result.gaoReports.push(gaoEntry);
-          // Also add to pain points if not already there
-          const shortText = record.title.slice(0, 50);
-          if (!result.painPoints.some(p => p.includes(shortText))) {
-            result.painPoints.push(`${record.title} (Source: GAO)`);
-          }
+          result.gaoReports.push(`${gaoEntry} [LEGACY_GOVINFO — not living Institute]`);
         }
       } else if (record.intelligence_type === 'contract_pattern') {
         const spendingEntry = record.description || record.title;
         if (!result.spendingPatterns.includes(spendingEntry)) {
           result.spendingPatterns.push(spendingEntry);
-          // Also add to priorities if not already there
           const shortText = spendingEntry.slice(0, 50);
           if (!result.priorities.some(p => p.includes(shortText))) {
-            result.priorities.push(spendingEntry);
+            result.priorities.push(`${spendingEntry} [LEGACY_MANUAL — provenance unavailable]`);
           }
         }
       } else if (record.intelligence_type === 'budget_priority') {
         const priority = record.description || record.title;
         if (!result.priorities.some(p => p.includes(priority.slice(0, 50)))) {
-          result.priorities.push(priority);
+          result.priorities.push(`${priority} [LEGACY_MANUAL — provenance unavailable]`);
         }
       }
     }
   }
 
-  // Return null if no data found
   if (result.sources.length === 0) {
     return null;
   }
