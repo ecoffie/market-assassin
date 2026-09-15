@@ -32,6 +32,7 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { findOpportunitiesTool } from './tools/find-opportunities';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
@@ -517,6 +518,53 @@ server.registerTool(
 );
 
 server.registerTool(
+  'find_opportunities',
+  {
+    title: 'Find Opportunities (Open · Coming back · Coming soon)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'PRIMARY market FIND across OPEN NOW (SAM), COMING BACK (recompetes), and COMING SOON (forecasts). ' +
+      'Use for "find opportunities in …" — customer need not know SAM/recompete/forecast. Each horizon is ' +
+      'independent (empty Open ≠ market zero). Prefer this over search_sam_opportunities for market hunts.',
+    inputSchema: {
+      query: z.string().describe('Plain-English what to find, e.g. "cybersecurity".'),
+      location: z.string().optional().describe('State name or code ("Florida" / "FL").'),
+      agency: z.string().optional().describe('Buying agency / customer.'),
+      set_aside: z.string().optional().describe('Set-aside program, e.g. "8(a)".'),
+      timeframe: z
+        .object({
+          open_closing_days: z.number().optional(),
+          recompete_months: z.number().optional(),
+          forecast_include_past: z.boolean().optional(),
+        })
+        .optional(),
+      horizons: z
+        .object({
+          open_now: z.boolean().optional(),
+          coming_back: z.boolean().optional(),
+          coming_soon: z.boolean().optional(),
+        })
+        .optional(),
+      limit_per_horizon: z.number().int().min(1).max(25).optional(),
+      advanced: z
+        .object({
+          naics: z.string().optional(),
+          psc: z.string().optional(),
+          keyword_exact: z.string().optional(),
+        })
+        .optional(),
+    },
+  },
+  async (args) => {
+    const result = await findOpportunitiesTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
   'get_expiring_contracts',
   {
     title: 'Get Expiring Contracts (Recompetes)',
@@ -524,7 +572,8 @@ server.registerTool(
     description:
       'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract"). Filter by ' +
       'NAICS / agency / state / expiration window (months) / value / recompete-likelihood; soonest-expiring first. ' +
-      'A multiple-award IDIQ appears as several rows (one per holder). grounded=false — widen months_window.',
+      'A multiple-award IDIQ appears as several rows (one per holder). grounded=false — widen months_window. ' +
+      'For market FIND across three horizons prefer find_opportunities.',
     inputSchema: {
       naics: z.string().optional().describe('NAICS code; ≤5 digits = prefix, 6 = exact.'),
       agency: z.string().optional().describe('Agency name, case-insensitive partial.'),

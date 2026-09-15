@@ -33,6 +33,7 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
@@ -102,6 +103,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_agency_opps_by_office: 5,
   get_agency_forecasts: 5,
   get_expiring_contracts: 5,
+  // 10 — Unified Opportunity Map FIND (Open + Coming back + Coming soon). One composed debit.
+  find_opportunities: 10,
   search_grants: 5,
   search_sbir: 5,
   search_idv_contracts: 5,
@@ -517,6 +520,76 @@ const SBIR_TOOL_DEF = {
   },
 };
 
+const FIND_OPPORTUNITIES_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'find_opportunities',
+    description:
+      'PRIMARY market FIND — the Opportunity Map mental model. Finds work across THREE horizons in one call: ' +
+      'OPEN NOW (live SAM solicitations), COMING BACK (contracts likely to recompete), COMING SOON (agency ' +
+      'forecasts / planned demand). Use this when the user says "find opportunities", "what\'s available", ' +
+      '"cybersecurity in Florida", or any market hunt — they should NOT need to know SAM / recompete / ' +
+      'forecast vocabulary. Accepts plain-English query + optional location / agency / timeframe / set-aside. ' +
+      'Each horizon reports independently (grounded | empty | unavailable) — an empty Open result is NOT a ' +
+      'market-wide zero if Coming back or Coming soon hit. Does NOT invent a solicitation for recompetes or ' +
+      'forecasts. Watch/email coverage today is Open + Coming soon only (Coming back not emailed yet). ' +
+      'For SAM-only / Open-only advanced search use search_sam_opportunities. Credits: 10 (one compose).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Plain-English description of what to find (what they sell / keyword), e.g. "cybersecurity", "commercial cleaning".',
+        },
+        location: {
+          type: 'string',
+          description: 'Optional geography — state name or 2-letter code ("Florida" / "FL"). Semantics differ by horizon (documented in result).',
+        },
+        agency: {
+          type: 'string',
+          description: 'Optional buying agency / customer ("Navy", "VA", "Department of Defense").',
+        },
+        set_aside: {
+          type: 'string',
+          description: 'Optional set-aside program ("8(a)", "SDVOSB", "WOSB", …).',
+        },
+        timeframe: {
+          type: 'object',
+          description: 'Optional timing knobs per horizon.',
+          properties: {
+            open_closing_days: { type: 'number', description: 'Open now: only notices closing within N days.' },
+            recompete_months: { type: 'number', description: 'Coming back: expiration window in months (default 18).' },
+            forecast_include_past: { type: 'boolean', description: 'Coming soon: include past fiscal years (default false).' },
+          },
+        },
+        horizons: {
+          type: 'object',
+          description: 'Optional horizon toggles (default all true).',
+          properties: {
+            open_now: { type: 'boolean' },
+            coming_back: { type: 'boolean' },
+            coming_soon: { type: 'boolean' },
+          },
+        },
+        limit_per_horizon: {
+          type: 'number',
+          description: 'Max items returned per horizon (default 5, max 25). Not a cross-horizon merge.',
+        },
+        advanced: {
+          type: 'object',
+          description: 'Optional power-user codes. Prefer plain query for customers.',
+          properties: {
+            naics: { type: 'string', description: 'Comma-separated NAICS codes.' },
+            psc: { type: 'string', description: 'PSC code (Open applies directly; other horizons crosswalk or skip).' },
+            keyword_exact: { type: 'string', description: 'Bypass search-brain free-text path when needed.' },
+          },
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
 const EXPIRING_CONTRACTS_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -526,7 +599,8 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
       'pursue it"). Filter by NAICS / agency / state / expiration window (months) / value / recompete-likelihood. ' +
       'Returns incumbent, agency, NAICS, obligated + ceiling value, period-of-performance end, recompete date, ' +
       'likelihood — soonest-expiring first. A multiple-award IDIQ appears as several rows (one per holder). ' +
-      'grounded=false when nothing matches — widen months_window.',
+      'grounded=false when nothing matches — widen months_window. For customer-facing market FIND across Open + ' +
+      'Recompete + Forecast, prefer find_opportunities.',
     parameters: {
       type: 'object',
       properties: {
@@ -1610,6 +1684,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     GRANTS_TOOL_DEF,
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
+    FIND_OPPORTUNITIES_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
@@ -1673,6 +1748,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_grants' ||
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
+    name === 'find_opportunities' ||
     name === 'get_expiring_contracts' ||
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
@@ -1880,6 +1956,50 @@ export async function runMcpTool(
       phase: args.phase === '1' || args.phase === '2' || args.phase === 'all' ? args.phase : undefined,
       source: args.source === 'nih' || args.source === 'dod' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'find_opportunities') {
+    const timeframe =
+      args.timeframe && typeof args.timeframe === 'object' && !Array.isArray(args.timeframe)
+        ? (args.timeframe as Record<string, unknown>)
+        : undefined;
+    const horizons =
+      args.horizons && typeof args.horizons === 'object' && !Array.isArray(args.horizons)
+        ? (args.horizons as Record<string, unknown>)
+        : undefined;
+    const advanced =
+      args.advanced && typeof args.advanced === 'object' && !Array.isArray(args.advanced)
+        ? (args.advanced as Record<string, unknown>)
+        : undefined;
+    const result = (await findOpportunitiesTool({
+      query: typeof args.query === 'string' ? args.query : '',
+      location: typeof args.location === 'string' ? args.location : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      timeframe: timeframe
+        ? {
+            open_closing_days: typeof timeframe.open_closing_days === 'number' ? timeframe.open_closing_days : undefined,
+            recompete_months: typeof timeframe.recompete_months === 'number' ? timeframe.recompete_months : undefined,
+            forecast_include_past: typeof timeframe.forecast_include_past === 'boolean' ? timeframe.forecast_include_past : undefined,
+          }
+        : undefined,
+      horizons: horizons
+        ? {
+            open_now: typeof horizons.open_now === 'boolean' ? horizons.open_now : undefined,
+            coming_back: typeof horizons.coming_back === 'boolean' ? horizons.coming_back : undefined,
+            coming_soon: typeof horizons.coming_soon === 'boolean' ? horizons.coming_soon : undefined,
+          }
+        : undefined,
+      limit_per_horizon: typeof args.limit_per_horizon === 'number' ? args.limit_per_horizon : undefined,
+      advanced: advanced
+        ? {
+            naics: typeof advanced.naics === 'string' ? advanced.naics : undefined,
+            psc: typeof advanced.psc === 'string' ? advanced.psc : undefined,
+            keyword_exact: typeof advanced.keyword_exact === 'string' ? advanced.keyword_exact : undefined,
+          }
+        : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

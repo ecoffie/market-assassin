@@ -49,7 +49,10 @@ export const TIER1_TOOL_DEFS = [
     function: {
       name: 'search_sam_opportunities',
       description:
-        'Search LIVE, currently-open federal opportunities on SAM.gov by keyword (and optionally NAICS code or set-aside). Call this when the user asks what opportunities/RFPs/solicitations are open, available, or posted in a topic, agency area, or their market. Returns only active, not-yet-closed notices.',
+        'ADVANCED / Open-only: search LIVE SAM.gov solicitations by keyword (optional NAICS / set-aside / state). ' +
+        'For the default customer FIND across Open now + Coming back (recompetes) + Coming soon (forecasts), ' +
+        'prefer find_opportunities. Use this tool when the user explicitly wants SAM/open notices only. ' +
+        'Returns only active, not-yet-closed notices.',
       parameters: {
         type: 'object',
         properties: {

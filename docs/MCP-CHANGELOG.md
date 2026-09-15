@@ -5,9 +5,18 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 58** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 59** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 58.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 59.
+
+---
+
+## September 2026 — find_opportunities (catalog 58 → 59)
+
+**New tool:** `find_opportunities` (10 credits). Customer-facing Opportunity Map FIND —
+Open now + Coming back + Coming soon in one compose. Independent horizon envelopes
+(empty Open ≠ market zero). `search_sam_opportunities` remains advanced/Open-only.
+Watch coverage honesty: Open + Coming soon until recompete alerts ship.
 
 ---
 
@@ -126,7 +135,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 58 tools.
+- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 59 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 

@@ -6781,3 +6781,15 @@ verified against live Postgres — 20 concurrent grants on one key produced exac
 1 applied grant and 1 ledger row (balance 8,000, not 160,000); a 25,000 balance
 against an 8,000 ceiling granted 0 and was never reduced. Detection independently
 surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
+
+---
+
+## find_opportunities — Unified Opportunity Map FIND (MCP)
+
+**What:** One MCP tool answers "find opportunities in my market" across three horizons the Opportunity Map already shows: Open now (live SAM), Coming back (recompetes), Coming soon (forecasts). Customers do not need to know SAM / recompete / forecast vocabulary.
+
+**Why:** Host agents previously defaulted to SAM-only search (~10.6K actionable notices). The Map's actionable discovery surface spans Open + Coming back + Coming soon (~16.5× raw rows under measured definitions). FIND composes those horizons with independent envelopes so an empty Open result is not a market-wide zero.
+
+**SEO / proof:** Grounded per-horizon counts from `sam_opportunities`, `recompete_opportunities`, `agency_forecasts`. Cross-class unique procurements are not claimed. Credits: 10 per compose (not 5×3). Watch coverage disclosed as Open + Coming soon until recompete alerts ship.
+
+**As of:** 2026-09-15
