@@ -27,7 +27,8 @@ export type CreateSavedSearchInput = {
   filters: SavedSearchFilters;
   bbox?: SavedSearchBBox | null;
   alertsEnabled?: boolean;
-  alertFrequency?: SavedSearchAlertFrequency;
+  /** daily | weekly | paused — unsupported values are rejected, not coerced. */
+  alertFrequency?: SavedSearchAlertFrequency | string;
 };
 
 export type UpdateSavedSearchInput = {
@@ -35,7 +36,8 @@ export type UpdateSavedSearchInput = {
   id: string;
   name?: string;
   alertsEnabled?: boolean;
-  alertFrequency?: SavedSearchAlertFrequency;
+  /** daily | weekly | paused — unsupported values are rejected, not coerced. */
+  alertFrequency?: SavedSearchAlertFrequency | string;
 };
 
 export type DeleteSavedSearchOptions = {

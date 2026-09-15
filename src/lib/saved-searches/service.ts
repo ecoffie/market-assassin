@@ -107,11 +107,13 @@ export async function createSavedSearch(
     return { ok: false, code: 'invalid_mode', message: `mode must be one of: ${ALLOWED_SAVED_SEARCH_MODE.join(', ')}` };
   }
 
-  if (input.alertFrequency && !ALLOWED_ALERT_FREQUENCY.includes(input.alertFrequency)) {
+  if (input.alertFrequency && !ALLOWED_ALERT_FREQUENCY.includes(input.alertFrequency as SavedSearchAlertFrequency)) {
     return {
       ok: false,
       code: 'invalid_frequency',
-      message: `alert_frequency must be one of: ${ALLOWED_ALERT_FREQUENCY.join(', ')}`,
+      message:
+        `alert_frequency must be one of: ${ALLOWED_ALERT_FREQUENCY.join(', ')}. ` +
+        `Exact clock times (e.g. 9am) are not supported — explain daily/weekly/paused and confirm before saving.`,
     };
   }
 
@@ -132,7 +134,7 @@ export async function createSavedSearch(
 
   const { alertsEnabled, alertFrequency } = normalizeAlertPreferences({
     alertsEnabled: input.alertsEnabled,
-    alertFrequency: input.alertFrequency,
+    alertFrequency: input.alertFrequency as SavedSearchAlertFrequency | undefined,
   });
 
   const fingerprint = savedSearchFingerprint({
@@ -264,10 +266,20 @@ export async function updateSavedSearch(
   }
   if (!current) return { ok: false, code: 'not_found', message: 'Saved search not found for this account' };
 
+  if (input.alertFrequency && !ALLOWED_ALERT_FREQUENCY.includes(input.alertFrequency as SavedSearchAlertFrequency)) {
+    return {
+      ok: false,
+      code: 'invalid_frequency',
+      message:
+        `alert_frequency must be one of: ${ALLOWED_ALERT_FREQUENCY.join(', ')}. ` +
+        `Exact clock times (e.g. 9am) are not supported — explain daily/weekly/paused and confirm before saving.`,
+    };
+  }
+
   const currentRow = rowFromDb(current as Record<string, unknown>);
   const normalized = normalizeAlertPreferences({
     alertsEnabled: typeof input.alertsEnabled === 'boolean' ? input.alertsEnabled : currentRow.alerts_enabled,
-    alertFrequency: input.alertFrequency ?? currentRow.alert_frequency,
+    alertFrequency: (input.alertFrequency as SavedSearchAlertFrequency | undefined) ?? currentRow.alert_frequency,
   });
 
   const updates: Record<string, unknown> = {};

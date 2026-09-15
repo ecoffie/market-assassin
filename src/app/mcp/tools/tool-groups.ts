@@ -92,8 +92,9 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     id: 'monitoring',
-    label: 'Watchlists & Alerts',
-    blurb: 'Save an Opportunity Map filter and get emailed when new matches appear — the same saved search + alert cron the app uses.',
+    label: 'Market Watches & Scheduling',
+    blurb:
+      'Schedule this search, monitor a market, keep me updated, or create a watch — emailed when new matches appear. Same saved search + cron the app uses.',
     tools: [
       'schedule_market_search',
       'list_market_schedules',

@@ -68,11 +68,21 @@ import { getFederalEventSeries } from './tools/event-series';
 import { getSbaGoalingShare } from './tools/sba-goaling';
 import { draftProposal, draftProposalSection } from './tools/draft-proposal';
 import { exportProposal } from './tools/export-proposal';
+import {
+  MCP_CONNECTOR_INSTRUCTIONS,
+  SCHEDULE_MARKET_SEARCH_DESCRIPTION,
+  SCHEDULE_MARKET_SEARCH_TITLE,
+} from '@/lib/mcp/schedule-discovery';
 
-const server = new McpServer({
-  name: 'mindy-govcon',
-  version: '0.1.0',
-});
+const server = new McpServer(
+  {
+    name: 'mindy-govcon',
+    version: '0.1.0',
+  },
+  {
+    instructions: MCP_CONNECTOR_INSTRUCTIONS,
+  },
+);
 
 server.registerTool(
   'get_winning_playbook',
@@ -715,10 +725,9 @@ server.registerTool(
 server.registerTool(
   'schedule_market_search',
   {
-    title: 'Schedule Market Search (saved search + alerts)',
+    title: SCHEDULE_MARKET_SEARCH_TITLE,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    description:
-      'Schedule recurring Map alerts for a saved filter set (daily/weekly). Alerts go to the authenticated Mindy account email only.',
+    description: SCHEDULE_MARKET_SEARCH_DESCRIPTION,
     inputSchema: {
       name: z.string().describe('Display name for this saved search.'),
       filters: z.record(z.string(), z.unknown()).describe('Map filter snapshot — at least one narrowing field required.'),
@@ -738,9 +747,10 @@ server.registerTool(
 server.registerTool(
   'list_market_schedules',
   {
-    title: 'List Market Schedules',
+    title: 'List Market Watches / Schedules',
     annotations: { readOnlyHint: true, openWorldHint: true },
-    description: "List the authenticated user's saved market search schedules.",
+    description:
+      "List the authenticated user's market watches / scheduled searches. Use when asking what is being monitored.",
     inputSchema: {},
   },
   async () => {
@@ -753,10 +763,10 @@ server.registerTool(
 server.registerTool(
   'update_market_schedule',
   {
-    title: 'Update Market Schedule',
+    title: 'Update Market Watch / Schedule',
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     description:
-      'Update cadence, pause/resume, or rename a saved market schedule owned by the authenticated account.',
+      'Update cadence, pause/resume, or rename a market watch. Cadence presets only: daily | weekly | paused.',
     inputSchema: {
       schedule_id: z.string(),
       name: z.string().optional(),

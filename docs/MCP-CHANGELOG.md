@@ -5,10 +5,22 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 41** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 58** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The stdio server registers a 35-tool subset; the hosted HTTP edge
-exposes all 41.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 58.
+
+---
+
+## September 2026 — Schedule discovery without saying "alerts"
+
+**Problem.** Connected agents only reached `schedule_market_search` when users said
+"alerts." Phrases like "monitor this market," "schedule this," "create a watch," or
+"email me new opportunities" did not discover the tool.
+
+**Fix.** Shared discovery copy (`src/lib/mcp/schedule-discovery.ts`): tool title +
+description + MCP `instructions` on both hosted and stdio transports. Cadence honesty
+(daily/weekly/paused only — explain clock times before saving). Unsupported filter keys
+and strategy strands are **rejected** (never silently dropped into a broader watch).
 
 ---
 
