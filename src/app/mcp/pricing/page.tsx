@@ -199,7 +199,18 @@ export default function McpPricing() {
       const biggest = plans[plans.length - 1];
       return { tier: 'Enterprise / API', cap: null, cta: 'Contact sales', href: ENTERPRISE_MAILTO, accent: 'amber', sub: `At ~${monthlyNeed.toLocaleString()} credits/mo you’re past the ${biggest.label} plan (${biggest.creditsPerMonth.toLocaleString()}/mo) — a custom pool is the right fit.` };
     }
-    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta: `Get ${plan.label} — $${plan.monthly.usd}/mo`, href: plan.monthly.checkoutUrl, accent: 'emerald', sub: `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month — every tool, charged on success.` };
+    // Honour the billing toggle: recommending a plan but linking to the MONTHLY checkout
+    // while the page shows annual prices sends the buyer somewhere other than what they
+    // were reading. Annual also grants its credits UPFRONT, which the copy must say.
+    const useAnnual = annual && !!plan.annual;
+    const href = useAnnual && plan.annual ? plan.annual.checkoutUrl : plan.monthly.checkoutUrl;
+    const cta = useAnnual && plan.annual
+      ? `Get ${plan.label} — $${plan.annual.usd.toLocaleString()}/yr`
+      : `Get ${plan.label} — $${plan.monthly.usd}/mo`;
+    const sub = useAnnual && plan.annual
+      ? `$${plan.annual.usd.toLocaleString()}/yr — ${plan.annual.credits.toLocaleString()} credits granted up front — every tool, charged on success.`
+      : `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month — every tool, charged on success.`;
+    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta, href, accent: 'emerald', sub };
   })();
   const usePct = rec && rec.cap ? Math.min(100, Math.round((monthlyNeed / rec.cap) * 100)) : 0;
 
