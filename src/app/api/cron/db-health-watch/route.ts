@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import {
+  appendProbeSample,
+  buildAlertHtml,
+  buildAlertSubject,
+  buildProbeTimingSample,
+  PROBE_SAMPLES_KEY,
+  type DbHealthStatus,
+  type ProbeResult,
+  type ProbeTimingSample,
+} from '@/lib/ops/db-health-alert';
 
 /**
  * DB Health Watch — Layer 2 early warning (the "hear it first, not from users").
@@ -18,14 +28,19 @@ import { sendOpsAlert } from '@/lib/ops-alert';
  *    NOT vercel.json (the 100-cron cap rule).
  *  - Three probes, cheapest → most telling:
  *      1. Reachability + latency: a trivial SELECT with a hard timeout.
+ *         Wall-clock includes PostgREST first-request path (not SQL alone).
  *      2. Write-path check: the alert pipeline reads sam_opportunities; confirm
  *         a light COUNT returns (the query class that thrashed during the incident).
  *      3. Pressure signals: row counts on the hottest tables + pg_stat activity
  *         via a lightweight RPC if present (best-effort — absence never fails).
  *  - State is kept in KV (survives a Supabase outage — the thing being watched
- *    can't also be the alarm's storage). We only EMAIL on a status TRANSITION
+ *    can't also be the alarm's storage). We only alert on a status TRANSITION
  *    (healthy→degraded / degraded→down / recovery), so a sustained incident
  *    doesn't spam; a flapping signal is rate-limited to one alert per 30 min.
+ *  - Every run persists probe timings to KV (`dbhealth:probeSamples`) so
+ *    reachability_ms / alert_count_ms / pg_stats_ms / overall_ms have a real
+ *    distribution — do not use cron_job_runs.duration_ms as a proxy.
+ *  - Degraded alert copy reports MEASURED fields only (no unmeasured cause).
  *
  * AUTH: cron secret (x-cron-secret / ?password=ADMIN_PASSWORD), like sibling crons.
  */
@@ -39,7 +54,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const CRON_SECRET = process.env.CRON_SECRET;
 const ALERT_TO = process.env.DB_HEALTH_ALERT_EMAIL || 'eric@govcongiants.com';
 
-// Thresholds — a slow-but-up DB is the early-warning window we want to catch.
+// Thresholds — a slow-but-up data path is the early-warning window we want to catch.
 const LATENCY_WARN_MS = 2500;   // a simple SELECT should be well under this
 const LATENCY_DOWN_MS = 8000;   // past this, treat as effectively unusable
 const PROBE_TIMEOUT_MS = 10000; // hard cap on any single probe
@@ -48,20 +63,13 @@ const STATE_KEY = 'dbhealth:state';         // last status we alerted on
 const LAST_ALERT_KEY = 'dbhealth:lastAlert'; // ISO of last alert sent (rate limit)
 const ALERT_COOLDOWN_MS = 30 * 60 * 1000;    // ≤ 1 transition alert / 30 min
 
-type Status = 'healthy' | 'degraded' | 'down';
-
-interface ProbeResult {
-  name: string;
-  ok: boolean;
-  ms: number;
-  detail?: string;
-}
+type Status = DbHealthStatus;
 
 function isAuthed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
   // The dispatcher invokes job routes with `authorization: Bearer <CRON_SECRET>`
-  // (see api/cron/dispatch line ~197) and an `x-cron-dispatch: 1` header — match
-  // that, plus the `x-vercel-cron` header and the manual ?password= path.
+  // (see api/cron/dispatch) and an `x-cron-dispatch: 1` header — match that,
+  // plus the `x-vercel-cron` header and the manual ?password= path.
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
   const isDispatch = request.headers.get('x-cron-dispatch') === '1';
@@ -85,6 +93,15 @@ async function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Pro
   ]);
 }
 
+async function persistProbeSample(sample: ProbeTimingSample): Promise<void> {
+  try {
+    const existing = (await kv.get<ProbeTimingSample[]>(PROBE_SAMPLES_KEY)) ?? [];
+    await kv.set(PROBE_SAMPLES_KEY, appendProbeSample(existing, sample));
+  } catch (err) {
+    console.error('[db-health-watch] probe sample persist failed:', (err as Error).message);
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -102,10 +119,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ test: true, delivered_to_slack: r.ok, error: r.error ?? null });
   }
 
+  const overallStarted = Date.now();
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
   const probes: ProbeResult[] = [];
 
   // Probe 1 — reachability + latency (trivial indexed read).
+  // Wall-clock includes PostgREST first-request path on a fresh client.
   {
     const t = Date.now();
     try {
@@ -150,18 +169,31 @@ export async function GET(request: NextRequest) {
         'pg-stats',
       );
       if (error) throw new Error(error.message);
-      probes.push({ name: 'pg-stats', ok: true, ms: Date.now() - t, detail: JSON.stringify(data)?.slice(0, 200) });
+      // Full JSON — alert measured fields parse this; do not truncate.
+      probes.push({ name: 'pg-stats', ok: true, ms: Date.now() - t, detail: JSON.stringify(data) });
     } catch (err) {
       // Expected when the RPC isn't deployed — informational, not a failure.
       probes.push({ name: 'pg-stats', ok: true, ms: Date.now() - t, detail: `skipped: ${(err as Error).message}` });
     }
   }
 
+  const overallMs = Date.now() - overallStarted;
+
   // Derive overall status from the two hard probes (1 & 2).
   const hard = probes.filter((p) => p.name === 'reachability' || p.name === 'alert-count');
   const anyDown = hard.some((p) => !p.ok || p.ms >= LATENCY_DOWN_MS);
   const anySlow = hard.some((p) => p.ok && p.ms >= LATENCY_WARN_MS);
   const status: Status = anyDown ? 'down' : anySlow ? 'degraded' : 'healthy';
+
+  const checkedAt = new Date().toISOString();
+  const sample = buildProbeTimingSample({
+    at: checkedAt,
+    status,
+    probes,
+    overallMs,
+  });
+  // Persist every run (not only transitions) so P50/P90 are real probe timings.
+  await persistProbeSample(sample);
 
   // Read prior state (KV — survives a Supabase outage).
   let prev: Status = 'healthy';
@@ -191,11 +223,11 @@ export async function GET(request: NextRequest) {
         // sendEmail; `to` is ignored.
         await sendOpsAlert({
           to: ALERT_TO,
-          subject: `🚨 [Mindy DB] ${status.toUpperCase()} — was ${prev} (${new Date().toISOString()})`,
+          subject: buildAlertSubject(status, prev, checkedAt),
           html: buildAlertHtml(status, prev, probes),
         });
         alerted = true;
-        await kv.set(LAST_ALERT_KEY, new Date().toISOString());
+        await kv.set(LAST_ALERT_KEY, checkedAt);
       } catch (err) {
         console.error('[db-health-watch] Slack alert failed:', (err as Error).message);
       }
@@ -209,36 +241,16 @@ export async function GET(request: NextRequest) {
     transitioned,
     alerted,
     probes,
-    checkedAt: new Date().toISOString(),
+    timings: {
+      reachability_ms: sample.reachability_ms,
+      alert_count_ms: sample.alert_count_ms,
+      pg_stats_ms: sample.pg_stats_ms,
+      overall_ms: sample.overall_ms,
+    },
+    checkedAt,
   });
 }
 
 function rank(s: Status): number {
   return s === 'down' ? 2 : s === 'degraded' ? 1 : 0;
-}
-
-function buildAlertHtml(status: Status, prev: Status, probes: ProbeResult[]): string {
-  const color = status === 'down' ? '#dc2626' : status === 'degraded' ? '#d97706' : '#059669';
-  const rows = probes
-    .map(
-      (p) =>
-        `<tr><td style="padding:4px 10px">${p.name}</td><td style="padding:4px 10px">${p.ok ? '✅' : '❌'}</td><td style="padding:4px 10px">${p.ms}ms</td><td style="padding:4px 10px;color:#666">${p.detail || ''}</td></tr>`,
-    )
-    .join('');
-  return `
-    <div style="font-family:system-ui,sans-serif;max-width:560px">
-      <h2 style="color:${color};margin-bottom:4px">Mindy DB health: ${status.toUpperCase()}</h2>
-      <p style="color:#555;margin-top:0">Transitioned from <b>${prev}</b> → <b>${status}</b>.</p>
-      <table style="border-collapse:collapse;font-size:14px;margin:12px 0;border:1px solid #eee">
-        <thead><tr style="background:#f8f8f8"><th style="padding:4px 10px;text-align:left">Probe</th><th style="padding:4px 10px">OK</th><th style="padding:4px 10px">Latency</th><th style="padding:4px 10px;text-align:left">Detail</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <p style="color:#888;font-size:12px">
-        ${status === 'down'
-          ? 'DB unreachable or critically slow. Read routes are serving last-good snapshots (graceful degradation). Do NOT restart/resize the Supabase instance mid-incident — that can trap the project. Check the Supabase status page + open an urgent DATABASE ticket if platform-side.'
-          : status === 'degraded'
-            ? 'DB is up but slow — the early-warning window. Check load: heavy ingest/backfill crons competing with live traffic, memory headroom, connection count. This is when to right-size before it becomes an outage.'
-            : 'Recovered to healthy.'}
-      </p>
-    </div>`;
 }

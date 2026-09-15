@@ -6781,3 +6781,27 @@ verified against live Postgres — 20 concurrent grants on one key produced exac
 1 applied grant and 1 ledger row (balance 8,000, not 160,000); a 25,000 balance
 against an 8,000 ceiling granted 0 and was never reduced. Detection independently
 surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
+
+---
+
+## DB health alerts report measured latency — not an unmeasured cause (2026-09-15)
+
+**What.** When the hourly `db-health-watch` probe crosses the warning threshold,
+Slack now says **Mindy data API latency elevated** and lists the measured fields:
+first PostgREST/reachability ms, subsequent check ms, connections current/max,
+active connections, longest query, and whether the DB is reachable. It does not
+blame ingest/backfill, memory pressure, or tell you to right-size the database.
+A true failed/critical reachability probe still alerts as **Mindy DB DOWN**.
+
+**Why.** A 2026-09-15 healthy→degraded flip was 3,970ms on the first PostgREST
+request while same-cycle DB checks were 137–144ms and connections were 31/160.
+The old alert copy diagnosed "heavy ingest/backfill" from a static template —
+that cause was never measured. Ops alerts must not invent a root cause.
+
+**SEO.** (Internal reliability — not a customer-facing surface.)
+
+**Proof.** `src/lib/ops/db-health-alert.ts` + `db-health-alert.unit.test.ts`
+(banned phrases fail the build). Every run persists
+`reachability_ms | alert_count_ms | pg_stats_ms | overall_ms` to KV
+`dbhealth:probeSamples` so future P50/P90 use real probe timings, not
+`cron_job_runs.duration_ms` as a proxy.
