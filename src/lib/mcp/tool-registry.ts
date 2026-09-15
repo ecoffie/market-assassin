@@ -50,6 +50,7 @@ import {
   updateMarketSchedule,
   deleteMarketSchedule,
 } from '@/mcp/tools/schedule-market-search';
+import { SCHEDULE_MARKET_SEARCH_DESCRIPTION } from '@/lib/mcp/schedule-discovery';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
@@ -796,7 +797,7 @@ const VERIFY_M_SCALE_TOOL_DEF = {
 const SAVED_SEARCH_FILTER_SCHEMA = {
   type: 'object',
   description:
-    'Opportunity Map filter snapshot (same keys as Save search on the map). At least one narrowing field is required.',
+    'Opportunity Map filter snapshot (same keys as Save search on the map). At least one narrowing field is required. Unknown keys are rejected — never silently dropped.',
   properties: {
     q: { type: 'string', description: 'Keyword search (exact phrase in title/description).' },
     naics: { type: 'string', description: 'NAICS code(s), comma-separated.' },
@@ -836,12 +837,8 @@ const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
   type: 'function' as const,
   function: {
     name: 'schedule_market_search',
-    description:
-      'Schedule recurring Opportunity Map alerts for a saved market filter set — the SAME saved_searches rows ' +
-      'the Map uses (daily/weekly cadence). Alerts email NEW matches to the authenticated Mindy account only; ' +
-      'do NOT pass a recipient email. Returns schedule_id, cadence, canonical filters, map_url (?ss=), and ' +
-      'alert_destination=account_email. grounded=false when filters are too broad, identity is missing, or ' +
-      'scheduling is unavailable. Idempotent: an identical filter+cadence returns the existing schedule.',
+    // Shared discovery copy — see schedule-discovery.ts (must stay in sync with stdio + TOOL_META).
+    description: SCHEDULE_MARKET_SEARCH_DESCRIPTION,
     parameters: {
       type: 'object',
       properties: {
@@ -851,9 +848,10 @@ const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
         alert_frequency: {
           type: 'string',
           enum: ['daily', 'weekly', 'paused'],
-          description: 'Alert cadence preset. Default daily.',
+          description:
+            'Cadence preset only: daily | weekly | paused. No clock times. If the user asked for an exact time, explain these options and confirm before calling.',
         },
-        alerts_enabled: { type: 'boolean', description: 'Whether alerts are active. Default true.' },
+        alerts_enabled: { type: 'boolean', description: 'Whether the watch emails new matches. Default true.' },
         bbox: {
           type: 'object',
           description: 'Optional viewport {w,s,e,n} at save time for map restoration.',
@@ -870,7 +868,8 @@ const LIST_MARKET_SCHEDULES_TOOL_DEF = {
   function: {
     name: 'list_market_schedules',
     description:
-      "List the authenticated user's saved market search schedules (same rows as the Map Watchlist). " +
+      "List the authenticated user's market watches / scheduled searches (same rows as the Map Watchlist). " +
+      'Use after schedule_market_search or when the user asks what is being monitored. ' +
       'Free read — returns schedule_id, cadence, filters, and map_url per row.',
     parameters: { type: 'object', properties: {} },
   },
@@ -881,15 +880,20 @@ const UPDATE_MARKET_SCHEDULE_TOOL_DEF = {
   function: {
     name: 'update_market_schedule',
     description:
-      'Update cadence, pause/resume, or rename an existing saved market schedule. ' +
+      'Update cadence, pause/resume, or rename an existing market watch / schedule. ' +
+      'Cadence presets only: daily | weekly | paused (explain exact-time requests before saving). ' +
       'Only schedules owned by the authenticated account can be updated.',
     parameters: {
       type: 'object',
       properties: {
         schedule_id: { type: 'string', description: 'UUID from schedule_market_search or list_market_schedules.' },
         name: { type: 'string' },
-        alert_frequency: { type: 'string', enum: ['daily', 'weekly', 'paused'] },
-        alerts_enabled: { type: 'boolean', description: 'false = pause alerts (same as Watchlist Off).' },
+        alert_frequency: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'paused'],
+          description: 'Cadence preset only — no clock times.',
+        },
+        alerts_enabled: { type: 'boolean', description: 'false = pause the watch (same as Watchlist Off).' },
       },
       required: ['schedule_id'],
     },
@@ -901,7 +905,7 @@ const DELETE_MARKET_SCHEDULE_TOOL_DEF = {
   function: {
     name: 'delete_market_schedule',
     description:
-      'Permanently delete a saved market schedule (destructive). Prefer update_market_schedule with alerts_enabled=false to pause. ' +
+      'Permanently delete a market watch / schedule (destructive). Prefer update_market_schedule with alerts_enabled=false to pause. ' +
       'Requires confirm=true. Missing or already-deleted schedules are uncharged no-ops.',
     parameters: {
       type: 'object',
@@ -2027,6 +2031,8 @@ export async function runMcpTool(
   }
 
   if (name === 'schedule_market_search') {
+    // Pass cadence strings through — scheduleMarketSearch / createSavedSearch reject
+    // unsupported values explicitly (never silently default to daily).
     const result = (await scheduleMarketSearch({
       userEmail: ctx.userEmail,
       name: typeof args.name === 'string' ? args.name : '',
@@ -2035,10 +2041,7 @@ export async function runMcpTool(
           ? (args.filters as Record<string, unknown>)
           : {},
       mode: args.mode === 'recompete' ? 'recompete' : args.mode === 'open' ? 'open' : undefined,
-      alert_frequency:
-        args.alert_frequency === 'daily' || args.alert_frequency === 'weekly' || args.alert_frequency === 'paused'
-          ? args.alert_frequency
-          : undefined,
+      alert_frequency: typeof args.alert_frequency === 'string' ? args.alert_frequency : undefined,
       alerts_enabled: typeof args.alerts_enabled === 'boolean' ? args.alerts_enabled : undefined,
       bbox:
         args.bbox && typeof args.bbox === 'object' && !Array.isArray(args.bbox)
@@ -2058,10 +2061,7 @@ export async function runMcpTool(
       userEmail: ctx.userEmail,
       schedule_id: typeof args.schedule_id === 'string' ? args.schedule_id : '',
       name: typeof args.name === 'string' ? args.name : undefined,
-      alert_frequency:
-        args.alert_frequency === 'daily' || args.alert_frequency === 'weekly' || args.alert_frequency === 'paused'
-          ? args.alert_frequency
-          : undefined,
+      alert_frequency: typeof args.alert_frequency === 'string' ? args.alert_frequency : undefined,
       alerts_enabled: typeof args.alerts_enabled === 'boolean' ? args.alerts_enabled : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };

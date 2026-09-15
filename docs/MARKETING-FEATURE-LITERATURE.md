@@ -6725,3 +6725,25 @@ Fish and Wildlife Service forecast — child-level, not parent dump.
 counts (USCG 702 … NAVFAC 2,278 … NPS 14); sibling overlap 0; department
 identity unregressed (35,751/35,751 reachable). Unit: agency-identity +
 agency-identity-children + forecast-agency-filter parity.
+
+## MCP schedule discovery — natural language watches (2026-09-14)
+
+**What.** Claude Desktop / MCP connectors now discover market watches from everyday
+language — "schedule this," "run this search every week," "monitor this market,"
+"keep me updated," "email me new opportunities," "create a watch" — without requiring
+the word "alerts." Shared connector `instructions` plus an updated
+`schedule_market_search` title/description. Unsupported filters are rejected instead
+of silently broadening the watch. Cadence is daily/weekly/paused only; exact clock
+times are explained before save.
+
+**Why.** Customers talk about monitoring markets and getting emailed new opportunities.
+Gatekeeping discovery behind "alerts" made scheduling look unavailable even when the
+tool was listed.
+
+**SEO.** schedule SAM search / monitor federal market / watch government opportunities
+MCP / email new solicitations.
+
+**Proof.** Unit: `schedule-discovery.unit.test.ts` (all six phrases in tool description;
+instructions route to `schedule_market_search`; inspect-tools-first). Filter reject:
+`validate-filters.unit.test.ts` (unknown keys + strategy strands). Live: catalog
+description + MCP initialize `instructions` after deploy.

@@ -39,6 +39,7 @@ import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
 // client (neither runs on Edge). force-dynamic: never cache an MCP response.
@@ -70,7 +71,7 @@ const SERVER_INFO: Implementation = {
   name: 'Mindy',
   version: '1.0.0',
   description:
-    'Federal contracting intelligence — SAM opportunities, incumbents, pricing, and win playbooks.',
+    'Federal contracting intelligence — SAM opportunities, incumbents, pricing, win playbooks, and market watches (schedule / monitor searches).',
   websiteUrl: 'https://getmindy.ai/mcp',
   icons: [{ src: 'https://getmindy.ai/icon.png', mimeType: 'image/png', sizes: ['512x512'] }],
 };
@@ -219,6 +220,8 @@ const baseHandler = createMcpHandler(
     // verbatim — `new McpServer(serverInfo, mcpServerOptions)` (dist/index.js:323).
     // The cast bypasses a stale type, not a missing capability.
     serverInfo: SERVER_INFO as { name: string; version: string },
+    // Shared connector guidance — clients surface this on initialize (same text as stdio).
+    instructions: MCP_CONNECTOR_INSTRUCTIONS,
     capabilities: {
       tools: {},
     },

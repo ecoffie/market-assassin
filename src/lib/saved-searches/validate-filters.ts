@@ -3,6 +3,33 @@ import type { SavedSearchFilters } from './types';
 
 const TRUTHY_STRINGS = new Set(['1', 'true', 'yes']);
 
+/** Top-level filter keys the Map + cron understand. Unknown keys must be rejected. */
+export const ALLOWED_SAVED_SEARCH_FILTER_KEYS = [
+  'q',
+  'naics',
+  'agency',
+  'subAgency',
+  'state',
+  'psc',
+  'setAside',
+  'noticeType',
+  'strategy',
+  'horizons',
+  'scope',
+  'fullOpen',
+  'closingDays',
+  'postedDays',
+  'country',
+  'hideCommodity',
+  'hasDocs',
+  'hasContact',
+  'sapBuyer',
+  'status',
+] as const;
+
+const ALLOWED_KEY_SET = new Set<string>(ALLOWED_SAVED_SEARCH_FILTER_KEYS);
+const STRATEGY_KEY_SET = new Set<string>(STRATEGY_STRAND_KEYS as readonly string[]);
+
 function asTrimmedString(v: unknown): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'string') return v.trim();
@@ -21,12 +48,18 @@ function positiveInt(v: unknown): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+function strategyParts(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((x) => asTrimmedString(x)).filter(Boolean);
+  }
+  return asTrimmedString(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function strategyKeys(filters: SavedSearchFilters): string[] {
-  const raw = filters.strategy;
-  const parts = Array.isArray(raw)
-    ? raw.map((x) => asTrimmedString(x)).filter(Boolean)
-    : asTrimmedString(raw).split(',').map((s) => s.trim()).filter(Boolean);
-  return parts.filter((k) => (STRATEGY_STRAND_KEYS as readonly string[]).includes(k));
+  return strategyParts(filters.strategy).filter((k) => STRATEGY_KEY_SET.has(k));
 }
 
 function horizonsNarrow(filters: SavedSearchFilters): boolean {
@@ -74,23 +107,49 @@ export type ValidateFiltersResult =
   | { ok: false; error: string };
 
 /**
- * Normalize + validate filters before persisting. Rejects malformed input and searches
- * that would silently match the entire federal market.
+ * Normalize + validate filters before persisting. Rejects malformed input, unknown
+ * filter keys (never silently drop into a broader watch), unknown strategy strands,
+ * and searches that would match the entire federal market.
  */
 export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: 'filters must be a plain object' };
   }
 
+  const rawObj = raw as Record<string, unknown>;
+  const unknownKeys = Object.keys(rawObj).filter((k) => !ALLOWED_KEY_SET.has(k));
+  if (unknownKeys.length > 0) {
+    const hint =
+      unknownKeys.includes('keyword') || unknownKeys.includes('keywords')
+        ? ' Tip: use q for keyword search.'
+        : '';
+    return {
+      ok: false,
+      error:
+        `Unsupported filter keys: ${unknownKeys.join(', ')}. ` +
+        `Supported: ${ALLOWED_SAVED_SEARCH_FILTER_KEYS.join(', ')}. ` +
+        `Do not drop unsupported filters and activate a broader watch — ask the user to adjust.${hint}`,
+    };
+  }
+
   const filters: SavedSearchFilters = { ...(raw as SavedSearchFilters) };
 
-  // Drop unknown strategy keys (same allowlist as parseMapFilters).
   if (filters.strategy !== undefined) {
-    const allowed = strategyKeys(filters);
+    const parts = strategyParts(filters.strategy);
+    const unknownStrategy = parts.filter((k) => !STRATEGY_KEY_SET.has(k));
+    if (unknownStrategy.length > 0) {
+      return {
+        ok: false,
+        error:
+          `Unsupported strategy values: ${unknownStrategy.join(', ')}. ` +
+          `Allowed: ${(STRATEGY_STRAND_KEYS as readonly string[]).join(', ')}. ` +
+          `Do not drop unsupported strategy strands and save a broader watch.`,
+      };
+    }
     if (Array.isArray(filters.strategy)) {
-      filters.strategy = allowed;
-    } else if (asTrimmedString(filters.strategy)) {
-      filters.strategy = allowed.join(',');
+      filters.strategy = parts;
+    } else if (parts.length) {
+      filters.strategy = parts.join(',');
     } else {
       delete filters.strategy;
     }
@@ -100,7 +159,7 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
     return {
       ok: false,
       error:
-        'At least one narrowing filter is required (naics, agency, keyword/q, state, set-aside, strategy, scope=profile, or forecast horizon). Cannot schedule alerts for the entire federal market.',
+        'At least one narrowing filter is required (naics, agency, q, state, set-aside, strategy, scope=profile, or forecast horizon). Cannot schedule a watch for the entire federal market.',
     };
   }
 
