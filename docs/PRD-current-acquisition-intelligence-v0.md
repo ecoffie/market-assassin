@@ -410,3 +410,12 @@ CAI v0 is **complete**. Host re-run cleared: **unavailable ≠ zero** and **hist
 | CURRENT INTELLIGENCE | What's changed about how they're buying, why does it matter, what should I do differently now? |
 
 **Next layer = PATHWAY / TALENT** — not more CAI. Gate: `docs/PRD-pathway-talent-gate.md`.
+
+### Production verification (acceptance proof — 2026-09-15)
+
+| Deploy | Vercel project | Counts as prod evidence? |
+|--------|----------------|--------------------------|
+| Accidental | `cai-language-guardrails` — successful build | **No** — wrong project; do not cite |
+| **Acceptance** | Worktree/repo relinked to existing **`market-assassin`** → deployed → **getmindy.ai** | **Yes** — **61 tools**, CAI @ **8 credits**, catalog includes unavailable-horizon / future-certainty guardrail language |
+
+CAI v0 remains **production-verified and complete** on that second deploy only.
