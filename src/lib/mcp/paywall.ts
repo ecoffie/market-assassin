@@ -17,6 +17,7 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES } from './packages';
+import { insufficientCreditsLead } from './commercial-refusal';
 
 /** Stripe payment links, mirroring src/app/mcp/pricing/page.tsx. */
 const CHECKOUT_ENTRY = 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y';
@@ -36,7 +37,9 @@ export const RESUME_BASE = 'https://getmindy.ai/mcp/continue';
 // so checkout can be created server-side WITH attempt attribution. This is a STRUCTURAL
 // change to the funnel (one more click), not just copy, so v3 rates are not comparable.
 // v3 was the 1,000-credit repricing at the same $119.
-export const PAYWALL_OFFER_VERSION = 'v4';
+// v5 (2026-09-15): lead with exact need/have credits + explicit "not a server error / do not
+// retry" so agents stop inventing timeout language for commercial refusals.
+export const PAYWALL_OFFER_VERSION = 'v5';
 
 export type PaywallReason = 'insufficient_credits' | 'requires_pro';
 
@@ -205,17 +208,26 @@ export function paywallMessage(opts: {
     return [
       `Ready to run another ${label}?`,
       offer ? offer.unlocks : `${opts.toolName} is part of Mindy Pro.`,
+      'This is not a temporary server error — do not retry until the account is upgraded.',
       offers,
       `Already upgraded, or want to see the saved request first? ${link}`,
     ].join('\n\n');
   }
 
+  // Insufficient credits: lead with exact need/have. Never "server unavailable" / "retry".
+  const lead =
+    typeof opts.creditsRequired === 'number'
+      ? insufficientCreditsLead(opts.creditsRequired, opts.balance)
+      : 'You do not have enough credits to run this analysis.';
   return [
-    `Ready to analyze another market?`,
+    lead,
+    'This is not a temporary server error — do not retry until credits are added.',
     offer
       ? `${offer.got} ${offer.unlocks}`
       : `You have used your free credits. Upgrade to keep researching your market.`,
-    [price, offers].filter(Boolean).join('\n'),
+    // priceLine is redundant when the lead already states both numbers; keep when
+    // balance was unknown so the cost still appears once.
+    typeof opts.balance === 'number' ? offers : [price, offers].filter(Boolean).join('\n'),
     `We saved exactly what you asked for — it runs the moment your credits land. ${link}`,
   ].join('\n\n');
 }

@@ -16,19 +16,31 @@ import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
-import { recordPaywallAttempt, paywallMessage } from './paywall';
+import { recordPaywallAttempt, paywallMessage, RESUME_BASE } from './paywall';
+import {
+  buildInsufficientCreditsRefusal,
+  buildRequiresProRefusal,
+  type CommercialRefusal,
+} from './commercial-refusal';
 
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
   apiKeyId?: string | null;
 }
 
+export type MeteredError = {
+  code: string;
+  message: string;
+  /** Machine-readable commercial gate — present for insufficient_credits / requires_pro. */
+  commercial?: CommercialRefusal;
+};
+
 export type MeteredOutcome =
   // `needsRecharge` = the post-debit balance dipped under AUTORECHARGE_SIGNAL_FLOOR, so
   // the transport should fire maybeAutoRecharge() (post-response, via after()). It's just
   // a numeric signal here — the engine decides whether the user actually has it enabled.
   | { ok: true; result: Record<string, unknown>; creditsCharged: number; balance: number | null; needsRecharge: boolean }
-  | { ok: false; error: { code: string; message: string }; creditsCharged: 0; balance?: number };
+  | { ok: false; error: MeteredError; creditsCharged: 0; balance?: number };
 
 export async function runMeteredTool(
   name: string,
@@ -55,11 +67,19 @@ export async function runMeteredTool(
         args,
         reason: 'requires_pro',
       });
+      const continueUrl = gatedAttemptId ? `${RESUME_BASE}?attempt=${gatedAttemptId}` : null;
+      const message = paywallMessage({
+        toolName: name,
+        reason: 'requires_pro',
+        attemptId: gatedAttemptId,
+        userEmail: ctx.userEmail,
+      });
       return {
         ok: false,
         error: {
           code: 'requires_pro',
-          message: paywallMessage({ toolName: name, reason: 'requires_pro', attemptId: gatedAttemptId, userEmail: ctx.userEmail }),
+          message,
+          commercial: buildRequiresProRefusal({ toolName: name, message, continueUrl }),
         },
         creditsCharged: 0,
       };
@@ -141,19 +161,28 @@ export async function runMeteredTool(
         creditsRequired: cost,
         balanceAtAttempt: balance,
       });
+      const continueUrl = attemptId ? `${RESUME_BASE}?attempt=${attemptId}` : null;
+      const message = paywallMessage({
+        toolName: name,
+        reason: 'insufficient_credits',
+        creditsRequired: cost,
+        balance,
+        attemptId,
+        // Threads the buyer into checkout so a purchase FROM THE CHAT credits
+        // this account (via /mcp/continue → server-side session), not a wrong identity.
+        userEmail: ctx.userEmail,
+      });
       return {
         ok: false,
         error: {
           code: 'insufficient_credits',
-          message: paywallMessage({
+          message,
+          commercial: buildInsufficientCreditsRefusal({
             toolName: name,
-            reason: 'insufficient_credits',
-            creditsRequired: cost,
-            balance,
-            attemptId,
-            // Threads the buyer into the Stripe links so a purchase made FROM THE CHAT
-            // credits this account, not whichever one Stripe matches on its own.
-            userEmail: ctx.userEmail,
+            requiredCredits: cost,
+            availableCredits: balance,
+            message,
+            continueUrl,
           }),
         },
         creditsCharged: 0,

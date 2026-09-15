@@ -6821,3 +6821,14 @@ GovCon capture messaging grounded in the notice + curated agency intel.
 `getUnifiedAgencyIntelligence`; emphasize bullets are token-overlap only (empty when no overlap).
 FIND specific `_next.tool === understand_customer`. Catalog 60. Capability/Response/Meeting brief
 outputs intentionally deferred.
+
+---
+
+## MCP commercial refusal contract — insufficient credits ≠ server failure (2026-09-15)
+
+**What.** When an MCP tool is refused for insufficient credits, Mindy now returns a structured `INSUFFICIENT_CREDITS` payload (required / available / shortfall, `retryable: false`, continue URL) as a normal tool result — not an MCP `isError`. Customer copy leads with exact numbers: "You need 50 credits… You currently have 45."
+
+**Why.** A real user hit `capability_market_match` with 45 credits (tool costs 50). Claude showed "Failed" and said "Mindy's server isn't responding — let me retry once" because the transport marked commercial refusals as `isError: true`. That is a commercial gate, not a timeout. The attempt remains on `/mcp/continue`.
+
+**SEO / proof.** Incident call `88c978d4-…` / paywall `59cb41f1-…`: balance 45, required 50, status `rejected_no_credits`, zero debit. Regression: `commercial-refusal.unit.test.ts` (45 vs 50 → no `runMcpTool`, structured contract, no isError).
+
