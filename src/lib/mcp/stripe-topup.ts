@@ -65,18 +65,48 @@ export async function handleMcpCreditTopup(session: Stripe.Checkout.Session): Pr
   if (meta.type !== MCP_TOPUP_TYPE) return { handled: false };
 
   // ⚠️ COMPLETION IS NOT PAYMENT (Eric, 2026-09-15). `checkout.session.completed` fires
-  // when the SESSION finishes, which is not the same as money having arrived:
-  //   • delayed/asynchronous payment methods complete the session with
-  //     payment_status 'unpaid' and settle (or FAIL) minutes-to-days later
-  //   • mode:'setup' sessions complete with no payment at all
-  // Granting on completion alone hands out credits for an unpaid session. Require an
-  // explicit paid state; 'no_payment_required' is included because a legitimate 100%
-  // discount settles that way.
+  // when the SESSION finishes, which is not the same as money arriving:
+  //   • delayed/asynchronous payment methods complete with payment_status 'unpaid' and
+  //     settle (or FAIL) minutes-to-days later
+  //   • mode:'setup' sessions complete with NO payment at all — they collect a payment
+  //     method for future use, so granting on one hands out credits for nothing
+  // Granting on completion alone hands out credits for an unpaid session.
+
+  // mode:'setup' (and 'subscription', handled by the subscription path) must never reach
+  // the top-up grant. Rejected explicitly rather than relying on payment_status, because
+  // a setup session's status is not a payment signal at all.
+  const mode = String(session.mode ?? '');
+  if (mode && mode !== 'payment') {
+    console.error(`[mcp:topup] session ${session.id} has mode='${mode}' — not a one-time payment, NOT granting.`);
+    return { handled: true, error: `ineligible_mode:${mode}` };
+  }
+
   const paymentStatus = String(session.payment_status ?? '');
-  if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+
+  // 'no_payment_required' is NOT "paid". It is a verified ZERO-DOLLAR entitlement (a 100%
+  // discount/coupon), so it is allowed only when the session is genuinely a zero-dollar
+  // one for an eligible credit product — never as a synonym for payment. A session
+  // claiming no_payment_required while carrying a non-zero total is a contradiction and
+  // is refused.
+  const amountTotal = typeof session.amount_total === 'number' ? session.amount_total : null;
+  const zeroDollarEntitlement =
+    paymentStatus === 'no_payment_required' && (amountTotal === 0 || amountTotal === null);
+  if (paymentStatus === 'no_payment_required' && !zeroDollarEntitlement) {
     console.error(
-      `[mcp:topup] session ${session.id} completed but payment_status='${paymentStatus || 'missing'}' — NOT granting. ` +
-      `Credits will be granted when the payment settles (async_payment_succeeded).`,
+      `[mcp:topup] session ${session.id} claims no_payment_required but amount_total=${amountTotal} — refusing.`,
+    );
+    return { handled: true, error: 'inconsistent_zero_dollar' };
+  }
+
+  if (paymentStatus !== 'paid' && !zeroDollarEntitlement) {
+    // NOT a dead end. An async method settles later and Stripe sends
+    // checkout.session.async_payment_succeeded, which routes back here; the grant is
+    // keyed on session.id via applyCreditOnce, so the eventual success grants EXACTLY
+    // ONCE no matter how many events arrive. Refusing here strands nobody — but only
+    // because that follow-up event is wired. Do not remove one without the other.
+    console.error(
+      `[mcp:topup] session ${session.id} completed but payment_status='${paymentStatus || 'missing'}' — NOT granting yet. ` +
+      `Credits are granted when the payment settles (checkout.session.async_payment_succeeded).`,
     );
     return { handled: true, error: `unpaid:${paymentStatus || 'missing'}` };
   }

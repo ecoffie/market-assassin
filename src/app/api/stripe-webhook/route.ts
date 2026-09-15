@@ -109,6 +109,30 @@ export async function POST(request: NextRequest) {
 
   console.log(`Stripe webhook: ${event.type} (test: ${isTestMode})`);
 
+  // ── ASYNC PAYMENT SETTLED. A delayed payment method (ACH, bank debit, some wallets)
+  // completes the checkout session with payment_status 'unpaid' and settles LATER.
+  // handleMcpCreditTopup correctly refuses to grant on that unpaid event — which would
+  // STRAND a customer who genuinely pays if this follow-up were not wired. Stripe sends
+  // async_payment_succeeded when the money actually arrives; routing it through the SAME
+  // handler grants exactly once, because applyCreditOnce is keyed on session.id.
+  // Removing this handler without also removing the unpaid refusal loses real payments.
+  if (event.type === 'checkout.session.async_payment_succeeded') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const mcpTopup = await handleMcpCreditTopup(session);
+    if (mcpTopup.handled) {
+      console.log(`[stripe-webhook] async payment settled for ${session.id}:`, mcpTopup);
+      return NextResponse.json({ received: true, mcp_topup: mcpTopup, via: 'async_payment_succeeded' });
+    }
+  }
+
+  // An async payment that FAILED grants nothing — logged so a customer who believes they
+  // paid can be told what actually happened rather than being met with silence.
+  if (event.type === 'checkout.session.async_payment_failed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    console.error(`[stripe-webhook] async payment FAILED for session ${session.id} — no credits granted.`);
+    return NextResponse.json({ received: true, async_payment_failed: session.id });
+  }
+
   // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;

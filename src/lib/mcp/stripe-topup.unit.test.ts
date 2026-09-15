@@ -106,4 +106,36 @@ describe('payment_status gate — completion is not payment', () => {
     expect(out.handled).toBe(true);
     expect(String(out.error)).toContain('unpaid');
   });
+
+  it("REJECTS mode:'setup' outright — it collects a card, it is not a purchase", async () => {
+    const { handleMcpCreditTopup } = await import('./stripe-topup');
+    const out = await handleMcpCreditTopup({ ...(base as object), mode: 'setup', payment_status: 'paid' } as never);
+    expect(out.handled).toBe(true);
+    expect(String(out.error)).toContain('ineligible_mode');
+  });
+
+  it("treats no_payment_required as a ZERO-DOLLAR entitlement, not as 'paid'", async () => {
+    const { handleMcpCreditTopup } = await import('./stripe-topup');
+    // Genuine 100% discount: zero total → allowed.
+    const ok = await handleMcpCreditTopup({
+      ...(base as object), mode: 'payment', payment_status: 'no_payment_required', amount_total: 0,
+    } as never);
+    expect(String(ok.error ?? '')).not.toContain('inconsistent');
+    // Contradiction: claims nothing owed while carrying a real total → refused.
+    const bad = await handleMcpCreditTopup({
+      ...(base as object), mode: 'payment', payment_status: 'no_payment_required', amount_total: 11900,
+    } as never);
+    expect(String(bad.error)).toContain('inconsistent_zero_dollar');
+  });
+
+  it('the unpaid refusal is not a dead end — async_payment_succeeded routes back here', async () => {
+    // Guard on the CONTRACT, not the wiring: the refusal is only safe because the
+    // follow-up event grants later, keyed on session.id so it applies exactly once.
+    const { handleMcpCreditTopup } = await import('./stripe-topup');
+    const first = await handleMcpCreditTopup({ ...(base as object), mode: 'payment', payment_status: 'unpaid' } as never);
+    expect(String(first.error)).toContain('unpaid');
+    const settled = await handleMcpCreditTopup({ ...(base as object), mode: 'payment', payment_status: 'paid' } as never);
+    expect(settled.handled).toBe(true);
+    expect(String(settled.error ?? '')).not.toContain('unpaid');
+  });
 });
