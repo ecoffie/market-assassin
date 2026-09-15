@@ -6,8 +6,22 @@
  * of the assistant — not the page it lands on. So the wall now carries the price and two
  * pressable Stripe links in the message itself.
  *
- * These tests pin the three things that make buying-from-chat safe:
- *   1. identity rides along, so a purchase credits the RIGHT account
+ * ⚠️ REVISED 2026-09-15 (Eric). The message no longer carries Stripe links directly. An
+ * MCP error payload is TEXT — it cannot POST — so a direct link there must be a static
+ * payment LINK, and payment links do not forward `?attempt=`. The purchase could be tied
+ * to the ACCOUNT but never to the blocked REQUEST, so the saved request could not resume.
+ * The offer now links to /mcp/continue, which POSTs /api/mcp/checkout and sets
+ * client_reference_id AND metadata.attempt server-side.
+ *
+ * KNOWN TENSION, recorded rather than buried: the measurement above says the drop-off IS
+ * the click out of the assistant, and this change adds a click. It is accepted because an
+ * unattributed purchase cannot resume the request the user was blocked on — the thing the
+ * flow exists to deliver. Watch offer_page_opened_at → checkout_clicked_at to see the real
+ * cost; if it proves material, the fix is a better landing page, not a link that drops
+ * attribution.
+ *
+ * These tests pin what makes buying-from-chat safe NOW:
+ *   1. the offer routes through the resume page carrying the attempt id
  *   2. prices come from packages.ts, never hardcoded in copy
  *   3. an unknown balance is never rendered as "you have 0"
  */
@@ -31,10 +45,16 @@ function wall(over: Partial<Parameters<typeof paywallMessage>[0]> = {}) {
 }
 
 describe('the offer is in the message', () => {
-  it('carries both a subscription and a no-subscription option', () => {
+  it('names both a subscription and a no-subscription option, and routes to the resume page', () => {
     const msg = wall();
-    expect(msg).toContain(ENTRY.monthly.checkoutUrl.split('?')[0]);
-    expect(msg).toContain(TOPUP.checkoutUrl.split('?')[0]);
+    // Both options are still NAMED with their real price/credits from packages.ts …
+    expect(msg).toContain(`$${ENTRY.monthly.usd}/mo`);
+    expect(msg).toContain(`$${TOPUP.usd}`);
+    expect(msg).toContain(TOPUP.credits.toLocaleString());
+    // … but the only link is the resume page, carrying the attempt so checkout can be
+    // created server-side WITH attribution.
+    expect(msg).toContain('/mcp/continue?attempt=');
+    expect(msg).not.toContain('buy.stripe.com');
   });
 
   it('states the price and the real balance', () => {
@@ -52,10 +72,11 @@ describe('the offer is in the message', () => {
     expect(wall()).toContain('attempt=attempt-1');
   });
 
-  it('offers the same purchase paths on the Pro gate', () => {
+  it('offers the same purchase path on the Pro gate', () => {
     const msg = wall({ reason: 'requires_pro', toolName: 'build_pursuit_dossier' });
-    expect(msg).toContain(ENTRY.monthly.checkoutUrl.split('?')[0]);
-    expect(msg).toContain(TOPUP.checkoutUrl.split('?')[0]);
+    expect(msg).toContain(`$${ENTRY.monthly.usd}/mo`);
+    expect(msg).toContain(`$${TOPUP.usd}`);
+    expect(msg).toContain('/mcp/continue?attempt=');
   });
 
   it('stays short enough to read in a chat turn', () => {
@@ -67,15 +88,20 @@ describe('the offer is in the message', () => {
 });
 
 describe('identity rides along — credits must land on the right account', () => {
-  it('threads the buyer email into every checkout link', () => {
-    const msg = wall({ userEmail: 'tabitha@example.com' });
-    // This is the guard against the real incident where a user paid on one identity and
-    // spent credits on another.
-    const links = msg.match(/https:\/\/buy\.stripe\.com\/\S+/g) ?? [];
-    expect(links.length).toBeGreaterThanOrEqual(2);
-    for (const l of links) {
-      expect(l).toContain('client_reference_id=tabitha%40example.com');
-    }
+  it('the message never carries a raw Stripe link that could take a payment unattributed', () => {
+    // THE GUARANTEE IS UNCHANGED — the guard against the real incident where a user paid
+    // on one identity and spent credits on another. What changed is WHERE it is enforced.
+    //
+    // Before: the message embedded Stripe links with ?client_reference_id=<email>, i.e.
+    // identity asserted by a URL the client could edit or strip.
+    // Now: the message links only to /mcp/continue, and identity is resolved SERVER-SIDE
+    // from the verified session in /api/mcp/checkout — which also rejects an attempt
+    // belonging to another account with 403. That is strictly stronger than a query param.
+    const msg = wall({ userEmail: 'tabitha@example.com', attemptId: 'abc-123' });
+    expect(msg).not.toMatch(/https:\/\/buy\.stripe\.com/);
+    expect(msg).toContain('/mcp/continue?attempt=abc-123');
+    // And the email is NOT put in the URL any more — nothing for a client to tamper with.
+    expect(msg).not.toContain('client_reference_id');
   });
 
   it('ties the purchase back to the refused request', () => {

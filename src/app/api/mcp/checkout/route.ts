@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   const db = getWriteClient();
   const { data: attempt, error } = await db
     .from('mcp_paywall_attempts')
-    .select('id,user_email,tool_name,consumed_at')
+    .select('id,user_email,tool_name,consumed_at,stripe_session_id')
     .eq('id', attemptId)
     .maybeSingle();
   if (error) return NextResponse.json({ error: 'lookup failed' }, { status: 500 });
@@ -66,6 +66,21 @@ export async function POST(req: NextRequest) {
 
   const stripe = new Stripe(key);
   try {
+    // IDEMPOTENT: a retry (the only recovery path now that the silent static-link
+    // fallback is gone) must NOT mint a second session for the same attempt. Reuse the
+    // existing one while it is still open; only a session that can no longer be paid
+    // (expired/complete) is replaced.
+    if (attempt.stripe_session_id) {
+      try {
+        const prior = await stripe.checkout.sessions.retrieve(String(attempt.stripe_session_id));
+        if (prior.status === 'open' && prior.url) {
+          return NextResponse.json({ url: prior.url, sessionId: prior.id, reused: true });
+        }
+      } catch {
+        // Unretrievable (wrong mode/key/deleted) — fall through and create a fresh one.
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: plan ? 'subscription' : 'payment',
       line_items: [{ price: priceId, quantity: 1 }],

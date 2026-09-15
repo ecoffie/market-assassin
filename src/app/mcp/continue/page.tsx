@@ -60,21 +60,26 @@ export default function ContinuePage() {
   const [state, setState] = useState<'loading' | 'ready' | 'running' | 'done' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [buying, setBuying] = useState<string | null>(null);
+  const [buyError, setBuyError] = useState('');
 
   /**
-   * Buy through a SERVER-CREATED Checkout Session, not the static payment link.
+   * Buy through a SERVER-CREATED Checkout Session, not a static payment link.
    *
    * WHY: Stripe payment LINKS do not forward arbitrary query params, so `?attempt=` never
    * reaches the webhook — a purchase could be tied to the ACCOUNT but never to the blocked
    * REQUEST, and the saved request could not be resumed automatically. /api/mcp/checkout
    * sets client_reference_id AND metadata.attempt server-side.
    *
-   * FALLBACK: if the route is unavailable the static link still sells the right product —
-   * the customer can always buy. They just lose attempt attribution, which is strictly
-   * better than a dead button.
+   * ⚠️ NO SILENT FALLBACK TO THE STATIC LINK (Eric, 2026-09-15). A failure here can be an
+   * ownership rejection (403), a consumed attempt (409), or a TIMEOUT AFTER THE SESSION
+   * WAS ALREADY CREATED. Quietly switching to the static link would turn a refusal into an
+   * unattributed purchase and discard the guarantees this flow exists to provide. Show a
+   * retryable error instead; session creation is idempotent, so retrying reuses the open
+   * session rather than minting a second one.
    */
-  async function buy(product: string, fallbackUrl: string) {
+  async function buy(product: string) {
     if (!attempt) return;
+    setBuyError('');
     setBuying(product);
     try {
       const res = await fetch('/api/mcp/checkout', {
@@ -83,9 +88,20 @@ export default function ContinuePage() {
         body: JSON.stringify({ attempt: attempt.id, product }),
       });
       const data = await res.json().catch(() => ({}));
-      window.location.href = res.ok && data?.url ? data.url : fallbackUrl;
+      if (res.ok && data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      // Name the actual reason — a generic "try again" on a 403 sends the user in circles.
+      setBuyError(
+        res.status === 403 ? 'This request belongs to a different account. Sign in as that account to continue.'
+        : res.status === 409 ? 'This request has already been run.'
+        : `Could not start checkout${data?.error ? ` (${data.error})` : ''}. Please try again.`,
+      );
     } catch {
-      window.location.href = fallbackUrl;
+      setBuyError('Could not reach checkout. Please try again.');
+    } finally {
+      setBuying(null);
     }
   }
 
@@ -195,7 +211,7 @@ export default function ContinuePage() {
                 <button
                   type="button"
                   disabled={buying !== null}
-                  onClick={() => buy('entry', ENTRY_PLAN.monthly.checkoutUrl)}
+                  onClick={() => buy('entry')}
                   className="block w-full text-left rounded-xl bg-emerald-500 px-5 py-4 text-[#06120c] transition hover:bg-emerald-400 disabled:opacity-60"
                 >
                   <div className="flex items-baseline justify-between gap-3">
@@ -215,7 +231,7 @@ export default function ContinuePage() {
                 <button
                   type="button"
                   disabled={buying !== null}
-                  onClick={() => buy('refill', TOPUP.checkoutUrl)}
+                  onClick={() => buy('refill')}
                   className="block w-full text-left rounded-xl border border-white/15 px-5 py-4 transition hover:bg-white/5 disabled:opacity-60"
                 >
                   <div className="flex items-baseline justify-between gap-3">
@@ -231,6 +247,12 @@ export default function ContinuePage() {
                   </div>
                 </button>
               </div>
+
+              {buyError ? (
+                <p className="mt-3 rounded-lg border border-red-400/30 bg-red-400/[0.07] px-4 py-3 text-[14px] text-red-200">
+                  {buyError}
+                </p>
+              ) : null}
 
               <p className="mt-4 text-center text-sm text-slate-500">
                 Your request stays saved — it runs the moment your credits land.
