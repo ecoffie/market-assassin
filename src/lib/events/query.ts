@@ -502,6 +502,7 @@ export async function queryEngagementGraph(noticeId: string): Promise<Engagement
     const { data: cs, error: cErr } = await supabase
       .from('federal_contacts')
       .select('contact_fullname, contact_title, department_ind_agency')
+      .eq('contact_kind', 'government_buyer')
       .ilike('solicitation_number', `${ev.inferred_dodaac.toUpperCase()}%`)
       .not('contact_fullname', 'is', null)
       .limit(50);

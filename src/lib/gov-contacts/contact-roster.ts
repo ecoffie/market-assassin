@@ -22,6 +22,7 @@ import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 
 // ── Lifted route-local classifiers (faithful copies of federal-contacts/route.ts) ──
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -320,6 +321,10 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // a bare text search here (name surnames + junk); the app route already
       // excludes them. A real POC always has a department.
       .not('department_ind_agency', 'is', null));
+    // Government buyers ONLY — the authoritative contact_kind contract. Applied as its own
+    // statement: nesting it inside the other wrappers exceeded TS's generic instantiation depth
+    // on the Supabase builder type.
+    q = governmentBuyersOnly(q);
     // Ghost-card guard: rows with a real email/agency whose contact_fullname is a SAM
     // placeholder. Excluded at the query by placeholderNameFilter so the roster's
     // `total`/`emailableCount` stay honest; isUsableContactCard below is the belt-and-braces.

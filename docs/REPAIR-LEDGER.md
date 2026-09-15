@@ -854,3 +854,9 @@ entity — so the rule keys on the raw_data payload, not the key shape.
 **`role_category` was NOT changed:** it is product-authoritative (drives `roleCategoryLabelFromDb`
 and a live `.eq('role_category', role)` filter). `federal_contacts.source` has zero consumers and
 is documented as dead.
+
+**Backfill executed 2026-09-15T16:0x** — one transaction, measured inside it: government 205,517
+(11,952 already typed by a scheduled run, 193,565 updated) · vendor 82,017 · unclassified **0** ·
+overlap **0**. `updated_at` newest stayed at the 16:00 scheduled run — the backfill bumped no
+writer clock, so the drain's change semantics are intact. Both control-plane instances derive
+`held_population` from `contact_kind`: active 205,517, frozen vendor 82,017.

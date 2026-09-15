@@ -201,7 +201,14 @@ export function isUsableContactCard(row: {
   department_ind_agency?: string | null;
   sub_tier?: string | null;
   office?: string | null;
+  contact_kind?: string | null;
 }): boolean {
+  // Defense in depth: a VENDOR entity POC is never a usable government-buyer card, whatever
+  // else it carries. This guard alone was NOT enough historically — `hasOrg` passes on a vendor
+  // row because the COMPANY sits in sub_tier — which is why the primary exclusion is the
+  // query-level governmentBuyersOnly() contract. Checked explicitly so a row selected WITHOUT
+  // contact_kind (undefined) is not silently rejected.
+  if (row.contact_kind === 'vendor_entity_poc') return false;
   if (!isUsableContactName(row.contact_fullname)) return false;
   const hasOrg = !!(row.department_ind_agency || row.sub_tier || row.office);
   const hasContactable = !!(row.contact_email || row.contact_phone);

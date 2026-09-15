@@ -36,6 +36,7 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
@@ -325,11 +326,11 @@ async function buyersPins(params: {
   // (no real name exists upstream — not recoverable). Excluding the labelled shapes at the
   // QUERY keeps `count` honest for the "N of M" label; isUsableContactCard below is the
   // belt-and-suspenders in case a row slips the ILIKE (e.g. a bare digit string or role label).
-  let q = placeholderNameFilter(db
+  let q = governmentBuyersOnly(placeholderNameFilter(db
     .from('federal_contacts')
     .select('id, contact_fullname, contact_title, department_ind_agency, office, sub_tier, solicitation_number', { count: 'exact' })
     .not('contact_fullname', 'is', null)
-    .not('solicitation_number', 'is', null))
+    .not('solicitation_number', 'is', null)))
     .limit(4000);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
   // Agency multi-select (pipe-joined needles; both word orders) → department_ind_agency ("STATE,

@@ -21,6 +21,7 @@ import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 
 export const dynamic = 'force-dynamic';
 
@@ -420,7 +421,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let q = placeholderNameFilter(sb
+  let q = governmentBuyersOnly(placeholderNameFilter(sb
     .from('federal_contacts')
     .select(
       'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
@@ -432,7 +433,7 @@ export async function GET(request: NextRequest) {
     // like "DIANE FOREST → ASMPT NEXX, INC" on a name search. A real POC always
     // has a department; requiring one drops the junk and loses no reachable
     // contact.
-    .not('department_ind_agency', 'is', null));
+    .not('department_ind_agency', 'is', null)));
   // Ghost-card guard: rows carrying a real email + agency whose contact_fullname is a SAM
   // placeholder ("Telephone: 7175503112", "ELECTRONIC MAIL: x@y.gov", "Facsimile: 000...").
   // Excluded IN THE QUERY by placeholderNameFilter above so `count` stays honest for the
