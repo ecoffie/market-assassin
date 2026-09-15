@@ -6824,6 +6824,16 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 
 **SEO / proof.** Freeze: `docs/PRD-current-acquisition-intelligence-v0.md` §14 · Gate: `docs/PRD-pathway-talent-gate.md` · CLAUDE in-flight. **Prod acceptance:** `market-assassin` → getmindy.ai (61 tools, CAI 8cr + guardrail catalog language). Accidental `cai-language-guardrails` Vercel project deploy is **not** acceptance evidence.
 
+---
+
+## match_company_to_pathways — PATHWAY FIT v0 (2026-09-15)
+
+**What.** After CAI, match a company’s stranger-verifiable public record (UEI awards + SAM certs) to buyer-side acquisition doors. Determinations SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED / NOT_APPLICABLE with two-sided evidence, `proof_to_lead_with`, `proof_missing`, transparent `pf_rank_v1`, and one `_next` missing-proof question. `no_proven_door` is success.
+
+**Why.** Customers ask which doors they can walk through — without inventing Talent, vehicle portfolios, or set-aside-first strategy.
+
+**SEO / proof.** Contract: `docs/PRD-pathway-fit-v0.md`. Unit: `pathway-fit.unit.test.ts` (19). Probes: `scripts/probe-pathway-fit-v0.mts`. Credits: 8. Catalog 62. **Branch `feat/pathway-fit-v0` — stop before merge.**
+
 
 ## understand_customer — UNDERSTAND after FIND (2026-09-15)
 

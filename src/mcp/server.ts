@@ -34,6 +34,7 @@ import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { findOpportunitiesTool } from './tools/find-opportunities';
 import { currentAcquisitionIntelligenceTool } from './tools/current-acquisition-intelligence';
+import { matchCompanyToPathwaysTool } from './tools/match-company-to-pathways';
 import { understandCustomerTool } from './tools/understand-customer';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
@@ -591,6 +592,31 @@ server.registerTool(
   },
   async (args) => {
     const result = await currentAcquisitionIntelligenceTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'match_company_to_pathways',
+  {
+    title: 'Pathway Fit (doors your company can walk through)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'PATHWAY FIT after CURRENT INTELLIGENCE — match a company’s public UEI record to CAI buyer doors. ' +
+      'Two-sided evidence required. no_proven_door is success. Never invents Talent, vehicle portfolios, or NYM doors.',
+    inputSchema: {
+      uei: z.string().optional().describe('12-char UEI (preferred).'),
+      company_name: z.string().optional(),
+      cage: z.string().optional(),
+      cai: z.record(z.string(), z.unknown()).optional().describe('CAI package / tool result (required).'),
+      include_owner_asserted: z.boolean().optional(),
+    },
+  },
+  async (args) => {
+    const result = await matchCompanyToPathwaysTool(args as Parameters<typeof matchCompanyToPathwaysTool>[0]);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,

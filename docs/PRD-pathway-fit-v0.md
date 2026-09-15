@@ -1,10 +1,11 @@
 # PATHWAY FIT v0 — Design Contract
 
-**Status:** DESIGN ONLY — no code, no PR, no ingestion.  
+**Status:** ✅ **IMPLEMENTED** on `feat/pathway-fit-v0` — **STOP BEFORE MERGE** (Eric 2026-09-15).  
 **Date:** 2026-09-15  
 **Prerequisite:** Evidence gate complete — `docs/PRD-pathway-talent-gate.md`  
 **Upstream:** CAI v0 **FROZEN** — `docs/PRD-current-acquisition-intelligence-v0.md`  
-**Journey slot:** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → later TALENT / POSITION / ACT`
+**Journey slot:** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → later TALENT / POSITION / ACT`  
+**Tool:** `match_company_to_pathways` (8cr). Pure lib: `src/lib/pathways/`. Probes: `scripts/probe-pathway-fit-v0.mts`.
 
 ---
 

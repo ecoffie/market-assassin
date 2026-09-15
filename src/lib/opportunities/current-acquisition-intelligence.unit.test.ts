@@ -158,6 +158,14 @@ describe('CAI_NEXT_PROMPT', () => {
   });
 });
 
+describe('CAI _next wires PATHWAY FIT', () => {
+  it('points at match_company_to_pathways', async () => {
+    const { CAI_NEXT } = await import('./current-acquisition-intelligence');
+    expect(CAI_NEXT.tool).toBe('match_company_to_pathways');
+    expect(CAI_NEXT.requires_confirmation).toBe(true);
+  });
+});
+
 describe('empty what_changed is OK', () => {
   it('killer rule allows empty change list with valid current-state actions only', () => {
     const see: CaiItem = {
