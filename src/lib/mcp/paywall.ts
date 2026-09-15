@@ -202,14 +202,47 @@ export function paywallMessage(opts: {
   ].join('\n\n');
 }
 
-/** Mark that the user reached checkout from a saved attempt. */
-export async function markCheckoutStarted(attemptId: string): Promise<void> {
+/**
+ * Mark that the OFFER PAGE was opened (/mcp/continue). This is NOT Stripe checkout.
+ *
+ * Renamed from markCheckoutStarted 2026-09-15: the old name said "checkout" while the
+ * call site stamped a page view, and reading the column as its name misplaced the funnel
+ * drop-off three separate times in one investigation. Use markCheckoutClicked for a real
+ * buy-link click.
+ */
+export async function markOfferPageOpened(attemptId: string): Promise<void> {
   try {
     await getWriteClient()
       .from('mcp_paywall_attempts')
-      .update({ checkout_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ offer_page_opened_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', attemptId)
-      .is('checkout_started_at', null);
+      .is('offer_page_opened_at', null);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Stamp a purchase-intent stage. Each is a DIFFERENT fact and they must not be conflated:
+ *   'checkout_clicked'  the customer clicked a buy link — deliberate intent
+ *   'stripe_session'    a Checkout Session was created. NOT proof they saw Stripe's page
+ *   'payment_confirmed' a SIGNED webhook confirmed payment
+ *   'credits_applied'   credits actually landed (paying != receiving)
+ */
+export async function markFunnelStage(
+  attemptId: string,
+  stage: 'checkout_clicked' | 'stripe_session' | 'payment_confirmed' | 'credits_applied',
+  extra?: { stripeSessionId?: string },
+): Promise<void> {
+  const col = `${stage}_at`;
+  const patch: Record<string, string> = { [col]: new Date().toISOString(), updated_at: new Date().toISOString() };
+  if (extra?.stripeSessionId) patch.stripe_session_id = extra.stripeSessionId;
+  try {
+    await getWriteClient()
+      .from('mcp_paywall_attempts')
+      .update(patch)
+      .eq('id', attemptId)
+      .is(col, null); // first observation wins; a retry must not move the timestamp
   } catch {
     /* best-effort */
   }
