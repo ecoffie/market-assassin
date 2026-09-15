@@ -1,6 +1,6 @@
 # Current Acquisition Intelligence v0 — Tool Contract
 
-**Status:** DESIGN ONLY — approved for compose implementation next. **No scrapers. No PATHWAY. No consortia/rapid/PAE ingest.**
+**Status:** SHIPPED via PR #1539. Compose-only. **No scrapers.** Fresh-host acceptance pending (catalog proof first).
 **Provisional tool name:** `get_current_acquisition_intelligence`
 **Credits (provisional):** 8 (between UNDERSTAND 5 and FIND 10 — revisit after host packages)
 **Journey slot:** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY → POSITION`

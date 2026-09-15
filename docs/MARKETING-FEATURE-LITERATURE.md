@@ -6803,3 +6803,21 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 **Why.** Customers need "what should I do differently because of what changed" — not pain-point prose, not set-aside-first qualification, not playbook SOCOM claims.
 
 **SEO / proof.** Unit: `current-acquisition-intelligence.unit.test.ts` (killer rule, pathway classifiers, no set-aside _next). Host probes: `scripts/probe-cai-v0.mjs` (SOCOM cyber, VA IT, USACE construction). Credits: 8. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY.
+
+
+## understand_customer — UNDERSTAND after FIND (2026-09-15)
+
+**What:** After a specific Opportunity Map FIND hit, Mindy can show what this customer cares about
+and what to say — a three-part grounded package: the opportunity says, broader agency research
+shows, and what that suggests you emphasize. One MCP tool (`understand_customer`, 5 credits).
+
+**Why:** FIND alone surfaces work; the next customer question is always “so what do I say to this
+buyer?” Host agents already offer that step via `_next`; this fulfills it without inventing a pitch.
+
+**SEO / discoverability:** “what does this agency care about”, “how to talk to [agency] about [RFP]”,
+GovCon capture messaging grounded in the notice + curated agency intel.
+
+**Proof:** Live notice_id + agency → sections grounded from `sam_opportunities` +
+`getUnifiedAgencyIntelligence`; emphasize bullets are token-overlap only (empty when no overlap).
+FIND specific `_next.tool === understand_customer`. Catalog 60. Capability/Response/Meeting brief
+outputs intentionally deferred.

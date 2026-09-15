@@ -172,6 +172,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_sam_opportunities: { title: 'Search SAM Opportunities (Open only)' },
   find_opportunities: { title: 'Find Opportunities (Open · Coming back · Coming soon)' },
   get_current_acquisition_intelligence: { title: 'Current Acquisition Intelligence (what changed · what to do)' },
+  understand_customer: { title: 'Understand This Customer (Opportunity · Agency · Emphasize)' },
   search_sbir: { title: 'Search SBIR' },
 };
 

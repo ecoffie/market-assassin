@@ -94,6 +94,7 @@ export const workups = (credits: number, workupCost: number) => Math.max(1, Math
 /** Concrete BD "recipes" — cheap → rich, so a prospect sees credits go a long way. */
 export const EXAMPLES: { title: string; desc: string; tools: string[] }[] = [
   { title: 'Find opportunities in my market', desc: 'Open now + coming back + coming soon — one FIND across Opportunity Map horizons.', tools: ['find_opportunities'] },
+  { title: 'Understand this customer', desc: 'Opportunity says · agency research · what to emphasize — after a specific FIND hit.', tools: ['understand_customer'] },
   { title: 'Check today’s open solicitations only', desc: 'Advanced SAM/Open-only search when you only want live notices.', tools: ['search_sam_opportunities'] },
   { title: 'Price your bid', desc: 'GSA labor-rate intel plus regulatory demand signals.', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
   { title: 'Vet an incumbent', desc: 'Pull their SEC financials and a full contractor profile.', tools: ['get_incumbent_financials', 'get_contractor_profile'] },

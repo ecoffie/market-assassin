@@ -86,6 +86,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     blurb: "The buyer's pain points and priorities, its spending and budget trend, and the fine print of one award.",
     tools: [
       'get_agency_intel',
+      'understand_customer',
       'get_agency_budget_trends',
       'get_agency_spending_detail',
       'get_sba_goaling_share',
