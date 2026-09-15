@@ -510,11 +510,12 @@ async function resolveAgencyFromAnchors(
   contractIds: string[],
 ): Promise<string | null> {
   if (noticeIds.length) {
-    const { data } = await client
+    const { data, error } = await client
       .from('sam_opportunities')
       .select('department, sub_tier')
       .in('notice_id', noticeIds.slice(0, 20))
       .limit(20);
+    if (error) console.error('[cai] resolveAgency sam_opportunities:', error.message);
     for (const r of data || []) {
       const dep = String((r as { department?: string }).department || '').trim();
       const sub = String((r as { sub_tier?: string }).sub_tier || '').trim();
@@ -523,11 +524,12 @@ async function resolveAgencyFromAnchors(
     }
   }
   if (contractIds.length) {
-    const { data } = await client
+    const { data, error } = await client
       .from('recompete_opportunities')
       .select('awarding_agency, awarding_sub_agency')
       .in('contract_id', contractIds.slice(0, 20))
       .limit(20);
+    if (error) console.error('[cai] resolveAgency recompete_opportunities:', error.message);
     for (const r of data || []) {
       const ag = String((r as { awarding_agency?: string }).awarding_agency || '').trim();
       const sub = String((r as { awarding_sub_agency?: string }).awarding_sub_agency || '').trim();
