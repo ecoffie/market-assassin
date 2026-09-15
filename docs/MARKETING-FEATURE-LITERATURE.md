@@ -6747,3 +6747,24 @@ MCP / email new solicitations.
 instructions route to `schedule_market_search`; inspect-tools-first). Filter reject:
 `validate-filters.unit.test.ts` (unknown keys + strategy strands). Live: catalog
 description + MCP initialize `instructions` after deploy.
+
+---
+
+## MCP Guided Next Steps — search → assess → monitor without tool-name fluency
+
+**What.** After every successful MCP tool result, Mindy attaches a structured `_next`
+block: one strong next action (occasionally two), the tool to use, credit cost, and
+any missing input. Shared connector instructions teach the host agent to offer that
+step in plain English — and **never auto-run** paid calls, watches, or delivery changes.
+
+**Why.** Customers shouldn't have to invent the workflow or memorize tool names. A
+good search result is only half the experience; Mindy should guide "want me to monitor
+this?" / "check bid-fit on the top match?" / "investigate the top buyers?"
+
+**SEO / content hooks.** GovCon AI assistant that guides next steps; MCP agent
+workflow for federal contractors; opportunity search to bid assessment to watch.
+
+**Proof.** Unit: `next-actions.unit.test.ts` (search→assess→monitor conversation
+contract + confirmation gates + credit alignment with `TOOL_CREDITS`). Connector
+instructions cover `_next` + `requires_confirmation` (`schedule-discovery.unit.test.ts`).
+Wired centrally in `runMcpTool` so every hosted metered call gets `_next`.

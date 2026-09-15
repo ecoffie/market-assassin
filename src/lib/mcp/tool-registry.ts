@@ -19,6 +19,7 @@
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
+import { attachNextActions } from '@/lib/mcp/next-actions';
 import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
@@ -1733,8 +1734,24 @@ export interface McpToolRun {
  * Run a tool by name with model-supplied args, as the given identity. Reuses the
  * existing chat toolsets' execute(). Throws on an unknown tool (the transport maps
  * that to an MCP error). Does NOT debit — that's Slice 3.
+ *
+ * Successful results are decorated with `_next` (contextual next-step suggestion)
+ * via attachNextActions — see src/lib/mcp/next-actions.ts.
  */
 export async function runMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: McpToolContext,
+): Promise<McpToolRun> {
+  const run = await runMcpToolRaw(name, args, ctx);
+  return {
+    credits: run.credits,
+    result: attachNextActions(name, run.result, args),
+  };
+}
+
+/** Unadorned dispatch — used by runMcpTool. Prefer runMcpTool from callers. */
+async function runMcpToolRaw(
   name: string,
   args: Record<string, unknown>,
   ctx: McpToolContext,

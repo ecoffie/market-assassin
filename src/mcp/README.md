@@ -84,6 +84,12 @@ Plus the free meta-tool `get_balance` (HTTP edge only).
   (data-first: the raw grounded data is the product). Gated by `mcpFlags.aiHint`
   (`MCP_ENABLE_AI_HINT`, accepts only the literal `'true'`); the smoke flips it on to
   exercise the layer.
+- **`_next { primary, secondary? }`** — contextual next-step suggestion attached by
+  `attachNextActions` inside `runMcpTool`. Each action has `prompt`, `tool`, `credits`,
+  `requires_confirmation`, and optional `missing_inputs` / `suggested_args`. Suggesting
+  a paid call, watch, or delivery change is **not** permission to execute it — the
+  shared MCP `instructions` tell the host agent to explain cost and wait. See
+  `src/lib/mcp/next-actions.ts`.
 
 ## Run it locally
 

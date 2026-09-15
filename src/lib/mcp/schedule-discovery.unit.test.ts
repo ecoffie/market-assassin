@@ -35,6 +35,8 @@ describe('MCP schedule discovery', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/inspect the available tool list/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Never drop unsupported/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/daily, weekly, or paused/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain('_next');
+    expect(MCP_CONNECTOR_INSTRUCTIONS.toLowerCase()).toMatch(/do not auto-run/);
   });
 
   it('maps each customer phrase to schedule_market_search (routing contract)', () => {

@@ -43,9 +43,26 @@ export const SCHEDULE_MARKET_SEARCH_DESCRIPTION =
 
 /**
  * MCP initialize `instructions` — shared by hosted HTTP edge and stdio.
- * Clients surface this as connector guidance; keep it short and action-oriented.
+ * Clients surface this as connector guidance. Covers: guided next steps (`_next`),
+ * confirmation before paid/watch/delivery writes, and schedule-discovery routing.
  */
 export const MCP_CONNECTOR_INSTRUCTIONS = [
+  'Mindy is federal contracting intelligence. Customers use ordinary language — they should',
+  'not need tool names or a memorized workflow.',
+  '',
+  'Guided next steps:',
+  '- After each successful tool result, look for the `_next` block. Offer its primary',
+  '  suggestion in plain English. Occasionally offer the secondary too — never dump a',
+  '  generic menu of every tool.',
+  '- `_next` is a suggestion, not permission. When `requires_confirmation` is true',
+  '  (paid calls, creating a watch/schedule, changing delivery), explain the action and',
+  '  credit cost, then wait for the user to ask you to proceed. Do not auto-run those tools.',
+  '- Common arc: search opportunities → offer to monitor; relevant opp → bid-fit or',
+  '  incumbent; bid assessment done → pursuit dossier or compliance checklist; market',
+  '  report → investigate top buyers.',
+  '- Only cite facts returned by tools. If `_meta.grounded` is false, say so honestly —',
+  '  do not invent agencies, dollars, or incumbents.',
+  '',
   'Scheduling / monitoring procurement searches:',
   '- When the user wants to schedule a search, run it on a cadence, monitor a market,',
   '  keep them updated, email new opportunities, or create a watch — call',
