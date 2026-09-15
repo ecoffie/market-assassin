@@ -23,7 +23,6 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from './contact-quality';
-import { governmentBuyersOnly } from './contact-kind';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { resolveBuyerLocation } from '@/lib/geo/city-geocode';

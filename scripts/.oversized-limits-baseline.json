@@ -182,12 +182,6 @@
       "limit": 2000
     },
     {
-      "fingerprint": "b6afacb5e9d6228f",
-      "file": "src/app/api/app/contacts-map/route.ts",
-      "table": "federal_contacts",
-      "limit": 4000
-    },
-    {
       "fingerprint": "b93f480ecd7efe8e",
       "file": "src/app/api/enterprise/change-history/route.ts",
       "table": "recompete_opportunities",
@@ -252,6 +246,12 @@
       "file": "src/app/api/admin/access-split/route.ts",
       "table": "user_profiles",
       "limit": 2000
+    },
+    {
+      "fingerprint": "e94d85f31d784305",
+      "file": "src/app/api/app/contacts-map/route.ts",
+      "table": "federal_contacts",
+      "limit": 4000
     },
     {
       "fingerprint": "fa32d7627f41788d",

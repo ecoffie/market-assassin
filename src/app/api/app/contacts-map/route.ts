@@ -326,12 +326,16 @@ async function buyersPins(params: {
   // (no real name exists upstream — not recoverable). Excluding the labelled shapes at the
   // QUERY keeps `count` honest for the "N of M" label; isUsableContactCard below is the
   // belt-and-suspenders in case a row slips the ILIKE (e.g. a bare digit string or role label).
-  let q = governmentBuyersOnly(placeholderNameFilter(db
+  let q = placeholderNameFilter(db
     .from('federal_contacts')
     .select('id, contact_fullname, contact_title, department_ind_agency, office, sub_tier, solicitation_number', { count: 'exact' })
     .not('contact_fullname', 'is', null)
-    .not('solicitation_number', 'is', null)))
+    .not('solicitation_number', 'is', null))
     .limit(4000);
+  // Government buyers ONLY — the authoritative contact_kind contract. Applied as its own
+  // statement: nesting it inside the other wrapper exceeds TS's generic instantiation depth on
+  // the Supabase builder type (TS2589), same as in contact-roster.ts.
+  q = governmentBuyersOnly(q);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
   // Agency multi-select (pipe-joined needles; both word orders) → department_ind_agency ("STATE,
   // DEPARTMENT OF" here). Empty/all-checked sends nothing → no narrowing (whole map).
