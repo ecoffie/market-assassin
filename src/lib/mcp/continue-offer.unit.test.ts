@@ -85,6 +85,33 @@ describe('the offer is wired to the real ladder', () => {
     expect(topupRate / proRate).toBeGreaterThan(1.1);
   });
 
+  it('OPEN: the catalog has multiple unresolved per-credit conflicts (consolidated review pending)', () => {
+    // Measured 2026-09-15. Ordered cheapest per credit:
+    //
+    //   Pro    $149 / 1,500/mo  =  9.9c   <- best rate
+    //   Refill $119 / 1,000     = 11.9c   <- one-time, the Phase 3 pack
+    //   Agency $999 / 8,000/mo  = 12.5c
+    //   Mid    $249 / 1,500/mo  = 16.6c
+    //   Entry  $99  / 500/mo    = 19.8c
+    //   Team   $499 / 1,000/mo  = 49.9c   <- 5x Pro
+    //
+    // FOUR subscriptions cost more per credit than a one-time pack, and Pro gives Mid's
+    // exact 1,500 allowance for $100 LESS. Eric, 2026-09-15: the refill price is approved
+    // and settled; these conflicts are a CONSOLIDATED PRICING REVIEW that stays open, and
+    // existing subscriptions are NOT changed.
+    //
+    // This test documents the state rather than asserting a target, so the conflict is
+    // visible in CI instead of living in a chat thread. When the review lands, replace
+    // this with the invariant it decides.
+    const refillRate = CREDIT_PACKAGES[0].usd / CREDIT_PACKAGES[0].credits;
+    const pricier = SUBSCRIPTION_PLANS
+      .filter((pl) => pl.monthly.usd / pl.creditsPerMonth > refillRate)
+      .map((pl) => pl.id);
+    expect(pricier.length).toBeGreaterThan(0); // known-open: not yet resolved
+    // Pro remains the floor — that part IS settled and must not regress.
+    expect(refillRate).toBeGreaterThan(149 / PRO_MONTHLY_CREDITS);
+  });
+
   it('KNOWN EXCEPTION: Entry is priced above the refill per credit', () => {
     // Deliberately asserted so the anomaly is visible rather than forgotten. Entry
     // ($99/500 = 19.8c) is the oldest offer in the ladder and is now the most expensive

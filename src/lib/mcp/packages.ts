@@ -61,7 +61,7 @@ export const CREDIT_PACKAGES: readonly CreditPackage[] = [
   // purchased/allowance pool split, not by copy.
   { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits',
     priceId: 'price_1UFvuQK5zyiZ50PBga7mejqu',
-    checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' },
+    checkoutUrl: 'https://buy.stripe.com/28EfZi5Ey97cgVL3OEfnO15' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
