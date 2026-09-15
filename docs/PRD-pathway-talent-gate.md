@@ -133,6 +133,8 @@ Tools already adjacent (not a matcher): `get_contractor_award_history`, `lookup_
 
 **Status after inventory:** gate answered — **thin matcher allowed; full Morehouse Talent blocked until evidence classes exist.**
 
+**Design contract (no code yet):** `docs/PRD-pathway-fit-v0.md` — tool `match_company_to_pathways`, two-sided evidence killer rule, determinations SUPPORTED/POSSIBLE/NOT_ESTABLISHED/NOT_APPLICABLE.
+
 ---
 
 ## Explicit non-goals (this gate)
