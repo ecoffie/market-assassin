@@ -92,7 +92,11 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
   // 1. The buyer's own contact row — name / title / agency / office / email / phone.
   const { data: rows, error: rowErr } = await db
     .from('federal_contacts')
-    .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number')
+    .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, contact_kind, solicitation_number')
+    // ⚠️ Direct-by-id retrieval — the one query with no scope of its own. Every LISTING surface
+    // is contact_kind-scoped, so no product path hands out a vendor id today, but "today's
+    // callers happen to be safe" is not a guarantee. Require the kind here too.
+    .eq('contact_kind', 'government_buyer')
     .eq('id', id)
     .limit(1);
   if (rowErr) throw rowErr;
@@ -190,7 +194,8 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
   if (agency) {
     const { data: rmates, error: rErr } = await placeholderNameFilter(db
       .from('federal_contacts')
-      .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, solicitation_number')
+      .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, contact_kind, solicitation_number')
+      .eq('contact_kind', 'government_buyer')
       .eq('department_ind_agency', agency)
       .neq('id', id)
       .not('contact_fullname', 'is', null))

@@ -83,3 +83,55 @@ describe('buyer-detail keeps raw-vs-display separate', () => {
     expect(src).toMatch(/const name = displayContactName\(nameRaw\)/);
   });
 });
+
+// ── PHASE 13: the government-buyer classification contract ───────────────────
+//
+// Before contact_kind, vendor exclusion depended on incidental predicates that happened to
+// correlate with vendor shape. A seventh route written without that folklore would have leaked
+// 82,017 vendor entity POCs as government buyers. These tests make the contract structural.
+
+describe('every customer government-buyer surface is contact_kind-scoped', () => {
+  const GOV_SURFACES = [
+    'src/app/api/app/federal-contacts/route.ts',
+    'src/app/api/app/contacts-map/route.ts',
+    'src/lib/gov-contacts/contact-roster.ts',
+    'src/lib/gov-contacts/buyer-detail.ts',
+    'src/lib/events/query.ts',
+  ];
+
+  it.each(GOV_SURFACES)('%s requires government_buyer', (p) => {
+    const src = read(p);
+    expect(src, `${p} does not scope on contact_kind`).toMatch(
+      /governmentBuyersOnly\(|\.eq\('contact_kind', 'government_buyer'\)/,
+    );
+  });
+
+  it('buyer-detail scopes its DIRECT by-id lookup too, not just its listings', () => {
+    // The latent gap: .eq('id', id) had no scope of its own, and isUsableContactCard could not
+    // save it — hasOrg passes on a vendor row because the COMPANY sits in sub_tier.
+    const src = read('src/lib/gov-contacts/buyer-detail.ts');
+    const byId = src.slice(src.indexOf("from('federal_contacts')"), src.indexOf('.limit(1)'));
+    expect(byId).toContain("eq('contact_kind', 'government_buyer')");
+  });
+
+  it('no surface re-implements the vendor predicate by hand', () => {
+    // The whole point is ONE contract. A route asserting vendor shape itself (UEI present,
+    // department null, …) is a seventh copy by another name.
+    for (const p of GOV_SURFACES) {
+      const src = read(p);
+      expect(src, `${p} hand-rolls a vendor test`).not.toMatch(/raw_data\s*\?\s*'uei'/);
+      expect(src, `${p} hand-rolls a vendor test`).not.toContain("'vendor_entity_poc'");
+    }
+  });
+
+  it('isUsableContactCard rejects vendor rows centrally as defense in depth', () => {
+    const src = read('src/lib/gov-contacts/contact-quality.ts');
+    expect(src).toMatch(/if \(row\.contact_kind === 'vendor_entity_poc'\) return false;/);
+  });
+
+  it('the producer sets the kind, so the fail-closed scope cannot starve live rows', () => {
+    // governmentBuyersOnly hides UNCLASSIFIED rows. That is only safe because the canonical
+    // producer states the kind on every write — these two facts must stay true together.
+    expect(read('src/lib/gov-contacts/buyer-contact-source.ts')).toContain('contact_kind: CONTACT_KIND_GOVERNMENT');
+  });
+});

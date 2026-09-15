@@ -36,6 +36,7 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
@@ -331,6 +332,10 @@ async function buyersPins(params: {
     .not('contact_fullname', 'is', null)
     .not('solicitation_number', 'is', null))
     .limit(4000);
+  // Government buyers ONLY — the authoritative contact_kind contract. Applied as its own
+  // statement: nesting it inside the other wrapper exceeds TS's generic instantiation depth on
+  // the Supabase builder type (TS2589), same as in contact-roster.ts.
+  q = governmentBuyersOnly(q);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
   // Agency multi-select (pipe-joined needles; both word orders) → department_ind_agency ("STATE,
   // DEPARTMENT OF" here). Empty/all-checked sends nothing → no narrowing (whole map).

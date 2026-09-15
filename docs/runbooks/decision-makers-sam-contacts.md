@@ -15,6 +15,57 @@ The Decision Makers source: named government points-of-contact on SAM notices.
 
 ---
 
+## TWO sources, three physical generations — read this first
+
+| | source 1 | source 2 |
+|---|---|---|
+| `source_key` | `decision_makers_sam_contacts` | `decision_makers_vendor_entity_pocs` |
+| upstream | SAM **notice** POCs | SAM **entity registrations** |
+| physical generations | `AllSamContacts` **and** `sam_opportunities_pointOfContact` | `sam_entities_pocs` |
+| `contact_kind` | `government_buyer` | `vendor_entity_poc` |
+| producer | `buyer-contact-run.ts`, cron `0 */2 * * *` | frozen legacy importer, unscheduled |
+| currentness | measurable | **UNMEASURED — no oracle exists** |
+
+⚠️ **`sam_opportunities_pointOfContact` is NOT a separate source.** It is the FIRST GENERATION of
+source 1: same `<notice_id>::<slot>` key space, and the live drain has re-adopted 94.7% of it in
+place. It is never archived and never relabelled.
+
+### Three columns, three different questions — never conflate them
+
+| column | question it answers | authoritative for |
+|---|---|---|
+| `source_table` | *which importer first wrote this row* | import lineage / history |
+| `contact_kind` | *is this a government buyer or a vendor* | **customer + product semantics** |
+| `data_source_instances` | *which upstream source owns it* | the control plane |
+
+### The `contact_kind` contract
+
+- Values: `government_buyer` · `vendor_entity_poc` · `NULL` (unclassified).
+- **No DB default, ever.** `source` and `role_category` became meaningless precisely because
+  every row inherited a value nobody asserted. Producers state the kind explicitly.
+- Classification is STRUCTURAL (`src/lib/gov-contacts/contact-kind.ts`), never label-based. The
+  two rules are mutually exclusive by construction: vendor needs `department_ind_agency IS NULL`,
+  government needs `IS NOT NULL`.
+- **Surface rule:** every customer government-buyer query goes through `governmentBuyersOnly()`.
+  It FAILS CLOSED — an unclassified row is hidden, not shown. That is only safe because the
+  canonical producer sets the kind on every write; `contact-name-parity.unit.test.ts` asserts
+  both halves together.
+- `buyer-detail`'s direct by-id lookup is scoped too. It is the one query with no scope of its
+  own, and `isUsableContactCard` cannot cover it — `hasOrg` passes on a vendor row because the
+  COMPANY sits in `sub_tier`.
+
+### Held population semantics
+
+Both instances derive `held_population` from `contact_kind`, never from `source_table`. Source 1
+therefore covers BOTH government generations (175,078 + 30,439 = 205,517).
+
+### ⚠️ Legacy importer danger
+
+`scripts/populate-contracting-officers.js` writes source 1's key space while explicitly setting
+`source_table`. A re-run would silently RELABEL rows the live producer owns and land them
+unclassified. It is dry-run by default and needs BOTH `--legacy-replay` and
+`--i-understand-this-relabels-live-rows`, guarded at the write. **Do not run it.**
+
 ## What this source is, and is not
 
 It is a **derived** source. It does not call SAM; it flattens POC arrays out of the notice

@@ -121,6 +121,49 @@ describe('the rules never consult the unreliable columns', () => {
   });
 });
 
+describe('the backfill script cannot drift from the classifier', () => {
+  const script = readFileSync(join(process.cwd(), 'scripts/backfill-contact-kind.mjs'), 'utf8');
+
+  it('uses the SAME predicates as CONTACT_KIND_SQL', () => {
+    // The script is .mjs, outside the TS build, so it cannot import the constant. This test IS
+    // the link: if either side changes, the two stop matching and the build fails.
+    // Both sides go through the SAME normalization — the script's literals carry JS string
+    // concatenation (+) and quotes that the TS constant does not, and normalizing only one side
+    // silently compares different things.
+    const norm = (v: string) => v.replace(/['"+;]/g, ' ').replace(/\s+/g, ' ').trim();
+    const vendorLit = norm(script.slice(script.indexOf('const VENDOR_SQL'), script.indexOf('const GOVERNMENT_SQL')).replace(/const VENDOR_SQL\s*=/, ''));
+    const govLit = norm(script.slice(script.indexOf('const GOVERNMENT_SQL'), script.indexOf('const GO =')).replace(/const GOVERNMENT_SQL\s*=/, ''));
+    expect(vendorLit).toContain(norm(CONTACT_KIND_SQL.vendor));
+    expect(govLit).toContain(norm(CONTACT_KIND_SQL.government));
+  });
+
+  it('is dry-run by default and writes only with --go', () => {
+    expect(script).toMatch(/const GO = process\.argv\.includes\('--go'\)/);
+    expect(script).toMatch(/if \(!GO\)[\s\S]{0,120}ROLLBACK/);
+  });
+
+  it('refuses to write if the exclusivity invariant is violated', () => {
+    expect(script).toMatch(/INVARIANT VIOLATED/);
+    expect(script).toMatch(/before\.overlap !== 0/);
+  });
+
+  it('never touches identity, lineage or the writer clock', () => {
+    // updated_at especially: federal_contacts has no trigger on it, so bumping it here would
+    // fake a data advance across the whole corpus and destroy the drain's change semantics.
+    const updates = script.match(/UPDATE federal_contacts SET [^`]*/g) ?? [];
+    expect(updates.length).toBeGreaterThan(0);
+    for (const u of updates) {
+      for (const col of ['updated_at', 'imported_at', 'source_table', 'source_row_key', 'contact_email', 'contact_fullname', 'raw_data']) {
+        expect(u, `backfill writes ${col}`).not.toContain(col);
+      }
+    }
+  });
+
+  it('reconciles after the write or rolls back', () => {
+    expect(script).toMatch(/post-write reconciliation failed/);
+  });
+});
+
 describe('the live producer states the kind explicitly', () => {
   const src = read('src/lib/gov-contacts/buyer-contact-source.ts');
 

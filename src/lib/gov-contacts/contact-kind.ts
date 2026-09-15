@@ -106,3 +106,26 @@ export const CONTACT_KIND_SQL = {
     "source_row_key ~ '^[0-9a-f]{32}::[0-9]+$' AND department_ind_agency IS NOT NULL "
     + "AND raw_data ? 'fullName'",
 } as const;
+
+// ── THE CUSTOMER-SURFACE CONTRACT ───────────────────────────────────────────
+//
+// Every customer-facing government-buyer query goes through ONE helper. Before contact_kind
+// existed, exclusion of the 82,017 vendor rows depended on incidental predicates
+// (`department_ind_agency IS NOT NULL` here, `solicitation_number IS NOT NULL` there) that
+// happened to correlate with vendor shape. They were correct, but nothing SAID so — a seventh
+// route written without that folklore would have leaked vendors as government buyers.
+
+/**
+ * Restrict a PostgREST query to government buyers.
+ *
+ * ⚠️ FAILS CLOSED: this requires `contact_kind = 'government_buyer'`, so an UNCLASSIFIED row is
+ * hidden rather than shown. That is deliberate — showing a row of unknown kind on a
+ * government-buyer surface is the failure this column exists to prevent. The cost is that a
+ * future producer which forgets to set the kind makes its rows invisible instead of wrong;
+ * `contact-kind.unit.test.ts` asserts the live producer sets it, and the backfill left zero
+ * unclassified rows.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function governmentBuyersOnly<T extends { eq: (c: string, v: any) => T }>(q: T): T {
+  return q.eq('contact_kind', CONTACT_KIND_GOVERNMENT);
+}
