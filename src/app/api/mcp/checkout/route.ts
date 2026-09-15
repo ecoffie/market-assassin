@@ -30,11 +30,12 @@ export async function POST(req: NextRequest) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ error: 'stripe not configured' }, { status: 500 });
 
-  let body: { attempt?: string; product?: string } = {};
+  let body: { attempt?: string; product?: string; interval?: string } = {};
   try { body = await req.json(); } catch { /* empty body is a validation error below */ }
 
   const attemptId = typeof body.attempt === 'string' ? body.attempt : null;
   const product = typeof body.product === 'string' ? body.product : 'entry';
+  const interval = typeof body.interval === 'string' ? body.interval : 'month';
   if (!attemptId) return NextResponse.json({ error: 'attempt required' }, { status: 400 });
 
   // IDENTITY COMES FROM THE SESSION, NEVER THE REQUEST BODY. A caller must not be able to
@@ -61,8 +62,24 @@ export async function POST(req: NextRequest) {
   const pkg = (CREDIT_PACKAGES as ReadonlyArray<{ id: string; priceId?: string; credits: number }>)
     .find((p) => p.id === product);
   const plan = SUBSCRIPTION_PLANS.find((p) => p.id === product);
-  const priceId = pkg?.priceId ?? plan?.monthly.priceId;
+  // `interval` selects the annual price where one exists; monthly stays the default so
+  // existing callers are unaffected.
+  const wantAnnual = interval === 'year' || interval === 'annual';
+  const planPrice = plan ? (wantAnnual && plan.annual ? plan.annual : plan.monthly) : null;
+  const priceId = pkg?.priceId ?? planPrice?.priceId;
   if (!priceId) return NextResponse.json({ error: `unknown product: ${product}` }, { status: 400 });
+
+  /**
+   * Checkout copy MUST be interval-specific and MUST NOT live on the Stripe product —
+   * monthly and annual prices share one product, so a product-level description saying
+   * "per month" is simply WRONG on an annual purchase (it was, on Growth, until fixed).
+   * Deriving it from config here means the figures cannot drift from the allowances.
+   */
+  const submitMessage = pkg
+    ? `${pkg.credits.toLocaleString()} additional credits. One-time payment. Credits never expire.`
+    : wantAnnual && plan?.annual
+      ? `${plan.annual.credits.toLocaleString()} credits delivered upfront each year. Every Mindy tool. Unused credits carry forward.`
+      : `${(plan?.creditsPerMonth ?? 0).toLocaleString()} credits delivered each month. Every Mindy tool. Unused credits carry forward.`;
 
   const stripe = new Stripe(key);
   try {
@@ -84,6 +101,7 @@ export async function POST(req: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: plan ? 'subscription' : 'payment',
       line_items: [{ price: priceId, quantity: 1 }],
+      custom_text: { submit: { message: submitMessage } },
       // BOTH attributions, set server-side so neither can be lost or spoofed:
       //   client_reference_id → the account (what the webhook already reads)
       //   metadata.attempt    → the specific blocked request, so resume can be exact
