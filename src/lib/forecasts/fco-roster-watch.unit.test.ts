@@ -178,6 +178,10 @@ describe('the census module can never write forecasts', () => {
       expect(s, `${n} can mutate`).not.toMatch(/\.(upsert|insert|update|delete)\(/);
     }
   });
+  it('has a soft time budget so an over-run reports INCOMPLETE rather than being killed', () => {
+    expect(SRC).toMatch(/budgetMs/);
+    expect(SRC).toMatch(/soft time budget/);
+  });
   it('enumeration is not bounded by a page-number ceiling of 320', () => {
     expect(SRC).not.toMatch(/start\s*<\s*320/);
     expect(SRC).toContain('MAX_PAGES');
