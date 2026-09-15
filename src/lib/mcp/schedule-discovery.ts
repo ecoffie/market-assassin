@@ -68,4 +68,10 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '- Cadence supports only daily, weekly, or paused. If they ask for an exact clock time',
   '  (e.g. "every Monday at 9am"), explain those options and confirm before saving.',
   '- Until recompete alerts ship, do not claim Coming back / recompetes are watched by email.',
+  '',
+  'Current Acquisition Intelligence (after FIND):',
+  '- After find_opportunities (or when the user asks what CHANGED about how a buyer is buying), call',
+  '  get_current_acquisition_intelligence — not pain-points JSON, not generic BD advice.',
+  '- It returns cited OBSERVED_CHANGE + CURRENT_STATE sections, pathway evidence only, and a capability/door',
+  '  _next prompt — never set-aside-first.',
 ].join('\n');

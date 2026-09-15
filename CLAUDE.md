@@ -234,6 +234,13 @@ don't re-derive.
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
 
+### Current Acquisition Intelligence v0 — ACTIVE 2026-09-15
+Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
+`get_current_acquisition_intelligence` (8 credits). Journey:
+**FIND → CURRENT INTELLIGENCE → PATHWAY** (UNDERSTAND may slot between FIND and
+CURRENT INTELLIGENCE when it ships). Compose only — no new scrapers/tables.
+Host probes A/B/C run via `node scripts/probe-cai-v0.mjs`; **HOLD merge until PASS.**
+
 ### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
 Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching
 `federal_contacts` ingest; don't re-derive.

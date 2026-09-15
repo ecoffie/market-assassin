@@ -6793,3 +6793,13 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 **SEO / proof:** Grounded per-horizon counts from `sam_opportunities`, `recompete_opportunities`, `agency_forecasts`. Cross-class unique procurements are not claimed. Credits: 10 per compose (not 5×3). Watch coverage disclosed as Open + Coming soon until recompete alerts ship.
 
 **As of:** 2026-09-15
+
+---
+
+## get_current_acquisition_intelligence — Current Acquisition Intelligence v0 (2026-09-15)
+
+**What.** MCP journey slot after FIND: one composed package answers what **changed** about how a buyer is buying for a capability scope, what Mindy sees **now**, supported implications, and do-differently actions — each tied to cited live rows (recompete_changes, SAM opps, recompetes, forecasts, events). Pathway claims require explicit record evidence; CSO/OT/consortium/rapid/PAE gaps are named, not invented.
+
+**Why.** Customers need "what should I do differently because of what changed" — not pain-point prose, not set-aside-first qualification, not playbook SOCOM claims.
+
+**SEO / proof.** Unit: `current-acquisition-intelligence.unit.test.ts` (killer rule, pathway classifiers, no set-aside _next). Host probes: `scripts/probe-cai-v0.mjs` (SOCOM cyber, VA IT, USACE construction). Credits: 8. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY.

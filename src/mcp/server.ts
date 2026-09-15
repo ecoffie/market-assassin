@@ -33,6 +33,7 @@ import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { findOpportunitiesTool } from './tools/find-opportunities';
+import { currentAcquisitionIntelligenceTool } from './tools/current-acquisition-intelligence';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
@@ -557,6 +558,38 @@ server.registerTool(
   },
   async (args) => {
     const result = await findOpportunitiesTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_current_acquisition_intelligence',
+  {
+    title: 'Current Acquisition Intelligence (what changed · what to do)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'CURRENT INTELLIGENCE journey slot — what changed about how this buyer buys for a capability, and what to ' +
+      'do differently (cited live deltas only). Composes recompete_changes, recompete_opportunities, sam_opportunities, ' +
+      'agency_forecasts, sam_events. Exposes pathway gaps honestly; never set-aside-first.',
+    inputSchema: {
+      agency: z.string().optional().describe('Buying organization.'),
+      office: z.string().optional(),
+      dodaac: z.string().optional().describe('6-char DoDAAC when known.'),
+      capability: z.string().optional().describe('Capability / market scope.'),
+      keywords: z.array(z.string()).optional(),
+      naics: z.array(z.string()).optional(),
+      psc: z.array(z.string()).optional(),
+      notice_ids: z.array(z.string()).optional(),
+      contract_ids: z.array(z.string()).optional(),
+      piids: z.array(z.string()).optional(),
+      window_days: z.number().int().min(7).max(365).optional(),
+    },
+  },
+  async (args) => {
+    const result = await currentAcquisitionIntelligenceTool(args);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,
