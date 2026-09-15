@@ -161,6 +161,31 @@ curl -s "https://getmindy.ai/api/cron/sync-gov-buyer-data?pull=contacts&backfill
 | health `draining` | catch-up in progress | **not an error.** Coverage debt is not a broken producer; it alerts on neither. |
 | cursor not moving across runs | backfill exhausted (`pass_completed_at` set) or the budget is being hit | check `budgetExhausted` per lane in the response |
 
+### ⚠️ `dispatched` is the HEALTHY terminal status — `success` never appears
+
+`timeout_ms` is 290000, which makes this a **long job**. The dispatcher cannot await a long job
+without timing itself out, so it aborts its own client at `LONG_JOB_ACK_MS` (12s) and records
+**`dispatched`** with a NULL `http_status`. The route keeps running on its own instance and
+completes normally. `daily-alerts` shows the same pattern (1,685 `dispatched` alongside its
+successes) and demonstrably works.
+
+So: **do not read `dispatched` as a failure, and do not judge a run by `cron_job_runs` alone.**
+The run takes ~31s while the ack lands at 12s, so for roughly 19 seconds the job is mid-flight
+with its checkpoint not yet written — sampling `decision_makers_sync_state` in that window shows
+the PREVIOUS run's values and looks like nothing happened. (This misled a check on 2026-09-15:
+the 04:00 run was reported as having done nothing when it was simply still running, and had in
+fact advanced `notices_scanned` 30,000 → 40,000.)
+
+**Judge a run by the checkpoint, sampled after it finishes:**
+
+```bash
+npm run db -- decision_makers_sync_state --select lane,notices_scanned,last_run_at
+```
+
+`last_run_at` newer than the dispatch time and a higher `notices_scanned` is the proof. A genuine
+failure shows up as `error` with a real `http_status` (as the first fire did: 401), or as a
+`last_run_at` that never advances past the dispatch.
+
 ### Manual recovery
 
 ```sql
