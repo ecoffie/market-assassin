@@ -39,6 +39,7 @@ import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { mcpToolResultFromMeteredError } from '@/lib/mcp/commercial-refusal';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
@@ -157,10 +158,11 @@ const baseHandler = createMcpHandler(
             { userEmail: identity.userEmail, apiKeyId: identity.keyId ?? null },
           );
           if (!outcome.ok) {
-            return {
-              isError: true,
-              content: [{ type: 'text', text: `${outcome.error.code}: ${outcome.error.message}` }],
-            };
+            // Commercial refusals (insufficient credits / requires Pro) MUST NOT set
+            // isError. Claude treats isError as a transport/tool crash and invents
+            // "server isn't responding — let me retry" — measured 2026-09-15 when a
+            // user had 45 credits and capability_market_match needed 50.
+            return mcpToolResultFromMeteredError(outcome.error);
           }
           // Balance-in-chat (like Higgsfield): surface the remaining balance right
           // in the conversation. `outcome.balance` is the post-debit balance

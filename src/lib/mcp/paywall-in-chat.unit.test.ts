@@ -66,7 +66,7 @@ describe('the offer is in the message', () => {
   });
 
   it('states the price and the real balance', () => {
-    expect(wall()).toContain('costs 100 credits — you have 0');
+    expect(wall()).toContain('You need 100 credits to run this analysis. You currently have 0.');
   });
 
   it('shows what the plan actually buys, from packages.ts', () => {

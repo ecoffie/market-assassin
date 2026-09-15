@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
 
-/** Pinned fingerprint of the v1 offer surface. Update ONLY alongside a version bump. */
-/** v2 (2026-08-28): the offer moved INTO the chat message — price + two pressable
- *  Stripe links. Bump + rehash on any further copy/CTA/checkout change. */
-const OFFER_SURFACE_HASH_V2 = '6f8efc507511e843';
+/** Pinned fingerprint of the offer surface. Update ONLY alongside a version bump. */
+/** v5 (2026-09-15): lead with exact need/have + do-not-retry (commercial ≠ server error). */
+const OFFER_SURFACE_HASH_V5 = '33c4534cd72ccedd';
 import { paywallMessage, RESUME_BASE, PAYWALL_OFFER_VERSION, __testing } from './paywall';
 
 describe('paywallMessage', () => {
@@ -16,11 +15,11 @@ describe('paywallMessage', () => {
       balance: 0,
       attemptId: 'abc-123',
     });
-    // The old message led with price and balance. The offer should lead with intent.
-    expect(msg).toContain('another market');
+    expect(msg).toContain('You need 100 credits to run this analysis. You currently have 0.');
     expect(msg).toContain('Market Report');
     expect(msg).toContain('one NAICS code and one geography');
-    expect(msg).not.toMatch(/your balance is 0/i);
+    expect(msg).toMatch(/do not retry/i);
+    expect(msg).not.toMatch(/server (isn.t|not) responding/i);
   });
 
   it('links to the saved attempt so the request survives checkout', () => {
@@ -102,6 +101,6 @@ describe('paywallMessage', () => {
     expect(
       { version: PAYWALL_OFFER_VERSION, hash },
       'Offer copy/CTA/checkout changed. Bump PAYWALL_OFFER_VERSION and update this hash.',
-    ).toEqual({ version: 'v4', hash: OFFER_SURFACE_HASH_V2 });
+    ).toEqual({ version: 'v5', hash: OFFER_SURFACE_HASH_V5 });
   });
 });
