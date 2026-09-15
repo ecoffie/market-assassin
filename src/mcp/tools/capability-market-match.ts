@@ -9,6 +9,11 @@
  * No new data engine — it orchestrates pure fns, each GUARDED (honest-miss: a failed
  * section degrades to empty, never fabricates). `_meta` always ships. Credits are
  * charged by the transport (runMeteredTool).
+ *
+ * Budget (P1): CAPABILITY_MARKET_MATCH_BUDGET_MS soft wall. keywordCoverage gets
+ * AbortSignal; optional enrichment is wrapped in guardedWithDeadline so a hung
+ * downstream call cannot burn the remaining Vercel window. Core market grounded
+ * ⇒ full price; coverage timeout ⇒ degraded+!grounded ⇒ DEFECT-7 uncharged.
  */
 import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
 import { keywordCoverage, CoverageDeadlineError, type KeywordCoverage } from '@/lib/market/keyword-coverage';
@@ -36,6 +41,12 @@ import {
 } from '@/lib/market/capability-competitors';
 
 export { pickLeadKeyword, pickBestAnchor };
+
+export type CapabilitySectionName =
+  | 'buyer_vocabulary'
+  | 'competitors'
+  | 'forecasts'
+  | 'recompetes';
 
 export interface CapabilityMarketMatchInput {
   description?: string;
@@ -70,6 +81,10 @@ export interface CapabilityMarketMatchResult {
     degraded: boolean;
     /** Machine reason when degraded — e.g. deadline_exceeded. Timed-out ≠ no market. */
     degraded_reason?: 'deadline_exceeded' | 'section_failed';
+    /** Optional enrichment skipped for time — does NOT flip degraded / does NOT cut price. */
+    sections_omitted?: CapabilitySectionName[];
+    /** Optional enrichment that threw — does NOT flip degraded for core billing. */
+    sections_failed?: CapabilitySectionName[];
     anchor_verified?: boolean;
     anchor_confidence?: AnchorConfidence;
     anchor_note?: string;
@@ -99,6 +114,12 @@ export interface CapabilityMarketMatchResult {
 /** Soft wall for the whole tool — under MCP maxDuration 60s with headroom for transport. */
 export const CAPABILITY_MARKET_MATCH_BUDGET_MS = 22_000;
 
+/** Minimum remaining budget before we even start an optional enrichment section. */
+const MIN_SECTION_MS = 500;
+
+type SectionOutcome<T> =
+  | { value: T | null; status: 'ok' | 'failed' | 'omitted' };
+
 async function guarded<T>(p: Promise<T>): Promise<{ value: T | null; degraded: boolean }> {
   try {
     return { value: await p, degraded: false };
@@ -106,6 +127,42 @@ async function guarded<T>(p: Promise<T>): Promise<{ value: T | null; degraded: b
     if (err instanceof CoverageDeadlineError) throw err;
     console.error('[capability_market_match] section failed:', err);
     return { value: null, degraded: true };
+  }
+}
+
+/**
+ * Bound an OPTIONAL enrichment promise to the remaining tool budget.
+ * Does not require the downstream helper to honor AbortSignal — we stop waiting.
+ * Omitted/failed sections are metadata, not fabricated empty "sourced" results.
+ */
+export async function guardedWithDeadline<T>(
+  promise: Promise<T>,
+  remainingMs: number,
+  _sectionName: CapabilitySectionName,
+): Promise<SectionOutcome<T>> {
+  if (remainingMs < MIN_SECTION_MS) {
+    // Detach — do not await; let it settle in the background.
+    void promise.catch(() => {});
+    return { value: null, status: 'omitted' };
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const raced = await Promise.race([
+      promise.then((value) => ({ kind: 'ok' as const, value })),
+      new Promise<{ kind: 'timeout' }>((resolve) => {
+        timer = setTimeout(() => resolve({ kind: 'timeout' }), remainingMs);
+      }),
+    ]);
+    if (raced.kind === 'timeout') {
+      void promise.catch(() => {});
+      return { value: null, status: 'omitted' };
+    }
+    return { value: raced.value, status: 'ok' };
+  } catch (err) {
+    console.error(`[capability_market_match] ${_sectionName} failed:`, err);
+    return { value: null, status: 'failed' };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -240,7 +297,7 @@ async function capabilityMarketMatchInner(
 
   // Propagate remaining deadline into keywordCoverage — every USASpending fetch aborts.
   let coverage: KeywordCoverage | null = null;
-  let covDegraded = false;
+  let covFailed = false;
   try {
     coverage = await keywordCoverage(lead, 0.9, { signal });
   } catch (err) {
@@ -248,10 +305,9 @@ async function capabilityMarketMatchInner(
       return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
     }
     console.error('[capability_market_match] keywordCoverage failed:', err);
-    covDegraded = true;
+    covFailed = true;
     coverage = null;
   }
-  const cov = { value: coverage, degraded: covDegraded };
 
   const GENERIC_SERVICES = new Set(['561210', '561990', '541990', '561499', '541611', '541618']);
   const isPscPinned = Boolean(coverage?.pinnedPscCodes?.length);
@@ -287,57 +343,89 @@ async function capabilityMarketMatchInner(
     validation.anchor_verified;
 
   const fetchCompetitors = marketVerified && Boolean(leadNaics);
+  const sectionsOmitted: CapabilitySectionName[] = [];
+  const sectionsFailed: CapabilitySectionName[] = [];
 
-  // Skip heavy fan-out when the budget is nearly gone — prefer a timely market
-  // answer over a platform 504. Empty sections are omitted, NOT fabricated zeros.
-  // ⚠️ CHARGING: we do NOT set degraded=true here when coverage already grounded.
-  // Existing metered DEFECT-7 bills degraded+grounded at full price; flipping
-  // degraded on a post-coverage trim would silently change billing. Product call
-  // deferred — see PR. Coverage-timeout path uses deadlineMiss (uncharged).
-  const skipHeavy = signal.aborted || remainingMs() < 3_000;
-  const competitorQuery =
-    fetchCompetitors && !skipHeavy
-      ? guarded(searchContractors({ naics: leadNaics!, limit: 10 }))
-      : Promise.resolve({ value: null, degraded: false as boolean });
+  const track = <T>(name: CapabilitySectionName, outcome: SectionOutcome<T>): T | null => {
+    if (outcome.status === 'omitted') sectionsOmitted.push(name);
+    if (outcome.status === 'failed') sectionsFailed.push(name);
+    return outcome.value;
+  };
 
-  const [vocab, competitors, forecasts, expiring] = await Promise.all([
-    !marketVerified || skipHeavy
-      ? Promise.resolve({ value: null, degraded: false as boolean })
-      : isPscPinned && pinnedPsc
-        ? guarded(getVocabulary(pinnedPsc, { codeType: 'psc', limit: 25 }))
-        : leadNaics
-          ? guarded(getVocabulary(leadNaics, { codeType: 'naics', limit: 25 }))
-          : Promise.resolve({ value: null, degraded: false as boolean }),
-    competitorQuery,
-    skipHeavy
-      ? Promise.resolve({ value: null, degraded: false as boolean })
-      : guarded(agencyForecasts({ keyword: lead, limit: 10 })),
-    marketVerified && leadNaics && !skipHeavy
-      ? guarded(expiringContracts({ naics: leadNaics, limit: 10 }))
-      : Promise.resolve({ value: null, degraded: false as boolean }),
-  ]);
+  // Optional enrichment — each section is independently deadline-bounded so a hung
+  // competitor/forecast call cannot hold the tool past the global budget.
+  // CHARGING: omitted enrichment does NOT set degraded=true (core market still bills).
+  const budgetLeft = () => remainingMs();
 
-  let competitorsResolved = competitors;
+  const vocabOutcome = !marketVerified
+    ? ({ value: null, status: 'ok' } as SectionOutcome<Awaited<ReturnType<typeof getVocabulary>>>)
+    : await guardedWithDeadline(
+        isPscPinned && pinnedPsc
+          ? getVocabulary(pinnedPsc, { codeType: 'psc', limit: 25 })
+          : leadNaics
+            ? getVocabulary(leadNaics, { codeType: 'naics', limit: 25 })
+            : Promise.resolve([] as Awaited<ReturnType<typeof getVocabulary>>),
+        budgetLeft(),
+        'buyer_vocabulary',
+      );
+  const vocabValue = track('buyer_vocabulary', vocabOutcome);
+
+  const competitorOutcome = !fetchCompetitors
+    ? ({ value: null, status: 'ok' } as SectionOutcome<Awaited<ReturnType<typeof searchContractors>>>)
+    : await guardedWithDeadline(
+        searchContractors({ naics: leadNaics!, limit: 10 }),
+        budgetLeft(),
+        'competitors',
+      );
+  let competitorsValue = track('competitors', competitorOutcome);
+
+  const forecastOutcome = await guardedWithDeadline(
+    agencyForecasts({ keyword: lead, limit: 10 }),
+    budgetLeft(),
+    'forecasts',
+  );
+  const forecastsValue = track('forecasts', forecastOutcome);
+
+  const expiringOutcome =
+    marketVerified && leadNaics
+      ? await guardedWithDeadline(
+          expiringContracts({ naics: leadNaics, limit: 10 }),
+          budgetLeft(),
+          'recompetes',
+        )
+      : ({ value: null, status: 'ok' } as SectionOutcome<Awaited<ReturnType<typeof expiringContracts>>>);
+  const expiringValue = track('recompetes', expiringOutcome);
+
   let usedPscPeers = false;
-  const pscPeers =
+  if (
     fetchCompetitors &&
     isPscPinned &&
-    coverage?.pinnedPscCodes?.length
-      ? await guarded(topRecipientsByPsc(coverage.pinnedPscCodes, 10))
-      : { value: null as RecipientRow[] | null, degraded: false as boolean };
-  if ((pscPeers.value?.length ?? 0) > 0) {
-    usedPscPeers = true;
-    competitorsResolved = {
-      value: {
+    coverage?.pinnedPscCodes?.length &&
+    budgetLeft() >= MIN_SECTION_MS
+  ) {
+    const pscPeers = await guardedWithDeadline(
+      topRecipientsByPsc(coverage.pinnedPscCodes, 10),
+      budgetLeft(),
+      'competitors',
+    );
+    if (pscPeers.status === 'ok' && (pscPeers.value?.length ?? 0) > 0) {
+      usedPscPeers = true;
+      // Prefer PSC peers when available; remove a prior competitors omit if we recovered.
+      const omitIdx = sectionsOmitted.lastIndexOf('competitors');
+      if (omitIdx >= 0 && competitorOutcome.status === 'omitted') sectionsOmitted.splice(omitIdx, 1);
+      competitorsValue = {
         queried: { naics: leadNaics ?? undefined, sort_by: 'total_obligated' as const },
         contractors: pscPeers.value as RecipientRow[],
         _meta: { grounded: true, degraded: false, count: (pscPeers.value as RecipientRow[]).length },
-      },
-      degraded: false,
-    };
+      } as Awaited<ReturnType<typeof searchContractors>>;
+    } else if (pscPeers.status === 'omitted' && !competitorsValue) {
+      if (!sectionsOmitted.includes('competitors')) sectionsOmitted.push('competitors');
+    } else if (pscPeers.status === 'failed' && !competitorsValue) {
+      if (!sectionsFailed.includes('competitors')) sectionsFailed.push('competitors');
+    }
   }
 
-  const rawCompetitorRows = competitorsResolved.value?.contractors ?? [];
+  const rawCompetitorRows = competitorsValue?.contractors ?? [];
   const competitorRows = filterCompetitorsFabricatedRelevance(rawCompetitorRows, lead);
   const competitorDerivation = describeCompetitorDerivation({
     usedPscPeers,
@@ -346,12 +434,15 @@ async function capabilityMarketMatchInner(
     rowCount: competitorRows.length,
   });
 
-  const degraded = [cov, vocab, competitorsResolved, forecasts, expiring].some((s) => s.degraded);
+  // Core billing signal: only coverage failure / timeout flips degraded for DEFECT-7.
+  // Optional enrichment omit/fail is sections_omitted / sections_failed — still billable
+  // when grounded. Coverage timeout already returned via deadlineMiss.
+  const coreDegraded = covFailed;
 
   const NAICS_CAP = 8, PSC_CAP = 6, VOCAB_CAP = 25, LIST_CAP = 10;
   const allNaics = coverage?.allNaics ?? [];
   const allPsc = coverage?.topPscList ?? [];
-  let vocabTerms = (vocab.value ?? []).map((t) => (t as { term?: string }).term ?? String(t));
+  let vocabTerms = (vocabValue ?? []).map((t) => (t as { term?: string }).term ?? String(t));
   if (isPscPinned && vocabTerms.length === 0) {
     const artTerms = termOfArtSynonyms(lead) ?? [];
     const pscTitles = (coverage?.topPscList ?? [])
@@ -359,8 +450,15 @@ async function capabilityMarketMatchInner(
       .filter(Boolean);
     vocabTerms = Array.from(new Set([...artTerms, ...pscTitles]));
   }
-  const forecastRows = forecasts.value?.forecasts ?? [];
-  const recompeteRows = expiring.value?.contracts ?? [];
+  // Omitted/failed enrichment → empty arrays that are NOT claimed as sourced counts
+  // (available=0 when omitted; shown=0). Never invent a "0 competitors found" story.
+  const vocabOmitted = sectionsOmitted.includes('buyer_vocabulary') || sectionsFailed.includes('buyer_vocabulary');
+  const competitorsOmitted = sectionsOmitted.includes('competitors') || sectionsFailed.includes('competitors');
+  const forecastsOmitted = sectionsOmitted.includes('forecasts') || sectionsFailed.includes('forecasts');
+  const recompetesOmitted = sectionsOmitted.includes('recompetes') || sectionsFailed.includes('recompetes');
+
+  const forecastRows = forecastsOmitted ? [] : (forecastsValue?.forecasts ?? []);
+  const recompeteRows = recompetesOmitted ? [] : (expiringValue?.contracts ?? []);
   const shownAvail = (shown: number, available: number) => ({ shown: Math.min(shown, available), available });
 
   return {
@@ -378,13 +476,17 @@ async function capabilityMarketMatchInner(
           single_code_share_pct: coverage.topCodePct,
         }
       : null,
-    buyer_vocabulary: vocabTerms.slice(0, VOCAB_CAP),
-    competitors: competitorRows.slice(0, LIST_CAP),
+    buyer_vocabulary: vocabOmitted ? [] : vocabTerms.slice(0, VOCAB_CAP),
+    competitors: competitorsOmitted ? [] : competitorRows.slice(0, LIST_CAP),
     upcoming_forecasts: forecastRows.slice(0, LIST_CAP),
     recompete_opportunities: recompeteRows.slice(0, LIST_CAP),
     _meta: {
       grounded: validation.grounded,
-      degraded,
+      // Only core coverage failure — NOT enrichment omission (Eric charging decision 2026-09-15).
+      degraded: coreDegraded,
+      ...(coreDegraded ? { degraded_reason: 'section_failed' as const } : {}),
+      ...(sectionsOmitted.length ? { sections_omitted: [...new Set(sectionsOmitted)] } : {}),
+      ...(sectionsFailed.length ? { sections_failed: [...new Set(sectionsFailed)] } : {}),
       anchor_verified: validation.anchor_verified,
       anchor_confidence: validation.anchor_confidence,
       anchor_note: validation.anchor_note,
@@ -411,16 +513,26 @@ async function capabilityMarketMatchInner(
         keywords: shownAvail(keywords.length, keywords.length),
         top_naics: shownAvail(NAICS_CAP, allNaics.length),
         top_psc: shownAvail(PSC_CAP, allPsc.length),
-        buyer_vocabulary: shownAvail(VOCAB_CAP, vocabTerms.length),
-        competitors: shownAvail(LIST_CAP, competitorsResolved.value?._meta?.count ?? competitorRows.length),
-        forecasts: shownAvail(LIST_CAP, forecasts.value?._meta?.count ?? forecastRows.length),
-        recompetes: shownAvail(LIST_CAP, expiring.value?._meta?.count ?? recompeteRows.length),
+        buyer_vocabulary: vocabOmitted
+          ? { shown: 0, available: 0 }
+          : shownAvail(VOCAB_CAP, vocabTerms.length),
+        competitors: competitorsOmitted
+          ? { shown: 0, available: 0 }
+          : shownAvail(LIST_CAP, competitorsValue?._meta?.count ?? competitorRows.length),
+        forecasts: forecastsOmitted
+          ? { shown: 0, available: 0 }
+          : shownAvail(LIST_CAP, forecastsValue?._meta?.count ?? forecastRows.length),
+        recompetes: recompetesOmitted
+          ? { shown: 0, available: 0 }
+          : shownAvail(LIST_CAP, expiringValue?._meta?.count ?? recompeteRows.length),
       },
       elapsed_ms: Date.now() - started,
       ...(validation.anchor_note
         ? { note: validation.anchor_note }
-        : skipHeavy
-          ? { note: 'Returned before all downstream sections finished — budget remaining was too low.' }
+        : sectionsOmitted.length
+          ? {
+              note: `Core market returned within budget; omitted enrichment: ${[...new Set(sectionsOmitted)].join(', ')}.`,
+            }
           : {}),
     },
   };

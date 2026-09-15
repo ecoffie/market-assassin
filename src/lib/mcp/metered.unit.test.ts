@@ -102,4 +102,45 @@ describe('runMeteredTool', () => {
     expect(r).toMatchObject({ ok: true, creditsCharged: 0 });
     expect(credits.logCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'uncharged', creditsCharged: 0 }));
   });
+
+  // capability_market_match charging contract (Eric 2026-09-15):
+  // coverage timeout → degraded+!grounded → DEFECT-7 uncharged;
+  // grounded core + omitted enrichment → full price (sections_omitted is not a discount).
+  it('coverage-timeout shape (degraded && !grounded) is uncharged — DEFECT-7', async () => {
+    m(registry.creditsFor).mockReturnValue(50);
+    m(credits.getBalance).mockResolvedValue(100);
+    m(registry.runMcpTool).mockResolvedValue({
+      result: {
+        market: null,
+        _meta: { grounded: false, degraded: true, degraded_reason: 'deadline_exceeded' },
+      },
+      credits: 50,
+    });
+    const r = await runMeteredTool('capability_market_match', {}, ctx);
+    expect(r).toMatchObject({ ok: true, creditsCharged: 0 });
+    expect(credits.debitCredits).not.toHaveBeenCalled();
+    expect(credits.logCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'uncharged', creditsCharged: 0 }));
+  });
+
+  it('grounded core + sections_omitted still bills the full tool price', async () => {
+    m(registry.creditsFor).mockReturnValue(50);
+    m(credits.getBalance).mockResolvedValue(100);
+    m(registry.runMcpTool).mockResolvedValue({
+      result: {
+        market: { lead_keyword: 'cnc', total_market: 1 },
+        competitors: [],
+        _meta: {
+          grounded: true,
+          degraded: false,
+          sections_omitted: ['competitors', 'forecasts'],
+        },
+      },
+      credits: 50,
+    });
+    m(credits.debitCredits).mockResolvedValue({ ok: true, newBalance: 50 });
+    const r = await runMeteredTool('capability_market_match', {}, ctx);
+    expect(r).toMatchObject({ ok: true, creditsCharged: 50, balance: 50 });
+    expect(credits.debitCredits).toHaveBeenCalledWith('u@x.com', 50, expect.anything());
+    expect(credits.logCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'success', creditsCharged: 50 }));
+  });
 });

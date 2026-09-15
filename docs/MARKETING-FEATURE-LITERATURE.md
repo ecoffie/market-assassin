@@ -6837,16 +6837,17 @@ outputs intentionally deferred.
 
 ## Capability-to-Market Match — deadline-aware coverage (P1 reliability)
 
-**What.** `capability_market_match` now runs under a ~22s soft budget. USASpending
-fetches inside `keywordCoverage` carry AbortSignal. If the clock runs out, Mindy
-returns an honest degraded result (`degraded_reason=deadline_exceeded`, market
-null) — never a hung tool and never a fabricated "$0 market."
+**What.** `capability_market_match` runs under a ~22s soft budget. USASpending
+fetches inside `keywordCoverage` carry AbortSignal. Optional enrichment
+(competitors / forecasts / recompetes / vocabulary) is deadline-bounded at the
+caller so a hung downstream call cannot hold the tool to a Vercel 504. Coverage
+timeout → honest degraded miss (not "$0 market"). Enrichment omitted for time →
+`sections_omitted` metadata; core market stays grounded and billable at full price.
 
-**Why.** Coverage fan-out could burn the full 60s MCP platform limit and surface as
-a gateway 504. Timed-out ≠ "no federal market."
+**Why.** Coverage fan-out — and then hung enrichment — could burn the full 60s MCP
+platform limit. Timed-out ≠ "no federal market." Skipping enrichment ≠ a discount.
 
-**Proof.** Unit tests: hanging USASpending → CoverageDeadlineError; tool returns
-inside budget with `grounded=false` / `degraded=true`. Billing: coverage-timeout
-uses existing DEFECT-7 uncharged path (`degraded && !grounded`). Charging for
-partial-but-grounded trims is deliberately NOT changed in this PR.
+**Proof.** Unit tests: hanging coverage / hanging competitors / hanging forecasts
+all return inside budget; metered tests lock DEFECT-7 uncharged vs full 50-credit
+success when grounded + sections_omitted.
 
