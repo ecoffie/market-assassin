@@ -830,6 +830,7 @@ export async function POST(request: NextRequest) {
       let oppRowsErr: { message: string } | null = null;
       try {
         oppRows = await fetchAllPaged<{ department: string | null; solicitation_number: string | null }>(() => supabase
+          // truncation-ok: fetchAllPaged drains all pages; the .select shape alone is not a population cap
           .from('sam_opportunities')
           .select('department, solicitation_number')
           .gte('response_deadline', new Date().toISOString())

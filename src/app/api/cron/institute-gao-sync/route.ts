@@ -79,10 +79,13 @@ export async function GET(request: NextRequest) {
   const names = Object.keys(CODES as Record<string, unknown>);
 
   // Prior instance state (for degradation + source-advance-without-held).
-  const { data: priorInst } = await db.from('data_source_instances')
+  const { data: priorInst, error: priorInstErr } = await db.from('data_source_instances')
     .select('last_source_advance, held_population, notes')
     .eq('source_key', GAO_SOURCE_KEY)
     .maybeSingle();
+  if (priorInstErr) {
+    console.error('[institute-gao-sync] prior instance read failed:', priorInstErr.message);
+  }
   const priorSourceAdvance = (priorInst?.last_source_advance as string) ?? null;
   const priorResolutionRate = await measureGaoResolutionRate(db);
 
@@ -189,11 +192,15 @@ export async function GET(request: NextRequest) {
     // Derive for newly resolved rows.
     for (const d of reconcile.details) {
       if (!d.canonicalAgency) continue;
-      const { data: row } = await db.from('institute_sources')
+      const { data: row, error: rowErr } = await db.from('institute_sources')
         .select('id,title,source_url,canonical_agency,resolution_method,resolution_confidence,toptier_code')
         .eq('source_type', 'gao_report')
         .eq('document_number', d.documentNumber)
         .maybeSingle();
+      if (rowErr) {
+        console.error('[institute-gao-sync] reconcile row read failed:', rowErr.message);
+        continue;
+      }
       if (!row?.canonical_agency) continue;
       const der = await deriveFromInstituteSource(db, {
         instituteSourceId: row.id as string,
