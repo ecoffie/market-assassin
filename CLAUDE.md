@@ -231,8 +231,24 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
+### Customer Journey — UNDERSTAND active (FIND Seam A COMPLETE 2026-09-15)
+- **Seam A FIND:** `#1535` merged + live Claude host PASS (`find_opportunities` @ 10cr). Mark **complete** — do not reopen for ordering soft-nits.
+- **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge; search→monitor assumptions partially superseded by unified FIND.
+- **Sequencing (locked):** `FIND → UNDERSTAND → PATHWAY/TALENT → POSITION/ACT`. Understand the **buyer** first; then ask what capability/door the **seller** can walk through (not set-aside-first). Set-aside only when opportunity evidence makes socioeconomic status material.
+- **Active:** UNDERSTAND → `understand_customer` (PR #1537 HOLD — provenance + inference + `_next` capability closer). Do **not** add Capability statement · Response · Meeting brief until UNDERSTAND is proven.
+- **Parked after UNDERSTAND:** PATHWAY (which door) → TALENT (verifiable record) → POSITION → ACT. Do not jump set-aside qualification immediately after FIND or UNDERSTAND.
+- **Separate ticket:** FIND relevance `security ≠ cybersecurity` (#1538) — not in #1537.
+
+
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
+
+### Current Acquisition Intelligence v0 — SHIPPED 2026-09-15 (PR #1539)
+Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
+`get_current_acquisition_intelligence` (8 credits). Journey:
+**FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY**. Compose only — no new scrapers/tables.
+Fresh-host acceptance: prove catalog lists CAI @ 8cr, then natural host selection (no routing patch first).
+
 
 ### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
 Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching

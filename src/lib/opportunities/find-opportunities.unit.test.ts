@@ -44,6 +44,7 @@ function openItem(daysOut: number) {
     source: 'sam_opportunities',
     why_this_matched: 'test',
     identity: { kind: 'notice_id', id: 'abc' },
+    notice_id: 'abc',
   };
 }
 
@@ -75,8 +76,11 @@ describe('buildFindNext', () => {
       coming_soon: hz('empty', 0),
     } as Record<HorizonKey, HorizonResult>;
     const next = buildFindNext('specific', horizons);
+    expect(next[0].tool).toBe('understand_customer');
     expect(next[0].prompt).toMatch(/what this customer cares about/);
     expect(next[0].requires_confirmation).toBe(true);
+    expect(next[0].suggested_args?.notice_id).toBe('abc');
+    expect(next[0].suggested_args?.agency).toBe('DEPT OF DEFENSE');
     expect(next[1].prompt).toMatch(/Coming back/);
     expect(next[1].suggested_args?.watch_coverage).toEqual(['open_now', 'coming_soon']);
   });

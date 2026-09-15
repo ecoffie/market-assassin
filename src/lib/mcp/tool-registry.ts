@@ -34,6 +34,8 @@ import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
+import { currentAcquisitionIntelligenceTool } from '@/mcp/tools/current-acquisition-intelligence';
+import { understandCustomerTool } from '@/mcp/tools/understand-customer';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
@@ -105,6 +107,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_expiring_contracts: 5,
   // 10 — Unified Opportunity Map FIND (Open + Coming back + Coming soon). One composed debit.
   find_opportunities: 10,
+  // 8 — CURRENT INTELLIGENCE: what changed + what to do differently (LIVE compose, journey slot after FIND).
+  get_current_acquisition_intelligence: 8,
   search_grants: 5,
   search_sbir: 5,
   search_idv_contracts: 5,
@@ -122,6 +126,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   derive_company_keywords: 5,
   evaluate_bid_decision: 5,
   get_agency_intel: 5,
+  understand_customer: 5,
   // 10 — Profile: synthesized read on a competitor / market / agency + no-AI proposal utilities
   search_contractors: 10,
   get_contractor_profile: 10,
@@ -586,6 +591,63 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
         },
       },
       required: ['query'],
+    },
+  },
+};
+
+const CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_current_acquisition_intelligence',
+    description:
+      'CURRENT INTELLIGENCE — after FIND, answers what CHANGED about how this buyer is buying for a capability ' +
+      'and what to do differently (cited OBSERVED_CHANGE + CURRENT_STATE only). Composes LIVE reads from ' +
+      'recompete_changes, recompete_opportunities, sam_opportunities, agency_forecasts, and sam_events. ' +
+      'Never invents CSO/OT/consortium/rapid/PAE pathways without observed evidence; exposes gaps in ' +
+      'not_yet_measurable. Empty what_changed is honest. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY. ' +
+      'Credits: 8.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Buying organization (required unless notice/contract anchors resolve it).' },
+        office: { type: 'string', description: 'Optional buying office label.' },
+        dodaac: { type: 'string', description: 'Optional 6-char DoDAAC to narrow office scope.' },
+        capability: { type: 'string', description: 'Capability / market scope in plain language (discovery key).' },
+        keywords: { type: 'array', items: { type: 'string' }, description: 'Optional keyword list.' },
+        naics: { type: 'array', items: { type: 'string' }, description: 'Optional NAICS codes (6-digit preferred).' },
+        psc: { type: 'array', items: { type: 'string' }, description: 'Optional PSC codes.' },
+        notice_ids: { type: 'array', items: { type: 'string' }, description: 'Optional SAM notice anchors from FIND.' },
+        contract_ids: { type: 'array', items: { type: 'string' }, description: 'Optional recompete contract_id anchors.' },
+        piids: { type: 'array', items: { type: 'string' }, description: 'Optional PIID anchors.' },
+        window_days: { type: 'number', description: 'Lookback for OBSERVED_CHANGE (default 90, max 365).' },
+      },
+    },
+  },
+};
+
+const UNDERSTAND_CUSTOMER_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'understand_customer',
+    description:
+      'UNDERSTAND journey after a specific FIND hit. Returns three provenance-labeled sections: ' +
+      '(1) What we can verify from this opportunity/buyer (SAM), (2) What broader Mindy research indicates ' +
+      '(curated — not "what they actually care about"), (3) What that suggests you emphasize (suggestion, not buyer fact). ' +
+      'Pass notice_id from find_opportunities. Ends with a capability/door ask — NOT set-aside-first. ' +
+      'Does NOT draft capability statements, emails, responses, or meeting briefs. Credits: 5. ' +
+      'For agency-only lookup without a notice use get_agency_intel.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: {
+          type: 'string',
+          description: 'SAM notice UUID from find_opportunities open_now.items[].notice_id (preferred).',
+        },
+        agency: {
+          type: 'string',
+          description: 'Buying agency if known (also read from the notice when present).',
+        },
+      },
     },
   },
 };
@@ -1685,6 +1747,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     FIND_OPPORTUNITIES_TOOL_DEF,
+    CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF,
+    UNDERSTAND_CUSTOMER_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
@@ -1749,6 +1813,8 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'find_opportunities' ||
+    name === 'get_current_acquisition_intelligence' ||
+    name === 'understand_customer' ||
     name === 'get_expiring_contracts' ||
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
@@ -1960,6 +2026,15 @@ export async function runMcpTool(
     return { result, credits };
   }
 
+
+  if (name === 'understand_customer') {
+    const result = (await understandCustomerTool({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
   if (name === 'find_opportunities') {
     const timeframe =
       args.timeframe && typeof args.timeframe === 'object' && !Array.isArray(args.timeframe)
@@ -2000,6 +2075,25 @@ export async function runMcpTool(
             keyword_exact: typeof advanced.keyword_exact === 'string' ? advanced.keyword_exact : undefined,
           }
         : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_current_acquisition_intelligence') {
+    const strArr = (v: unknown): string[] | undefined =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined;
+    const result = (await currentAcquisitionIntelligenceTool({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      office: typeof args.office === 'string' ? args.office : undefined,
+      dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
+      capability: typeof args.capability === 'string' ? args.capability : undefined,
+      keywords: strArr(args.keywords),
+      naics: strArr(args.naics),
+      psc: strArr(args.psc),
+      notice_ids: strArr(args.notice_ids),
+      contract_ids: strArr(args.contract_ids),
+      piids: strArr(args.piids),
+      window_days: typeof args.window_days === 'number' ? args.window_days : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

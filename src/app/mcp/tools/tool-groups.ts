@@ -37,6 +37,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     blurb: "What's open, what's coming, what's expiring — across keywords, buying offices, grants, R&D and vehicles.",
     tools: [
       'find_opportunities',
+      'get_current_acquisition_intelligence',
       'search_sam_opportunities',
       'search_agency_opps_by_office',
       'get_agency_forecasts',
@@ -85,6 +86,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     blurb: "The buyer's pain points and priorities, its spending and budget trend, and the fine print of one award.",
     tools: [
       'get_agency_intel',
+      'understand_customer',
       'get_agency_budget_trends',
       'get_agency_spending_detail',
       'get_sba_goaling_share',

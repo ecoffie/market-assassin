@@ -33,6 +33,8 @@ import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { findOpportunitiesTool } from './tools/find-opportunities';
+import { currentAcquisitionIntelligenceTool } from './tools/current-acquisition-intelligence';
+import { understandCustomerTool } from './tools/understand-customer';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
@@ -561,6 +563,59 @@ server.registerTool(
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,
     };
+  },
+);
+
+server.registerTool(
+  'get_current_acquisition_intelligence',
+  {
+    title: 'Current Acquisition Intelligence (what changed · what to do)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'CURRENT INTELLIGENCE journey slot — what changed about how this buyer buys for a capability, and what to ' +
+      'do differently (cited live deltas only). Composes recompete_changes, recompete_opportunities, sam_opportunities, ' +
+      'agency_forecasts, sam_events. Exposes pathway gaps honestly; never set-aside-first.',
+    inputSchema: {
+      agency: z.string().optional().describe('Buying organization.'),
+      office: z.string().optional(),
+      dodaac: z.string().optional().describe('6-char DoDAAC when known.'),
+      capability: z.string().optional().describe('Capability / market scope.'),
+      keywords: z.array(z.string()).optional(),
+      naics: z.array(z.string()).optional(),
+      psc: z.array(z.string()).optional(),
+      notice_ids: z.array(z.string()).optional(),
+      contract_ids: z.array(z.string()).optional(),
+      piids: z.array(z.string()).optional(),
+      window_days: z.number().int().min(7).max(365).optional(),
+    },
+  },
+  async (args) => {
+    const result = await currentAcquisitionIntelligenceTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'understand_customer',
+  {
+    title: 'Understand This Customer (Opportunity · Agency · Emphasize)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'UNDERSTAND after specific FIND. Three provenance-labeled sections: what we can verify from ' +
+      'this opportunity/buyer; what broader Mindy research indicates; what that suggests you emphasize. ' +
+      'Never present curated research as what they "actually care about." Ends with a capability/door ask ' +
+      '(not set-aside-first). Does not draft emails, capability statements, responses, or meeting briefs.',
+    inputSchema: {
+      notice_id: z.string().optional().describe('SAM notice UUID from find_opportunities open_now item.'),
+      agency: z.string().optional().describe('Buying agency if known.'),
+    },
+  },
+  async ({ notice_id, agency }) => {
+    const result = await understandCustomerTool({ notice_id, agency });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
 

@@ -5,11 +5,29 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 59** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 61** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 59.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 61.
 
 ---
+
+## September 2026 — get_current_acquisition_intelligence (catalog 60 → 61)
+
+**New tool:** `get_current_acquisition_intelligence` (8 credits). CURRENT INTELLIGENCE journey
+slot after FIND: what CHANGED about how a buyer is buying for a capability, and what to do
+differently — cited OBSERVED_CHANGE + CURRENT_STATE from LIVE compose only
+(`recompete_changes`, `recompete_opportunities`, `sam_opportunities`, `agency_forecasts`,
+`sam_events`). Killer rule: no `do_differently` without `caused_by`. Pathway gaps stay in
+`not_yet_measurable` (no CSO/OT/consortium/rapid/PAE invention).
+
+
+## September 2026 — understand_customer (catalog 59 → 60)
+
+**New tool:** `understand_customer` (5 credits). First Customer Journey UNDERSTAND transition after
+specific `find_opportunities`: grounded package with **The opportunity says** · **Broader agency
+research shows** · **What that suggests you emphasize**. FIND `_next` for specific shape now points
+here (not bare `get_agency_intel`). Capability statement / Response / Meeting brief intentionally
+not included yet. Seam A (FIND) remains complete via #1535; PR #1526 stays frozen pending reconcile.
 
 ## September 2026 — find_opportunities (catalog 58 → 59)
 
@@ -135,7 +153,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 59 tools.
+- Capabilities artifact — 61 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 
