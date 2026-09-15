@@ -2,10 +2,11 @@
  * /api/cron/grant-mcp-pro-credits — monthly MCP-credit grant for PAYING subscribers + comp.
  *
  * GOS Decision #019 (2026-07-20): recurring credits require a recurring payment.
- *   • Active Pro sub ($149/mo)   → PRO_MONTHLY_CREDITS  (250)
+ *   • Active Pro sub ($149/mo)   → PRO_MONTHLY_CREDITS  (1,500 — read packages.ts, not this line)
  *   • Active Team sub ($499/mo)  → TEAM_MONTHLY_CREDITS  (1,000 — the header said 750, stale; corrected 2026-09-08)
  *   • Internal team (comp)       → INTERNAL_MONTHLY_CREDITS (25,000)
- *   • Advocates (comp)           → PRO_MONTHLY_CREDITS (250)
+ *   • Advocates (comp)           → PRO_MONTHLY_CREDITS (same as Pro)
+ *   • Sponsored (comp, sponsor-funded) → per-entitlement allowance, TOP-UP not add
  *
  * ⚠️ The subscriber audience is enumerated from ACTIVE Stripe subscriptions (classified by
  * price amount), NOT the KV `briefings:*` access gate — 716 have access but only ~49 pay, so
