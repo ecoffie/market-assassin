@@ -21,6 +21,15 @@
  *      in SAM POCs; role_category leaves empty buckets for them). See
  *      docs/PRD-gov-buyer-market-research.md §7.
  *
+ *      ⚠️ THE CONTACTS PULL IS NOW A REGISTERED, CHECKPOINTED SOURCE.
+ *      It is `decision_makers_sam_contacts` in `data_source_instances`, it owns a durable
+ *      cursor in `decision_makers_sync_state`, and it is scheduled by its OWN `cron_jobs`
+ *      row — NOT by being chained off sync-sam-opportunities. The implementation lives in
+ *      src/lib/gov-contacts/buyer-contact-run.ts; this route is only the HTTP edge.
+ *      It used to re-read the newest 10 pages with `offset` reset to 0 each run, which is
+ *      an ~11-day rolling window over 207,986 notices — 50.8% of held rows had not been
+ *      revisited in 90+ days. Do NOT reintroduce a head-only sweep here.
+ *
  * Modes (?pull=):
  *   - both     (default) run gov POCs + a slice of SB entities
  *   - contacts gov POC harvest only
@@ -34,7 +43,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
-import { isUsableContactName } from '@/lib/gov-contacts/contact-quality';
+import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -70,27 +79,6 @@ function getSupabase() {
 }
 
 // ───────────────────────── helpers ─────────────────────────
-
-function normalize(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  const s = String(v).trim();
-  return s.length ? s : null;
-}
-
-// A SAM POC "fullName" is garbage when an agency (e.g. DLA) stuffs the
-// field with buyer-lookup instructions, OR when SAM itself has no real name
-// and falls back to a "Telephone: 7175503112" placeholder (measured
-// 2026-07-26: 1,348 federal_contacts rows via this exact importer carried
-// that placeholder verbatim as the contact's "name"). Mirror the filter in
-// scripts/populate-contracting-officers.js; isUsableContactName is the
-// shared placeholder/phone-shape check reused by the read side too.
-function isGarbageName(name: string | null): boolean {
-  if (!name) return true;
-  if (name.length > 80) return true;          // paragraph, not a name
-  if (/\b(see|visit|email|contact the|please)\b/i.test(name)) return true;
-  if (!isUsableContactName(name)) return true; // "Telephone: ###" / bare digits
-  return false;
-}
 
 // Map a transformed SAMEntity → sam_entities row.
 // Exported so the dry-run (scripts/dry-run-gov-buyer-entities.ts) tests
@@ -240,72 +228,9 @@ async function syncEntities() {
 }
 
 // ───────────────────────── gov POC pull ─────────────────────────
-
-async function syncContacts() {
-  const sb = getSupabase();
-  const errors: string[] = [];
-  let upserted = 0;
-  const PAGE = 1000;
-  let offset = 0;
-
-  // Sweep sam_opportunities pages, flatten points_of_contact → rows.
-  // Bounded by CONTACT_MAX_PAGES so a single run stays cheap; the unique
-  // source_row_key makes re-runs idempotent so daily passes converge.
-  const MAX_PAGES = Number(process.env.GOV_BUYER_CONTACT_PAGES_PER_RUN || 10);
-
-  for (let p = 0; p < MAX_PAGES; p++) {
-    const { data: opps, error } = await sb
-      .from('sam_opportunities')
-      .select('notice_id, solicitation_number, department, office, sub_tier, posted_date, points_of_contact')
-      .order('posted_date', { ascending: false })
-      .range(offset, offset + PAGE - 1);
-
-    if (error) { errors.push(`contacts page ${p}: ${error.message}`); break; }
-    if (!opps || opps.length === 0) break;
-
-    const rows: Record<string, unknown>[] = [];
-    for (const row of opps) {
-      const pocs = Array.isArray(row.points_of_contact) ? row.points_of_contact : [];
-      pocs.forEach((c: Record<string, unknown>, idx: number) => {
-        const fullName = normalize(c.fullName as string);
-        const email = normalize(c.email as string);
-        const phone = normalize(c.phone as string);
-        if (isGarbageName(fullName)) return;
-        if (!email && !phone) return;            // useless for outreach
-        rows.push({
-          source_row_key: `${row.notice_id}::${idx}`,
-          contact_fullname: fullName,
-          contact_title: normalize(c.title as string) ||
-            (c.type === 'primary' ? 'Primary Contact' : c.type === 'secondary' ? 'Secondary Contact' : null),
-          contact_email: email,
-          contact_phone: phone,
-          department_ind_agency: normalize(row.department),
-          office: normalize(row.office),
-          sub_tier: normalize(row.sub_tier),
-          role_category: 'contracting',          // the only role SAM POCs yield
-          solicitation_number: normalize(row.solicitation_number),
-          posted_date: normalize(row.posted_date),
-          source: 'sam_opportunities_poc',
-          raw_data: c,
-          updated_at: new Date().toISOString(),
-        });
-      });
-    }
-
-    if (rows.length) {
-      const { error: upErr } = await sb
-        .from('federal_contacts')
-        .upsert(rows, { onConflict: 'source_row_key', ignoreDuplicates: false });
-      if (upErr) errors.push(`contacts upsert page ${p}: ${upErr.message}`);
-      else upserted += rows.length;
-    }
-
-    if (opps.length < PAGE) break;
-    offset += PAGE;
-  }
-
-  return { upserted, errors };
-}
+//
+// Delegates to the registered source runner. The extraction logic, the checkpoint algebra
+// and the clock semantics are all unit-tested in src/lib/gov-contacts/buyer-contact-source.ts.
 
 // ───────────────────────── handler ─────────────────────────
 
@@ -320,14 +245,28 @@ export async function GET(request: NextRequest) {
   }
 
   const pull = searchParams.get('pull') || 'both';
+  // dry=1 means ZERO persistent writes: no contact rows, no checkpoint move, no lease, no
+  // clocks, no alert state. It is a read-only rehearsal, not a quieter run.
+  const dry = searchParams.get('dry') === '1';
+  const num = (k: string, d: number) => {
+    const v = Number(searchParams.get(k));
+    return Number.isFinite(v) && v > 0 ? v : d;
+  };
   const started = Date.now();
-  const out: Record<string, unknown> = { pull };
+  const out: Record<string, unknown> = { pull, dry };
 
   try {
     if (pull === 'both' || pull === 'contacts') {
-      out.contacts = await syncContacts();
+      out.contacts = await runDecisionMakersSync(getSupabase(), {
+        dry,
+        pageSize: num('pageSize', 500),
+        refreshPages: num('refreshPages', 12),
+        backfillPages: num('backfillPages', 20),
+        refreshWindowDays: num('refreshWindowDays', 3),
+        budgetMs: num('budgetMs', 210_000),
+      });
     }
-    if (pull === 'both' || pull === 'entities') {
+    if ((pull === 'both' || pull === 'entities') && !dry) {
       out.entities = await syncEntities();
     }
     out.durationSeconds = Math.round((Date.now() - started) / 1000);

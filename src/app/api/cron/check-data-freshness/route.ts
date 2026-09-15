@@ -16,7 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 import {
   classifyFreshness,
   resolveAwardsIngestClocks,
@@ -117,53 +117,54 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // When sources are overdue, EMAIL the refresh checklist (cron runs unattended,
-  // so JSON alone is invisible). The refreshes are human-run scrapers; the email
+  // When sources are overdue, post the refresh checklist to OPS (Slack). The cron runs
+  // unattended, so JSON alone is invisible. The refreshes are human-run scrapers; the alert
   // tells Eric exactly which script to run, then ?stamp=<key> marks it done.
-  let emailed = false;
+  //
+  // ⚠️ THIS WAS ON THE EMAIL PATH AND HAD BEEN FAILING SILENTLY.
+  // Internal ops/health/watchdog notifications moved off email onto Slack in 2026-07 because
+  // they were burying the inbox; this watchdog never followed. Production evidence: it
+  // returned 502 on 2026-08-28, 08-30, 09-09, 09-11 and 09-14, and in this route a 502 means
+  // "staleness WAS detected and the notification failed" — so the monitor whose entire job is
+  // surfacing stale data had itself gone dark for 17 days while reporting the failure only in
+  // a response body nobody reads. sendOpsAlert is the same call shape and posts to the ops
+  // channel. `notified` is still load-bearing: a failed delivery must keep failing the job.
+  let notified = false;
   const notify = request.nextUrl.searchParams.get('notify') !== 'false';
   if (stale.length > 0 && notify) {
     try {
       const rows = stale.map(s =>
-        `<tr><td style="padding:6px 12px;border-bottom:1px solid #eee"><b>${s.name}</b></td>` +
-        `<td style="padding:6px 12px;border-bottom:1px solid #eee">${s.ageDays}d old (${s.cadence})</td>` +
-        `<td style="padding:6px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:12px">${s.refreshWith}</td></tr>`
+        `<li><b>${s.name}</b> — ${s.ageDays}d old (${s.cadence}) — ${s.refreshWith}</li>`
       ).join('');
-      emailed = await sendEmail({
-        to: 'evankoffdev@gmail.com',
-        subject: `📊 ${stale.length} Mindy data source(s) need attention`,
-        html: `<div style="font-family:system-ui;max-width:640px">
-          <h2 style="color:#1e3a8a">Data freshness check</h2>
-          <p>${stale.length} source(s) need attention — curated sources past their refresh cadence (run the script, then mark refreshed) and/or a live sync that has gone quiet (check its cron). See the "Refresh with" column.</p>
-          <table style="border-collapse:collapse;width:100%"><thead><tr style="background:#f3f4f6">
-            <th style="padding:6px 12px;text-align:left">Source</th><th style="padding:6px 12px;text-align:left">Age</th><th style="padding:6px 12px;text-align:left">Refresh with</th></tr></thead>
-          <tbody>${rows}</tbody></table>
-          <p style="margin-top:16px;font-size:13px;color:#666">After running a script, mark it done:<br>
-          <code style="font-size:12px">curl "https://getmindy.ai/api/cron/check-data-freshness?password=...&stamp=&lt;key&gt;"</code><br>
-          Keys: ${stale.map(s => s.key).join(', ')}</p>
-        </div>`,
+      const res = await sendOpsAlert({
+        subject: `${stale.length} Mindy data source(s) need attention`,
+        html: `<p>${stale.length} source(s) need attention — curated sources past their refresh cadence, and/or a live sync that has gone quiet.</p>`
+          + `<ul>${rows}</ul>`
+          + `<p>After running a script, mark it done: <code>curl "https://getmindy.ai/api/cron/check-data-freshness?password=...&amp;stamp=&lt;key&gt;"</code><br>`
+          + `Keys: ${stale.map(s => s.key).join(', ')}</p>`,
         emailType: 'admin_alert',
-        eventSource: 'data-freshness-cron',
       });
+      notified = res.ok;
+      if (!res.ok) console.error('[check-data-freshness] ops alert failed:', res.error);
     } catch (e) {
-      console.error('[check-data-freshness] email failed:', e);
+      console.error('[check-data-freshness] ops alert threw:', e);
     }
   }
 
-  const emailFailed = shouldFailWhenEmailFails({ staleCount: stale.length, notify, emailOk: emailed });
+  const notifyFailed = shouldFailWhenEmailFails({ staleCount: stale.length, notify, emailOk: notified });
   return NextResponse.json({
-    success: !emailFailed,
+    success: !notifyFailed,
     checkedAt: new Date().toISOString(),
     totalSources: (data || []).length,
     staleCount: stale.length,
     stale,
-    emailed,
-    message: emailFailed
-      ? 'Freshness issues found, but the notification email failed.'
+    notified,
+    message: notifyFailed
+      ? 'Freshness issues found, but the ops alert failed to deliver.'
       : stale.length === 0
         ? 'All curated data sources are within cadence.'
         : `${stale.length} source(s) due for refresh.`,
-  }, { status: emailFailed ? 502 : 200 });
+  }, { status: notifyFailed ? 502 : 200 });
 }
 
 // Live syncs we monitor by table recency (max updated_at), NOT by a stamped
