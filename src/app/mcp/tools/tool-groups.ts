@@ -37,6 +37,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     blurb: "What's open, what's coming, what's expiring — across keywords, buying offices, grants, R&D and vehicles.",
     tools: [
       'find_opportunities',
+      'get_current_acquisition_intelligence',
       'search_sam_opportunities',
       'search_agency_opps_by_office',
       'get_agency_forecasts',
