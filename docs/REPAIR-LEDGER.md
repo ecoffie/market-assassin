@@ -795,3 +795,36 @@ that supports BOTH writers, and it must land before or with the code — never a
 A bare try/catch around a write turns that skew window into silent data loss. The legacy
 column is deliberately NOT dropped here; removing it before the new build is live everywhere
 would recreate the outage.
+
+## 2026-09-15 — Decision Makers placeholder names: ONE name-quality contract
+
+**Defect.** `PLACEHOLDER_NAME_RE` matched only `telephone|phone|fax|tel`, so customers saw
+`ELECTRONIC MAIL: AUSTIN.SHATTO@DLA.MIL` (873 rows), `Facsimile: 0000000000` (26) and bare role
+labels like `CONTRACTING OFFICER` (382) rendered as a buyer's NAME. Separately, 28,010 rows
+(13.6%) displayed a phone glued to the name (`Stephen Weaver6142923131`).
+
+**The real defect was architectural:** the same decision existed in SIX divergent places —
+contact-quality's regex, four hand-copied PostgREST prefix lists, and an inline copy in
+`events/query.ts` — plus a private name cleaner in `market-report.ts` that no other surface had,
+and `relationships/route.ts` with no guard at all. MCP showed a cleaned name, Maps showed raw
+pollution, the CRM directory emitted the placeholder verbatim.
+
+**Proof anchors** (re-grep; a revert breaks them):
+- `src/lib/gov-contacts/contact-quality.ts` — `export function displayContactName`
+- `src/lib/gov-contacts/contact-quality.ts` — `export function placeholderNameFilter`
+- `src/lib/gov-contacts/contact-quality.ts` — `function stripAddress`
+- `src/lib/gov-contacts/buyer-detail.ts` — `.eq('contact_fullname', nameRaw)`
+- `src/lib/gov-contacts/contact-name-parity.unit.test.ts` — the six-copy regression gate
+
+**Measured on the live corpus (205,354 government rows), before → after:**
+displayed 201,433 → 199,797 · newly suppressed 1,636 (873 ELECTRONIC_MAIL + 382 role label +
+355 cleaned-to-nothing + 26 facsimile) · newly cleaned 28,010 · rejected by both 3,921 ·
+residual suspicious 743 (office/unit designators — deliberately NOT suppressed).
+
+**Two bugs in the fix itself were caught by running it over production data, not by tests:**
+an unconditional trailing-punct trim turned `HYONTONG YANG (Rio)` into `HYONTONG YANG (Rio`, and
+a naive address strip turned `Tamara Feist-Hatfield@va.gov` into `Tamara` — eating a real
+surname fused to its domain. Both are now fixtures.
+
+**The raw observation is never rewritten** — presentation only, so the source evidence survives
+for the person-identity work.

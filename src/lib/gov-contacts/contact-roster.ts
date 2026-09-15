@@ -21,7 +21,7 @@ import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
-import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
+import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 
 // ── Lifted route-local classifiers (faithful copies of federal-contacts/route.ts) ──
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -308,7 +308,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
 
   // Build a fresh query each call so we can retry without sub_tier narrowing.
   const buildQuery = (applySubTier: boolean) => {
-    let q = sb
+    let q = placeholderNameFilter(sb
       .from('federal_contacts')
       .select(
         'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
@@ -319,16 +319,10 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // in sub_tier, NO federal agency, and ZERO with an email). They leaked into
       // a bare text search here (name surnames + junk); the app route already
       // excludes them. A real POC always has a department.
-      .not('department_ind_agency', 'is', null)
-      // Ghost-card guard (2026-07-26): mirror the app route — ~3,912 rows carry a
-      // real email/agency but contact_fullname is a literal SAM placeholder
-      // ("Telephone: 7175503112"); no real name exists upstream. Excluded at the
-      // query so the roster's `total`/`emailableCount` stay honest; the
-      // isUsableContactCard filter below is the belt-and-suspenders.
-      .not('contact_fullname', 'ilike', 'telephone:%')
-      .not('contact_fullname', 'ilike', 'phone:%')
-      .not('contact_fullname', 'ilike', 'fax:%')
-      .not('contact_fullname', 'ilike', 'tel:%');
+      .not('department_ind_agency', 'is', null));
+    // Ghost-card guard: rows with a real email/agency whose contact_fullname is a SAM
+    // placeholder. Excluded at the query by placeholderNameFilter so the roster's
+    // `total`/`emailableCount` stay honest; isUsableContactCard below is the belt-and-braces.
     if (search) {
       // Mirror the app route's agency-aware search: name/title PLUS agency + the
       // sub_tier (bureau) column, so "forest" finds sub_tier "FOREST SERVICE" (the
@@ -411,7 +405,9 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // "Contracting" instead of null. The title-derived bucket still WINS when present (more specific).
       const roleCatLabel = roleCategory || roleCategoryLabel(r.role_category);
       return {
-        contact_fullname: r.contact_fullname,
+        // Display value: SAM's appended phone/DSN/email stripped. The raw observation in
+        // federal_contacts is untouched — this is presentation only.
+        contact_fullname: displayContactName(r.contact_fullname) ?? r.contact_fullname,
         contact_title: r.contact_title,
         contact_email: r.contact_email,
         contact_phone: r.contact_phone,

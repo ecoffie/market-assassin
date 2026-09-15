@@ -27,6 +27,7 @@ import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
@@ -442,13 +443,11 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     const people = (roster?.contacts ?? [])
       .filter((c) => (c.contact_email || '').includes('@'))
       .map((c) => ({
-        // The roster occasionally appends phone/DSN junk to the name (data quirk):
-        // "Stephen Weaver6142923131", "Joseph WerstakDSN(...". Strip a trailing run of
-        // digits/DSN and cut at the first digit or a bare "DSN".
-        name: (c.contact_fullname || '')
-          .replace(/\s*DSN.*$/i, '')
-          .replace(/\d[\d\s().-]*$/, '')
-          .trim(),
+        // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
+        // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
+        // here, so the report showed clean names while every other surface showed the raw
+        // pollution. It is now the shared contract.
+        name: displayContactName(c.contact_fullname) || '',
         role: c.role_category_label || c.contact_title || c.role || '',
         email: c.contact_email || '',
         office: c.derived_office || c.sub_agency || null,
