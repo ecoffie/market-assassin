@@ -34,7 +34,7 @@ const NOTICE_COLUMNS =
 /** Columns read back from federal_contacts to classify a write. Must cover MEANINGFUL_FIELDS. */
 const HELD_COLUMNS =
   'source_row_key, contact_fullname, contact_title, contact_email, contact_phone, '
-  + 'department_ind_agency, office, sub_tier, role_category, solicitation_number, posted_date';
+  + 'department_ind_agency, office, sub_tier, role_category, contact_kind, solicitation_number, posted_date';
 
 /** PostgREST builds a URL per request; 200 keys per `in.()` stays well inside the limit. */
 const HELD_LOOKUP_CHUNK = 200;
