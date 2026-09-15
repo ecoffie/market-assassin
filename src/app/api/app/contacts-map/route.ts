@@ -35,7 +35,7 @@ import { geocodeCity, stableSeed, resolveBuyerLocation } from '@/lib/geo/city-ge
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
-import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
+import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
@@ -322,19 +322,14 @@ async function buyersPins(params: {
   //
   // Ghost-card guard (2026-07-26): federal_contacts has ~3,912 rows where
   // contact_fullname is a literal SAM placeholder like "Telephone: 7175503112"
-  // (no real name exists upstream — not recoverable). Excluding the "telephone/
-  // phone/fax/tel:" shape at the QUERY keeps `count` honest for the "N of M"
-  // label; isUsableContactCard below is the belt-and-suspenders in case a row
-  // slips the ILIKE (e.g. a bare digit string with no label prefix).
-  let q = db
+  // (no real name exists upstream — not recoverable). Excluding the labelled shapes at the
+  // QUERY keeps `count` honest for the "N of M" label; isUsableContactCard below is the
+  // belt-and-suspenders in case a row slips the ILIKE (e.g. a bare digit string or role label).
+  let q = placeholderNameFilter(db
     .from('federal_contacts')
     .select('id, contact_fullname, contact_title, department_ind_agency, office, sub_tier, solicitation_number', { count: 'exact' })
     .not('contact_fullname', 'is', null)
-    .not('solicitation_number', 'is', null)
-    .not('contact_fullname', 'ilike', 'telephone:%')
-    .not('contact_fullname', 'ilike', 'phone:%')
-    .not('contact_fullname', 'ilike', 'fax:%')
-    .not('contact_fullname', 'ilike', 'tel:%')
+    .not('solicitation_number', 'is', null))
     .limit(4000);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
   // Agency multi-select (pipe-joined needles; both word orders) → department_ind_agency ("STATE,
@@ -430,7 +425,7 @@ async function buyersPins(params: {
     pins.push({
       id: String(r.id),
       lat: at[0], lng: at[1],
-      name: r.contact_fullname,
+      name: displayContactName(r.contact_fullname) ?? r.contact_fullname,
       title,
       // Clean, readable agency ("STATE, DEPARTMENT OF" → "Department of State"), not the
       // bare "State" the client-side clean() produced. Empty → neutral "Government".

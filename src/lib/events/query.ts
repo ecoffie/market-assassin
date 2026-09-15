@@ -16,6 +16,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { normalizeAgencyKey, isValidDodaac } from '@/lib/gov-contacts/agency-key';
+import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -496,7 +497,7 @@ export async function queryEngagementGraph(noticeId: string): Promise<Engagement
 
   // EDGE 2 (fact) — the buying office's real people, via the solicitation prefix. The
   // `office` column is NULL on all 126k federal_contacts rows, so the prefix is the key.
-  let buyers: EngagementGraph['buyers'] = [];
+  const buyers: EngagementGraph['buyers'] = [];
   if (ev.inferred_dodaac && isValidDodaac(ev.inferred_dodaac)) {
     const { data: cs, error: cErr } = await supabase
       .from('federal_contacts')
@@ -509,9 +510,14 @@ export async function queryEngagementGraph(noticeId: string): Promise<Engagement
     for (const c of (cs || []) as Array<{ contact_fullname: string; contact_title: string | null; department_ind_agency: string | null }>) {
       const k = (c.contact_fullname || '').toLowerCase();
       if (!k || seen.has(k)) continue;                 // same person appears on many notices
-      if (/^(telephone|phone|fax|tel)\s*:/i.test(c.contact_fullname)) continue;  // SAM placeholder rows
+      // Was a LOCAL copy of the placeholder regex — a fifth divergent implementation that
+      // never learned about facsimile / "ELECTRONIC MAIL:" / bare role labels. Now the one
+      // shared contract, and the displayed name gets the same pollution strip as every
+      // other surface.
+      const display = displayContactName(c.contact_fullname);
+      if (!display) continue;
       seen.add(k);
-      buyers.push({ name: c.contact_fullname, title: c.contact_title, agency: c.department_ind_agency });
+      buyers.push({ name: display, title: c.contact_title, agency: c.department_ind_agency });
       if (buyers.length >= 8) break;
     }
   }
