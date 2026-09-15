@@ -6747,3 +6747,37 @@ MCP / email new solicitations.
 instructions route to `schedule_market_search`; inspect-tools-first). Filter reject:
 `validate-filters.unit.test.ts` (unknown keys + strategy strands). Live: catalog
 description + MCP initialize `instructions` after deploy.
+
+---
+
+## Sponsored accounts — sponsor-funded recurring access (2026-09-15)
+
+**What.** An organization can sponsor a contractor's Mindy access: the sponsor
+funds a recurring monthly credit allowance, the sponsored user keeps their own
+login, history, and data. The sponsorship is a first-class record — allowance,
+sponsor, start and expiry — not a name on an internal list. It ends on its own
+date without anyone remembering to switch it off.
+
+**Why.** Sponsorship is how SBDCs, PTACs, primes, and funders already support
+small contractors, and previously we could only express it as a manual credit
+grant that someone had to repeat by hand each month. When that was forgotten the
+account hit a wall silently — which is exactly what happened before this shipped:
+an account sat blocked for four days generating 59 rejected calls that nobody
+saw. The allowance now renews monthly on its own, and exhaustion is detected
+rather than discovered.
+
+**Honest scope.** This is account infrastructure, not a purchasable plan —
+there is no self-serve "sponsor someone" checkout (that would need a sponsor-side
+billing relationship we do not have). Sponsorships are provisioned internally
+today. Alerting is detection-and-reporting; outbound notification is deliberately
+off pending review. Retry/rate-limit protection is a separate release (coming).
+
+**SEO.** Sponsored government contracting software / SBDC contractor tools /
+sponsor a small business GovCon subscription.
+
+**Proof.** First entitlement live 2026-09-15: Encore Funding → 8,000 credits/mo,
+expires 2027-03-15, enforced by `sponsor_active_entitlements`. Grant atomicity
+verified against live Postgres — 20 concurrent grants on one key produced exactly
+1 applied grant and 1 ledger row (balance 8,000, not 160,000); a 25,000 balance
+against an 8,000 ceiling granted 0 and was never reduced. Detection independently
+surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
