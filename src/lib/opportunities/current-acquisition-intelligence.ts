@@ -34,6 +34,13 @@ sanitizeSupabaseEnv();
 export const CAI_NEXT_PROMPT =
   'Want me to figure out which of these doors your company can actually walk through and what proof you should lead with?';
 
+/** Wired once PATHWAY FIT ships — host confirmation still required. */
+export const CAI_NEXT = {
+  prompt: CAI_NEXT_PROMPT,
+  requires_confirmation: true as const,
+  tool: 'match_company_to_pathways' as const,
+};
+
 export type CaiEpistemicClass =
   | 'observed_change'
   | 'current_state'
@@ -510,7 +517,7 @@ function emptyResult(
       })),
     ],
     pathways,
-    _next: [{ prompt: CAI_NEXT_PROMPT, requires_confirmation: true }],
+    _next: [{ ...CAI_NEXT }],
     _meta: {
       grounded: false,
       degraded: false,
@@ -1220,7 +1227,7 @@ export async function getCurrentAcquisitionIntelligence(
     do_differently: killed.do_differently,
     not_yet_measurable,
     pathways,
-    _next: [{ prompt: CAI_NEXT_PROMPT, requires_confirmation: true }],
+    _next: [{ ...CAI_NEXT }],
     _meta: {
       grounded,
       degraded: bundle.degraded,
