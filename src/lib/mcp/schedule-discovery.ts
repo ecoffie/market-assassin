@@ -46,6 +46,15 @@ export const SCHEDULE_MARKET_SEARCH_DESCRIPTION =
  * Clients surface this as connector guidance; keep it short and action-oriented.
  */
 export const MCP_CONNECTOR_INSTRUCTIONS = [
+  'Finding opportunities (PRIMARY):',
+  '- When the user wants to find opportunities, what is available, what is coming, or a market hunt',
+  '  (e.g. "cybersecurity in Florida"), call find_opportunities — NOT search_sam_opportunities alone.',
+  '- find_opportunities returns three independent horizons: OPEN NOW, COMING BACK, COMING SOON.',
+  '  An empty Open result is not a market-wide zero if other horizons hit. Never invent a solicitation',
+  '  number for a recompete or forecast.',
+  '- search_sam_opportunities remains for advanced SAM/Open-only searches.',
+  '- Watch/email coverage today is Open now + Coming soon only; Coming back is not emailed yet — say so.',
+  '',
   'Scheduling / monitoring procurement searches:',
   '- When the user wants to schedule a search, run it on a cadence, monitor a market,',
   '  keep them updated, email new opportunities, or create a watch — call',
@@ -58,4 +67,5 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '  and ask them to adjust.',
   '- Cadence supports only daily, weekly, or paused. If they ask for an exact clock time',
   '  (e.g. "every Monday at 9am"), explain those options and confirm before saving.',
+  '- Until recompete alerts ship, do not claim Coming back / recompetes are watched by email.',
 ].join('\n');

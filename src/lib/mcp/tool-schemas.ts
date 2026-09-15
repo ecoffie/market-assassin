@@ -169,7 +169,8 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_idv_contracts: { title: 'Search IDV Contracts' },
   search_past_contracts: { title: 'Search Past Contracts' },
   search_podcast_lessons: { title: 'Search Podcast Lessons' },
-  search_sam_opportunities: { title: 'Search SAM Opportunities' },
+  search_sam_opportunities: { title: 'Search SAM Opportunities (Open only)' },
+  find_opportunities: { title: 'Find Opportunities (Open · Coming back · Coming soon)' },
   search_sbir: { title: 'Search SBIR' },
 };
 
