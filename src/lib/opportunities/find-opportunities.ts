@@ -214,7 +214,7 @@ async function tableAsOf(client: SupabaseClient, table: string, col: string): Pr
   try {
     const { data, error } = await client.from(table).select(col).order(col, { ascending: false }).limit(1);
     if (error || !data?.[0]) return null;
-    const v = (data[0] as Record<string, unknown>)[col];
+    const v = (data[0] as unknown as Record<string, unknown>)[col];
     return typeof v === 'string' ? v : null;
   } catch {
     return null;

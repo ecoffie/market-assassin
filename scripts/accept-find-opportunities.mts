@@ -2,8 +2,8 @@
  * Blind acceptance: five FIND markets against live Supabase.
  * Usage: npx tsx --env-file=.env.local scripts/accept-find-opportunities.mts
  */
-import { findOpportunities } from '../src/lib/opportunities/find-opportunities.ts';
-import { creditsFor, isMcpTool, listMcpTools } from '../src/lib/mcp/tool-registry.ts';
+import { findOpportunities } from '../src/lib/opportunities/find-opportunities';
+import { creditsFor, isMcpTool, listMcpTools } from '../src/lib/mcp/tool-registry';
 
 const CASES = [
   {

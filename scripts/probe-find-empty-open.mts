@@ -1,4 +1,4 @@
-import { findOpportunities } from '../src/lib/opportunities/find-opportunities.ts';
+import { findOpportunities } from '../src/lib/opportunities/find-opportunities';
 
 async function main() {
   const probes = [
