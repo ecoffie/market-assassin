@@ -17,7 +17,7 @@ const m = (fn: unknown) => fn as any;
 const ENTRY_MONTHLY = 'price_1TuxApK5zyiZ50PB8iMg8WqG';
 const MID_MONTHLY = 'price_1TuxApK5zyiZ50PBPV40eCvG';
 const ENTRY_CR = 500;
-const MID_CR = 1500;
+const MID_CR = 2000;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const invoice = (over: any) => ({
@@ -41,7 +41,7 @@ describe('handleMcpSubscriptionInvoice', () => {
     expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', ENTRY_CR, 'mcp_sub_monthly');
   });
 
-  it('grants the correct allowance for a different tier (Mid = 1,500)', async () => {
+  it('grants the correct allowance for a different tier (Mid = 2,000)', async () => {
     m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: MID_CR });
     const r = await handleMcpSubscriptionInvoice(invoice({ lines: { data: [{ price: { id: MID_MONTHLY } }] } }));
     expect(r).toMatchObject({ handled: true, credits: MID_CR, plan: 'mid', interval: 'month' });
