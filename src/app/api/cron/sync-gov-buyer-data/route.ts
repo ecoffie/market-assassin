@@ -260,9 +260,9 @@ export async function GET(request: NextRequest) {
       out.contacts = await runDecisionMakersSync(getSupabase(), {
         dry,
         pageSize: num('pageSize', 500),
-        refreshPages: num('refreshPages', 4),
+        refreshPages: num('refreshPages', 12),
         backfillPages: num('backfillPages', 20),
-        refreshWindowDays: num('refreshWindowDays', 14),
+        refreshWindowDays: num('refreshWindowDays', 3),
         budgetMs: num('budgetMs', 210_000),
       });
     }

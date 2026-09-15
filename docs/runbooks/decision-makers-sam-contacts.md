@@ -65,11 +65,18 @@ pass**. Never collapse those two into "no work".
 
 | lane | range | why |
 |---|---|---|
-| **REFRESH** | notices with `updated_at >= now() - refreshWindowDays` (default 14d) | Keeps live notices current. This is all the source used to do — and doing only this is why **125,515 rows (50.8%) had not been touched in 90+ days**. |
+| **REFRESH** | notices with `updated_at >= now() - refreshWindowDays` (default 3d) | Keeps live notices current. This is all the source used to do — and doing only this is why **125,515 rows (50.8%) had not been touched in 90+ days**. |
 | **BACKFILL** | keyset drain from the cursor | Traverses history once, then stays traversed. `created_at` says nothing about in-place edits, which is exactly why REFRESH also exists. |
 
 Refresh runs **first**: if the wall-clock budget cuts the run short, the lane protecting
 currently-live notices is the one that already ran.
+
+**Window sizing — the lane must have capacity for its whole window.** Measured 2026-09-14 on
+the eligible corpus: **1,599** notices updated in the last day, **4,806** in 3 days, **17,628**
+in 14 days. The defaults (3-day window, 12 × 500 = 6,000 rows of capacity) cover the window with
+headroom, and 3 days means the lane still catches up after a day or two of missed runs. Widening
+`refreshWindowDays` without raising `refreshPages` silently degrades the lane back into a
+head-only sweep — the exact defect this source replaces.
 
 ---
 
@@ -135,9 +142,9 @@ curl -s "https://getmindy.ai/api/cron/sync-gov-buyer-data?pull=contacts&backfill
 | param | default | notes |
 |---|---|---|
 | `pageSize` | 500 | notices per page |
-| `refreshPages` | 4 | ~2,000 recent notices/run |
+| `refreshPages` | 12 | 6,000 rows of capacity — see the window sizing below |
 | `backfillPages` | 20 | ~10,000 historical notices/run |
-| `refreshWindowDays` | 14 | recent window |
+| `refreshWindowDays` | 3 | recent window |
 | `budgetMs` | 210000 | soft; a lane stops at a page boundary |
 | `dry` | off | `dry=1` ⇒ no persistent writes anywhere |
 

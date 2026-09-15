@@ -380,9 +380,16 @@ export async function runDecisionMakersSync(sb: SupabaseClient, options: RunOpti
   const now = options.now ?? new Date();
   const nowIso = now.toISOString();
   const pageSize = options.pageSize ?? 500;
-  const refreshPages = options.refreshPages ?? 4;
+  // The refresh lane must have capacity for its WHOLE window, or it silently covers only the
+  // newest slice of what it claims to watch. Measured 2026-09-14 on the eligible corpus:
+  // 1,599 notices updated in the last day, 4,806 in 3 days, 17,628 in 14 days. So a 3-day
+  // window needs ~4,800 rows of capacity — 12 pages × 500 = 6,000 gives headroom, and 3 days
+  // means the lane still catches up after a day or two of missed runs. A 14-day window with
+  // 4 pages (the first cut of this design) would have covered 2,000 of 17,628 and quietly
+  // degraded into the same head-only sweep this source is replacing.
+  const refreshPages = options.refreshPages ?? 12;
   const backfillPages = options.backfillPages ?? 20;
-  const refreshWindowDays = options.refreshWindowDays ?? 14;
+  const refreshWindowDays = options.refreshWindowDays ?? 3;
   const deadline = started + (options.budgetMs ?? 210_000);
   const errors: string[] = [];
   const owner = `${DM_LOCK_TOKEN}:${now.getTime()}:${Math.random().toString(36).slice(2, 8)}`;
