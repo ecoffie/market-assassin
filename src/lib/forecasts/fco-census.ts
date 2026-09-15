@@ -115,9 +115,21 @@ type FetchLike = (url: string) => Promise<{ ok: boolean; status: number; json: (
  * than silently shortening it. That distinction is the whole point — "succeeded while seeing less
  * than the source" is the failure shape that hid State.
  */
-export async function runFcoCensus(opts: { fetchImpl?: FetchLike; pageDelayMs?: number } = {}): Promise<FcoCensus> {
+export async function runFcoCensus(
+  opts: { fetchImpl?: FetchLike; pageDelayMs?: number; concurrency?: number; budgetMs?: number } = {},
+): Promise<FcoCensus> {
   const doFetch: FetchLike = opts.fetchImpl ?? ((url) => fetch(url) as unknown as ReturnType<FetchLike>);
-  const delay = opts.pageDelayMs ?? 120;
+  const delay = opts.pageDelayMs ?? 0;
+  // Bounded concurrency. Sequential at 120ms/page took ~7 minutes for 370 pages, which EXCEEDS the
+  // 300s cron ceiling — a watcher that always times out never succeeds. A small pool keeps us well
+  // inside it without hammering the source. De-dup is on `nid`, so overlapping pages are harmless.
+  const pool = Math.max(1, Math.min(opts.concurrency ?? 6, 12));
+  // SOFT WALL-CLOCK BUDGET. Measured 2026-09-14: a full 372-page census takes ~215s at pool 6,
+  // against a 300s cron ceiling. Rather than be KILLED mid-run (which looks like nothing happened),
+  // stop at the budget and report INCOMPLETE — the watcher then alerts on incomplete enumeration
+  // instead of silently recording a short census as a success.
+  const budgetMs = opts.budgetMs ?? 240_000;
+  const startedAt = Date.now();
   const byNid = new Map<string, FcoRow>();
   let reportedTotal = 0;
   let pagesFetched = 0;
@@ -125,48 +137,57 @@ export async function runFcoCensus(opts: { fetchImpl?: FetchLike; pageDelayMs?: 
   let consecutiveNoNew = 0;
   let failure: string | undefined;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    type FcoPayload = { listing?: { total?: number | string; data?: Record<string, { render?: Record<string, unknown> }> } };
-    let payload: FcoPayload | null = null;
+  type FcoPayload = { listing?: { total?: number | string; data?: Record<string, { render?: Record<string, unknown> }> } };
+  const fetchPage = async (page: number): Promise<FcoPayload | null> => {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await doFetch(`${FCO_BASE}?range=${PAGE_SIZE}&page=${page}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        payload = (await res.json()) as FcoPayload;
-        break;
+        return (await res.json()) as FcoPayload;
       } catch {
-        if (attempt === 2) payload = null;
-        else await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        if (attempt === 2) return null;
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
       }
     }
-    if (!payload?.listing) {
-      // A page we could not read. Record it and STOP claiming completeness.
-      pagesFailed++;
-      failure = `page ${page} unreadable after 3 attempts`;
-      break;
-    }
-    pagesFetched++;
-    // ⚠️ `listing.total` arrives as a STRING ("9225"), not a number. A `typeof === 'number'`
-    // guard silently left reportedTotal at 0, which made EVERY census report itself incomplete —
-    // the census that exists to detect a source growing could not read the source's own size.
-    // Coerce, and accept only a finite positive value.
-    const rawTotal = Number(payload.listing.total);
-    if (Number.isFinite(rawTotal) && rawTotal > 0) reportedTotal = rawTotal;
+    return null;
+  };
 
-    // ⚠️ `listing.data` is keyed by POSITION (0..24) on every page, NOT by record id. De-duping on
-    // that key collapses the entire corpus to 25 rows — measured. Always key on the row's own nid.
-    const data = payload.listing.data ?? {};
+  for (let start = 0; start < MAX_PAGES; start += pool) {
+    const batch = await Promise.all(
+      Array.from({ length: pool }, (_, k) => fetchPage(start + k)),
+    );
     let added = 0;
-    for (const v of Object.values(data)) {
-      const row = mapFcoRow((v as { render?: Record<string, unknown> })?.render ?? {});
-      if (!row.nid) continue;
-      if (!byNid.has(row.nid)) { byNid.set(row.nid, row); added++; }
+    for (const payload of batch) {
+      if (!payload?.listing) {
+        // A page we could not read. Record it and STOP claiming completeness.
+        pagesFailed++;
+        failure = `a page in batch starting ${start} was unreadable after 3 attempts`;
+        continue;
+      }
+      pagesFetched++;
+      // ⚠️ `listing.total` arrives as a STRING ("9225"), not a number. A `typeof === 'number'`
+      // guard silently left reportedTotal at 0, which made EVERY census report itself incomplete —
+      // the census that exists to detect a source growing could not read the source's own size.
+      const rawTotal = Number(payload.listing.total);
+      if (Number.isFinite(rawTotal) && rawTotal > 0) reportedTotal = rawTotal;
+
+      // ⚠️ `listing.data` is keyed by POSITION (0..24) on every page, NOT by record id. De-duping on
+      // that key collapses the entire corpus to 25 rows — measured. Always key on the row's own nid.
+      for (const v of Object.values(payload.listing.data ?? {})) {
+        const row = mapFcoRow((v as { render?: Record<string, unknown> })?.render ?? {});
+        if (!row.nid) continue;
+        if (!byNid.has(row.nid)) { byNid.set(row.nid, row); added++; }
+      }
+    }
+    if (pagesFailed > 0) break;
+    if (Date.now() - startedAt > budgetMs) {
+      failure = `soft time budget ${budgetMs}ms exceeded after ${byNid.size} rows`;
+      break;
     }
     if (added === 0) {
       consecutiveNoNew++;
-      if (consecutiveNoNew >= 3) break;   // exhausted: three pages yielding nothing new
+      if (consecutiveNoNew >= 1) break;   // a whole batch yielding nothing new = exhausted
     } else consecutiveNoNew = 0;
-
     if (reportedTotal > 0 && byNid.size >= reportedTotal) break;
     if (delay) await new Promise((r) => setTimeout(r, delay));
   }
