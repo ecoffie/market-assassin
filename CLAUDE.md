@@ -234,6 +234,28 @@ don't re-derive.
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
 
+### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
+Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching
+`federal_contacts` ingest; don't re-derive.
+- `federal_contacts` is now the registered source **`decision_makers_sam_contacts`** (dataset
+  `decision_makers`) with a durable checkpoint in `decision_makers_sync_state` and its own
+  `cron_jobs` row `sync-decision-makers` (`0 */2 * * *`). It previously had **no schedule at
+  all** — only an unawaited `fetch()` from `sync-sam-opportunities`, sweeping an ~11-day rolling
+  window while 50.8% of rows went 90+ days untouched.
+- ⚠️ **The cursor is `sam_opportunities.created_at`, never `posted_date`.** 34,906 notices
+  (16.8%) are created >2 days after they were posted (worst 30 days), so a posted_date cursor
+  silently skips every backdated arrival. Do not "improve" this.
+- ⚠️ **Registered + enabled + firing on time ≠ working.** The first scheduled fire **401'd**:
+  the dispatcher sends `authorization: Bearer $CRON_SECRET` + `x-cron-dispatch: 1` and **never**
+  `x-vercel-cron`. Any `cron_jobs` route must accept that bearer — and verification means reading
+  `cron_job_runs.http_status`, not `cron_jobs.last_run_at`.
+- ⚠️ **`source` / `source_table` on `federal_contacts` are column DEFAULTS**, not provenance. The
+  82,017 `sam_entities_pocs` rows are VENDOR POCs yet inherit `source='sam_opportunities_poc'`.
+- Unchanged rows are never re-upserted, so `last_data_advance` moves only on real mutations and
+  `updated_at` means "content changed", not "a sweep passed over it".
+- **NOT done (next passes, in order):** person identity (~21K people behind 247K rows; 2,321
+  emails with conflicting names), then vendor-POC provenance + the two frozen importers.
+
 ### Specialty feeds (DIBBS · Grants · SBIR) — ⏸️ PARKED 2026-09-13
 Full record: **`docs/data-core-reliability-dibbs-grants-sbir.md`** (PR #1458). Read it; do NOT re-audit.
 **Do not reopen until explicitly requested** — priority is the Strategic Intelligence Core
