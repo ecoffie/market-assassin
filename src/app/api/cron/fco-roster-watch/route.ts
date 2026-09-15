@@ -32,7 +32,14 @@ export async function GET(request: NextRequest) {
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
-    const run = await runFcoWatch(sb, { dry });
+    // Tunable without a redeploy — the source throttles datacenter egress harder than a laptop.
+    const conc = Number(request.nextUrl.searchParams.get('concurrency'));
+    const budget = Number(request.nextUrl.searchParams.get('budgetMs'));
+    const run = await runFcoWatch(sb, {
+      dry,
+      concurrency: Number.isFinite(conc) && conc > 0 ? conc : undefined,
+      budgetMs: Number.isFinite(budget) && budget > 0 ? budget : undefined,
+    });
 
     // Alert only on conditions worth a human's attention, deduped on WHICH things are affected.
     const worth = run.events.filter((e) => e.severity !== 'info');

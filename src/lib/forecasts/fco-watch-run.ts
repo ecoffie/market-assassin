@@ -48,7 +48,10 @@ function parsePrevious(row: Record<string, unknown> | null): FcoWatchState | nul
   try { return JSON.parse(raw) as FcoWatchState; } catch { return null; }
 }
 
-export async function runFcoWatch(sb: SupabaseClient, opts: { dry?: boolean } = {}): Promise<FcoWatchRun> {
+export async function runFcoWatch(
+  sb: SupabaseClient,
+  opts: { dry?: boolean; concurrency?: number; budgetMs?: number } = {},
+): Promise<FcoWatchRun> {
   const dry = opts.dry === true;
 
   const { data: inst, error: instErr } = await sb
@@ -58,7 +61,7 @@ export async function runFcoWatch(sb: SupabaseClient, opts: { dry?: boolean } = 
     .maybeSingle();
   if (instErr) throw new Error(instErr.message);
 
-  const census = await runFcoCensus();
+  const census = await runFcoCensus({ concurrency: opts.concurrency, budgetMs: opts.budgetMs });
   const heldCanonical = await countCanonicalGatewayHeld(sb);
 
   const result = evaluateFcoWatch({
