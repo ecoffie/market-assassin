@@ -152,3 +152,46 @@ describe('credit health — thresholds', () => {
     expect(k('exhausted', 'a@b.com', '2026-09-15')).not.toBe(k('exhausted', 'a@b.com', '2026-09-16'));
   });
 });
+
+describe('credit health — fleet-wide scope (not just entitlements)', () => {
+  /**
+   * The watch first shipped covering ONLY sponsored accounts, reasoning that a paying
+   * user hitting zero is "a billing prompt, a different signal." The paywall funnel
+   * refuted that: 331 generated paywall responses to 43 accounts produced 3 checkout
+   * starts and 0 payments. Excluding non-sponsored accounts reproduces the original
+   * blind spot on a different population, so every account kind is watched.
+   */
+  type Kind = 'entitled' | 'paid' | 'courtesy' | 'free';
+  const watched = (hasEntitlement: boolean, rejections: number) => hasEntitlement || rejections > 0;
+
+  it('watches a blocked FREE account, not only entitled ones', () => {
+    expect(watched(false, 13)).toBe(true);
+  });
+
+  it('watches a blocked COURTESY account', () => {
+    expect(watched(false, 7)).toBe(true);
+  });
+
+  it('watches an entitled account even with no rejections', () => {
+    expect(watched(true, 0)).toBe(true);
+  });
+
+  it('ignores an untouched account with neither signal', () => {
+    expect(watched(false, 0)).toBe(false);
+  });
+
+  it('low-balance warning applies to allowance-backed accounts only', () => {
+    // A free account resting near zero is its normal state, not a finding.
+    const warns = (hasEntitlement: boolean, balance: number) => hasEntitlement && balance < 1600;
+    expect(warns(true, 900)).toBe(true);
+    expect(warns(false, 0)).toBe(false);
+    expect(warns(true, 5000)).toBe(false);
+  });
+
+  it('a paywall response is counted as GENERATED, never as seen', () => {
+    // Naming guard: the field records a server event. Human visibility is unverified,
+    // so nothing downstream may treat this as an impression.
+    const finding = { paywallResponses: 38, rejections: 38 };
+    expect(finding.paywallResponses).toBe(finding.rejections);
+  });
+});
