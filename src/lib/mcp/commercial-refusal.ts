@@ -102,19 +102,21 @@ export function mcpToolResultFromMeteredError(error: {
   message: string;
   commercial?: CommercialRefusal;
 }): {
-  isError?: true;
+  isError?: boolean;
   content: { type: 'text'; text: string }[];
-  structuredContent?: CommercialRefusal;
+  structuredContent?: Record<string, unknown>;
 } {
   if (error.commercial && isCommercialMeteredCode(error.code)) {
     const refusal = error.commercial;
     return {
+      // Explicit false — omit alone still typed as optional; false documents the contract.
+      isError: false,
       content: [
         { type: 'text', text: refusal.message },
         // Second block: machine-readable contract for clients that ignore structuredContent.
         { type: 'text', text: JSON.stringify(refusal) },
       ],
-      structuredContent: refusal,
+      structuredContent: { ...refusal },
     };
   }
   return {

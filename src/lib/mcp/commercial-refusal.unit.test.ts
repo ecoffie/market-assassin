@@ -124,8 +124,14 @@ describe('mcpToolResultFromMeteredError', () => {
       message: commercial.message,
       commercial,
     });
-    expect(result.isError).toBeUndefined();
-    expect(result.structuredContent).toEqual(commercial);
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      error_code: INSUFFICIENT_CREDITS,
+      required_credits: 50,
+      available_credits: 45,
+      credits_needed: 5,
+      retryable: false,
+    });
     expect(result.content[0].text).toContain('You need 50 credits');
     const parsed = JSON.parse(result.content[1].text);
     expect(parsed.error_code).toBe(INSUFFICIENT_CREDITS);
@@ -189,9 +195,9 @@ describe('capability_market_match credit gate — incident 45 vs 50', () => {
       }),
     );
 
-    // Transport shape Claude actually sees — not isError.
+    // Transport shape Claude actually sees — isError false, not a crash.
     const mcp = mcpToolResultFromMeteredError(r.error);
-    expect(mcp.isError).toBeUndefined();
+    expect(mcp.isError).toBe(false);
     expect(mcp.structuredContent?.error_code).toBe(INSUFFICIENT_CREDITS);
   });
 
