@@ -828,3 +828,29 @@ surname fused to its domain. Both are now fixtures.
 
 **The raw observation is never rewritten** — presentation only, so the source evidence survives
 for the person-identity work.
+
+## 2026-09-16 — Decision Makers: explicit contact_kind provenance typing
+
+**Defect.** Government-vs-vendor was never stated anywhere. `source` and `role_category` are
+column DEFAULTS no producer sets — uniform across all 287,534 rows and factually WRONG on the
+82,017 vendor entity POCs. `source_table` is a GENERATION label, not a source identity: two of
+its three values are the SAME upstream source (94.7% of `sam_opportunities_pointOfContact` has
+been re-adopted in place by the live drain). Exclusion of vendor rows from customer surfaces
+relied entirely on incidental query predicates.
+
+**Proof anchors** (re-grep; a revert breaks them):
+- `src/lib/gov-contacts/contact-kind.ts` — `export function classifyContactKind`
+- `src/lib/gov-contacts/buyer-contact-source.ts` — `contact_kind: CONTACT_KIND_GOVERNMENT`
+- `src/lib/gov-contacts/buyer-contact-run.ts` — `contact_kind` inside `HELD_COLUMNS`
+- `scripts/populate-contracting-officers.js` — `WRITES_ENABLED = LEGACY_REPLAY && ACKNOWLEDGED`
+
+**Measured before mutation:** vendor 82,017 · government 205,517 · overlap **0** · unresolved
+**0**. The two rules are mutually exclusive by construction (vendor needs
+`department_ind_agency IS NULL`, government needs `IS NOT NULL`), which is *why* the overlap is 0.
+
+The six rows keyed `No longer available::<role>` are proven vendor — SAM's literal for a delisted
+entity — so the rule keys on the raw_data payload, not the key shape.
+
+**`role_category` was NOT changed:** it is product-authoritative (drives `roleCategoryLabelFromDb`
+and a live `.eq('role_category', role)` filter). `federal_contacts.source` has zero consumers and
+is documented as dead.

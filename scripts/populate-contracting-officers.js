@@ -26,7 +26,27 @@
  *   - Skip contacts with no email AND no phone (useless for outreach)
  *   - Trim/normalize whitespace
  *
- * Usage: node scripts/populate-contracting-officers.js
+ * ============================================================================
+ * ⚠️  RETIRED — NOT THE CANONICAL PRODUCER. DANGEROUS IF RE-RUN.
+ * ============================================================================
+ *
+ * The canonical producer is `src/lib/gov-contacts/buyer-contact-run.ts`, scheduled as the
+ * `sync-decision-makers` cron. It owns THIS EXACT KEY SPACE (`<notice_id>::<slot>`) and keeps
+ * a durable checkpoint in `decision_makers_sync_state`.
+ *
+ * WHY THIS SCRIPT IS DANGEROUS: it explicitly writes
+ * `source_table: 'sam_opportunities_pointOfContact'`. The live producer deliberately OMITS
+ * source_table so each row keeps its original import-generation label. Re-running this would
+ * silently RELABEL rows the live producer now owns — destroying the only import-lineage signal
+ * the provenance audit relies on. It also predates `contact_kind`, so its rows would land
+ * UNCLASSIFIED. It deletes nothing, which is exactly why the damage would be easy to miss.
+ *
+ * It is retained (not deleted) because it documents how the 30,439-row first generation was
+ * created — 94.7% of which the live drain has since re-adopted in place.
+ *
+ * Usage (read-only by default):
+ *   node scripts/populate-contracting-officers.js            # dry run, writes nothing
+ *   node scripts/populate-contracting-officers.js --legacy-replay --i-understand-this-relabels-live-rows
  */
 // Load env explicitly from .env.local (dotenv default looks for .env)
 import dotenv from 'dotenv';
@@ -118,6 +138,9 @@ function extractContacts(row) {
 }
 
 async function upsertChunk(rows) {
+  // The guard lives at the WRITE, not only at the entry point, so no future refactor of main()
+  // can route around it.
+  if (!WRITES_ENABLED) return;
   const { error } = await sb
     .from('federal_contacts')
     .upsert(rows, { onConflict: 'source_row_key' });
@@ -127,7 +150,33 @@ async function upsertChunk(rows) {
   }
 }
 
+// ── WRITE GUARD ──────────────────────────────────────────────────────────────
+// Two independent, deliberately unguessable flags. One alone is not enough: a half-remembered
+// command line must not be able to write production.
+const ARGV = process.argv.slice(2);
+const LEGACY_REPLAY = ARGV.includes('--legacy-replay');
+const ACKNOWLEDGED = ARGV.includes('--i-understand-this-relabels-live-rows');
+export const WRITES_ENABLED = LEGACY_REPLAY && ACKNOWLEDGED;
+
+function announceGuard() {
+  console.error('='.repeat(78));
+  console.error('  RETIRED SCRIPT — populate-contracting-officers.js');
+  console.error('  The canonical producer is the `sync-decision-makers` cron');
+  console.error('  (src/lib/gov-contacts/buyer-contact-run.ts).');
+  console.error('');
+  if (WRITES_ENABLED) {
+    console.error('  *** WRITES ENABLED *** This will RELABEL source_table on rows the live');
+    console.error('  producer owns, and will write rows with contact_kind UNSET.');
+  } else {
+    console.error('  DRY RUN — nothing will be written.');
+    console.error('  Writing requires BOTH --legacy-replay and');
+    console.error('  --i-understand-this-relabels-live-rows');
+  }
+  console.error('='.repeat(78));
+}
+
 async function main() {
+  announceGuard();
   const start = Date.now();
   let offset = 0;
   let totalSeen = 0;
@@ -160,7 +209,7 @@ async function main() {
   console.log('---');
   console.log(`Done. Opportunities scanned: ${totalSeen}`);
   console.log(`Contacts extracted (after filters): ${totalExtracted}`);
-  console.log(`Contacts upserted: ${totalUpserted}`);
+  console.log(`Contacts ${WRITES_ENABLED ? 'upserted' : 'that WOULD be upserted (dry run)'}: ${totalUpserted}`);
   console.log(`Filtered out as garbage: ${totalSeen > 0 ? `${((totalSeen - totalExtracted) / totalSeen * 100).toFixed(1)}% of source rows had usable contacts` : 'n/a'}`);
 }
 

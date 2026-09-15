@@ -36,6 +36,7 @@
  */
 
 import { isUsableContactName } from './contact-quality';
+import { CONTACT_KIND_GOVERNMENT, type ContactKind } from './contact-kind';
 
 /** `data_source_instances.source_key` for this source. */
 export const DM_SOURCE_KEY = 'decision_makers_sam_contacts';
@@ -79,6 +80,14 @@ export interface ContactRow {
   office: string | null;
   sub_tier: string | null;
   role_category: string;
+  /**
+   * AUTHORITATIVE government/vendor classification, set EXPLICITLY on every write.
+   *
+   * Deliberately not a DB default: `source` and `role_category` became meaningless precisely
+   * because every row inherited a value no producer asserted. This producer only ever emits
+   * notice POCs, so the value is always `government_buyer` — stated, not inherited.
+   */
+  contact_kind: ContactKind;
   solicitation_number: string | null;
   posted_date: string | null;
   source: string;
@@ -158,6 +167,7 @@ export function extractContactRows(notice: SourceNotice): ExtractOutcome {
       office: normalizeValue(notice.office),
       sub_tier: normalizeValue(notice.sub_tier),
       role_category: 'contracting',
+      contact_kind: CONTACT_KIND_GOVERNMENT,
       solicitation_number: normalizeValue(notice.solicitation_number),
       posted_date: normalizeValue(notice.posted_date),
       source: 'sam_opportunities_poc',
@@ -223,6 +233,9 @@ const MEANINGFUL_FIELDS: Array<keyof ContactRow> = [
   'office',
   'sub_tier',
   'role_category',
+  // Included so an UNCLASSIFIED legacy row counts as CHANGED and the drain repairs it in place
+  // as it sweeps — the backfill covers the corpus, this keeps it converged afterwards.
+  'contact_kind',
   'solicitation_number',
   'posted_date',
 ];
