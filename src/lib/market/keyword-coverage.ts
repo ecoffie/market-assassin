@@ -18,6 +18,43 @@ import { codesForTerm } from './vocabulary';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 
+/**
+ * Thrown when a caller AbortSignal aborts keywordCoverage mid-flight.
+ * Distinct from "no market found" (null) — a timeout is NOT evidence of zero spend.
+ */
+export class CoverageDeadlineError extends Error {
+  readonly code = 'deadline_exceeded' as const;
+  constructor(message = 'keywordCoverage deadline exceeded') {
+    super(message);
+    this.name = 'CoverageDeadlineError';
+  }
+}
+
+export interface KeywordCoverageOptions {
+  /** Abort in-flight USASpending work. Do not cache aborted results as empty markets. */
+  signal?: AbortSignal;
+  /** Per-request ceiling (ms). Combined with `signal` via AbortSignal.any when available. */
+  perFetchMs?: number;
+}
+
+const DEFAULT_PER_FETCH_MS = 12_000;
+
+function assertNotAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new CoverageDeadlineError();
+}
+
+function fetchSignal(opts?: KeywordCoverageOptions): AbortSignal | undefined {
+  const parent = opts?.signal;
+  const per = opts?.perFetchMs ?? DEFAULT_PER_FETCH_MS;
+  const timed = AbortSignal.timeout(per);
+  if (!parent) return timed;
+  // Node 20+: abort when either the tool deadline or the per-fetch ceiling fires.
+  const any = (AbortSignal as typeof AbortSignal & {
+    any?: (signals: AbortSignal[]) => AbortSignal;
+  }).any;
+  return any ? any([parent, timed]) : parent;
+}
+
 // Vocabulary synonym expansion — a SMALL set of ubiquitous abbreviations/aliases
 // that federal award text spells out in full, so the naics_vocabulary table keys
 // them by the long form. Without this, "IT support" and "help desk" find no vocab
@@ -376,17 +413,36 @@ const COV_TTL_MS = 10 * 60 * 1000;
 /**
  * Resolve a keyword to its market coverage. coverageTarget = the spend fraction
  * the derived code set should capture (default 0.9 = 90%).
+ *
+ * Pass `opts.signal` from capability_market_match (or any budgeted caller). On abort
+ * this throws CoverageDeadlineError — never caches null as "no market".
  */
-export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
+export async function keywordCoverage(
+  keyword: string,
+  coverageTarget = 0.9,
+  opts?: KeywordCoverageOptions,
+): Promise<KeywordCoverage | null> {
+  assertNotAborted(opts?.signal);
   const cacheKey = `${(keyword || '').trim().toLowerCase()}|${coverageTarget}`;
   const hit = _covCache.get(cacheKey);
   if (hit && Date.now() - hit.at < COV_TTL_MS) return hit.val;
-  const val = await keywordCoverageUncached(keyword, coverageTarget);
-  _covCache.set(cacheKey, { at: Date.now(), val });
-  return val;
+  try {
+    const val = await keywordCoverageUncached(keyword, coverageTarget, opts);
+    // Never cache a deadline miss as an empty market.
+    if (!opts?.signal?.aborted) _covCache.set(cacheKey, { at: Date.now(), val });
+    return val;
+  } catch (err) {
+    if (err instanceof CoverageDeadlineError) throw err;
+    if (opts?.signal?.aborted) throw new CoverageDeadlineError();
+    throw err;
+  }
 }
 
-async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
+async function keywordCoverageUncached(
+  keyword: string,
+  coverageTarget = 0.9,
+  opts?: KeywordCoverageOptions,
+): Promise<KeywordCoverage | null> {
   const raw = (keyword || '').trim();
   if (raw.length < 2) return null;
 
@@ -400,18 +456,24 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
   // .hasNext up to MAX_PAGES so the count + $ are REAL, not cap-artifacts. Bounded
   // at 5 pages (500 codes) to keep cold-cache latency sane; the 10-min coverage
   // cache absorbs the extra calls. (Eric, Jul 11 2026 — "found 100 NAICS" wasn't true.)
+  //
+  // P1 (2026-09-15): every USASpending fetch carries AbortSignal. A deadline abort
+  // throws CoverageDeadlineError (timed-out ≠ no market). Partial pages on network
+  // errors still return what we have — only abort is the hard stop.
   const MAX_COVERAGE_PAGES = 5;
   const fetchCat = async (kw: string | string[], cat: 'naics' | 'psc') => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const all: any[] = [];
     try {
       for (let page = 1; page <= MAX_COVERAGE_PAGES; page++) {
+        assertNotAborted(opts?.signal);
         const res = await fetch(`${BASE}/${cat}/`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             filters: { keywords: Array.isArray(kw) ? kw : [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
             category: cat, limit: 100, page,
           }),
+          signal: fetchSignal(opts),
         });
         if (!res.ok) break;
         const j = await res.json();
@@ -420,7 +482,13 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
         all.push(...rows);
         if (!j.page_metadata?.hasNext) break;
       }
-    } catch { /* return what we have so far */ }
+    } catch (err) {
+      if (err instanceof CoverageDeadlineError) throw err;
+      if (opts?.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        throw new CoverageDeadlineError();
+      }
+      /* network/parse — return what we have so far */
+    }
     return all.sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
   };
   try {
@@ -456,12 +524,14 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
         const all: any[] = [];
         try {
           for (let page = 1; page <= MAX_COVERAGE_PAGES; page++) {
+            assertNotAborted(opts?.signal);
             const res = await fetch(`${BASE}/${cat}/`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 filters: { psc_codes: pinnedPsc, time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
                 category: cat, limit: 100, page,
               }),
+              signal: fetchSignal(opts),
             });
             if (!res.ok) break;
             const j = await res.json();
@@ -470,7 +540,13 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
             all.push(...r);
             if (!j.page_metadata?.hasNext) break;
           }
-        } catch { /* return what we have */ }
+        } catch (err) {
+          if (err instanceof CoverageDeadlineError) throw err;
+          if (opts?.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+            throw new CoverageDeadlineError();
+          }
+          /* return what we have */
+        }
         return all.sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
       };
       const [pnNaics, pnPsc] = await Promise.all([fetchByPsc('naics'), fetchByPsc('psc')]);
@@ -491,6 +567,7 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
 
     let bestKw = raw;
     if (rows.length === 0) for (const cand of rawCandidates) {
+      assertNotAborted(opts?.signal);
       const [n, p] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
       if (n.length === 0) continue;
       const candTotal = sumAmt(n);
@@ -704,14 +781,20 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       const topVocab = vocabRanked.find((v) => promotable(v.code))?.code;
       if (topVocab && !rows.some((r) => r.code === topVocab)) {
         try {
-          const sized = await codeMarketSize({ naics: topVocab });
+          const sized = await codeMarketSize({ naics: topVocab, signal: opts?.signal, perFetchMs: opts?.perFetchMs });
           const amount = sized?.totalMarket || 0;
           if (amount > 0) {
             // codeMarketSize's NAICS query returns the code's own Census name as
             // the first row — carry it so the lead card reads a real title, not a code.
             rows.unshift({ code: topVocab, name: sized?.leadName || topVocab, amount });
           }
-        } catch { /* injection is best-effort; the set without it is still valid */ }
+        } catch (err) {
+          if (err instanceof CoverageDeadlineError) throw err;
+          if (opts?.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+            throw new CoverageDeadlineError();
+          }
+          /* injection is best-effort; the set without it is still valid */
+        }
       }
     }
 
@@ -759,7 +842,11 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       topPscList,
       pinnedPscCodes: pinnedPsc ?? null,
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof CoverageDeadlineError) throw err;
+    if (opts?.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw new CoverageDeadlineError();
+    }
     return null;
   }
 }
@@ -780,10 +867,13 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
 export async function codeMarketSize(opts: {
   psc?: string;
   naics?: string;
+  signal?: AbortSignal;
+  perFetchMs?: number;
 }): Promise<{ totalMarket: number; topPsc: { code: string; name: string } | null; basis: 'psc' | 'naics'; leadName?: string } | null> {
   const psc = (opts.psc || '').trim();
   const naics = (opts.naics || '').trim();
   if (!psc && !naics) return null;
+  assertNotAborted(opts.signal);
 
   // Prefer PSC (literal product bought); fall back to NAICS (vendor industry).
   const basis: 'psc' | 'naics' = psc ? 'psc' : 'naics';
@@ -794,18 +884,27 @@ export async function codeMarketSize(opts: {
   if (basis === 'psc') filters.psc_codes = [psc];
   else filters.naics_codes = [naics];
 
+  const covOpts: KeywordCoverageOptions = { signal: opts.signal, perFetchMs: opts.perFetchMs };
   const fetchCat = async (cat: 'psc' | 'naics') => {
     try {
+      assertNotAborted(opts.signal);
       const res = await fetch(`${BASE}/${cat}/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filters, category: cat, limit: 100 }),
+        signal: fetchSignal(covOpts),
       });
       if (!res.ok) return [];
       const j = await res.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (j.results || []).filter((r: any) => r.code && (r.amount || 0) > 0)
         .sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
-    } catch { return []; }
+    } catch (err) {
+      if (err instanceof CoverageDeadlineError) throw err;
+      if (opts.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        throw new CoverageDeadlineError();
+      }
+      return [];
+    }
   };
 
   try {
@@ -820,7 +919,11 @@ export async function codeMarketSize(opts: {
       ? (naicsRows.find((r: { code: string; name?: string }) => r.code === naics)?.name || undefined)
       : undefined;
     return { totalMarket: total, topPsc, basis, leadName };
-  } catch {
+  } catch (err) {
+    if (err instanceof CoverageDeadlineError) throw err;
+    if (opts.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw new CoverageDeadlineError();
+    }
     return null;
   }
 }

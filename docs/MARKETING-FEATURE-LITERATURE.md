@@ -6832,3 +6832,21 @@ outputs intentionally deferred.
 
 **SEO / proof.** Incident call `88c978d4-…` / paywall `59cb41f1-…`: balance 45, required 50, status `rejected_no_credits`, zero debit. Regression: `commercial-refusal.unit.test.ts` (45 vs 50 → no `runMcpTool`, structured contract, no isError).
 
+
+---
+
+## Capability-to-Market Match — deadline-aware coverage (P1 reliability)
+
+**What.** `capability_market_match` now runs under a ~22s soft budget. USASpending
+fetches inside `keywordCoverage` carry AbortSignal. If the clock runs out, Mindy
+returns an honest degraded result (`degraded_reason=deadline_exceeded`, market
+null) — never a hung tool and never a fabricated "$0 market."
+
+**Why.** Coverage fan-out could burn the full 60s MCP platform limit and surface as
+a gateway 504. Timed-out ≠ "no federal market."
+
+**Proof.** Unit tests: hanging USASpending → CoverageDeadlineError; tool returns
+inside budget with `grounded=false` / `degraded=true`. Billing: coverage-timeout
+uses existing DEFECT-7 uncharged path (`degraded && !grounded`). Charging for
+partial-but-grounded trims is deliberately NOT changed in this PR.
+

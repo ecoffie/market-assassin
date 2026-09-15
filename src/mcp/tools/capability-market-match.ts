@@ -11,7 +11,7 @@
  * charged by the transport (runMeteredTool).
  */
 import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
-import { keywordCoverage, type KeywordCoverage } from '@/lib/market/keyword-coverage';
+import { keywordCoverage, CoverageDeadlineError, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { getVocabulary } from '@/lib/market/vocabulary';
 import { termOfArtSynonyms } from '@/lib/market/sector-expansions';
 import { searchContractors } from '@/mcp/tools/search-contractors';
@@ -68,6 +68,8 @@ export interface CapabilityMarketMatchResult {
   _meta: {
     grounded: boolean;
     degraded: boolean;
+    /** Machine reason when degraded — e.g. deadline_exceeded. Timed-out ≠ no market. */
+    degraded_reason?: 'deadline_exceeded' | 'section_failed';
     anchor_verified?: boolean;
     anchor_confidence?: AnchorConfidence;
     anchor_note?: string;
@@ -94,10 +96,14 @@ export interface CapabilityMarketMatchResult {
   };
 }
 
+/** Soft wall for the whole tool — under MCP maxDuration 60s with headroom for transport. */
+export const CAPABILITY_MARKET_MATCH_BUDGET_MS = 22_000;
+
 async function guarded<T>(p: Promise<T>): Promise<{ value: T | null; degraded: boolean }> {
   try {
     return { value: await p, degraded: false };
   } catch (err) {
+    if (err instanceof CoverageDeadlineError) throw err;
     console.error('[capability_market_match] section failed:', err);
     return { value: null, degraded: true };
   }
@@ -135,10 +141,58 @@ function miss(note: string, started: number, partial?: Partial<CapabilityMarketM
   };
 }
 
+/**
+ * Deadline abort during keywordCoverage — market is UNKNOWN, not empty.
+ * grounded=false + degraded=true → runMeteredTool DEFECT-7 leaves this uncharged.
+ * Do NOT return fabricated total_market: 0.
+ */
+function deadlineMiss(started: number, partial?: Partial<CapabilityMarketMatchResult>): CapabilityMarketMatchResult {
+  const base = miss(
+    'Analysis stopped early — market coverage timed out before USASpending finished. This is not "no market found"; retry or narrow the capability statement.',
+    started,
+    partial,
+  );
+  return {
+    ...base,
+    _meta: {
+      ...base._meta,
+      degraded: true,
+      degraded_reason: 'deadline_exceeded',
+      grounded: false,
+    },
+  };
+}
+
 export async function capabilityMarketMatch(
   input: CapabilityMarketMatchInput,
 ): Promise<CapabilityMarketMatchResult> {
   const started = Date.now();
+  const deadline = started + CAPABILITY_MARKET_MATCH_BUDGET_MS;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), CAPABILITY_MARKET_MATCH_BUDGET_MS);
+  const remainingMs = () => Math.max(0, deadline - Date.now());
+
+  try {
+    return await capabilityMarketMatchInner(input, started, ac.signal, remainingMs);
+  } catch (err) {
+    if (err instanceof CoverageDeadlineError || ac.signal.aborted) {
+      return deadlineMiss(started, {
+        subject: input.client_name || 'your company',
+        keywords: [],
+      });
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function capabilityMarketMatchInner(
+  input: CapabilityMarketMatchInput,
+  started: number,
+  signal: AbortSignal,
+  remainingMs: () => number,
+): Promise<CapabilityMarketMatchResult> {
   const capabilityText = [input.description, ...(input.capabilities ?? []), ...(input.past_performance ?? [])]
     .filter(Boolean)
     .join('\n');
@@ -180,8 +234,24 @@ export async function capabilityMarketMatch(
   }
   const lead = bestAnchor.phrase;
 
-  const cov = await guarded(keywordCoverage(lead));
-  const coverage = cov.value;
+  if (signal.aborted || remainingMs() < 1_500) {
+    return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
+  }
+
+  // Propagate remaining deadline into keywordCoverage — every USASpending fetch aborts.
+  let coverage: KeywordCoverage | null = null;
+  let covDegraded = false;
+  try {
+    coverage = await keywordCoverage(lead, 0.9, { signal });
+  } catch (err) {
+    if (err instanceof CoverageDeadlineError || signal.aborted) {
+      return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
+    }
+    console.error('[capability_market_match] keywordCoverage failed:', err);
+    covDegraded = true;
+    coverage = null;
+  }
+  const cov = { value: coverage, degraded: covDegraded };
 
   const GENERIC_SERVICES = new Set(['561210', '561990', '541990', '561499', '541611', '541618']);
   const isPscPinned = Boolean(coverage?.pinnedPscCodes?.length);
@@ -218,12 +288,20 @@ export async function capabilityMarketMatch(
 
   const fetchCompetitors = marketVerified && Boolean(leadNaics);
 
-  const competitorQuery = fetchCompetitors
-    ? guarded(searchContractors({ naics: leadNaics!, limit: 10 }))
-    : Promise.resolve({ value: null, degraded: false as boolean });
+  // Skip heavy fan-out when the budget is nearly gone — prefer a timely market
+  // answer over a platform 504. Empty sections are omitted, NOT fabricated zeros.
+  // ⚠️ CHARGING: we do NOT set degraded=true here when coverage already grounded.
+  // Existing metered DEFECT-7 bills degraded+grounded at full price; flipping
+  // degraded on a post-coverage trim would silently change billing. Product call
+  // deferred — see PR. Coverage-timeout path uses deadlineMiss (uncharged).
+  const skipHeavy = signal.aborted || remainingMs() < 3_000;
+  const competitorQuery =
+    fetchCompetitors && !skipHeavy
+      ? guarded(searchContractors({ naics: leadNaics!, limit: 10 }))
+      : Promise.resolve({ value: null, degraded: false as boolean });
 
   const [vocab, competitors, forecasts, expiring] = await Promise.all([
-    !marketVerified
+    !marketVerified || skipHeavy
       ? Promise.resolve({ value: null, degraded: false as boolean })
       : isPscPinned && pinnedPsc
         ? guarded(getVocabulary(pinnedPsc, { codeType: 'psc', limit: 25 }))
@@ -231,8 +309,10 @@ export async function capabilityMarketMatch(
           ? guarded(getVocabulary(leadNaics, { codeType: 'naics', limit: 25 }))
           : Promise.resolve({ value: null, degraded: false as boolean }),
     competitorQuery,
-    guarded(agencyForecasts({ keyword: lead, limit: 10 })),
-    marketVerified && leadNaics
+    skipHeavy
+      ? Promise.resolve({ value: null, degraded: false as boolean })
+      : guarded(agencyForecasts({ keyword: lead, limit: 10 })),
+    marketVerified && leadNaics && !skipHeavy
       ? guarded(expiringContracts({ naics: leadNaics, limit: 10 }))
       : Promise.resolve({ value: null, degraded: false as boolean }),
   ]);
@@ -337,7 +417,11 @@ export async function capabilityMarketMatch(
         recompetes: shownAvail(LIST_CAP, expiring.value?._meta?.count ?? recompeteRows.length),
       },
       elapsed_ms: Date.now() - started,
-      ...(validation.anchor_note ? { note: validation.anchor_note } : {}),
+      ...(validation.anchor_note
+        ? { note: validation.anchor_note }
+        : skipHeavy
+          ? { note: 'Returned before all downstream sections finished — budget remaining was too low.' }
+          : {}),
     },
   };
 }
