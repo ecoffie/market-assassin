@@ -6804,6 +6804,16 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 
 **SEO / proof.** Unit: `current-acquisition-intelligence.unit.test.ts` (killer rule, pathway classifiers, no set-aside _next). Host probes: `scripts/probe-cai-v0.mjs` (SOCOM cyber, VA IT, USACE construction). Credits: 8. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY.
 
+---
+
+## CAI language guardrails — unavailable ≠ zero; pathways ≠ future certainty (2026-09-15)
+
+**What.** Host/CAI packaging never describes a failed/unavailable horizon as zero demand; `SUPPORTED_IMPLICATION` / `DO_DIFFERENTLY` stay hedged; absolute transitions (“competition already happened,” “binding constraint is,” “whatever replaces X is where the money goes next”) are banned unless citations establish them. Observed pathways (incl. CSO) remain pathway-first record evidence with explicit “not future certainty” wording.
+
+**Why.** Host over-claim turned historical vehicle/CSO language into acquisition strategy certainty and invented do-differently when the package was empty.
+
+**SEO / proof.** Unit: absolute-claim scrub + CSO disclaimer; `MCP_CONNECTOR_INSTRUCTIONS` CAI block; host re-run `scripts/host-cai-socom-routing.mts` (SOCOM cyber).
+
 
 ## understand_customer — UNDERSTAND after FIND (2026-09-15)
 
