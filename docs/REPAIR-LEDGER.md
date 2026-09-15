@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Ops / DB health watch
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-15 | **Degraded db-health alert no longer diagnoses an unmeasured cause.** A 3970ms first PostgREST request with 137–144ms subsequent checks was alerted as "DB DEGRADED" with static copy blaming ingest/backfill and urging right-size. Alert now titles **Mindy data API latency elevated**, lists measured fields only, and keeps separate DOWN language for failed/critical reachability. Every run persists `reachability_ms`/`alert_count_ms`/`pg_stats_ms`/`overall_ms` to KV `dbhealth:probeSamples`. | `Mindy data API latency elevated` → `src/lib/ops/db-health-alert.ts` | db-health-alert.unit.test.ts — banned phrases (ingest/backfill/right-size/outage/pooler) fail; DOWN title preserved; sample ring buffer. | SHIPPING |
+
 ## Forecast agency identity
 
 | 2026-09-14 | **FCO roster watch is now OPERATIONAL — the monitoring path is finished.** The census/watch logic shipped earlier was never scheduled: no cron route, no `cron_jobs` row, so the blind spot that let Department of State join unnoticed for 3.5 weeks was still open. Added `/api/cron/fco-roster-watch` following the EXISTING manual-source pattern (same `sendOpsAlert` + `shouldSendAlert`/`ops_alert_state` stack as Navy — no bespoke Slack logic). Writes ONLY `data_source_instances` machine fields; a test asserts no insert/upsert/delete anywhere and that the single `.update()` targets the control-plane row. Clocks: `last_poll` every attempt · `last_successful_check` only on a COMPLETE enumeration · `last_source_advance` = upstream MAX(changed) · `last_verified_ingest`/`last_data_advance` never touched by a watch · `held_population` the verified canonical count, never aspirational · behind-upstream records `content_stale`, never `current`. `?dry=1` is proven zero-write (clocks, alert send AND dedup state all gated). ⚠️ Also fixed a cron-killer: the sequential census took ~7min against a 300s ceiling — parallelised to pool 6 (measured 214.5s, 372 pages, 0 failures) plus a 240s SOFT BUDGET so an over-run reports INCOMPLETE and alerts rather than being silently killed. | `runFcoWatch` → `src/lib/forecasts/fco-watch-run.ts` | 13 runner tests + 21 census/watch tests. Live: census complete=true, 9,225 rows / 9,216 ids / 9 departments / MAX(changed) observed, 0 failed pages, 214.5s. | IN REVIEW |
