@@ -61,6 +61,8 @@ export default function ContinuePage() {
   const [message, setMessage] = useState('');
   const [buying, setBuying] = useState<string | null>(null);
   const [buyError, setBuyError] = useState('');
+  /** 'retry' = transient, retrying can work. 'account' / 'done' = terminal, it cannot. */
+  const [buyErrorKind, setBuyErrorKind] = useState<'retry' | 'account' | 'done' | null>(null);
 
   /**
    * Buy through a SERVER-CREATED Checkout Session, not a static payment link.
@@ -80,6 +82,7 @@ export default function ContinuePage() {
   async function buy(product: string) {
     if (!attempt) return;
     setBuyError('');
+    setBuyErrorKind(null);
     setBuying(product);
     try {
       const res = await fetch('/api/mcp/checkout', {
@@ -92,14 +95,23 @@ export default function ContinuePage() {
         window.location.href = data.url;
         return;
       }
-      // Name the actual reason — a generic "try again" on a 403 sends the user in circles.
-      setBuyError(
-        res.status === 403 ? 'This request belongs to a different account. Sign in as that account to continue.'
-        : res.status === 409 ? 'This request has already been run.'
-        : `Could not start checkout${data?.error ? ` (${data.error})` : ''}. Please try again.`,
-      );
+      // 403 and 409 are TERMINAL — retrying is guaranteed to fail again, so neither gets
+      // a "try again". Ownership mismatch needs an account switch; a consumed attempt is
+      // a completed request, which is good news and should read that way. Retry is
+      // reserved for genuinely transient failures (network, Stripe 5xx, timeout).
+      if (res.status === 403) {
+        setBuyErrorKind('account');
+        setBuyError('This request belongs to a different Mindy account.');
+      } else if (res.status === 409) {
+        setBuyErrorKind('done');
+        setBuyError('This request has already been run — no payment is needed.');
+      } else {
+        setBuyErrorKind('retry');
+        setBuyError(`Could not start checkout${data?.error ? ` (${data.error})` : ''}.`);
+      }
     } catch {
-      setBuyError('Could not reach checkout. Please try again.');
+      setBuyErrorKind('retry');
+      setBuyError('Could not reach checkout.');
     } finally {
       setBuying(null);
     }
@@ -249,9 +261,28 @@ export default function ContinuePage() {
               </div>
 
               {buyError ? (
-                <p className="mt-3 rounded-lg border border-red-400/30 bg-red-400/[0.07] px-4 py-3 text-[14px] text-red-200">
-                  {buyError}
-                </p>
+                <div
+                  className={`mt-3 rounded-lg border px-4 py-3 text-[14px] ${
+                    buyErrorKind === 'done'
+                      ? 'border-emerald-400/30 bg-emerald-400/[0.07] text-emerald-100'
+                      : 'border-amber-400/30 bg-amber-400/[0.07] text-amber-100'
+                  }`}
+                >
+                  <p>{buyError}</p>
+                  {buyErrorKind === 'account' ? (
+                    <a href="/app" className="mt-2 inline-block font-semibold underline">
+                      Switch account →
+                    </a>
+                  ) : null}
+                  {buyErrorKind === 'done' ? (
+                    <a href="/mcp/account" className="mt-2 inline-block font-semibold underline">
+                      View your credits and results →
+                    </a>
+                  ) : null}
+                  {buyErrorKind === 'retry' ? (
+                    <p className="mt-1 opacity-80">This looks temporary — try again.</p>
+                  ) : null}
+                </div>
               ) : null}
 
               <p className="mt-4 text-center text-sm text-slate-500">

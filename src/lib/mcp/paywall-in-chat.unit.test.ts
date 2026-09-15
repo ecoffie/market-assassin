@@ -2,9 +2,11 @@
  * The offer must survive INSIDE the conversation.
  *
  * Measured over the first six days of launch: 40 paywall refusals across 15 distinct users
- * produced ONE visit to the resume page and zero purchases. The drop-off is the click out
- * of the assistant — not the page it lands on. So the wall now carries the price and two
- * pressable Stripe links in the message itself.
+ * produced ONE visit to the resume page and zero purchases. ⚠️ That measures WHERE the
+ * funnel stops, NOT WHY — "the drop-off is the click out of the assistant" was a
+ * hypothesis stated as a finding (corrected 2026-09-15). The wall carrying price and
+ * options in the message followed from that hypothesis; it may well be right, but it was
+ * never established.
  *
  * ⚠️ REVISED 2026-09-15 (Eric). The message no longer carries Stripe links directly. An
  * MCP error payload is TEXT — it cannot POST — so a direct link there must be a static
@@ -13,12 +15,18 @@
  * The offer now links to /mcp/continue, which POSTs /api/mcp/checkout and sets
  * client_reference_id AND metadata.attempt server-side.
  *
- * KNOWN TENSION, recorded rather than buried: the measurement above says the drop-off IS
- * the click out of the assistant, and this change adds a click. It is accepted because an
- * unattributed purchase cannot resume the request the user was blocked on — the thing the
- * flow exists to deliver. Watch offer_page_opened_at → checkout_clicked_at to see the real
- * cost; if it proves material, the fix is a better landing page, not a link that drops
- * attribution.
+ * KNOWN TENSION, recorded rather than buried — and stated as a HYPOTHESIS, which is all
+ * the data supports (Eric, 2026-09-15). What was MEASURED is that 40 refusals produced 1
+ * page view and 0 purchases. WHY users did not proceed was never established: the click
+ * out of the assistant is one candidate, but so are price, intent, a client that renders
+ * the offer poorly, or an agent retrying without ever showing a human the text.
+ *
+ * This change adds a click, so if the extra-click hypothesis is right it costs something.
+ * It is accepted because an unattributed purchase cannot resume the request the user was
+ * blocked on — the thing this flow exists to deliver. The per-stage columns now make the
+ * question answerable: offer_page_opened_at → checkout_clicked_at isolates the page, which
+ * the old single `checkout_started_at` could not. If the page proves to be the drop-off,
+ * the fix is a better page — not a link that drops attribution.
  *
  * These tests pin what makes buying-from-chat safe NOW:
  *   1. the offer routes through the resume page carrying the attempt id
