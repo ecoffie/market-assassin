@@ -211,16 +211,38 @@ export function paywallMessage(opts: {
  * buy-link click.
  */
 export async function markOfferPageOpened(attemptId: string): Promise<void> {
+  const now = new Date().toISOString();
   try {
-    await getWriteClient()
+    const { error } = await getWriteClient()
       .from('mcp_paywall_attempts')
-      .update({ offer_page_opened_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ offer_page_opened_at: now, updated_at: now })
       .eq('id', attemptId)
       .is('offer_page_opened_at', null);
+    if (!error) return;
+    // ⚠️ SCHEMA/CODE SKEW FALLBACK. A column rename in the DB lands before the code that
+    // uses it reaches production, so for the length of that window the deployed build
+    // writes a column that no longer exists. The old call site swallowed the failure
+    // entirely (bare try/catch) and the offer page still returned 200 — so the stamp was
+    // lost SILENTLY and the funnel under-counted with no error anywhere. Measured live
+    // 2026-09-15: an offer page opened and offer_page_opened_at stayed null.
+    // Falling back to the legacy column keeps the event rather than dropping it.
+    await getWriteClient()
+      .from('mcp_paywall_attempts')
+      .update({ checkout_started_at: now, updated_at: now })
+      .eq('id', attemptId)
+      .is('checkout_started_at', null);
   } catch {
     /* best-effort */
   }
 }
+
+/**
+ * Compatibility alias for builds deployed BEFORE the funnel-stage rename. Keeping the old
+ * exported name means a deployed bundle calling markCheckoutStarted still stamps the
+ * event through the fallback above instead of throwing on a missing import.
+ * @deprecated use markOfferPageOpened — this records a page view, never Stripe checkout.
+ */
+export const markCheckoutStarted = markOfferPageOpened;
 
 /**
  * Stamp a purchase-intent stage. Each is a DIFFERENT fact and they must not be conflated:
