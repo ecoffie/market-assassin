@@ -3,6 +3,7 @@ import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { createClient } from '@supabase/supabase-js';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 import { hasProAccess } from '@/lib/access/resolve-access';
+import { shouldChallengePaidMfa } from '@/lib/mindy/post-signin-destination';
 import { sendTwoFactorCode } from '@/lib/mindy/two-factor-code';
 
 // Paid-MFA gate (P0). When ON, a PAID account that signs in with a password must
@@ -123,7 +124,10 @@ export async function POST(request: NextRequest) {
     // the client to switch to the code step. mi-login already holds the verified
     // password, so we send the code here (no need to re-send the password from the
     // client). Fail-open: if the paid check throws, fall through and mint normally.
-    if (mfaEnforcedForPaid()) {
+    // Advocates hold complimentary Pro, so hasProAccess is true — but they are
+    // not a paid account. Challenging them forces the Maps modal to hand off to
+    // the legacy /app login and then never returns (see post-signin-destination).
+    if (shouldChallengePaidMfa(email, mfaEnforcedForPaid())) {
       try {
         if (await hasProAccess(email)) {
           const sent = await sendTwoFactorCode(email, {

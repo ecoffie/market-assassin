@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
+import { postSignInPath } from '@/lib/mindy/post-signin-destination';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -51,6 +52,25 @@ const KNOWN_PANELS = new Set<AppPanel>([
   'team', 'settings', 'vault', 'library', 'knowledge-base', 'coach',
   'pricing', 'proposals', 'target-list', 'grants', 'dibbs', 'partner-finder',
 ]);
+
+/** Fresh sign-in only. Cached /app sessions stay put so a panel deep link works. */
+function redirectAwayFromLegacyLogin(email: string): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const dest = postSignInPath({
+    email,
+    next: params.get('next'),
+    panel: params.get('panel'),
+  });
+  if (!dest) return false;
+  try {
+    localStorage.setItem('mi_beta_email', email);
+  } catch {
+    /* token already stored; email is only a convenience */
+  }
+  window.location.replace(dest);
+  return true;
+}
 
 // Wrap in Suspense for useSearchParams
 export default function AppPage() {
@@ -696,6 +716,7 @@ function AppDashboard() {
         localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);
       }
 
+      if (redirectAwayFromLegacyLogin(normalizedEmail)) return;
       await loadUserProfile(normalizedEmail);
     } catch (error) {
       console.error('Failed to sign in:', error);
@@ -817,6 +838,7 @@ function AppDashboard() {
         localStorage.setItem('mi_beta_authenticated_at', data.verifiedAt);
       }
 
+      if (redirectAwayFromLegacyLogin(normalizedEmail)) return;
       await loadUserProfile(normalizedEmail);
     } catch (error) {
       console.error('Failed to verify 2FA code:', error);
@@ -1006,7 +1028,9 @@ function AppDashboard() {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.email) {
         const ok = await bootstrapFromSupabaseSession();
         if (ok && typeof window !== 'undefined') {
-          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+          if (!redirectAwayFromLegacyLogin(session.user.email!)) {
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+          }
         } else if (!ok) {
           clearStoredAppAuth();
           setIsLoading(false);
