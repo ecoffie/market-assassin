@@ -72,6 +72,16 @@ export function isLegacyDestination(raw: string | null | undefined): boolean {
 export function resolvePostSignupDestination(input: DestinationInput = {}): ResolvedDestination {
   const rawIntent = String(input.intent || '').trim().toLowerCase();
 
+  // 0. An in-flight connector authorization is the destination, not a setup page.
+  //    Skipping profile setup must return them to Allow, not trap them in /mcp/setup.
+  if (isSafeNext(input.next) && /^\/oauth\/authorize(\?|#|$)/i.test((input.next || '').trim())) {
+    return {
+      path: safeNext(input.next, WELCOME_PATH),
+      intent: 'mcp',
+      reason: 'resume connector authorization',
+    };
+  }
+
   // 1. EXPLICIT MCP INTENT wins over a generic next — someone who came to connect Mindy to
   //    their AI should land in setup, not be asked what they want.
   if (rawIntent === 'mcp') {

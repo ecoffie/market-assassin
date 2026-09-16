@@ -17,6 +17,7 @@ import { resolveSetupInput, type CertificationAnswer } from '@/lib/profile/compa
 import { resolvePostSignupDestination } from '@/lib/mindy/post-signup-destination';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
+import { deferralPreferencePatch } from '@/lib/onboarding/setup-deferral';
 
 const ACTIONS: SetupAction[] = ['confirm', 'accept_all', 'skip'];
 
@@ -95,6 +96,29 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_email' });
       if (error) console.error('[company-setup] description upsert failed:', error.message);
+    }
+
+    if (action === 'skip' && outcome.writesNothing) {
+      const { data: row, error: readErr } = await sb
+        .from('user_profiles')
+        .select('preferences')
+        .eq('email', email)
+        .maybeSingle();
+      if (readErr) {
+        return NextResponse.json({ success: false, error: readErr.message, path: destination.path }, { status: 500 });
+      }
+      if (row) {
+        const existing = row.preferences && typeof row.preferences === 'object' && !Array.isArray(row.preferences)
+          ? row.preferences as Record<string, unknown>
+          : {};
+        const { error: stampErr } = await sb
+          .from('user_profiles')
+          .update({ preferences: deferralPreferencePatch(existing, new Date().toISOString()) })
+          .eq('email', email);
+        if (stampErr) {
+          return NextResponse.json({ success: false, error: stampErr.message, path: destination.path }, { status: 500 });
+        }
+      }
     }
 
     return NextResponse.json({

@@ -703,7 +703,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">
           <section className="bg-ground border border-surface rounded-xl p-6 space-y-5">
-            <SectionTitle title="Profile" />
+            <div className="flex items-center justify-between gap-3">
+              <SectionTitle title="Profile" />
+              <a href="/welcome/company" className="text-sm text-emerald-300 underline underline-offset-4 hover:text-emerald-200">
+                Finish setup
+              </a>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
               <Field label="Role / Title" value={form.role_title} onChange={(value) => setForm({ ...form, role_title: value })} placeholder="Founder, BD Lead..." />

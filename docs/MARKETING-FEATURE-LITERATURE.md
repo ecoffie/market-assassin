@@ -6866,3 +6866,13 @@ no 504; representative drones capability completes grounded under 55s.
 **Why.** The living pipeline was healthy and current but customer-invisible; the 3,043-row JSON corpus was customer-facing but mostly unsourced. Promoting GAO end-to-end makes citations the default without deleting legacy coverage.
 
 **Proof.** Unit tests: gao-instance clocks, document-agency no-force-map, sourced-pain-points provenance, GovInfo quarantine. Cron stamps `data_source_instances`; held population from `institute_sources` only (not GovInfo / JSON).
+
+---
+
+## Optional profile setup — skip does not enroll or trap (2026-09-16)
+
+**What.** Every profile-setup step has a visible “Skip for now · Exit setup”. An authenticated user continues to Maps, their original destination, or an in-progress connector authorization. Skipping does not turn alerts on and does not send them back into setup. They can finish later from Settings.
+
+**Why.** Setup was a wall in front of the product, including connector Allow. A skip that wrote nothing still looked unfinished, so the next visit restarted the wizard. Remembering the skip by inserting a notification row would have enabled alerts they never asked for.
+
+**SEO / proof.** Deferral is `user_profiles.preferences.setupDeferredAt`, not NAICS and not `alerts_enabled`. Exit requires `requireMIAuthSession` — a 401 does not create an account. Connector `next=/oauth/authorize` is preserved over `/mcp/setup`.

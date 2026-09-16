@@ -45,6 +45,11 @@ describe('known intent is preserved', () => {
     expect(postSignupPath({ intent: 'mcp', next: '/opportunity-map' })).toBe(MCP_SETUP_PATH);
   });
 
+  it('an in-flight connector authorization beats MCP setup — skip must return to Allow', () => {
+    const next = '/oauth/authorize?client_id=abc&redirect_uri=https%3A%2F%2Fclaude.ai%2Fcb';
+    expect(postSignupPath({ intent: 'mcp', next })).toBe(next);
+  });
+
   it('purchase intent preserves the checkout destination', () => {
     const r = resolvePostSignupDestination({ intent: 'purchase', purchaseNext: '/checkout/pro?session=abc' });
     expect(r.path).toBe('/checkout/pro?session=abc');

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
+import { SetupExit } from '@/components/app/onboarding/SetupExit';
 import { capturePartnerRefFromSearchParams, getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
@@ -716,6 +717,9 @@ function AlertSignupContent() {
           <p className="text-gray-400 max-w-md mx-auto">
             Setting up for <span className="text-white">{email}</span>
           </p>
+          <div className="mt-4 flex justify-center">
+            <SetupExit email={email} />
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -1077,18 +1081,7 @@ function AlertSignupContent() {
             >
               Back
             </button>
-            {step === 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setBusinessDescription('');
-                  goToStep(2);
-                }}
-                className="px-6 py-2.5 text-gray-400 hover:text-white transition-colors"
-              >
-                Skip for now
-              </button>
-            )}
+            <SetupExit email={email} className="px-6 py-2.5 text-gray-400 hover:text-white transition-colors" />
             <button
               type="button"
               onClick={handleNext}

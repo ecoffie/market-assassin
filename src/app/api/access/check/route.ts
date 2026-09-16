@@ -4,16 +4,36 @@ import { verifyMIAccess, canSeePrototypeSurfaces } from '@/lib/api-auth';
 import { resolveAccess } from '@/lib/access/resolve-access';
 import { resolveCoachAccess } from '@/lib/mindy/coach-access';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { profileSetupRequired } from '@/lib/onboarding/setup-deferral';
 
-// Has the user saved a real profile yet? Drives the new-user → onboarding gate on
-// /app (every login lands here, including password logins that skip OAuth's
-// onboarding redirect). On error → true (never force-onboard a real user).
-async function hasSavedProfile(email: string): Promise<boolean> {
+// Has the user saved a real profile, or explicitly skipped setup? Drives the
+// new-user gate on /app. A skip stamp is not NAICS and must not loop them back.
+// On error → setup is NOT required (never force-onboard a real user).
+async function needsProfileSetup(email: string): Promise<boolean> {
   try {
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const { data } = await sb.from('user_notification_settings').select('naics_codes').eq('user_email', email).maybeSingle();
-    return Array.isArray(data?.naics_codes) && (data!.naics_codes as string[]).length > 0;
-  } catch { return true; }
+    const { data: settings, error: settingsErr } = await sb
+      .from('user_notification_settings')
+      .select('naics_codes')
+      .eq('user_email', email)
+      .maybeSingle();
+    if (settingsErr) return false;
+    const { data: profile, error: profileErr } = await sb
+      .from('user_profiles')
+      .select('preferences')
+      .eq('email', email)
+      .maybeSingle();
+    if (profileErr) return false;
+    const preferences = profile?.preferences && typeof profile.preferences === 'object'
+      ? profile.preferences as Record<string, unknown>
+      : null;
+    return profileSetupRequired({
+      naicsCodes: Array.isArray(settings?.naics_codes) ? settings.naics_codes as string[] : null,
+      preferences,
+    });
+  } catch {
+    return false;
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -30,11 +50,11 @@ export async function GET(request: NextRequest) {
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
 
-    const [access, resolved, coachMode, profileExists] = await Promise.all([
+    const [access, resolved, coachMode, stillNeedsSetup] = await Promise.all([
       verifyMIAccess(email),
       resolveAccess(email),
       resolveCoachAccess(email),
-      hasSavedProfile(email),
+      needsProfileSetup(email),
     ]);
 
     // Partner trials (and other per-user trial_ends_at) stamp Pro via
@@ -57,7 +77,7 @@ export async function GET(request: NextRequest) {
       success: true,
       email,
       tier,
-      needsOnboarding: !profileExists,
+      needsOnboarding: stillNeedsSetup,
       isStaff: access.isStaff ?? false,
       staffRole: access.staffRole ?? 'none',
       // Prototype demo tabs are gated on their own allowlist, NOT isStaff, so

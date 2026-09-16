@@ -20,6 +20,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { DECLARABLE_CERTIFICATIONS, type CertificationAnswer } from '@/lib/profile/company-setup-input';
 import { rankSuggestions, groundingLabel } from '@/lib/profile/suggestion-ranking';
 import type { SetupAction } from '@/lib/profile/company-setup-outcome';
@@ -44,11 +45,27 @@ function CompanySetupInner() {
   const leadTerm = useMemo(() => description.trim().split(/\s+/).find((w) => w.length > 3) || null, [description]);
   const rankedNaics = useMemo(() => rankSuggestions(naics, { leadTerm }), [naics, leadTerm]);
 
-  /** Leave setup without writing anything, honouring the original intent. */
+  /** Leave setup. Stamp the deferral (not a profile, not alerts) so /app does not loop. */
   const leave = async () => {
-    const res = await fetch(`/api/company-setup/destination?${params.toString()}`).catch(() => null);
-    const j = await res?.json().catch(() => null);
-    window.location.href = j?.path || '/opportunity-map';
+    const email = typeof window !== 'undefined' ? localStorage.getItem('mi_beta_email') : null;
+    let path = '/opportunity-map';
+    try {
+      const res = await fetch('/api/app/setup-deferral', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email: email || undefined,
+          next: params.get('next'),
+          intent: params.get('intent'),
+          purchaseNext: params.get('purchase_next'),
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (typeof j?.path === 'string' && j.path.startsWith('/')) path = j.path;
+    } catch {
+      /* Maps fallback — no session is minted */
+    }
+    window.location.href = path;
   };
 
   const seeMarket = async () => {
@@ -69,10 +86,13 @@ function CompanySetupInner() {
   const finish = async (action: SetupAction) => {
     setBusy(true);
     try {
+      const email = typeof window !== 'undefined' ? localStorage.getItem('mi_beta_email') : null;
       const r = await fetch('/api/company-setup', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           action,
+          email: email || undefined,
           companyName, description,
           certifications: certs,
           states: nationwide ? null : states.split(',').map((s) => s.trim()).filter(Boolean),
@@ -99,7 +119,7 @@ function CompanySetupInner() {
         {/* Skip is ALWAYS reachable, on both screens, and states its consequence. */}
         <div className="flex justify-end">
           <button onClick={leave} className="text-sm text-slate-400 underline underline-offset-4 hover:text-slate-200">
-            Skip for now →
+            Skip for now · Exit setup
           </button>
         </div>
 
@@ -225,9 +245,9 @@ function CompanySetupInner() {
               </button>
             </div>
 
-            <button onClick={() => finish('skip')} disabled={busy}
+            <button onClick={leave} disabled={busy}
               className="mt-4 text-sm text-slate-400 underline underline-offset-4 hover:text-slate-200">
-              Skip for now — don&apos;t save any of this
+              Skip for now · Exit setup
             </button>
           </>
         )}

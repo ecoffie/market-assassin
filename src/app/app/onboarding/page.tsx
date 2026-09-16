@@ -9,8 +9,19 @@ import MarketDataMap from '@/components/app/market/MarketDataMap';
 import OnboardingScan, { type RevealData } from '@/components/app/onboarding/OnboardingScan';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
+import { signInWithGoogle } from '@/lib/supabase/auth';
 import { useAppTracker } from '@/components/app/track';
 import { getMIApiHeaders, authedFetch } from '@/components/app/authHeaders';
+import { SetupExit } from '@/components/app/onboarding/SetupExit';
+import { SetupSessionRecovery } from '@/components/app/onboarding/SetupSessionRecovery';
+import {
+  SETUP_DRAFT_KEY,
+  credentialForSetupSave,
+  isMiSessionToken,
+  isSessionFailureMessage,
+  parseSetupDraft,
+  serializeSetupDraft,
+} from '@/lib/app/setup-session';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
@@ -370,6 +381,37 @@ export default function OnboardingPage() {
   const [calibratedFromSamples, setCalibratedFromSamples] = useState(false);
   const [skippedSamplePicker, setSkippedSamplePicker] = useState(false);
   const [calibrationMessage, setCalibrationMessage] = useState('');
+  const [sessionRecovery, setSessionRecovery] = useState<string | null>(null);
+
+  function stashSetupDraft() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      sessionStorage.setItem(SETUP_DRAFT_KEY, serializeSetupDraft({
+        savedAt: new Date().toISOString(),
+        email,
+        businessDescription,
+        selectedIndustries,
+        customNaics,
+        selectedStates,
+        selectedAgencies,
+        customAgencies,
+        selectedSetAsides,
+        frequency,
+        step,
+        mode,
+        next: params.get('next'),
+      }));
+    } catch { /* private mode — React state still holds the fields */ }
+  }
+
+  function rememberSession(sessionToken: string) {
+    if (!isMiSessionToken(sessionToken)) return;
+    localStorage.setItem('mi_beta_auth_token', sessionToken);
+    localStorage.setItem('mi_beta_authenticated_at', new Date().toISOString());
+    if (email) localStorage.setItem('mi_beta_email', email);
+    setAccessToken(sessionToken);
+    setSessionRecovery(null);
+  }
 
   useEffect(() => {
     async function checkAuth() {
@@ -379,44 +421,43 @@ export default function OnboardingPage() {
       let userEmail = session?.user?.email?.toLowerCase() || '';
       let token = session?.access_token || '';
 
-      // Non-OAuth logins (password / MI-token) have no Supabase session but a valid
-      // MI auth token + email in localStorage. Honor it so onboarding works for EVERY
-      // sign-in method instead of bouncing to /signup (Eric Jun 25).
+      // Email-code and password logins have no Supabase session, but they do have
+      // an MI session token. That token — not the consumed 6-digit code, and not an
+      // empty string — is what Complete Setup must send.
+      const storedMi = typeof window !== 'undefined' ? (localStorage.getItem('mi_beta_auth_token') || '') : '';
       if (!userEmail || !token) {
         const miEmail = (typeof window !== 'undefined' ? (localStorage.getItem('mi_beta_email') || '') : '').toLowerCase();
-        const miToken = typeof window !== 'undefined' ? (localStorage.getItem('mi_beta_auth_token') || '') : '';
-        if (miEmail && miToken) { userEmail = miEmail; token = ''; }
+        if (miEmail && isMiSessionToken(storedMi)) { userEmail = miEmail; token = ''; }
         else { router.push('/signup'); return; }
       }
 
-      // Mint the MI auth token for THIS account UP FRONT (not just on the way out).
-      // Onboarding's in-flow saves (profile-from-text, mindy/profile, vault) are
-      // 2FA-gated; without a current-account token they failed with "two-factor
-      // session does not match this account" — especially after switching accounts,
-      // where a stale prior-account token lingered in localStorage. Purge any
-      // mismatched token, then mint fresh from the Supabase session so every save
-      // below is authorized. Best-effort; the ensureMIToken backstop still runs.
+      // Prefer the stored MI session. A Supabase access JWT is only an exchange
+      // input — forwarding it to requireMIAuthSession is "Invalid two-factor session".
+      let sessionToken = isMiSessionToken(storedMi) ? storedMi : '';
       if (typeof window !== 'undefined') {
         const storedEmail = (localStorage.getItem('mi_beta_email') || '').toLowerCase();
-        if (storedEmail && storedEmail !== userEmail) {
+        if (storedEmail && userEmail && storedEmail !== userEmail) {
           localStorage.removeItem('mi_beta_auth_token');
           localStorage.removeItem('mi_beta_2fa_token');
+          sessionToken = '';
         }
-        if (token) {
+        if (!sessionToken && token) {
           try {
             const mintRes = await fetch('/api/auth/mi-session', {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}` },
             });
             const mintData = await mintRes.json().catch(() => null);
-            if (mintRes.ok && mintData?.success && mintData.sessionToken) {
-              localStorage.setItem('mi_beta_auth_token', mintData.sessionToken);
+            if (mintRes.ok && mintData?.success && isMiSessionToken(mintData.sessionToken)) {
+              sessionToken = mintData.sessionToken;
+              localStorage.setItem('mi_beta_auth_token', sessionToken);
               localStorage.setItem('mi_beta_authenticated_at', mintData.authenticatedAt || new Date().toISOString());
               localStorage.setItem('mi_beta_email', userEmail);
             }
-          } catch { /* ensureMIToken backstop retries before leaving onboarding */ }
+          } catch { /* recovery panel retries if the save 401s */ }
         }
       }
+      token = sessionToken;
 
       // OAuth's redirectTo always lands here, so returning users hit the
       // onboarding wizard on every sign-in. Check whether they've already
@@ -426,7 +467,7 @@ export default function OnboardingPage() {
       try {
         const res = await fetch(
           `/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`,
-          { headers: getMIApiHeaders(userEmail, token ? { Authorization: `Bearer ${token}` } : undefined) }
+          { headers: getMIApiHeaders(userEmail) }
         );
         if (res.ok) {
           const data = await res.json();
@@ -453,7 +494,20 @@ export default function OnboardingPage() {
       }
 
       setEmail(userEmail);
-      setAccessToken(token);
+      setAccessToken(isMiSessionToken(token) ? token : '');
+      const draft = typeof window !== 'undefined' ? parseSetupDraft(sessionStorage.getItem(SETUP_DRAFT_KEY)) : null;
+      if (draft?.businessDescription) setBusinessDescription(draft.businessDescription);
+      if (draft?.selectedIndustries) setSelectedIndustries(draft.selectedIndustries);
+      if (draft?.customNaics) setCustomNaics(draft.customNaics);
+      if (draft?.selectedStates) setSelectedStates(draft.selectedStates);
+      if (draft?.selectedAgencies) setSelectedAgencies(draft.selectedAgencies);
+      if (draft?.customAgencies) setCustomAgencies(draft.customAgencies);
+      if (draft?.selectedSetAsides) setSelectedSetAsides(draft.selectedSetAsides);
+      if (draft?.frequency === 'daily' || draft?.frequency === 'mwf' || draft?.frequency === 'tth' || draft?.frequency === 'weekly' || draft?.frequency === 'paused') {
+        setFrequency(draft.frequency);
+      }
+      if (typeof draft?.step === 'number' && draft.step >= 1) setStep(draft.step);
+      if (draft?.mode === 'auto' || draft?.mode === 'manual') setMode(draft.mode);
       setLoading(false);
     }
 
@@ -669,6 +723,15 @@ export default function OnboardingPage() {
   async function confirmAuto() {
     if (!autoProfile) return;
     setSaving(true); setError('');
+    setSessionRecovery(null);
+    stashSetupDraft();
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('mi_beta_auth_token') : '';
+    const cred = credentialForSetupSave({ storedMiToken: stored || accessToken });
+    if (cred.kind !== 'mi-session') {
+      setSessionRecovery('Sign in again to save what you entered. Setup will not resend your old login code.');
+      setSaving(false);
+      return;
+    }
     try {
       // UEI path: write SAM identity + USASpending past performance into the Vault
       // FIRST (non-blocking) — this is what grounds the hidden-match capability
@@ -683,7 +746,7 @@ export default function OnboardingPage() {
         try {
           const vRes = await authedFetch('/api/app/vault/prefill', email, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+            headers: { 'Content-Type': 'application/json', 'x-mi-auth-token': cred.token },
             body: JSON.stringify({
               email,
               uei: autoProfile.uei,
@@ -703,7 +766,7 @@ export default function OnboardingPage() {
       }
       const res = await fetch('/api/mindy/profile', {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', 'x-mi-auth-token': cred.token }),
         body: JSON.stringify({
           email,
           businessDescription: autoText.trim() || null,
@@ -730,6 +793,10 @@ export default function OnboardingPage() {
         }),
       });
       const d = await res.json();
+      if (res.status === 401 || isSessionFailureMessage(d.error)) {
+        setSessionRecovery(d.error || 'Invalid two-factor session');
+        return;
+      }
       if (!res.ok || !d.success) { setError(d.error || 'Failed to save. Try again.'); return; }
       track('onboarding_step', 'onboarding', { step: 'completion', status: 'success', mode: 'auto' });
       // Land in the Vault so the user finishes a COMPLETE profile — enter their UEI
@@ -1001,13 +1068,21 @@ export default function OnboardingPage() {
     }
 
     setSaving(true);
+    stashSetupDraft();
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('mi_beta_auth_token') : '';
+    const cred = credentialForSetupSave({ storedMiToken: stored || accessToken });
+    if (cred.kind !== 'mi-session') {
+      setSessionRecovery('Sign in again to save what you entered. Setup will not resend your old login code.');
+      setSaving(false);
+      return;
+    }
     try {
       const res = await fetch('/api/mindy/profile', {
         method: 'POST',
-        headers: {
+        headers: getMIApiHeaders(email, {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
+          'x-mi-auth-token': cred.token,
+        }),
         body: JSON.stringify({
           email,
           businessDescription: businessDescription.trim() || null,
@@ -1024,6 +1099,9 @@ export default function OnboardingPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (res.status === 401 || isSessionFailureMessage(data.error)) {
+          setSessionRecovery(data.error || 'Invalid two-factor session');
+        }
         setError(data.error || 'Failed to save your profile. Please try again.');
         track('onboarding_step', 'onboarding', {
           step: 'completion',
@@ -1049,6 +1127,7 @@ export default function OnboardingPage() {
       // would have left one path still ending in the legacy product. Explicit safe `next`
       // wins; otherwise the Maps front door.
       await ensureMIToken();
+      try { sessionStorage.removeItem(SETUP_DRAFT_KEY); } catch { /* private mode */ }
       router.push(safeNext(
         new URLSearchParams(window.location.search).get('next'),
         `${MAPS_HOME_PATH}?onboarded=1`,
@@ -1074,6 +1153,9 @@ export default function OnboardingPage() {
       <main className="min-h-screen bg-ground-deep px-4 py-10 text-white">
         <div className="mx-auto max-w-2xl">
           <header className="mb-8 text-center">
+            <div className="mb-4 flex justify-end">
+              <SetupExit email={email} />
+            </div>
             <MindyLogo size={64} className="mx-auto mb-5" />
             <h1 className="text-3xl font-bold">Set up your profile</h1>
             <p className="mt-2 text-muted">Mindy finds the right federal opportunities for you</p>
@@ -1385,6 +1467,14 @@ export default function OnboardingPage() {
               </div>
             </div>
           )}
+          {sessionRecovery && (
+            <SetupSessionRecovery
+              email={email}
+              message={sessionRecovery}
+              onRecovered={(token) => { rememberSession(token); void confirmAuto(); }}
+              onUseGoogle={() => { stashSetupDraft(); void signInWithGoogle(window.location.href); }}
+            />
+          )}
         </div>
       </main>
     );
@@ -1394,6 +1484,9 @@ export default function OnboardingPage() {
     <main className="min-h-screen bg-ground-deep px-4 py-10 text-white">
       <div className="mx-auto max-w-3xl">
         <header className="mb-8 text-center">
+          <div className="mb-4 flex justify-end">
+            <SetupExit email={email} />
+          </div>
           <MindyLogo size={64} className="mx-auto mb-5" />
           <h1 className="text-3xl font-bold">Set up your profile</h1>
           <p className="mt-2 text-muted">Help Mindy find the right opportunities for you</p>
@@ -1439,6 +1532,14 @@ export default function OnboardingPage() {
             <div className="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {error}
             </div>
+          )}
+          {sessionRecovery && (
+            <SetupSessionRecovery
+              email={email}
+              message={sessionRecovery}
+              onRecovered={(token) => { rememberSession(token); void handleNext(); }}
+              onUseGoogle={() => { stashSetupDraft(); void signInWithGoogle(window.location.href); }}
+            />
           )}
           {calibrationMessage && (
             <div className="mb-5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
@@ -1767,19 +1868,7 @@ export default function OnboardingPage() {
               Back
             </button>
             <div className="flex items-center gap-3">
-              {step === 1 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileSuggestions(null);
-                    setSkippedSamplePicker(true);
-                    goToStep(2);
-                  }}
-                  className="px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:text-white"
-                >
-                  Skip for now
-                </button>
-              )}
+              <SetupExit email={email} className="px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:text-white" />
               <button
                 type="button"
                 onClick={handleNext}
