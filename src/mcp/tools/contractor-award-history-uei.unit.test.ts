@@ -7,15 +7,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockShared = vi.fn();
 const mockSales = vi.fn();
 const mockExistence = vi.fn();
+const mockResolveName = vi.fn();
 
 vi.mock('@/lib/contractor/history-by-uei', () => ({
   getContractorHistoryByUei: (...a: unknown[]) => mockShared(...a),
 }));
 vi.mock('@/lib/contractor-sales-history', () => ({
   getContractorSalesHistory: (...a: unknown[]) => mockSales(...a),
+  slugifyContractorName: (n: string) => String(n).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
 }));
 vi.mock('@/lib/contractor/award-history-existence', () => ({
   establishAwardHistory: (...a: unknown[]) => mockExistence(...a),
+}));
+vi.mock('@/lib/contractor/name-resolution', () => ({
+  resolveAwardCorpusByName: (...a: unknown[]) => mockResolveName(...a),
 }));
 vi.mock('@/lib/mcp/flags', () => ({
   mcpFlags: { aiHint: false },
@@ -30,6 +35,8 @@ beforeEach(() => {
   mockShared.mockReset();
   mockSales.mockReset();
   mockExistence.mockReset();
+  mockResolveName.mockReset();
+  mockResolveName.mockResolvedValue({ status: 'none', searched: '' });
 });
 
 describe('contractorAwardHistory — UEI path', () => {

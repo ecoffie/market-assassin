@@ -1101,9 +1101,7 @@ const CONTRACTOR_AWARD_HISTORY_TOOL_DEF = {
   function: {
     name: 'get_contractor_award_history',
     description:
-      "A contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
-      'agencies, top NAICS, and recent awards. Prefer uei when known (same BigQuery warehouse path as the Map ' +
-      'company drawer). Name matching is fuzzy — always check match.confidence. grounded=false when unresolved.',
+      "A contractor's federal prime-award history. Prefer uei. A company name is resolved against the award-warehouse name index: one match is loaded by that UEI; several matches return candidates and are not picked; zero matches is none_in_award_corpus, not a claim of no federal awards. grounded=false on ambiguous and on a dataset miss. Do not read match.method on a UEI payload as the company-parameter match.",
     parameters: {
       type: 'object',
       properties: {

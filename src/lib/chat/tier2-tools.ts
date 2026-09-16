@@ -31,10 +31,9 @@ import {
   findCapableSmallBusinesses,
   recipientSlug,
   type RollupProfile,
+  type RecipientProfile,
 } from '@/lib/bigquery/recipients';
-import { localEntitiesByName } from '@/lib/sam/entity-local-fallback';
-import { namesMatchLegalStem } from '@/lib/contractor/legal-name-stem';
-import type { SAMEntity } from '@/lib/sam/entity-api';
+import { resolveAwardCorpusByName } from '@/lib/contractor/name-resolution';
 import {
   allowColdBqLookup,
   type ColdBqTurnState,
@@ -53,7 +52,7 @@ export const TIER2_TOOL_DEFS = [
     function: {
       name: 'get_contractor_profile',
       description:
-        "Look up a specific federal contractor by company name and return who they are, their total federal awards, top buying agencies, and recent contracts. Call this when the user asks about a specific company — an incumbent, a competitor, or a potential teaming partner ('who is X', 'what has X won', 'who's the incumbent').",
+        "Look up one federal contractor by company name. A unique award-warehouse match returns that firm's rollup totals, top agencies, and recent awards. Several matches return resolution=ambiguous and candidates — this tool does not pick one, and that is not 'no contractor found'. Zero rows in the award index is resolution=none_in_award_corpus (this dataset only, not proof of no federal awards and not a certification finding). A failed lookup is resolution=lookup_failed, distinct from both.",
       parameters: {
         type: 'object',
         properties: {
@@ -147,79 +146,26 @@ export function makeTier2Tools(email: string) {
     return { profile, resolvedCold, rateLimited: false };
   }
 
-  function familyCard(entity: SAMEntity) {
+  function rollupFromRecipient(recipient: RecipientProfile): RollupProfile {
     return {
-      name: entity.legalBusinessName,
-      uei: entity.ueiSAM,
-      cage: entity.cageCode || null,
-      status: entity.registrationStatus,
-      has8a: entity.has8a === true,
-      hasWOSB: entity.hasWOSB === true,
-      primary_naics: entity.primaryNaics || entity.naicsList?.find((n) => n.isPrimary)?.naicsCode || null,
-      state: entity.physicalAddress?.stateOrProvince || null,
-    };
-  }
-
-  /**
-   * BQ slug lookup only matches `tanaq-llc`, not `tanaq-global-solutions-llc`,
-   * and a registered firm with no warehouse row is invisible to it. The SAM
-   * mirror already resolved this name. Use it before saying "not found".
-   */
-  async function profileFromSamRegistry(name: string): Promise<Record<string, unknown> | null> {
-    const hits = await localEntitiesByName(name, 25).catch(() => []);
-    if (!hits.length) return null;
-    const family = hits.map((h) => familyCard(h.entity));
-    const exact = hits.find((h) => namesMatchLegalStem(name, h.entity.legalBusinessName || '') === 'exact');
-    if (!exact) {
-      return {
-        ok: true,
-        found: true,
-        ambiguous: true,
-        match_count: family.length,
-        family,
-        note:
-          `${family.length} registered SAM entit${family.length === 1 ? 'y matches' : 'ies match'} "${name}". ` +
-          'Name the legal entity, or pass its UEI to get_contractor_award_history. Do NOT say no federal contractor was found.',
-      };
-    }
-    const chosen = exact.entity;
-    let recipient = chosen.ueiSAM
-      ? await getRecipientByUei(chosen.ueiSAM, false).catch(() => null)
-      : null;
-    let awardNote: string | undefined;
-    if (!recipient && chosen.ueiSAM) {
-      if (await allowColdLookup()) {
-        recipient = await getRecipientByUei(chosen.ueiSAM, true).catch(() => null);
-      } else {
-        awardNote =
-          `${chosen.legalBusinessName} is registered in SAM (${chosen.ueiSAM}). Warehouse award totals were not retrieved — the live-lookup budget is spent. Do NOT treat missing awards as zero past performance.`;
-      }
-    }
-    if (!recipient && !awardNote) {
-      awardNote =
-        `${chosen.legalBusinessName} is registered in SAM (${chosen.ueiSAM}). No warehouse award row for this UEI. That is not "no such contractor."`;
-    }
-    const addr = chosen.physicalAddress;
-    return {
-      ok: true,
-      found: true,
-      source: 'sam_registry',
-      match_count: family.length,
-      company: {
-        name: chosen.legalBusinessName,
-        uei: chosen.ueiSAM,
-        cage: chosen.cageCode || null,
-        registration_status: chosen.registrationStatus,
-        location: [addr?.city, addr?.stateOrProvince].filter(Boolean).join(', ') || null,
-        total_obligated: recipient?.total_obligated ?? null,
-        award_count: recipient ? recipient.award_count : null,
-        has8a: chosen.has8a === true,
-        primary_naics: chosen.primaryNaics || null,
-      },
-      ...(family.length > 1 ? { family } : {}),
-      top_agencies: [],
-      recent_awards: [],
-      ...(awardNote ? { note: awardNote } : {}),
+      rollup_uei: recipient.recipient_uei,
+      rollup_name: recipient.recipient_name,
+      canonical_slug: recipientSlug(recipient.recipient_name),
+      child_ueis: [recipient.recipient_uei],
+      child_count: 1,
+      cage_code: recipient.cage_code,
+      address: recipient.address,
+      city: recipient.city,
+      state: recipient.state,
+      zip: recipient.zip,
+      country: recipient.country,
+      total_obligated: Number(recipient.total_obligated || 0),
+      award_count: Number(recipient.award_count || 0),
+      transaction_count: Number(recipient.transaction_count || 0),
+      first_action_date: recipient.first_action_date,
+      last_action_date: recipient.last_action_date,
+      distinct_agency_count: Number(recipient.distinct_agency_count || 0),
+      distinct_naics_count: Number(recipient.distinct_naics_count || 0),
     };
   }
 
@@ -227,16 +173,78 @@ export function makeTier2Tools(email: string) {
     const name = typeof args?.company_name === 'string' ? args.company_name.trim() : '';
     if (!name) return { ok: false, error: 'company_name_required' };
 
-    const { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
-    if (profile) {
-      // fall through to award enrichment below
-    } else {
-      // SAM mirror is Postgres, not a BQ scan. Check it even when the cold
-      // budget is spent — "not found" was the stage failure for a family of 18.
-      const sam = await profileFromSamRegistry(name);
-      if (sam) return sam;
-      if (rateLimited) return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
-      return { ok: true, found: false, note: `I couldn't find a federal contractor matching "${name}".` };
+    let { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
+    let totalsScope: 'parent_rollup' | 'single_uei' = 'parent_rollup';
+    if (!profile) {
+      // A spent cold budget is a failed lookup, not an empty corpus.
+      if (rateLimited) {
+        return { ok: false, found: false, resolution: 'lookup_failed', error: 'rate_limited', note: OVER_LIMIT_NOTE };
+      }
+      const named = await resolveAwardCorpusByName(name);
+      if (named.status === 'degraded') {
+        return {
+          ok: false,
+          found: false,
+          resolution: 'lookup_failed',
+          error: 'lookup_failed',
+          note: 'The award-warehouse name search failed. Do not treat this as a miss and do not claim the contractor has no federal presence.',
+        };
+      }
+      if (named.status === 'ambiguous') {
+        return {
+          ok: true,
+          found: false,
+          resolution: 'ambiguous',
+          match_count: named.match_count,
+          source: 'recipients',
+          candidates: named.candidates,
+          note: named.note,
+        };
+      }
+      if (named.status === 'unique') {
+        const recipient = await getRecipientByUei(named.uei, true).catch(() => null);
+        if (recipient) {
+          profile = rollupFromRecipient(recipient);
+          totalsScope = 'single_uei';
+          resolvedCold = true;
+        } else {
+          return {
+            ok: true,
+            found: true,
+            resolution: 'unique',
+            source: 'recipients',
+            coverage: {
+              dataset: 'recipients',
+              measure: 'total_obligated',
+              scope: 'single_uei',
+              as_of: null,
+              not_equivalent_to: 'recipients_rollup.total_obligated',
+            },
+            company: {
+              name: named.name,
+              uei: named.uei,
+              total_obligated: named.total_obligated,
+              award_count: named.award_count,
+            },
+            top_agencies: [],
+            recent_awards: [],
+            enrichment_status: 'budget_limited',
+            partial: true,
+            note: 'One award-warehouse recipient matched. Detail rows were not loaded. Empty top_agencies/recent_awards means not retrieved, not none exist.',
+          };
+        }
+      } else {
+        return {
+          ok: true,
+          found: false,
+          resolution: 'none_in_award_corpus',
+          source: 'recipients',
+          note:
+            `No award-holding recipient in the warehouse name index matches "${name}". ` +
+            'That is this dataset only — it does not prove the firm has no federal awards, and it says nothing about SAM registration or certifications. ' +
+            'Use lookup_sam_entity for registration. A missing has8a flag is not a finding that the firm is uncertified.',
+        };
+      }
     }
 
     // Enrich with recent awards + top agencies (rolled up across child UEIs,
@@ -303,6 +311,17 @@ export function makeTier2Tools(email: string) {
     return {
       ok: true,
       found: true,
+      resolution: 'unique',
+      source: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
+      coverage: {
+        dataset: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
+        measure: 'total_obligated',
+        scope: totalsScope,
+        as_of: profile.last_action_date ?? null,
+        not_equivalent_to: totalsScope === 'single_uei'
+          ? 'recipients_rollup.total_obligated'
+          : 'recipients.total_obligated',
+      },
       company: {
         name: profile.rollup_name,
         uei: profile.rollup_uei,
@@ -318,6 +337,10 @@ export function makeTier2Tools(email: string) {
       // P0-2 invariant: when award_count > 0 and enrichment was not actually queried,
       // empty arrays must NEVER be presented as complete data.
       enrichment_status: enrichmentStatus,
+      totals_note:
+        'total_obligated is this coverage snapshot (recipients_rollup for a slug hit, recipients for a UEI loaded after the slug missed). ' +
+        'get_contractor_award_history reports recipients.total_obligated for one UEI, plus a fiscal-year series summed from usaspending.awards. ' +
+        'The same award_count can still differ. Do not treat the two dollar figures as one total.',
       ...(enrichmentStatus === 'budget_limited'
         ? {
             partial: true,

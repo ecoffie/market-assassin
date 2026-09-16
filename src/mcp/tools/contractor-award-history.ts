@@ -5,16 +5,21 @@
  *
  * UEI path (authoritative when supplied): shared BigQuery/KV service
  * `getContractorHistoryByUei` — same aggregates as Map/in-app company detail.
- * Name-only path: legacy `getContractorSalesHistory` + CHAIN-2 existence check.
+ * Name path: the same award-warehouse name index as search_contractors. A unique
+ * match is loaded by that UEI. Several matches are returned as candidates and
+ * are not picked. A miss still runs the existence check (stem-normalized, so a
+ * comma does not drop the safety net). A `recipient_name` label inside a UEI
+ * history payload is how that payload was keyed after the UEI was known — it
+ * is not evidence of how the company string was matched.
  *
  * credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  * Contact details are gated out here (publicView) — MCP is a data surface, not the
  * gated contacts product.
  */
 import { getContractorSalesHistory, type ContractorSalesHistory } from '@/lib/contractor-sales-history';
-import { slugifyContractorName } from '@/lib/contractor-sales-history';
-import { establishAwardHistory, type AwardHistoryEvidence, type RecompeteHistoryRow } from '@/lib/contractor/award-history-existence';
+import { establishAwardHistory, type AwardHistoryEvidence } from '@/lib/contractor/award-history-existence';
 import { getContractorHistoryByUei } from '@/lib/contractor/history-by-uei';
+import { resolveAwardCorpusByName, type AwardNameCandidate } from '@/lib/contractor/name-resolution';
 import { isWellFormedUei } from '@/lib/sam/resolve-uei';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -30,6 +35,7 @@ export interface ContractorAwardHistoryToolInput {
 export interface ContractorAwardHistoryToolResult {
   queried: { company?: string; uei?: string };
   history: ContractorSalesHistory | null;
+  candidates?: AwardNameCandidate[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -37,6 +43,15 @@ export interface ContractorAwardHistoryToolResult {
     award_count: number;
     total_obligations: number;
     resolution?: string;
+    name_resolution?: string;
+    match_count?: number;
+    coverage?: {
+      dataset: string;
+      measure: string;
+      scope: string;
+      as_of: string | null;
+      not_equivalent_to?: string;
+    };
     source?: string | null;
     asOf?: string | null;
     aggregates_cover?: string | null;
@@ -124,80 +139,27 @@ async function byUei(
   };
 }
 
-function amountOf(row: RecompeteHistoryRow): number {
-  const n = Number(row.total_obligation);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/**
- * Shape recompete-mirror rows into the history payload. One source, labeled.
- * awardCount is the number of rows in THIS payload (the dollars cover those
- * rows). The mirror's exact total, when larger, stays in the message — never
- * as a dollar figure we didn't sum.
- */
-export function historyFromRecompeteRows(
+function withNameResolution(
   company: string,
-  rows: RecompeteHistoryRow[],
-  exactCount: number | null,
-  awardLimit?: number,
-): ContractorSalesHistory {
-  const shown = awardLimit && rows.length > awardLimit ? rows.slice(0, awardLimit) : rows;
-  const dollars = shown.reduce((sum, row) => sum + amountOf(row), 0);
-  const name = rows.find((r) => r.incumbent_name)?.incumbent_name || company;
-  const agencies = new Map<string, { amount: number; count: number }>();
-  for (const row of shown) {
-    const agency = row.awarding_agency || 'Unknown';
-    const prev = agencies.get(agency) || { amount: 0, count: 0 };
-    agencies.set(agency, { amount: prev.amount + amountOf(row), count: prev.count + 1 });
-  }
-  const topAgencies = [...agencies.entries()]
-    .map(([agency, v]) => ({ agency, amount: v.amount, count: v.count }))
-    .sort((a, b) => b.amount - a.amount);
-  const truncated = exactCount != null && exactCount > shown.length;
+  uei: string,
+  via: ContractorAwardHistoryToolResult,
+): ContractorAwardHistoryToolResult {
   return {
-    success: true,
-    source: 'recompete_mirror',
-    coverage: truncated ? 'limited' : 'cached',
-    lastUpdated: null,
-    contractor: {
-      company: name,
-      slug: slugifyContractorName(name),
-      naics: [...new Set(shown.map((r) => r.naics_code).filter((c): c is string => !!c))],
-      agencies: topAgencies.map((a) => a.agency),
-      totalContractValue: dollars,
-      contractCount: shown.length,
-      hasContact: false,
-      hasEmail: false,
-      hasPhone: false,
+    ...via,
+    queried: { company, uei },
+    _meta: {
+      ...via._meta,
+      name_resolution: 'award_corpus_name_to_uei',
+      coverage: {
+        dataset: 'recipients',
+        measure: 'total_obligated',
+        scope: 'single_uei',
+        as_of: via._meta.asOf ?? null,
+        not_equivalent_to: 'recipients_rollup.total_obligated',
+      },
+      note: via._meta.note
+        ?? 'Name matched one award-warehouse recipient; history was loaded by that UEI. total_obligations is recipients.total_obligated for this UEI. A profile card reads recipients_rollup.total_obligated, a different snapshot — do not treat the two dollar figures as the same total. match.method recipient_name, when present, is the warehouse label after the UEI was known, not how the company parameter was matched.',
     },
-    match: { method: 'recipient_name', confidence: 'high', name },
-    summary: {
-      totalObligations: dollars,
-      awardCount: shown.length,
-      latestFiscalYear: null,
-      topAgency: topAgencies[0]?.agency ?? null,
-      averageAwardSize: shown.length ? dollars / shown.length : 0,
-    },
-    series: [],
-    topAgencies,
-    topNaics: [],
-    recentAwards: shown.map((row) => ({
-      id: row.contract_id,
-      title: row.description || name,
-      agency: row.awarding_agency || 'Unknown',
-      subAgency: row.awarding_sub_agency,
-      naics: row.naics_code,
-      naicsDescription: null,
-      amount: amountOf(row),
-      startDate: row.period_of_performance_start,
-      endDate: row.period_of_performance_current_end,
-      state: null,
-      url: null,
-    })),
-    gated: { fullHistory: true, contacts: true, workflowActions: true, exports: true },
-    message: truncated
-      ? `Resolved from the recompete mirror: ${shown.length} of ${exactCount} matching contracts returned. Dollars are the sum of the returned rows, not an all-time warehouse total.`
-      : 'Resolved from the recompete mirror (expiring-contract view). Dollars are this source, not an all-time warehouse total.',
   };
 }
 
@@ -206,8 +168,37 @@ async function byCompany(
   actor: string | undefined,
   awardLimit?: number,
 ): Promise<ContractorAwardHistoryToolResult> {
+  const named = await resolveAwardCorpusByName(company);
+
+  if (named.status === 'ambiguous') {
+    return {
+      queried: { company },
+      history: null,
+      candidates: named.candidates,
+      _meta: {
+        grounded: false,
+        degraded: false,
+        award_count: 0,
+        total_obligations: 0,
+        resolution: 'ambiguous',
+        match_count: named.match_count,
+        source: 'recipients',
+        note: named.note,
+      },
+    };
+  }
+
+  if (named.status === 'unique') {
+    const via = await byUei(named.uei, actor, awardLimit);
+    const usable =
+      via._meta.resolution === 'found' ||
+      via._meta.resolution === 'registered_zero' ||
+      (via.history?.summary?.awardCount ?? 0) > 0;
+    if (usable) return withNameResolution(company, named.uei, via);
+  }
+
   let history: ContractorSalesHistory | null = null;
-  let degraded = false;
+  let degraded = named.status === 'degraded' || (named.status === 'unique');
   try {
     history = company
       ? await getContractorSalesHistory({
@@ -225,20 +216,17 @@ async function byCompany(
 
   let grounded = !!history && (history.summary?.awardCount ?? 0) > 0;
 
-  // ── CHAIN-2 + BUG-02: existence is not enough — resolve the rows ────────────────
-  // Flagging "history exists elsewhere" stopped the false "no past performance"
-  // claim. It still returned history:null / award_count:0 for a name this tool
-  // had itself emitted ("TANAQ SUPPORT SERVICES, LLC"). When the mirror (or the
-  // UEI warehouse) has the rows, return them. One source, labeled. Do not merge
-  // two dollar totals into a number neither source stated.
+  // Existence net on every name miss, including a punctuation variant the
+  // warehouse index missed. The check stems the name itself, so ", LLC" and
+  // "LLC" are the same query. Do not substitute the mirror's dollar slice for
+  // the warehouse total — flag the miss, keep the two coverages distinct.
   let evidence: AwardHistoryEvidence | null = null;
+  const knownUei = named.status === 'unique' ? named.uei : null;
   if (!grounded && company) {
     try {
-      evidence = await establishAwardHistory(company, null);
+      evidence = await establishAwardHistory(company, knownUei);
       if (evidence.degraded && !evidence.hasFederalAwardHistory) degraded = true;
-
-      const mirrorCount = evidence.sources.find((s) => s.source === 'recompete_mirror')?.awardCount ?? null;
-      if (evidence.uei) {
+      if (evidence.uei && evidence.uei !== knownUei) {
         const viaUei = await getContractorHistoryByUei({
           uei: evidence.uei,
           actor,
@@ -250,12 +238,7 @@ async function byCompany(
           grounded = true;
         }
       }
-      if ((!history || (history.summary?.awardCount ?? 0) === 0) && evidence.rows && evidence.rows.length > 0) {
-        history = historyFromRecompeteRows(company, evidence.rows, mirrorCount, awardLimit);
-        grounded = true;
-      } else if (evidence.hasFederalAwardHistory) {
-        grounded = true;
-      }
+      if (evidence.hasFederalAwardHistory && !grounded) grounded = true;
     } catch (err) {
       degraded = true;
       console.error('[mcp:contractor-award-history] existence check failed:', err);
@@ -264,6 +247,7 @@ async function byCompany(
 
   const ownCount = history?.summary?.awardCount ?? 0;
   const resolved = ownCount > 0;
+  const elsewhere = !!evidence?.hasFederalAwardHistory && !resolved;
 
   const result: ContractorAwardHistoryToolResult = {
     queried: { company },
@@ -271,11 +255,28 @@ async function byCompany(
     _meta: {
       grounded,
       degraded,
-      ...(evidence?.hasFederalAwardHistory && !resolved
+      resolution: degraded && !grounded
+        ? 'lookup_failed'
+        : elsewhere
+        ? 'none_in_award_corpus'
+        : resolved
+        ? 'static_cache'
+        : 'none_in_award_corpus',
+      ...(elsewhere
         ? {
             award_history_elsewhere: true,
-            award_history_sources: evidence.sources.filter((x) => x.found).map((x) => x.source),
+            award_history_sources: evidence!.sources.filter((x) => x.found).map((x) => x.source),
             note: 'This tool\'s award cache returned nothing, but Mindy holds federal award history for this contractor from another source. Do NOT state the contractor has no federal past performance.',
+          }
+        : !resolved && !degraded
+        ? {
+            note:
+              `No award-holding recipient in the warehouse name index matched "${company}", and the existence check found none in the datasets it queried. ` +
+              'That is not proof the firm has no federal awards, and it says nothing about SAM registration or certifications.',
+          }
+        : degraded && !resolved
+        ? {
+            note: 'Award-history lookup failed. Do not treat this as a miss and do not state the contractor has no awards.',
           }
         : {}),
       award_count: ownCount,
@@ -286,19 +287,23 @@ async function byCompany(
   if (mcpFlags.aiHint) {
     const s = history?.summary;
     result._ai_hint = {
-      summary: degraded
+      summary: result._meta.resolution === 'ambiguous'
+        ? result._meta.note || 'Several contractors matched. Do not pick one.'
+        : degraded
         ? 'Award-history lookup errored — retry; do not state the contractor has no awards.'
         : !history
-        ? `No contractor named "${company}" matched. Check spelling or try the legal business name.`
+        ? (result._meta.note || `No award-holding recipient in this dataset matched "${company}".`)
         : grounded
-        ? `${history.contractor.company}: $${((s!.totalObligations) / 1e6).toFixed(1)}M across ${s!.awardCount} awards; top agency ${s!.topAgency ?? 'n/a'}; latest FY ${s!.latestFiscalYear ?? 'n/a'} (match confidence: ${history.match.confidence}).`
-        : `"${company}" matched an entity but has no cached award history (may be a new/inactive filer).`,
-      how_to_use: grounded
-        ? 'topAgencies = where they win (find gaps / their strongholds); series = trajectory (growing vs fading); topNaics = their lanes. Use match.confidence — a "low" match may be a name collision, not the same firm.'
-        : 'No grounded history; say none was found rather than inventing awards.',
+        ? `${history.contractor.company}: $${((s!.totalObligations) / 1e6).toFixed(1)}M across ${s!.awardCount} awards; top agency ${s!.topAgency ?? 'n/a'}; latest FY ${s!.latestFiscalYear ?? 'n/a'}.`
+        : `"${company}" matched an entity but has no cached award history in this dataset.`,
+      how_to_use: result._meta.resolution === 'ambiguous'
+        ? 'Use candidates, or search_contractors, then call this tool with a UEI. Do not attribute the largest match.'
+        : grounded
+        ? 'topAgencies = where they win; series = trajectory; topNaics = their lanes. The dollar total is this source only.'
+        : 'Do not invent awards. Absence from this dataset is not absence from every federal source.',
       key_caveats: [
-        'Name matching is fuzzy — verify match.confidence and match.name before attributing awards.',
-        'Award history is prime obligations from the warehouse / cache; subcontract revenue is not included.',
+        'A unique name is loaded by UEI. Several matches are not auto-selected. match.method on a UEI payload is not how the company string was resolved.',
+        'Profile rollup dollars and this UEI total are different snapshots. Subcontract revenue is not included.',
       ],
     };
   }

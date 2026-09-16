@@ -1,12 +1,11 @@
 /**
  * Search stem for a legal business name.
  *
- * "TANAQ SUPPORT SERVICES, LLC" and "Tanaq Support Services LLC" are the same
- * firm. A raw ILIKE of the typed string misses when the stored row has a comma
- * the query lacks (or the reverse) — measured on get_contractor_award_history
- * ("TANAQ SUPPORT SERVICES, LLC" → history null) and get_contractor_profile
- * ("Tanaq Global Solutions LLC" → found false) while lookup_sam_entity("Tanaq")
- * already returned the family.
+ * "TANAQ SUPPORT SERVICES, LLC" and "Tanaq Support Services LLC" share a stem.
+ * The award-history company path does not fail because of the comma — it
+ * failed because that path never resolved a name to a UEI. The stem is still
+ * required so a punctuation variant is the same existence-check query, and so
+ * a name-index retry finds the stored comma form.
  *
  * Strip the legal suffix and punctuation so the stem is a substring of either
  * form. Does NOT rewrite "&" → "and": the stored name may keep the ampersand,
