@@ -14,11 +14,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockHistory = vi.fn();
 const mockEstablish = vi.fn();
+const mockByUei = vi.fn();
 vi.mock('@/lib/contractor-sales-history', () => ({
   getContractorSalesHistory: (o: unknown) => mockHistory(o),
+  slugifyContractorName: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
 }));
 vi.mock('@/lib/contractor/award-history-existence', () => ({
   establishAwardHistory: (c: string, u: string | null) => mockEstablish(c, u),
+}));
+vi.mock('@/lib/contractor/history-by-uei', () => ({
+  getContractorHistoryByUei: (o: unknown) => mockByUei(o),
 }));
 
 const { contractorAwardHistory } = await import('./contractor-award-history');
@@ -26,8 +31,9 @@ const { contractorAwardHistory } = await import('./contractor-award-history');
 const EMPTY_HISTORY = { summary: { awardCount: 0 }, source: 'cache', awards: [] };
 
 beforeEach(() => {
-  mockHistory.mockReset(); mockEstablish.mockReset();
+  mockHistory.mockReset(); mockEstablish.mockReset(); mockByUei.mockReset();
   mockEstablish.mockResolvedValue({ hasFederalAwardHistory: false, degraded: false, sources: [], uei: null, recipientName: null });
+  mockByUei.mockResolvedValue({ resolution: 'not_found', history: null });
 });
 
 describe('CHAIN-2 — existence may not be contradicted', () => {
@@ -80,6 +86,38 @@ describe('CHAIN-2 — existence may not be contradicted', () => {
     mockEstablish.mockRejectedValue(new Error('db down'));
     const r = await contractorAwardHistory({ company: 'FLUIDYNE CORPORATION' });
     expect(r._meta.degraded).toBe(true);
+  });
+
+  it('BUG-02: a name the cache missed is RESOLVED from mirror rows, not only flagged', async () => {
+    mockHistory.mockResolvedValue(null);
+    mockEstablish.mockResolvedValue({
+      hasFederalAwardHistory: true,
+      degraded: false,
+      uei: 'WDMBF2J6EML3',
+      recipientName: 'TANAQ SUPPORT SERVICES LLC',
+      sources: [{ source: 'recompete_mirror', found: true, awardCount: 2 }],
+      rows: [
+        {
+          contract_id: 'C1',
+          incumbent_uei: 'WDMBF2J6EML3',
+          incumbent_name: 'TANAQ SUPPORT SERVICES LLC',
+          awarding_agency: 'Department of Defense',
+          awarding_sub_agency: null,
+          naics_code: '562910',
+          description: 'Environmental remediation',
+          total_obligation: 1_200_000,
+          potential_total_value: 2_000_000,
+          period_of_performance_start: '2024-01-01',
+          period_of_performance_current_end: '2027-01-01',
+        },
+      ],
+    });
+    const r = await contractorAwardHistory({ company: 'TANAQ SUPPORT SERVICES, LLC' });
+    expect(r.history).not.toBeNull();
+    expect(r.history?.source).toBe('recompete_mirror');
+    expect(r._meta.award_count).toBe(1);
+    expect(r._meta.award_history_elsewhere).toBeUndefined();
+    expect(r._meta.grounded).toBe(true);
   });
 
   it('when its own cache HAS awards, no second lookup is needed', async () => {

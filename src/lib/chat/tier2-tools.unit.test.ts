@@ -11,15 +11,18 @@ import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from './tier2-tools
 const bqCalls: Array<{ fn: string; liveBq: boolean; limit?: number }> = [];
 let rollupWarm = false;          // when true, cache-only (liveBq=false) returns a profile
 let capableWarm = false;
+let forceMiss = false;
 
 vi.mock('@/lib/bigquery/recipients', () => ({
   recipientSlug: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   resolveCanonicalSlug: vi.fn(async () => null),
   getRollupOrSingleBySlug: vi.fn(async (_slug: string, liveBq = false) => {
     bqCalls.push({ fn: 'getRollupBySlug', liveBq });
+    if (forceMiss) return null;
     if (!liveBq && !rollupWarm) return null;    // cache miss
     return { rollup_uei: 'UEI1', rollup_name: 'Leidos', child_ueis: ['UEI1'], city: 'Reston', state: 'VA', total_obligated: 5e9, award_count: 1200, distinct_agency_count: 40, first_action_date: '2008-01-01', last_action_date: '2026-06-01' };
   }),
+  getRecipientByUei: vi.fn(async () => null),
   getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ piid: 'X', obligated: 1000 }]),
   getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ agency: 'DoD', total: 4e9 }]),
   findCapableSmallBusinesses: vi.fn(async ({ liveBq = false, limit }: { liveBq?: boolean; limit?: number }) => {
@@ -29,6 +32,11 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   }),
 }));
 
+const mockLocalName = vi.fn(async () => [] as Array<{ entity: Record<string, unknown> }>);
+vi.mock('@/lib/sam/entity-local-fallback', () => ({
+  localEntitiesByName: (...args: unknown[]) => mockLocalName(...args),
+}));
+
 // --- mock rate-limit: allow first N, then deny ---
 let rlAllowed = true;
 let rlCalls = 0;
@@ -36,7 +44,7 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => { rlCalls++; return { allowed: rlAllowed, remaining: rlAllowed ? 5 : 0, limit: 12, resetAt: 0 }; }),
 }));
 
-beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; rlAllowed = true; rlCalls = 0; });
+beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; forceMiss = false; rlAllowed = true; rlCalls = 0; mockLocalName.mockReset(); mockLocalName.mockResolvedValue([]); });
 
 describe('Tier-2 tool definitions', () => {
   it('registers the Tier-2 contractor-intel tools', () => {
@@ -90,6 +98,38 @@ describe('get_contractor_profile — cost discipline', () => {
     const res = await tools.execute('get_contractor_profile', {});
     expect(res.ok).toBe(false);
     expect(res.error).toBe('company_name_required');
+  });
+});
+
+describe('get_contractor_profile — SAM mirror when the award slug misses', () => {
+  it('BUG-01: a family token is not "not found"', async () => {
+    forceMiss = true;
+    mockLocalName.mockResolvedValue([
+      { entity: { legalBusinessName: 'TANAQ SUPPORT SERVICES, LLC', ueiSAM: 'U1', registrationStatus: 'Active', has8a: true } },
+      { entity: { legalBusinessName: 'TANAQ GLOBAL SOLUTIONS, LLC', ueiSAM: 'WDMBF2J6EML3', registrationStatus: 'Active', has8a: false, primaryNaics: '541611' } },
+    ]);
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Tanaq' }) as {
+      found: boolean; ambiguous?: boolean; match_count?: number; note?: string;
+    };
+    expect(res.found).toBe(true);
+    expect(res.ambiguous).toBe(true);
+    expect(res.match_count).toBe(2);
+    expect(res.note).toMatch(/Do NOT say no federal contractor was found/);
+  });
+
+  it('BUG-01: legal name without the comma resolves the registered entity', async () => {
+    forceMiss = true;
+    mockLocalName.mockResolvedValue([
+      { entity: { legalBusinessName: 'TANAQ GLOBAL SOLUTIONS, LLC', ueiSAM: 'WDMBF2J6EML3', cageCode: '12AD6', registrationStatus: 'Active', has8a: false, primaryNaics: '541611', physicalAddress: { city: 'Anchorage', stateOrProvince: 'AK' } } },
+    ]);
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Tanaq Global Solutions LLC' }) as {
+      found: boolean; company?: { name: string; uei: string; has8a: boolean };
+    };
+    expect(res.found).toBe(true);
+    expect(res.company?.uei).toBe('WDMBF2J6EML3');
+    expect(res.company?.has8a).toBe(false);
   });
 });
 

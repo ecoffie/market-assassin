@@ -30,6 +30,7 @@
  * <date>" rather than implying it re-checked SAM this second. Never present cached data as live.
  */
 import { createClient } from '@supabase/supabase-js';
+import { legalNameIlikePattern } from '@/lib/contractor/legal-name-stem';
 import type { SAMEntity } from './entity-api';
 
 export interface LocalEntityHit {
@@ -172,14 +173,17 @@ export async function localEntityByUEI(uei: string): Promise<LocalEntityHit | nu
   return r.status === 'found' ? r.hit : null;
 }
 
-/** Look a legal business name up in the local mirror. */
+/**
+ * Look a legal business name up in the local mirror.
+ * Uses the legal-name stem so ", LLC" and "LLC" resolve to the same row.
+ */
 export async function localEntitiesByName(name: string, limit = 10): Promise<LocalEntityHit[]> {
   const sb = db();
   if (!sb || !name.trim()) return [];
   const { data, error } = await sb
     .from('sam_entities')
     .select(LOCAL_ENTITY_COLUMNS)
-    .ilike('legal_business_name', `%${name.trim()}%`)
+    .ilike('legal_business_name', legalNameIlikePattern(name))
     .limit(Math.min(Math.max(limit, 1), 25));
   if (error) { console.error('[sam-local-fallback] name query failed:', error.message); return []; }
   if (!data?.length) return [];

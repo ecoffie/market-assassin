@@ -4,7 +4,7 @@
  * clean schema, arg validation.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from './tier1-tools';
+import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, pickNarrowerTokenHits, type Tier1Db } from './tier1-tools';
 
 // Mock the vocabulary lib.
 const vocabCalls: string[][] = [];
@@ -151,6 +151,16 @@ describe('search_sam_opportunities', () => {
     expect(res.count).toBe(0);
     expect(res.items).toEqual([]);
     expect(String(res.note)).toMatch(/no open sam/i);
+  });
+
+  it('phrase miss keeps the narrower token, not the union', () => {
+    const best = pickNarrowerTokenHits([
+      { token: 'remediation', rows: [1, 2, 3, 4, 5, 6, 7] },
+      { token: 'PFAS', rows: [1, 2, 3, 4] },
+    ]);
+    expect(best?.token).toBe('PFAS');
+    expect(best?.rows).toHaveLength(4);
+    expect(pickNarrowerTokenHits([{ token: 'x', rows: [] }])).toBeNull();
   });
 
   it('maps rows to the citable shape (agency/deadline/link)', async () => {

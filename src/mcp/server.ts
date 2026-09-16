@@ -634,6 +634,7 @@ server.registerTool(
       agency: z.string().optional().describe('Agency name, case-insensitive partial.'),
       state: z.string().optional().describe('2-letter place-of-performance state.'),
       months_window: z.number().int().min(1).max(60).optional().describe('Expiration window in months (default 18).'),
+      months_min: z.number().int().min(0).max(60).optional().describe('Skip contracts ending sooner than this many months. Capture window: months_min=6, months_window=18.'),
       min_value: z.number().optional().describe('Minimum obligated dollars.'),
       max_value: z.number().optional().describe('Maximum obligated dollars.'),
       likelihood: z.enum(['high', 'medium', 'low']).optional().describe('Recompete-likelihood filter.'),
@@ -644,8 +645,8 @@ server.registerTool(
       limit: z.number().int().min(1).max(200).optional().describe('Max results (default 25).'),
     },
   },
-  async ({ naics, agency, state, months_window, min_value, max_value, likelihood, eligible_set_asides, limit }) => {
-    const result = await expiringContracts({ naics, agency, state, months_window, min_value, max_value, likelihood, eligible_set_asides, limit });
+  async ({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit }) => {
+    const result = await expiringContracts({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

@@ -103,4 +103,14 @@ describe('CHAIN-1 — live empty must be reconciled before asserting absence', (
     expect(mockLocalName).not.toHaveBeenCalled();
     expect(mockSearch).not.toHaveBeenCalled();
   });
+
+  it('name-search match_count counts the matches array, not the detail record', async () => {
+    const sibling = { ...FLUIDYNE, ueiSAM: 'OTHERUEI00001', legalBusinessName: 'FLUIDYNE SERVICES LLC' };
+    mockSearch.mockResolvedValue({ entities: [FLUIDYNE, sibling] });
+    mockByUei.mockResolvedValue(FLUIDYNE);
+    const r = await lookupSamEntity({ name: 'Fluidyne' });
+    expect(r.matches).toHaveLength(2);
+    expect(r.entity?.ueiSAM).toBe('RG3VUTDYFNF8');
+    expect(r._meta.match_count).toBe(2);
+  });
 });

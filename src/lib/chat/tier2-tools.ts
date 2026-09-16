@@ -27,10 +27,14 @@ import {
   resolveCanonicalSlug,
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
+  getRecipientByUei,
   findCapableSmallBusinesses,
   recipientSlug,
   type RollupProfile,
 } from '@/lib/bigquery/recipients';
+import { localEntitiesByName } from '@/lib/sam/entity-local-fallback';
+import { namesMatchLegalStem } from '@/lib/contractor/legal-name-stem';
+import type { SAMEntity } from '@/lib/sam/entity-api';
 import {
   allowColdBqLookup,
   type ColdBqTurnState,
@@ -143,13 +147,95 @@ export function makeTier2Tools(email: string) {
     return { profile, resolvedCold, rateLimited: false };
   }
 
+  function familyCard(entity: SAMEntity) {
+    return {
+      name: entity.legalBusinessName,
+      uei: entity.ueiSAM,
+      cage: entity.cageCode || null,
+      status: entity.registrationStatus,
+      has8a: entity.has8a === true,
+      hasWOSB: entity.hasWOSB === true,
+      primary_naics: entity.primaryNaics || entity.naicsList?.find((n) => n.isPrimary)?.naicsCode || null,
+      state: entity.physicalAddress?.stateOrProvince || null,
+    };
+  }
+
+  /**
+   * BQ slug lookup only matches `tanaq-llc`, not `tanaq-global-solutions-llc`,
+   * and a registered firm with no warehouse row is invisible to it. The SAM
+   * mirror already resolved this name. Use it before saying "not found".
+   */
+  async function profileFromSamRegistry(name: string): Promise<Record<string, unknown> | null> {
+    const hits = await localEntitiesByName(name, 25).catch(() => []);
+    if (!hits.length) return null;
+    const family = hits.map((h) => familyCard(h.entity));
+    const exact = hits.find((h) => namesMatchLegalStem(name, h.entity.legalBusinessName || '') === 'exact');
+    if (!exact) {
+      return {
+        ok: true,
+        found: true,
+        ambiguous: true,
+        match_count: family.length,
+        family,
+        note:
+          `${family.length} registered SAM entit${family.length === 1 ? 'y matches' : 'ies match'} "${name}". ` +
+          'Name the legal entity, or pass its UEI to get_contractor_award_history. Do NOT say no federal contractor was found.',
+      };
+    }
+    const chosen = exact.entity;
+    let recipient = chosen.ueiSAM
+      ? await getRecipientByUei(chosen.ueiSAM, false).catch(() => null)
+      : null;
+    let awardNote: string | undefined;
+    if (!recipient && chosen.ueiSAM) {
+      if (await allowColdLookup()) {
+        recipient = await getRecipientByUei(chosen.ueiSAM, true).catch(() => null);
+      } else {
+        awardNote =
+          `${chosen.legalBusinessName} is registered in SAM (${chosen.ueiSAM}). Warehouse award totals were not retrieved — the live-lookup budget is spent. Do NOT treat missing awards as zero past performance.`;
+      }
+    }
+    if (!recipient && !awardNote) {
+      awardNote =
+        `${chosen.legalBusinessName} is registered in SAM (${chosen.ueiSAM}). No warehouse award row for this UEI. That is not "no such contractor."`;
+    }
+    const addr = chosen.physicalAddress;
+    return {
+      ok: true,
+      found: true,
+      source: 'sam_registry',
+      match_count: family.length,
+      company: {
+        name: chosen.legalBusinessName,
+        uei: chosen.ueiSAM,
+        cage: chosen.cageCode || null,
+        registration_status: chosen.registrationStatus,
+        location: [addr?.city, addr?.stateOrProvince].filter(Boolean).join(', ') || null,
+        total_obligated: recipient?.total_obligated ?? null,
+        award_count: recipient ? recipient.award_count : null,
+        has8a: chosen.has8a === true,
+        primary_naics: chosen.primaryNaics || null,
+      },
+      ...(family.length > 1 ? { family } : {}),
+      top_agencies: [],
+      recent_awards: [],
+      ...(awardNote ? { note: awardNote } : {}),
+    };
+  }
+
   async function getContractorProfile(args: { company_name?: unknown }): Promise<Record<string, unknown>> {
     const name = typeof args?.company_name === 'string' ? args.company_name.trim() : '';
     if (!name) return { ok: false, error: 'company_name_required' };
 
     const { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
-    if (rateLimited) return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
-    if (!profile) {
+    if (profile) {
+      // fall through to award enrichment below
+    } else {
+      // SAM mirror is Postgres, not a BQ scan. Check it even when the cold
+      // budget is spent — "not found" was the stage failure for a family of 18.
+      const sam = await profileFromSamRegistry(name);
+      if (sam) return sam;
+      if (rateLimited) return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
       return { ok: true, found: false, note: `I couldn't find a federal contractor matching "${name}".` };
     }
 
