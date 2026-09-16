@@ -245,7 +245,7 @@ function CompanySetupInner() {
               </button>
             </div>
 
-            <button onClick={leave} disabled={busy}
+            <button onClick={() => finish('skip')} disabled={busy}
               className="mt-4 text-sm text-slate-400 underline underline-offset-4 hover:text-slate-200">
               Skip for now · Exit setup
             </button>

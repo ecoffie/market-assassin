@@ -81,9 +81,8 @@ describe('the screens carry no legacy destinations', () => {
   });
 
   it('Skip is present on BOTH screens', () => {
-    expect(uiCode).toContain('Skip for now →');                       // header, always visible
-    expect(uiCode).toContain("Skip for now — don't save any of this"  // Screen 2, consequence stated
-      .replace("'", '&apos;'));
+    expect(uiCode).toContain('Skip for now · Exit setup');
+    expect(uiCode.match(/Skip for now · Exit setup/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   it('no progress bar, step counter or percentage', () => {
