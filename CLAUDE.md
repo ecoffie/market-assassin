@@ -231,19 +231,13 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
-### Customer Journey — FIND · UNDERSTAND · CURRENT INTELLIGENCE complete; PATHWAY next
-- **Sequencing (locked):** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY/TALENT → POSITION/ACT`.
-  Understand the **buyer** first; CURRENT INTELLIGENCE answers what changed / what to do differently;
-  then ask which capability/door the **seller** can walk through (not set-aside-first). Set-aside only
-  when opportunity evidence makes socioeconomic status material.
-- **COMPLETE — do not reopen for polish:** FIND (`find_opportunities` #1535) · UNDERSTAND
-  (`understand_customer` #1537) · CURRENT INTELLIGENCE (`get_current_acquisition_intelligence` #1539 +
-  language guardrails). Empty `do_differently` when unearned is intentional.
-- **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge.
-- **Next product gate:** PATHWAY FIT v0 **IMPLEMENTED** on `feat/pathway-fit-v0` —
-  **`docs/PRD-pathway-fit-v0.md`** + `match_company_to_pathways` (8cr). Unit red-team PASS;
-  CAI `_next.tool` wired. **STOP BEFORE MERGE** until Eric accepts host probes. Full Talent still blocked.
-- **Separate ticket:** FIND relevance `security ≠ cybersecurity` (#1538) — not in #1537.
+### Potato v1 — ✅ SHIPPED → CLOSED 2026-09-17
+Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.”
+- Journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → TALENT THIN → POSITION → ACT → MONITOR. Then STOP.
+- Product production: merge SHA **`8cab32a2`** on `getmindy.ai` (Vercel project `market-assassin`). Docs merge `919dbcb5` is the completion record, not a product deploy.
+- 12/13 acceptance PASS; positioning-claims PARTIAL is **v2 debt**, not a v1 reopen.
+- Reopen v1 only for billing, security/privacy, fabricated evidence, or a genuinely broken customer journey.
+- Any next build is a **separately named track** with its own goal and acceptance gate (not “Potato v1.1”). Candidates on the debt list are not automatically next.
 
 
 Concise pointers to the living records so a new session doesn't spend an hour
@@ -261,7 +255,8 @@ Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
 - **Not acceptance evidence:** a successful deploy to the accidental Vercel project
   `cai-language-guardrails` (green build, wrong project — do not cite).
 - **⛔ No more CAI polishing.** Do not reopen compose, host_rules, or pathway classifiers unless a
-  production defect breaks the killer rule or invents pathways. Next work is PATHWAY/TALENT gate.
+  production defect breaks the killer rule or invents pathways. PATHWAY FIT and Potato v1 are
+  **CLOSED** — see `docs/POTATO-V1-COMPLETION.md`. Do not treat CAI follow-ups as “continue Potato.”
   (Process debt: worktree→wrong Vercel project has now bitten twice — assert
   `.vercel/project.json` → `market-assassin` before `--prod`; build an abort guard only if it
   happens again. Do not divert PATHWAY/TALENT for that guard.)
