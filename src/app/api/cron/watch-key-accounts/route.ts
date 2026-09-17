@@ -220,11 +220,9 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- Fleet-wide invariant: entitled ⇒ deliverable -------------------
-  // Not per-account: this catches the whole population, including people we
-  // aren't explicitly watching. access_briefings=true with briefings_enabled=
-  // false means precompute-briefings skips them — entitled, never sent.
-  // Found 2026-08-05 affecting 27 accounts, 14 of them paying ($7,202).
-  // Silent by construction: they still get alerts, so nothing looks broken.
+  // Three different failures used to be one CRITICAL blob, so the "fix" was
+  // often a no-op (flip briefings_enabled on an excluded or unclassified
+  // account) or a spam complaint (re-enable someone who paused). Split them.
   let briefingsDrift: DriftRow[] = [];
   const drift = await findBriefingsDrift(supabase);
   if (!drift.ok) {
@@ -232,34 +230,70 @@ export async function GET(request: NextRequest) {
       email: '(fleet)', label: 'briefings drift check', severity: 'warning',
       message: `Drift query failed: ${drift.error}`,
     });
-  } else if (drift.rows.length > 0) {
+  } else {
     briefingsDrift = drift.rows;
-    const paid = drift.rows.filter(r => r.paid_status).length;
-    const blockedOnEntitlement = drift.rows.filter(r => !r.entitlement_ok).length;
-    const sample = drift.rows.slice(0, 5).map(r => r.user_email).join(', ');
-    findings.push({
-      email: '(fleet)',
-      label: 'briefings entitled-but-undelivered',
-      // Paying customers not receiving what they bought is critical; a comped
-      // account in the same state is worth knowing but isn't an emergency.
-      severity: paid > 0 ? 'critical' : 'warning',
-      message:
-        `${drift.rows.length} account(s) have access_briefings=true but ` +
-        `briefings_enabled=false — entitled, with real targeting, never sent a briefing` +
-        (paid > 0 ? ` (${paid} PAYING)` : '') +
-        `. e.g. ${sample}${drift.rows.length > 5 ? ` +${drift.rows.length - 5} more` : ''}. ` +
-        // Name the gate that is ACTUALLY blocking delivery. Advising a flag
-        // flip for an account blocked on entitlement is advising a no-op —
-        // it gets applied, reported as fixed, and the customer stays silent.
-        (blockedOnEntitlement === drift.rows.length
-          ? `Fix: ALL of these are blocked by customer_classifications (briefings_access) — ` +
-            `setting briefings_enabled=true alone delivers NOTHING. Grant the classification first, then flip the preference.`
-          : blockedOnEntitlement > 0
-            ? `Fix: ${drift.rows.length - blockedOnEntitlement} need briefings_enabled=true; ` +
-              `the other ${blockedOnEntitlement} are ALSO blocked by customer_classifications (briefings_access) ` +
-              `and need that granted FIRST or the flag flip is a no-op.`
-            : `Fix: set briefings_enabled=true on their notification settings.`),
-    });
+    const sample = (rows: DriftRow[]) => {
+      const emails = rows.slice(0, 5).map(r => r.user_email).join(', ');
+      return `${emails}${rows.length > 5 ? ` +${rows.length - 5} more` : ''}`;
+    };
+    const paidCount = (rows: DriftRow[]) => rows.filter(r => r.paid_status).length;
+    const paidNote = (rows: DriftRow[]) => {
+      const n = paidCount(rows);
+      return n > 0 ? ` (${n} PAYING)` : '';
+    };
+
+    const mismatch = drift.rows.filter(r => r.kind === 'classification_mismatch');
+    const disabled = drift.rows.filter(r => r.kind === 'delivery_disabled');
+    const paused = drift.rows.filter(r => r.kind === 'intentionally_paused');
+    const excluded = drift.rows.filter(r => r.kind === 'intentionally_excluded');
+
+    if (mismatch.length > 0) {
+      findings.push({
+        email: '(fleet)',
+        label: 'briefings access mismatch',
+        severity: paidCount(mismatch) > 0 ? 'critical' : 'warning',
+        message:
+          `${mismatch.length} account(s) have access_briefings=true but are invisible ` +
+          `to the sender — customer_classifications.briefings_access does not entitle` +
+          `${paidNote(mismatch)}. e.g. ${sample(mismatch)}. ` +
+          `Fix: grant the classification FIRST; setting briefings_enabled=true alone delivers NOTHING.`,
+      });
+    }
+    if (disabled.length > 0) {
+      findings.push({
+        email: '(fleet)',
+        label: 'briefings delivery unexpectedly disabled',
+        severity: paidCount(disabled) > 0 ? 'critical' : 'warning',
+        message:
+          `${disabled.length} account(s) pass customer_classifications but have ` +
+          `briefings_enabled=false, with is_active=true (not an opt-out)` +
+          `${paidNote(disabled)}. e.g. ${sample(disabled)}. ` +
+          `Fix: set briefings_enabled=true — classification is already in place.`,
+      });
+    }
+    if (paused.length > 0) {
+      findings.push({
+        email: '(fleet)',
+        label: 'briefings customer intentionally paused',
+        severity: 'warning',
+        message:
+          `${paused.length} entitled account(s) have is_active=false — delivery is off ` +
+          `on purpose. Preserve this; an entitlement must not override an opt-out. ` +
+          `e.g. ${sample(paused)}.`,
+      });
+    }
+    if (excluded.length > 0) {
+      findings.push({
+        email: '(fleet)',
+        label: 'briefings intentionally excluded',
+        severity: 'warning',
+        message:
+          `${excluded.length} account(s) hold access_briefings but ` +
+          `customer_classifications.briefings_access='excluded' (comp/testimonial cutoff). ` +
+          `Not a provisioning failure — do not grant classification or flip delivery. ` +
+          `e.g. ${sample(excluded)}.`,
+      });
+    }
   }
 
   const critical = findings.filter(f => f.severity === 'critical');

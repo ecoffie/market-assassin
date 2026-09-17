@@ -3,12 +3,14 @@
  *
  * THE BUG THIS EXISTS TO PREVENT
  *
- * Briefings need TWO flags in TWO tables to agree:
- *   user_profiles.access_briefings            — "they are entitled"
+ * Briefings need THREE flags in THREE tables to agree:
+ *   user_profiles.access_briefings               — "they are entitled"
  *   user_notification_settings.briefings_enabled — "the cron will send to them"
+ *   customer_classifications.briefings_access    — the GATE the sender enforces
  *
  * `precompute-briefings` builds its audience with
- * `.eq('briefings_enabled', true)`. So entitlement alone delivers nothing.
+ * `.eq('briefings_enabled', true)` and then hard-filters on classifications.
+ * Entitlement or a delivery-flag flip alone delivers nothing.
  *
  * `briefings_enabled` has NO single default — which is the whole trap. The
  * COLUMN declares `BOOLEAN DEFAULT TRUE`
@@ -36,12 +38,21 @@
  *
  * Rather than patch a dozen grant sites (which is how this drifted in the first
  * place — the next new grant path would miss it too), grant paths call
- * `enableBriefingsDelivery()` and a watchdog re-checks the invariant daily.
+ * `provisionBriefingsGates()` (classification THEN delivery) and a watchdog
+ * re-checks the invariant daily.
  */
 
 import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isBriefingEntitled } from '@/lib/briefings/delivery/rollout';
+import {
+  ensureEntitlingClassification,
+  classifyEntitlementDrift,
+  type EntitlingAccess,
+  type EnsureClassificationResult,
+  type DriftKind,
+} from '@/lib/briefings/classification-provision';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 
 export interface EnableBriefingsResult {
   ok: boolean;
@@ -106,6 +117,36 @@ export async function enableBriefingsDelivery(
   return { ok: true, changed: true };
 }
 
+export interface ProvisionBriefingsResult {
+  ok: boolean;
+  classification: EnsureClassificationResult;
+  delivery: EnableBriefingsResult;
+}
+
+/**
+ * Grant BOTH remaining gates after `access_briefings` is set true.
+ *
+ * Classification first: flipping briefings_enabled without an entitling
+ * customer_classifications row is a documented no-op (2026-08-14: 18 accounts
+ * "fixed" that way, zero briefings delivered). Delivery second, and still
+ * refuses an explicit `is_active=false` opt-out.
+ */
+export async function provisionBriefingsGates(
+  supabase: SupabaseClient,
+  email: string,
+  access: EntitlingAccess = 'beta_preview',
+): Promise<ProvisionBriefingsResult> {
+  const classification = await ensureEntitlingClassification(supabase, email, access);
+  const delivery = await enableBriefingsDelivery(supabase, email);
+  return {
+    ok: classification.ok && delivery.ok,
+    classification,
+    delivery,
+  };
+}
+
+export type { DriftKind };
+
 export interface DriftRow {
   user_email: string;
   naics_count: number;
@@ -119,48 +160,58 @@ export interface DriftRow {
   entitlement_ok: boolean;
   /** Current briefings_access, or null when there is no classification row. */
   briefings_access: string | null;
+  kind: DriftKind;
+  is_active: boolean | null;
+  briefings_enabled: boolean | null;
 }
 
 /**
- * Find accounts entitled to briefings whose delivery is switched off — the
- * invariant `access_briefings = true` ⇒ `briefings_enabled = true`.
+ * Find entitled accounts whose THREE gates do not agree.
  *
- * Read-only. Excludes opt-outs (`is_active = false`) and accounts with no
- * targeting at all, since a briefing for those would be generic — both are
- * legitimately off, not drift.
+ * Four kinds, because lumping them produced a "set briefings_enabled=true"
+ * instruction for accounts that were excluded on purpose, paused, or blocked
+ * on classification (2026-08-14 + 2026-09-17).
+ *
+ *   classification_mismatch  — access_briefings, active, targeted, sender cannot see them
+ *   delivery_disabled        — classification already entitles; delivery flag is off
+ *   intentionally_paused     — is_active=false (preserve; do not re-enable)
+ *   intentionally_excluded   — briefings_access='excluded' (comp/testimonial cutoff)
+ *
+ * Untargeted active accounts are still skipped for mismatch/disabled — a
+ * briefing for those would be generic.
  */
 export async function findBriefingsDrift(
   supabase: SupabaseClient,
 ): Promise<{ ok: boolean; rows: DriftRow[]; error?: string }> {
-  const { data: entitled, error: profErr } = await supabase
-    .from('user_profiles')
-    .select('email')
-    .eq('access_briefings', true);
+  let entitled: { email?: string }[];
+  try {
+    entitled = await fetchAllPaged<{ email?: string }>(() =>
+      supabase
+        .from('user_profiles')
+        .select('email')
+        .eq('access_briefings', true)
+        .order('email', { ascending: true }),
+    );
+  } catch (err) {
+    return { ok: false, rows: [], error: err instanceof Error ? err.message : String(err) };
+  }
 
-  if (profErr) return { ok: false, rows: [], error: profErr.message };
-
-  const emails = (entitled || [])
-    .map(r => String((r as { email?: string }).email || '').toLowerCase().trim())
+  const emails = entitled
+    .map(r => String(r.email || '').toLowerCase().trim())
     .filter(Boolean);
   if (emails.length === 0) return { ok: true, rows: [] };
 
   const rows: DriftRow[] = [];
-  // Chunked so a large entitled population doesn't blow the URL length.
   const CHUNK = 200;
   for (let i = 0; i < emails.length; i += CHUNK) {
     const slice = emails.slice(i, i + CHUNK);
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, keywords, paid_status')
-      .in('user_email', slice)
-      .eq('briefings_enabled', false)
-      .eq('is_active', true);
+      .select('user_email, naics_codes, keywords, paid_status, briefings_enabled, is_active')
+      .in('user_email', slice);
 
     if (error) return { ok: false, rows: [], error: error.message };
 
-    // The gate the sender actually enforces. Without it this monitor reported
-    // "fix: set briefings_enabled=true" for accounts where that is a NO-OP
-    // (2026-08-14: all 18 it named were blocked here instead).
     const { data: classRows, error: classErr } = await supabase
       .from('customer_classifications')
       .select('email, briefings_access, briefings_expiry')
@@ -177,20 +228,42 @@ export async function findBriefingsDrift(
     }
 
     for (const r of data || []) {
-      const row = r as { user_email: string; naics_codes?: unknown[] | null; keywords?: unknown[] | null; paid_status?: boolean | null };
+      const row = r as {
+        user_email: string;
+        naics_codes?: unknown[] | null;
+        keywords?: unknown[] | null;
+        paid_status?: boolean | null;
+        briefings_enabled?: boolean | null;
+        is_active?: boolean | null;
+      };
       const naics = (row.naics_codes || []).length;
       const kw = (row.keywords || []).length;
-      // No targeting at all → a briefing would be generic. Not drift.
-      if (naics === 0 && kw === 0) continue;
       const key = String(row.user_email).toLowerCase().trim();
       const cls = byEmail.get(key);
+      const entitlementOk = cls ? isBriefingEntitled({ email: key, ...cls }) : false;
+      const access = cls ? cls.briefings_access : null;
+      const isActive = row.is_active === null || row.is_active === undefined ? null : row.is_active === true;
+      const targeted = naics > 0 || kw > 0;
+
+      const kind = classifyEntitlementDrift({
+        isActive,
+        briefingsEnabled: row.briefings_enabled ?? null,
+        entitlementOk,
+        briefingsAccess: access,
+        targeted,
+      });
+
+      if (!kind) continue;
       rows.push({
         user_email: row.user_email,
         naics_count: naics,
         keyword_count: kw,
         paid_status: row.paid_status ?? null,
-        entitlement_ok: cls ? isBriefingEntitled({ email: key, ...cls }) : false,
-        briefings_access: cls ? cls.briefings_access : null,
+        entitlement_ok: entitlementOk,
+        briefings_access: access,
+        kind,
+        is_active: isActive,
+        briefings_enabled: row.briefings_enabled ?? null,
       });
     }
   }

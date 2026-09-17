@@ -6896,3 +6896,13 @@ no 504; representative drones capability completes grounded under 55s.
 **Why.** The living pipeline was healthy and current but customer-invisible; the 3,043-row JSON corpus was customer-facing but mostly unsourced. Promoting GAO end-to-end makes citations the default without deleting legacy coverage.
 
 **Proof.** Unit tests: gao-instance clocks, document-agency no-force-map, sourced-pain-points provenance, GovInfo quarantine. Cron stamps `data_source_instances`; held population from `institute_sources` only (not GovInfo / JSON).
+
+---
+
+## Briefings classification gate stays in sync with entitlement
+
+**What.** Granting Pro/Team (Stripe webhook, Command Center, admin grant) now writes the classification row the briefing sender actually reads — `customer_classifications.briefings_access` — then enables delivery. The morning watchdog reports four distinct states instead of one blob: access mismatch, delivery unexpectedly disabled, customer paused, and intentional exclusion.
+
+**Why.** Fourteen accounts held `access_briefings=true` with real targeting and never received a briefing. Setting `briefings_enabled=true` alone is a no-op: the cron audience is classifications. Two of the fourteen (advocates AJ and Olga) were classified `excluded` on purpose; flipping delivery would have emailed a cutoff. A Contractor Database buyer was in the same list without having bought briefings.
+
+**Proof.** Unit tests: never overwrite `excluded`, never downgrade lifetime, expired rows are upgradeable, four watchdog buckets. Repair of 11 provisioning failures verified against the live eligibility query (`isBriefingEntitled` ∩ `briefings_enabled` ∩ `is_active`). No catch-up send — next scheduled briefing is the proof of delivery.

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
-import { enableBriefingsDelivery } from '@/lib/supabase/briefings-entitlement';
+import { provisionBriefingsGates } from '@/lib/supabase/briefings-entitlement';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 
@@ -73,10 +73,10 @@ function getSupabase() {
         .update({ access_briefings: true })
         .eq('email', profile.email);
 
-      // Entitlement lives in user_profiles; DELIVERY is gated separately by
-      // user_notification_settings.briefings_enabled, which precompute-briefings
-      // filters on. Granting one without the other = entitled but never sent.
-      await enableBriefingsDelivery(getSupabase(), profile.email);
+      // THREE gates: profile flag (just written), classification (sender
+      // audience), delivery preference. Classification first — a flag flip
+      // without it is a no-op.
+      await provisionBriefingsGates(getSupabase(), profile.email);
 
       // Set KV access
       await kv.set(`briefings:${profile.email.toLowerCase()}`, 'true');

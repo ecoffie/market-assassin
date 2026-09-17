@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { recordAccessGrant } from '@/lib/access/grant-audit';
-import { enableBriefingsDelivery } from '@/lib/supabase/briefings-entitlement';
-import { buildEntitlementRepairDeps, repairEntitlement } from '@/lib/supabase/briefings-entitlement';
+import { provisionBriefingsGates, buildEntitlementRepairDeps, repairEntitlement } from '@/lib/supabase/briefings-entitlement';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -183,11 +182,13 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Entitlement alone delivers NOTHING — precompute-briefings builds its
-      // audience with .eq('briefings_enabled', true) on user_notification_settings,
-      // a different table. Granting access without this leaves them entitled and
-      // undelivered (27 such accounts found 2026-08-05, 14 of them paying).
-      const delivery = await enableBriefingsDelivery(supabase, member.email);
+      // THREE gates. Classification first: flipping briefings_enabled without
+      // an entitling customer_classifications row delivers nothing.
+      const provisioned = await provisionBriefingsGates(supabase, member.email);
+      const delivery = provisioned.delivery;
+      if (!provisioned.classification.ok) {
+        console.warn(`[grant-briefings] classification failed for ${member.email}: ${provisioned.classification.error}`);
+      }
       if (!delivery.ok) {
         console.warn(`[grant-briefings] delivery flag failed for ${member.email}: ${delivery.error}`);
       } else if (delivery.skipped === 'no_settings_row') {

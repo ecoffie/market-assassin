@@ -228,6 +228,11 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
  *
  * Uses the established labels — `free` + `beta_preview` is the existing 123-row
  * convention for self-serve accounts, not an invented pair.
+ *
+ * This is INSERT-ONLY on first profile create. When access is later GRANTED,
+ * call `ensureEntitlingClassification` / `provisionBriefingsGates` so an
+ * existing `none` row is upgraded. Leaving `none` in place is how entitled
+ * customers stayed invisible to the sender.
  */
 async function ensureCustomerClassification(email: string): Promise<void> {
   const supabase = getAdminClient();
@@ -615,6 +620,22 @@ export async function updateAccessFlags(
   }
 
   console.log(`Updated access flags for ${normalizedEmail}:`, Object.keys(updates));
+
+  // THE THIRD GATE. access_briefings on the profile is not what the sender
+  // reads — customer_classifications is. Grant paths that flipped the profile
+  // (and sometimes briefings_enabled) and never wrote a classification left
+  // paying customers silent. Best-effort: a classification miss must not
+  // roll back the profile flags the webhook already recorded.
+  if (updates.access_briefings) {
+    try {
+      const { provisionBriefingsGates } = await import('@/lib/supabase/briefings-entitlement');
+      const { accessTierForGrant } = await import('@/lib/briefings/classification-provision');
+      await provisionBriefingsGates(supabase, normalizedEmail, accessTierForGrant(tier, bundle));
+    } catch (err) {
+      console.error(`[updateAccessFlags] briefings gates failed for ${normalizedEmail} (profile flag still set):`, err);
+    }
+  }
+
   return updates;
 }
 

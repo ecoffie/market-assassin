@@ -427,6 +427,17 @@ export async function applyMemberGrant(opts: {
     } catch (err) {
       console.error('[member-grants] paid_status stamp failed (non-fatal):', err);
     }
+
+    // Classification + delivery. KV/profile flags above do not put the user
+    // in the briefing audience; customer_classifications does. Team and Pro
+    // grants both earn a subscription-tier row (never excluded, never a
+    // downgrade of lifetime).
+    try {
+      const { provisionBriefingsGates } = await import('@/lib/supabase/briefings-entitlement');
+      await provisionBriefingsGates(supabase, email, 'subscription');
+    } catch (err) {
+      console.error('[member-grants] briefings gates failed (non-fatal):', err);
+    }
   }
 
   // 4) Welcome email on grant (best-effort).
