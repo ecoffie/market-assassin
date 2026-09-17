@@ -590,7 +590,8 @@ async function resolveAgencyFromAnchors(
   return null;
 }
 
-type SourceBundle = {
+/** Live compose bundle. Exported so tests can prove unavailable ≠ zero. */
+export type CaiSourceBundle = {
   samRows: Array<Record<string, unknown>>;
   samCount: number | null;
   recompeteRows: Array<Record<string, unknown>>;
@@ -604,6 +605,8 @@ type SourceBundle = {
   sourcesFailed: CaiSourceKind[];
   degraded: boolean;
 };
+
+type SourceBundle = CaiSourceBundle;
 
 async function fetchLiveSources(
   client: SupabaseClient,
@@ -863,7 +866,7 @@ function topOfficeFromSam(samRows: Array<Record<string, unknown>>): { office: st
   return best;
 }
 
-function buildCurrentState(
+export function buildCurrentState(
   bundle: SourceBundle,
   agency: string,
   capabilityLabel: string,

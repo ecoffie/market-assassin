@@ -239,6 +239,26 @@ export interface MatchCompanyToPathwaysResult {
     ranking_rule_version: 'pf_rank_v1';
     next_outputs_not_yet: string[];
     error?: string;
+    /**
+     * Canonical award-warehouse identity seam (#1548).
+     * UEI is authoritative when well-formed. A company name is unique / ambiguous / none / degraded.
+     * Ambiguous never auto-picks. none_in_award_corpus is not “no federal awards”.
+     */
+    identity_resolution?:
+      | 'uei'
+      | 'unique_name'
+      | 'ambiguous'
+      | 'none_in_award_corpus'
+      | 'degraded'
+      | 'malformed'
+      | 'unresolved';
+    identity_note?: string;
+    identity_candidates?: Array<{
+      name: string;
+      uei: string;
+      total_obligated: number;
+      award_count: number;
+    }>;
   };
   _next: Array<{
     prompt: string;

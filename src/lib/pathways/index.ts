@@ -74,11 +74,30 @@ export async function matchCompanyToPathways(
   result._meta.sources_queried = [...new Set([...result._meta.sources_queried, ...loaded.sources_queried])];
   result._meta.sources_failed = [...loaded.sources_failed];
   result._meta.degraded = loaded.degraded;
+  result._meta.identity_resolution = loaded.identity.resolution;
+  result._meta.identity_note = loaded.identity.note;
+  result._meta.identity_candidates = loaded.identity.candidates;
+
   if (!loaded.company.uei) {
     result._meta.grounded = false;
     result.summary.no_proven_door = true;
-    result.summary.headline =
-      'I need a valid UEI to match stranger-verifiable public evidence to these acquisition doors.';
+    if (loaded.identity.resolution === 'ambiguous') {
+      result.summary.headline =
+        loaded.identity.note ||
+        'Several award-warehouse recipients match that name. I will not pick one — pass the legal entity or its UEI.';
+    } else if (loaded.identity.resolution === 'none_in_award_corpus') {
+      result.summary.headline =
+        loaded.identity.note ||
+        'That name is not in the award-warehouse index. That is not proof the company has no federal awards.';
+    } else if (loaded.identity.resolution === 'degraded') {
+      result.summary.headline =
+        'Company name lookup was unavailable — not a measured miss. Pass a UEI or retry.';
+    } else if (loaded.identity.resolution === 'malformed') {
+      result.summary.headline = loaded.identity.note || 'UEI must be exactly 12 alphanumeric characters.';
+    } else {
+      result.summary.headline =
+        'I need a valid UEI or a unique company name to match stranger-verifiable public evidence to these acquisition doors.';
+    }
   }
   return result;
 }

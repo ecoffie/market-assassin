@@ -6832,7 +6832,7 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 
 **Why.** Customers ask which doors they can walk through — without inventing Talent, vehicle portfolios, or set-aside-first strategy.
 
-**SEO / proof.** Contract: `docs/PRD-pathway-fit-v0.md`. Unit: `pathway-fit.unit.test.ts` (19). Probes: `scripts/probe-pathway-fit-v0.mts`. Credits: 8. Catalog 62. **Branch `feat/pathway-fit-v0` — stop before merge.**
+**SEO / proof.** Contract: `docs/PRD-pathway-fit-v0.md`. Unit: `pathway-fit.unit.test.ts` + `pathway-fit-load.unit.test.ts` (#1548 name→UEI unique/ambiguous/none; no second resolver). Live probes: `scripts/probe-pathway-fit-live.mts`. Credits: 8. Catalog 62. **Branch `feat/pathway-fit-v0` — stop before merge.**
 
 
 ## understand_customer — UNDERSTAND after FIND (2026-09-15)

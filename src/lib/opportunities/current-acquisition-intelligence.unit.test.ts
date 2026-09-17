@@ -11,8 +11,10 @@ import {
   rejectUnsupportedObservedPathway,
   statementViolatesAbsoluteFutureClaim,
   scrubAbsoluteFutureClaims,
+  buildCurrentState,
   CAI_NEXT_PROMPT,
   type CaiItem,
+  type CaiSourceBundle,
 } from './current-acquisition-intelligence';
 
 describe('applyCausalKillerRule', () => {
@@ -251,5 +253,89 @@ describe('language guardrails — absolute future claims', () => {
     expect(cso!.statement).toMatch(/Commercial Solutions Opening/i);
     expect(cso!.statement).toMatch(/not that future/i);
     expect(statementViolatesAbsoluteFutureClaim(cso!.statement)).toBe(false);
+  });
+});
+
+function emptyBundle(over: Partial<CaiSourceBundle> = {}): CaiSourceBundle {
+  return {
+    samRows: [],
+    samCount: null,
+    recompeteRows: [],
+    recompeteCount: null,
+    changeRows: [],
+    forecastRows: [],
+    forecastCount: null,
+    eventCount: 0,
+    pathwayEvidence: [],
+    sourcesQueried: [],
+    sourcesFailed: [],
+    degraded: false,
+    ...over,
+  };
+}
+
+describe('language guardrails — unavailable ≠ zero', () => {
+  it('failed forecast/SAM sources emit unavailable (unknown), never a measured zero', () => {
+    const items = buildCurrentState(
+      emptyBundle({
+        sourcesFailed: ['agency_forecasts', 'sam_opportunities'],
+        degraded: true,
+      }),
+      'USSOCOM',
+      'cybersecurity',
+    );
+    expect(items.length).toBeGreaterThan(0);
+    const blob = items.map((i) => i.statement).join('\n').toLowerCase();
+    expect(blob).toMatch(/unavailable/);
+    expect(blob).toMatch(/not a measured zero/);
+    expect(blob).not.toMatch(/\bno opportunities\b/);
+    expect(blob).not.toMatch(/\bempty market\b/);
+    for (const item of items) {
+      expect(item.magnitude?.unknown).toBe(true);
+      expect(item.magnitude?.value).toBeNull();
+    }
+  });
+
+  it('a genuine empty forecast table is a scope miss, not a failed-source zero', () => {
+    const items = buildCurrentState(
+      emptyBundle({ forecastCount: 0, forecastRows: [] }),
+      'USSOCOM',
+      'cybersecurity',
+    );
+    const fc = items.find((i) => i.citations.some((c) => c.source_kind === 'agency_forecasts'));
+    expect(fc).toBeTruthy();
+    expect(fc!.statement).toMatch(/scope miss/i);
+    expect(fc!.statement).toMatch(/not proof of no demand/i);
+    expect(fc!.magnitude?.unknown).toBe(true);
+    expect(fc!.magnitude?.value).toBeNull();
+  });
+});
+
+describe('empty DO_DIFFERENTLY is valid', () => {
+  it('no earned current-state/change → killer rule may return zero actions', () => {
+    const out = applyCausalKillerRule({
+      what_changed: [],
+      what_we_are_seeing_now: [],
+      what_that_may_mean: [
+        {
+          id: 'imp_unearned',
+          epistemic: 'supported_implication',
+          statement: 'You should pivot strategy.',
+          citations: [],
+          caused_by: ['missing'],
+        },
+      ],
+      do_differently: [
+        {
+          id: 'act_unearned',
+          epistemic: 'do_differently',
+          statement: 'Do something useful looking.',
+          citations: [],
+          caused_by: ['missing'],
+        },
+      ],
+    });
+    expect(out.do_differently).toHaveLength(0);
+    expect(out.what_that_may_mean).toHaveLength(0);
   });
 });

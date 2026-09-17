@@ -1,11 +1,19 @@
 /**
- * PATHWAY FIT v0 — load stranger-verifiable company record for a UEI.
- * No vault upgrade. No vehicle-portfolio invention.
+ * PATHWAY FIT v0 — load stranger-verifiable company record.
+ * Identity: UEI is authoritative. Company name uses the canonical
+ * award-warehouse seam (`resolveAwardCorpusByName`, #1548) — unique match
+ * loads by UEI; ambiguous never auto-picks; none is a dataset miss, not
+ * “no federal awards”. No second resolver. No vault upgrade. No vehicle
+ * portfolio invention.
  */
 import { getContractorHistoryByUei } from '@/lib/contractor/history-by-uei';
+import {
+  resolveAwardCorpusByName,
+  type AwardNameCandidate,
+} from '@/lib/contractor/name-resolution';
 import { getCachedCerts, certBucketsWithSource, type CertBucket } from '@/lib/sam/recipient-certs';
 import { isWellFormedUei } from '@/lib/sam/resolve-uei';
-import type { CompanyCertFact, CompanyPublicRecord } from './pathway-fit-types';
+import type { CompanyCertFact, CompanyPublicRecord, MatchCompanyToPathwaysResult } from './pathway-fit-types';
 
 const BUCKET_LABEL: Record<CertBucket, string> = {
   '8A': '8(a)',
@@ -14,36 +22,141 @@ const BUCKET_LABEL: Record<CertBucket, string> = {
   HZ: 'HUBZone',
 };
 
+export type PathwayIdentityResolution = NonNullable<
+  MatchCompanyToPathwaysResult['_meta']['identity_resolution']
+>;
+
+export interface ResolvedPathwayIdentity {
+  uei: string | null;
+  legal_name: string | null;
+  resolution: PathwayIdentityResolution;
+  name_match?: 'sole_hit' | 'exact_stem' | 'slug';
+  match_count?: number;
+  candidates?: AwardNameCandidate[];
+  note?: string;
+}
+
+/**
+ * Canonical identity seam for PATHWAY FIT. Delegates name matching to
+ * `resolveAwardCorpusByName` — same unique / ambiguous / none / degraded
+ * contract as get_contractor_profile and get_contractor_award_history.
+ */
+export async function resolvePathwayFitIdentity(opts: {
+  uei?: string;
+  company_name?: string;
+}): Promise<ResolvedPathwayIdentity> {
+  const uei = (opts.uei || '').trim().toUpperCase();
+  if (uei) {
+    if (!isWellFormedUei(uei)) {
+      return {
+        uei: null,
+        legal_name: (opts.company_name || '').trim() || null,
+        resolution: 'malformed',
+        note: 'UEI must be exactly 12 alphanumeric characters.',
+      };
+    }
+    return {
+      uei,
+      legal_name: (opts.company_name || '').trim() || null,
+      resolution: 'uei',
+    };
+  }
+
+  const name = (opts.company_name || '').trim();
+  if (!name) {
+    return {
+      uei: null,
+      legal_name: null,
+      resolution: 'unresolved',
+      note: 'Pass a UEI or a unique company name.',
+    };
+  }
+
+  const named = await resolveAwardCorpusByName(name);
+  if (named.status === 'unique') {
+    return {
+      uei: named.uei,
+      legal_name: named.name,
+      resolution: 'unique_name',
+      name_match: named.match,
+    };
+  }
+  if (named.status === 'ambiguous') {
+    return {
+      uei: null,
+      legal_name: name,
+      resolution: 'ambiguous',
+      match_count: named.match_count,
+      candidates: named.candidates,
+      note: named.note,
+    };
+  }
+  if (named.status === 'degraded') {
+    return {
+      uei: null,
+      legal_name: name,
+      resolution: 'degraded',
+      note: named.detail,
+    };
+  }
+  return {
+    uei: null,
+    legal_name: name,
+    resolution: 'none_in_award_corpus',
+    note:
+      'No award-warehouse recipient matched this name. That is this dataset only — not proof of no federal awards.',
+  };
+}
+
 export async function loadCompanyPublicRecord(opts: {
   uei?: string;
   company_name?: string;
   actor?: string;
-}): Promise<{ company: CompanyPublicRecord; sources_queried: string[]; sources_failed: string[]; degraded: boolean }> {
+}): Promise<{
+  company: CompanyPublicRecord;
+  identity: ResolvedPathwayIdentity;
+  sources_queried: string[];
+  sources_failed: string[];
+  degraded: boolean;
+}> {
   const sources_queried: string[] = [];
   const sources_failed: string[] = [];
   let degraded = false;
 
-  const uei = (opts.uei || '').trim().toUpperCase();
-  if (!uei || !isWellFormedUei(uei)) {
+  sources_queried.push('award_corpus_name_to_uei');
+  const identity = await resolvePathwayFitIdentity({
+    uei: opts.uei,
+    company_name: opts.company_name,
+  });
+
+  const emptyCompany = (legal_name: string | null): CompanyPublicRecord => ({
+    uei: null,
+    legal_name,
+    cage: null,
+    identity_source: 'unresolved',
+    certifications: [],
+    awards: [],
+    verified_vehicle_holds: [],
+    ot_nontraditional_established: false,
+  });
+
+  if (!identity.uei) {
+    if (identity.resolution === 'degraded') {
+      sources_failed.push('award_corpus_name_to_uei');
+      degraded = true;
+    }
     return {
-      company: {
-        uei: null,
-        legal_name: opts.company_name || null,
-        cage: null,
-        identity_source: 'unresolved',
-        certifications: [],
-        awards: [],
-        verified_vehicle_holds: [],
-        ot_nontraditional_established: false,
-      },
+      company: emptyCompany(identity.legal_name),
+      identity,
       sources_queried,
       sources_failed,
-      degraded: false,
+      degraded,
     };
   }
 
+  const uei = identity.uei;
   sources_queried.push('history_by_uei');
-  let legal_name: string | null = opts.company_name || null;
+  let legal_name: string | null = identity.legal_name;
   let identity_source: CompanyPublicRecord['identity_source'] = 'unresolved';
   const awards: CompanyPublicRecord['awards'] = [];
 
@@ -109,6 +222,7 @@ export async function loadCompanyPublicRecord(opts: {
       verified_vehicle_holds: [], // never invent
       ot_nontraditional_established: false, // never infer
     },
+    identity,
     sources_queried,
     sources_failed,
     degraded,
