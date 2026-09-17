@@ -3,10 +3,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  buildPathwayFitNext,
   matchCompanyToPathwaysPure,
   scoreCapabilityOverlap,
   stripEvidenceSide,
 } from './pathway-fit-match';
+import { HOST_RULES_PATHWAY_FIT } from './pathway-fit-types';
 import {
   caiConstruction,
   caiSocomCyber,
@@ -187,8 +189,8 @@ describe('PATHWAY FIT additional killers', () => {
   it('no positive fit produces valid NO_PROVEN_DOOR', () => {
     const r = matchCompanyToPathwaysPure(caiSocomCyber(), companyNoAwards());
     expect(r.summary.no_proven_door).toBe(true);
-    expect(r.summary.headline).toMatch(/enough public evidence/i);
-    expect(r._next).toHaveLength(1);
+    expect(r.summary.headline).toMatch(/enough evidence to establish an acquisition door/i);
+    expect(r.presentation.sections.honest_miss?.display_title).toMatch(/no door i can prove yet/i);
   });
 
   it('pf_rank_v1: set-aside does not outrank better-supported vehicle/conventional/CSO', () => {
@@ -242,5 +244,97 @@ describe('PATHWAY FIT fixture shapes for probes', () => {
   it('construction buyer + construction UEI can yield conventional fit', () => {
     const r = matchCompanyToPathwaysPure(caiConstruction(), companyUnrelatedConstruction());
     expect(positive(door(r, 'conventional_solicitation'))).toBe(true);
+  });
+});
+
+describe('PATHWAY FIT honest-miss host presentation (no matcher scoring change)', () => {
+  it('1. NO_PROVEN_DOOR + vehicle_access missing → one vehicle/access question', () => {
+    const pos = matchCompanyToPathwaysPure(caiSocomCyber(), companyCyberRelevant());
+    expect(positive(door(pos, 'idv_task_order'))).toBe(true);
+    const miss = stripEvidenceSide(pos, 'company');
+    expect(miss.summary.no_proven_door).toBe(true);
+    expect(door(miss, 'idv_task_order').proof_missing.some((m) => m.code === 'vehicle_access_unverified')).toBe(true);
+    expect(miss._next).toHaveLength(1);
+    expect(miss._next[0].prompt).toMatch(/vehicle|teaming/i);
+    expect(miss._next[0].prompt).not.toMatch(/demonstrat/i);
+  });
+
+  it('2. NO_PROVEN_DOOR + demo_readiness missing → one demo-readiness question', () => {
+    const cai = caiSocomCyber({
+      pathways: {
+        observed: [
+          {
+            kind: 'cso',
+            established: true,
+            statement: 'Commercial Solutions Opening language appears on scoped SAM notices.',
+            citations: [
+              {
+                source_kind: 'sam_opportunities',
+                source_id: 'NOTICE-CSO-1',
+                locator: 'sam_opportunities.notice_id=NOTICE-CSO-1',
+                as_of: '2026-09-01',
+              },
+            ],
+            evidence_count: 2,
+          },
+        ],
+        potential_not_established: [{ kind: 'pae_portfolio' }],
+      },
+    });
+    const pos = matchCompanyToPathwaysPure(cai, companyCyberRelevant());
+    expect(door(pos, 'cso').determination).toBe('POSSIBLE_FIT');
+    const miss = stripEvidenceSide(pos, 'company');
+    expect(miss.summary.no_proven_door).toBe(true);
+    expect(door(miss, 'cso').proof_missing.some((m) => m.code === 'demonstrable_product_unestablished')).toBe(true);
+    expect(miss._next).toHaveLength(1);
+    expect(miss._next[0].prompt).toMatch(/demonstrat/i);
+    expect(miss._next[0].prompt).not.toMatch(/vehicle|teaming/i);
+  });
+
+  it('3. NO_PROVEN_DOOR + no actionable missing proof → no follow-up question', () => {
+    const cai: CaiPackageSlim = {
+      scope: { agency: 'Department of Veterans Affairs', capability: 'information technology' },
+      pathways: { observed: [], potential_not_established: [{ kind: 'pae_portfolio' }] },
+    };
+    const r = matchCompanyToPathwaysPure(cai, companyCyberRelevant());
+    expect(r.summary.no_proven_door).toBe(true);
+    expect(r._next).toHaveLength(0);
+    expect(buildPathwayFitNext(r.doors, companyCyberRelevant())).toHaveLength(0);
+  });
+
+  it('4. NO_PROVEN_DOOR host rules forbid a research menu', () => {
+    const blob = HOST_RULES_PATHWAY_FIT.join('\n');
+    expect(blob).toMatch(/research menu/i);
+    expect(blob).toMatch(/complete successful result/i);
+    const r = matchCompanyToPathwaysPure(caiSocomCyber(), companyNoAwards());
+    expect(r._next.map((n) => n.prompt).join(' ')).not.toMatch(
+      /vehicle access, a demonstrable product, or a measurable result/i,
+    );
+    expect(r.presentation.host_rules.join('\n')).toMatch(/research menu/i);
+  });
+
+  it('5. NO_PROVEN_DOOR host rules forbid FIND restart', () => {
+    expect(HOST_RULES_PATHWAY_FIT.join('\n')).toMatch(/restart FIND/i);
+  });
+
+  it('6. NO_PROVEN_DOOR host rules forbid set-aside-first', () => {
+    expect(HOST_RULES_PATHWAY_FIT.join('\n')).toMatch(/never ask set-aside-first/i);
+    const r = matchCompanyToPathwaysPure(
+      { scope: { agency: 'VA', capability: 'IT' }, pathways: { observed: [], potential_not_established: [] } },
+      companyNoAwards(),
+    );
+    expect(r._next.map((n) => n.prompt).join('\n')).not.toMatch(/set-?aside/i);
+  });
+
+  it('7. Positive SOCOM case remains unchanged', () => {
+    const r = matchCompanyToPathwaysPure(caiSocomCyber(), companyCyberRelevant());
+    expect(r.summary.no_proven_door).toBe(false);
+    expect(door(r, 'cso').determination).toBe('POSSIBLE_FIT');
+    expect(door(r, 'idv_task_order').determination).toBe('POSSIBLE_FIT');
+    expect(r._next).toHaveLength(1);
+    expect(r._next[0].prompt).toMatch(/vehicle|teaming/i);
+    expect(r.presentation.sections.doors?.display_title).toMatch(/doors I can actually support/i);
+    expect(r.presentation.sections.talent_verified?.display_title).toMatch(/proof I can verify/i);
+    expect(r.presentation.sections.honest_miss).toBeUndefined();
   });
 });

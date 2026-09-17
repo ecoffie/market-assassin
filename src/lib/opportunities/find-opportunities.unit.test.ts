@@ -85,17 +85,31 @@ describe('buildFindNext', () => {
     expect(next[1].suggested_args?.watch_coverage).toEqual(['open_now', 'coming_soon']);
   });
 
-  it('broad → monitor primary with Open+Coming soon disclosure', () => {
+  it('broad with an open hit still continues UNDERSTAND — do not skip to MONITOR-only', () => {
+    const horizons = {
+      open_now: hz('grounded', 40, [openItem(90)]),
+      coming_back: hz('empty', 0),
+      coming_soon: hz('empty', 0),
+    } as Record<HorizonKey, HorizonResult>;
+    const next = buildFindNext('broad', horizons);
+    expect(next[0].tool).toBe('understand_customer');
+    expect(next[0].requires_confirmation).toBe(true);
+    expect(next.some((n) => n.tool === 'schedule_market_search')).toBe(true);
+  });
+
+  it('broad with no open hit → CURRENT INTELLIGENCE first, then monitor (confirm-first)', () => {
     const horizons = {
       open_now: hz('empty', 0),
       coming_back: hz('grounded', 18),
       coming_soon: hz('grounded', 7),
     } as Record<HorizonKey, HorizonResult>;
     const next = buildFindNext('broad', horizons);
-    expect(next).toHaveLength(1);
-    expect(next[0].prompt).toMatch(/monitor this market/);
-    expect(next[0].prompt).toMatch(/not emailed yet/);
-    expect(next[0].suggested_args?.watch_coverage).toEqual(['open_now', 'coming_soon']);
+    expect(next[0].tool).toBe('get_current_acquisition_intelligence');
+    expect(next[0].requires_confirmation).toBe(true);
+    expect(next[1].prompt).toMatch(/monitor this market/);
+    expect(next[1].prompt).toMatch(/not emailed yet/);
+    expect(next[1].suggested_args?.watch_coverage).toEqual(['open_now', 'coming_soon']);
+    expect(next[1].requires_confirmation).toBe(true);
   });
 });
 

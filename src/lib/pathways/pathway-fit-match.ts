@@ -927,11 +927,60 @@ function buildAdditionalAdvantages(
   }
 }
 
-function buildNext(doors: PathwayDoorFit[], company: CompanyPublicRecord): MatchCompanyToPathwaysResult['_next'] {
+/** Codes that can change a no_proven_door determination if the customer answers. */
+const HONEST_MISS_ACTIONABLE: ProofMissingCode[] = [
+  'vehicle_access_unverified',
+  'demonstrable_product_unestablished',
+];
+
+function promptForMissingCode(code: ProofMissingCode): string | null {
+  if (code === 'vehicle_access_unverified') {
+    return 'Are you currently on this vehicle, or do you have a teaming relationship with a holder?';
+  }
+  if (code === 'demonstrable_product_unestablished') {
+    return 'Do you have a working capability you can demonstrate today?';
+  }
+  if (code === 'measurable_outcome_unavailable') {
+    return 'What measurable result did your team produce on this work?';
+  }
+  if (code === 'ot_nontraditional_status_unestablished') {
+    return 'Can you point to a verifiable source that establishes your OT / nontraditional eligibility for this path?';
+  }
+  if (code === 'cert_self_identified_not_authoritative') {
+    return 'Can you confirm SBA or VetCert certification for the socioeconomic status that matches this restriction?';
+  }
+  return null;
+}
+
+function nextFromCodes(
+  doors: PathwayDoorFit[],
+  codes: ProofMissingCode[],
+): MatchCompanyToPathwaysResult['_next'] {
+  for (const code of codes) {
+    for (const d of doors) {
+      const hit = d.proof_missing.find((m) => m.code === code);
+      if (!hit) continue;
+      if (code === 'cert_self_identified_not_authoritative' && d.door !== 'set_aside') continue;
+      const prompt = promptForMissingCode(code);
+      if (!prompt) continue;
+      return [{ prompt, requires_confirmation: true }];
+    }
+  }
+  return [];
+}
+
+/**
+ * Presentation `_next` only — does not change determinations.
+ * no_proven_door: at most one evidence-changing question, else none (not a research menu).
+ */
+export function buildPathwayFitNext(
+  doors: PathwayDoorFit[],
+  company: CompanyPublicRecord,
+): MatchCompanyToPathwaysResult['_next'] {
   if (!company.uei) {
     return [
       {
-        prompt: 'I need your UEI to match public federal evidence to these doors. What is your company’s UEI?',
+        prompt: 'What’s your company name? I match public federal records from that — you don’t need contracting jargon.',
         requires_confirmation: true,
       },
     ];
@@ -940,8 +989,14 @@ function buildNext(doors: PathwayDoorFit[], company: CompanyPublicRecord): Match
   const positive = doors.filter(
     (d) => d.determination === 'SUPPORTED_FIT' || d.determination === 'POSSIBLE_FIT',
   );
-  const ranked = sortDoors(positive.length ? positive : doors);
+  const noProven = positive.length === 0;
 
+  if (noProven) {
+    // Honest miss is complete. Only ask if a proof_missing item could open a door.
+    return nextFromCodes(sortDoors(doors), HONEST_MISS_ACTIONABLE);
+  }
+
+  const ranked = sortDoors(positive);
   const priorityCodes: ProofMissingCode[] = [
     'company_identity_unresolved',
     'vehicle_access_unverified',
@@ -951,70 +1006,8 @@ function buildNext(doors: PathwayDoorFit[], company: CompanyPublicRecord): Match
     'cert_self_identified_not_authoritative',
     'capability_relation_unestablished',
   ];
-
-  for (const code of priorityCodes) {
-    for (const d of ranked) {
-      const hit = d.proof_missing.find((m) => m.code === code);
-      if (!hit) continue;
-      // Set-aside-first only when it is genuinely the single missing fact on the top pathway
-      if (code === 'cert_self_identified_not_authoritative' && d.door !== 'set_aside') continue;
-      if (code === 'vehicle_access_unverified') {
-        return [
-          {
-            prompt:
-              'Are you currently on this vehicle, or do you have a teaming relationship with a holder?',
-            requires_confirmation: true,
-          },
-        ];
-      }
-      if (code === 'demonstrable_product_unestablished') {
-        return [
-          {
-            prompt: 'Do you have a working capability you can demonstrate today?',
-            requires_confirmation: true,
-          },
-        ];
-      }
-      if (code === 'measurable_outcome_unavailable') {
-        return [
-          {
-            prompt: 'What measurable result did your team produce on this work?',
-            requires_confirmation: true,
-          },
-        ];
-      }
-      if (code === 'ot_nontraditional_status_unestablished') {
-        return [
-          {
-            prompt:
-              'Can you point to a verifiable source that establishes your OT / nontraditional eligibility for this path?',
-            requires_confirmation: true,
-          },
-        ];
-      }
-      if (code === 'cert_self_identified_not_authoritative') {
-        return [
-          {
-            prompt:
-              'Can you confirm SBA or VetCert certification for the socioeconomic status that matches this restriction?',
-            requires_confirmation: true,
-          },
-        ];
-      }
-    }
-  }
-
-  const noProven = positive.length === 0;
-  if (noProven) {
-    return [
-      {
-        prompt:
-          'I found acquisition paths around this buyer, but I don’t have enough public evidence to establish that your company can access them yet. Which proof can you verify first — vehicle access, a demonstrable product, or a measurable result on a past award?',
-        requires_confirmation: true,
-      },
-    ];
-  }
-
+  const hit = nextFromCodes(ranked, priorityCodes);
+  if (hit.length) return hit;
   return [
     {
       prompt: 'What measurable result did your team produce on this work?',
@@ -1029,7 +1022,7 @@ function headlineFor(summary: {
   possible_count: number;
 }): string {
   if (summary.no_proven_door) {
-    return 'I found acquisition paths around this buyer, but I don’t have enough public evidence to establish that your company can access them yet.';
+    return 'I don’t have enough evidence to establish an acquisition door for this company yet.';
   }
   if (summary.supported_count > 0) {
     return 'Here are the doors I can actually support from the evidence.';
@@ -1146,30 +1139,58 @@ export function matchCompanyToPathwaysPure(
       sources_failed: [],
       ranking_rule_version: 'pf_rank_v1',
       next_outputs_not_yet: [
-        'talent_fit',
+        'full_talent',
         'win_claim',
         'vehicle_portfolio',
-        'demo_readiness',
-        'measurable_outcome',
+        'demo_readiness_verified',
+        'measurable_outcome_verified',
       ],
     },
-    _next: buildNext(sorted, company),
+    _next: buildPathwayFitNext(sorted, company),
     presentation: {
       host_rules: [...HOST_RULES_PATHWAY_FIT],
-      sections: {
-        doors: {
-          display_title: 'Here are the doors I can actually support from the evidence',
-          provenance_label: 'Two-sided: CAI buyer doors + stranger-verifiable company record',
-        },
-        proof: {
-          display_title: 'What proves it',
-          provenance_label: 'Government / public evidence only',
-        },
-        missing: {
-          display_title: 'What I cannot verify',
-          provenance_label: 'Blocks upgrade — drives the next question',
-        },
-      },
+      sections: no_proven_door
+        ? {
+            honest_miss: {
+              display_title: 'No door I can prove yet',
+              provenance_label:
+                'Based on the evidence available, I cannot responsibly connect this company to one of the buyer’s observed acquisition paths.',
+            },
+            verify: {
+              display_title: 'What I can verify',
+              provenance_label: 'Buyer-side and company-side public evidence that exists — not a pathway fit',
+            },
+            missing: {
+              display_title: "What's missing",
+              provenance_label: 'Exact proof_missing items preventing a positive determination',
+            },
+            would_change: {
+              display_title: 'What would change the answer',
+              provenance_label: 'The smallest evidence class that could change this determination — not a research menu',
+            },
+          }
+        : {
+            doors: {
+              display_title: 'Here are the doors I can actually support from the evidence',
+              provenance_label: 'Two-sided: CAI buyer doors + stranger-verifiable company record',
+            },
+            proof: {
+              display_title: 'What proves it',
+              provenance_label: 'Government / public evidence only',
+            },
+            talent_verified: {
+              display_title: 'What proof I can verify',
+              provenance_label: 'Stranger-verifiable public records only — not owner-asserted',
+            },
+            talent_missing: {
+              display_title: "What's missing",
+              provenance_label: 'The single most important proof gap — one question, not a questionnaire',
+            },
+            missing: {
+              display_title: 'What I cannot verify',
+              provenance_label: 'Blocks upgrade — drives the next question',
+            },
+          },
     },
   };
 }
@@ -1189,20 +1210,32 @@ export function stripEvidenceSide(
   });
   const supported_count = doors.filter((d) => d.determination === 'SUPPORTED_FIT').length;
   const possible_count = doors.filter((d) => d.determination === 'POSSIBLE_FIT').length;
+  const no_proven_door = supported_count === 0 && possible_count === 0;
+  const nextDoors = sortDoors(doors);
   return {
     ...result,
-    doors: sortDoors(doors),
+    doors: nextDoors,
     summary: {
       ...result.summary,
       supported_count,
       possible_count,
-      no_proven_door: supported_count === 0 && possible_count === 0,
+      no_proven_door,
       headline: headlineFor({
-        no_proven_door: supported_count === 0 && possible_count === 0,
+        no_proven_door,
         supported_count,
         possible_count,
       }),
     },
+    _next: buildPathwayFitNext(nextDoors, {
+      uei: result.company.uei,
+      legal_name: result.company.legal_name,
+      cage: result.company.cage,
+      identity_source: result.company.identity_source,
+      certifications: result.company.certifications,
+      awards: [],
+      verified_vehicle_holds: [],
+      ot_nontraditional_established: false,
+    }),
   };
 }
 
@@ -1240,7 +1273,7 @@ export function caiContextRequiredResult(): MatchCompanyToPathwaysResult {
       sources_queried: [],
       sources_failed: [],
       ranking_rule_version: 'pf_rank_v1',
-      next_outputs_not_yet: ['talent_fit'],
+      next_outputs_not_yet: ['full_talent'],
       error: 'cai_context_required',
     },
     _next: [

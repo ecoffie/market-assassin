@@ -104,16 +104,20 @@ export interface UnderstandCustomerResult {
   };
 }
 
-/** Plain-English ask that ends UNDERSTAND — not set-aside-first. PATHWAY is the next PR. */
-export const UNDERSTAND_PATHWAY_NEXT_PROMPT =
-  'Now let’s figure out which door your company can actually walk through. ' +
-  'What capability can you deliver for this mission today, and what have you already done that proves it?';
+/** Plain-English ask that ends UNDERSTAND — Current Intelligence next, not set-aside-first. */
+export const UNDERSTAND_CAI_NEXT_PROMPT =
+  'Want me to show you what’s changed about how this customer is buying this work?';
+
+/** @deprecated Potato v1 routes UNDERSTAND → CURRENT INTELLIGENCE, not straight to PATHWAY. */
+export const UNDERSTAND_PATHWAY_NEXT_PROMPT = UNDERSTAND_CAI_NEXT_PROMPT;
 
 export function buildUnderstandNext(): UnderstandNextAction[] {
   return [
     {
-      prompt: UNDERSTAND_PATHWAY_NEXT_PROMPT,
+      prompt: UNDERSTAND_CAI_NEXT_PROMPT,
       requires_confirmation: true,
+      tool: 'get_current_acquisition_intelligence',
+      credits: 8,
     },
   ];
 }
@@ -450,7 +454,7 @@ export async function understandCustomer(
       'Present the three sections under presentation.sections.*.display_title — never "what they actually care about" for curated research.',
       'State each section’s provenance_label before the bullets/claims in that section.',
       'Do not draft outreach email, name set-aside-first, or auto-run PATHWAY/Talent tools in this turn.',
-      'After the package, offer _next primary (capability/door ask) and wait — do not ask "what is your set-aside?" as the UNDERSTAND closer.',
+      'After the package, offer _next (what changed about how they buy) and wait — do not ask "what is your set-aside?" as the UNDERSTAND closer.',
     ],
   };
 

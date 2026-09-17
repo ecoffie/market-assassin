@@ -45,6 +45,30 @@ describe('MCP schedule discovery', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/invent nothing/i);
   });
 
+  it('connector instructions treat PATHWAY FIT no_proven_door as a complete result', () => {
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain('match_company_to_pathways');
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/no_proven_door === true is a complete successful result/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/do NOT restart find_opportunities/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/numbered research menu/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/If `_next` is empty, STOP/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Never ask set-aside-first/i);
+  });
+
+  it('connector instructions include Potato v1 journey through POSITION / ACT / MONITOR', () => {
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Potato v1 journey/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/TALENT THIN/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/OWNER_ASSERTED/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/capability statement/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Want me to watch this for you/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Do not skip to MONITOR after FIND/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Confirm before calling schedule_market_search/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/TALENT THIN uses only PATHWAY FIT/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Draft POSITION from FIND/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/ONE primary next action/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/keep going/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Do NOT substitute get_agency_intel/i);
+  });
+
   it('maps each customer phrase to schedule_market_search (routing contract)', () => {
     // Discovery surface: if the phrase appears in the tool description OR instructions,
     // a connected client has the signal to call schedule_market_search without "alerts."

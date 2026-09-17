@@ -292,13 +292,16 @@ export const DOOR_LABELS: Record<PathwayDoorKind, string> = {
 
 export const HOST_RULES_PATHWAY_FIT = [
   'Every positive fit needs buyer_evidence AND company_evidence — never one-sided.',
-  'Empty / no_proven_door is success — do not invent a door.',
+  'Empty / no_proven_door is a COMPLETE SUCCESSFUL RESULT — intelligence, not a failure. Do not invent a door.',
+  'When summary.no_proven_door is true, present: NO DOOR I CAN PROVE YET — "I don\'t have enough evidence to establish an acquisition door for this company yet." Then WHAT I CAN VERIFY, WHAT\'S MISSING (exact proof_missing), WHAT WOULD CHANGE THE ANSWER. Not apologetic.',
+  'After no_proven_door: do NOT offer a research menu, restart FIND, search opportunities, research awards, inspect the company, offer dossier, offer monitor, or run more market research. Ask at most ONE proof_missing question, and only if answering it could change this determination. If _next is empty, STOP.',
   'Never claim win, pick, or vehicle bid rights without verified access evidence.',
-  'Set-aside is never the automatic opener when other doors exist.',
+  'Set-aside is never the automatic opener when other doors exist. Never ask set-aside-first after no_proven_door.',
   'Do not promote CAI NOT_YET_MEASURABLE doors (consortium, rapid, PAE).',
   'proof_to_lead_with = stranger-verifiable only; vault is labeled owner-asserted and does not upgrade.',
-  'Ask one _next question from proof_missing — not a questionnaire, not set-aside-first.',
-  'Customer need not know IDV/CSO/OT/NAICS jargon — use door_label language.',
+  'On a positive fit: present doors, then TALENT THIN (proof I can verify + the single missing proof). Ask one `_next` question from proof_missing — not a questionnaire, not set-aside-first.',
+  'After the talent answer, continue Potato POSITION → one ACT → MONITOR (confirm first). Do not restart FIND. Do not auto-run paid/write tools.',
+  'Customer need not know IDV/CSO/OT/NAICS jargon — use door_label language. Ask for company name in plain English; entity ID is optional.',
 ] as const;
 
 export const OWNER_ASSERTED_DISCLAIMER =

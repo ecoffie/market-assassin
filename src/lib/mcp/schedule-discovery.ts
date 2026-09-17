@@ -7,6 +7,14 @@
  * Consumed by: tool-registry, tool-schemas, hosted transport, stdio server, tests.
  */
 
+import {
+  HOST_RULES_ACT,
+  HOST_RULES_MONITOR,
+  HOST_RULES_POSITION,
+  HOST_RULES_TALENT_THIN,
+  POTATO_JOURNEY_INSTRUCTIONS,
+} from './potato-journey';
+
 /** Phrases customers use that MUST map to schedule_market_search for procurement searches. */
 export const SCHEDULE_DISCOVERY_PHRASES = [
   'schedule this',
@@ -46,9 +54,27 @@ export const SCHEDULE_MARKET_SEARCH_DESCRIPTION =
  * Clients surface this as connector guidance; keep it short and action-oriented.
  */
 export const MCP_CONNECTOR_INSTRUCTIONS = [
+  POTATO_JOURNEY_INSTRUCTIONS,
+  '',
+  'TALENT THIN:',
+  ...HOST_RULES_TALENT_THIN,
+  '',
+  'POSITION:',
+  ...HOST_RULES_POSITION,
+  '',
+  'ACT:',
+  ...HOST_RULES_ACT,
+  '',
+  'MONITOR:',
+  ...HOST_RULES_MONITOR,
+  '- "Yes" / "keep going" on a prior journey question is NOT watch confirmation.',
+  '  Only call schedule_market_search after an explicit yes to "Want me to watch this for you?"',
+  '',
   'Finding opportunities (PRIMARY):',
   '- When the user wants to find opportunities, what is available, what is coming, or a market hunt',
   '  (e.g. "cybersecurity in Florida"), call find_opportunities — NOT search_sam_opportunities alone.',
+  '- If find_opportunities errors, say the finder failed. Do NOT substitute get_agency_intel or',
+  '  pain-points as "where the money is." Unavailable is not zero demand.',
   '- find_opportunities returns three independent horizons: OPEN NOW, COMING BACK, COMING SOON.',
   '  An empty Open result is not a market-wide zero if other horizons hit. Never invent a solicitation',
   '  number for a recompete or forecast.',
@@ -62,9 +88,10 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '  Say each section’s provenance_label BEFORE listing claims. Never headline curated research',
   '  as what the customer "actually cares about." Soften inferences ("may be more persuasive")',
   '  — do not invent buyer evaluation facts.',
-  '- After UNDERSTAND, offer `_next` (capability/door ask) and wait. Do NOT close UNDERSTAND with',
+  '- After UNDERSTAND, offer `_next` (what changed about how they buy) and wait. Do NOT close UNDERSTAND with',
   '  "what is your set-aside?" — set-aside is only relevant when opportunity evidence makes it so.',
-  '  Do not draft capability statements, outreach emails, responses, or meeting briefs until those tools ship.',
+  '  After PATHWAY FIT + TALENT THIN, draft capability statements / responses / meeting briefs from journey',
+  '  evidence only (Potato POSITION). Do not auto-run paid or write tools.',
   '- Watch/email coverage today is Open now + Coming soon only; Coming back is not emailed yet — say so.',
   '',
   'Scheduling / monitoring procurement searches:',
@@ -92,4 +119,17 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '  • pathways.observed = record evidence only — not certainty about future acquisition vehicles.',
   '  • Do not say "the competition already happened", "the binding constraint is", or "whatever replaces X',
   '    is where the money goes next" unless the package citations explicitly establish that.',
+  '',
+  'PATHWAY FIT (after Current Acquisition Intelligence confirms):',
+  '- When the user asks which doors their company can walk through and what proof to lead with, call',
+  '  match_company_to_pathways. Obey presentation.host_rules on that result.',
+  '- summary.no_proven_door === true is a complete successful result. Say: no door I can prove yet —',
+  '  "I don\'t have enough evidence to establish an acquisition door for this company yet." Then what you',
+  '  can verify, what is missing, and what would change the answer. That is intelligence. Do not apologize.',
+  '- After no_proven_door: do NOT restart find_opportunities, do NOT offer a numbered research menu',
+  '  (search opportunities / research awards / inspect the company), do NOT offer dossier or monitor,',
+  '  do NOT manufacture a possible pathway. Ask at most the result\'s `_next` prompt (one proof question).',
+  '  If `_next` is empty, STOP the door step. Never ask set-aside-first.',
+  '- After a positive door result, TALENT THIN is the proof_to_lead_with + one `_next` missing-proof question.',
+  '  Then POSITION (capability statement / response / meeting) → one ACT → MONITOR only with confirmation.',
 ].join('\n');

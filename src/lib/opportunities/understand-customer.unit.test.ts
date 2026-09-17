@@ -3,7 +3,7 @@ import {
   buildEmphasizeBullets,
   buildUnderstandNext,
   statedFocusFromText,
-  UNDERSTAND_PATHWAY_NEXT_PROMPT,
+  UNDERSTAND_CAI_NEXT_PROMPT,
 } from './understand-customer';
 
 describe('statedFocusFromText', () => {
@@ -45,13 +45,13 @@ describe('buildEmphasizeBullets', () => {
 });
 
 describe('buildUnderstandNext', () => {
-  it('ends UNDERSTAND with capability/door ask — not set-aside-first', () => {
+  it('ends UNDERSTAND with CURRENT INTELLIGENCE ask — not set-aside-first', () => {
     const next = buildUnderstandNext();
     expect(next).toHaveLength(1);
-    expect(next[0].prompt).toBe(UNDERSTAND_PATHWAY_NEXT_PROMPT);
+    expect(next[0].prompt).toBe(UNDERSTAND_CAI_NEXT_PROMPT);
     expect(next[0].requires_confirmation).toBe(true);
-    expect(next[0].tool).toBeUndefined();
+    expect(next[0].tool).toBe('get_current_acquisition_intelligence');
     expect(next[0].prompt.toLowerCase()).not.toMatch(/set-aside|8\(a\)|sdvosb|hubzone|wosb/);
-    expect(next[0].prompt.toLowerCase()).toMatch(/capability|door|proves/);
+    expect(next[0].prompt.toLowerCase()).toMatch(/changed|buying/);
   });
 });
