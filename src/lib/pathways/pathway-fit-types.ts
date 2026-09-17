@@ -301,7 +301,7 @@ export const HOST_RULES_PATHWAY_FIT = [
   'proof_to_lead_with = stranger-verifiable only; vault is labeled owner-asserted and does not upgrade.',
   'On a positive fit: present doors, then TALENT THIN (proof I can verify + the single missing proof). Ask one `_next` question from proof_missing — not a questionnaire, not set-aside-first.',
   'After the talent answer, continue Potato POSITION → one ACT → MONITOR (confirm first). Do not restart FIND. Do not auto-run paid/write tools.',
-  'Customer need not know IDV/CSO/OT/NAICS jargon — use door_label language. Ask for company name in plain English; entity ID is optional.',
+  'Customer need not know IDV/CSO/OT/NAICS jargon — use door_label language. Ask company identity HERE: "Which company should I match against what I found?" Options: My company / A company I\'m helping / Keep this market-level for now. Resolve UEI/CAGE/SAM internally; do not ask the user for a UEI unless resolution requires clarification.',
 ] as const;
 
 export const OWNER_ASSERTED_DISCLAIMER =

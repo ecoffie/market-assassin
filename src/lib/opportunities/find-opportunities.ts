@@ -126,6 +126,58 @@ export interface FindOpportunitiesResult {
     find_shape: 'specific' | 'broad';
   };
   _next: FindNextAction[];
+  presentation: {
+    host_rules: string[];
+    sections: Record<string, { display_title: string; provenance_label: string }>;
+  };
+}
+
+/** P2 — local presentation contract on the FIND result (CAI/PATHWAY pattern). */
+export const HOST_RULES_FIND_FIRST_VALUE = [
+  'FIRST VALUE: present this result immediately. Do not ask questions before showing it.',
+  'HERE\'S WHERE I SEE THE MONEY — use presentation.sections titles in order: Open now, Coming back, Coming soon. Report each horizon\'s own status. An unavailable or failed horizon is a coverage gap — never zero / none / empty demand.',
+  'WHERE I WOULD START: one evidence-supported point from the returned items (prefer a live Open hit if grounded; else Coming back; else Coming soon). Do not invent a solicitation for a recompete or forecast.',
+  'WHY: 1–3 concise reasons from this result\'s evidence only.',
+  'WHAT I CAN\'T ESTABLISH YET: one material limitation if any (sparse coverage, unavailable horizon, broad query).',
+  'ONE FIND: this call is the first-value FIND. Do not call find_opportunities again before presenting. Do not fan out parallel FIND variants.',
+  'Then ask at most ONE plain-English refinement (what they actually sell). WAIT. Do not auto-call understand_customer or get_current_acquisition_intelligence even if `_next` offers them — those are confirmation-gated after first value.',
+  'Do not ask company identity, UEI, CAGE, certifications, clearance, FCL, set-aside, vehicle, or desired deliverable before presenting this. Do not expose NAICS/PSC/ATO/CNO/CEMA/CSO/OT/PAE/FCL in the refinement unless the user already used that word.',
+  'Do not web-search or create an artifact on this turn. Do not ask market map vs access-path vs capability statement.',
+  'Clearance is not a first-value question. Do not call it a hard gate because the buyer is SOCOM.',
+] as const;
+
+export const FIND_FIRST_VALUE_SECTIONS = {
+  open_now: {
+    display_title: 'Open now',
+    provenance_label: 'Live solicitations for this query — grounded, empty, or unavailable (unavailable is not zero)',
+  },
+  coming_back: {
+    display_title: 'Coming back',
+    provenance_label: 'Contracts likely to recompete — not a live solicitation number',
+  },
+  coming_soon: {
+    display_title: 'Coming soon',
+    provenance_label: 'Agency forecasts / planned demand — not a live solicitation number',
+  },
+  start: {
+    display_title: 'Where I would start',
+    provenance_label: 'One item from the returned evidence — not a new lookup',
+  },
+  why: {
+    display_title: 'Why',
+    provenance_label: '1–3 reasons from this result only',
+  },
+  gaps: {
+    display_title: "What I can't establish yet",
+    provenance_label: 'Coverage gap or query limit — never fabricated as zero',
+  },
+} as const;
+
+export function buildFindPresentation(): FindOpportunitiesResult['presentation'] {
+  return {
+    host_rules: [...HOST_RULES_FIND_FIRST_VALUE],
+    sections: FIND_FIRST_VALUE_SECTIONS as FindOpportunitiesResult['presentation']['sections'],
+  };
 }
 
 const OPEN_HANDOFFS: HandoffKey[] = [
@@ -885,6 +937,7 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
         find_shape: 'broad',
       },
       _next: [],
+      presentation: buildFindPresentation(),
     };
   }
 
@@ -957,5 +1010,6 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       find_shape: shape,
     },
     _next: grounded ? buildFindNext(shape, horizons) : [],
+    presentation: buildFindPresentation(),
   };
 }

@@ -541,6 +541,7 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
       'Each horizon reports independently (grounded | empty | unavailable) — an empty Open result is NOT a ' +
       'market-wide zero if Coming back or Coming soon hit. Does NOT invent a solicitation for recompetes or ' +
       'forecasts. Watch/email coverage today is Open + Coming soon only (Coming back not emailed yet). ' +
+      'First-turn: ONE call using the user\'s words, then present presentation.host_rules — do not parallel-variant or requery before showing the result. ' +
       'For SAM-only / Open-only advanced search use search_sam_opportunities. Credits: 10 (one compose).',
     parameters: {
       type: 'object',
