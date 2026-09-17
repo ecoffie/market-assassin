@@ -6896,3 +6896,23 @@ no 504; representative drones capability completes grounded under 55s.
 **Why.** The living pipeline was healthy and current but customer-invisible; the 3,043-row JSON corpus was customer-facing but mostly unsourced. Promoting GAO end-to-end makes citations the default without deleting legacy coverage.
 
 **Proof.** Unit tests: gao-instance clocks, document-agency no-force-map, sourced-pain-points provenance, GovInfo quarantine. Cron stamps `data_source_instances`; held population from `institute_sources` only (not GovInfo / JSON).
+
+---
+
+## Recompete capture date is PoP-end − 12 months (MINDY-006)
+
+**What.** `get_expiring_contracts` now reports `estimated_recompete_date` as each contract's period-of-performance end minus **12 calendar months** — the same definition the database trigger has used since April 2026. A capture date that already passed stays in the past. Two contracts ending ten days apart keep two different dates. `lead_time_months` stays the remaining clock to PoP end (not the capture-start date).
+
+**Why.** The MCP overlay had been clamping that date to "today" and using a 9-month offset that never appeared in the PRD, glossary, or trigger. Near-term expirations all collapsed to the run date, so the capture signal was the calendar, not the contract.
+
+**SEO / proof.** Canonical 12-month offset: `update_recompete_computed_fields` + `docs/PRD-forecast-intelligence.md`. Overlay: `overlayRecompeteTiming` in `src/lib/recompete/timing.ts`. Tests: `timing.unit.test.ts` (2026-09-18 vs 2026-09-28 stay 2025-09-18 / 2025-09-28).
+
+---
+
+## Recompete PSC/description survive the hourly sync (MINDY-007)
+
+**What.** The hourly `sync-recompete-contracts` job can no longer blank out a contract's PSC code or description when USASpending's search payload omits them. A later, richer fill from award detail or BigQuery stays. New contracts with a genuine empty search result still insert as empty.
+
+**Why.** Search returns those fields NULL even when requested. The sync wrote the nulls over verified fills and left `detail_checked_at` in place, so the row looked "already checked" while the columns were blank.
+
+**SEO / proof.** App merge: `preserveRicherEnrichment`. DB: `trg_recompete_preserve_enrichment` BEFORE UPDATE. Census of remaining blanks vs `award_detail_lookup` is a separate read-only pass — no bulk refill in this ship.

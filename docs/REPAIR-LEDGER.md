@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Recompete timing + enrichment
+
+| 2026-09-17 | **MINDY-006: estimated_recompete_date is PoP-end − 12 calendar months, never clamped to today.** MCP overlay had used an undocumented 9-month offset plus `Math.max(now, …)`, collapsing distinct near-term PoP ends onto the run date. 12 months is the DB trigger / forecast-PRD definition; 9 months had no product basis. `lead_time_months` stays remaining clock to PoP end. | `RECOMPETE_CAPTURE_LEAD_MONTHS = 12` → `src/lib/recompete/timing.ts` | timing.unit.test.ts: 2026-09-18 vs 2026-09-28 stay 2025-09-18 / 2025-09-28; query.ts has no `Math.max(now`. Live MCP fixture after deploy. | IN REVIEW |
+
+| 2026-09-17 | **MINDY-007: null PSC/description from spending_by_award cannot overwrite stored non-null enrichment.** Hourly upsert now merges through `preserveRicherEnrichment`; DB `trg_recompete_preserve_enrichment` is the structural BEFORE UPDATE guard (blank treated as empty). `detail_checked_at` on a currently-null row is not an authoritative miss — stamp reset only with approved refill. Census vs BQ is read-only; no bulk write in this ship. | `preserveRicherEnrichment` → `src/lib/recompete/preserve-enrichment.ts` | preserve-enrichment.unit.test.ts (null cannot clobber; cron maps toWrite). Migration `20260917_preserve_recompete_enrichment.sql`. | IN REVIEW |
+
 ## Contractor name resolution
 
 | 2026-09-16 | **Company name now resolves to the UEI history path; a multi-match is not "not found".** `get_contractor_award_history` company path was null for every name form because it never called the warehouse UEI loader. A unique slug (same suffix sweep as profile) or a unique award-index hit now loads by UEI and is not guessed from the largest substring. Several hits return `resolution: ambiguous` and candidates. Zero rows in the award index is `none_in_award_corpus`, distinct from `lookup_failed`. The existence flag still runs on a miss, including a no-comma variant. Profile and history dollars are not the same field: measured 2026-09-16, UEI UM53UXL5QNF5, same 54 awards, child_count 1 — recipients_rollup $259,934,761.21 as-of 2026-08-28 vs recipients $261,903,825.70 as-of 2026-09-09. | `award_corpus_name_to_uei` → `src/mcp/tools/contractor-award-history.ts` | name-resolution.unit.test.ts refuses to pick the first of 13. Live BQ: "Tanaq Support Services" and the no-comma form → UM53UXL5QNF5; "Tanaq" ambiguous 13, not picked; "Tanaq Global Solutions LLC" and a garbage control → none. | IN REVIEW |

@@ -109,6 +109,10 @@ async function existingNaics(): Promise<string[]> {
 }
 
 async function upsertBatch(rows: SyncedContract[]) {
+  // MINDY-007: this payload can carry null PSC/description from spending_by_award.
+  // The DB trigger trg_recompete_preserve_enrichment keeps stored non-nulls. Do
+  // not add a second write path that bypasses the table (ON CONFLICT upsert is
+  // an UPDATE → trigger fires).
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);
     const { error } = await sb

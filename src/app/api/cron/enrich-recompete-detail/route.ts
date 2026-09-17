@@ -1,12 +1,18 @@
 /**
  * /api/cron/enrich-recompete-detail
  *
- * The LONG-TERM fix for MINDY-007's psc_code / psc_description / description NULLs.
+ * The LONG-TERM fill for MINDY-007's psc_code / psc_description / description NULLs.
  * The recompete sync's source (spending_by_award SEARCH) returns those NULL even when
  * requested; the per-award DETAIL endpoint has them. This cron drains
  * recompete_opportunities rows where detail_checked_at IS NULL, filling the three fields
  * from that endpoint via the SHARED resolveRecompeteDetail (src/lib/recompete/detail-enrich.ts
  * — same code the one-time local drain uses, so they never drift).
+ *
+ * ⚠️ MINDY-007 (2026-09-17): `detail_checked_at` is NOT "fields are empty on the source."
+ * The hourly sync used to upsert null PSC/description over successful fills while leaving
+ * this stamp in place. A stamped-but-null row is an erased enrichment, not an authoritative
+ * miss. Do not treat remaining=0 as "coverage complete." Resetting the stamp on those rows
+ * is a bulk write — wait for the BQ census + explicit approval before draining them again.
  *
  * WHY A CRON, not a one-shot bulk run: USASpending's detail endpoint THROTTLES a sustained
  * burst (~1000 requests → dropped connections). A one-time drain trips it and stalls. A cron
@@ -59,15 +65,25 @@ export async function GET(request: NextRequest) {
     const stampedRes = await base().not('detail_checked_at', 'is', null);
     const pscRes = await base().not('psc_code', 'is', null);
     const descRes = await base().not('description', 'is', null);
-    if (totalRes.error) return NextResponse.json({ error: totalRes.error.message }, { status: 500 });
-    const total = totalRes.count ?? 0;
+    const stampedNullRes = await base().not('detail_checked_at', 'is', null).is('psc_code', null).is('description', null);
+    const firstError = totalRes.error || stampedRes.error || pscRes.error || descRes.error || stampedNullRes.error;
+    if (firstError) return NextResponse.json({ error: firstError.message }, { status: 500 });
+    const total = totalRes.count;
+    const stamped = stampedRes.count;
+    if (total == null || stamped == null) {
+      return NextResponse.json({ error: 'coverage counts unknown (null count, not zero)' }, { status: 500 });
+    }
     return NextResponse.json({
       success: true,
       total,
-      stamped: stampedRes.count ?? 0,
-      psc_code_populated: pscRes.count ?? 0,
-      description_populated: descRes.count ?? 0,
-      remaining: total - (stampedRes.count ?? 0),
+      stamped,
+      psc_code_populated: pscRes.count,
+      description_populated: descRes.count,
+      remaining: total - stamped,
+      // Stamp-without-fields: later sync erased enrichment. Not "source empty."
+      // null count = unknown, never coalesced to 0.
+      stamped_but_null_psc_and_desc: stampedNullRes.count,
+      stamp_authoritative_empty: false,
     });
   }
 

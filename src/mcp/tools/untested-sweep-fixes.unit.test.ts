@@ -1,7 +1,7 @@
 /**
  * Untested-tools sweep fixes (FM-U01..U09, Eric/QA independent test 2026-07-29). Locks the
  * deterministic parts of each fix. Live-verified separately: U01 (Amentum FY2025 $14.4B correct),
- * U02 (332994 not_applicable), U03 (null goals), U09 (Navy $176.5B), U06 (no past recompete dates).
+ * U02 (332994 not_applicable), U03 (null goals), U09 (Navy $176.5B), U06 (PoP−12mo capture date; past stays past).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -59,25 +59,16 @@ describe('FM-U05 — solicitation-documents resolves a solicitation number, not 
   });
 });
 
-describe('FM-U06 — expiring-contracts computes recompete date/lead LIVE (never a past date)', () => {
+describe('FM-U06 / MINDY-006 — expiring-contracts capture date from PoP, remaining clock separate', () => {
   const src = read('../../lib/recompete/query.ts');
-  it('recomputes lead_time_months from today (>=0) and clamps est date to not-past', () => {
-    expect(src).toMatch(/lead_time_months: leadMonths/);
-    expect(src).toMatch(/Math\.max\(now, end - solLead\)/);
-  });
-  // Pure-logic mirror of the date math.
-  it('a near-term expiry never yields a past estimated_recompete_date or lead_time 0', () => {
-    const now = Date.now();
-    const MS = 30.4375 * 86_400_000;
-    const compute = (endMs: number) => ({
-      lead: Math.max(0, Math.round((endMs - now) / MS)),
-      est: Math.max(now, endMs - 9 * MS),
-    });
-    for (const months of [1, 3, 6, 15]) {
-      const r = compute(now + months * MS);
-      expect(r.lead).toBeGreaterThan(0);
-      expect(r.est).toBeGreaterThanOrEqual(now);
-    }
+  const timingSrc = read('../../lib/recompete/timing.ts');
+  it('overlays via overlayRecompeteTiming and never clamps to today', () => {
+    expect(src).toMatch(/overlayRecompeteTiming/);
+    expect(src).toMatch(/lead_time_months: timing\.lead_time_months/);
+    expect(src).not.toMatch(/Math\.max\(now,/);
+    expect(src).not.toMatch(/solLead/);
+    expect(timingSrc).toMatch(/RECOMPETE_CAPTURE_LEAD_MONTHS = 12/);
+    expect(timingSrc).not.toMatch(/Math\.max\(now/);
   });
 });
 
