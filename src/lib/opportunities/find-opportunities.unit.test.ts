@@ -5,7 +5,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildFindNext,
+  buildFindPresentation,
   classifyFindShape,
+  HOST_RULES_FIND_FIRST_VALUE,
   type HorizonKey,
   type HorizonResult,
 } from './find-opportunities';
@@ -110,6 +112,13 @@ describe('buildFindNext', () => {
     expect(next[1].prompt).toMatch(/not emailed yet/);
     expect(next[1].suggested_args?.watch_coverage).toEqual(['open_now', 'coming_soon']);
     expect(next[1].requires_confirmation).toBe(true);
+  });
+
+  it('P2 presentation host_rules ride on the FIND result helper (CAI/PATHWAY pattern)', () => {
+    const p = buildFindPresentation();
+    expect(p.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE]);
+    expect(p.host_rules.join('\n')).toMatch(/present this result immediately/i);
+    expect(p.host_rules.join('\n')).toMatch(/unavailable or failed horizon is a coverage gap/i);
   });
 });
 

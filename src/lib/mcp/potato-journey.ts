@@ -1,20 +1,38 @@
 /**
- * Potato v1 — finish the existing customer journey by orchestration.
- * No new intelligence products, datasets, or MCP tools.
+ * Potato journey orchestration.
+ * P2 changes first-turn sequencing (value before qualification).
+ * v1 evidence invariants stay locked — no new intelligence products, datasets, or MCP tools.
  */
 
+/** First-turn contract — must lead initialize instructions. */
+export const P2_FIRST_TURN_INSTRUCTIONS = [
+  'Potato P2 — VALUE BEFORE QUALIFICATION (first turn).',
+  'Broad intent: "I sell X and want to sell to Y", "help me", "where do I start".',
+  'The host MUST:',
+  '1. Call find_opportunities ONCE using the user\'s words (query = what they sell; agency = the buyer if named). Do not wait for qualification.',
+  '2. Present that result immediately. Obey find_opportunities presentation.host_rules and presentation.sections.',
+  '3. First-value contract — HERE\'S WHERE I SEE THE MONEY: Open now, Coming back, Coming soon, each as grounded result or unavailable/coverage gap. Never turn unavailable into zero. Then WHERE I WOULD START (one evidence-supported point from returned items), WHY (1–3 reasons from that evidence), WHAT I CAN\'T ESTABLISH YET (one limitation if material).',
+  '4. Ask at most ONE plain-English refinement question. Then WAIT.',
+  '5. BEFORE first value do NOT: ask company identity, UEI, CAGE, certifications, clearance, FCL, set-aside, vehicle access, or desired deliverable; ask the user to choose a GovCon workflow; expose NAICS, PSC, ATO, CNO, CEMA, CSO, OT, PAE, or FCL unless the user already used that word; call FIND a second time; fan out parallel FIND variants; auto-call understand_customer; auto-call get_current_acquisition_intelligence; web-search; create an artifact.',
+  'Refinement (after first value, beginner language). Example after cybersecurity FIND: "Which sounds closest to what you sell?" — Cybersecurity services / Security monitoring or managed defense / Cybersecurity software or products / Both / I\'m not sure. Do not use RMF, ATO, CNO, CEMA, NAICS, CSO, SBIR, SOFWERX in that question.',
+  'Clearance: do not ask merely because the buyer is SOCOM. Ask only when grounded evidence from a selected opportunity or pathway makes clearance decision-changing. Do not say clearance is "the hard gate on most SOCOM cyber work" without measured evidence in this result.',
+  'POSITION / deep dive: do not ask market map vs access-path plan vs capability statement before diagnosis. Recommend the next useful output from evidence. A full research artifact is an opt-in payoff AFTER first value + refine — not onboarding.',
+].join('\n');
+
 export const POTATO_JOURNEY_INSTRUCTIONS = [
-  'Potato v1 journey (naive customers — they will not say SAM, NAICS, CSO, OT, PAE, set-aside, recompete, forecast):',
-  'When someone wants to sell to a buyer, find work, or says "help me", guide this sequence. Do not require jargon to advance.',
-  '1. FIND — find_opportunities. "Here\'s where the money is." Three independent horizons. An empty Open result is not a market-wide zero. Never a SAM-only market conclusion. An unavailable horizon is not zero demand.',
-  '2. UNDERSTAND — after a specific open hit, understand_customer. "What does this customer care about?" Use presentation.sections titles and provenance_label. Curated research is not government fact.',
-  '3. CURRENT INTELLIGENCE — get_current_acquisition_intelligence. "What changed about how they\'re buying?" Record evidence is not future certainty.',
-  '4. PATHWAY FIT — match_company_to_pathways. Ask for company name in plain English (a 12-character entity ID is optional). Two-sided doors only. no_proven_door === true is a complete successful result — do not manufacture a pathway, restart FIND, or offer a research menu.',
+  P2_FIRST_TURN_INSTRUCTIONS,
+  '',
+  'Potato v1 journey AFTER first value (naive customers — they will not say SAM, NAICS, CSO, OT, PAE, set-aside, recompete, forecast):',
+  'Do not treat this list as first-turn intake. Do not collect company, clearance, or deliverable choice before first value. Later steps are progressive. Do not require jargon to advance.',
+  '1. FIND — find_opportunities (one call on the first turn). "Here\'s where the money is." Three independent horizons. An empty Open result is not a market-wide zero. Never a SAM-only market conclusion. An unavailable horizon is not zero demand. Present first, then one plain-English refine, then WAIT.',
+  '2. UNDERSTAND — after first value + refine (or the user asks to continue), when `_next` offers it. understand_customer. Confirmation-gated — do not auto-call on the FIND turn. "What does this customer care about?" Use presentation.sections titles and provenance_label. Curated research is not government fact.',
+  '3. CURRENT INTELLIGENCE — get_current_acquisition_intelligence after UNDERSTAND (or when they ask what changed). "What changed about how they\'re buying?" Record evidence is not future certainty. Do not auto-call on the FIND turn.',
+  '4. PATHWAY FIT — match_company_to_pathways. Company identity is asked HERE, not on first turn: "Which company should I match against what I found?" Options: My company / A company I\'m helping / Keep this market-level for now. Resolve UEI/CAGE/SAM internally. Do not ask the user for a UEI unless identity resolution actually requires clarification. Two-sided doors only. no_proven_door === true is a complete successful result — do not manufacture a pathway, restart FIND, or offer a research menu.',
   '5. TALENT THIN — from the PATHWAY FIT result only: show stranger-verifiable proof, name the SINGLE most important missing proof, ask at most the result\'s one `_next` question. The customer\'s answer is OWNER_ASSERTED and must stay labeled — it does not become PUBLIC_VERIFIED. No giant questionnaire. Full Talent (what broke, attributable savings, vouches, complete vehicle portfolio) is not in v1.',
-  '6. POSITION — after the talent answer (or if they skip), draft from THIS journey\'s evidence only. Ask in customer language and produce the one they pick (capability statement if they just say yes):',
-  '   • "Want the right language and keywords for your capability statement?" → headline, buyer language, capabilities to emphasize, proof to lead with, evidence-backed differentiators, claims to avoid, short buyer-specific paragraph.',
-  '   • "Want me to help you respond to this opportunity?" → THE OPPORTUNITY SAYS / BROADER CUSTOMER RESEARCH SHOWS / YOUR PROOF / WHAT THAT SUGGESTS YOU EMPHASIZE, then draft. Never turn broader research into solicitation fact.',
-  '   • "Want me to prepare you for a conversation with this customer?" → what they appear to care about, what changed, buying behavior, what to say, proof to mention, questions to ask, claims to avoid, one recommended meeting objective.',
+  '6. POSITION — after the talent answer (or if they skip), recommend the most useful output from THIS journey\'s evidence. Do not ask the beginner to choose among market map / access-path plan / capability statement before diagnosis. If a draft is the right next output, produce one of: capability statement / response to this opportunity / conversation brief — recommended by you, not a first-turn menu:',
+  '   • capability statement → headline, buyer language, capabilities to emphasize, proof to lead with, evidence-backed differentiators, claims to avoid, short buyer-specific paragraph.',
+  '   • response → THE OPPORTUNITY SAYS / BROADER CUSTOMER RESEARCH SHOWS / YOUR PROOF / WHAT THAT SUGGESTS YOU EMPHASIZE. Never turn broader research into solicitation fact.',
+  '   • conversation → what they appear to care about, what changed, buying behavior, what to say, proof to mention, questions to ask, claims to avoid, one recommended meeting objective.',
   '   Positioning claims must not outrun evidence. Owner-asserted stays labeled.',
   '7. ACT — ONE concrete next action grounded in this journey (respond to this notice, approach a vehicle holder, prepare a demo, verify access, gather the missing proof, contact this office). Not a generic GovCon checklist. Do not auto-run paid or write tools.',
   '8. MONITOR — "Want me to watch this for you?" Coverage today: Open now + Coming soon only. Coming back / recompetes are not emailed. Confirm before calling schedule_market_search. Never auto-create a watch.',
@@ -34,6 +52,7 @@ export const HOST_RULES_POSITION = [
   'Never turn curated agency research into solicitation fact. Never turn historical pathway usage into future certainty.',
   'Set-aside is not the automatic strategy. Do not claim win, vehicle bid rights, or a prototype without public evidence.',
   'Owner-asserted proof stays labeled owner-asserted in the draft.',
+  'Recommend the next useful output from evidence. Do not first-turn menu market map vs access-path plan vs capability statement.',
 ] as const;
 
 export const HOST_RULES_ACT = [

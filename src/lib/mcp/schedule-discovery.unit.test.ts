@@ -56,6 +56,7 @@ describe('MCP schedule discovery', () => {
 
   it('connector instructions include Potato v1 journey through POSITION / ACT / MONITOR', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Potato v1 journey/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/VALUE BEFORE QUALIFICATION/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/TALENT THIN/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/OWNER_ASSERTED/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/capability statement/i);

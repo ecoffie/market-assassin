@@ -239,6 +239,12 @@ Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.�
 - Reopen v1 only for billing, security/privacy, fabricated evidence, or a genuinely broken customer journey.
 - Any next build is a **separately named track** with its own goal and acceptance gate (not “Potato v1.1”). Candidates on the debt list are not automatically next.
 
+### Potato P2 — VALUE BEFORE QUALIFICATION (awaiting merge)
+Track: first-turn sequencing only. Do **not** reopen Potato v1 evidence engines.
+- Principle: broad “I sell X to Y / help me” → one `find_opportunities` → present Open / Coming back / Coming soon → one plain-English refine → WAIT.
+- Controls: `P2_FIRST_TURN_INSTRUCTIONS` (MCP initialize) + FIND `presentation.host_rules` (CAI/PATHWAY pattern).
+- Company identity moves to PATHWAY FIT. Clearance only when evidence makes it decision-changing. No first-turn deliverable menu.
+- Branch: `feat/potato-p2-value-first`. Do not start another P2 issue. No server-side FIND debit guard unless a live host still triple-calls FIND after this ships.
 
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.

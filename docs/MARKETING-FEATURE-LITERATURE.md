@@ -6920,3 +6920,15 @@ no 504; representative drones capability completes grounded under 55s.
 **SEO.** GovCon capability statement, opportunity response, customer meeting prep, SAM.gov watch.
 
 **Proof.** Connector Potato v1 journey copy; FIND `_next` continues UNDERSTAND when an open hit exists; UNDERSTAND `_next` is Current Intelligence; PATHWAY FIT talent sections; `composeActFromPathwayFit` honest-miss stop vs one grounded action. Talent/Position/Act/Monitor host rules are on MCP initialize instructions (not journey copy only). Naive SOCOM host: FIND → UNDERSTAND → CAI → PATHWAY FIT CSO/OT POSSIBLE → owner-asserted labeled → capability statement → one action → watch asked, `schedule_market_search` not called. Catalog 62.
+
+---
+
+## Potato P2 — value before qualification
+
+**What.** Broad “I sell X and want to sell to Y / help me” now gets a first market read before intake. Mindy calls `find_opportunities` once with the user’s words, presents Open now / Coming back / Coming soon (unavailable is not zero), names one evidence-supported starting point, then asks one plain-English refine. Company, clearance, certifications, and deliverable choice wait until they change the next decision.
+
+**Why.** A production naive SOCOM turn spent ~4 minutes on four qualification questions and three FIND calls (30 credits) before showing the market. The host still produced a useful artifact after the user skipped every question — proof those questions were not prerequisites for first value.
+
+**SEO.** GovCon first market read, sell to SOCOM, Army construction opportunities, VA IT services, time to first value.
+
+**Proof.** Connector `P2_FIRST_TURN_INSTRUCTIONS` leads MCP initialize. FIND results carry `presentation.host_rules` (same local-contract pattern as Current Intelligence / Pathway Fit). Naive host A/B/C: exactly 1 FIND, 10 credits, Open/Coming back/Coming soon presented, one refine, no company/clearance/deliverable before value. Ledger `eric@govcongiants.com` 2026-09-17 22:51–22:52 UTC: three `find_opportunities` success rows, `credits_charged=10` each (one per prompt). v1 horizon honesty and confirmation-gated UNDERSTAND unchanged.
