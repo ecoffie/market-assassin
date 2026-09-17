@@ -117,7 +117,8 @@ async function loadExistingEnrichment(contractIds: string[]): Promise<Map<string
     const { data, error } = await sb
       .from('recompete_opportunities')
       .select('contract_id,psc_code,description,psc_description')
-      .in('contract_id', contractIds.slice(i, i + EXISTING_READ_CHUNK));
+      .in('contract_id', contractIds.slice(i, i + EXISTING_READ_CHUNK))
+      .limit(EXISTING_READ_CHUNK);
     if (error) throw new Error(`existing-enrichment read failed: ${error.message}`);
     for (const row of data ?? []) {
       byId.set(String(row.contract_id), {
