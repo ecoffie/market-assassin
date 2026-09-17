@@ -6919,4 +6919,4 @@ no 504; representative drones capability completes grounded under 55s.
 
 **SEO.** GovCon capability statement, opportunity response, customer meeting prep, SAM.gov watch.
 
-**Proof.** Connector Potato v1 journey copy; FIND `_next` continues UNDERSTAND when an open hit exists; UNDERSTAND `_next` is Current Intelligence; PATHWAY FIT talent sections; `composeActFromPathwayFit` honest-miss stop vs one grounded action.
+**Proof.** Connector Potato v1 journey copy; FIND `_next` continues UNDERSTAND when an open hit exists; UNDERSTAND `_next` is Current Intelligence; PATHWAY FIT talent sections; `composeActFromPathwayFit` honest-miss stop vs one grounded action. Talent/Position/Act/Monitor host rules are on MCP initialize instructions (not journey copy only). Naive SOCOM host: FIND → UNDERSTAND → CAI → PATHWAY FIT CSO/OT POSSIBLE → owner-asserted labeled → capability statement → one action → watch asked, `schedule_market_search` not called. Catalog 62.

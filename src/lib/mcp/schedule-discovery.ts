@@ -7,7 +7,13 @@
  * Consumed by: tool-registry, tool-schemas, hosted transport, stdio server, tests.
  */
 
-import { POTATO_JOURNEY_INSTRUCTIONS } from './potato-journey';
+import {
+  HOST_RULES_ACT,
+  HOST_RULES_MONITOR,
+  HOST_RULES_POSITION,
+  HOST_RULES_TALENT_THIN,
+  POTATO_JOURNEY_INSTRUCTIONS,
+} from './potato-journey';
 
 /** Phrases customers use that MUST map to schedule_market_search for procurement searches. */
 export const SCHEDULE_DISCOVERY_PHRASES = [
@@ -50,9 +56,25 @@ export const SCHEDULE_MARKET_SEARCH_DESCRIPTION =
 export const MCP_CONNECTOR_INSTRUCTIONS = [
   POTATO_JOURNEY_INSTRUCTIONS,
   '',
+  'TALENT THIN:',
+  ...HOST_RULES_TALENT_THIN,
+  '',
+  'POSITION:',
+  ...HOST_RULES_POSITION,
+  '',
+  'ACT:',
+  ...HOST_RULES_ACT,
+  '',
+  'MONITOR:',
+  ...HOST_RULES_MONITOR,
+  '- "Yes" / "keep going" on a prior journey question is NOT watch confirmation.',
+  '  Only call schedule_market_search after an explicit yes to "Want me to watch this for you?"',
+  '',
   'Finding opportunities (PRIMARY):',
   '- When the user wants to find opportunities, what is available, what is coming, or a market hunt',
   '  (e.g. "cybersecurity in Florida"), call find_opportunities — NOT search_sam_opportunities alone.',
+  '- If find_opportunities errors, say the finder failed. Do NOT substitute get_agency_intel or',
+  '  pain-points as "where the money is." Unavailable is not zero demand.',
   '- find_opportunities returns three independent horizons: OPEN NOW, COMING BACK, COMING SOON.',
   '  An empty Open result is not a market-wide zero if other horizons hit. Never invent a solicitation',
   '  number for a recompete or forecast.',

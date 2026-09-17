@@ -16,6 +16,10 @@ import { MCP_CONNECTOR_INSTRUCTIONS } from './schedule-discovery';
 describe('Potato v1 journey copy', () => {
   it('is wired into connector instructions', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toContain(POTATO_JOURNEY_INSTRUCTIONS);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain(HOST_RULES_TALENT_THIN[0]);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain(HOST_RULES_POSITION[0]);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain(HOST_RULES_ACT[0]);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain(HOST_RULES_MONITOR[0]);
   });
 
   it('does not require GovCon vocabulary to start', () => {

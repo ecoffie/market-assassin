@@ -62,6 +62,11 @@ describe('MCP schedule discovery', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Want me to watch this for you/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Do not skip to MONITOR after FIND/i);
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Confirm before calling schedule_market_search/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/TALENT THIN uses only PATHWAY FIT/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Draft POSITION from FIND/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/ONE primary next action/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/keep going/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Do NOT substitute get_agency_intel/i);
   });
 
   it('maps each customer phrase to schedule_market_search (routing contract)', () => {
