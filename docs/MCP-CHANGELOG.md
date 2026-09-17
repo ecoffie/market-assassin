@@ -5,11 +5,19 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 61** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 62** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 61.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 62.
 
 ---
+
+## September 2026 — match_company_to_pathways (catalog 61 → 62)
+
+**New tool:** `match_company_to_pathways` (8 credits). PATHWAY FIT after CURRENT INTELLIGENCE:
+two-sided match of CAI buyer doors to a company’s stranger-verifiable public record (UEI awards +
+SAM certs with provenance). Determinations: SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED /
+NOT_APPLICABLE. `no_proven_door` is success. Never invents Talent, vehicle portfolios, or CAI
+NOT_YET_MEASURABLE doors. Never set-aside-first. CAI `_next.tool` now points here.
 
 ## September 2026 — get_current_acquisition_intelligence (catalog 60 → 61)
 

@@ -1,10 +1,12 @@
 # Current Acquisition Intelligence v0 — Tool Contract
 
-**Status:** SHIPPED via PR #1539. Compose-only. **No scrapers.** Fresh-host acceptance pending (catalog proof first).
-**Provisional tool name:** `get_current_acquisition_intelligence`
-**Credits (provisional):** 8 (between UNDERSTAND 5 and FIND 10 — revisit after host packages)
+**Status:** ✅ **FROZEN COMPLETE** 2026-09-15 (PR #1539 + language guardrails). Compose-only. **No scrapers.**
+**⛔ Do not polish CAI further** unless a production defect breaks the killer rule or invents pathways.
+**Tool name:** `get_current_acquisition_intelligence`
+**Credits:** 8
 **Journey slot:** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY → POSITION`
 **Date:** 2026-09-15
+**Next gate:** `docs/PRD-pathway-talent-gate.md`
 
 ---
 
@@ -392,3 +394,28 @@ Same agent/host discipline as FIND/UNDERSTAND. **HOLD until PASS on all three:**
 ## 13. What this unlocks next
 
 Once v0 host packages run on SOCOM cyber / VA IT / construction, the **empty `not_yet_measurable` + `potential_not_established` lines** tell us which pathway data is worth adding — instead of ingesting consortia/rapid/PAE because they sound useful.
+
+---
+
+## 14. Freeze (Eric, 2026-09-15)
+
+CAI v0 is **complete**. Host re-run cleared: **unavailable ≠ zero** and **historical evidence ≠ future certainty**. Empty `do_differently` when evidence does not earn an action is a **feature**.
+
+**Production journey now:**
+
+| Step | Question |
+|------|----------|
+| FIND | Where's the money? (Open · Coming back · Coming soon) |
+| UNDERSTAND | What does this customer appear to care about, and what should I say? |
+| CURRENT INTELLIGENCE | What's changed about how they're buying, why does it matter, what should I do differently now? |
+
+**Next layer = PATHWAY / TALENT** — not more CAI. Gate: `docs/PRD-pathway-talent-gate.md`.
+
+### Production verification (acceptance proof — 2026-09-15)
+
+| Deploy | Vercel project | Counts as prod evidence? |
+|--------|----------------|--------------------------|
+| Accidental | `cai-language-guardrails` — successful build | **No** — wrong project; do not cite |
+| **Acceptance** | Worktree/repo relinked to existing **`market-assassin`** → deployed → **getmindy.ai** | **Yes** — **61 tools**, CAI @ **8 credits**, catalog includes unavailable-horizon / future-certainty guardrail language |
+
+CAI v0 remains **production-verified and complete** on that second deploy only.

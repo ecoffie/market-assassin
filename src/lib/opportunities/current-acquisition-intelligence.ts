@@ -34,6 +34,13 @@ sanitizeSupabaseEnv();
 export const CAI_NEXT_PROMPT =
   'Want me to figure out which of these doors your company can actually walk through and what proof you should lead with?';
 
+/** Wired once PATHWAY FIT ships — host confirmation still required. */
+export const CAI_NEXT = {
+  prompt: CAI_NEXT_PROMPT,
+  requires_confirmation: true as const,
+  tool: 'match_company_to_pathways' as const,
+};
+
 export type CaiEpistemicClass =
   | 'observed_change'
   | 'current_state'
@@ -179,8 +186,31 @@ const HOST_RULES = [
   'Never center strategy on set-aside unless pathways.observed includes set_aside with citations for this scope.',
   'Every "do differently" line must mention what caused it (host should echo caused_by).',
   'Empty what_changed is honest — do not fill with pain points or playbook.',
+  'Empty what_that_may_mean / do_differently means invent NOTHING — do not invent recommendations, strategy, or urgency.',
+  'Never describe an unavailable or failed horizon (_meta.sources_failed) as zero / none / empty demand — say unavailable or not measured.',
+  'pathways.observed = language/labels on scoped LIVE records only. Do NOT treat historical vehicle usage as certainty about future acquisition.',
+  'Ban absolute transitions unless the package citations explicitly establish them — e.g. "the competition already happened", "the binding constraint is", "whatever replaces X is where the money goes next".',
   'After this package, ask the capability/door question — do not ask set-aside-first.',
 ] as const;
+
+/** Absolute future/certainty claims banned unless evidence explicitly establishes them. */
+export const CAI_BANNED_ABSOLUTE_PATTERNS: RegExp[] = [
+  /\bthe competition already happened\b/i,
+  /\bthe binding constraint is\b/i,
+  /\bwhatever replaces\b.+\bwhere the money goes next\b/i,
+  /\bwill (definitely|certainly|inevitably)\b/i,
+  /\bis (definitely|certainly) (how|where|the)\b/i,
+  /\bfuture buys? will (use|require|go through)\b/i,
+];
+
+export function statementViolatesAbsoluteFutureClaim(statement: string): boolean {
+  return CAI_BANNED_ABSOLUTE_PATTERNS.some((re) => re.test(statement));
+}
+
+/** Drop implication/action statements that smuggle absolute future certainty. */
+export function scrubAbsoluteFutureClaims(items: CaiItem[]): CaiItem[] {
+  return items.filter((item) => !statementViolatesAbsoluteFutureClaim(item.statement));
+}
 
 const PRESENTATION = {
   what_changed: {
@@ -205,7 +235,8 @@ const PRESENTATION = {
   },
   pathways: {
     display_title: 'Acquisition pathways (evidence only)',
-    provenance_label: 'Observed = explicitly established in records; potential = not established',
+    provenance_label:
+      'Observed = mechanism language/labels on scoped LIVE records only — not a forecast of future buys; potential = not established',
   },
 } as const;
 
@@ -332,7 +363,7 @@ export function classifyObservedPathways(
     observed.push({
       kind: 'conventional_solicitation',
       established: true,
-      statement: `${agencyLabel} has conventional solicitations posted in Mindy’s live SAM records for ${capabilityLabel}.`,
+      statement: `${agencyLabel} has conventional solicitations posted in Mindy’s live SAM records for ${capabilityLabel}. This is record evidence in this scope — not proof that future buys will use the same mechanism.`,
       citations: citationsFor((r) => isConventionalSolicitationNoticeType(r.notice_type, r.title)),
       evidence_count: conventionalRows.length,
     });
@@ -351,7 +382,7 @@ export function classifyObservedPathways(
     observed.push({
       kind: 'idv_task_order',
       established: true,
-      statement: `Task-order / IDV / BPA activity appears in scoped recompete records for ${capabilityLabel}.`,
+      statement: `Task-order / IDV / BPA activity appears in scoped recompete records for ${capabilityLabel}. Record evidence only — not certainty that the next buy will ride the same vehicle.`,
       citations: citationsFor((r) => {
         const blob = `${r.notice_type || ''} ${r.title || ''} ${r.description || ''}`.toLowerCase();
         return (
@@ -373,7 +404,7 @@ export function classifyObservedPathways(
     observed.push({
       kind: 'cso',
       established: true,
-      statement: `Commercial Solutions Opening language appears on scoped SAM notices for ${capabilityLabel}.`,
+      statement: `Commercial Solutions Opening language appears on scoped SAM notices for ${capabilityLabel}. That establishes CSO on these records — not that future cybersecurity buys will use CSO.`,
       citations: citationsFor((r) => textEstablishesCso(`${r.title || ''} ${r.description || ''} ${r.notice_type || ''}`)),
       evidence_count: csoRows.length,
     });
@@ -387,7 +418,7 @@ export function classifyObservedPathways(
     observed.push({
       kind: 'other_transaction',
       established: true,
-      statement: `Other-transaction language appears on scoped records for ${capabilityLabel}.`,
+      statement: `Other-transaction language appears on scoped records for ${capabilityLabel}. Record evidence only — not a prediction that the next acquisition will be OT.`,
       citations: citationsFor((r) =>
         textEstablishesOtherTransaction(`${r.title || ''} ${r.description || ''} ${r.notice_type || ''}`),
       ),
@@ -400,7 +431,7 @@ export function classifyObservedPathways(
     observed.push({
       kind: 'set_aside',
       established: true,
-      statement: `Explicit set-aside labels appear on scoped notices or awards for ${capabilityLabel}.`,
+      statement: `Explicit set-aside labels appear on scoped notices or awards for ${capabilityLabel}. Labels on these records are not a guarantee about how the next buy will be competed.`,
       citations: citationsFor((r) => Boolean((r.set_aside_type || r.set_aside_code || '').trim())),
       evidence_count: setAsideRows.length,
     });
@@ -486,7 +517,7 @@ function emptyResult(
       })),
     ],
     pathways,
-    _next: [{ prompt: CAI_NEXT_PROMPT, requires_confirmation: true }],
+    _next: [{ ...CAI_NEXT }],
     _meta: {
       grounded: false,
       degraded: false,
@@ -559,7 +590,8 @@ async function resolveAgencyFromAnchors(
   return null;
 }
 
-type SourceBundle = {
+/** Live compose bundle. Exported so tests can prove unavailable ≠ zero. */
+export type CaiSourceBundle = {
   samRows: Array<Record<string, unknown>>;
   samCount: number | null;
   recompeteRows: Array<Record<string, unknown>>;
@@ -573,6 +605,8 @@ type SourceBundle = {
   sourcesFailed: CaiSourceKind[];
   degraded: boolean;
 };
+
+type SourceBundle = CaiSourceBundle;
 
 async function fetchLiveSources(
   client: SupabaseClient,
@@ -832,7 +866,7 @@ function topOfficeFromSam(samRows: Array<Record<string, unknown>>): { office: st
   return best;
 }
 
-function buildCurrentState(
+export function buildCurrentState(
   bundle: SourceBundle,
   agency: string,
   capabilityLabel: string,
@@ -919,13 +953,29 @@ function buildCurrentState(
     });
   }
 
-  if (bundle.forecastCount !== null) {
+  // Unavailable horizons: never emit a measured zero for a failed source.
+  if (bundle.sourcesFailed.includes('agency_forecasts')) {
+    items.push({
+      id: nextId(),
+      epistemic: 'current_state',
+      statement: `Agency forecast coverage was unavailable for this pull (source error) — not a measured zero for ${capabilityLabel} demand.`,
+      citations: [
+        {
+          source_kind: 'agency_forecasts',
+          source_id: null,
+          locator: 'agency_forecasts (unavailable)',
+          as_of: null,
+        },
+      ],
+      magnitude: { label: 'forecasts', value: null, unit: 'count', unknown: true },
+    });
+  } else if (bundle.forecastCount !== null) {
     items.push({
       id: nextId(),
       epistemic: 'current_state',
       statement:
         bundle.forecastCount === 0
-          ? `Agency forecast coverage returned zero rows for ${agency} in this scope — not proof of zero demand.`
+          ? `No agency forecast rows matched ${agency} in this scope — that is a scope miss in the forecast table, not proof of no demand.`
           : `${bundle.forecastCount} agency forecast rows match this buyer and capability scope.`,
       citations: [
         {
@@ -939,10 +989,27 @@ function buildCurrentState(
       ],
       magnitude: {
         label: 'forecasts',
-        value: bundle.forecastCount,
+        value: bundle.forecastCount === 0 ? null : bundle.forecastCount,
         unit: 'count',
-        unknown: bundle.forecastCount === null,
+        unknown: bundle.forecastCount === 0,
       },
+    });
+  }
+
+  if (bundle.sourcesFailed.includes('sam_opportunities')) {
+    items.push({
+      id: nextId(),
+      epistemic: 'current_state',
+      statement: `Open-notice coverage was unavailable for this pull (SAM source error) — not a measured zero for ${capabilityLabel}.`,
+      citations: [
+        {
+          source_kind: 'sam_opportunities',
+          source_id: null,
+          locator: 'sam_opportunities (unavailable)',
+          as_of: null,
+        },
+      ],
+      magnitude: { label: 'open notices', value: null, unit: 'count', unknown: true },
     });
   }
 
@@ -978,14 +1045,16 @@ function buildImplicationsAndActions(
     implications.push({
       id: 'imp_01',
       epistemic: 'supported_implication',
-      statement: 'Replacement windows may be opening before new solicitations post — incumbent engagement timing matters.',
+      statement:
+        'Replacement windows may be opening before new solicitations post — incumbent engagement timing may matter. This is not proof that competition has already happened or that a specific vehicle will win the next buy.',
       citations: [],
       caused_by: [final12.id],
     });
     actions.push({
       id: 'act_01',
       epistemic: 'do_differently',
-      statement: 'Engage the buyers and contracts entering their final year now rather than waiting for a new solicitation.',
+      statement:
+        'Consider engaging the buyers and contracts entering their final year now rather than waiting for a new solicitation — without assuming what vehicle or set-aside comes next.',
       citations: [],
       caused_by: [final12.id],
     });
@@ -996,14 +1065,16 @@ function buildImplicationsAndActions(
     implications.push({
       id: 'imp_02',
       epistemic: 'supported_implication',
-      statement: 'Office-level positioning may matter more than department-wide marketing for this scope.',
+      statement:
+        'Office-level positioning may matter more than department-wide marketing for this scope — concentration in this pull is not a binding constraint on how the buyer must acquire next.',
       citations: [],
       caused_by: [topOffice.id],
     });
     actions.push({
       id: 'act_02',
       epistemic: 'do_differently',
-      statement: 'Prioritize the buying offices showing the highest open-notice concentration in this pull.',
+      statement:
+        'Prioritize the buying offices showing the highest open-notice concentration in this pull — treat that as a lead, not as proof of where money goes next.',
       citations: [],
       caused_by: [topOffice.id],
     });
@@ -1013,13 +1084,17 @@ function buildImplicationsAndActions(
     implications.push({
       id: 'imp_03',
       epistemic: 'supported_implication',
-      statement: 'Recorded contract-field moves in the lookback window may shift recompete timing or ceiling assumptions.',
+      statement:
+        'Recorded contract-field moves in the lookback window may shift recompete timing or ceiling assumptions — they do not by themselves establish what replaces the current vehicle.',
       citations: [],
       caused_by: whatChanged.slice(0, 3).map((c) => c.id),
     });
   }
 
-  return { implications: implications.slice(0, 5), actions: actions.slice(0, 5) };
+  return {
+    implications: scrubAbsoluteFutureClaims(implications.slice(0, 5)),
+    actions: scrubAbsoluteFutureClaims(actions.slice(0, 5)),
+  };
 }
 
 function buildNotYetMeasurable(
@@ -1128,6 +1203,8 @@ export async function getCurrentAcquisitionIntelligence(
     what_that_may_mean: implications,
     do_differently: actions,
   });
+  killed.what_that_may_mean = scrubAbsoluteFutureClaims(killed.what_that_may_mean);
+  killed.do_differently = scrubAbsoluteFutureClaims(killed.do_differently);
 
   const pathways = classifyObservedPathways(
     bundle.pathwayEvidence,
@@ -1153,7 +1230,7 @@ export async function getCurrentAcquisitionIntelligence(
     do_differently: killed.do_differently,
     not_yet_measurable,
     pathways,
-    _next: [{ prompt: CAI_NEXT_PROMPT, requires_confirmation: true }],
+    _next: [{ ...CAI_NEXT }],
     _meta: {
       grounded,
       degraded: bundle.degraded,

@@ -50,6 +50,10 @@ test -f .vercel/project.json || {
 }
 # cwd must be the worktree that contains the fix
 pwd   # must end with .claude/worktrees/<slug>
+# Must be the getmindy.ai project — not a slug-named project vercel auto-created
+node -e 'const p=require("./.vercel/project.json"); if(p.projectName!=="market-assassin"){console.error("REFUSED: .vercel/project.json projectName="+p.projectName+" (need market-assassin)"); process.exit(1)}'
 ```
 
-Do **not** treat a green Vercel READY as proof the branch shipped. Grep the live chunk/page for a string that exists only on the feature branch.
+Do **not** treat a green Vercel READY as proof the branch shipped. Grep the live chunk/page for a string that exists only on the feature branch. A READY deploy on a **wrong** Vercel project (e.g. slug-named `cai-language-guardrails`) is **not** production evidence for getmindy.ai.
+
+**Process debt (Eric 2026-09-15 — 2nd wrong-project incident):** worktrees can auto-link/create a non-`market-assassin` project. Manual assertion above is required; a hard abort script is deferred unless it happens a third time — do not divert PATHWAY/TALENT to build that guard now.

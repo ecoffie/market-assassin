@@ -9,8 +9,12 @@ import {
   isConventionalSolicitationNoticeType,
   classifyObservedPathways,
   rejectUnsupportedObservedPathway,
+  statementViolatesAbsoluteFutureClaim,
+  scrubAbsoluteFutureClaims,
+  buildCurrentState,
   CAI_NEXT_PROMPT,
   type CaiItem,
+  type CaiSourceBundle,
 } from './current-acquisition-intelligence';
 
 describe('applyCausalKillerRule', () => {
@@ -156,6 +160,14 @@ describe('CAI_NEXT_PROMPT', () => {
   });
 });
 
+describe('CAI _next wires PATHWAY FIT', () => {
+  it('points at match_company_to_pathways', async () => {
+    const { CAI_NEXT } = await import('./current-acquisition-intelligence');
+    expect(CAI_NEXT.tool).toBe('match_company_to_pathways');
+    expect(CAI_NEXT.requires_confirmation).toBe(true);
+  });
+});
+
 describe('empty what_changed is OK', () => {
   it('killer rule allows empty change list with valid current-state actions only', () => {
     const see: CaiItem = {
@@ -178,5 +190,152 @@ describe('empty what_changed is OK', () => {
       do_differently: [action],
     });
     expect(out.do_differently).toHaveLength(1);
+  });
+});
+
+describe('language guardrails — absolute future claims', () => {
+  it('flags banned absolute transitions', () => {
+    expect(statementViolatesAbsoluteFutureClaim('The competition already happened for SITEC.')).toBe(true);
+    expect(statementViolatesAbsoluteFutureClaim('The binding constraint is CMMC.')).toBe(true);
+    expect(
+      statementViolatesAbsoluteFutureClaim(
+        'Whatever replaces SITEC II is where the money goes next for cyber.',
+      ),
+    ).toBe(true);
+    expect(
+      statementViolatesAbsoluteFutureClaim(
+        'Commercial Solutions Opening language appears on scoped SAM notices — record evidence only.',
+      ),
+    ).toBe(false);
+  });
+
+  it('scrubs absolute claims from implication/action lists', () => {
+    const items: CaiItem[] = [
+      {
+        id: 'imp_ok',
+        epistemic: 'supported_implication',
+        statement: 'Office-level positioning may matter more for this scope.',
+        citations: [],
+        caused_by: ['see_01'],
+      },
+      {
+        id: 'imp_bad',
+        epistemic: 'supported_implication',
+        statement: 'The competition already happened — pivot now.',
+        citations: [],
+        caused_by: ['see_01'],
+      },
+    ];
+    const out = scrubAbsoluteFutureClaims(items);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('imp_ok');
+  });
+
+  it('CSO observed pathway keeps evidence and denies future certainty', () => {
+    const { observed } = classifyObservedPathways(
+      [
+        {
+          notice_type: 'Special Notice',
+          title: 'Commercial Solutions Opening — cyber prototype',
+          description: 'CSO for defensive cyber',
+          source_kind: 'sam_opportunities',
+          source_id: 'n-cso',
+          locator: 'sam_opportunities.notice_id=n-cso',
+          as_of: null,
+        },
+      ],
+      'USSOCOM',
+      'cybersecurity',
+    );
+    const cso = observed.find((o) => o.kind === 'cso');
+    expect(cso).toBeTruthy();
+    expect(cso!.established).toBe(true);
+    expect(cso!.statement).toMatch(/Commercial Solutions Opening/i);
+    expect(cso!.statement).toMatch(/not that future/i);
+    expect(statementViolatesAbsoluteFutureClaim(cso!.statement)).toBe(false);
+  });
+});
+
+function emptyBundle(over: Partial<CaiSourceBundle> = {}): CaiSourceBundle {
+  return {
+    samRows: [],
+    samCount: null,
+    recompeteRows: [],
+    recompeteCount: null,
+    changeRows: [],
+    forecastRows: [],
+    forecastCount: null,
+    eventCount: 0,
+    pathwayEvidence: [],
+    sourcesQueried: [],
+    sourcesFailed: [],
+    degraded: false,
+    ...over,
+  };
+}
+
+describe('language guardrails — unavailable ≠ zero', () => {
+  it('failed forecast/SAM sources emit unavailable (unknown), never a measured zero', () => {
+    const items = buildCurrentState(
+      emptyBundle({
+        sourcesFailed: ['agency_forecasts', 'sam_opportunities'],
+        degraded: true,
+      }),
+      'USSOCOM',
+      'cybersecurity',
+    );
+    expect(items.length).toBeGreaterThan(0);
+    const blob = items.map((i) => i.statement).join('\n').toLowerCase();
+    expect(blob).toMatch(/unavailable/);
+    expect(blob).toMatch(/not a measured zero/);
+    expect(blob).not.toMatch(/\bno opportunities\b/);
+    expect(blob).not.toMatch(/\bempty market\b/);
+    for (const item of items) {
+      expect(item.magnitude?.unknown).toBe(true);
+      expect(item.magnitude?.value).toBeNull();
+    }
+  });
+
+  it('a genuine empty forecast table is a scope miss, not a failed-source zero', () => {
+    const items = buildCurrentState(
+      emptyBundle({ forecastCount: 0, forecastRows: [] }),
+      'USSOCOM',
+      'cybersecurity',
+    );
+    const fc = items.find((i) => i.citations.some((c) => c.source_kind === 'agency_forecasts'));
+    expect(fc).toBeTruthy();
+    expect(fc!.statement).toMatch(/scope miss/i);
+    expect(fc!.statement).toMatch(/not proof of no demand/i);
+    expect(fc!.magnitude?.unknown).toBe(true);
+    expect(fc!.magnitude?.value).toBeNull();
+  });
+});
+
+describe('empty DO_DIFFERENTLY is valid', () => {
+  it('no earned current-state/change → killer rule may return zero actions', () => {
+    const out = applyCausalKillerRule({
+      what_changed: [],
+      what_we_are_seeing_now: [],
+      what_that_may_mean: [
+        {
+          id: 'imp_unearned',
+          epistemic: 'supported_implication',
+          statement: 'You should pivot strategy.',
+          citations: [],
+          caused_by: ['missing'],
+        },
+      ],
+      do_differently: [
+        {
+          id: 'act_unearned',
+          epistemic: 'do_differently',
+          statement: 'Do something useful looking.',
+          citations: [],
+          caused_by: ['missing'],
+        },
+      ],
+    });
+    expect(out.do_differently).toHaveLength(0);
+    expect(out.what_that_may_mean).toHaveLength(0);
   });
 });

@@ -38,6 +38,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     tools: [
       'find_opportunities',
       'get_current_acquisition_intelligence',
+      'match_company_to_pathways',
       'search_sam_opportunities',
       'search_agency_opps_by_office',
       'get_agency_forecasts',

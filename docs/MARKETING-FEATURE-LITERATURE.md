@@ -6804,6 +6804,36 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 
 **SEO / proof.** Unit: `current-acquisition-intelligence.unit.test.ts` (killer rule, pathway classifiers, no set-aside _next). Host probes: `scripts/probe-cai-v0.mjs` (SOCOM cyber, VA IT, USACE construction). Credits: 8. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY.
 
+---
+
+## CAI language guardrails — unavailable ≠ zero; pathways ≠ future certainty (2026-09-15)
+
+**What.** Host/CAI packaging never describes a failed/unavailable horizon as zero demand; `SUPPORTED_IMPLICATION` / `DO_DIFFERENTLY` stay hedged; absolute transitions (“competition already happened,” “binding constraint is,” “whatever replaces X is where the money goes next”) are banned unless citations establish them. Observed pathways (incl. CSO) remain pathway-first record evidence with explicit “not future certainty” wording.
+
+**Why.** Host over-claim turned historical vehicle/CSO language into acquisition strategy certainty and invented do-differently when the package was empty.
+
+**SEO / proof.** Unit: absolute-claim scrub + CSO disclaimer; `MCP_CONNECTOR_INSTRUCTIONS` CAI block; host re-run `scripts/host-cai-socom-routing.mts` (SOCOM cyber).
+
+---
+
+## CAI v0 frozen — PATHWAY/TALENT is the next gate (2026-09-15)
+
+**What.** Current Acquisition Intelligence v0 marked complete. Production journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE. Next layer is PATHWAY/TALENT (Morehouse: doors first, then verifiable talent proof) — inventory existing company evidence vs CAI doors before any new tool.
+
+**Why.** Empty unearned `do_differently` is a feature; polishing CAI further would recreate generic synthesis. The product gate is matchability without set-aside-first.
+
+**SEO / proof.** Freeze: `docs/PRD-current-acquisition-intelligence-v0.md` §14 · Gate: `docs/PRD-pathway-talent-gate.md` · CLAUDE in-flight. **Prod acceptance:** `market-assassin` → getmindy.ai (61 tools, CAI 8cr + guardrail catalog language). Accidental `cai-language-guardrails` Vercel project deploy is **not** acceptance evidence.
+
+---
+
+## match_company_to_pathways — PATHWAY FIT v0 (2026-09-15)
+
+**What.** After CAI, match a company’s stranger-verifiable public record (UEI awards + SAM certs) to buyer-side acquisition doors. Determinations SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED / NOT_APPLICABLE with two-sided evidence, `proof_to_lead_with`, `proof_missing`, transparent `pf_rank_v1`, and one `_next` missing-proof question. `no_proven_door` is success.
+
+**Why.** Customers ask which doors they can walk through — without inventing Talent, vehicle portfolios, or set-aside-first strategy.
+
+**SEO / proof.** Contract: `docs/PRD-pathway-fit-v0.md`. Unit: `pathway-fit.unit.test.ts` + `pathway-fit-load.unit.test.ts` (#1548 name→UEI unique/ambiguous/none; no second resolver). Live probes: `scripts/probe-pathway-fit-live.mts`. Credits: 8. Catalog 62. **Branch `feat/pathway-fit-v0` — stop before merge.**
+
 
 ## understand_customer — UNDERSTAND after FIND (2026-09-15)
 

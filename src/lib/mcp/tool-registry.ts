@@ -35,6 +35,7 @@ import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
 import { currentAcquisitionIntelligenceTool } from '@/mcp/tools/current-acquisition-intelligence';
+import { matchCompanyToPathwaysTool } from '@/mcp/tools/match-company-to-pathways';
 import { understandCustomerTool } from '@/mcp/tools/understand-customer';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
@@ -109,6 +110,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   find_opportunities: 10,
   // 8 — CURRENT INTELLIGENCE: what changed + what to do differently (LIVE compose, journey slot after FIND).
   get_current_acquisition_intelligence: 8,
+  // 8 — PATHWAY FIT: two-sided match of CAI doors to company public record.
+  match_company_to_pathways: 8,
   search_grants: 5,
   search_sbir: 5,
   search_idv_contracts: 5,
@@ -604,8 +607,9 @@ const CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF = {
       'and what to do differently (cited OBSERVED_CHANGE + CURRENT_STATE only). Composes LIVE reads from ' +
       'recompete_changes, recompete_opportunities, sam_opportunities, agency_forecasts, and sam_events. ' +
       'Never invents CSO/OT/consortium/rapid/PAE pathways without observed evidence; exposes gaps in ' +
-      'not_yet_measurable. Empty what_changed is honest. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY. ' +
-      'Credits: 8.',
+      'not_yet_measurable. Empty what_changed is honest. Observed pathways are record evidence only — not ' +
+      'future-acquisition certainty; never treat an unavailable horizon as zero. Journey: FIND → CURRENT ' +
+      'INTELLIGENCE → PATHWAY. Credits: 8.',
     parameters: {
       type: 'object',
       properties: {
@@ -620,6 +624,36 @@ const CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF = {
         contract_ids: { type: 'array', items: { type: 'string' }, description: 'Optional recompete contract_id anchors.' },
         piids: { type: 'array', items: { type: 'string' }, description: 'Optional PIID anchors.' },
         window_days: { type: 'number', description: 'Lookback for OBSERVED_CHANGE (default 90, max 365).' },
+      },
+    },
+  },
+};
+
+const MATCH_COMPANY_TO_PATHWAYS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'match_company_to_pathways',
+    description:
+      'PATHWAY FIT — after CURRENT INTELLIGENCE, match a company’s stranger-verifiable public record ' +
+      '(UEI awards + SAM certs) to buyer-side acquisition doors from the CAI package. Returns ' +
+      'SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED / NOT_APPLICABLE with two-sided evidence. ' +
+      'Empty / no_proven_door is success. Never invents vehicle portfolios, Talent outcomes, or ' +
+      'promotes CAI NOT_YET_MEASURABLE doors. Never set-aside-first. Pass cai package + uei. Credits: 8.',
+    parameters: {
+      type: 'object',
+      properties: {
+        uei: { type: 'string', description: '12-char UEI (preferred).' },
+        company_name: { type: 'string', description: 'Fallback name if UEI unknown — identity must still resolve.' },
+        cage: { type: 'string', description: 'Optional CAGE.' },
+        cai: {
+          type: 'object',
+          description:
+            'Slim or full get_current_acquisition_intelligence result (required). Must include pathways.observed / potential_not_established and scope.',
+        },
+        include_owner_asserted: {
+          type: 'boolean',
+          description: 'If true, show vault-style owner assertions separately — never upgrades fit.',
+        },
       },
     },
   },
@@ -1747,6 +1781,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     SBIR_TOOL_DEF,
     FIND_OPPORTUNITIES_TOOL_DEF,
     CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF,
+    MATCH_COMPANY_TO_PATHWAYS_TOOL_DEF,
     UNDERSTAND_CUSTOMER_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
     KEYWORD_COVERAGE_TOOL_DEF,
@@ -1813,6 +1848,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_sbir' ||
     name === 'find_opportunities' ||
     name === 'get_current_acquisition_intelligence' ||
+    name === 'match_company_to_pathways' ||
     name === 'understand_customer' ||
     name === 'get_expiring_contracts' ||
     name === 'get_keyword_coverage' ||
@@ -2093,6 +2129,18 @@ export async function runMcpTool(
       contract_ids: strArr(args.contract_ids),
       piids: strArr(args.piids),
       window_days: typeof args.window_days === 'number' ? args.window_days : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'match_company_to_pathways') {
+    const result = (await matchCompanyToPathwaysTool({
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
+      company_name: typeof args.company_name === 'string' ? args.company_name : undefined,
+      cage: typeof args.cage === 'string' ? args.cage : undefined,
+      cai: args.cai,
+      include_owner_asserted: args.include_owner_asserted === true,
+      actor: typeof ctx?.userEmail === 'string' ? ctx.userEmail : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
