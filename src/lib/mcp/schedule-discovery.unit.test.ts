@@ -45,6 +45,15 @@ describe('MCP schedule discovery', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/invent nothing/i);
   });
 
+  it('connector instructions treat PATHWAY FIT no_proven_door as a complete result', () => {
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain('match_company_to_pathways');
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/no_proven_door === true is a complete successful result/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/do NOT restart find_opportunities/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/numbered research menu/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/If `_next` is empty, STOP/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Never ask set-aside-first/i);
+  });
+
   it('maps each customer phrase to schedule_market_search (routing contract)', () => {
     // Discovery surface: if the phrase appears in the tool description OR instructions,
     // a connected client has the signal to call schedule_market_search without "alerts."

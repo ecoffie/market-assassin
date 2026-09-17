@@ -6896,3 +6896,15 @@ no 504; representative drones capability completes grounded under 55s.
 **Why.** The living pipeline was healthy and current but customer-invisible; the 3,043-row JSON corpus was customer-facing but mostly unsourced. Promoting GAO end-to-end makes citations the default without deleting legacy coverage.
 
 **Proof.** Unit tests: gao-instance clocks, document-agency no-force-map, sourced-pain-points provenance, GovInfo quarantine. Cron stamps `data_source_instances`; held population from `institute_sources` only (not GovInfo / JSON).
+
+---
+
+## PATHWAY FIT honest miss is a complete answer (no research menu)
+
+**What.** When Mindy cannot prove an acquisition door (`no_proven_door`), that finding is the product: no door I can prove yet, what can be verified, what proof is missing, and what would change the answer. At most one evidence-changing question. No opportunity-search / awards / company-history menu, no FIND restart, no manufactured pathway.
+
+**Why.** An honest miss is intelligence. Offering a three-option research menu after “I cannot establish a door” treats emptiness as failure and manufactures a next step the evidence does not support.
+
+**SEO.** Pathway fit, acquisition door, no proven door, GovCon company-to-buyer match.
+
+**Proof.** Host rules + MCP connector instructions treat `no_proven_door === true` as a complete successful result. `_next` on an honest miss is empty or one vehicle/demo question — never a questionnaire. Red-team 1–7 in `pathway-fit.unit.test.ts`; connector copy in `schedule-discovery.unit.test.ts`.
