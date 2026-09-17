@@ -101,7 +101,10 @@ export async function GET(request: NextRequest) {
   if (remainingRes.error) {
     return NextResponse.json({ error: `count failed: ${remainingRes.error.message}` }, { status: 500 });
   }
-  const remaining = remainingRes.count ?? 0;
+  if (remainingRes.count == null) {
+    return NextResponse.json({ error: 'remaining count unknown (null count, not zero)' }, { status: 500 });
+  }
+  const remaining = remainingRes.count;
 
   if (mode !== 'execute') {
     return NextResponse.json({ success: true, mode: 'preview', remaining, wouldProcess: Math.min(limit, remaining) });

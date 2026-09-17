@@ -31,6 +31,14 @@ describe('recompete timing (MINDY-006)', () => {
     expect(est! < '2026-09-17').toBe(true);
   });
 
+  it('a far-future PoP end still yields PoP-end minus 12 months (not today)', () => {
+    expect(estimatedRecompeteDateFromPopEnd('2028-03-15')).toBe('2027-03-15');
+    const now = new Date('2026-09-17T12:00:00.000Z');
+    const overlay = overlayRecompeteTiming('2028-03-15', now);
+    expect(overlay?.estimated_recompete_date).toBe('2027-03-15');
+    expect(overlay?.lead_time_months).toBeGreaterThan(12);
+  });
+
   it('clamps month-end like Postgres INTERVAL months (leap day)', () => {
     expect(addCalendarMonths('2024-02-29', -12)).toBe('2023-02-28');
     expect(estimatedRecompeteDateFromPopEnd('2024-02-29')).toBe('2023-02-28');

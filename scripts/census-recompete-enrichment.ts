@@ -40,7 +40,7 @@ const sb = createClient(url, key);
 
 const PAGE = 1000;
 const HASH_CHUNK = 5000;
-const BUCKET_CONCURRENCY = 8;
+const BUCKET_CONCURRENCY = 16;
 const BQ_LABELS = bqJobOptions({
   feature: 'recompete',
   tool: 'census-recompete-enrichment',
@@ -167,19 +167,50 @@ async function main() {
   const pscNull = await countOrThrow('psc-null', base().is('psc_code', null));
   const descNull = await countOrThrow('desc-null', base().is('description', null));
   const bothNull = await countOrThrow('both-null', base().is('psc_code', null).is('description', null));
+  const pscNullDescPresent = await countOrThrow(
+    'psc-null-desc-present',
+    base().is('psc_code', null).not('description', 'is', null),
+  );
+  const descNullPscPresent = await countOrThrow(
+    'desc-null-psc-present',
+    base().is('description', null).not('psc_code', 'is', null),
+  );
   const stamped = await countOrThrow('stamped', base().not('detail_checked_at', 'is', null));
   const stampedBothNull = await countOrThrow(
     'stamped-both-null',
     base().not('detail_checked_at', 'is', null).is('psc_code', null).is('description', null),
   );
+  const stampedPscNull = await countOrThrow(
+    'stamped-psc-null',
+    base().not('detail_checked_at', 'is', null).is('psc_code', null),
+  );
+  const stampedDescNull = await countOrThrow(
+    'stamped-desc-null',
+    base().not('detail_checked_at', 'is', null).is('description', null),
+  );
+
+  if (pscNull !== bothNull + pscNullDescPresent) {
+    throw new Error(
+      `psc-null arithmetic failed: pscNull=${pscNull} both=${bothNull} psc-only-null=${pscNullDescPresent}`,
+    );
+  }
+  if (descNull !== bothNull + descNullPscPresent) {
+    throw new Error(
+      `desc-null arithmetic failed: descNull=${descNull} both=${bothNull} desc-only-null=${descNullPscPresent}`,
+    );
+  }
 
   console.log('Supabase recompete_opportunities (quality_flag IS NULL)');
   console.log(`  total rows              : ${total}`);
   console.log(`  psc_code NULL           : ${pscNull}`);
   console.log(`  description NULL        : ${descNull}`);
   console.log(`  both NULL (census pop.) : ${bothNull}`);
+  console.log(`  PSC null, desc present  : ${pscNullDescPresent}`);
+  console.log(`  desc null, PSC present  : ${descNullPscPresent}`);
   console.log(`  detail_checked_at set   : ${stamped}`);
   console.log(`  stamped AND both NULL   : ${stampedBothNull}`);
+  console.log(`  stamped AND psc NULL    : ${stampedPscNull}`);
+  console.log(`  stamped AND desc NULL   : ${stampedDescNull}`);
   console.log('');
 
   if (bothNull !== stampedBothNull) {
@@ -289,8 +320,45 @@ async function main() {
   console.log(`BQ recoverable both                   : ${recoverableBoth}`);
   console.log(`genuinely unavailable in BQ lookup    : ${genuinelyUnavailable}`);
   console.log('────────────────────────────────────────');
-  console.log(`psc-only (no description)             : ${recoverablePsc - recoverableBoth}`);
-  console.log(`description-only (no PSC)             : ${recoverableDesc - recoverableBoth}`);
+  console.log(`psc-only (no description)             : ${pscOnly}`);
+  console.log(`description-only (no PSC)             : ${descOnly}`);
+
+  // Mixed rows (description NULL, PSC already present) are outside the both-null
+  // universe. Census them exactly — do not extrapolate.
+  let mixedDescRecoverable = 0;
+  if (descNullPscPresent > 0) {
+    const mixed: { contract_id: string; piid: string | null }[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await sb
+        .from('recompete_opportunities')
+        .select('contract_id,piid')
+        .is('quality_flag', null)
+        .is('description', null)
+        .not('psc_code', 'is', null)
+        .order('contract_id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`mixed-row page at ${from} failed: ${error.message}`);
+      if (!data?.length) break;
+      for (const r of data) {
+        mixed.push({ contract_id: String(r.contract_id), piid: r.piid ? String(r.piid) : null });
+      }
+      if (data.length < PAGE) break;
+    }
+    if (mixed.length !== descNullPscPresent) {
+      throw new Error(`paged ${mixed.length} mixed rows but count was ${descNullPscPresent}`);
+    }
+    const mixedBuckets = await bucketsFor(mixed.map((r) => r.contract_id));
+    await mapPool([...mixedBuckets.entries()], BUCKET_CONCURRENCY, async ([bucket, bucketIds]) => {
+      const rows = await lookupDetail(bucketIds, bucket);
+      for (const row of rows) {
+        if (present(row.description)) mixedDescRecoverable++;
+      }
+    });
+    console.log('────────────────────────────────────────');
+    console.log(`mixed (desc NULL, PSC present)        : ${descNullPscPresent}`);
+    console.log(`BQ recoverable description (mixed)    : ${mixedDescRecoverable}`);
+  }
+
   console.log('\nSTOP. No bulk write. Request approval before refill.');
   console.log(
     'detail_checked_at: do not reset in isolation. On approved refill, fill BQ-recoverable rows and clear the stamp only on remaining stamped-null so enrich can re-ask USASpending detail. A stamp on a null row is not an authoritative empty.',

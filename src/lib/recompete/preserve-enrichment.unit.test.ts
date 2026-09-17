@@ -24,6 +24,16 @@ describe('preserveRicherEnrichment (MINDY-007)', () => {
     expect(next.psc_description).toBe('Ops');
   });
 
+  it('lets incoming enrichment populate a currently-null stored row', () => {
+    const next = preserveRicherEnrichment(
+      { psc_code: 'R422', description: 'CONSUMER RESEARCH', psc_description: 'Market research' },
+      { psc_code: null, description: null, psc_description: null },
+    );
+    expect(next.psc_code).toBe('R422');
+    expect(next.description).toBe('CONSUMER RESEARCH');
+    expect(next.psc_description).toBe('Market research');
+  });
+
   it('treats blank strings as empty, not an improvement', () => {
     const next = preserveRicherEnrichment(
       { psc_code: '  ', description: '', psc_description: '\t' },
@@ -48,6 +58,12 @@ describe('preserveRicherEnrichment (MINDY-007)', () => {
     expect(src).toMatch(/preserveRicherEnrichment/);
     expect(src).toMatch(/toWrite/);
     expect(src).toMatch(/upsertContracts\(supabase, toWrite\)/);
+  });
+
+  it('full sweep also merges through preserveRicherEnrichment (does not wait on the DB trigger)', () => {
+    const src = readFileSync(join(__dirname, '../../../scripts/sync-recompete-full.ts'), 'utf8');
+    expect(src).toMatch(/preserveRicherEnrichment/);
+    expect(src).toMatch(/toWrite/);
   });
 
   it('DB trigger refuses null/blank incoming over stored non-null', () => {

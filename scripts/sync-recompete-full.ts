@@ -26,6 +26,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fetchExpiringForNaics, type SyncedContract } from '../src/lib/recompete/usaspending-sync';
+import { preserveRicherEnrichment, type EnrichmentFields } from '../src/lib/recompete/preserve-enrichment';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
@@ -108,16 +109,38 @@ async function existingNaics(): Promise<string[]> {
   return [...tally.entries()].sort((a, b) => b[1] - a[1]).map(([code]) => code);
 }
 
+const EXISTING_READ_CHUNK = 100;
+
+async function loadExistingEnrichment(contractIds: string[]): Promise<Map<string, EnrichmentFields>> {
+  const byId = new Map<string, EnrichmentFields>();
+  for (let i = 0; i < contractIds.length; i += EXISTING_READ_CHUNK) {
+    const { data, error } = await sb
+      .from('recompete_opportunities')
+      .select('contract_id,psc_code,description,psc_description')
+      .in('contract_id', contractIds.slice(i, i + EXISTING_READ_CHUNK));
+    if (error) throw new Error(`existing-enrichment read failed: ${error.message}`);
+    for (const row of data ?? []) {
+      byId.set(String(row.contract_id), {
+        psc_code: (row.psc_code as string | null) ?? null,
+        description: (row.description as string | null) ?? null,
+        psc_description: (row.psc_description as string | null) ?? null,
+      });
+    }
+  }
+  return byId;
+}
+
 async function upsertBatch(rows: SyncedContract[]) {
-  // MINDY-007: this payload can carry null PSC/description from spending_by_award.
-  // The DB trigger trg_recompete_preserve_enrichment keeps stored non-nulls. Do
-  // not add a second write path that bypasses the table (ON CONFLICT upsert is
-  // an UPDATE → trigger fires).
+  // MINDY-007: spending_by_award can carry null PSC/description. Merge in JS so
+  // this path is safe even before trg_recompete_preserve_enrichment is applied.
+  // The trigger is the structural backup once the migration lands.
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);
+    const existing = await loadExistingEnrichment(chunk.map((c) => c.contract_id));
+    const toWrite = chunk.map((c) => preserveRicherEnrichment(c, existing.get(c.contract_id)));
     const { error } = await sb
       .from('recompete_opportunities')
-      .upsert(chunk, { onConflict: 'contract_id', ignoreDuplicates: false });
+      .upsert(toWrite, { onConflict: 'contract_id', ignoreDuplicates: false });
     // Never continue past a write failure -- a swallowed error here is exactly
     // how the table ended up trusted-but-wrong in the first place.
     if (error) throw new Error(`upsert failed (${chunk.length} rows, first=${chunk[0]?.contract_id}): ${error.message}`);
