@@ -6908,3 +6908,15 @@ no 504; representative drones capability completes grounded under 55s.
 **SEO.** Pathway fit, acquisition door, no proven door, GovCon company-to-buyer match.
 
 **Proof.** Host rules + MCP connector instructions treat `no_proven_door === true` as a complete successful result. `_next` on an honest miss is empty or one vehicle/demo question — never a questionnaire. Red-team 1–7 in `pathway-fit.unit.test.ts`; connector copy in `schedule-discovery.unit.test.ts`.
+
+---
+
+## Potato v1 journey — FIND through WATCH, no new engines
+
+**What.** After PATHWAY FIT, Mindy finishes the customer conversation: verified proof + one missing-proof question (Talent thin), then capability-statement / response / meeting language from that evidence (Position), one concrete next action (Act), then “want me to watch this?” with Open-now + Coming-soon coverage only (Monitor). Naive users do not need SAM/NAICS/CSO vocabulary to advance.
+
+**Why.** The architecture was already there. Leaving the host at “here are doors” stranded customers before language, action, and watch.
+
+**SEO.** GovCon capability statement, opportunity response, customer meeting prep, SAM.gov watch.
+
+**Proof.** Connector Potato v1 journey copy; FIND `_next` continues UNDERSTAND when an open hit exists; UNDERSTAND `_next` is Current Intelligence; PATHWAY FIT talent sections; `composeActFromPathwayFit` honest-miss stop vs one grounded action.

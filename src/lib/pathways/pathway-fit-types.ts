@@ -299,8 +299,9 @@ export const HOST_RULES_PATHWAY_FIT = [
   'Set-aside is never the automatic opener when other doors exist. Never ask set-aside-first after no_proven_door.',
   'Do not promote CAI NOT_YET_MEASURABLE doors (consortium, rapid, PAE).',
   'proof_to_lead_with = stranger-verifiable only; vault is labeled owner-asserted and does not upgrade.',
-  'On a positive fit, ask one _next question from proof_missing — not a questionnaire, not set-aside-first.',
-  'Customer need not know IDV/CSO/OT/NAICS jargon — use door_label language.',
+  'On a positive fit: present doors, then TALENT THIN (proof I can verify + the single missing proof). Ask one `_next` question from proof_missing — not a questionnaire, not set-aside-first.',
+  'After the talent answer, continue Potato POSITION → one ACT → MONITOR (confirm first). Do not restart FIND. Do not auto-run paid/write tools.',
+  'Customer need not know IDV/CSO/OT/NAICS jargon — use door_label language. Ask for company name in plain English; entity ID is optional.',
 ] as const;
 
 export const OWNER_ASSERTED_DISCLAIMER =

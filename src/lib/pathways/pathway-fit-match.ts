@@ -980,7 +980,7 @@ export function buildPathwayFitNext(
   if (!company.uei) {
     return [
       {
-        prompt: 'I need your UEI to match public federal evidence to these doors. What is your company’s UEI?',
+        prompt: 'What’s your company name? I match public federal records from that — you don’t need contracting jargon.',
         requires_confirmation: true,
       },
     ];
@@ -1139,11 +1139,11 @@ export function matchCompanyToPathwaysPure(
       sources_failed: [],
       ranking_rule_version: 'pf_rank_v1',
       next_outputs_not_yet: [
-        'talent_fit',
+        'full_talent',
         'win_claim',
         'vehicle_portfolio',
-        'demo_readiness',
-        'measurable_outcome',
+        'demo_readiness_verified',
+        'measurable_outcome_verified',
       ],
     },
     _next: buildPathwayFitNext(sorted, company),
@@ -1177,6 +1177,14 @@ export function matchCompanyToPathwaysPure(
             proof: {
               display_title: 'What proves it',
               provenance_label: 'Government / public evidence only',
+            },
+            talent_verified: {
+              display_title: 'What proof I can verify',
+              provenance_label: 'Stranger-verifiable public records only — not owner-asserted',
+            },
+            talent_missing: {
+              display_title: "What's missing",
+              provenance_label: 'The single most important proof gap — one question, not a questionnaire',
             },
             missing: {
               display_title: 'What I cannot verify',
@@ -1265,7 +1273,7 @@ export function caiContextRequiredResult(): MatchCompanyToPathwaysResult {
       sources_queried: [],
       sources_failed: [],
       ranking_rule_version: 'pf_rank_v1',
-      next_outputs_not_yet: ['talent_fit'],
+      next_outputs_not_yet: ['full_talent'],
       error: 'cai_context_required',
     },
     _next: [

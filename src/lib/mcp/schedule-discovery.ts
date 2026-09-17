@@ -7,6 +7,8 @@
  * Consumed by: tool-registry, tool-schemas, hosted transport, stdio server, tests.
  */
 
+import { POTATO_JOURNEY_INSTRUCTIONS } from './potato-journey';
+
 /** Phrases customers use that MUST map to schedule_market_search for procurement searches. */
 export const SCHEDULE_DISCOVERY_PHRASES = [
   'schedule this',
@@ -46,6 +48,8 @@ export const SCHEDULE_MARKET_SEARCH_DESCRIPTION =
  * Clients surface this as connector guidance; keep it short and action-oriented.
  */
 export const MCP_CONNECTOR_INSTRUCTIONS = [
+  POTATO_JOURNEY_INSTRUCTIONS,
+  '',
   'Finding opportunities (PRIMARY):',
   '- When the user wants to find opportunities, what is available, what is coming, or a market hunt',
   '  (e.g. "cybersecurity in Florida"), call find_opportunities — NOT search_sam_opportunities alone.',
@@ -62,9 +66,10 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '  Say each section’s provenance_label BEFORE listing claims. Never headline curated research',
   '  as what the customer "actually cares about." Soften inferences ("may be more persuasive")',
   '  — do not invent buyer evaluation facts.',
-  '- After UNDERSTAND, offer `_next` (capability/door ask) and wait. Do NOT close UNDERSTAND with',
+  '- After UNDERSTAND, offer `_next` (what changed about how they buy) and wait. Do NOT close UNDERSTAND with',
   '  "what is your set-aside?" — set-aside is only relevant when opportunity evidence makes it so.',
-  '  Do not draft capability statements, outreach emails, responses, or meeting briefs until those tools ship.',
+  '  After PATHWAY FIT + TALENT THIN, draft capability statements / responses / meeting briefs from journey',
+  '  evidence only (Potato POSITION). Do not auto-run paid or write tools.',
   '- Watch/email coverage today is Open now + Coming soon only; Coming back is not emailed yet — say so.',
   '',
   'Scheduling / monitoring procurement searches:',
@@ -102,5 +107,7 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '- After no_proven_door: do NOT restart find_opportunities, do NOT offer a numbered research menu',
   '  (search opportunities / research awards / inspect the company), do NOT offer dossier or monitor,',
   '  do NOT manufacture a possible pathway. Ask at most the result\'s `_next` prompt (one proof question).',
-  '  If `_next` is empty, STOP. Never ask set-aside-first.',
+  '  If `_next` is empty, STOP the door step. Never ask set-aside-first.',
+  '- After a positive door result, TALENT THIN is the proof_to_lead_with + one `_next` missing-proof question.',
+  '  Then POSITION (capability statement / response / meeting) → one ACT → MONITOR only with confirmation.',
 ].join('\n');

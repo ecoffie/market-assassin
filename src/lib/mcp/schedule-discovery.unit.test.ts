@@ -54,6 +54,16 @@ describe('MCP schedule discovery', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Never ask set-aside-first/i);
   });
 
+  it('connector instructions include Potato v1 journey through POSITION / ACT / MONITOR', () => {
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Potato v1 journey/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/TALENT THIN/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/OWNER_ASSERTED/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/capability statement/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Want me to watch this for you/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Do not skip to MONITOR after FIND/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/Confirm before calling schedule_market_search/i);
+  });
+
   it('maps each customer phrase to schedule_market_search (routing contract)', () => {
     // Discovery surface: if the phrase appears in the tool description OR instructions,
     // a connected client has the signal to call schedule_market_search without "alerts."

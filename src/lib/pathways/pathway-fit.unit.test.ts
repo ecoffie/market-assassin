@@ -334,6 +334,7 @@ describe('PATHWAY FIT honest-miss host presentation (no matcher scoring change)'
     expect(r._next).toHaveLength(1);
     expect(r._next[0].prompt).toMatch(/vehicle|teaming/i);
     expect(r.presentation.sections.doors?.display_title).toMatch(/doors I can actually support/i);
+    expect(r.presentation.sections.talent_verified?.display_title).toMatch(/proof I can verify/i);
     expect(r.presentation.sections.honest_miss).toBeUndefined();
   });
 });

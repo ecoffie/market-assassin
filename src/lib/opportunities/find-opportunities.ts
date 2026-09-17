@@ -762,7 +762,11 @@ export function buildFindNext(
   shape: 'specific' | 'broad',
   horizons: Record<HorizonKey, HorizonResult>,
 ): FindNextAction[] {
-  if (shape === 'specific') {
+  const hasOpenHit =
+    horizons.open_now.status === 'grounded' && horizons.open_now.items.length > 0;
+  // Potato v1: an open hit continues UNDERSTAND even when the market is broad.
+  // Do not skip the journey to MONITOR-only because matched_count > 8.
+  if (shape === 'specific' || hasOpenHit) {
     const top = horizons.open_now.items[0];
     const noticeId =
       (typeof top?.notice_id === 'string' && top.notice_id) ||
@@ -796,6 +800,12 @@ export function buildFindNext(
   }
 
   return [
+    {
+      prompt: 'Want me to show you what’s changed about how this buyer is buying this work?',
+      tool: 'get_current_acquisition_intelligence',
+      credits: 8,
+      requires_confirmation: true,
+    },
     {
       prompt:
         'Want me to monitor this market for new and upcoming opportunities? ' +
