@@ -285,12 +285,16 @@ export async function reconcileEntitlementsFromPurchases(email: string): Promise
   const normalizedEmail = email.toLowerCase().trim();
   if (!supabase) return { tiers: [], applied: {} };
 
-  const { data: paid } = await supabase
+  const { data: paid, error: paidErr } = await supabase
     .from('purchases')
     .select('tier, bundle, status, superseded_by')
     .eq('user_email', normalizedEmail)
     .eq('status', 'completed')
     .is('superseded_by', null);
+  if (paidErr) {
+    console.error(`[reconcile] purchases read failed for ${normalizedEmail}:`, paidErr.message);
+    return { tiers: [], applied: {} };
+  }
 
   const rows = (paid || []) as Array<{ tier?: string | null; bundle?: string | null }>;
   if (rows.length === 0) return { tiers: [], applied: {} };

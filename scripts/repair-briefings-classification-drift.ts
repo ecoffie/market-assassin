@@ -43,14 +43,26 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 async function passesEligibility(email: string): Promise<{ ok: boolean; detail: string }> {
   const [{ data: cls, error: cErr }, { data: settings, error: sErr }] = await Promise.all([
-    sb.from('customer_classifications').select('email, briefings_access, briefings_expiry').eq('email', email).maybeSingle(),
-    sb.from('user_notification_settings').select('briefings_enabled, is_active, naics_codes, keywords').eq('user_email', email).maybeSingle(),
+    sb.from('customer_classifications')
+      .select('briefings_access, briefings_expiry')
+      .eq('email', email)
+      .limit(1)
+      .maybeSingle(),
+    sb.from('user_notification_settings')
+      .select('briefings_enabled, is_active, naics_codes, keywords')
+      .eq('user_email', email)
+      .limit(1)
+      .maybeSingle(),
   ]);
   if (cErr) return { ok: false, detail: `classification read failed: ${cErr.message}` };
   if (sErr) return { ok: false, detail: `settings read failed: ${sErr.message}` };
   if (!cls) return { ok: false, detail: 'no classification row' };
   if (!settings) return { ok: false, detail: 'no settings row' };
-  const entitled = isBriefingEntitled({ email, ...cls });
+  const entitled = isBriefingEntitled({
+    email,
+    briefings_access: cls.briefings_access,
+    briefings_expiry: cls.briefings_expiry,
+  });
   const enabled = settings.briefings_enabled === true;
   const active = settings.is_active === true;
   const targeted = (settings.naics_codes || []).length + (settings.keywords || []).length > 0;
