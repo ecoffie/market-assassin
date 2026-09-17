@@ -156,7 +156,10 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     }
   }
 
-  const matchCount = entity ? 1 : matches.length;
+  // Name search sets `entity` to the top match's full registration AND keeps every
+  // hit in `matches`. Counting the detail record made _meta.match_count 1 while
+  // matches held 18 (Tanaq family, 2026-09-16). UEI mode is one record or none.
+  const matchCount = mode === 'name' ? matches.length : (entity ? 1 : 0);
   const grounded = matchCount > 0;
 
   // Per-cert provenance (Eric #3) — spell out which certs are SBA-CERTIFIED vs SAM SELF-IDENTIFIED so a

@@ -16,6 +16,12 @@ export interface ExpiringContractsToolInput {
   agency?: string;
   state?: string;
   months_window?: number;
+  /**
+   * Skip contracts ending sooner than this many months. The default window
+   * sorts soonest-first, so the first page is the decided end (lead time
+   * rounding to 0). A capture window is months_min=6, months_window=18.
+   */
+  months_min?: number;
   min_value?: number;
   max_value?: number;
   likelihood?: 'high' | 'medium' | 'low';
@@ -42,6 +48,7 @@ export async function expiringContracts(input: ExpiringContractsToolInput): Prom
     agency: input.agency,
     state: input.state,
     monthsWindow: input.months_window,
+    minMonthsWindow: input.months_min,
     minValue: input.min_value,
     maxValue: input.max_value,
     likelihood: input.likelihood,
@@ -50,7 +57,7 @@ export async function expiringContracts(input: ExpiringContractsToolInput): Prom
   });
   const grounded = res.contracts.length > 0;
   const queried: Record<string, string | number> = {};
-  for (const [k, v] of Object.entries({ naics: input.naics, agency: input.agency, state: input.state, months_window: input.months_window, likelihood: input.likelihood })) {
+  for (const [k, v] of Object.entries({ naics: input.naics, agency: input.agency, state: input.state, months_window: input.months_window, months_min: input.months_min, likelihood: input.likelihood })) {
     if (v !== undefined && v !== '') queried[k] = v as string | number;
   }
   const result: ExpiringContractsToolResult = {

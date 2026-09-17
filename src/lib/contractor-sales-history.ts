@@ -55,9 +55,10 @@ export interface ContractorSalesHistory {
    * - usaspending_cache / contractor_database — legacy JSON + sample-table path
    * - bigquery_normalized — BigQuery warehouse via queryCached / KV
    * - local_registry — SAM mirror identity with no warehouse awards
+   * - recompete_mirror — expiring-contract rows for a name the warehouse cache missed
    * - unavailable — source error
    */
-  source: 'usaspending_cache' | 'contractor_database' | 'bigquery_normalized' | 'local_registry' | 'unavailable';
+  source: 'usaspending_cache' | 'contractor_database' | 'bigquery_normalized' | 'local_registry' | 'recompete_mirror' | 'unavailable';
   coverage: 'cached' | 'limited' | 'none' | 'unavailable';
   lastUpdated: string | null;
   contractor: {

@@ -11,15 +11,18 @@ import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from './tier2-tools
 const bqCalls: Array<{ fn: string; liveBq: boolean; limit?: number }> = [];
 let rollupWarm = false;          // when true, cache-only (liveBq=false) returns a profile
 let capableWarm = false;
+let forceMiss = false;
 
 vi.mock('@/lib/bigquery/recipients', () => ({
   recipientSlug: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   resolveCanonicalSlug: vi.fn(async () => null),
   getRollupOrSingleBySlug: vi.fn(async (_slug: string, liveBq = false) => {
     bqCalls.push({ fn: 'getRollupBySlug', liveBq });
+    if (forceMiss) return null;
     if (!liveBq && !rollupWarm) return null;    // cache miss
     return { rollup_uei: 'UEI1', rollup_name: 'Leidos', child_ueis: ['UEI1'], city: 'Reston', state: 'VA', total_obligated: 5e9, award_count: 1200, distinct_agency_count: 40, first_action_date: '2008-01-01', last_action_date: '2026-06-01' };
   }),
+  getRecipientByUei: vi.fn(async () => null),
   getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ piid: 'X', obligated: 1000 }]),
   getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ agency: 'DoD', total: 4e9 }]),
   findCapableSmallBusinesses: vi.fn(async ({ liveBq = false, limit }: { liveBq?: boolean; limit?: number }) => {
@@ -29,6 +32,11 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   }),
 }));
 
+const mockResolveName = vi.fn(async () => ({ status: 'none' as const, searched: '' }));
+vi.mock('@/lib/contractor/name-resolution', () => ({
+  resolveAwardCorpusByName: (q: string) => mockResolveName(q),
+}));
+
 // --- mock rate-limit: allow first N, then deny ---
 let rlAllowed = true;
 let rlCalls = 0;
@@ -36,7 +44,7 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => { rlCalls++; return { allowed: rlAllowed, remaining: rlAllowed ? 5 : 0, limit: 12, resetAt: 0 }; }),
 }));
 
-beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; rlAllowed = true; rlCalls = 0; });
+beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; forceMiss = false; rlAllowed = true; rlCalls = 0; mockResolveName.mockReset(); mockResolveName.mockResolvedValue({ status: 'none', searched: '' }); });
 
 describe('Tier-2 tool definitions', () => {
   it('registers the Tier-2 contractor-intel tools', () => {
@@ -90,6 +98,59 @@ describe('get_contractor_profile — cost discipline', () => {
     const res = await tools.execute('get_contractor_profile', {});
     expect(res.ok).toBe(false);
     expect(res.error).toBe('company_name_required');
+  });
+});
+
+describe('get_contractor_profile — award-corpus name resolution when the slug misses', () => {
+  it('a family token is ambiguous, not a false miss, and is not auto-picked', async () => {
+    forceMiss = true;
+    mockResolveName.mockResolvedValue({
+      status: 'ambiguous',
+      match_count: 13,
+      truncated: false,
+      candidates: [
+        { name: 'TANAQ SUPPORT SERVICES, LLC', uei: 'UM53UXL5QNF5', total_obligated: 261_903_825.7, award_count: 54 },
+        { name: 'TANAQ MANAGEMENT SERVICES LLC', uei: 'WJ21VL51LDV4', total_obligated: 136_848_342.61, award_count: 20 },
+      ],
+      note: '13 award-holding recipients match "Tanaq". This tool will not pick one.',
+    });
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Tanaq' }) as {
+      found: boolean; resolution?: string; match_count?: number; note?: string; candidates?: Array<{ uei: string }>;
+    };
+    expect(res.found).toBe(false);
+    expect(res.resolution).toBe('ambiguous');
+    expect(res.match_count).toBe(13);
+    expect(res.candidates?.[0].uei).toBe('UM53UXL5QNF5');
+    expect(res.note).toMatch(/will not pick one/);
+    expect(res.note).not.toMatch(/couldn't find a federal contractor/i);
+  });
+
+  it('zero award-index rows are none_in_award_corpus, not a certification or existence claim', async () => {
+    forceMiss = true;
+    mockResolveName.mockResolvedValue({ status: 'none', searched: 'Tanaq Global Solutions LLC' });
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Tanaq Global Solutions LLC' }) as {
+      found: boolean; resolution?: string; note?: string;
+    };
+    expect(res.found).toBe(false);
+    expect(res.resolution).toBe('none_in_award_corpus');
+    expect(res.note).toMatch(/this dataset only/i);
+    expect(res.note).toMatch(/does not prove/i);
+    expect(res.note).not.toMatch(/couldn't find a federal contractor/i);
+    expect(res.note).not.toMatch(/not certified/i);
+  });
+
+  it('a failed name search is lookup_failed, distinct from none', async () => {
+    forceMiss = true;
+    mockResolveName.mockResolvedValue({ status: 'degraded', detail: 'bq down' });
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Tanaq' }) as {
+      found: boolean; resolution?: string; error?: string;
+    };
+    expect(res.found).toBe(false);
+    expect(res.resolution).toBe('lookup_failed');
+    expect(res.error).toBe('lookup_failed');
   });
 });
 

@@ -306,7 +306,10 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
     const end = c.period_of_performance_current_end ? new Date(c.period_of_performance_current_end).getTime() : null;
     if (!end || Number.isNaN(end)) return { ...c, set_aside_type, naics_description };
-    const leadMonths = Math.max(0, Math.round((end - now) / MS_PER_MONTH));
+    const rawMonths = (end - now) / MS_PER_MONTH;
+    // A contract that has not ended is not "0 months". round() turned a
+    // 10-day expiry into 0, and soonest-first put those on the first page.
+    const leadMonths = end > now ? Math.max(1, Math.round(rawMonths)) : 0;
     const solLead = 9 * MS_PER_MONTH; // typical months a recompete solicitation posts before PoP-end
     const estMs = Math.max(now, end - solLead); // never in the past
     return {

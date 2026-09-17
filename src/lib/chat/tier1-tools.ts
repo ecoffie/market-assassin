@@ -213,6 +213,27 @@ export function resolveSetAsideCodes(input: string): readonly string[] | null {
 const SET_ASIDE_HELP =
   '8(a), SDVOSB, WOSB, EDWOSB, HUBZone, Small Business, Veteran, Buy Indian, ISBEE, IEE, Local Area, None — or a raw SAM code (8A, 8AN, SDVOSBC, SBA, HZC…)';
 
+const SEARCH_TOKEN_STOP = new Set(['and', 'the', 'for', 'of', 'with', 'from', 'services', 'service']);
+
+/** Tokens worth a second pass when the full phrase matches nothing. */
+export function searchTokens(keyword: string): string[] {
+  return keyword
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3 && !SEARCH_TOKEN_STOP.has(t.toLowerCase()));
+}
+
+/**
+ * Phrase miss → keep the NARROWEST non-empty token, not the union.
+ * Measured 2026-09-16: "PFAS remediation" is 0 (AND). Body "PFAS" is 4 open
+ * notices; "remediation" is the wide set. Union would bury the PFAS rows.
+ */
+export function pickNarrowerTokenHits<T>(hits: Array<{ token: string; rows: T[] }>): { token: string; rows: T[] } | null {
+  const nonempty = hits.filter((h) => h.rows.length > 0);
+  if (!nonempty.length) return null;
+  return nonempty.reduce((best, h) => (h.rows.length < best.rows.length ? h : best));
+}
+
 export function makeTier1Tools(db: Tier1Db) {
   async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown; limit?: unknown }): Promise<Record<string, unknown>> {
     const keyword = typeof args?.keyword === 'string' ? args.keyword.trim() : '';
@@ -289,15 +310,46 @@ export function makeTier1Tools(db: Tier1Db) {
     // solicitation_number (fall back to title+deadline when it's null).
     const seen = new Set<string>();
     const rowKey = (r: SamRow) => r.solicitation_number || `${r.title ?? ''}|${r.response_deadline ?? ''}`;
-    const merged: SamRow[] = [];
-    for (const r of [...((titleRes.data || []) as SamRow[]), ...((bodyRes.data || []) as SamRow[])]) {
-      const k = rowKey(r);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      merged.push(r);
-      if (merged.length >= limit) break;
+    const mergeRows = (parts: SamRow[]): SamRow[] => {
+      const out: SamRow[] = [];
+      for (const r of parts) {
+        const k = rowKey(r);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(r);
+        if (out.length >= limit) break;
+      }
+      return out;
+    };
+    let rows = mergeRows([...((titleRes.data || []) as SamRow[]), ...((bodyRes.data || []) as SamRow[])]);
+    let matchedToken: string | null = null;
+    // Phrase AND returned nothing. A multi-word query like "PFAS remediation"
+    // then misses body-only acronym hits. Retry each token; keep the narrower set.
+    if (rows.length === 0) {
+      const tokens = searchTokens(keyword);
+      if (tokens.length >= 2) {
+        const hits: Array<{ token: string; rows: SamRow[] }> = [];
+        for (const token of tokens) {
+          seen.clear();
+          const tokenTitle = withFilters(
+            db.from('sam_opportunities').select(SELECT_COLS).ilike('title', `%${token}%`),
+          ).order('response_deadline', { ascending: true, nullsFirst: false }).limit(limit);
+          const tokenBody = withFilters(
+            db.from('sam_opportunities').select(SELECT_COLS).textSearch('search_tsv', token, { type: 'websearch' }),
+          ).order('response_deadline', { ascending: true, nullsFirst: false }).limit(limit);
+          const [tt, tb] = await Promise.all([tokenTitle, tokenBody]);
+          hits.push({
+            token,
+            rows: mergeRows([...((tt.data || []) as SamRow[]), ...((tb.data || []) as SamRow[])]),
+          });
+        }
+        const best = pickNarrowerTokenHits(hits);
+        if (best) {
+          rows = best.rows;
+          matchedToken = best.token;
+        }
+      }
     }
-    const rows = merged;
     if (rows.length === 0) {
       // Name EVERY filter that was applied. The old note omitted set_aside, so a
       // zero caused by the set-aside filter read as "nothing exists" — which is
@@ -314,6 +366,12 @@ export function makeTier1Tools(db: Tier1Db) {
     return {
       ok: true,
       count: rows.length,
+      ...(matchedToken
+        ? {
+            matched_token: matchedToken,
+            note: `No open notice matched the phrase "${keyword}". These match the narrower term "${matchedToken}" — say that, do not claim the full phrase.`,
+          }
+        : {}),
       items: rows.map((r) => ({
         title: r.title ?? null,
         agency: r.department ?? null,

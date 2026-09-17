@@ -670,6 +670,7 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
         agency: { type: 'string', description: 'Agency name, case-insensitive partial.' },
         state: { type: 'string', description: '2-letter place-of-performance state.' },
         months_window: { type: 'number', description: 'Expiration window in months (default 18, max 60).' },
+        months_min: { type: 'number', description: 'Skip contracts ending sooner than this many months (capture window). Example: months_min=6 with months_window=18. Omit to include the soonest expirations.' },
         min_value: { type: 'number', description: 'Minimum obligated dollars.' },
         max_value: { type: 'number', description: 'Maximum obligated dollars.' },
         likelihood: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Recompete-likelihood filter.' },
@@ -1100,9 +1101,7 @@ const CONTRACTOR_AWARD_HISTORY_TOOL_DEF = {
   function: {
     name: 'get_contractor_award_history',
     description:
-      "A contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
-      'agencies, top NAICS, and recent awards. Prefer uei when known (same BigQuery warehouse path as the Map ' +
-      'company drawer). Name matching is fuzzy — always check match.confidence. grounded=false when unresolved.',
+      "A contractor's federal prime-award history. Prefer uei. A company name is resolved against the award-warehouse name index: one match is loaded by that UEI; several matches return candidates and are not picked; zero matches is none_in_award_corpus, not a claim of no federal awards. grounded=false on ambiguous and on a dataset miss. Do not read match.method on a UEI payload as the company-parameter match.",
     parameters: {
       type: 'object',
       properties: {
@@ -2104,6 +2103,7 @@ export async function runMcpTool(
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
       months_window: typeof args.months_window === 'number' ? args.months_window : undefined,
+      months_min: typeof args.months_min === 'number' ? args.months_min : undefined,
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,

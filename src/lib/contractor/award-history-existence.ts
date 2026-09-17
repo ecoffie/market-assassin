@@ -33,6 +33,7 @@
  * the shared claim; the amounts stay attributed to whoever reported them.
  */
 import { createClient } from '@supabase/supabase-js';
+import { legalNameIlikePattern } from '@/lib/contractor/legal-name-stem';
 
 export interface AwardHistoryEvidence {
   /** The shared claim every tool must agree on. */
@@ -49,6 +50,27 @@ export interface AwardHistoryEvidence {
   /** Canonical UEI when a source could supply one. */
   uei: string | null;
   recipientName: string | null;
+  /**
+   * Recompete-mirror rows actually fetched (capped). Present so a name that
+   * the legacy cache missed can still be RESOLVED into history, not merely
+   * flagged. Dollars in these rows are this source's view — do not merge them
+   * with a warehouse total.
+   */
+  rows?: RecompeteHistoryRow[];
+}
+
+export interface RecompeteHistoryRow {
+  contract_id: string;
+  incumbent_uei: string | null;
+  incumbent_name: string | null;
+  awarding_agency: string | null;
+  awarding_sub_agency: string | null;
+  naics_code: string | null;
+  description: string | null;
+  total_obligation: number | null;
+  potential_total_value: number | null;
+  period_of_performance_start: string | null;
+  period_of_performance_current_end: string | null;
 }
 
 function sb() {
@@ -73,6 +95,7 @@ export async function establishAwardHistory(
     sources: [],
     uei: canonicalUei || null,
     recipientName: null,
+    rows: [],
   };
   if (!name && !canonicalUei) return out;
 
@@ -82,11 +105,15 @@ export async function establishAwardHistory(
   // ── SOURCE 1: our own award mirror. 150K+ rows with real per-contract incumbents.
   // This is the source Path A never consulted, and it is the one that holds Fluidyne.
   try {
+    // Stem, not the verbatim string. ", LLC" is not a substring of "LLC" and
+    // the reverse is also true — that split is what left a name this tool had
+    // emitted unresolved (BUG-02, TANAQ SUPPORT SERVICES, LLC).
+    const namePattern = legalNameIlikePattern(name);
     let q = client
       .from('recompete_opportunities')
-      .select('incumbent_uei, incumbent_name, potential_total_value', { count: 'exact' })
+      .select('contract_id, incumbent_uei, incumbent_name, awarding_agency, awarding_sub_agency, naics_code, description, total_obligation, potential_total_value, period_of_performance_start, period_of_performance_current_end', { count: 'exact' })
       .not('incumbent_uei', 'is', null);
-    q = canonicalUei ? q.eq('incumbent_uei', canonicalUei) : q.ilike('incumbent_name', `%${name}%`);
+    q = canonicalUei ? q.eq('incumbent_uei', canonicalUei) : q.ilike('incumbent_name', namePattern);
     const { data, count, error } = await q.limit(50);
     if (error) throw new Error(error.message);
     anyQueried = true;
@@ -96,6 +123,7 @@ export async function establishAwardHistory(
       out.hasFederalAwardHistory = true;
       out.uei = out.uei || data?.[0]?.incumbent_uei || null;
       out.recipientName = out.recipientName || data?.[0]?.incumbent_name || null;
+      out.rows = (data || []) as RecompeteHistoryRow[];
     }
   } catch (err) {
     // ⚠️ A source that FAILED is not a source that said "no". Record it as unqueryable
@@ -114,7 +142,7 @@ export async function establishAwardHistory(
     let q = client
       .from('usaspending_awards')
       .select('recipient_name, award_amount', { count: 'exact' });
-    q = q.ilike('recipient_name', `%${name || canonicalUei}%`);
+    q = q.ilike('recipient_name', name ? legalNameIlikePattern(name) : `%${canonicalUei}%`);
     const { data, count, error } = await q.limit(50);
     if (error) throw new Error(error.message);
     anyQueried = true;
