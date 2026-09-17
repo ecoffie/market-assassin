@@ -174,7 +174,7 @@ async function twoSided(live: Awaited<ReturnType<typeof runProbe>>) {
 }
 
 async function main() {
-  const out: unknown[] = [];
+  const out: Array<Omit<Awaited<ReturnType<typeof runProbe>>, 'raw'> & { raw?: undefined }> = [];
   for (const spec of SPECS) {
     console.error(`\n--- ${spec.id}: ${spec.label} ---`);
     const probe = await runProbe(spec);
@@ -204,12 +204,10 @@ async function main() {
     });
   }
 
-  const withPositive = (out as Array<{ match: { positive: unknown[] } }>).find(
-    (p) => p.match.positive.length > 0,
-  );
+  const withPositive = out.find((p) => p.match.positive.length > 0);
   let two_sided = null;
   if (withPositive) {
-    const live = await runProbe((withPositive as { spec: ProbeSpec }).spec);
+    const live = await runProbe(withPositive.spec);
     two_sided = await twoSided(live);
     console.error('\n--- two-sided live deletion ---');
     console.error(JSON.stringify(two_sided, null, 2));
