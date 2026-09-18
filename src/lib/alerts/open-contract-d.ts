@@ -17,6 +17,10 @@ export const OPEN_MARKET_NO_KEYWORD_HITS_COPY =
 export const OPEN_MARKET_NO_KEYWORDS_COPY =
   'Open opportunities in your NAICS/PSC market. Keywords are not required filters in Market Discovery.';
 
+export const OPEN_NOW_HEADING = 'Open Now';
+export const OPEN_NOW_EXPLAIN =
+  'Work you can pursue now — currently open solicitations matching your market.';
+
 export type OpenKeywordOutcome =
   | 'distinctive_hits'
   | 'open_market_no_keyword_hits'

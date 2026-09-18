@@ -64,9 +64,9 @@ describe('Coming Back to Market — omit vs show', () => {
     expect(renderComingBackSection(out, { panelUrl: 'https://getmindy.ai/app?panel=recompetes' })).toBe('');
   });
 
-  it('omits when nothing qualifies and does not render a zero section', () => {
+  it('omits contracts with under 3 months remaining even when they are the largest', () => {
     const out = selectComingBackRows({
-      contracts: [row({ contract_id: 'too-far', lead_time_months: 24 })],
+      contracts: [row({ contract_id: 'too-soon', lead_time_months: 2, potential_total_value: 90_000_000 })],
       count: 1,
       naicsCodes: ['561720'],
     });
@@ -159,20 +159,22 @@ describe('Coming Back to Market — rank and cap', () => {
     expect(html).not.toMatch(/undefined|TODO|Lorem/i);
   });
 
-  it('does not let keyword interior collapse the list to Department of the Interior', () => {
+  it('does not let keyword interior match the Department of the Interior agency name', () => {
     const out = selectComingBackRows({
       contracts: [
         row({
-          contract_id: 'doi-soon-huge',
+          contract_id: 'doi-huge',
           incumbent_name: 'Interior Janitorial Co',
           awarding_agency: 'Department of the Interior',
-          lead_time_months: 2,
+          description: 'facilities support at regional offices',
+          lead_time_months: 10,
           potential_total_value: 50_000_000,
         }),
         row({
           contract_id: 'army-lead',
           incumbent_name: 'Army Grounds LLC',
           awarding_agency: 'Department of the Army',
+          description: 'JANITORIAL SERVICES',
           lead_time_months: 10,
           potential_total_value: 400_000,
         }),
@@ -185,7 +187,7 @@ describe('Coming Back to Market — rank and cap', () => {
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('Army Grounds LLC');
     expect(out.rows[0].agency).toBe('Department of the Army');
-    expect(out.rows.some((r) => /Interior/i.test(r.agency || '') && r.window === 'lead_6_18')).toBe(false);
+    expect(out.rows.some((r) => /Interior/i.test(r.agency || ''))).toBe(false);
   });
 
   it('still returns NAICS-market rows for a user with no keywords', () => {
@@ -231,6 +233,9 @@ describe('Coming Back to Market — email copy', () => {
     expect(html).not.toMatch(/5,876/);
     expect(html).not.toMatch(/0 recompete/i);
     expect(html).toMatch(/not confirmed solicitations/i);
+    expect(html).toMatch(/prepare capture, not to bid today/);
+    expect(html).not.toMatch(/currently soliciting/i);
+    expect(html).not.toMatch(/Open Now/);
     expect(html).toMatch(/Potential value \(ceiling\)/);
     expect(html).not.toMatch(/the entire amount will be recompeted/i);
   });
@@ -332,6 +337,7 @@ describe('Coming Back to Market — exact-code states', () => {
           incumbent_name: 'BOOZ ALLEN HAMILTON INC.',
           awarding_agency: 'Department of the Navy',
           naics_code: '541611',
+          description: 'management consulting support',
           potential_total_value: 211_800_000,
           lead_time_months: 10,
         }),
@@ -340,6 +346,7 @@ describe('Coming Back to Market — exact-code states', () => {
           incumbent_name: 'PERATON INC.',
           awarding_agency: 'Department of the Air Force',
           naics_code: '541511',
+          description: 'programming and custom software development',
           potential_total_value: 12_400_000,
           lead_time_months: 11,
         }),
@@ -359,16 +366,17 @@ describe('Coming Back to Market — exact-code states', () => {
     expect(out.rows[0].incumbent).toBe('PERATON INC.');
     expect(out.rows[0].naics).toBe('541511');
     expect(out.rows[0].codeState).toBe('evidence_supported');
-    expect(out.rows.find((r) => r.contract_id === 'booz-611')?.codeState).toBe('inferred');
+    expect(out.rows.find((r) => r.contract_id === 'booz-611')).toBeUndefined();
   });
 
-  it('lets persisted user-primary outrank evidence_supported and dollars', () => {
+  it('prefers distinctive description hits over raw dollars, not code-state as a sort key', () => {
     const out = selectComingBackRows({
       contracts: [
         row({
           contract_id: 'consult-huge',
           incumbent_name: 'Booz Consulting Mega',
           naics_code: '541611',
+          description: 'administrative management consulting',
           potential_total_value: 90_000_000,
           lead_time_months: 9,
         }),
@@ -376,6 +384,7 @@ describe('Coming Back to Market — exact-code states', () => {
           contract_id: 'it-fit',
           incumbent_name: 'Custom Software LLC',
           naics_code: '541511',
+          description: 'programming and custom software development',
           potential_total_value: 350_000,
           lead_time_months: 14,
         }),
@@ -393,17 +402,17 @@ describe('Coming Back to Market — exact-code states', () => {
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('Custom Software LLC');
     expect(out.rows[0].codeState).toBe('primary_confirmed');
-    expect(out.rows[0].codeProvenance).toBe('persisted user primary');
     expect(out.rows[0].value).toBe(350_000);
   });
 
-  it('lets evidence-supported exact codes outrank inferred value', () => {
+  it('lets evidence-supported exact codes outrank inferred value when the distinctive phrase hits', () => {
     const out = selectComingBackRows({
       contracts: [
         row({
           contract_id: 'consult-huge',
           incumbent_name: 'Booz Consulting Mega',
           naics_code: '541611',
+          description: 'administrative management consulting',
           potential_total_value: 90_000_000,
           lead_time_months: 9,
         }),
@@ -411,6 +420,7 @@ describe('Coming Back to Market — exact-code states', () => {
           contract_id: 'it-fit',
           incumbent_name: 'Custom Software LLC',
           naics_code: '541511',
+          description: 'programming and custom software development',
           potential_total_value: 350_000,
           lead_time_months: 14,
         }),
@@ -461,7 +471,7 @@ describe('Coming Back to Market — exact-code states', () => {
     expect(html).not.toContain(COMING_BACK_HEADING);
   });
 
-  it('still ranks 541611 first when that code is individually confirmed', () => {
+  it('when distinctive misses, ranks 6–18 by value rather than code-state', () => {
     const out = selectComingBackRows({
       contracts: [
         row({
@@ -491,8 +501,7 @@ describe('Coming Back to Market — exact-code states', () => {
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('BOOZ ALLEN HAMILTON INC.');
-    expect(out.rows[0].codeState).toBe('primary_confirmed');
-    expect(out.rows.find((r) => r.contract_id === 'it')?.codeState).toBe('evidence_supported');
+    expect(out.rows[0].value).toBe(211_800_000);
   });
 });
 
@@ -617,13 +626,14 @@ describe('Coming Back to Market — targeting', () => {
     expect(html).toContain('Teaming opportunity');
   });
 
-  it('diversifies so one NAICS cannot occupy all five slots when other core codes qualify', () => {
+  it('prefers distinctive janitorial hits inside the market instead of diversifying by NAICS', () => {
     const contracts = [
       ...[0, 1, 2, 3, 4].map((i) =>
         row({
           contract_id: `fac-${i}`,
           incumbent_name: `Facilities Whale ${i}`,
           naics_code: '561210',
+          description: 'facility support services',
           potential_total_value: 10_000_000 + i,
           lead_time_months: 10,
         }),
@@ -632,6 +642,7 @@ describe('Coming Back to Market — targeting', () => {
         contract_id: 'jan-a',
         incumbent_name: 'Janitorial Alpha',
         naics_code: '561720',
+        description: 'JANITORIAL SERVICES',
         potential_total_value: 500_000,
         lead_time_months: 11,
       }),
@@ -639,6 +650,7 @@ describe('Coming Back to Market — targeting', () => {
         contract_id: 'jan-b',
         incumbent_name: 'Janitorial Beta',
         naics_code: '561720',
+        description: 'custodial janitorial',
         potential_total_value: 400_000,
         lead_time_months: 12,
       }),
@@ -647,18 +659,16 @@ describe('Coming Back to Market — targeting', () => {
       contracts,
       count: 7,
       naicsCodes: ['561210', '561720'],
-      profile: { storedNaics: ['561210', '561720'], businessType: 'Small Business' },
+      profile: {
+        storedNaics: ['561210', '561720'],
+        businessType: 'Small Business',
+        keywords: ['janitorial'],
+      },
     });
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
-    expect(out.rows).toHaveLength(5);
-    const byNaics = out.rows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.naics || ''] = (acc[r.naics || ''] || 0) + 1;
-      return acc;
-    }, {});
-    expect(byNaics['561210']).toBeLessThanOrEqual(3);
-    expect(byNaics['561720']).toBeGreaterThanOrEqual(2);
-    expect(out.rows.some((r) => r.incumbent === 'Janitorial Alpha')).toBe(true);
+    expect(out.rows.every((r) => r.naics === '561720')).toBe(true);
+    expect(out.rows[0].incumbent).toBe('Janitorial Alpha');
   });
 
   it('treats a $250M+ vehicle as teaming when business type is unknown', () => {
@@ -689,7 +699,7 @@ describe('Coming Back to Market — targeting', () => {
     expect(out.rows.find((r) => r.contract_id === 'embassy')?.fit).toBe('teaming');
   });
 
-  it('does not let a $90M inferred vehicle beat a confirmed 6–18 IT match', () => {
+  it('does not let a $90M inferred vehicle beat a distinctive 6–18 IT match', () => {
     const out = selectComingBackRows({
       contracts: [
         row({
@@ -697,6 +707,7 @@ describe('Coming Back to Market — targeting', () => {
           incumbent_name: 'Interior Janitorial Co',
           awarding_agency: 'Department of the Interior',
           naics_code: '561210',
+          description: 'janitorial and custodial services',
           potential_total_value: 90_000_000,
           lead_time_months: 9,
         }),
@@ -705,6 +716,7 @@ describe('Coming Back to Market — targeting', () => {
           incumbent_name: 'Custom Software LLC',
           awarding_agency: 'Department of the Navy',
           naics_code: '541511',
+          description: 'programming and custom software development',
           potential_total_value: 350_000,
           lead_time_months: 14,
         }),
@@ -721,8 +733,104 @@ describe('Coming Back to Market — targeting', () => {
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('Custom Software LLC');
-    expect(out.rows[0].codeState).toBe('evidence_supported');
     expect(out.rows[0].value).toBe(350_000);
+  });
+});
+
+describe('Coming Back locked rank — window then value, not hit-count', () => {
+  it('orders 6–18 ahead of 3–6 ahead of >18, and excludes under 3 months', () => {
+    const out = selectComingBackRows({
+      contracts: [
+        row({ contract_id: 'late', incumbent_name: 'Too Late LLC', lead_time_months: 2, potential_total_value: 80_000_000 }),
+        row({ contract_id: 'near', incumbent_name: 'Near Term LLC', lead_time_months: 4, potential_total_value: 5_000_000 }),
+        row({ contract_id: 'prime-window', incumbent_name: 'Capture Window LLC', lead_time_months: 10, potential_total_value: 2_000_000 }),
+        row({ contract_id: 'far', incumbent_name: 'Far Out LLC', lead_time_months: 24, potential_total_value: 90_000_000 }),
+      ],
+      count: 4,
+      naicsCodes: ['561720'],
+    });
+    expect(out.kind).toBe('show');
+    if (out.kind !== 'show') return;
+    expect(out.rows.map((r) => r.incumbent)).toEqual([
+      'Capture Window LLC',
+      'Near Term LLC',
+      'Far Out LLC',
+    ]);
+    expect(out.rows.some((r) => r.contract_id === 'late')).toBe(false);
+  });
+
+  it('does not use keyword-hit count as the primary sort inside the preferred set', () => {
+    const out = selectComingBackRows({
+      contracts: [
+        row({
+          contract_id: 'two-hits',
+          incumbent_name: 'Two Hit Janitorial',
+          description: 'JANITORIAL SERVICES AND COMMERCIAL CLEANING',
+          lead_time_months: 10,
+          potential_total_value: 1_200_000,
+        }),
+        row({
+          contract_id: 'one-hit-huge',
+          incumbent_name: 'CDC Janitorial',
+          description: 'JANITORIAL SERVICES',
+          lead_time_months: 10,
+          potential_total_value: 38_800_000,
+        }),
+      ],
+      count: 2,
+      naicsCodes: ['561720'],
+      keywords: ['janitorial', 'commercial cleaning'],
+    });
+    expect(out.kind).toBe('show');
+    if (out.kind !== 'show') return;
+    expect(out.rows[0].incumbent).toBe('CDC Janitorial');
+  });
+
+  it('keeps the NAICS market when distinctive keywords miss, and does not expand it', () => {
+    const out = selectComingBackRows({
+      contracts: [
+        row({
+          contract_id: 'in-market',
+          incumbent_name: 'Market Janitorial',
+          naics_code: '561720',
+          description: 'floor waxing',
+          lead_time_months: 10,
+          potential_total_value: 800_000,
+        }),
+        row({
+          contract_id: 'off-market',
+          incumbent_name: 'Cyber Firm',
+          naics_code: '541512',
+          description: 'cybersecurity operations',
+          lead_time_months: 10,
+          potential_total_value: 50_000_000,
+        }),
+      ],
+      count: 2,
+      naicsCodes: ['561720'],
+      keywords: ['cybersecurity'],
+    });
+    expect(out.kind).toBe('show');
+    if (out.kind !== 'show') return;
+    expect(out.rows.map((r) => r.contract_id)).toEqual(['in-market']);
+  });
+
+  it('generic singles never expand a missing NAICS/PSC market', () => {
+    const out = selectComingBackRows({
+      contracts: [
+        row({
+          contract_id: 'any',
+          incumbent_name: 'Any Construction',
+          naics_code: '236220',
+          description: 'construction',
+          lead_time_months: 10,
+        }),
+      ],
+      count: 1,
+      naicsCodes: [],
+      keywords: ['construction'],
+    });
+    expect(out).toEqual({ kind: 'omit', reason: 'no_naics_market' });
   });
 });
 

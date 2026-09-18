@@ -9,6 +9,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { getNaics } from '@/lib/codes/lookup';
+import { overlayRecompeteTiming } from '@/lib/recompete/timing';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -282,14 +283,11 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     }
   }
 
-  // FM-U06 (Eric/QA 2026-07-29): the stored estimated_recompete_date/lead_time_months were baked at
-  // sync time as (pop_end − 12mo) and a static value — so for a near-term expiry they read as PAST
-  // dates and lead_time_months=0 for every row. Recompute them LIVE from today vs the real PoP-end:
-  //  • lead_time_months  = whole months from today until PoP-end (>=0)
-  //  • estimated_recompete_date = when a solicitation typically posts — ~9mo before PoP-end, but never
-  //    before today (if the window's already inside 9mo, "expect it now"). Forward-looking, never past.
-  const now = Date.now();
-  const MS_PER_MONTH = 30.4375 * 86_400_000;
+  // MINDY-006 (2026-09-17): estimated_recompete_date is PoP-end minus 12 calendar
+  // months (DB trigger / forecast-PRD). Never derived from today, never clamped
+  // to the run date — a past capture date stays past. lead_time_months is a
+  // different quantity: remaining clock to PoP-end, recomputed live.
+  const now = new Date();
   const contracts = rawContracts.map((c) => {
     // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
     // recovered it into set_aside_enriched from BQ awards.set_aside. Coalesce so every downstream
@@ -304,20 +302,14 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     // description are NOT derivable from what we store (they live on the per-award
     // detail endpoint) and stay null — an honest miss, never a guess.
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
-    const end = c.period_of_performance_current_end ? new Date(c.period_of_performance_current_end).getTime() : null;
-    if (!end || Number.isNaN(end)) return { ...c, set_aside_type, naics_description };
-    const rawMonths = (end - now) / MS_PER_MONTH;
-    // A contract that has not ended is not "0 months". round() turned a
-    // 10-day expiry into 0, and soonest-first put those on the first page.
-    const leadMonths = end > now ? Math.max(1, Math.round(rawMonths)) : 0;
-    const solLead = 9 * MS_PER_MONTH; // typical months a recompete solicitation posts before PoP-end
-    const estMs = Math.max(now, end - solLead); // never in the past
+    const timing = overlayRecompeteTiming(c.period_of_performance_current_end, now);
+    if (!timing) return { ...c, set_aside_type, naics_description };
     return {
       ...c,
       set_aside_type,
       naics_description,
-      lead_time_months: leadMonths,
-      estimated_recompete_date: new Date(estMs).toISOString().slice(0, 10),
+      lead_time_months: timing.lead_time_months,
+      estimated_recompete_date: timing.estimated_recompete_date,
     };
   });
   return { contracts, total: res.count ?? contracts.length, count: res.count ?? null, degraded: false };
