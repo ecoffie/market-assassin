@@ -6956,3 +6956,17 @@ no 504; representative drones capability completes grounded under 55s.
 **SEO.** Federal recompete alerts, contracts coming back to market, SAM.gov daily alerts vs expiring contracts, 6–18 month capture window.
 
 **Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: 7hillstransportation@gmail.com Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); americanpatriot1872@pm.me Open Now + Coming Back Saliense $24.7M (541512); civelladante@gmail.com roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); diannewilsoncontact@gmail.com Arrow Arc $32.1M (541910); wednel.joseph@gmail.com generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.
+
+---
+
+## Potato P4 — Open FIND ranks market relevance before deadline (2026-09-17)
+
+**What.** Open now on `find_opportunities` over-fetches one `sam_opportunities` pool (cap 500), then ranks **DIRECT_MATCH → RELATED_MARKET_CANDIDATE → WEAK_NON_MARKET**, and only then sorts `response_deadline` inside each tier. Deadline is no longer the first sort. Relevance evidence is NAICS **or** PSC **or** word-boundary/phrase market text — not a 2-character substring such as “it” inside *solicitation* / *with* / *city*.
+
+**Why.** “I sell IT services and want to work with the VA” was ranking ceiling lifts and carpet cleaning first because stop-word stripping left token `it`, Open matched `%it%` across title/description/SOW, every survivor scored equal, and `response_deadline ASC` plus a visible limit of 5 hid the real IT work. Measured before: P@5 = 0.00, P@10 = 0.00, P@25 = 0.12. Actual IT notices (Enterprise QA Software, DistillerSR, C&P Help Desk) sat lower in the same result set.
+
+**SEO.** VA IT services opportunities, SAM.gov opportunity ranking, sell IT to Veterans Affairs, federal help desk RFP, relevance before urgency.
+
+**Proof.** Live 2026-09-17, same FIND compose, 10 credits, one call. VA + IT services: P@5 **0.00 → 1.00**, P@10 **0.00 → 1.00**, P@25 **0.12 → 0.76**. Rank 1 = Enterprise QA Software (541519/DA10); rank 6 = DistillerSR (513210/DA10 — PSC evidence, not NAICS-only); rank 17 = C&P Help Desk Tier 2 (541512/DA01, recovered because cap 500 covers the 357-row union; 100/200 truncated it). Construction + Army control stayed P@5/P@10/P@25 = 1.00 with deadline still ordering inside DIRECT. SOCOM + cybersecurity Open stayed honestly empty; Coming back 8 DIRECT / 31 RELATED; Coming soon unavailable, not zero. Cap 500 is the smallest of {100, 200, 500} that kept later-deadline DIRECT in the pool. Units: `open-relevance.unit.test.ts`. **Not a P4 win:** DLA janitorial 561210 Installation Support is existing Facilities taxonomy debt; ML + Air Force token/AFFAIRS buyer-needle debt is unchanged.
+
+P2 one-FIND / first-value / one-refine and P3 buyer-normalization / DIRECT vs RELATED are unchanged.
