@@ -6,6 +6,7 @@ import { grantBriefingsAccess, revokeBriefingsAccess } from '@/lib/briefings/acc
 import { sendBundleEmail, sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
 import { updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { getStripe } from '@/lib/stripe';
+import { cancelSubscriptionForDispute } from '@/lib/stripe/cancel-on-dispute';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { briefingGrantForPurchase } from '@/lib/briefings/product-entitlement';
 // `Stripe` imported for TYPES; the client is created lazily via getStripe() so
@@ -74,6 +75,10 @@ export async function POST(request: Request) {
 
       case 'charge.refunded':
         await handleChargeRefunded(supabase, event.data.object as Stripe.Charge);
+        break;
+
+      case 'charge.dispute.created':
+        await cancelSubscriptionForDispute(getStripe(), event.data.object as Stripe.Dispute);
         break;
 
       // Subscription events

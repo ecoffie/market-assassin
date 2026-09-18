@@ -6970,3 +6970,14 @@ no 504; representative drones capability completes grounded under 55s.
 **Proof.** Live 2026-09-17, same FIND compose, 10 credits, one call. VA + IT services: P@5 **0.00 → 1.00**, P@10 **0.00 → 1.00**, P@25 **0.12 → 0.76**. Rank 1 = Enterprise QA Software (541519/DA10); rank 6 = DistillerSR (513210/DA10 — PSC evidence, not NAICS-only); rank 17 = C&P Help Desk Tier 2 (541512/DA01, recovered because cap 500 covers the 357-row union; 100/200 truncated it). Construction + Army control stayed P@5/P@10/P@25 = 1.00 with deadline still ordering inside DIRECT. SOCOM + cybersecurity Open stayed honestly empty; Coming back 8 DIRECT / 31 RELATED; Coming soon unavailable, not zero. Cap 500 is the smallest of {100, 200, 500} that kept later-deadline DIRECT in the pool. Units: `open-relevance.unit.test.ts`. **Not a P4 win:** DLA janitorial 561210 Installation Support is existing Facilities taxonomy debt; ML + Air Force token/AFFAIRS buyer-needle debt is unchanged.
 
 P2 one-FIND / first-value / one-refine and P3 buyer-normalization / DIRECT vs RELATED are unchanged.
+
+## Chargeback stops the next invoice (2026-09-18)
+
+**What.** The first Discover/Visa chargeback on a subscription invoice cancels that subscription. One-time charges (MCP top-ups) and bank retrieval inquiries are left alone. A second dispute on the same sub is a no-op.
+
+**Why.** A subscriber disputed three $149 Mindy Ai renewals while Stripe still had the subscription active, so the next cycle would have billed again. Canceling in the dashboard after the fact is fine at that volume; leaving the meter running is how one dispute becomes three.
+
+**SEO.** Cancel Mindy subscription, Mindy billing dispute, GovCon SaaS chargeback.
+
+**Proof.** `charge.dispute.created` on `getmindy.ai/api/stripe-webhook` (and `/api/webhooks/stripe`). Helper `cancelSubscriptionForDispute` in `src/lib/stripe/cancel-on-dispute.ts`. Units: 9/9 in `cancel-on-dispute.unit.test.ts` (cancels the invoice's sub, skips one-time charges, skips inquiries, does not cancel twice).
+

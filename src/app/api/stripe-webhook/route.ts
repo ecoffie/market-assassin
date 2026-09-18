@@ -23,6 +23,7 @@ import {
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
+import { cancelSubscriptionForDispute } from '@/lib/stripe/cancel-on-dispute';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
 
@@ -108,6 +109,13 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabase();
 
   console.log(`Stripe webhook: ${event.type} (test: ${isTestMode})`);
+
+  // First chargeback on a subscription invoice cancels THAT sub so a second
+  // (and third) renewal cannot fire. Inquiries are skipped inside the helper.
+  if (event.type === 'charge.dispute.created') {
+    const result = await cancelSubscriptionForDispute(stripe, event.data.object as Stripe.Dispute);
+    return NextResponse.json({ received: true, dispute: result });
+  }
 
   // ── ASYNC PAYMENT SETTLED. A delayed payment method (ACH, bank debit, some wallets)
   // completes the checkout session with payment_status 'unpaid' and settles LATER.
