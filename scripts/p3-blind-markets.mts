@@ -2,7 +2,7 @@
  * P3 live probe — not a billed host FIND fan-out. One findOpportunities per market.
  * Prints precision/recall vs named SOCOM IT PIIDs + blind markets.
  */
-import { findOpportunities } from '../src/lib/opportunities/find-opportunities.ts';
+import { findOpportunities } from '../src/lib/opportunities/find-opportunities';
 
 const NAMED = ['H9241524F0002', 'H9223922F0028', 'H9241524F0028', 'H9241522F0062'];
 
