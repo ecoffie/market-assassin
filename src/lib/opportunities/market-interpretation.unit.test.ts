@@ -135,4 +135,12 @@ describe('interpretMarket contract', () => {
     expect(m.capability.direct.naics).toEqual(['236', '237', '238']);
     expect(m.retrieval_plan.related_market_applied).toBe(false);
   });
+
+  it('IT services + VA maps to the IT preset with no related-market overlay', () => {
+    const m = interpretMarket('IT services', 'VA');
+    expect(m.capability.kind).toBe('industry_preset');
+    expect(m.capability.direct.naics).toEqual(['541511', '541512', '541513', '541519']);
+    expect(m.retrieval_plan.related_market_applied).toBe(false);
+    expect(m.capability.related_market).toBeNull();
+  });
 });

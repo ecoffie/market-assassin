@@ -78,7 +78,8 @@ const SHARED_ALIASES = (aliasData as { aliases?: Record<string, string> }).alias
 function fold(s: string): string {
   return String(s || '')
     .toUpperCase()
-    .replace(/[.,/&()]/g, ' ')
+    .replace(/\./g, '')
+    .replace(/[,/&()]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

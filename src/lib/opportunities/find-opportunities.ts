@@ -127,7 +127,12 @@ export interface FindOpportunitiesResult {
   horizons: Record<HorizonKey, HorizonResult>;
   summary: {
     open_now: { status: HorizonStatus; matched_count: number | null };
-    coming_back: { status: HorizonStatus; matched_count: number | null };
+    coming_back: {
+      status: HorizonStatus;
+      matched_count: number | null;
+      direct_match: number | null;
+      related_market_candidate: number | null;
+    };
     coming_soon: { status: HorizonStatus; matched_count: number | null };
     headline: string;
     claim_hygiene: string;
@@ -160,6 +165,7 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'Do not web-search or create an artifact on this turn. Do not ask market map vs access-path vs capability statement.',
   'Clearance is not a first-value question. Do not call it a hard gate because the buyer is SOCOM.',
   'EVIDENCE CLASS: DIRECT_MATCH is confirmed relevance to what they asked to sell. RELATED_MARKET_CANDIDATE is this buyer’s broader market that can contain that work. Never count related-market rows as confirmed cyber (or other capability) demand. Never mix the two into one “cyber contracts” number. Explain the distinction in plain English. Do not dump NAICS/PSC.',
+  'COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say “N contracts with direct cybersecurity evidence and M related SOCOM IT contracts worth reviewing.” Never say “N+M cybersecurity recompetes/contracts.” presentation_note and summary.headline already split the counts — use them.',
   'INTERPRETATION: use presentation_note / market_interpretation.truth. Buyer alias (SOCOM = U.S. Special Operations Command) is spelling, not a wider department. Never say you searched all of DoD. Never claim the entire IT-services market is cybersecurity.',
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
 ] as const;
@@ -1016,7 +1022,34 @@ export function buildFindNext(
   ];
 }
 
-function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string {
+export function comingBackSummary(h: HorizonResult): FindOpportunitiesResult['summary']['coming_back'] {
+  const ev = h.evidence_counts;
+  return {
+    status: h.status,
+    matched_count: h.matched_count,
+    direct_match: ev?.DIRECT_MATCH ?? null,
+    related_market_candidate: ev?.RELATED_MARKET_CANDIDATE ?? null,
+  };
+}
+
+/** Host-facing Coming back sentence. Never collapses DIRECT+RELATED into one capability count. */
+export function comingBackHostClaim(
+  phrase: string,
+  ev: { DIRECT_MATCH: number; RELATED_MARKET_CANDIDATE: number } | null | undefined,
+): string {
+  const p = (phrase || 'this market').trim();
+  if (!ev) return '';
+  if (ev.RELATED_MARKET_CANDIDATE > 0) {
+    return (
+      `I found ${ev.DIRECT_MATCH} contracts with direct ${p} evidence and ` +
+      `${ev.RELATED_MARKET_CANDIDATE} related-market candidates worth reviewing. ` +
+      `Do not call the combined ${ev.DIRECT_MATCH + ev.RELATED_MARKET_CANDIDATE} "${p} contracts".`
+    );
+  }
+  return `I found ${ev.DIRECT_MATCH} coming-back contracts with direct ${p} evidence.`;
+}
+
+export function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string {
   const part = (key: HorizonKey, label: string) => {
     const h = horizons[key];
     if (h.status === 'unavailable') return `${label} unavailable`;
@@ -1074,7 +1107,12 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       horizons,
       summary: {
         open_now: { status: 'unavailable', matched_count: null },
-        coming_back: { status: 'unavailable', matched_count: null },
+        coming_back: {
+          status: 'unavailable',
+          matched_count: null,
+          direct_match: null,
+          related_market_candidate: null,
+        },
         coming_soon: { status: 'unavailable', matched_count: null },
         headline: 'query required',
         claim_hygiene:
@@ -1155,11 +1193,13 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       interpreted_as: interpreted.interpreted,
     },
     market_interpretation: mi,
-    presentation_note: plainEnglishInterpretation(mi),
+    presentation_note: [plainEnglishInterpretation(mi), comingBackHostClaim(interpreted.searchText, coming_back.evidence_counts)]
+      .filter(Boolean)
+      .join(' '),
     horizons,
     summary: {
       open_now: { status: open_now.status, matched_count: open_now.matched_count },
-      coming_back: { status: coming_back.status, matched_count: coming_back.matched_count },
+      coming_back: comingBackSummary(coming_back),
       coming_soon: { status: coming_soon.status, matched_count: coming_soon.matched_count },
       headline: headlineFor(horizons),
       claim_hygiene:
