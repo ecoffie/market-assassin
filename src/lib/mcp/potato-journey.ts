@@ -6,6 +6,11 @@
 
 /** First-turn contract — must lead initialize instructions. */
 export const P2_FIRST_TURN_INSTRUCTIONS = [
+  'Solicitation intent (BEFORE Potato P2 FIND-first). Classify, then call ONE tool. Do not call FIND first and then lookup.',
+  'KNOWN_ID — a notice UUID or solicitation identifier (isSolicitationIdentifier): call lookup_solicitation with that token. Do NOT call find_opportunities.',
+  'HISTORICAL — submitted / bid / proposal / worked on / what happened / previous / old / recently / last month / "the solicitation we" / "the bid we" / a named program in a retrospective context: call lookup_solicitation ONCE with the user\'s words. Closed ≠ gone. Do NOT call find_opportunities first.',
+  'CURRENT_FIND — sell / opportunities / available / where\'s the money / want to work with, without retrospective/past-work intent: Potato P2 below.',
+  '',
   'Potato P2 — VALUE BEFORE QUALIFICATION (first turn).',
   'Broad intent: "I sell X and want to sell to Y", "help me", "where do I start".',
   'The host MUST:',
