@@ -174,6 +174,13 @@ export const FORECAST_AGENCY_IDENTITIES: ForecastAgencyIdentity[] = [
   { key: 'DLA', label: 'Defense Logistics Agency', codes: [], coverage: 'none', parentWithData: 'DOD',
     aliases: ['DLA', 'DEFENSE LOGISTICS AGENCY', 'DEFENSE LOGISTICS'],
     note: 'No DLA forecast feed. DLA demand is covered by the DIBBS RFQ dataset, not agency_forecasts.' },
+  { key: 'SOCOM', label: 'U.S. Special Operations Command', codes: [], coverage: 'none', parentWithData: 'DOD',
+    aliases: [
+      'SOCOM', 'USSOCOM', 'U.S. SPECIAL OPERATIONS COMMAND', 'US SPECIAL OPERATIONS COMMAND',
+      'UNITED STATES SPECIAL OPERATIONS COMMAND', 'SPECIAL OPERATIONS', 'SPECIAL OPS',
+      'U.S. SPECIAL OPERATIONS COMMAND (SOCOM)',
+    ],
+    note: 'No SOCOM/USSOCOM forecast publisher in agency_forecasts. DoD coverage is Navy/ONR/NRL/USACE only — not USSOCOM. Alias matching is not coverage.' },
   { key: 'SEC', label: 'Securities and Exchange Commission', codes: [], coverage: 'none',
     aliases: ['SEC', 'SECURITIES AND EXCHANGE COMMISSION', 'SECURITIES AND EXCHANGE'],
     note: 'No SEC forecast feed. Previously substring-matched 170 "Social SECurity Administration" rows.' },
@@ -364,6 +371,8 @@ for (const [canonical, key] of [
   ['U S ARMY CORPS OF ENGINEERS CIVIL WORKS', 'USACE'],
   ['DEPARTMENT OF HEALTH AND HUMAN SERVICES', 'HHS'],
   ['NATIONAL AERONAUTICS AND SPACE ADMINISTRATION', 'NASA'],
+  ['U S SPECIAL OPERATIONS COMMAND SOCOM', 'SOCOM'],
+  ['U S SPECIAL OPERATIONS COMMAND', 'SOCOM'],
 ] as const) {
   const id = FORECAST_AGENCY_IDENTITIES.find((x) => x.key === key);
   if (id) IDENTITY_BY_CANONICAL_NAME.set(normalize(canonical), id);
