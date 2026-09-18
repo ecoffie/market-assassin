@@ -98,7 +98,7 @@ describe('rejected false positives — a substring is NOT an identity', () => {
   });
 
   it('short acronyms never emit a bare substring clause', () => {
-    for (const a of ['EPA', 'FBI', 'DEA', 'ATF', 'TSA', 'FAA', 'DLA', 'SEC', 'GSA', 'VA', 'USCG', 'CBP', 'NIH', 'CMS', 'NPS', 'FWS', 'FAS', 'PBS', 'NAVFAC', 'NAVAIR', 'NAVSEA']) {
+    for (const a of ['EPA', 'FBI', 'DEA', 'ATF', 'TSA', 'FAA', 'DLA', 'SEC', 'GSA', 'VA', 'USCG', 'CBP', 'NIH', 'CMS', 'NPS', 'FWS', 'FAS', 'PBS', 'NAVFAC', 'NAVAIR', 'NAVSEA', 'SOCOM', 'USSOCOM']) {
       const e = expr(a);
       expect(e, `${a} produced a substring match`).not.toMatch(/ilike\.%/);
       expect(e, `${a} produced a bare %term%`).not.toMatch(/%[A-Za-z]/);
@@ -149,7 +149,7 @@ describe('parent behaviour — rollup is parent → child ONLY', () => {
     // FAA/FBI/… must not return the parent department corpus; that is the EPA bug in another hat.
     // TSA used to be in this list — it is now a real CHILD identity (DHS bureau anchor) and is
     // covered in the subagency suite below.
-    for (const [child, parent] of [['FAA', 'DOT'], ['FBI', 'DOJ'], ['DEA', 'DOJ'], ['ATF', 'DOJ'], ['DLA', 'DOD']] as const) {
+    for (const [child, parent] of [['FAA', 'DOT'], ['FBI', 'DOJ'], ['DEA', 'DOJ'], ['ATF', 'DOJ'], ['DLA', 'DOD'], ['SOCOM', 'DOD']] as const) {
       const id = resolveForecastAgencyIdentity(child)!;
       expect(id.codes, `${child} inherited ${parent}`).toEqual([]);
       expect(id.coverage).toBe('none');

@@ -6935,6 +6935,18 @@ no 504; representative drones capability completes grounded under 55s.
 
 ---
 
+## Potato P3 — market understanding (customer language in)
+
+**What.** `find_opportunities` now interprets “I sell cybersecurity to SOCOM” as a government market without asking the customer for NAICS, PSC, or legal agency names. Buyer aliases (SOCOM / USSOCOM / U.S. Special Operations Command) are spelling, not a wider department. When cyber classification is thin, Coming back can return this buyer’s IT-coded contracts as **related-market candidates** — never as confirmed cybersecurity demand. Missing forecast publishers are coverage-not-established, not a measured zero.
+
+**Why.** P2 sequenced first value correctly, then returned 0/0/0 because FIND looked for the literal word “cybersecurity” on the parent awarding-agency column. USSOCOM cyber-relevant work is stored as “U.S. Special Operations Command” on the sub-agency column and billed under IT NAICS, not the word cybersecurity.
+
+**SEO.** sell to SOCOM, USSOCOM cybersecurity contracts, federal IT recompetes, GovCon market language.
+
+**Proof.** Interpretation contract on the FIND payload (`market_interpretation`, `evidence_class` DIRECT_MATCH vs RELATED_MARKET_CANDIDATE). Customer-facing `summary.coming_back` carries `direct_match` and `related_market_candidate` separately; `comingBackHostClaim` and `summary.headline` refuse a mixed “39 cybersecurity recompetes” sentence for 8+31. Unit tests: SOCOM / USSOCOM / U.S. Special Operations Command share one canonical without DoD; generic 541511/541512/541519 is RELATED not cyber; physical security and bare “security” do not enter the related-IT family; 160th SOAR is not a SIEM/SOAR signal; SOCOM forecast identity is coverage `'none'`; `creditsFor('find_opportunities') === 10`. Live 2026-09-17: `cybersecurity`+`SOCOM` → Open empty 0 · Coming back 39 (8 direct · 31 related-market) · Coming soon unavailable (`coverage_unestablished`). Named PIIDs: H9241524F0002 DIRECT (DJ01 + “Cybersecurity Support Services”); H9223922F0028 / H9241524F0028 / H9241522F0062 RELATED (IT NAICS, no cyber claim). P2 one-FIND sequencing unchanged. Blind-market table in the P3 stop report.
+
+---
+
 ## Daily Alert Coming Back rank — market, then distinctive, then lead window, then value (2026-09-17)
 
 **What.** Daily Alert keeps two sections. **Open Now** is respondable SAM. **Coming Back to Market** is expiring contracts worth positioning for — never implied as currently soliciting. Rank inside Coming Back is locked: stored NAICS/PSC market → distinctive-keyword preference inside that market → 6–18 months remaining, then 3–6, then >18 if needed to fill the cap → value. Under 3 months is excluded. Distinctive misses keep the NAICS/PSC set; generic singles never expand it. Existing $250M+ / nuclear M&O teaming stays; keyword-hit count, capture-band, and soonest-PoP are not primary sorts.
