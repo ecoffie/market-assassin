@@ -6996,9 +6996,21 @@ Current notice `f1aa309fa39040a4929d90a7d88fd091`, Amendment 0003, deadline
 2026-08-27, status archived. Explicit Original UUID
 `ce85c48dc296497eb902a0a73ac45680` remains that historical record. Unit:
 `solicitation-family.unit.test.ts` tests 1–20. Production known-ID proof is
-#1557 (`741ec0d3`) on getmindy.ai. Targeted dry-run (no writes): 3,730
-pipeline-touched families / 10,316 versions / 3,022 pursuits on older siblings.
-The 44,560-family fleet population is out of scope.
+#1557 (`741ec0d3`) on getmindy.ai. Family v1 (#1558) is live as **lazy persist
+only** (production canary 2026-09-19: one MASA family, Original `notice_id`
+preserved). Targeted 3,729-family backfill and the 44,560-family fleet are
+blocked. Do not build a `--go` writer until historical discovery (#1560) shows
+persisted families are worth populating.
+
+## Historical Solicitation Discovery — lookup_solicitation (2026-09-18)
+
+**What.** A dedicated MCP tool looks up a solicitation the customer already worked — by known id or by memory ("I submitted a Navy manufacturing bid at Indian Head recently") — including closed and archived notices. Closed is not gone. Closed is not awarded.
+
+**Why.** FIND only answers "what can I sell into now." The original MASA failure was discovery: Mindy stored the SAM family, but the host called FIND first and the archived notice never appeared. Historical lookup short-circuits that path.
+
+**SEO.** find archived SAM solicitation, lookup past bid, NSWC Indian Head MASA, closed solicitation not awarded, SAM amendment history.
+
+**Proof.** Tool `lookup_solicitation`, 5 credits, local `sam_opportunities` only (no web, no sow_text). Result kinds: `RESOLVED_SOLICITATION` vs `MATCHED_CANDIDATE`. Amendments collapse via production #1557. MASA without a number is a strong candidate, not silent identity. Open control `70RTAC26R00000007` stays OPEN / `not_biddable=false`. FIND is unchanged: "I sell IT services and want to work with the VA" still calls `find_opportunities` once at 10 credits.
 
 ---
 
