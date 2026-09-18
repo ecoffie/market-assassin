@@ -31,6 +31,13 @@ import {
   type EvidenceClass,
   type MarketInterpretation,
 } from '@/lib/opportunities/market-interpretation';
+import {
+  OPEN_FETCH_CAP,
+  openCandidateOrExpr,
+  openEvidenceWhy,
+  openEvidenceCounts,
+  rankOpenRows,
+} from '@/lib/opportunities/open-relevance';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -349,7 +356,8 @@ function interpretQuery(input: FindOpportunitiesInput): InterpretedQuery {
     market,
     interpreted: {
       open_now:
-        `SAM active notices; keyword via search brain (${intent.kind}); ` +
+        `SAM active notices; keyword via search brain (${intent.kind}) OR interpreted DIRECT NAICS/PSC; ` +
+        `rank DIRECT → RELATED → deadline; ` +
         `buyer = department OR sub_tier` +
         (agencyNeedles.length ? ` (normalized ${agencyNeedles.length} spellings)` : '') +
         `; geo = place-of-performance OR buying-office state` +
@@ -387,8 +395,13 @@ async function queryOpenNow(
   const asOf = await tableAsOf(client, source, 'updated_at');
 
   try {
+    const cap = p.market.capability;
+    const searchIntent = p.searchText ? resolveQueryIntent(p.searchText) : { kind: 'empty' as const };
+    const keywordPath = searchIntent.kind === 'keyword' || searchIntent.kind === 'empty';
     const get = (k: string): string | null => {
-      if (k === 'q' || k === 'search') return p.searchText || null;
+      // Keyword path: skip search here and apply keyword∪DIRECT-taxonomy as ONE .or()
+      // (a second PostgREST .or() would AND and drop Help Desk / DistillerSR).
+      if (k === 'q' || k === 'search') return keywordPath ? null : p.searchText || null;
       if (k === 'state') return p.stateCode || null;
       if (k === 'agency') return p.agencyNeedles.length ? pipeNeedles(p.agencyNeedles) : (p.agency || null);
       if (k === 'setAside') return p.setAside || null;
@@ -399,7 +412,9 @@ async function queryOpenNow(
       return null;
     };
     const f = parseMapFilters(get);
-    if (p.searchText) consumed.push('query→search_brain');
+    const candidateOr = keywordPath ? openCandidateOrExpr(p.searchText, cap) : null;
+    if (p.searchText) consumed.push(keywordPath ? 'query→search_brain∪direct_taxonomy' : 'query→search_brain');
+    consumed.push('query→open_relevance_rank');
     if (p.stateCode) consumed.push('location→pop_or_office');
     if (p.agency) consumed.push(p.market.buyer.kind === 'normalization' ? 'agency→normalized_buyer' : 'agency');
     if (p.setAside) consumed.push('set_aside');
@@ -408,20 +423,27 @@ async function queryOpenNow(
     if (p.openClosingDays > 0) consumed.push('timeframe.open_closing_days');
 
     const COLS =
-      'notice_id, title, department, sub_tier, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, updated_at';
+      'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, updated_at';
 
+    const applyOpen = (q: any) => {
+      let next = applyMapFilters(q, f);
+      if (candidateOr) next = next.or(candidateOr);
+      return next;
+    };
+
+    const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
     let listQ = client.from(source).select(COLS, { count: 'exact' });
-    listQ = applyMapFilters(listQ, f);
+    listQ = applyOpen(listQ);
     const { data, count, error } = await listQ
       .order('response_deadline', { ascending: true, nullsFirst: false })
-      .limit(limit);
+      .limit(fetchCap);
 
     if (error) return unavailable(source, OPEN_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
     {
       let uq = client.from(source).select('notice_id', { count: 'exact', head: true }).is('map_lat', null);
-      uq = applyMapFilters(uq, f);
+      uq = applyOpen(uq);
       const { count: uc, error: ue } = await uq;
       if (!ue) unmapped = uc ?? null;
     }
@@ -440,7 +462,25 @@ async function queryOpenNow(
       );
     }
 
-    const items: HorizonItem[] = rows.map((r) => {
+    const ranked = rankOpenRows(
+      rows.map((r) => ({
+        title: String(r.title || ''),
+        description: String(r.description || ''),
+        naics_code: (r.naics_code as string) || '',
+        psc_code: (r.psc_code as string) || '',
+        department: String(r.department || ''),
+        solicitation_number: String(r.solicitation_number || ''),
+        response_deadline: (r.response_deadline as string) || null,
+        _raw: r,
+      })),
+      cap,
+    );
+    const evidence_counts = openEvidenceCounts(ranked);
+    const sliced = ranked.slice(0, limit);
+    const phrase = p.searchText || 'this work';
+
+    const items: HorizonItem[] = sliced.map(({ row, cls }) => {
+      const r = row._raw;
       const office = r.office_address as { city?: string; state?: string } | null;
       const st = String(r.pop_state || office?.state || '');
       const city = String(r.pop_city || office?.city || '');
@@ -453,10 +493,9 @@ async function queryOpenNow(
         relevant_date_label: 'response_deadline',
         value_label: null,
         source,
-        why_this_matched: p.searchText
-          ? `Matched open SAM notice for “${p.searchText}”`
-          : 'Matched open SAM notice',
+        why_this_matched: openEvidenceWhy(cls, phrase),
         identity: { kind: 'notice_id', id: String(r.notice_id || '') },
+        evidence_class: cls === 'WEAK_NON_MARKET' ? undefined : cls,
         notice_id: String(r.notice_id || ''),
         solicitation_number: String(r.solicitation_number || '') || null,
         response_deadline: (r.response_deadline as string) || null,
@@ -464,6 +503,7 @@ async function queryOpenNow(
         sam_url: (r.ui_link as string) || null,
         notice_type: (r.notice_type as string) || null,
         naics_code: (r.naics_code as string) || null,
+        psc_code: (r.psc_code as string) || null,
         sub_agency: (r.sub_tier as string) || null,
       };
     });
@@ -480,7 +520,9 @@ async function queryOpenNow(
       unmapped_count: unmapped,
       error: null,
       allowed_handoffs: OPEN_HANDOFFS,
-      semantics_note: 'Geography: place of performance OR buying-office state.',
+      semantics_note:
+        'Ranked DIRECT_MATCH then RELATED_MARKET_CANDIDATE then other matches; deadline sorts inside each tier. Geography: place of performance OR buying-office state.',
+      evidence_counts,
     };
   } catch (e) {
     return unavailable(source, OPEN_HANDOFFS, (e as Error).message, unsupported);
