@@ -12,6 +12,7 @@ import {
   parseReportRef,
   resolveLegislationAgency,
   NDAA_TITLE_PATTERN,
+  LEGISLATIVE_SOURCE_TYPES,
   type BillRef,
 } from './legislation';
 import { classifyFamilyState } from '@/app/api/cron/institute-legislation-sync/route';
@@ -302,5 +303,66 @@ describe('the sort parameter must not be percent-encoded', () => {
     });
     expect(urls[0]).toContain('sort=updateDate+desc');
     expect(urls[0]).not.toContain('%2B');
+  });
+});
+
+/**
+ * CLOCK SCOPE. institute_sources and intelligence_changes are SHARED with the GAO
+ * collector, which writes daily. An unscoped "newest row" query reports GAO's
+ * activity as legislative activity, so a legislative ingest dead for months would
+ * still show a fresh clock. Measured live 2026-09-18: the unscoped query returned a
+ * `gao_report` row's timestamp while zero legislative rows existed.
+ */
+describe('legislative clocks are scoped to the legislative corpus', () => {
+  it('the scope list holds exactly the types this collector emits', () => {
+    expect([...LEGISLATIVE_SOURCE_TYPES].sort()).toEqual(['committee_report', 'enacted_law', 'introduced_bill']);
+  });
+
+  it('every document this collector can emit falls inside the scope list', () => {
+    const enacted = { latestActionDate: '2025-12-19', latestActionText: 'Became law', becameLaw: true, lawNumber: '119-60' };
+    const emitted = new Set<string>([
+      ...billVersionsToDocuments(HR8800, HOUSE_VERSIONS, NO_LAW, 'T').map((d) => d.sourceType),
+      ...billVersionsToDocuments(S4784, SENATE_VERSIONS, NO_LAW, 'T').map((d) => d.sourceType),
+      ...billVersionsToDocuments(HR8800, [{ type: 'Enrolled Bill', date: null, formats: [] }, { type: 'Public Law', date: '2025-12-19T04:00:00Z', formats: [] }], enacted, 'T').map((d) => d.sourceType),
+      committeeReportToDocument({ type: 'HRPT', number: 698, congress: 119, part: 1, citation: 'H. Rept. 119-698', title: 'X' }, 'T')!.sourceType,
+    ]);
+    // A type emitted but NOT in the scope list would silently fall out of the clock.
+    for (const t of emitted) expect(LEGISLATIVE_SOURCE_TYPES as unknown as string[]).toContain(t);
+  });
+
+  it('gao_report is NOT in scope — the contamination the live probe caught', () => {
+    expect(LEGISLATIVE_SOURCE_TYPES as unknown as string[]).not.toContain('gao_report');
+  });
+
+  it('the route filters both clock reads by source type and never reads unscoped', async () => {
+    const fs = await import('node:fs');
+    const route = fs.readFileSync(
+      new URL('../../app/api/cron/institute-legislation-sync/route.ts', import.meta.url), 'utf8',
+    );
+    const code = route.replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+    // Slice each query at its OWN terminator. A fixed character window spills into
+    // the NEXT query — which also mentions LEGISLATIVE_SOURCE_TYPES — so a window
+    // assertion passes even with the filter deleted. (Caught by inject-testing this
+    // very guard: the first version of it did exactly that.)
+    const stmt = (marker: string) => {
+      const from = code.indexOf(marker);
+      expect(from).toBeGreaterThan(-1);
+      const end = code.indexOf('maybeSingle()', from);
+      expect(end).toBeGreaterThan(from);
+      return code.slice(from, end);
+    };
+
+    // The ingest clock must be type-filtered within its OWN statement.
+    const ingest = stmt("from('institute_sources')");
+    expect(ingest).toContain("in('source_type', LEGISLATIVE_SOURCE_TYPES");
+
+    // The change clock must join back to the corpus, not read the table bare.
+    const change = stmt("from('intelligence_changes')");
+    expect(change).toContain('institute_sources!inner');
+    expect(change).toContain("in('institute_sources.source_type', LEGISLATIVE_SOURCE_TYPES");
+
+    // And a failed clock read must not stamp (null would erase real history).
+    expect(code).toContain('clocksReadable');
   });
 });

@@ -37,6 +37,7 @@ import {
   currentCongress,
   chamberOf,
   NDAA_TITLE_PATTERN,
+  LEGISLATIVE_SOURCE_TYPES,
   type BillRef,
 } from '@/lib/institute/legislation';
 import { ingestInstituteDocument } from '@/lib/institute/sources';
@@ -306,18 +307,42 @@ export async function GET(request: NextRequest) {
     .eq('key', SOURCE_KEY)
     .maybeSingle();
 
-  const { data: newestIngest } = await db
+  // ⚠️ BOTH of these MUST be scoped to the LEGISLATIVE corpus.
+  //
+  // institute_sources and intelligence_changes are SHARED with the GAO collector,
+  // which runs daily. An unscoped "newest row" query returns GAO's timestamp, so a
+  // legislative ingest that had been dead for months would still report a fresh
+  // clock — the same "absence is invisible" failure that caused this whole incident.
+  // The clock must measure THIS source or it is worse than no clock at all.
+  const { data: newestIngest, error: ingestErr } = await db
     .from('institute_sources')
+    // unranged-ok: newest single row, bounded by limit(1) + maybeSingle().
     .select('discovered_at')
+    .in('source_type', LEGISLATIVE_SOURCE_TYPES as unknown as string[])
     .order('discovered_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  const { data: newestChange } = await db
+
+  // Legislative derivations link to their evidence by institute_source_id, so the
+  // change clock is scoped by an INNER JOIN back to this corpus via PostgREST's
+  // embedded-resource filter.
+  //
+  // ⚠️ NOT a two-step "collect ids, then .in(ids)" — that pattern needs a row cap,
+  // and a capped id list silently drops older sources, so the newest change under a
+  // dropped source would vanish from the clock. That is the capped-RETURNING lesson
+  // (a bounded read reported as a complete answer). The join has no such ceiling.
+  const { data: newestChange, error: changeErr } = await db
     .from('intelligence_changes')
-    .select('changed_at')
+    // unranged-ok: newest single row, bounded by limit(1) + maybeSingle().
+    .select('changed_at, institute_sources!inner(source_type)')
+    .in('institute_sources.source_type', LEGISLATIVE_SOURCE_TYPES as unknown as string[])
     .order('changed_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // A failed clock read is UNKNOWN, never "never happened" (Bug Prevention Rule #11).
+  // Stamping a null over a real timestamp would silently erase ingest history.
+  const clocksReadable = !ingestErr && !changeErr;
 
   const clocks: LegislationClocks = {
     lastPoll: pollAt,
@@ -326,7 +351,7 @@ export async function GET(request: NextRequest) {
   };
   const lastInstituteIngest = (newestIngest?.discovered_at as string) ?? null;
 
-  const stampable = !partial && failed === 0 && blocked === 0 && collectFailures === 0;
+  const stampable = !partial && failed === 0 && blocked === 0 && collectFailures === 0 && clocksReadable;
   if (stampable) {
     const notes = encodeLegislationClocks((srcRow?.notes as string) ?? null, clocks);
     await db.from('data_sources').update({ last_built: pollAt.slice(0, 10), notes }).eq('key', SOURCE_KEY);
@@ -366,6 +391,7 @@ export async function GET(request: NextRequest) {
     clocks: { ...clocks, lastInstituteIngest },
     freshness,
     clocksStamped: stampable,
+    clocksReadable,
     elapsedMs: Date.now() - started,
   });
 }

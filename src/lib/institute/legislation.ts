@@ -138,6 +138,23 @@ export function fiscalYearFromTitle(title: string): number | null {
   return y >= 1900 && y <= 2200 ? y : null;
 }
 
+/**
+ * Every source_type this collector can emit — the SCOPE of the legislative corpus.
+ *
+ * ⚠️ THIS IS A CLOCK BOUNDARY, NOT A CONVENIENCE LIST. institute_sources is SHARED
+ * with the GAO collector, which writes to it daily. Any "newest row" query that does
+ * not filter by these types reports GAO's activity as legislative activity — a
+ * legislative ingest could be dead for months while its clock looked fresh, which is
+ * this workstream's founding failure mode wearing a different hat.
+ *
+ * Kept in sync with the source_type CHECK (20260918 migration) by a unit test.
+ */
+export const LEGISLATIVE_SOURCE_TYPES = [
+  'introduced_bill',
+  'enacted_law',
+  'committee_report',
+] as const;
+
 // ── TYPES ────────────────────────────────────────────────────────────────────
 export interface BillRef {
   congress: number;
