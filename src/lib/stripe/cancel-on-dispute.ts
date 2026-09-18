@@ -93,11 +93,16 @@ function chargeIdOf(dispute: Stripe.Dispute): string | null {
   return null;
 }
 
+/** Stripe SDK v20 dropped Charge.invoice from the types; the live object still carries it. */
+function invoiceFromCharge(charge: Stripe.Charge): unknown {
+  return (charge as { invoice?: unknown }).invoice;
+}
+
 function invoiceIdOf(charge: Stripe.Charge): string | null {
-  const invoice = charge.invoice;
+  const invoice = invoiceFromCharge(charge);
   if (typeof invoice === 'string' && invoice.startsWith('in_')) return invoice;
   if (invoice && typeof invoice === 'object' && 'id' in invoice) {
-    const id = (invoice as { id: string }).id;
+    const id = (invoice as { id: unknown }).id;
     if (typeof id === 'string' && id.startsWith('in_')) return id;
   }
   return null;
@@ -144,8 +149,9 @@ export async function cancelSubscriptionForDispute(
   }
 
   let subscriptionId: string | null = null;
-  if (charge.invoice && typeof charge.invoice === 'object') {
-    subscriptionId = subscriptionIdFromInvoice(charge.invoice as Stripe.Invoice);
+  const expandedInvoice = invoiceFromCharge(charge);
+  if (expandedInvoice && typeof expandedInvoice === 'object') {
+    subscriptionId = subscriptionIdFromInvoice(expandedInvoice as Stripe.Invoice);
   }
   if (!subscriptionId) {
     const invoiceId = invoiceIdOf(charge);

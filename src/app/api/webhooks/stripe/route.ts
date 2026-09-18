@@ -630,6 +630,7 @@ async function refreshCustomerClassification(supabase: any, customerId: string) 
   // Get all charges for this customer
   const { data: charges } = await supabase
     .from('stripe_charges')
+    // truncation-ok: scoped to ONE Stripe customer — classifyCustomer only needs this customer's charges.
     .select('*')
     .eq('customer_id', customerId)
     .eq('livemode', true)
