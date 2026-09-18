@@ -177,6 +177,13 @@ export function parseLookupQuery(raw: string, _now: Date = new Date()): LookupNe
   return { identifiers, acronyms, capability, buyerGeo, buyerOrg, recentlyDays, tokens };
 }
 
+function listingKey(row: { notice_id?: string | null; solicitation_number?: string | null }): string {
+  return canonicalListingKey({
+    notice_id: row.notice_id ?? null,
+    solicitation_number: row.solicitation_number ?? null,
+  });
+}
+
 function officeCity(row: LookupRow): string {
   const addr = row.office_address;
   if (!addr || typeof addr !== 'object') return '';
@@ -279,7 +286,7 @@ export function rankScore(why: WhyMatched[], posted: string | null, now: Date): 
 export function collapseLookupRows(rows: LookupRow[]): LookupRow[] {
   const byKey = new Map<string, LookupRow[]>();
   for (const r of rows) {
-    const key = canonicalListingKey(r);
+    const key = listingKey(r);
     if (!key) continue;
     const cur = byKey.get(key) || [];
     cur.push(r);
@@ -614,16 +621,16 @@ export async function lookupSolicitation(
   const collapsed = collapseLookupRows(corpus).slice(0, LOOKUP_CANDIDATE_CAP);
 
   const historySet = new Set(historyIds.map((id) => normalizeNoticeUuid(id)));
-  const historyFamilyKeys = new Set(historyRows.map((r) => canonicalListingKey(r)).filter(Boolean));
+  const historyFamilyKeys = new Set(historyRows.map((r) => listingKey(r)).filter(Boolean));
   const filenameFamilyKeys = new Set(
     historyRows
       .filter((r) => filenameHits.has(r.notice_id) || filenameHits.has(normalizeNoticeUuid(r.notice_id)))
-      .map((r) => canonicalListingKey(r))
+      .map((r) => listingKey(r))
       .filter(Boolean),
   );
 
   const preScored = collapsed.map((row) => {
-    const family = canonicalListingKey(row);
+    const family = listingKey(row);
     const why = whyMatchedFor(row, needles, {
       fromHistory: historySet.has(normalizeNoticeUuid(row.notice_id)) || historyFamilyKeys.has(family),
       fromFilename: filenameHits.has(row.notice_id) || filenameFamilyKeys.has(family),
@@ -648,7 +655,7 @@ export async function lookupSolicitation(
           points_of_contact: cur.row.points_of_contact,
         });
         versionCounts.set(row.notice_id, canon.version_count);
-        const family = canonicalListingKey(row);
+        const family = listingKey(row);
         const why = whyMatchedFor(row, needles, {
           fromHistory: historySet.has(normalizeNoticeUuid(row.notice_id)) || historyFamilyKeys.has(family),
           fromFilename: filenameHits.has(row.notice_id) || filenameFamilyKeys.has(family),
@@ -663,7 +670,7 @@ export async function lookupSolicitation(
   upgraded.sort((a, b) => b.score - a.score || dateMs(b.row.posted_date) - dateMs(a.row.posted_date));
   const scored = upgraded;
 
-  const uniqueFamilies = new Set(scored.map((s) => canonicalListingKey(s.row)));
+  const uniqueFamilies = new Set(scored.map((s) => listingKey(s.row)));
   const items: LookupItem[] = scored.map((s) => {
     const provenance = historySet.has(normalizeNoticeUuid(s.row.notice_id))
       ? 'user_pipeline+sam_opportunities'
@@ -682,7 +689,7 @@ export async function lookupSolicitation(
 
   const historyOlder = historyRows.some((h) => {
     const top = items[0];
-    return top && h.notice_id !== top.notice_id && canonicalListingKey(h) === canonicalListingKey({
+    return top && h.notice_id !== top.notice_id && listingKey(h) === listingKey({
       notice_id: top.notice_id,
       solicitation_number: top.identifiers.find((id) => !isNoticeUuid(id)) || null,
     });
