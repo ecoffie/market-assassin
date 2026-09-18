@@ -19,6 +19,7 @@ import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 import { computeNextAction } from '@/lib/pipeline/next-action';
 import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
+import { familyAttachmentForNotice, indexFamiliesByNoticeId, type FamilyNoticeRow } from '@/lib/sam/solicitation-family';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -212,6 +213,44 @@ export async function GET(request: NextRequest) {
           ...o,
           notice_type: typeById.get(o.notice_id as string) || fallbackTypes.get(o.id as string) || null,
         }));
+
+        // Family current truth — does not rewrite worked-from notice_id.
+        if (noticeIds.length > 0) {
+          const { data: seedRows, error: seedErr } = await sb
+            .from('sam_opportunities')
+            .select('notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link,attachments,points_of_contact')
+            .in('notice_id', noticeIds);
+          if (seedErr) {
+            console.warn('[pipeline] family seed read failed:', seedErr.message);
+          } else {
+            const solNums = [...new Set((seedRows || []).map((r: { solicitation_number?: string | null }) => r.solicitation_number).filter(Boolean))] as string[];
+            let siblingRows = (seedRows || []) as FamilyNoticeRow[];
+            if (solNums.length) {
+              const { data: sibs, error: sibErr } = await sb
+                .from('sam_opportunities')
+                .select('notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link,attachments,points_of_contact')
+                .in('solicitation_number', solNums.slice(0, 200))
+                .limit(1000);
+              if (sibErr) console.warn('[pipeline] family sibling read failed:', sibErr.message);
+              else siblingRows = (sibs || seedRows || []) as FamilyNoticeRow[];
+            }
+            const byNotice = indexFamiliesByNoticeId(siblingRows);
+            opportunities = opportunities.map((o: Record<string, unknown>) => {
+              const fam = o.notice_id ? byNotice.get(o.notice_id as string) : undefined;
+              if (!fam) return o;
+              return {
+                ...o,
+                family_identity_key: fam.identity_key,
+                family_current_notice_id: fam.current_notice_id,
+                family_current_status: fam.current_status,
+                family_current_deadline: fam.current_deadline,
+                family_current_amendment: fam.current_amendment,
+                family_newer_sibling: fam.current_notice_id !== o.notice_id,
+                worked_from_notice_id: o.notice_id,
+              };
+            });
+          }
+        }
       } catch (e) {
         console.warn('[Pipeline GET] notice_type enrichment failed:', e);
       }
@@ -445,6 +484,23 @@ export async function POST(request: NextRequest) {
             .limit(1)
             .maybeSingle();
           existing = dup ?? null;
+          if (dup?.notice_id) {
+            const attached = await familyAttachmentForNotice(dup.notice_id, {
+              persist: true,
+              client: getSupabase(),
+            });
+            if (attached?.view.family_id && dup.id) {
+              await getSupabase()
+                .from('user_pipeline')
+                .update({ family_id: attached.view.family_id })
+                .eq('id', dup.id);
+              existing = {
+                ...dup,
+                family_id: attached.view.family_id,
+                family: attached.attachment,
+              };
+            }
+          }
         } catch { /* best-effort — the 409 is the contract, the row is a bonus */ }
         return NextResponse.json(
           { error: 'Opportunity already in pipeline', opportunity: existing },
@@ -516,9 +572,36 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    let family = null;
+    if (data?.notice_id) {
+      try {
+        const attached = await familyAttachmentForNotice(data.notice_id, {
+          persist: true,
+          client: getSupabase(),
+        });
+        if (attached) {
+          family = attached.attachment;
+          if (attached.view.family_id) {
+            const { error: famErr } = await getSupabase()
+              .from('user_pipeline')
+              .update({ family_id: attached.view.family_id })
+              .eq('id', data.id);
+            if (famErr && famErr.code !== '42703' && famErr.code !== 'PGRST204') {
+              console.warn('[pipeline] family_id write failed:', famErr.message);
+            } else if (!famErr) {
+              data = { ...data, family_id: attached.view.family_id };
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[pipeline] family attach skipped:', e instanceof Error ? e.message : e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       opportunity: data,
+      family,
       message: 'Added to pipeline'
     });
   } catch (error) {

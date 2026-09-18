@@ -26,6 +26,11 @@ import { fetchAllPaged, fetchAllByKeys } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { sendViaGHL } from '@/lib/ghl/sms';
+import {
+  detectFamilyNewVersion,
+  indexFamiliesByNoticeId,
+  type FamilyNoticeRow,
+} from '@/lib/sam/solicitation-family';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -219,12 +224,12 @@ export async function GET(request: NextRequest) {
   // paging 178,436 rows of sam_opportunities. (Fetching a whole table so JS can filter it
   // would defeat the cap and still be wrong architecture.)
   const { data: samRows, error: samErrRaw } = await fetchAllByKeys<{
-    notice_id: string; response_deadline: string; notice_type: string; posted_date: string; active: boolean;
+    notice_id: string; solicitation_number: string | null; response_deadline: string; notice_type: string; posted_date: string; active: boolean; description: string | null; title: string | null; department: string | null; sub_tier: string | null; office: string | null; naics_code: string | null; psc_code: string | null; set_aside_description: string | null; archive_date: string | null; ui_link: string | null;
   }>(noticeIds, (chunk) => supabase
     .from('sam_opportunities')
     // truncation-ok: fetchAllByKeys chunks `noticeIds` (500/request) and merges — bounded
     // by the tracked-pursuit list, never a scan of the 178,436-row table.
-    .select('notice_id, response_deadline, notice_type, posted_date, active')
+    .select('notice_id, solicitation_number, response_deadline, notice_type, posted_date, active, description, title, department, sub_tier, office, naics_code, psc_code, set_aside_description, archive_date, ui_link')
     .in('notice_id', chunk));
   const samErr = samErrRaw ? { message: samErrRaw } : null;
   // Surface, don't swallow (silent-failure follow-up, 2026-07-28). detectChanges is null-safe (every
@@ -234,6 +239,18 @@ export async function GET(request: NextRequest) {
   const samByNotice = new Map<string, { response_deadline: string; notice_type: string; posted_date: string; active: boolean }>();
   for (const r of (samRows || [])) samByNotice.set(r.notice_id, r);
 
+  const solNums = [...new Set((samRows || []).map((r) => r.solicitation_number).filter(Boolean))] as string[];
+  let familyRows: FamilyNoticeRow[] = (samRows || []) as FamilyNoticeRow[];
+  if (solNums.length) {
+    const { data: siblings, error: sibErr } = await fetchAllByKeys<FamilyNoticeRow>(solNums, (chunk) => supabase
+      .from('sam_opportunities')
+      .select('notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link')
+      .in('solicitation_number', chunk));
+    if (sibErr) console.error('[pursuit-changes] family sibling read failed — NEW_VERSION detection skipped this run:', sibErr);
+    else if (siblings?.length) familyRows = siblings;
+  }
+  const familyByNotice = indexFamiliesByNoticeId(familyRows);
+
   // Existing snapshots.
   const pursuitIds = pursuits.map((p: { id: string }) => p.id);
   const { data: snaps, error: snapsErr } = await supabase.from('pursuit_monitor_state').select('*').in('pursuit_id', pursuitIds);
@@ -242,13 +259,14 @@ export async function GET(request: NextRequest) {
   if (snapsErr) console.error('[pursuit-changes] pursuit_monitor_state snapshot read failed — no change detection this run:', snapsErr.message);
   // The `last_modified` column now stores posted_date (see upsert note). Map it
   // to last_posted for detectChanges; last_active is the new migration column.
-  const snapById = new Map<string, { last_deadline: string; last_notice_type: string; last_posted: string; last_active: boolean | null; last_docs_count: number }>();
+  const snapById = new Map<string, { last_deadline: string; last_notice_type: string; last_posted: string; last_active: boolean | null; last_docs_count: number; last_current_notice_id: string | null }>();
   for (const s of (snaps || [])) snapById.set(s.pursuit_id, {
     last_deadline: s.last_deadline,
     last_notice_type: s.last_notice_type,
     last_posted: s.last_modified, // reused column
     last_active: typeof s.last_active === 'boolean' ? s.last_active : null,
     last_docs_count: s.last_docs_count,
+    last_current_notice_id: s.last_current_notice_id || null,
   });
 
   const changesByUser = new Map<string, Array<{ title: string; changes: Change[] }>>();
@@ -272,6 +290,16 @@ export async function GET(request: NextRequest) {
     };
     const prev = snapById.get(p.id) || null;
     const changes = detectChanges(prev, live);
+    const fam = familyByNotice.get(p.notice_id);
+    if (fam) {
+      const sibling = detectFamilyNewVersion({
+        previousCurrentNoticeId: prev?.last_current_notice_id || null,
+        familyCurrentNoticeId: fam.current_notice_id,
+        familyNoticeIds: fam.versions.map((v) => v.notice_id),
+        currentAmendment: fam.current_amendment,
+      });
+      if (sibling) changes.push(sibling);
+    }
 
     if (changes.length) {
       totalChanges += changes.length;
@@ -293,7 +321,7 @@ export async function GET(request: NextRequest) {
     // `last_modified` TEXT column to store SAM's posted_date (SAM has no real
     // last-modified; postedDate is the amendment proxy) — avoids a migration for
     // that field. `last_active` is a new column (migration 20260629).
-    await supabase.from('pursuit_monitor_state').upsert({
+    const snapPayload: Record<string, unknown> = {
       pursuit_id: p.id,
       notice_id: p.notice_id,
       last_deadline: live.response_deadline,
@@ -301,8 +329,14 @@ export async function GET(request: NextRequest) {
       last_modified: live.posted_date,   // reused column = posted_date snapshot
       last_active: live.active,
       last_docs_count: live.docs_count,
+      last_current_notice_id: fam?.current_notice_id || p.notice_id,
       last_checked_at: new Date().toISOString(),
-    });
+    };
+    const snapRes = await supabase.from('pursuit_monitor_state').upsert(snapPayload);
+    if (snapRes.error && (snapRes.error.code === '42703' || snapRes.error.code === 'PGRST204')) {
+      delete snapPayload.last_current_notice_id;
+      await supabase.from('pursuit_monitor_state').upsert(snapPayload);
+    }
   }
 
   // SMS opt-in: amendment/deadline changes are time-sensitive, so users who

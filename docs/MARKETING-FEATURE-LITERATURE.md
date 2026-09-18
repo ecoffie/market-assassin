@@ -6970,3 +6970,33 @@ no 504; representative drones capability completes grounded under 55s.
 **Proof.** Live 2026-09-17, same FIND compose, 10 credits, one call. VA + IT services: P@5 **0.00 → 1.00**, P@10 **0.00 → 1.00**, P@25 **0.12 → 0.76**. Rank 1 = Enterprise QA Software (541519/DA10); rank 6 = DistillerSR (513210/DA10 — PSC evidence, not NAICS-only); rank 17 = C&P Help Desk Tier 2 (541512/DA01, recovered because cap 500 covers the 357-row union; 100/200 truncated it). Construction + Army control stayed P@5/P@10/P@25 = 1.00 with deadline still ordering inside DIRECT. SOCOM + cybersecurity Open stayed honestly empty; Coming back 8 DIRECT / 31 RELATED; Coming soon unavailable, not zero. Cap 500 is the smallest of {100, 200, 500} that kept later-deadline DIRECT in the pool. Units: `open-relevance.unit.test.ts`. **Not a P4 win:** DLA janitorial 561210 Installation Support is existing Facilities taxonomy debt; ML + Air Force token/AFFAIRS buyer-needle debt is unchanged.
 
 P2 one-FIND / first-value / one-refine and P3 buyer-normalization / DIRECT vs RELATED are unchanged.
+
+---
+
+## Solicitation Family v1 — confirmed identity, not a lifecycle super-entity (2026-09-18)
+
+**What.** A known SAM solicitation becomes one family: confirmed aliases (SAM
+solicitation number + official customer RFP token), version membership, and a
+current-notice pointer. A pursuit keeps the notice the user actually worked
+from. Family-aware monitoring can say "a newer amendment posted" without
+rewriting that worked-from id. Documents stay on the version that carried them.
+
+**Why.** Known-ID truth (#1557) already picks the latest stored version for a
+solicitation number. Users still attach work to an older UUID. Without a family,
+Mindy either lies ("you worked from Amd 0003") or goes silent when a sibling
+amendment posts. Family v1 is the persistence seam. It is not FIND, not PAE,
+and not a forecast/award/recompete merge.
+
+**SEO.** Track SAM.gov amendments / current solicitation version / RFP
+N0017426R1003 / Indian Head MASA.
+
+**Proof.** MASA gold: customer RFP `N0017426R1003` and SAM token
+`N0017425RFPREQIHDMDept0002` are one family (`sol:N0017425RFPREQIHDMDEPT0002`).
+Current notice `f1aa309fa39040a4929d90a7d88fd091`, Amendment 0003, deadline
+2026-08-27, status archived. Explicit Original UUID
+`ce85c48dc296497eb902a0a73ac45680` remains that historical record. Unit:
+`solicitation-family.unit.test.ts` tests 1–20. Production known-ID proof is
+#1557 (`741ec0d3`) on getmindy.ai. Targeted dry-run (no writes): 3,730
+pipeline-touched families / 10,316 versions / 3,022 pursuits on older siblings.
+The 44,560-family fleet population is out of scope.
+
