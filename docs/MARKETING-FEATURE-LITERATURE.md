@@ -6932,3 +6932,15 @@ no 504; representative drones capability completes grounded under 55s.
 **SEO.** GovCon first market read, sell to SOCOM, Army construction opportunities, VA IT services, time to first value.
 
 **Proof.** Connector `P2_FIRST_TURN_INSTRUCTIONS` leads MCP initialize. FIND results carry `presentation.host_rules` (same local-contract pattern as Current Intelligence / Pathway Fit). Naive host A/B/C: exactly 1 FIND, 10 credits, Open/Coming back/Coming soon presented, one refine, no company/clearance/deliverable before value. Ledger `eric@govcongiants.com` 2026-09-17 22:51–22:52 UTC: three `find_opportunities` success rows, `credits_charged=10` each (one per prompt). v1 horizon honesty and confirmation-gated UNDERSTAND unchanged.
+
+---
+
+## Daily Alert Coming Back rank — market, then distinctive, then lead window, then value (2026-09-17)
+
+**What.** Daily Alert keeps two sections. **Open Now** is respondable SAM. **Coming Back to Market** is expiring contracts worth positioning for — never implied as currently soliciting. Rank inside Coming Back is locked: stored NAICS/PSC market → distinctive-keyword preference inside that market → 6–18 months remaining, then 3–6, then >18 if needed to fill the cap → value. Under 3 months is excluded. Distinctive misses keep the NAICS/PSC set; generic singles never expand it. Existing $250M+ / nuclear M&O teaming stays; keyword-hit count, capture-band, and soonest-PoP are not primary sorts.
+
+**Why.** A ranking replay on five real profiles showed the useful list is the user's market, preferred by distinctive description/PSC hits, then the capture window, then dollars. Hit-count and soonest-PoP put the wrong incumbents first. Mixing Open and Recompete into one list would make a contract that is still running look bid-today.
+
+**SEO.** Federal recompete alerts, contracts coming back to market, SAM.gov daily alerts vs expiring contracts, 6–18 month capture window.
+
+**Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: 7hillstransportation@gmail.com Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); americanpatriot1872@pm.me Open Now + Coming Back Saliense $24.7M (541512); civelladante@gmail.com roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); diannewilsoncontact@gmail.com Arrow Arc $32.1M (541910); wednel.joseph@gmail.com generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.

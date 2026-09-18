@@ -28,7 +28,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
-import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
 import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
   COMING_BACK_PANEL_PATH,
@@ -904,9 +904,10 @@ async function runDailyAlertJob(options?: {
           // Continue without grants - don't fail the whole alert
         }
 
-        if (userNaics.length > 0) {
+        if (userNaics.length > 0 || (user.psc_codes || []).some(Boolean)) {
           comingBack = await loadComingBackSection({
             storedNaics: userNaics,
+            storedPsc: (user.psc_codes || []).filter(Boolean),
             naicsSource: user.naics_source ?? null,
             keywords: userKeywords,
             businessType: user.business_type,
@@ -1838,9 +1839,10 @@ function mindyDayBannerHtml(): string {
   ${mindyInsightHtml}
 
   ${opportunities.length > 0 ? `
-  <!-- ── NEW TODAY ─────────────────────────────────────────────────────────────── -->
-  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${isUsingFallback ? 'Still open in your market' : 'New today'}</p>
+  <!-- ── OPEN NOW: respondable SAM. Never mixed with Coming Back recompetes. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
+  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${isUsingFallback ? 'These solicitations are still open in your market.' : OPEN_NOW_EXPLAIN}</p>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
     ${opportunitiesHtml}
   </table>
@@ -1850,9 +1852,9 @@ function mindyDayBannerHtml(): string {
   </p>` : ''}
   ` : `
   <!-- Quiet day — honest, no fabricated rows, no emoji. -->
-  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">New today</p>
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 16px 0;"></div>
-  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">Nothing new matched your filters today. The market below is still live.</p>
+  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">Nothing new matched your filters today. Coming Back below is work returning to market later — not an open solicitation.</p>
   `}
 
   ${renderComingBackSection(sendOptions?.comingBack ?? { kind: 'omit', reason: 'none_qualify' }, {

@@ -1,22 +1,27 @@
 /**
  * Daily Alert "Coming Back to Market" — a second section, never mixed with Open.
  *
- * Market = stored exact six-digit NAICS via queryExpiringContracts. Keywords
- * never filter or prefer contracts by agency/title (Interior collision). They
- * only (1) detect nuclear / M&O capability and (2) mark evidence_supported
- * when a phrase maps directly to that exact Census code. A family, or a
- * neighboring code, is not evidence. Confirmation is a persisted user choice.
+ * Rank (locked 2026-09-17): stored NAICS/PSC market → distinctive-keyword
+ * preference inside that market → actionable lead window → value.
  *
- * Rank: exact-code state, then size-fit / nuclear demotion, then 6–18 timing,
- * then diversification, then ceiling. Query failure or unknown count omits.
+ * Windows: primary 6–18 months remaining, secondary 3–6, tertiary >18 if
+ * needed to fill the cap. Under 3 months is excluded. Keyword-hit count,
+ * capture-band, and soonest-PoP are not primary sorts. Generic singles
+ * never expand the market. A distinctive miss keeps the NAICS/PSC set.
+ *
+ * $250M+ teaming (and nuclear M&O teaming) is the existing grounded size
+ * treatment — not a new threshold. Query failure or unknown count omits.
  * Zero is not a success label.
  */
+import { createClient } from '@supabase/supabase-js';
+import { preferDistinctiveInOpenMarket } from '@/lib/alerts/open-contract-d';
 import { parseNaicsPriorities, type NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 import { DEFAULT_PROFILE_NAICS } from '@/lib/alerts/profile-setup';
 import { getNaics } from '@/lib/codes/lookup';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
-import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
+import { parseNaicsCodes, naicsOrExpression, type ExpiringContract } from '@/lib/recompete/query';
+import { overlayRecompeteTiming } from '@/lib/recompete/timing';
 
 export const COMING_BACK_CAP = 5;
 export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
@@ -27,7 +32,11 @@ export const COMING_BACK_EXPLAIN =
   'These are existing contracts approaching expiration — not confirmed solicitations. Use them to prepare capture, not to bid today. Dollar figures are the current ceiling or amount obligated, not a promised recompete value.';
 export const MEGA_TEAMING_USD = 250_000_000;
 export const NUCLEAR_MO_TEAMING_USD = 50_000_000;
+/** @deprecated diversification is not part of the locked rank; kept for callers that still import it */
 export const MAX_PER_NAICS = 2;
+const MARKET_PAGE = 1000;
+const MARKET_ROW_CAP = 8000;
+const TERTIARY_MONTHS = 36;
 
 export type ComingBackOmitReason =
   | 'no_naics_market'
@@ -35,7 +44,7 @@ export type ComingBackOmitReason =
   | 'query_failed'
   | 'unknown_count';
 
-export type ComingBackWindow = 'lead_6_18' | 'inside_6';
+export type ComingBackWindow = 'lead_6_18' | 'lead_3_6' | 'lead_over_18';
 export type ComingBackCodeState =
   | 'primary_confirmed'
   | 'secondary_confirmed'
@@ -52,6 +61,7 @@ export type ComingBackCodeClass = {
 
 export type ComingBackProfile = {
   storedNaics: string[];
+  storedPsc?: string[];
   naicsSource?: NaicsProvenance | null;
   keywords?: string[];
   businessType?: string | null;
@@ -84,14 +94,6 @@ export type ComingBackRow = {
 export type ComingBackDecision =
   | { kind: 'omit'; reason: ComingBackOmitReason }
   | { kind: 'show'; rows: ComingBackRow[]; matchedNaics: string[]; starterMarket: boolean };
-
-const STATE_RANK: Record<ComingBackCodeState, number> = {
-  primary_confirmed: 5,
-  secondary_confirmed: 4,
-  evidence_supported: 3,
-  inferred: 2,
-  system_default: 1,
-};
 
 const NUCLEAR_MO_VEHICLE =
   /consolidated nuclear|savannah river nuclear|solutions of sandia|sandia, llc|\bsandia\b|mission support & test|mission support and test|national nuclear|\bnnsa\b|nuclear security|nuclear solutions|management and operat/;
@@ -194,12 +196,19 @@ export function contractValue(c: Pick<ExpiringContract, 'potential_total_value' 
   return contractSize(c).amount;
 }
 
-export function comingBackWindow(leadMonths: number | null | undefined): ComingBackWindow | 'outside' {
-  if (leadMonths == null || !Number.isFinite(leadMonths)) return 'outside';
-  if (leadMonths >= 6 && leadMonths <= 18) return 'lead_6_18';
-  if (leadMonths >= 0 && leadMonths < 6) return 'inside_6';
-  return 'outside';
+export function comingBackWindow(leadMonths: number | null | undefined): ComingBackWindow | 'exclude' {
+  if (leadMonths == null || !Number.isFinite(leadMonths)) return 'exclude';
+  if (leadMonths < 3) return 'exclude';
+  if (leadMonths < 6) return 'lead_3_6';
+  if (leadMonths <= 18) return 'lead_6_18';
+  return 'lead_over_18';
 }
+
+const WINDOW_RANK: Record<ComingBackWindow, number> = {
+  lead_6_18: 3,
+  lead_3_6: 2,
+  lead_over_18: 1,
+};
 
 export function isDefaultNaicsSet(storedNaics: string[]): boolean {
   const set = new Set((storedNaics || []).map((c) => String(c).trim()).filter(Boolean));
@@ -381,54 +390,59 @@ function toRow(
 }
 
 function compareRanked(a: ComingBackRow, b: ComingBackRow): number {
-  const state = STATE_RANK[b.codeState] - STATE_RANK[a.codeState];
-  if (state !== 0) return state;
+  const win = WINDOW_RANK[b.window] - WINDOW_RANK[a.window];
+  if (win !== 0) return win;
   const fitA = a.fit === 'prime' ? 1 : 0;
   const fitB = b.fit === 'prime' ? 1 : 0;
   if (fitA !== fitB) return fitB - fitA;
-  const winA = a.window === 'lead_6_18' ? 1 : 0;
-  const winB = b.window === 'lead_6_18' ? 1 : 0;
-  if (winA !== winB) return winB - winA;
   const vb = b.value ?? -1;
   const va = a.value ?? -1;
   if (vb !== va) return vb - va;
   return 0;
 }
 
-function pickDiversified(ranked: ComingBackRow[]): ComingBackRow[] {
-  const picked: ComingBackRow[] = [];
-  const perNaics = new Map<string, number>();
-  const take = (row: ComingBackRow, enforceCap: boolean) => {
-    const key = row.naics || row.contract_id;
-    const used = perNaics.get(key) || 0;
-    if (enforceCap && used >= MAX_PER_NAICS) return;
-    picked.push(row);
-    perNaics.set(key, used + 1);
-  };
-  for (const row of ranked) {
-    if (picked.length >= COMING_BACK_CAP) break;
-    take(row, true);
+function storedPscCodes(codes: string[] | null | undefined): string[] {
+  const out: string[] = [];
+  for (const raw of codes || []) {
+    const p = String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (/^[A-Z0-9]{4}$/.test(p) && !out.includes(p)) out.push(p);
   }
-  if (picked.length < COMING_BACK_CAP) {
-    const have = new Set(picked.map((r) => r.contract_id));
-    for (const row of ranked) {
-      if (picked.length >= COMING_BACK_CAP) break;
-      if (have.has(row.contract_id)) continue;
-      take(row, false);
+  return out;
+}
+
+export function inStoredComingBackMarket(
+  c: Pick<ExpiringContract, 'naics_code' | 'psc_code'>,
+  naics: string[],
+  pscs: string[],
+): boolean {
+  const code = String(c.naics_code || '').trim();
+  for (const n of naics) {
+    if (!n) continue;
+    if (n.length === 6) {
+      if (code === n) return true;
+      continue;
     }
+    if (code.startsWith(n)) return true;
   }
-  return picked;
+  const p = String(c.psc_code || '').trim().toUpperCase();
+  return p.length > 0 && pscs.includes(p);
+}
+
+function distinctiveHaystack(c: Pick<ExpiringContract, 'description' | 'psc_code'>): string {
+  return [c.description, c.psc_code].filter(Boolean).join(' ');
 }
 
 /**
- * Pure rank + omit. `keywords` never filter the contract list. They only
- * feed nuclear-capability detection and per-code confirmation.
+ * Pure rank + omit. Distinctive keywords prefer description/PSC hits inside
+ * the stored NAICS/PSC market. They never match agency names (Interior collision)
+ * and never expand the candidate set. Hit count is not a sort key.
  */
 export function selectComingBackRows(input: {
   contracts: ExpiringContract[];
   count: number | null;
   degraded?: boolean;
   naicsCodes: string[];
+  pscCodes?: string[];
   keywords?: string[];
   profile?: ComingBackProfile;
 }): ComingBackDecision {
@@ -437,10 +451,12 @@ export function selectComingBackRows(input: {
   const stored = knownNaicsForMatch(
     input.profile?.storedNaics?.length ? input.profile.storedNaics : input.naicsCodes,
   );
-  if (stored.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
+  const storedPsc = storedPscCodes(input.profile?.storedPsc?.length ? input.profile.storedPsc : input.pscCodes);
+  if (stored.length === 0 && storedPsc.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
 
   const profile: ComingBackProfile = {
     storedNaics: stored,
+    storedPsc,
     naicsSource: input.profile?.naicsSource ?? (isDefaultNaicsSet(stored) ? 'system_default' : input.profile?.naicsSource),
     keywords: input.profile?.keywords ?? input.keywords,
     businessType: input.profile?.businessType ?? null,
@@ -450,18 +466,18 @@ export function selectComingBackRows(input: {
     codeClasses: input.profile?.codeClasses,
   };
   const classes = classifyCodes(profile);
-  const allowed = new Set(stored);
+
+  const market = input.contracts.filter((c) => inStoredComingBackMarket(c, stored, storedPsc));
+  const preferred = preferDistinctiveInOpenMarket(market, profile.keywords || [], distinctiveHaystack);
 
   const scored: ComingBackRow[] = [];
-  for (const c of input.contracts) {
-    const code = String(c.naics_code || '').trim();
-    if (!allowed.has(code)) continue;
+  for (const c of preferred.rows) {
     const w = comingBackWindow(c.lead_time_months);
-    if (w === 'outside') continue;
+    if (w === 'exclude') continue;
     scored.push(toRow(c, w, profile, classes));
   }
   scored.sort(compareRanked);
-  const picked = pickDiversified(scored);
+  const picked = scored.slice(0, COMING_BACK_CAP);
   if (picked.length === 0) return { kind: 'omit', reason: 'none_qualify' };
 
   return {
@@ -472,17 +488,69 @@ export function selectComingBackRows(input: {
   };
 }
 
-async function safeQuery(
-  input: Parameters<typeof queryExpiringContracts>[0],
-): Promise<{ ok: true; result: Awaited<ReturnType<typeof queryExpiringContracts>> } | { ok: false; reason: 'query_failed' | 'unknown_count' }> {
+const COMING_BACK_COLUMNS =
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
+
+function marketOrExpression(naics: string[], pscs: string[]): string | null {
+  const parts: string[] = [];
+  const parsed = parseNaicsCodes(naics);
+  if (parsed.length) parts.push(naicsOrExpression(parsed));
+  for (const p of pscs) parts.push(`psc_code.eq.${p}`);
+  return parts.length ? parts.join(',') : null;
+}
+
+async function pageComingBackMarket(naics: string[], pscs: string[]): Promise<
+  | { ok: true; contracts: ExpiringContract[]; count: number }
+  | { ok: false; reason: 'query_failed' | 'unknown_count' }
+> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { ok: false, reason: 'query_failed' };
+  const orExpr = marketOrExpression(naics, pscs);
+  if (!orExpr) return { ok: false, reason: 'query_failed' };
+
+  const sb = createClient(url, key);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const max = new Date(today);
+  max.setMonth(max.getMonth() + TERTIARY_MONTHS);
+  const maxStr = max.toISOString().slice(0, 10);
+  const rows: Record<string, unknown>[] = [];
+
   try {
-    const result = await queryExpiringContracts(input);
-    if (result.degraded) return { ok: false, reason: 'query_failed' };
-    if (result.count == null) return { ok: false, reason: 'unknown_count' };
-    return { ok: true, result };
+    for (let from = 0; ; from += MARKET_PAGE) {
+      const { data, error } = await sb
+        .from('recompete_opportunities')
+        .select(COMING_BACK_COLUMNS)
+        .is('quality_flag', null)
+        .gt('period_of_performance_current_end', todayStr)
+        .lte('period_of_performance_current_end', maxStr)
+        .or(orExpr)
+        .order('contract_id', { ascending: true })
+        .range(from, from + MARKET_PAGE - 1);
+      if (error) return { ok: false, reason: 'query_failed' };
+      if (!data?.length) break;
+      rows.push(...data);
+      if (data.length < MARKET_PAGE) break;
+      if (rows.length >= MARKET_ROW_CAP) break;
+    }
   } catch {
     return { ok: false, reason: 'query_failed' };
   }
+
+  const now = new Date();
+  const contracts = (rows as unknown as ExpiringContract[]).map((c) => {
+    const timing = overlayRecompeteTiming(c.period_of_performance_current_end, now);
+    const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
+    if (!timing) return { ...c, naics_description };
+    return {
+      ...c,
+      naics_description,
+      lead_time_months: timing.lead_time_months,
+      estimated_recompete_date: timing.estimated_recompete_date,
+    };
+  });
+  return { ok: true, contracts, count: contracts.length };
 }
 
 export async function loadComingBackSection(profile: ComingBackProfile | string[]): Promise<ComingBackDecision> {
@@ -490,54 +558,20 @@ export async function loadComingBackSection(profile: ComingBackProfile | string[
     ? { storedNaics: profile }
     : profile;
   const stored = knownNaicsForMatch(resolved.storedNaics);
-  if (stored.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
+  const storedPsc = storedPscCodes(resolved.storedPsc);
+  if (stored.length === 0 && storedPsc.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
 
-  const unique = [...new Set(stored.filter((c) => /^\d{6}$/.test(c)))];
-
-  try {
-    const jobs = unique.flatMap((code) => [
-      safeQuery({
-        naicsCodes: [code],
-        minMonthsWindow: 6,
-        monthsWindow: 18,
-        orderBy: 'expiry',
-        limit: 40,
-      }),
-      safeQuery({
-        naicsCodes: [code],
-        monthsWindow: 6,
-        orderBy: 'expiry',
-        limit: 15,
-      }),
-    ]);
-    const settled = await Promise.all(jobs);
-    const ok = settled.filter((s): s is { ok: true; result: Awaited<ReturnType<typeof queryExpiringContracts>> } => s.ok);
-    if (ok.length === 0) {
-      const failed = settled.find((s) => !s.ok && s.reason === 'query_failed');
-      return { kind: 'omit', reason: failed ? 'query_failed' : 'unknown_count' };
-    }
-    const seen = new Set<string>();
-    const contracts: ExpiringContract[] = [];
-    let count = 0;
-    for (const item of ok) {
-      count += item.result.count ?? 0;
-      for (const c of item.result.contracts) {
-        if (seen.has(c.contract_id)) continue;
-        seen.add(c.contract_id);
-        contracts.push(c);
-      }
-    }
-    return selectComingBackRows({
-      contracts,
-      count,
-      degraded: false,
-      naicsCodes: stored,
-      keywords: resolved.keywords,
-      profile: { ...resolved, storedNaics: stored },
-    });
-  } catch {
-    return { kind: 'omit', reason: 'query_failed' };
-  }
+  const paged = await pageComingBackMarket(stored, storedPsc);
+  if (!paged.ok) return { kind: 'omit', reason: paged.reason };
+  return selectComingBackRows({
+    contracts: paged.contracts,
+    count: paged.count,
+    degraded: false,
+    naicsCodes: stored,
+    pscCodes: storedPsc,
+    keywords: resolved.keywords,
+    profile: { ...resolved, storedNaics: stored, storedPsc },
+  });
 }
 
 export function formatComingBackValue(value: number | null): string | null {

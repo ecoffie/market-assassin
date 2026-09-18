@@ -133,7 +133,10 @@ describe('Focused omit vs Discovery label', () => {
     expect(comingBack.kind).toBe('show');
     const html = renderComingBackSection(comingBack, { panelUrl: 'https://getmindy.ai/app?panel=recompetes' });
     expect(html).toMatch(/Coming Back to Market/);
+    expect(html).toMatch(/not confirmed solicitations/i);
+    expect(html).not.toMatch(/currently soliciting/i);
     expect(focused.rows.some((row) => /ACME|cb-1/.test(JSON.stringify(row)))).toBe(false);
+    expect(html).not.toMatch(/Open Now/);
   });
 });
 

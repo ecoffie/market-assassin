@@ -99,7 +99,9 @@ describe('the shipped surfaces satisfy the contract', () => {
   it('daily-alerts drops the "new" claim on the fallback path — subject and header', () => {
     const SRC = read('src/app/api/cron/daily-alerts/route.ts');
     expect(SRC).toMatch(/subject: isUsingFallback/);
-    expect(SRC).toMatch(/isUsingFallback \? 'Still open in your market' : 'New today'/);
+    expect(SRC).toMatch(/OPEN_NOW_HEADING/);
+    expect(SRC).toMatch(/These solicitations are still open in your market/);
+    expect(SRC).not.toMatch(/isUsingFallback \? 'Still open in your market' : 'New today'/);
   });
 
   it('the fallback flag actually reaches the email — it was computed and ignored for months', () => {
