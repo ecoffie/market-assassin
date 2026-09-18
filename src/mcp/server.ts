@@ -342,7 +342,8 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
-      'and asks who won the prior work / what it cost. Resolves the OPEN notice, then finds the LIKELY ' +
+      'and asks who won the prior work / what it cost. Resolves the stored notice (latest version; status ' +
+      'derived from active + deadline), then finds the LIKELY ' +
       'prior award. Do NOT call get_award_detail with an RFQ number.',
     inputSchema: {
       solicitation_number: z.string().optional().describe('SAM solicitation number, e.g. "140L6226Q0013".'),

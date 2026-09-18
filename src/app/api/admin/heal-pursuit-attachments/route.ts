@@ -24,6 +24,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { extractPdf } from '@/lib/sam/pdf-extract';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
+import { resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -134,9 +135,19 @@ export async function GET(request: NextRequest) {
     const byId = await sb.from('sam_opportunities')
       .select('notice_id, solicitation_number, title, attachments, raw_data')
       .eq('notice_id', id).maybeSingle();
-    const bySol = byId.data ? null : await sb.from('sam_opportunities')
-      .select('notice_id, solicitation_number, title, attachments, raw_data')
-      .ilike('solicitation_number', id).limit(1).maybeSingle();
+    if (byId.error) {
+      return NextResponse.json({ success: false, error: byId.error.message }, { status: 500 });
+    }
+    const canonical = byId.data ? null : await resolveCanonicalSolicitation(id, { client: sb });
+    const bySol = canonical
+      ? await sb.from('sam_opportunities')
+        .select('notice_id, solicitation_number, title, attachments, raw_data')
+        .eq('notice_id', canonical.notice.notice_id)
+        .maybeSingle()
+      : null;
+    if (bySol?.error) {
+      return NextResponse.json({ success: false, error: bySol.error.message }, { status: 500 });
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const row: any = byId.data || bySol?.data || null;
     if (!row) {
@@ -146,7 +157,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       found: true,
-      matchedBy: byId.data ? 'notice_id' : 'solicitation_number',
+      matchedBy: byId.data ? 'notice_id' : (canonical?.matched_by ?? 'solicitation_number'),
       notice_id: row.notice_id,
       solicitation_number: row.solicitation_number,
       title: row.title,
@@ -208,9 +219,12 @@ export async function GET(request: NextRequest) {
   const docsFor = url.searchParams.get('docs_for');
   if (docsFor) {
     const sb = getSupabase();
-    const { data } = await sb.from('pursuit_documents')
+    const { data, error } = await sb.from('pursuit_documents')
       .select('sam_file_id, filename, mime_type, size_bytes, char_count, extraction_error, doc_source, downloaded_at')
       .eq('pipeline_id', docsFor);
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ success: true, pipeline_id: docsFor, rows: data || [] });
   }
 

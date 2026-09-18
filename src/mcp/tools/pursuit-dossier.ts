@@ -101,7 +101,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   const notice = a?.notice ?? null;
   const incumbent = a?.incumbent ?? null;
   if (!notice) {
-    return miss('Solicitation number did not resolve to an open notice on SAM.', sol, started);
+    return miss('Solicitation identifier did not resolve to a stored notice.', sol, started);
   }
 
   const naics = pick(notice, 'naics', 'naicsCode', 'naics_code');

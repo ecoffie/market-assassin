@@ -357,16 +357,17 @@ const PREDECESSOR_AWARD_TOOL_DEF = {
   },
 };
 
-/** Sol # / notice UUID → open notice + likely prior award (Chat "who held this?" path). */
+/** Sol # / notice UUID → stored notice (latest version) + likely prior award (Chat "who held this?" path). */
 const SOLICITATION_INCUMBENT_TOOL_DEF = {
   type: 'function' as const,
   function: {
     name: 'get_solicitation_incumbent',
     description:
       'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
-      'and asks who won the prior work, what it cost, or "was this awarded before." Resolves the OPEN ' +
-      'solicitation on SAM, then finds the LIKELY prior award on USASpending (recipient, PIID, ceiling, ' +
-      'expiry). Do NOT call get_award_detail with an RFQ/solicitation number — those are not award PIIDs. ' +
+      'and asks who won the prior work, what it cost, or "was this awarded before." Resolves the stored ' +
+      'solicitation on SAM (latest version; status derived from active + deadline — never assumed open), ' +
+      'then finds the LIKELY prior award on USASpending (recipient, PIID, ceiling, expiry). Do NOT call ' +
+      'get_award_detail with an RFQ/solicitation number — those are not award PIIDs. ' +
       'grounded_notice=false = sol# not found; grounded_incumbent=false = notice found but no clear prior award.',
     parameters: {
       type: 'object',
@@ -883,7 +884,7 @@ const PURSUIT_DOSSIER_TOOL_DEF = {
     name: 'build_pursuit_dossier',
     description:
       "COMBINATION — the capture package on ONE opportunity. Paste a solicitation number or notice_id and this " +
-      "assembles a full should-I-bid + how-to-win dossier in one call: the open notice, the LIKELY incumbent + " +
+      "assembles a full should-I-bid + how-to-win dossier in one call: the stored notice (latest version), the LIKELY incumbent + " +
       "their prior award and financial health, how crowded the market is (Rule of Two), the price-to-win labor " +
       "rates, and the named buying-office contacts (COs / specialists) — plus the solicitation documents. A " +
       "capture manager's day of research in one deliverable. grounded=false only when the solicitation number " +

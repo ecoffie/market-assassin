@@ -1,17 +1,8 @@
-type SupabaseLike = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        maybeSingle: () => Promise<{ data: SamOpportunityRow | null; error?: unknown }>;
-      };
-      ilike: (column: string, value: string) => {
-        limit: (count: number) => Promise<{ data: SamOpportunityRow[] | null; error?: unknown }>;
-      };
-    };
-  };
-};
-
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { extractNoticePoc, type NoticePocSet } from '@/lib/proposal/notice-poc';
+import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
+
+type PipelineDb = Pick<SupabaseClient, 'from'>;
 
 export interface SamOpportunityRow {
   notice_id: string | null;
@@ -92,11 +83,12 @@ function toLookup(row: SamOpportunityRow | null): SamOpportunityLookup | null {
 }
 
 export async function lookupSamOpportunityForPipeline(
-  supabase: SupabaseLike,
+  supabase: PipelineDb,
   input: { noticeId?: string | null; title?: string | null; agency?: string | null }
 ): Promise<SamOpportunityLookup | null> {
   const noticeId = input.noticeId?.trim();
   if (noticeId) {
+    // Record UUID stays exact — do not upgrade an older amendment pin to latest.
     const { data: byNoticeId } = await supabase
       .from('sam_opportunities')
       .select(SAM_SELECT)
@@ -104,13 +96,17 @@ export async function lookupSamOpportunityForPipeline(
       .maybeSingle();
     if (byNoticeId) return toLookup(byNoticeId);
 
-    const { data: bySolicitation } = await supabase
-      .from('sam_opportunities')
-      .select(SAM_SELECT)
-      .ilike('solicitation_number', noticeId)
-      .limit(10);
-    const solicitationMatch = consistent(bySolicitation || [], input.agency);
-    if (solicitationMatch) return toLookup(solicitationMatch);
+    if (!isNoticeUuid(noticeId)) {
+      const canonical = await resolveCanonicalSolicitation(noticeId, { client: supabase });
+      if (canonical) {
+        const { data: latest } = await supabase
+          .from('sam_opportunities')
+          .select(SAM_SELECT)
+          .eq('notice_id', canonical.notice.notice_id)
+          .maybeSingle();
+        if (latest) return toLookup(latest);
+      }
+    }
   }
 
   const title = input.title?.trim();
