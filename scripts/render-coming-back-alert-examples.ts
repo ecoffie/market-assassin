@@ -51,6 +51,7 @@ async function main() {
       .from('user_notification_settings')
       .select('user_email,naics_codes,psc_codes,keywords,business_type,business_description')
       .eq('user_email', email)
+      .limit(1)
       .maybeSingle();
     if (error) fail(`${email}: ${error.message}`);
     if (!data) fail(`${email}: profile not found`);
