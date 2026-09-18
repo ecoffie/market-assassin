@@ -6932,3 +6932,16 @@ no 504; representative drones capability completes grounded under 55s.
 **SEO.** GovCon first market read, sell to SOCOM, Army construction opportunities, VA IT services, time to first value.
 
 **Proof.** Connector `P2_FIRST_TURN_INSTRUCTIONS` leads MCP initialize. FIND results carry `presentation.host_rules` (same local-contract pattern as Current Intelligence / Pathway Fit). Naive host A/B/C: exactly 1 FIND, 10 credits, Open/Coming back/Coming soon presented, one refine, no company/clearance/deliverable before value. Ledger `eric@govcongiants.com` 2026-09-17 22:51–22:52 UTC: three `find_opportunities` success rows, `credits_charged=10` each (one per prompt). v1 horizon honesty and confirmation-gated UNDERSTAND unchanged.
+
+---
+
+## Potato P3 — market understanding (customer language in)
+
+**What.** `find_opportunities` now interprets “I sell cybersecurity to SOCOM” as a government market without asking the customer for NAICS, PSC, or legal agency names. Buyer aliases (SOCOM / USSOCOM / U.S. Special Operations Command) are spelling, not a wider department. When cyber classification is thin, Coming back can return this buyer’s IT-coded contracts as **related-market candidates** — never as confirmed cybersecurity demand. Missing forecast publishers are coverage-not-established, not a measured zero.
+
+**Why.** P2 sequenced first value correctly, then returned 0/0/0 because FIND looked for the literal word “cybersecurity” on the parent awarding-agency column. USSOCOM cyber-relevant work is stored as “U.S. Special Operations Command” on the sub-agency column and billed under IT NAICS, not the word cybersecurity.
+
+**SEO.** sell to SOCOM, USSOCOM cybersecurity contracts, federal IT recompetes, GovCon market language.
+
+**Proof.** Interpretation contract on the FIND payload (`market_interpretation`, `evidence_class` DIRECT_MATCH vs RELATED_MARKET_CANDIDATE). Unit tests: SOCOM needles never include DoD; 541512 without cyber text is RELATED not DIRECT; physical security is excluded from the cyber market; 160th SOAR is not a SIEM/SOAR signal; SOCOM forecast identity is coverage `'none'`. Live 2026-09-17: `cybersecurity`+`SOCOM` → Open empty 0 · Coming back 39 (8 direct · 31 related-market) · Coming soon unavailable (`coverage_unestablished`). Named PIIDs: H9241524F0002 DIRECT (DJ01 + “Cybersecurity Support Services”); H9223922F0028 / H9241524F0028 / H9241522F0062 RELATED (IT NAICS, no cyber claim). P2 one-FIND sequencing unchanged. Blind-market table in the P3 stop report.
+

@@ -11,8 +11,6 @@ import {
   parseMapFilters,
   parseStateList,
   naicsMatchConds,
-  agencyOrExpr,
-  multiAgency,
   NO_MATCH_SENTINEL,
 } from '@/lib/opportunities/map-filters';
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
@@ -20,6 +18,19 @@ import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/searc
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { currentFiscalYear } from '@/lib/forecasts/query';
+import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
+import {
+  interpretMarket,
+  classifyRecord,
+  evidenceWhy,
+  dualBuyerOrExpr,
+  pipeNeedles,
+  retrievalNaics,
+  retrievalPsc,
+  plainEnglishInterpretation,
+  type EvidenceClass,
+  type MarketInterpretation,
+} from '@/lib/opportunities/market-interpretation';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -80,6 +91,7 @@ export interface HorizonItemBase {
   source: string;
   why_this_matched: string;
   identity: { kind: string; id: string };
+  evidence_class?: EvidenceClass;
 }
 
 export type HorizonItem = HorizonItemBase & Record<string, unknown>;
@@ -97,6 +109,7 @@ export interface HorizonResult {
   error: { class: string; message: string } | null;
   allowed_handoffs: HandoffKey[];
   semantics_note: string | null;
+  evidence_counts?: { DIRECT_MATCH: number; RELATED_MARKET_CANDIDATE: number } | null;
 }
 
 export interface FindOpportunitiesResult {
@@ -109,6 +122,8 @@ export interface FindOpportunitiesResult {
     horizons_requested: HorizonKey[];
     interpreted_as: Record<HorizonKey, string>;
   };
+  market_interpretation: MarketInterpretation;
+  presentation_note: string;
   horizons: Record<HorizonKey, HorizonResult>;
   summary: {
     open_now: { status: HorizonStatus; matched_count: number | null };
@@ -144,6 +159,9 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'Do not ask company identity, UEI, CAGE, certifications, clearance, FCL, set-aside, vehicle, or desired deliverable before presenting this. Do not expose NAICS/PSC/ATO/CNO/CEMA/CSO/OT/PAE/FCL in the refinement unless the user already used that word.',
   'Do not web-search or create an artifact on this turn. Do not ask market map vs access-path vs capability statement.',
   'Clearance is not a first-value question. Do not call it a hard gate because the buyer is SOCOM.',
+  'EVIDENCE CLASS: DIRECT_MATCH is confirmed relevance to what they asked to sell. RELATED_MARKET_CANDIDATE is this buyer’s broader market that can contain that work. Never count related-market rows as confirmed cyber (or other capability) demand. Never mix the two into one “cyber contracts” number. Explain the distinction in plain English. Do not dump NAICS/PSC.',
+  'INTERPRETATION: use presentation_note / market_interpretation.truth. Buyer alias (SOCOM = U.S. Special Operations Command) is spelling, not a wider department. Never say you searched all of DoD. Never claim the entire IT-services market is cybersecurity.',
+  'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
 ] as const;
 
 export const FIND_FIRST_VALUE_SECTIONS = {
@@ -170,6 +188,10 @@ export const FIND_FIRST_VALUE_SECTIONS = {
   gaps: {
     display_title: "What I can't establish yet",
     provenance_label: 'Coverage gap or query limit — never fabricated as zero',
+  },
+  related: {
+    display_title: 'Related market — not confirmed',
+    provenance_label: 'RELATED_MARKET_CANDIDATE rows. Broader market at this buyer; not confirmed capability demand',
   },
 } as const;
 
@@ -273,19 +295,23 @@ async function tableAsOf(client: SupabaseClient, table: string, col: string): Pr
   }
 }
 
-/** Resolve customer query into per-horizon filter bags (Maps search brain). */
-function interpretQuery(input: FindOpportunitiesInput): {
+type InterpretedQuery = {
   searchText: string;
   stateCode: string | null;
   agency: string;
+  agencyNeedles: string[];
   setAside: string;
   advancedNaics: string;
   advancedPsc: string;
   openClosingDays: number;
   recompeteMonths: number;
   forecastIncludePast: boolean;
+  market: MarketInterpretation;
   interpreted: Record<HorizonKey, string>;
-} {
+};
+
+/** Resolve customer query into per-horizon filter bags (Maps search brain + P3 interpretation). */
+function interpretQuery(input: FindOpportunitiesInput): InterpretedQuery {
   const searchText = (input.advanced?.keyword_exact || input.query || '').trim();
   const stateRaw = (input.location || '').trim();
   const stateCode = stateRaw ? normalizeStateCode(stateRaw) : null;
@@ -297,41 +323,56 @@ function interpretQuery(input: FindOpportunitiesInput): {
   const recompeteMonths = Math.min(60, Math.max(1, Number(input.timeframe?.recompete_months) || 18));
   const forecastIncludePast = !!input.timeframe?.forecast_include_past;
 
+  const market = interpretMarket(searchText, agency || null);
+  const agencyNeedles = market.buyer.needles.length ? market.buyer.needles : (agency ? [agency] : []);
   const intent = resolveQueryIntent(searchText);
   const toa = intent.kind === 'keyword' ? termOfArtNaicsCodes(searchText) : null;
+  const related = market.capability.related_market;
 
   return {
     searchText,
     stateCode,
     agency,
+    agencyNeedles,
     setAside,
     advancedNaics,
     advancedPsc,
     openClosingDays,
     recompeteMonths,
     forecastIncludePast,
+    market,
     interpreted: {
       open_now:
         `SAM active notices; keyword via search brain (${intent.kind}); ` +
-        `geo = place-of-performance OR buying-office state` +
+        `buyer = department OR sub_tier` +
+        (agencyNeedles.length ? ` (normalized ${agencyNeedles.length} spellings)` : '') +
+        `; geo = place-of-performance OR buying-office state` +
         (stateCode ? ` (${stateCode})` : ''),
       coming_back:
-        `Real future recompetes; keyword → ${toa?.length ? 'term-of-art NAICS' : intent.kind}; ` +
-        `geo = place_of_performance_state only` +
+        `Real future recompetes; ` +
+        (related
+          ? `direct taxonomy + related-market NAICS (labeled, not claimed as the requested capability)`
+          : market.capability.direct.naics.length
+            ? `industry-preset NAICS`
+            : toa?.length
+              ? 'term-of-art NAICS'
+              : intent.kind) +
+        `; buyer = awarding_agency OR awarding_sub_agency` +
+        `; geo = place_of_performance_state only` +
         (stateCode ? ` (${stateCode})` : '') +
         `; window ≤${recompeteMonths}mo`,
       coming_soon:
         `agency_forecasts (Maps universe, exclude past FY` +
         `${forecastIncludePast ? ' DISABLED' : ''}); geo = pop_state only` +
         (stateCode ? ` (${stateCode})` : '') +
-        `; no status=forecasted requirement`,
+        `; no status=forecasted requirement; unresolved publisher → unavailable not zero`,
     },
   };
 }
 
 async function queryOpenNow(
   client: SupabaseClient,
-  p: ReturnType<typeof interpretQuery>,
+  p: InterpretedQuery,
   limit: number,
 ): Promise<HorizonResult> {
   const source = 'sam_opportunities';
@@ -343,7 +384,7 @@ async function queryOpenNow(
     const get = (k: string): string | null => {
       if (k === 'q' || k === 'search') return p.searchText || null;
       if (k === 'state') return p.stateCode || null;
-      if (k === 'agency') return p.agency || null;
+      if (k === 'agency') return p.agencyNeedles.length ? pipeNeedles(p.agencyNeedles) : (p.agency || null);
       if (k === 'setAside') return p.setAside || null;
       if (k === 'naics') return p.advancedNaics || null;
       if (k === 'psc') return p.advancedPsc || null;
@@ -354,7 +395,7 @@ async function queryOpenNow(
     const f = parseMapFilters(get);
     if (p.searchText) consumed.push('query→search_brain');
     if (p.stateCode) consumed.push('location→pop_or_office');
-    if (p.agency) consumed.push('agency');
+    if (p.agency) consumed.push(p.market.buyer.kind === 'normalization' ? 'agency→normalized_buyer' : 'agency');
     if (p.setAside) consumed.push('set_aside');
     if (p.advancedNaics) consumed.push('advanced.naics');
     if (p.advancedPsc) consumed.push('advanced.psc');
@@ -442,7 +483,7 @@ async function queryOpenNow(
 
 async function queryComingBack(
   client: SupabaseClient,
-  p: ReturnType<typeof interpretQuery>,
+  p: InterpretedQuery,
   limit: number,
 ): Promise<HorizonResult> {
   const source = 'recompete_opportunities';
@@ -453,12 +494,17 @@ async function queryComingBack(
   const bound = new Date();
   bound.setMonth(bound.getMonth() + p.recompeteMonths);
   const maxEnd = bound.toISOString().slice(0, 10);
+  const cap = p.market.capability;
+  const related = cap.related_market;
 
   try {
     let naics = p.advancedNaics;
     let qKeyword = '';
     let qSetAside = '';
     const q = p.searchText;
+    const pinnedNaics = retrievalNaics(cap);
+    const pinnedPsc = retrievalPsc(cap);
+    const usePinned = !naics && pinnedNaics.length > 0;
 
     if (q && !naics) {
       const intent = resolveQueryIntent(q);
@@ -478,6 +524,14 @@ async function queryComingBack(
           unsupported.push('psc (column ~empty; no NAICS crosswalk)');
           consumed.push('query→keyword_fallback');
         }
+      } else if (usePinned) {
+        naics = pinnedNaics.join(',');
+        consumed.push(
+          related
+            ? 'query→direct_taxonomy+related_market_naics'
+            : 'query→industry_preset_naics',
+        );
+        if (related) consumed.push('related_market_labeled_not_claimed');
       } else {
         const toa = termOfArtNaicsCodes(q);
         if (toa?.length) {
@@ -496,12 +550,43 @@ async function queryComingBack(
       unsupported.push('advanced.psc (recompete psc_code sparse — not applied)');
     }
     if (p.stateCode) consumed.push('location→place_of_performance_state');
-    if (p.agency) consumed.push('agency→awarding_agency');
+    if (p.agency) {
+      consumed.push(
+        p.market.buyer.kind === 'normalization'
+          ? 'agency→awarding_agency_or_sub_normalized'
+          : 'agency→awarding_agency_or_sub',
+      );
+    }
     if (p.setAside && !qSetAside) {
-      // Free-text set-aside from dedicated field
       consumed.push('set_aside');
     }
     consumed.push(`timeframe.recompete_months=${p.recompeteMonths}`);
+
+    const buyerNeedles = p.agencyNeedles;
+    const buyerExpr = buyerNeedles.length
+      ? dualBuyerOrExpr('awarding_agency', 'awarding_sub_agency', buyerNeedles)
+      : '';
+
+    const capOrParts: string[] = [];
+    if (naics) {
+      const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
+      capOrParts.push(...naicsMatchConds(codes));
+    }
+    if (usePinned && pinnedPsc.length && !p.advancedPsc) {
+      for (const code of pinnedPsc) capOrParts.push(`psc_code.eq.${code}`);
+      consumed.push('direct_psc_if_populated');
+    }
+    if (usePinned && cap.direct.terms.length && related) {
+      for (const t of cap.direct.terms) {
+        const esc = t.replace(/[%,()]/g, ' ').trim();
+        if (esc.length < 3) continue;
+        capOrParts.push(
+          `incumbent_name.ilike.%${esc}%`,
+          `naics_description.ilike.%${esc}%`,
+          `description.ilike.%${esc}%`,
+        );
+      }
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const apply = (query: any) => {
@@ -509,15 +594,8 @@ async function queryComingBack(
         .is('quality_flag', null)
         .gte('period_of_performance_current_end', today)
         .lte('period_of_performance_current_end', maxEnd);
-      if (p.agency) {
-        const expr = agencyOrExpr('awarding_agency', multiAgency(p.agency));
-        if (expr) query = query.or(expr);
-      }
-      if (naics) {
-        const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
-        const conds = naicsMatchConds(codes);
-        if (conds.length) query = query.or(conds.join(','));
-      }
+      if (buyerExpr) query = query.or(buyerExpr);
+      if (capOrParts.length) query = query.or(capOrParts.join(','));
       const states = parseStateList(p.stateCode);
       if (states) {
         if (states.length) query = query.or(states.map((st) => `place_of_performance_state.eq.${st}`).join(','));
@@ -528,19 +606,20 @@ async function queryComingBack(
       if (qKeyword) {
         const esc = qKeyword.replace(/[%,()]/g, ' ');
         query = query.or(
-          `incumbent_name.ilike.%${esc}%,naics_description.ilike.%${esc}%,awarding_agency.ilike.%${esc}%`,
+          `incumbent_name.ilike.%${esc}%,naics_description.ilike.%${esc}%,awarding_agency.ilike.%${esc}%,awarding_sub_agency.ilike.%${esc}%`,
         );
       }
       return query;
     };
 
     const COLS =
-      'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at';
+      'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at';
 
+    const fetchCap = Math.max(limit, related ? 200 : limit);
     let listQ = apply(client.from(source).select(COLS, { count: 'exact' }));
     const { data, count, error } = await listQ
       .order('period_of_performance_current_end', { ascending: true })
-      .limit(limit);
+      .limit(fetchCap);
 
     if (error) return unavailable(source, BACK_HANDOFFS, error.message, unsupported);
 
@@ -551,8 +630,34 @@ async function queryComingBack(
       if (!ue) unmapped = uc ?? null;
     }
 
-    const rows = (data || []) as Array<Record<string, unknown>>;
-    if (!rows.length) {
+    const rawRows = (data || []) as Array<Record<string, unknown>>;
+    const classified: Array<{ row: Record<string, unknown>; cls: EvidenceClass }> = [];
+    const evidence_counts = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 0 };
+    for (const row of rawRows) {
+      const cls = classifyRecord(
+        {
+          title: (row.naics_description as string) || (row.piid as string) || '',
+          description: (row.description as string) || '',
+          naics_code: (row.naics_code as string) || '',
+          naics_description: (row.naics_description as string) || '',
+          psc_code: (row.psc_code as string) || '',
+          incumbent_name: (row.incumbent_name as string) || '',
+        },
+        cap,
+      );
+      if (!cls) continue;
+      evidence_counts[cls] += 1;
+      classified.push({ row, cls });
+    }
+    classified.sort((a, b) => {
+      if (a.cls !== b.cls) return a.cls === 'DIRECT_MATCH' ? -1 : 1;
+      return String(a.row.period_of_performance_current_end || '').localeCompare(
+        String(b.row.period_of_performance_current_end || ''),
+      );
+    });
+    const sliced = classified.slice(0, limit);
+
+    if (!sliced.length) {
       return emptyHorizon(
         source,
         BACK_HANDOFFS,
@@ -564,19 +669,18 @@ async function queryComingBack(
       );
     }
 
-    const items: HorizonItem[] = rows.map((r) => ({
+    const items: HorizonItem[] = sliced.map(({ row: r, cls }) => ({
       horizon: 'coming_back',
-      title: String(r.naics_description || r.piid || 'Expiring contract'),
-      buyer: String(r.awarding_agency || '') || null,
+      title: String(r.naics_description || r.incumbent_name || r.piid || 'Expiring contract'),
+      buyer: String(r.awarding_sub_agency || r.awarding_agency || '') || null,
       location_label: locLabel(r.place_of_performance_city as string, r.place_of_performance_state as string),
       relevant_date: (r.period_of_performance_current_end as string) || null,
       relevant_date_label: 'current_end',
       value_label: moneyLabel(r.potential_total_value) || moneyLabel(r.total_obligation),
       source,
-      why_this_matched: p.searchText
-        ? `Matched recompete / expiring contract for “${p.searchText}”`
-        : 'Matched recompete / expiring contract',
+      why_this_matched: evidenceWhy(cls, p.searchText || 'this work'),
       identity: { kind: 'contract_id', id: String(r.contract_id || '') },
+      evidence_class: cls,
       contract_id: String(r.contract_id || ''),
       piid: String(r.piid || '') || null,
       incumbent_name: (r.incumbent_name as string) || null,
@@ -590,6 +694,10 @@ async function queryComingBack(
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
     }));
 
+    const note = related
+      ? 'DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is this buyer’s broader IT market — not confirmed cybersecurity. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet.'
+      : 'Geography: place of performance only (not buying-office). Not a live solicitation — do not draft a proposal as if an RFP exists. Watch/email for this horizon is not available yet.';
+
     return {
       status: 'grounded',
       matched_count: count ?? null,
@@ -602,8 +710,8 @@ async function queryComingBack(
       unmapped_count: unmapped,
       error: null,
       allowed_handoffs: BACK_HANDOFFS,
-      semantics_note:
-        'Geography: place of performance only (not buying-office). Not a live solicitation — do not draft a proposal as if an RFP exists. Watch/email for this horizon is not available yet.',
+      semantics_note: note,
+      evidence_counts,
     };
   } catch (e) {
     return unavailable(source, BACK_HANDOFFS, (e as Error).message, unsupported);
@@ -612,7 +720,7 @@ async function queryComingBack(
 
 async function queryComingSoon(
   client: SupabaseClient,
-  p: ReturnType<typeof interpretQuery>,
+  p: InterpretedQuery,
   limit: number,
 ): Promise<HorizonResult> {
   const source = 'agency_forecasts';
@@ -621,6 +729,44 @@ async function queryComingSoon(
   const asOf = await tableAsOf(client, source, 'last_synced_at');
 
   try {
+    if (p.agency) {
+      const forecastRes = resolveForecastAgencies(p.agency);
+      const noneCoverage =
+        !forecastRes.empty &&
+        forecastRes.identities.length > 0 &&
+        forecastRes.identities.every((id) => id.coverage === 'none') &&
+        forecastRes.codes.length === 0 &&
+        forecastRes.children.length === 0 &&
+        forecastRes.unresolved.length === 0;
+      if (noneCoverage) {
+        const id = forecastRes.identities[0];
+        consumed.push('agency→forecast_identity_no_publisher');
+        p.market.truth.what_remains_unsupported.push(
+          `forecast publisher coverage for ${id.label} is not established`,
+        );
+        return {
+          status: 'unavailable',
+          matched_count: null,
+          returned_count: 0,
+          items: [],
+          source,
+          as_of: asOf,
+          filters_consumed: consumed,
+          filters_unsupported: ['agency forecast publisher'],
+          unmapped_count: null,
+          error: {
+            class: 'coverage_unestablished',
+            message:
+              id.note ||
+              `No forecast publisher for ${id.label}. Coverage is not established — not a measured zero.`,
+          },
+          allowed_handoffs: SOON_HANDOFFS,
+          semantics_note:
+            'Coverage not established for this buyer in agency_forecasts. Do not treat as zero demand. Do not substitute parent-department forecasts.',
+        };
+      }
+    }
+
     // Build search/naics the way Maps applyForecastFilters expects.
     let q = p.searchText;
     let naics = p.advancedNaics;
@@ -876,6 +1022,10 @@ function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string {
     if (h.status === 'unavailable') return `${label} unavailable`;
     if (h.status === 'empty') return `0 ${label}`;
     const n = h.matched_count;
+    const ev = h.evidence_counts;
+    if (ev && (ev.DIRECT_MATCH + ev.RELATED_MARKET_CANDIDATE) > 0) {
+      return `${n == null ? '?' : n.toLocaleString()} ${label} (${ev.DIRECT_MATCH} direct · ${ev.RELATED_MARKET_CANDIDATE} related-market)`;
+    }
     if (n == null) return `${label} count unknown`;
     return `${n.toLocaleString()} ${label}`;
   };
@@ -919,6 +1069,8 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
           coming_soon: 'n/a',
         },
       },
+      market_interpretation: interpretMarket('', null),
+      presentation_note: '',
       horizons,
       summary: {
         open_now: { status: 'unavailable', matched_count: null },
@@ -977,6 +1129,16 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
   const shape = classifyFindShape(horizons);
   const grounded = Object.values(horizons).some((h) => h.status === 'grounded');
   const degraded = Object.values(horizons).some((h) => h.status === 'unavailable' || h.status === 'partial');
+  const mi = interpreted.market;
+  mi.truth.records = {
+    DIRECT_MATCH: coming_back.items.filter((i) => i.evidence_class === 'DIRECT_MATCH').map((i) => String(i.identity.id)),
+    RELATED_MARKET_CANDIDATE: coming_back.items
+      .filter((i) => i.evidence_class === 'RELATED_MARKET_CANDIDATE')
+      .map((i) => String(i.identity.id)),
+  };
+  const relatedNote = mi.retrieval_plan.related_market_applied
+    ? 'Related-market rows are labeled RELATED_MARKET_CANDIDATE and are not confirmed capability demand. '
+    : '';
 
   return {
     query_summary: {
@@ -992,6 +1154,8 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       horizons_requested: requested,
       interpreted_as: interpreted.interpreted,
     },
+    market_interpretation: mi,
+    presentation_note: plainEnglishInterpretation(mi),
     horizons,
     summary: {
       open_now: { status: open_now.status, matched_count: open_now.matched_count },
@@ -999,13 +1163,16 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       coming_soon: { status: coming_soon.status, matched_count: coming_soon.matched_count },
       headline: headlineFor(horizons),
       claim_hygiene:
-        'Counts are per-horizon matches under this query — not unique procurements across horizons. Do not call combined raw rows unique opportunities.',
+        relatedNote +
+        'Counts are per-horizon matches under this query — not unique procurements across horizons. Do not call combined raw rows unique opportunities. Do not count RELATED_MARKET_CANDIDATE as confirmed cybersecurity demand.',
     },
     _meta: {
       grounded,
       degraded,
       composition: 'opportunity_map_horizons_v1',
-      expansion_note: 'Cross-class deduplicated procurement identity is unknown.',
+      expansion_note: mi.retrieval_plan.related_market_applied
+        ? `Related-market expansion recorded: ${mi.retrieval_plan.related_market_reason}`
+        : 'Cross-class deduplicated procurement identity is unknown. Buyer alias normalization is not expansion.',
       watch_coverage: [...WATCH_COVERAGE],
       find_shape: shape,
     },
