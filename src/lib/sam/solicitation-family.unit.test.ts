@@ -21,6 +21,8 @@ import {
   familyIdentityKey,
   gradeAwardRelationship,
   gradeForecastRelationship,
+  groupRowsBySolicitationNumber,
+  indexFamiliesByNoticeId,
   paeRelationshipForFamily,
   partitionConfirmedFamily,
   shouldMergeFamilies,
@@ -319,6 +321,64 @@ describe('solicitation family v1 — identity rules', () => {
     expect(familyIdentityKey('N0017425RFPREQIHDMDept0002', AMD3_ID)).toBe('sol:N0017425RFPREQIHDMDEPT0002');
     expect(isSolicitationIdentifier('N0017426R1003')).toBe(true);
     expect(isSolicitationIdentifier('N00174')).toBe(false);
+  });
+
+  it('junk solicitation_number never shares a sol: family', () => {
+    const energy = row({
+      notice_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      solicitation_number: 'EMAIL',
+      department: 'DEPARTMENT OF ENERGY',
+      title: 'Energy junk token',
+      description: 'Unrelated.',
+      attachments: [],
+    });
+    const epa = row({
+      notice_id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      solicitation_number: 'EMAIL',
+      department: 'ENVIRONMENTAL PROTECTION AGENCY',
+      title: 'EPA junk token',
+      description: 'Unrelated.',
+      attachments: [],
+    });
+    expect(familyIdentityKey('EMAIL', energy.notice_id)).toBe(`nid:${energy.notice_id}`);
+    expect(familyIdentityKey('0001', energy.notice_id)).toBe(`nid:${energy.notice_id}`);
+    expect(familyIdentityKey('RFP', energy.notice_id)).toBe(`nid:${energy.notice_id}`);
+    expect(familyIdentityKey('2026', energy.notice_id)).toBe(`nid:${energy.notice_id}`);
+    expect(familyIdentityKey('07152026', energy.notice_id)).toBe(`nid:${energy.notice_id}`);
+    expect(familyIdentityKey('EMAIL', energy.notice_id)).not.toBe(familyIdentityKey('EMAIL', epa.notice_id));
+
+    const mixed = partitionConfirmedFamily([energy, epa], energy.notice_id);
+    expect(mixed.accepted.map((r) => r.notice_id)).toEqual([energy.notice_id]);
+    expect(mixed.rejected.map((r) => r.notice_id)).toEqual([epa.notice_id]);
+    expect(buildFamilyView([energy, epa], { query: energy.notice_id, now: NOW })!.identity_key).toBe(`nid:${energy.notice_id}`);
+    expect(buildFamilyView([energy, epa], { query: epa.notice_id, now: NOW })!.identity_key).toBe(`nid:${epa.notice_id}`);
+    expect(buildFamilyView([energy, epa], { query: energy.notice_id, now: NOW })!.versions).toHaveLength(1);
+    expect(extractConfirmedAliases([energy, epa]).filter((id) => id.identifier_type === 'solicitation_number')).toEqual([]);
+
+    const groups = groupRowsBySolicitationNumber([energy, epa]);
+    expect(groups.size).toBe(2);
+    const indexed = indexFamiliesByNoticeId([energy, epa], NOW);
+    expect(indexed.get(energy.notice_id)!.identity_key).not.toBe(indexed.get(epa.notice_id)!.identity_key);
+  });
+
+  it('valid identical solicitation_number still produces one sol family', () => {
+    expect(family(MASA)!.identity_key).toBe('sol:N0017425RFPREQIHDMDEPT0002');
+    expect(family(MASA)!.versions).toHaveLength(4);
+    expect(groupRowsBySolicitationNumber(MASA).size).toBe(1);
+  });
+
+  it('shared hyphenated customer-RFP across different SAM sol numbers does not merge', () => {
+    // HVAC: shared W912C3-26-R-A009, neither side's SAM sol# is that alias.
+    expect(shouldMergeFamilies(
+      {
+        canonical_solicitation_number: 'W912C326RA009',
+        confirmed_identifier_norms: ['W912C326RA009', 'W912C3-26-R-A009'],
+      },
+      {
+        canonical_solicitation_number: 'W912C326QA011',
+        confirmed_identifier_norms: ['W912C326QA011', 'W912C3-26-R-A009'],
+      },
+    )).toBe(false);
   });
 
   it('monitor ignores unrelated same-office notices', () => {

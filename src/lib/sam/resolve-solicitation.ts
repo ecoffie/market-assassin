@@ -82,13 +82,14 @@ export function normalizeNoticeUuid(raw: string): string {
   return t.length === 32 ? t : raw.trim();
 }
 
-/** Alphanumeric solicitation token — not free text, not a UUID. */
+/** Alphanumeric solicitation token — not free text, not a UUID, not a digit-only stamp. */
 export function isSolicitationIdentifier(raw: string): boolean {
   const t = raw.trim();
   if (t.length < 8 || t.length > 40) return false;
   if (isNoticeUuid(t)) return false;
   if (/\s/.test(t)) return false;
   if (!/\d/.test(t)) return false;
+  if (!/[A-Za-z]/.test(t)) return false;
   return /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(t);
 }
 

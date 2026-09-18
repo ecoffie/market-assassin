@@ -6,8 +6,11 @@
 -- per sam_opportunities notice.
 --
 -- identity_key:
---   sol:<NORMALIZED_SOLICITATION_NUMBER>  — confirmed SAM family
---   nid:<notice_id>                       — singleton with no SAM sol #
+--   sol:<NORMALIZED_SOLICITATION_NUMBER>  — confirmed SAM family, only when
+--     the stored solicitation_number passes isSolicitationIdentifier
+--     (the #1557 known-ID shape: 8–40, letter+digit, no space, not a UUID)
+--   nid:<notice_id>                       — missing OR junk solicitation_number
+--     (EMAIL, RFP, 0001, 2026, 07152026, …). Junk never shares a sol: family.
 -- Never keyed by title, DoDAAC, NAICS, PSC, incumbent, or buyer.
 
 CREATE TABLE IF NOT EXISTS solicitation_family (

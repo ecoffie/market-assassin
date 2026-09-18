@@ -107,7 +107,26 @@ export interface FamilyNewVersionChange {
   new_value: string;
 }
 
+export interface IdentityConflict {
+  kind: 'IDENTITY_CONFLICT';
+  identifier_norm: string;
+  identifier_type: IdentifierType;
+  existing_family_id: string;
+  attempted_family_id: string;
+}
+
+export interface FamilyPersistResult {
+  view: SolicitationFamilyView;
+  identity_conflicts: IdentityConflict[];
+}
+
 type FamilyDb = Pick<SupabaseClient, 'from'>;
+
+function pgCode(err: unknown): string | null {
+  if (!err || typeof err !== 'object') return null;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+}
 
 export interface FamilyNoticeRow extends SolicitationVersionRow {
   attachments?: unknown;
@@ -130,8 +149,8 @@ export function normalizeIdentifier(raw: string | null | undefined): string {
 }
 
 export function familyIdentityKey(canonicalSolicitationNumber: string | null, currentNoticeId: string): string {
-  const sol = normalizeIdentifier(canonicalSolicitationNumber);
-  if (sol) return `sol:${sol}`;
+  const raw = String(canonicalSolicitationNumber || '').trim();
+  if (raw && isSolicitationIdentifier(raw)) return `sol:${normalizeIdentifier(raw)}`;
   return `nid:${currentNoticeId}`;
 }
 
@@ -196,7 +215,7 @@ export function extractConfirmedAliases(rows: FamilyNoticeRow[]): FamilyIdentifi
       });
     }
     const sol = row.solicitation_number?.trim() ?? null;
-    if (sol) {
+    if (sol && isSolicitationIdentifier(sol)) {
       addIdentifier(out, {
         identifier_type: 'solicitation_number',
         identifier_value: sol,
@@ -240,7 +259,10 @@ export function extractConfirmedAliases(rows: FamilyNoticeRow[]): FamilyIdentifi
 export function groupRowsBySolicitationNumber(rows: FamilyNoticeRow[]): Map<string, FamilyNoticeRow[]> {
   const groups = new Map<string, FamilyNoticeRow[]>();
   for (const row of rows) {
-    const key = normalizeIdentifier(row.solicitation_number) || `nid:${row.notice_id}`;
+    const raw = row.solicitation_number?.trim() || '';
+    const key = raw && isSolicitationIdentifier(raw)
+      ? normalizeIdentifier(raw)
+      : `nid:${row.notice_id}`;
     const list = groups.get(key) || [];
     list.push(row);
     groups.set(key, list);
@@ -260,17 +282,13 @@ export function shouldMergeFamilies(
 ): boolean {
   const aSol = normalizeIdentifier(a.canonical_solicitation_number);
   const bSol = normalizeIdentifier(b.canonical_solicitation_number);
-  if (aSol && bSol && aSol === bSol) return true;
+  if (aSol && bSol && aSol === bSol && isSolicitationIdentifier(aSol)) return true;
   const aSet = new Set(a.confirmed_identifier_norms.map(normalizeIdentifier).filter(Boolean));
   const bSet = new Set(b.confirmed_identifier_norms.map(normalizeIdentifier).filter(Boolean));
-  if (aSol && bSet.has(aSol)) return true;
-  if (bSol && aSet.has(bSol)) return true;
-  for (const id of aSet) {
-    if (bSet.has(id) && !id.startsWith('nid:')) {
-      // Shared confirmed customer-RFP / SAM token — not a notice_id (those are unique).
-      if (id.length >= 8) return true;
-    }
-  }
+  // Rule B: one family's authoritative SAM sol# is named as the other's confirmed alias.
+  // Shared customer-RFP tokens alone do not merge (alias theft / HVAC dual-sol case).
+  if (aSol && isSolicitationIdentifier(aSol) && bSet.has(aSol)) return true;
+  if (bSol && isSolicitationIdentifier(bSol) && aSet.has(bSol)) return true;
   return false;
 }
 
@@ -522,7 +540,7 @@ export async function resolveFamilyForQuery(
   const sb = opts?.client ?? db();
   const sol = canonical.notice.solicitation_number?.trim();
 
-  if (sb && sol) {
+  if (sb && sol && isSolicitationIdentifier(sol)) {
     const { data, error } = await sb
       .from('sam_opportunities')
       .select(FAMILY_MEMBER_COLS)
@@ -573,18 +591,10 @@ export async function resolveFamilyForQuery(
 export async function ensureFamilyPersisted(
   view: SolicitationFamilyView,
   opts?: { client?: FamilyDb },
-): Promise<SolicitationFamilyView> {
+): Promise<FamilyPersistResult> {
   const sb = opts?.client ?? db();
-  if (!sb) return view;
+  if (!sb) return { view, identity_conflicts: [] };
 
-  const { data: existing, error: readErr } = await sb
-    .from('solicitation_family')
-    .select('family_id')
-    .eq('identity_key', view.identity_key)
-    .maybeSingle();
-  if (readErr) throw readErr;
-
-  let familyId: string | null = existing?.family_id ?? null;
   const row = {
     identity_key: view.identity_key,
     canonical_solicitation_number: view.canonical_solicitation_number,
@@ -602,17 +612,25 @@ export async function ensureFamilyPersisted(
     updated_at: new Date().toISOString(),
   };
 
-  if (familyId) {
-    const { error } = await sb.from('solicitation_family').update(row).eq('family_id', familyId);
-    if (error) throw error;
-  } else {
-    const { data: inserted, error } = await sb
+  const { data: upserted, error: upsertErr } = await sb
+    .from('solicitation_family')
+    .upsert(row, { onConflict: 'identity_key' })
+    .select('family_id')
+    .single();
+
+  let familyId: string | null = upserted?.family_id ?? null;
+  if (upsertErr) {
+    if (pgCode(upsertErr) !== '23505') throw upsertErr;
+    const { data: existing, error: readErr } = await sb
       .from('solicitation_family')
-      .insert(row)
       .select('family_id')
-      .single();
-    if (error) throw error;
-    familyId = inserted.family_id;
+      .eq('identity_key', view.identity_key)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    familyId = existing?.family_id ?? null;
+  }
+  if (!familyId) {
+    throw new Error('solicitation_family upsert returned no family_id');
   }
 
   const versionRows = view.versions.map((v) => ({
@@ -631,7 +649,23 @@ export async function ensureFamilyPersisted(
     if (error) throw error;
   }
 
-  const idRows = view.identifiers.map((id) => ({
+  const identity_conflicts = await persistIdentifiersWithoutTheft(sb, familyId, view.identifiers);
+  return { view: { ...view, family_id: familyId }, identity_conflicts };
+}
+
+/**
+ * CASE A: identifier absent → insert.
+ * CASE B: same family → idempotent success.
+ * CASE C: different family → IDENTITY_CONFLICT; do not update family_id.
+ */
+async function persistIdentifiersWithoutTheft(
+  sb: FamilyDb,
+  familyId: string,
+  identifiers: FamilyIdentifier[],
+): Promise<IdentityConflict[]> {
+  if (!identifiers.length) return [];
+
+  const idRows = identifiers.map((id) => ({
     family_id: familyId,
     identifier_type: id.identifier_type,
     identifier_value: id.identifier_value,
@@ -639,14 +673,41 @@ export async function ensureFamilyPersisted(
     source: id.source,
     evidence_grade: id.evidence_grade,
   }));
-  if (idRows.length) {
-    const { error } = await sb.from('solicitation_identifiers').upsert(idRows, {
-      onConflict: 'identifier_norm,identifier_type',
-    });
-    if (error) throw error;
+
+  const { error: insErr } = await sb.from('solicitation_identifiers').upsert(idRows, {
+    onConflict: 'identifier_norm,identifier_type',
+    ignoreDuplicates: true,
+  });
+  if (insErr) throw insErr;
+
+  const norms = [...new Set(identifiers.map((id) => id.identifier_norm))];
+  const { data: owned, error: readErr } = await sb
+    .from('solicitation_identifiers')
+    .select('identifier_norm,identifier_type,family_id')
+    .in('identifier_norm', norms);
+  if (readErr) throw readErr;
+  if (owned == null) {
+    throw new Error('solicitation_identifiers ownership read returned no data');
   }
 
-  return { ...view, family_id: familyId };
+  const wanted = new Set(identifiers.map((id) => `${id.identifier_norm}|${id.identifier_type}`));
+  const conflicts: IdentityConflict[] = [];
+  for (const row of owned as Array<{
+    identifier_norm: string;
+    identifier_type: IdentifierType;
+    family_id: string;
+  }>) {
+    if (!wanted.has(`${row.identifier_norm}|${row.identifier_type}`)) continue;
+    if (row.family_id === familyId) continue;
+    conflicts.push({
+      kind: 'IDENTITY_CONFLICT',
+      identifier_norm: row.identifier_norm,
+      identifier_type: row.identifier_type,
+      existing_family_id: row.family_id,
+      attempted_family_id: familyId,
+    });
+  }
+  return conflicts;
 }
 
 export function isKnownIdQuery(raw: string): boolean {
@@ -678,9 +739,18 @@ export async function familyAttachmentForNotice(
   let persisted = view;
   if (opts?.persist) {
     try {
-      persisted = await ensureFamilyPersisted(view, { client: opts?.client });
+      const result = await ensureFamilyPersisted(view, { client: opts?.client });
+      persisted = result.view;
+      if (result.identity_conflicts.length) {
+        console.warn('[solicitation-family] IDENTITY_CONFLICT', result.identity_conflicts);
+      }
     } catch (err) {
-      console.warn('[solicitation-family] persist skipped:', err instanceof Error ? err.message : err);
+      const code = pgCode(err);
+      if (code === '23505') {
+        console.warn('[solicitation-family] persist unique violation after ON CONFLICT handling:', err instanceof Error ? err.message : err);
+      } else {
+        console.warn('[solicitation-family] persist skipped:', err instanceof Error ? err.message : err);
+      }
     }
   }
   return { view: persisted, attachment: attachPursuitToFamily(noticeId, persisted) };
