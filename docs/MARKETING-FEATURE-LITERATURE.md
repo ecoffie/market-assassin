@@ -6970,3 +6970,15 @@ no 504; representative drones capability completes grounded under 55s.
 **Proof.** Live 2026-09-17, same FIND compose, 10 credits, one call. VA + IT services: P@5 **0.00 → 1.00**, P@10 **0.00 → 1.00**, P@25 **0.12 → 0.76**. Rank 1 = Enterprise QA Software (541519/DA10); rank 6 = DistillerSR (513210/DA10 — PSC evidence, not NAICS-only); rank 17 = C&P Help Desk Tier 2 (541512/DA01, recovered because cap 500 covers the 357-row union; 100/200 truncated it). Construction + Army control stayed P@5/P@10/P@25 = 1.00 with deadline still ordering inside DIRECT. SOCOM + cybersecurity Open stayed honestly empty; Coming back 8 DIRECT / 31 RELATED; Coming soon unavailable, not zero. Cap 500 is the smallest of {100, 200, 500} that kept later-deadline DIRECT in the pool. Units: `open-relevance.unit.test.ts`. **Not a P4 win:** DLA janitorial 561210 Installation Support is existing Facilities taxonomy debt; ML + Air Force token/AFFAIRS buyer-needle debt is unchanged.
 
 P2 one-FIND / first-value / one-refine and P3 buyer-normalization / DIRECT vs RELATED are unchanged.
+
+---
+
+## MCP decision integrity — evidence, not guesses (2026-09-18)
+
+**What.** MCP notice, contact, incumbent, spend, OSBP, and entity tools now refuse to treat a guess as a fact. A notice UUID keeps that notice's deadline; a solicitation-number family with conflicting close dates is flagged. Contacts that only match by email domain stay uncertain. An incumbent is named only when PSC or distinctive title evidence supports it. Spend that could not be fetched is unavailable, not $0. An agency missing from the OSBP directory is a coverage gap, not "no office." An entity lookup that failed is not an unregistered business; DBA names are searched without picking the first ambiguous match.
+
+**Why.** Bid decisions were being made from the wrong amendment, the wrong office, or an unsupported prior award. Empty results looked like "$0" or "not registered" when the real answer was "we don't know." Compliance-matrix extraction on a notice ID was truncating attachment text that a manual paste of the same documents extracted fully.
+
+**SEO.** SAM.gov solicitation deadline, federal incumbent identification, OSBP contact, SAM entity lookup, compliance matrix from SAM notice.
+
+**Proof.** Units 2026-09-18 (137/137): `notice-identity` UUID vs solicitation-number deadline conflict + 28-shall paste vs 20k cap; `incumbent-evidence` NAICS-alone never grounds; `derive-subagency` email domain is not a verdict; `resolve-solicitation` MASA UUID keeps the original close date; `annual-obligations` unavailable ≠ $0; `federal-osbp-provenance` not_in_directory ≠ no_osbp_listed; `sam-entity-empty-success` lookup_failed ≠ unregistered + DBA + Tanaq-family ambiguous; contractor-resolution punctuation / first-match / corpus-miss controls unchanged. Pricing (`packages.ts` / `TOOL_CREDITS`) untouched.

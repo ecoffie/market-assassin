@@ -11,7 +11,8 @@
  * `_ai_hint` OFF by default.
  */
 import { getEntityByUEI, searchEntities, type SAMEntity } from '@/lib/sam/entity-api';
-import { localEntityByUEI, localEntitiesByName } from '@/lib/sam/entity-local-fallback';
+import { lookupLocalEntitiesByName, lookupLocalEntityByUEI } from '@/lib/sam/entity-local-fallback';
+import { classifyNameHits } from '@/lib/contractor/name-resolution';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SamEntityInput {
@@ -50,7 +51,47 @@ export interface SamEntityResult {
     /** When the local row was last refreshed from SAM. Present only for source='local_registry'. */
     as_of?: string | null;
     source_note?: string;
+    /**
+     * found = unique entity. ambiguous = several hits, none selected.
+     * not_found = both live and local agreed there is no row.
+     * lookup_failed = the lookup itself failed — NOT "unregistered".
+     * empty = no query.
+     */
+    lookup_status: 'found' | 'ambiguous' | 'not_found' | 'lookup_failed' | 'empty';
   };
+}
+
+function mergeEntities(groups: SAMEntity[][]): SAMEntity[] {
+  const byUei = new Map<string, SAMEntity>();
+  for (const list of groups) {
+    for (const e of list) {
+      const uei = String(e.ueiSAM || '').trim().toUpperCase();
+      if (!uei || byUei.has(uei)) continue;
+      byUei.set(uei, e);
+    }
+  }
+  return [...byUei.values()];
+}
+
+function pickUniqueEntity(
+  name: string,
+  matches: SAMEntity[],
+): { entity: SAMEntity | null; status: 'found' | 'ambiguous' | 'not_found' } {
+  const classified = classifyNameHits(
+    name,
+    matches.map((m) => ({
+      name: m.legalBusinessName || m.dbaName || '',
+      uei: m.ueiSAM,
+      total_obligated: 0,
+      award_count: 0,
+    })),
+    matches.length,
+  );
+  if (classified.status === 'unique') {
+    return { entity: matches.find((m) => m.ueiSAM === classified.uei) || null, status: 'found' };
+  }
+  if (classified.status === 'ambiguous') return { entity: null, status: 'ambiguous' };
+  return { entity: null, status: 'not_found' };
 }
 
 export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityResult> {
@@ -65,23 +106,32 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   let degraded = false;
   let usedLocal = false;
   let localAsOf: string | null = null;
+  let lookupStatus: SamEntityResult['_meta']['lookup_status'] = mode === 'empty' ? 'empty' : 'not_found';
 
   try {
     if (mode === 'uei') {
       entity = await getEntityByUEI(uei);
+      if (entity) lookupStatus = 'found';
     } else if (mode === 'name') {
-      const res = await searchEntities({ legalBusinessName: name, stateCode: state || undefined, size: limit });
-      matches = res.entities || [];
-      // The name-search endpoint returns LIGHT records without the points-of-
-      // contact block, so a name query used to surface no registered POCs. Fetch
-      // the TOP match's full registration so the company's registered POC NAMES
-      // (government-business / electronic-business / past-performance) come back
-      // for "who do I contact at [company]". One extra call, best match only.
-      // NOTE: SAM redacts POC email/phone on the public API — NAMES only.
-      const topUei = String(matches[0]?.ueiSAM || '').trim();
+      const legal = await searchEntities({ legalBusinessName: name, stateCode: state || undefined, size: limit });
+      let dbaEntities: SAMEntity[] = [];
+      try {
+        const dba = await searchEntities({ dbaName: name, stateCode: state || undefined, size: limit });
+        dbaEntities = dba.entities || [];
+      } catch (dbaErr) {
+        console.warn('[mcp:lookup_sam_entity] DBA live search failed; legal-name results still used:', dbaErr);
+      }
+      matches = mergeEntities([legal.entities || [], dbaEntities]);
+      const picked = pickUniqueEntity(name, matches);
+      lookupStatus = picked.status;
+      entity = picked.entity;
+      const topUei = String(entity?.ueiSAM || '').trim();
       if (topUei) {
         const detail = await getEntityByUEI(topUei).catch(() => null);
-        if (detail) { entity = detail; matches[0] = detail; }
+        if (detail) {
+          entity = detail;
+          matches = matches.map((m) => (m.ueiSAM === topUei ? detail : m));
+        }
       }
     }
   } catch (err) {
@@ -98,18 +148,24 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     // one — the caller must be able to say "as of <date>" instead of implying a fresh check.
     try {
       if (mode === 'uei') {
-        const hit = await localEntityByUEI(uei);
-        if (hit) { entity = hit.entity; localAsOf = hit.asOf; usedLocal = true; }
+        const looked = await lookupLocalEntityByUEI(uei);
+        if (looked.status === 'found') { entity = looked.hit.entity; localAsOf = looked.hit.asOf; usedLocal = true; lookupStatus = 'found'; }
+        else if (looked.status === 'unavailable') { lookupStatus = 'lookup_failed'; }
       } else if (mode === 'name') {
-        const hits = await localEntitiesByName(name, limit);
-        if (hits.length) {
-          matches = hits.map((h) => h.entity);
-          entity = hits[0].entity;
-          localAsOf = hits[0].asOf;
+        const looked = await lookupLocalEntitiesByName(name, limit);
+        if (looked.status === 'found') {
+          matches = looked.hits.map((h) => h.entity);
+          const picked = pickUniqueEntity(name, matches);
+          lookupStatus = picked.status;
+          entity = picked.entity;
+          localAsOf = looked.hits[0]?.asOf ?? null;
           usedLocal = true;
+        } else if (looked.status === 'unavailable') {
+          lookupStatus = 'lookup_failed';
         }
       }
     } catch (fallbackErr) {
+      lookupStatus = 'lookup_failed';
       console.error('[mcp:lookup_sam_entity] local fallback also failed:', fallbackErr);
     }
   }
@@ -134,24 +190,29 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   if (!degraded && !entity && matches.length === 0 && mode !== 'empty') {
     try {
       if (mode === 'uei') {
-        const hit = await localEntityByUEI(uei);
-        if (hit) { entity = hit.entity; localAsOf = hit.asOf; usedLocal = true; }
+        const looked = await lookupLocalEntityByUEI(uei);
+        if (looked.status === 'found') { entity = looked.hit.entity; localAsOf = looked.hit.asOf; usedLocal = true; lookupStatus = 'found'; }
+        else if (looked.status === 'unavailable') { degraded = true; lookupStatus = 'lookup_failed'; }
       } else {
-        const hits = await localEntitiesByName(name, limit);
-        if (hits.length) {
-          matches = hits.map((h) => h.entity);
-          entity = hits[0].entity;
-          localAsOf = hits[0].asOf;
+        const looked = await lookupLocalEntitiesByName(name, limit);
+        if (looked.status === 'found') {
+          matches = looked.hits.map((h) => h.entity);
+          const picked = pickUniqueEntity(name, matches);
+          lookupStatus = picked.status;
+          entity = picked.entity;
+          localAsOf = looked.hits[0]?.asOf ?? null;
           usedLocal = true;
+        } else if (looked.status === 'unavailable') {
+          degraded = true;
+          lookupStatus = 'lookup_failed';
         }
       }
       if (usedLocal) {
         console.warn(`[mcp:lookup_sam_entity] live SAM returned EMPTY for ${mode}="${mode === 'uei' ? uei : name}" but the local registry has it — reconciled, not reported as absent.`);
       }
     } catch (reconcileErr) {
-      // We could not reconcile, so we cannot claim absence either. Mark degraded so the
-      // caller sees an evidence gap rather than a confident "not registered".
       degraded = true;
+      lookupStatus = 'lookup_failed';
       console.error('[mcp:lookup_sam_entity] local reconciliation failed:', reconcileErr);
     }
   }
@@ -161,6 +222,10 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   // matches held 18 (Tanaq family, 2026-09-16). UEI mode is one record or none.
   const matchCount = mode === 'name' ? matches.length : (entity ? 1 : 0);
   const grounded = matchCount > 0;
+  if (mode !== 'empty' && lookupStatus === 'not_found' && grounded && matches.length === 1 && entity) {
+    lookupStatus = 'found';
+  }
+  if (degraded && !grounded) lookupStatus = 'lookup_failed';
 
   // Per-cert provenance (Eric #3) — spell out which certs are SBA-CERTIFIED vs SAM SELF-IDENTIFIED so a
   // consumer doesn't treat a self-cert as authoritative (the "hasSDVOSB:false" trust bug). Only for a
@@ -190,6 +255,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       // Where the answer came from. A consumer must not present a cached row as a live SAM
       // check — 'local' means "registered as of `as_of`", not "verified just now".
       source: usedLocal ? 'local_registry' : 'sam_live',
+      lookup_status: lookupStatus,
       ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
     },
   };
@@ -200,11 +266,15 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         ? 'SAM.gov could not be reached (temporary error) — retry; do NOT state the entity is unregistered.'
         : mode === 'empty'
         ? 'No UEI or name supplied — nothing to look up.'
+        : lookupStatus === 'lookup_failed'
+        ? `SAM registration lookup failed for ${uei || name}. That is not evidence the business is unregistered.`
+        : lookupStatus === 'ambiguous'
+        ? `${matches.length} SAM matches for "${name}" — none selected. Name the legal entity or pass a UEI.`
         : grounded
         ? mode === 'uei'
           ? `${entity!.legalBusinessName || uei} — registration ${entity!.registrationStatus || 'unknown'}.`
           : `${matches.length} SAM match${matches.length === 1 ? '' : 'es'} for "${name}".`
-        : `No SAM registration found for ${uei || name}. Do not claim certifications or eligibility.`,
+        : `No SAM registration found for ${uei || name}. Do not claim the business is unregistered; say the lookup did not return a row.`,
       how_to_use: grounded
         ? 'Cite registration status + certifications straight from the record. An Inactive/Expired registration means they cannot currently receive an award.'
         : 'No grounded entity; say the vendor is not found in SAM rather than assuming.',

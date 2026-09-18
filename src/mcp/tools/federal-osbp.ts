@@ -63,15 +63,27 @@ export interface FederalOsbpToolResult {
     /** How many returned offices carry a verification stamp, and how many do not. */
     directors_verified: number;
     directors_unverified: number;
+    /**
+     * Distinguish "this agency is not in the curated directory" from
+     * "the directory lists the command but has no OSBP office".
+     */
+    coverage: 'hit' | 'not_in_directory' | 'no_osbp_listed' | 'empty_query';
   };
 }
 
-/**
- * Three honest states for a contact name, mirroring the PSC four-state model
- * (lib/codes/psc-status.ts). 'unverified' is NOT 'none' — the name is probably
- * right, it simply has not been re-checked, and the caller should lead with the
- * office mailbox rather than the person.
- */
+export type OsbpCoverage = 'hit' | 'not_in_directory' | 'no_osbp_listed' | 'empty_query';
+
+export function classifyOsbpCoverage(input: {
+  query: string;
+  commandMatched: boolean;
+  officeHasOsbp: boolean;
+  relatedCount: number;
+}): OsbpCoverage {
+  if (!input.query.trim()) return 'empty_query';
+  if (!input.commandMatched && input.relatedCount === 0) return 'not_in_directory';
+  if (!input.officeHasOsbp && input.relatedCount === 0) return 'no_osbp_listed';
+  return 'hit';
+}
 function directorStatus(director: string | null, verified: string | null): 'verified' | 'unverified' | 'none' {
   if (!director) return 'none';
   return verified ? 'verified' : 'unverified';
@@ -104,7 +116,11 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
     return {
       office: null,
       related_offices: [],
-      _meta: { grounded: false, degraded: false, match: 'none', office_count: 0, director_verified: false, directors_verified: 0, directors_unverified: 0 },
+      _meta: {
+        grounded: false, degraded: false, match: 'none', office_count: 0,
+        director_verified: false, directors_verified: 0, directors_unverified: 0,
+        coverage: 'empty_query',
+      },
     };
   }
 
@@ -149,6 +165,13 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
   const allOffices = [...(resolvedOffice ? [resolvedOffice] : []), ...related];
   const anyVerified =
     (resolvedOffice?.director_verified != null) || related.some((o) => o.director_verified != null);
+  const officeHasOsbp = !!(resolvedOffice?.osbp_office || resolvedOffice?.email);
+  const coverage = classifyOsbpCoverage({
+    query: agency,
+    commandMatched: !!(direct || branchOnly),
+    officeHasOsbp,
+    relatedCount: related.length,
+  });
 
   const result: FederalOsbpToolResult = {
     office: resolvedOffice,
@@ -163,13 +186,16 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
       // was verified read as "these names are checked". Report the split.
       directors_verified: allOffices.filter((o) => o.director_status === 'verified').length,
       directors_unverified: allOffices.filter((o) => o.director_status === 'unverified').length,
+      coverage,
     },
   };
 
   if (mcpFlags.aiHint) {
     result._ai_hint = {
-      summary: !grounded
-        ? `No OSBP office found for "${agency}" in the curated DoD command directory. This directory is DoD/DLA/Navy/Army-weighted — a civilian agency or an unusual spelling may simply not be covered.`
+      summary: coverage === 'not_in_directory'
+        ? `No OSBP office found for "${agency}" because this name is not in the curated DoD command directory. That is a coverage gap, not proof the office does not exist.`
+        : coverage === 'no_osbp_listed'
+        ? `The directory has "${agency}" but lists no OSBP/OSDBU office for it. Do not invent a mailbox.`
         : match === 'parent_agency'
         ? `"${agency}" is a parent agency — returned ${related.length} of its commands' OSBP offices. Pick the one whose mission matches the buy.`
         : `OSBP for ${resolvedOffice?.abbreviation}: ${resolvedOffice?.osbp_office || 'office'}${resolvedOffice?.email ? ` (${resolvedOffice.email})` : ''}.`,
@@ -178,7 +204,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         : 'Not in the directory; do NOT invent a name or email. Suggest the buying office POC on the actual SAM solicitation instead (search_federal_contacts).',
       key_caveats: [
         'Office structure + mailboxes are STABLE, but director NAMES rotate — trust `director_verified` (YYYY-MM); when it is null, treat the name as an unverified role-title and lead with the office mailbox, not the person.',
-        'Curated directory is DoD/DLA/Navy/Army-weighted — a "none" result is a coverage gap, not proof the office does not exist.',
+        'Curated directory is DoD/DLA/Navy/Army-weighted — coverage=not_in_directory is a gap, not proof the office does not exist. coverage=no_osbp_listed means the command is known but no OSBP row is stored.',
       ],
     };
   }

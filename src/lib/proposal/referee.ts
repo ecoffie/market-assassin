@@ -29,7 +29,7 @@ export interface RefereeRequirement {
 export interface RefereeVerdict {
   id: string;
   requirement: string;
-  status: 'met' | 'partial' | 'missing';
+  status: 'met' | 'partial' | 'missing' | 'unevaluated';
   evidence?: string; // where in the draft it's addressed (or why it's not)
 }
 
@@ -45,7 +45,21 @@ export interface RefereeResult {
   verdicts: RefereeVerdict[];
   summary: RefereeSummary;
   ok: boolean; // at least one batch returned (distinguishes provider-down from a real "all missing")
+  timeout_trace: RefereeTimeoutTrace;
 }
+
+export interface RefereeTimeoutTrace {
+  budget_ms: number;
+  elapsed_ms: number;
+  batches_planned: number;
+  batches_completed: number;
+  batches_skipped: number;
+  timed_out: boolean;
+  reason: string | null;
+}
+
+/** Default wall-clock budget for one referee call (MCP / connector timeout is ~60s). */
+export const REFEREE_BUDGET_MS = 45_000;
 
 const REFEREE_PROMPT = `You are an INDEPENDENT federal proposal compliance reviewer. You did NOT write this draft — your only job is to verify, requirement by requirement, whether the draft actually satisfies it. Be strict: a real Contracting Officer would.
 
@@ -78,16 +92,34 @@ function chunk<T>(arr: T[], n: number): T[][] {
 export async function refereeProposal(
   requirements: RefereeRequirement[],
   draft: string,
-  opts: { userEmail?: string | null } = {},
+  opts: { userEmail?: string | null; budgetMs?: number } = {},
 ): Promise<RefereeResult> {
   const reqs = requirements.filter((r) => r.requirement && r.requirement.trim());
-  // Number stably, then check in batches so each referee call has enough room to reason.
   const numbered = reqs.map((r, i) => ({ ...r, id: r.id || `REQ-${String(i + 1).padStart(3, '0')}` }));
   const draftForPrompt = draft.slice(0, DRAFT_CAP_CHARS);
   const verdicts: RefereeVerdict[] = [];
   let ok = false;
+  const budgetMs = opts.budgetMs ?? REFEREE_BUDGET_MS;
+  const started = Date.now();
+  const batches = chunk(numbered, REFEREE_BATCH);
+  let batchesCompleted = 0;
+  let batchesSkipped = 0;
+  let timedOut = false;
 
-  for (const batch of chunk(numbered, REFEREE_BATCH)) {
+  for (const batch of batches) {
+    if (Date.now() - started >= budgetMs) {
+      timedOut = true;
+      batchesSkipped += 1;
+      for (const r of batch) {
+        verdicts.push({
+          id: r.id,
+          requirement: r.requirement,
+          status: 'unevaluated',
+          evidence: `Referee stopped: wall-clock budget ${budgetMs}ms exhausted after ${batchesCompleted} of ${batches.length} batches. Review these requirements manually.`,
+        });
+      }
+      continue;
+    }
     const reqList = batch
       .map((r) => `${r.id} [${r.category || 'other'}${r.section ? ` · ${r.section}` : ''}]: ${r.requirement}`)
       .join('\n');
@@ -98,14 +130,15 @@ export async function refereeProposal(
         json: true,
         maxTokens: 2500,
         temperature: 0.1,
-        dataClass: 'sensitive', // draft contains the bidder's vault facts → no-training providers only
-        job: 'referee', // independent model (Claude) — different from the drafter
+        dataClass: 'sensitive',
+        job: 'referee',
         tool: 'proposal_referee',
         userEmail: opts.userEmail ?? null,
       });
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const parsed = JSON.parse(cleaned);
       ok = true;
+      batchesCompleted += 1;
       for (const v of parsed.verdicts || []) {
         const req = batch.find((b) => b.id === v.id);
         verdicts.push({
@@ -117,17 +150,34 @@ export async function refereeProposal(
       }
     } catch (err) {
       console.warn('[proposal/referee] batch failed:', err instanceof Error ? err.message : err);
-      // On failure, mark the batch missing so it's surfaced, not hidden.
+      batchesCompleted += 1;
       for (const r of batch) {
         verdicts.push({ id: r.id, requirement: r.requirement, status: 'missing', evidence: 'Referee could not evaluate — review manually.' });
       }
     }
   }
 
-  const met = verdicts.filter((v) => v.status === 'met').length;
-  const partial = verdicts.filter((v) => v.status === 'partial').length;
-  const missing = verdicts.filter((v) => v.status === 'missing').length;
-  const score = verdicts.length ? Math.round(((met + partial * 0.5) / verdicts.length) * 100) : 0;
+  const evaluated = verdicts.filter((v) => v.status !== 'unevaluated');
+  const met = evaluated.filter((v) => v.status === 'met').length;
+  const partial = evaluated.filter((v) => v.status === 'partial').length;
+  const missing = evaluated.filter((v) => v.status === 'missing').length;
+  const score = evaluated.length ? Math.round(((met + partial * 0.5) / evaluated.length) * 100) : 0;
+  const elapsed = Date.now() - started;
 
-  return { verdicts, summary: { total: verdicts.length, met, partial, missing, score }, ok };
+  return {
+    verdicts,
+    summary: { total: verdicts.length, met, partial, missing, score },
+    ok,
+    timeout_trace: {
+      budget_ms: budgetMs,
+      elapsed_ms: elapsed,
+      batches_planned: batches.length,
+      batches_completed: batchesCompleted,
+      batches_skipped: batchesSkipped,
+      timed_out: timedOut,
+      reason: timedOut
+        ? `Stopped after ${batchesCompleted}/${batches.length} batches at ${elapsed}ms (budget ${budgetMs}ms). Remaining requirements are unevaluated, not missing.`
+        : null,
+    },
+  };
 }

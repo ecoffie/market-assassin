@@ -18,7 +18,7 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ from: (t: string) => mockFrom(t) }),
 }));
 
-const { localEntityByUEI, localEntitiesByName } = await import('./entity-local-fallback');
+const { localEntityByUEI, localEntitiesByName, lookupLocalEntitiesByName } = await import('./entity-local-fallback');
 
 /** The real production row, verbatim. */
 const NORTH_STAR_ROW = {
@@ -122,5 +122,54 @@ describe('NS-1 — identity contract parity (North Star fixture)', () => {
     expect(Object.keys(byName).sort()).toEqual(Object.keys(byUei).sort());
     expect(byName.has8a).toBe(byUei.has8a);
     expect((byName.naicsList as unknown[]).length).toBe((byUei.naicsList as unknown[]).length);
+  });
+});
+
+describe('DBA lookup — a trade name is not "unregistered"', () => {
+  const DBA_ROW = {
+    ...NORTH_STAR_ROW,
+    uei: 'DBAUEI000001',
+    legal_business_name: 'ACME HOLDINGS LLC',
+    dba_name: 'NORTH STAR FACADES',
+  };
+
+  function stubByColumn(legal: unknown[], dba: unknown[]) {
+    mockFrom.mockImplementation(() => {
+      let col = '';
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        ilike: (c: string) => { col = c; return chain; },
+        limit: () => Promise.resolve({
+          data: col === 'dba_name' ? dba : legal,
+          error: null,
+        }),
+      };
+      return chain;
+    });
+  }
+
+  it('finds the entity when only the DBA matches', async () => {
+    stubByColumn([], [DBA_ROW]);
+    const r = await lookupLocalEntitiesByName('North Star Facades');
+    expect(r.status).toBe('found');
+    if (r.status !== 'found') return;
+    expect(r.hits[0].entity.legalBusinessName).toBe('ACME HOLDINGS LLC');
+    expect(r.hits[0].entity.dbaName).toBe('NORTH STAR FACADES');
+  });
+
+  it('a query error is unavailable, not an unregistered business', async () => {
+    mockFrom.mockImplementation(() => {
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        ilike: () => chain,
+        limit: () => Promise.resolve({ data: null, error: { message: 'column does not exist' } }),
+      };
+      return chain;
+    });
+    const r = await lookupLocalEntitiesByName('Acme');
+    expect(r.status).toBe('unavailable');
+    expect((await localEntitiesByName('Acme'))).toEqual([]);
   });
 });

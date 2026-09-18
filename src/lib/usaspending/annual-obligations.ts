@@ -72,8 +72,23 @@ export interface AnnualObligationsResult {
   query: string;
   resolved: ResolvedRecipient | null;
   years: FiscalYearObligation[];
-  total: number;
+  /** Null when spending data is unavailable — never a fabricated $0. */
+  total: number | null;
   degraded: boolean;
+  amount_status: ObligationAmountStatus;
+}
+
+export type ObligationAmountStatus = 'unavailable' | 'zero' | 'positive' | 'unresolved';
+
+export function classifyObligationAmount(input: {
+  degraded: boolean;
+  resolved: boolean;
+  total: number;
+}): { total: number | null; amount_status: ObligationAmountStatus } {
+  if (input.degraded) return { total: null, amount_status: 'unavailable' };
+  if (!input.resolved) return { total: null, amount_status: 'unresolved' };
+  if (input.total > 0) return { total: input.total, amount_status: 'positive' };
+  return { total: 0, amount_status: 'zero' };
 }
 
 /**
@@ -128,16 +143,25 @@ export async function getRecipientAnnualObligations(
   opts: AnnualObligationsOptions,
 ): Promise<AnnualObligationsResult> {
   const query = opts.recipient.trim();
-  if (!query) return { query: '', resolved: null, years: [], total: 0, degraded: false };
+  if (!query) {
+    const classified = classifyObligationAmount({ degraded: false, resolved: false, total: 0 });
+    return { query: '', resolved: null, years: [], ...classified, degraded: false };
+  }
 
   const currentFy = latestCompleteFiscalYear();
   const toFy = opts.toFy ?? currentFy;
   const requestedFrom = opts.fromFy ?? toFy - (DEFAULT_SERIES_YEARS - 1);
-  if (toFy < requestedFrom) return { query, resolved: null, years: [], total: 0, degraded: false };
+  if (toFy < requestedFrom) {
+    const classified = classifyObligationAmount({ degraded: false, resolved: false, total: 0 });
+    return { query, resolved: null, years: [], ...classified, degraded: false };
+  }
   const fromFy = toFy - requestedFrom + 1 > MAX_SERIES_YEARS ? toFy - (MAX_SERIES_YEARS - 1) : requestedFrom;
 
   const { rec, degraded: resolveDegraded } = await resolveParent(query);
-  if (!rec?.id) return { query, resolved: rec, years: [], total: 0, degraded: resolveDegraded };
+  if (!rec?.id) {
+    const classified = classifyObligationAmount({ degraded: resolveDegraded, resolved: false, total: 0 });
+    return { query, resolved: rec, years: [], ...classified, degraded: resolveDegraded };
+  }
 
   const filters: Record<string, unknown> = {
     award_type_codes: CONTRACT_AWARD_TYPE_CODES,
@@ -179,5 +203,11 @@ export async function getRecipientAnnualObligations(
     degraded = true;
   }
 
-  return { query, resolved: rec, years, total: years.reduce((s, y) => s + y.obligated, 0), degraded };
+  const summed = years.reduce((s, y) => s + y.obligated, 0);
+  const classified = classifyObligationAmount({
+    degraded,
+    resolved: true,
+    total: summed,
+  });
+  return { query, resolved: rec, years, ...classified, degraded };
 }
