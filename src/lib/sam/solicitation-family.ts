@@ -614,6 +614,7 @@ export async function ensureFamilyPersisted(
 
   const { data: upserted, error: upsertErr } = await sb
     .from('solicitation_family')
+    // truncation-ok: identity_key is UNIQUE — this upsert is one family row, never a scan.
     .upsert(row, { onConflict: 'identity_key' })
     .select('family_id')
     .single();
