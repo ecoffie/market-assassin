@@ -40,6 +40,18 @@ export function looksLikePiid(q: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9-]{6,24}$/.test(t) && /\d/.test(t);
 }
 
+/** SAM solicitation / RFQ token, including identifiers longer than a PIID (e.g. RFPREQ). */
+export function looksLikeSolicitationId(q: string): boolean {
+  const t = q.trim();
+  if (t.length < 8 || t.length > 40) return false;
+  if (/\s/.test(t)) return false;
+  if (!/\d/.test(t)) return false;
+  if (/^[a-f0-9]{32}$/i.test(t) || /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(t)) {
+    return false;
+  }
+  return /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(t);
+}
+
 /** Multi-word or corp suffix → confident company name. */
 export function looksLikeCompany(q: string): boolean {
   const t = q.trim();
@@ -50,7 +62,7 @@ export function looksLikeCompany(q: string): boolean {
 export function isAmbiguousLookup(q: string): boolean {
   const t = q.trim();
   if (!t || t.length < 2) return false;
-  if (looksLikeUei(t) || looksLikePiid(t) || looksLikeCompany(t)) return false;
+  if (looksLikeUei(t) || looksLikePiid(t) || looksLikeSolicitationId(t) || looksLikeCompany(t)) return false;
   return t.length <= 48;
 }
 

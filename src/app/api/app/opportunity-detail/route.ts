@@ -18,6 +18,7 @@ import { decodeFSC, extractNSNs, type FSCDecode } from '@/lib/codes/fsc';
 import { longDate as fmtOppDate } from '@/lib/utils/opp-date';
 import { getNsnReference } from '@/lib/nsn/reference';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
+import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -157,10 +158,13 @@ export async function GET(request: NextRequest) {
   if (!id) return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
 
   const db = sb();
-  // Match on notice_id first, then solicitation_number (cards may carry either).
+  // Record UUID stays exact. Solicitation identifiers resolve to the latest stored version.
   let { data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('notice_id', id).limit(1).maybeSingle();
-  if (!data && !error) {
-    ({ data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('solicitation_number', id).limit(1).maybeSingle());
+  if (!data && !error && !isNoticeUuid(id)) {
+    const canonical = await resolveCanonicalSolicitation(id, { client: db });
+    if (canonical) {
+      ({ data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('notice_id', canonical.notice.notice_id).limit(1).maybeSingle());
+    }
   }
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 

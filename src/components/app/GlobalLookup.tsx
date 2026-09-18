@@ -10,6 +10,7 @@ import AwardDetailDrawer from './awards/AwardDetailDrawer';
 import {
   looksLikeUei,
   looksLikePiid,
+  looksLikeSolicitationId,
   looksLikeCompany,
   isAmbiguousLookup,
   getProductVendorHint,
@@ -102,7 +103,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
       resolveContractor(q.toUpperCase());
       return;
     }
-    if (looksLikePiid(q)) {
+    if (looksLikePiid(q) || looksLikeSolicitationId(q)) {
       // PIID-shaped strings are often SAM solicitation #s (RFQs), not awards.
       // Try award first; on miss, fall back to solicitation → incumbent workflow.
       setResolving(true);
@@ -119,29 +120,31 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         if (solData?.success && solData?.notice) {
           const n = solData.notice;
           const inc = solData.incumbent;
+          const statusAdj = n.status === 'open' ? 'open ' : n.status === 'closed' ? 'closed ' : n.status === 'archived' ? 'archived ' : '';
           if (inc?.awardId) {
             // Land the user ON the data: open the contract drawer for the likely
             // incumbent's PRIOR award, with a context line so it's clear this is the
-            // predecessor to the open RFQ they searched. No lingering toast — the
-            // drawer IS the destination (Eric: "take you to another place").
+            // predecessor to the solicitation they searched.
             setDrawerContext(
-              `Likely incumbent for open RFQ ${n.solicitation_number || q}` +
+              `Likely incumbent for ${statusAdj}solicitation ${n.solicitation_number || q}` +
               (n.title ? ` — ${n.title}` : '') +
-              (n.agency ? ` (${n.agency})` : ''),
+              (n.agency ? ` (${n.agency})` : '') +
+              (n.response_deadline ? `. Deadline ${n.response_deadline}` : ''),
             );
             setOpenPiid(String(inc.awardId).toUpperCase());
           } else {
             setHint(
-              `Found open solicitation ${n.solicitation_number || q}` +
+              `Found ${statusAdj}solicitation ${n.solicitation_number || q}` +
               (n.title ? ` — "${n.title}"` : '') +
               (n.agency ? ` (${n.agency})` : '') +
+              (n.response_deadline ? `. Deadline ${n.response_deadline}` : '') +
               ', but no clear prior award on USASpending.' +
               (n.ui_link ? ` SAM: ${n.ui_link}` : ''),
             );
           }
           return;
         }
-        setHint(`No award or open solicitation found for "${q}".`);
+        setHint(`No award or stored solicitation found for "${q}".`);
       } catch {
         setHint('Lookup failed — try again.');
       } finally {

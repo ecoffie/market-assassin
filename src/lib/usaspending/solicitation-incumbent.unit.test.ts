@@ -116,6 +116,35 @@ describe('summarizeSolicitationIncumbent', () => {
     expect(s).toMatch(/140L6226Q0013/);
     expect(s).toMatch(/MATT L KEIL/);
     expect(s).toMatch(/140L6221P0029/);
+    expect(s).not.toMatch(/^Open solicitation/);
+  });
+  it('closed latest version is never labeled Open', () => {
+    const s = summarizeSolicitationIncumbent(
+      {
+        notice_id: 'f1aa309fa39040a4929d90a7d88fd091',
+        solicitation_number: 'N0017425RFPREQIHDMDept0002',
+        title: 'MASA',
+        agency: 'NAVY',
+        department: 'DOD',
+        naics_code: '332710',
+        psc_code: '1377',
+        set_aside: null,
+        notice_type: 'Solicitation',
+        posted_date: '2026-07-29T00:00:00Z',
+        response_deadline: '2026-08-27T19:00:00Z',
+        ui_link: null,
+        source: 'cache',
+        active: false,
+        archive_date: '2026-09-11T00:00:00Z',
+        status: 'archived',
+        amendment: 'Amendment 0003',
+      },
+      null,
+    );
+    expect(s).not.toMatch(/Open solicitation/);
+    expect(s).toMatch(/Archived solicitation/);
+    expect(s).toMatch(/2026-08-27/);
+    expect(s).toMatch(/Amendment 0003/);
   });
 });
 

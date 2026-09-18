@@ -1,9 +1,9 @@
 /**
  * MCP tool: get_solicitation_incumbent
  *
- * Paste a SAM solicitation # (e.g. 140L6226Q0013) or notice UUID → open notice
- * metadata + the LIKELY prior award (who / $ / expiry). This is the Chat path
- * for "was this awarded before and to whom?"
+ * Paste a SAM solicitation # (e.g. 140L6226Q0013) or notice UUID → stored notice
+ * (latest version; derived status) + the LIKELY prior award (who / $ / expiry).
+ * Chat path for "was this awarded before and to whom?"
  *
  * Wraps src/lib/usaspending/solicitation-incumbent.ts. Credits: 20.
  */
@@ -11,6 +11,7 @@ import {
   resolveSolicitationIncumbent,
   type SolicitationIncumbentResult,
 } from '@/lib/usaspending/solicitation-incumbent';
+import { solicitationStatusLabel } from '@/lib/sam/resolve-solicitation';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SolicitationIncumbentInput {
@@ -48,20 +49,22 @@ export async function getSolicitationIncumbent(
 
   if (mcpFlags.aiHint) {
     const { notice, incumbent, _meta } = result;
+    const statusBit = notice ? solicitationStatusLabel(notice.status ?? 'unknown') : '';
     result._ai_hint = {
       summary: _meta.degraded && !notice
         ? 'Notice lookup degraded (SAM/cache unreachable) — retry; do NOT conclude the solicitation does not exist.'
         : notice && incumbent
-        ? `Open ${notice.solicitation_number || notice.notice_id}: "${notice.title || 'untitled'}". Likely prior award: ${incumbent.recipientName} (${incumbent.awardId}) at $${Math.round(incumbent.ceiling || incumbent.obligated || 0).toLocaleString()}, expires ${incumbent.popPotentialEnd || '?'}.`
+        ? `${statusBit} ${notice.solicitation_number || notice.notice_id}: "${notice.title || 'untitled'}". Likely prior award: ${incumbent.recipientName} (${incumbent.awardId}) at $${Math.round(incumbent.ceiling || incumbent.obligated || 0).toLocaleString()}, expires ${incumbent.popPotentialEnd || '?'}.`
         : notice
-        ? `Found open notice ${notice.solicitation_number || notice.notice_id}${notice.title ? ` — "${notice.title}"` : ''}, but no clear prior award on USASpending.`
+        ? `Found ${statusBit.toLowerCase()} ${notice.solicitation_number || notice.notice_id}${notice.title ? ` — "${notice.title}"` : ''}${notice.response_deadline ? `. Deadline ${notice.response_deadline}` : ''}, but no clear prior award on USASpending.`
         : `No SAM notice matched "${q}". Do not invent an opportunity or prior awardee.`,
       how_to_use: notice
-        ? 'Lead with the open solicitation (title, agency, deadline, set-aside). Then present the incumbent as LIKELY prior award (best-match inference), citing PIID, recipient, ceiling/obligated, and expiry verbatim. Link to notice.ui_link and incumbent.usaSpendingUrl when present.'
+        ? 'Lead with the stored solicitation (title, agency, derived status, deadline, set-aside, amendment when present). Then present the incumbent as LIKELY prior award (best-match inference), citing PIID, recipient, ceiling/obligated, and expiry verbatim. Link to notice.ui_link and incumbent.usaSpendingUrl when present. Do not call it open unless status is open.'
         : 'Say the solicitation number was not found; ask the user to confirm the number or paste the SAM title.',
       key_caveats: [
         'Prior award is inferred (title/NAICS/agency match) — not a certified predecessor link on the RFQ.',
         'Solicitation numbers are NOT award PIIDs — do not call get_award_detail with the RFQ number.',
+        'Status is derived from the latest stored version (active + deadline), never hardcoded as open.',
         ...(_meta.grounded_incumbent ? [] : ['No grounded incumbent — do not invent who held it or at what price.']),
       ],
     };

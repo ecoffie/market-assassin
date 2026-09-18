@@ -21,6 +21,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCached, setCached } from '@/lib/mcp/external-cache';
 import { fetchAndExtractNoticeFiles, normalizeNoticeId } from '@/lib/sam/fetch-pursuit-docs';
+import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
 
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
@@ -140,28 +141,34 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
 
   // ── Base fields from the opportunity cache (title + inline body/SOW text) ──
   const OPP_COLS = 'notice_id, title, solicitation_number, department, agency_hierarchy, description, sow_text';
-  let { data: opp } = await supabase
+  let { data: opp, error: oppError } = await supabase
     .from('sam_opportunities')
     .select(OPP_COLS)
     .eq('notice_id', noticeId)
     .maybeSingle();
+  if (oppError) {
+    console.error('[getSolicitationDocuments] notice_id', oppError.message);
+    base.degraded = true;
+  }
 
-  // FM-U05 (Eric/QA 2026-07-29): a caller may pass a SOLICITATION NUMBER (e.g. "W912PL-24-R-0005")
-  // instead of the notice UUID — a notice_id is 32 hex chars, a sol# has dashes/letters. When the
-  // notice_id lookup misses AND the input isn't UUID-shaped, resolve by solicitation_number so the tool
-  // is consistent with get_solicitation_incumbent (which accepts either) instead of a silent all-null.
-  const looksLikeUuid = /^[0-9a-f]{32}$/i.test(noticeId.replace(/-/g, ''));
-  if (!opp && !looksLikeUuid) {
-    const { data: bySol } = await supabase
-      .from('sam_opportunities')
-      .select(OPP_COLS)
-      .eq('solicitation_number', noticeId)
-      .order('posted_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (bySol) {
-      opp = bySol;
-      base.notice_id = bySol.notice_id; // continue the doc fetch with the RESOLVED notice_id
+  // Known-ID: solicitation number or description-held identifier → latest stored version.
+  // Record UUID stays exact (do not upgrade an older amendment pin).
+  if (!opp && !isNoticeUuid(noticeId)) {
+    const canonical = await resolveCanonicalSolicitation(input.noticeId, { client: supabase });
+    if (canonical) {
+      const { data: latest, error: latestError } = await supabase
+        .from('sam_opportunities')
+        .select(OPP_COLS)
+        .eq('notice_id', canonical.notice.notice_id)
+        .maybeSingle();
+      if (latestError) {
+        console.error('[getSolicitationDocuments] canonical', latestError.message);
+        base.degraded = true;
+      }
+      if (latest) {
+        opp = latest;
+        base.notice_id = latest.notice_id;
+      }
     }
   }
   // From here on, use the RESOLVED notice_id (a sol#-input now points at the real UUID).
@@ -183,13 +190,17 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   }
 
   // ── Layer 1: WARM — notice-level dedup already in pursuit_documents ────────
-  const { data: warmRows } = await supabase
+  const { data: warmRows, error: warmError } = await supabase
     .from('pursuit_documents')
     .select('sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind')
     .eq('notice_id', resolvedNoticeId)
     .eq('doc_source', 'sam_public')
     .not('extracted_text', 'is', null)
     .order('char_count', { ascending: false });
+  if (warmError) {
+    console.error('[getSolicitationDocuments] warm cache', warmError.message);
+    base.degraded = true;
+  }
 
   if (warmRows && warmRows.length > 0) {
     const seen = new Set<string>();

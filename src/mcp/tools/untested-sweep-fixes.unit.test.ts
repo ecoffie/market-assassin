@@ -54,9 +54,10 @@ describe('FM-U04 — predecessor/incumbent penalizes stale PoP + rewards NAICS m
 
 describe('FM-U05 — solicitation-documents resolves a solicitation number, not just a UUID', () => {
   const src = read('../../lib/sam/solicitation-documents.ts');
-  it('falls back to solicitation_number when the input is not UUID-shaped', () => {
-    expect(src).toContain('looksLikeUuid');
-    expect(src).toMatch(/\.eq\('solicitation_number', noticeId\)/);
+  it('falls back via canonical resolver when the input is not UUID-shaped', () => {
+    expect(src).toContain('isNoticeUuid');
+    expect(src).toContain('resolveCanonicalSolicitation');
+    expect(src).not.toMatch(/\.eq\('solicitation_number', noticeId\)/);
   });
 });
 
