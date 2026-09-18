@@ -7023,3 +7023,41 @@ persisted families are worth populating.
 **SEO.** SAM.gov solicitation deadline, federal incumbent identification, OSBP contact, SAM entity lookup, compliance matrix from SAM notice.
 
 **Proof.** Units 2026-09-18: `notice-identity` UUID vs solicitation-number deadline conflict + 28-shall paste vs 20k cap; `incumbent-evidence` NAICS-alone never grounds; `derive-subagency` email domain is not a verdict (`@state.gov` on Navy `N40084…` is conflict, not State; `@uscg.mil` on a Navy prefix is conflict, not Coast Guard); `resolve-solicitation` MASA UUID keeps the original close date; `annual-obligations` unavailable ≠ $0; `federal-osbp-provenance` not_in_directory ≠ no_osbp_listed; `sam-entity-empty-success` lookup_failed ≠ unregistered + DBA + Tanaq-family ambiguous; contractor-resolution punctuation / first-match / corpus-miss controls unchanged. Pricing (`packages.ts` / `TOOL_CREDITS`) untouched. A notice-ID matrix that returns 96 rows with `truncated_attachments: 5` proves retrieval and honest truncation, not extraction completeness. Named-DoDAAC contact lookups keep that office even when overseas (N40084 / May Dayday `@state.gov` is conflict + Navy, not filtered away as Far East).
+
+
+---
+
+## Mindy Institute — Federal Legislation (automatic legislative discovery)
+
+**What.** Mindy now discovers federal legislation on its own and keeps every
+legislative version as its own citable document. When a defense authorization bill
+moves — introduced, reported, engrossed, reported in the other chamber, conference,
+signed — each of those texts is a separate Institute record carrying its Congress,
+chamber, bill number, version, action date and source URL. House and Senate versions
+are never merged into one "NDAA 2027," because until conference they are competing
+texts and the provision a contractor is reading may not survive.
+
+**Why.** Legislation is the earliest demand signal in government contracting:
+authorization language precedes budget, which precedes forecast, which precedes
+solicitation. Mindy previously had no legislative watcher at all — the prior NDAA
+content was hand-merged prose from a script with a bill number hardcoded in it, so a
+new fiscal year's bill could only arrive if a human re-ran it. Discovery is now
+dynamic: the collector matches on bill TITLE across the current Congress, so next
+year's bill is found without anyone editing code.
+
+**Honest scope.** This ships the DOCUMENT layer, not section-level provision
+extraction. Mindy can tell you which version of a bill it holds and cite it exactly;
+it does not yet parse individual sections. The 45 legacy `FY2026 NDAA:` pain-point
+strings are **not** authoritative NDAA records and are explicitly excluded from this
+corpus pending separate remediation.
+
+**SEO.** FY2027 NDAA tracking / defense authorization bill status / NDAA committee
+report language / how legislation becomes a federal contract.
+
+**Proof.** Live against api.congress.gov 2026-09-18, zero hardcoded identifiers:
+discovery scanned 1,500 recently-updated bills of the 119th Congress and returned
+**H.R. 8800** (3 House versions + H. Rept. 119-698), **S. 4784** (Senate-reported +
+S. Rept. 119-127) and **S. 1071** (FY2026 NDAA, correctly typed `enacted_law` —
+Public Law 119-60). Five discovery states proven distinguishable in the same run:
+`source_unavailable` · `not_yet_introduced` · `introduced` · `diverging` · `enacted`
+— so "Mindy has nothing" can never again read the same as "nothing exists."
