@@ -195,7 +195,7 @@ export function extractConfirmedAliases(rows: FamilyNoticeRow[]): FamilyIdentifi
         evidence_grade: 'CONFIRMED_IDENTITY',
       });
     }
-    const sol = row.solicitation_number?.trim();
+    const sol = row.solicitation_number?.trim() ?? null;
     if (sol) {
       addIdentifier(out, {
         identifier_type: 'solicitation_number',
@@ -210,7 +210,7 @@ export function extractConfirmedAliases(rows: FamilyNoticeRow[]): FamilyIdentifi
     let phrase: RegExpExecArray | null;
     while ((phrase = RFP_PHRASE.exec(description))) {
       const token = phrase[1];
-      if (!isSolicitationIdentifier(token)) continue;
+      if (!token || !isSolicitationIdentifier(token)) continue;
       if (normalizeIdentifier(token) === normalizeIdentifier(sol)) continue;
       if (isOfficePrefixOf(token, sol)) continue;
       addIdentifier(out, {

@@ -112,33 +112,40 @@ export async function GET(request: NextRequest) {
     const totalRes = await supabase.from('pursuit_change_log').select('id', { count: 'exact', head: true });
     const emailedRes = await supabase.from('pursuit_change_log').select('id', { count: 'exact', head: true }).eq('emailed', true);
     const ackedRes = await supabase.from('pursuit_change_log').select('id', { count: 'exact', head: true }).eq('acknowledged', true);
-    const total = totalRes.count ?? 0;
-    const emailed = emailedRes.count ?? 0;
-    const acked = ackedRes.count ?? 0;
-    const { data: recent } = await supabase
+    if (totalRes.error) console.error('[pursuit-changes] stats total read failed:', totalRes.error.message);
+    if (emailedRes.error) console.error('[pursuit-changes] stats emailed read failed:', emailedRes.error.message);
+    if (ackedRes.error) console.error('[pursuit-changes] stats acked read failed:', ackedRes.error.message);
+    const total = totalRes.error ? null : totalRes.count;
+    const emailed = emailedRes.error ? null : emailedRes.count;
+    const acked = ackedRes.error ? null : ackedRes.count;
+    const { data: recent, error: recentErr } = await supabase
       .from('pursuit_change_log')
       .select('user_email, change_type, summary, detected_at, emailed')
       .eq('emailed', true)
       .order('detected_at', { ascending: false })
       .limit(10);
+    if (recentErr) console.error('[pursuit-changes] stats recent read failed:', recentErr.message);
 
     // ROOT-CAUSE DIAGNOSTICS: is detection silent because nothing changed, or
     // because the inputs are missing? Check (1) how many snapshots exist, and
     // (2) whether the SAM cache has the compare fields (last_modified /
     // response_deadline) populated for the actually-tracked notice_ids.
     const snapCountRes = await supabase.from('pursuit_monitor_state').select('pursuit_id', { count: 'exact', head: true });
-    const { data: trackedRows } = await supabase
+    if (snapCountRes.error) console.error('[pursuit-changes] stats snapshot count failed:', snapCountRes.error.message);
+    const { data: trackedRows, error: trackedErr } = await supabase
       .from('user_pipeline')
       .select('notice_id')
       .not('notice_id', 'is', null)
       .limit(500);
+    if (trackedErr) console.error('[pursuit-changes] stats tracked-pipeline read failed:', trackedErr.message);
     const trackedNotices = Array.from(new Set((trackedRows || []).map((r: { notice_id: string }) => r.notice_id)));
-    const { data: samRows } = await supabase
+    const { data: samRows, error: samDiagErr } = await supabase
       .from('sam_opportunities')
       // truncation-ok: diagnostic sample only — .in() over an explicitly .slice(0, 300)
       // key list, and the upstream read is .limit(500). Cannot reach the 1,000 cap.
       .select('notice_id, last_modified, response_deadline, notice_type')
       .in('notice_id', trackedNotices.slice(0, 300));
+    if (samDiagErr) console.error('[pursuit-changes] stats SAM diagnostic read failed:', samDiagErr.message);
     const inCache = (samRows || []).length;
     const withLastMod = (samRows || []).filter((r: { last_modified: string | null }) => r.last_modified).length;
     const withDeadline = (samRows || []).filter((r: { response_deadline: string | null }) => r.response_deadline).length;
@@ -148,7 +155,7 @@ export async function GET(request: NextRequest) {
         stats: { total, emailed, acknowledged: acked },
         recentEmailed: recent || [],
         diagnostics: {
-          snapshotsStored: snapCountRes.count ?? 0,
+          snapshotsStored: snapCountRes.error ? null : snapCountRes.count,
           trackedNoticeIds: trackedNotices.length,
           ofThoseInSamCache: inCache,
           cacheHasLastModified: withLastMod,   // ← if low/0, detection can't see amendments
@@ -244,6 +251,7 @@ export async function GET(request: NextRequest) {
   if (solNums.length) {
     const { data: siblings, error: sibErr } = await fetchAllByKeys<FamilyNoticeRow>(solNums, (chunk) => supabase
       .from('sam_opportunities')
+      // truncation-ok: fetchAllByKeys chunks solicitation_number keys (500/request).
       .select('notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link')
       .in('solicitation_number', chunk));
     if (sibErr) console.error('[pursuit-changes] family sibling read failed — NEW_VERSION detection skipped this run:', sibErr);

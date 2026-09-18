@@ -234,7 +234,8 @@ async function main() {
       const { data: samRows, error: samErr } = await sb
         .from('sam_opportunities')
         .select('notice_id,solicitation_number,posted_date,response_deadline,active,description,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,archive_date,ui_link,attachments')
-        .in('notice_id', noticeIds.slice(0, 500));
+        .in('notice_id', noticeIds.slice(0, 500))
+        .limit(500);
       if (samErr) {
         report.pipeline = {
           total_with_notice: pipeCount.count,
@@ -288,7 +289,8 @@ async function main() {
   const { data: masaRows, error: masaErr } = await sb
     .from('sam_opportunities')
     .select('notice_id,solicitation_number,title,description,posted_date,response_deadline,active,archive_date,naics_code,office,department,sub_tier,psc_code,set_aside_description,notice_type,ui_link,attachments,points_of_contact')
-    .in('notice_id', masaIds);
+    .in('notice_id', masaIds)
+    .limit(4);
   if (masaErr) {
     report.masa = unknown('MASA fixture', masaErr);
   } else {

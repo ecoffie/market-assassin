@@ -218,6 +218,7 @@ export async function GET(request: NextRequest) {
         if (noticeIds.length > 0) {
           const { data: seedRows, error: seedErr } = await sb
             .from('sam_opportunities')
+            // truncation-ok: noticeIds is this GET page of the caller's pipeline, not the fleet.
             .select('notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link,attachments,points_of_contact')
             .in('notice_id', noticeIds);
           if (seedErr) {
