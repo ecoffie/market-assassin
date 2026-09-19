@@ -171,6 +171,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_podcast_lessons: { title: 'Search Podcast Lessons' },
   search_sam_opportunities: { title: 'Search SAM Opportunities (Open only)' },
   find_opportunities: { title: 'Find Opportunities (Open · Coming back · Coming soon)' },
+  lookup_solicitation: { title: 'Look Up Solicitation (historical · known id)' },
   get_current_acquisition_intelligence: { title: 'Current Acquisition Intelligence (what changed · what to do)' },
   match_company_to_pathways: { title: 'Pathway Fit (doors your company can walk through)' },
   understand_customer: { title: 'Understand This Customer (Opportunity · Agency · Emphasize)' },

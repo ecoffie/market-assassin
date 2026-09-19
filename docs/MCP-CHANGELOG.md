@@ -5,11 +5,15 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 62** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 63** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 62.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 63.
 
 ---
+
+## September 2026 — lookup_solicitation (catalog 62 → 63)
+
+**New tool:** `lookup_solicitation` (5 credits, scan-class, local `sam_opportunities` — no web, no sow_text). Historical / known-id solicitation lookup. Closed ≠ gone. Short-circuits Potato P2 FIND-first. `MATCHED_CANDIDATE` is not identity. Amendments collapse at query time via #1557. Does not modify `find_opportunities`.
 
 ## September 2026 — match_company_to_pathways (catalog 61 → 62)
 

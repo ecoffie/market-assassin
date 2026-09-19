@@ -34,6 +34,7 @@ import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
+import { lookupSolicitationTool } from '@/mcp/tools/lookup-solicitation';
 import { currentAcquisitionIntelligenceTool } from '@/mcp/tools/current-acquisition-intelligence';
 import { matchCompanyToPathwaysTool } from '@/mcp/tools/match-company-to-pathways';
 import { understandCustomerTool } from '@/mcp/tools/understand-customer';
@@ -103,6 +104,7 @@ export interface McpToolContext {
 export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   // 5 — Scan: search & lookup (top-of-funnel retrieval)
   search_sam_opportunities: 5,
+  lookup_solicitation: 5,
   search_agency_opps_by_office: 5,
   get_agency_forecasts: 5,
   get_expiring_contracts: 5,
@@ -593,6 +595,36 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
             psc: { type: 'string', description: 'PSC code (Open applies directly; other horizons crosswalk or skip).' },
             keyword_exact: { type: 'string', description: 'Bypass search-brain free-text path when needed.' },
           },
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+const LOOKUP_SOLICITATION_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup_solicitation',
+    description:
+      'Look up a specific solicitation by known id OR historical context — closed/archived notices included. ' +
+      'Use when the user submitted/bid/proposed, asks "what happened with …", names a past program, or pastes a ' +
+      'solicitation number / notice UUID. Closed ≠ gone. Closed is not awarded. Returns RESOLVED_SOLICITATION ' +
+      'only when identity is established (known id or user confirm); otherwise MATCHED_CANDIDATE — never treat ' +
+      'the top hit as identity. Collapses amendments to the latest stored version. Does NOT find a current ' +
+      'market (use find_opportunities). Does NOT accept a user email argument. Credits: 5.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            'Plain-English recall ("Navy manufacturing bid at Indian Head") OR a solicitation number / notice UUID.',
+        },
+        confirm_notice_id: {
+          type: 'string',
+          description:
+            'After the user confirms a MATCHED_CANDIDATE ("yes, that\'s the one"), pass that notice_id to upgrade to current truth.',
         },
       },
       required: ['query'],
@@ -1782,6 +1814,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     FIND_OPPORTUNITIES_TOOL_DEF,
+    LOOKUP_SOLICITATION_TOOL_DEF,
     CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF,
     MATCH_COMPANY_TO_PATHWAYS_TOOL_DEF,
     UNDERSTAND_CUSTOMER_TOOL_DEF,
@@ -1849,6 +1882,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'find_opportunities' ||
+    name === 'lookup_solicitation' ||
     name === 'get_current_acquisition_intelligence' ||
     name === 'match_company_to_pathways' ||
     name === 'understand_customer' ||
@@ -2113,6 +2147,17 @@ export async function runMcpTool(
           }
         : undefined,
     })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'lookup_solicitation') {
+    const result = (await lookupSolicitationTool(
+      {
+        query: typeof args.query === 'string' ? args.query : '',
+        confirm_notice_id: typeof args.confirm_notice_id === 'string' ? args.confirm_notice_id : undefined,
+      },
+      { userEmail: ctx.userEmail },
+    )) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
