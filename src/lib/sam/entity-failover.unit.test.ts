@@ -58,8 +58,8 @@ describe('local registry fallback keeps identity available during a SAM outage',
 
   it('the tool falls back to the local mirror on a live failure', () => {
     const c = tool();
-    expect(c).toContain('localEntityByUEI');
-    expect(c).toContain('localEntitiesByName');
+    expect(c).toContain('lookupLocalEntityByUEI');
+    expect(c).toContain('lookupLocalEntitiesByName');
   });
 
   it('a local hit is reported HONESTLY — degraded stays true, source is local', () => {

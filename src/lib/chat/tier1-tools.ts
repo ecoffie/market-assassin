@@ -75,7 +75,11 @@ export const TIER1_TOOL_DEFS = [
           },
           limit: {
             type: 'number',
-            description: 'Optional max number of opportunities to return (1–200, default 100). Results come from a local cache, so returning more has no rate-limit cost — request a larger set to see more of the open market.',
+            description: 'Optional page size (1–50, default 10). Compact summaries; use offset for the next page.',
+          },
+          offset: {
+            type: 'number',
+            description: 'Optional number of compact results to skip (default 0). Pair with has_more.',
           },
         },
         required: ['keyword'],
@@ -108,6 +112,7 @@ export const TIER1_TOOL_DEFS = [
 export const TIER1_TOOL_NAMES = new Set(TIER1_TOOL_DEFS.map((t) => t.function.name));
 
 interface SamRow {
+  notice_id?: string;
   title?: string;
   department?: string;
   naics_code?: string;
@@ -121,18 +126,20 @@ interface SamRow {
   office_address?: { state?: string | null } | null;
 }
 
-// We read the LOCAL sam_opportunities cache (~30K active rows, GIN-indexed), not
-// the rate-limited SAM API — so there's no cost reason to cap results tightly.
-// The default is the full matched set; the ceiling only exists to keep a single
-// tool result from dumping thousands of rows into the model's context at once.
-const SAM_LIMIT_DEFAULT = 100; // return the full useful match set by default
-const SAM_LIMIT_MAX = 200; // context guard, not a data-cost guard
+const SAM_LIMIT_DEFAULT = 10;
+const SAM_LIMIT_MAX = 50;
 
 /** Clamp a caller-supplied limit to [1, SAM_LIMIT_MAX], defaulting when absent/invalid. */
 function resolveSamLimit(raw: unknown): number {
   const n = typeof raw === 'number' ? raw : Number(raw);
   if (!Number.isFinite(n)) return SAM_LIMIT_DEFAULT;
-  return Math.max(1, Math.min(SAM_LIMIT_MAX, Math.floor(n)));
+  return Math.min(SAM_LIMIT_MAX, Math.max(1, Math.floor(n)));
+}
+
+function resolveSamOffset(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
 }
 
 /**
@@ -235,12 +242,14 @@ export function pickNarrowerTokenHits<T>(hits: Array<{ token: string; rows: T[] 
 }
 
 export function makeTier1Tools(db: Tier1Db) {
-  async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown; limit?: unknown }): Promise<Record<string, unknown>> {
+  async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown; limit?: unknown; offset?: unknown }): Promise<Record<string, unknown>> {
     const keyword = typeof args?.keyword === 'string' ? args.keyword.trim() : '';
-    if (!keyword) return { ok: false, error: 'keyword_required', count: 0, items: [] };
+    if (!keyword) return { ok: false, error: 'keyword_required', count: 0, items: [], has_more: false, offset: 0, limit: SAM_LIMIT_DEFAULT };
     const naics = typeof args?.naics === 'string' ? args.naics.trim() : '';
     const setAside = typeof args?.set_aside === 'string' ? args.set_aside.trim() : '';
     const limit = resolveSamLimit(args?.limit);
+    const offset = resolveSamOffset(args?.offset);
+    const fetchN = offset + limit + 1;
     // Location: match place-of-performance OR buying-office state. SAM omits
     // pop_state on ~64% of rows, so office_address.state widens coverage. A
     // state arg that doesn't resolve to a real code is ignored (still search).
@@ -250,7 +259,7 @@ export function makeTier1Tools(db: Tier1Db) {
     // (websearch = supports quoted phrases / OR).
     const todayIso = new Date().toISOString();
     const SELECT_COLS =
-      'title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address';
+      'notice_id, title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address';
 
     // Resolve set-aside BEFORE the fetch so an unrecognized term errors, never
     // returns zero rows (see SET_ASIDE_CODES). "no 8(a) work in Maryland" and "you
@@ -295,12 +304,12 @@ export function makeTier1Tools(db: Tier1Db) {
       db.from('sam_opportunities').select(SELECT_COLS).ilike('title', `%${keyword}%`),
     )
       .order('response_deadline', { ascending: true, nullsFirst: false })
-      .limit(limit);
+      .limit(fetchN);
     const bodyPass = withFilters(
       db.from('sam_opportunities').select(SELECT_COLS).textSearch('search_tsv', keyword, { type: 'websearch' }),
     )
       .order('response_deadline', { ascending: true, nullsFirst: false })
-      .limit(limit);
+      .limit(fetchN);
 
     const [titleRes, bodyRes] = await Promise.all([titlePass, bodyPass]);
     if (titleRes.error && bodyRes.error) {
@@ -309,7 +318,7 @@ export function makeTier1Tools(db: Tier1Db) {
     // Title matches first (most relevant), then body-only matches, de-duped by
     // solicitation_number (fall back to title+deadline when it's null).
     const seen = new Set<string>();
-    const rowKey = (r: SamRow) => r.solicitation_number || `${r.title ?? ''}|${r.response_deadline ?? ''}`;
+    const rowKey = (r: SamRow) => r.notice_id || r.solicitation_number || `${r.title ?? ''}|${r.response_deadline ?? ''}`;
     const mergeRows = (parts: SamRow[]): SamRow[] => {
       const out: SamRow[] = [];
       for (const r of parts) {
@@ -317,7 +326,7 @@ export function makeTier1Tools(db: Tier1Db) {
         if (seen.has(k)) continue;
         seen.add(k);
         out.push(r);
-        if (out.length >= limit) break;
+        if (out.length >= fetchN) break;
       }
       return out;
     };
@@ -333,10 +342,10 @@ export function makeTier1Tools(db: Tier1Db) {
           seen.clear();
           const tokenTitle = withFilters(
             db.from('sam_opportunities').select(SELECT_COLS).ilike('title', `%${token}%`),
-          ).order('response_deadline', { ascending: true, nullsFirst: false }).limit(limit);
+          ).order('response_deadline', { ascending: true, nullsFirst: false }).limit(fetchN);
           const tokenBody = withFilters(
             db.from('sam_opportunities').select(SELECT_COLS).textSearch('search_tsv', token, { type: 'websearch' }),
-          ).order('response_deadline', { ascending: true, nullsFirst: false }).limit(limit);
+          ).order('response_deadline', { ascending: true, nullsFirst: false }).limit(fetchN);
           const [tt, tb] = await Promise.all([tokenTitle, tokenBody]);
           hits.push({
             token,
@@ -358,21 +367,30 @@ export function makeTier1Tools(db: Tier1Db) {
         ok: true,
         count: 0,
         items: [],
+        has_more: false,
+        offset,
+        limit,
         note: `No open SAM opportunities matched "${keyword}"${naics ? ` in NAICS ${naics}` : ''}${
           setAsideCodes ? ` with set-aside ${setAside} (${setAsideCodes.join('/')})` : ''
         }${st ? ` in ${st} (place of performance or buying office)` : ''} right now.`,
       };
     }
+    const page = rows.slice(offset, offset + limit);
+    const hasMore = rows.length > offset + limit;
     return {
       ok: true,
-      count: rows.length,
+      count: page.length,
+      has_more: hasMore,
+      offset,
+      limit,
       ...(matchedToken
         ? {
             matched_token: matchedToken,
             note: `No open notice matched the phrase "${keyword}". These match the narrower term "${matchedToken}" — say that, do not claim the full phrase.`,
           }
         : {}),
-      items: rows.map((r) => ({
+      items: page.map((r) => ({
+        notice_id: r.notice_id ?? null,
         title: r.title ?? null,
         agency: r.department ?? null,
         naics: r.naics_code ?? null,

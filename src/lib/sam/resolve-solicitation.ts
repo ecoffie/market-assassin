@@ -11,6 +11,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { deadlineDay, deadlinesConflict } from '@/lib/sam/notice-identity';
 
 export const SOLICITATION_RESOLVE_COLS =
   'notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link';
@@ -50,6 +51,9 @@ export interface CanonicalSolicitation {
   identifiers: string[];
   version_count: number;
   source: 'sam_opportunities';
+  /** True when family members disagree on calendar-day deadline. UUID lookup is never a conflict. */
+  deadline_conflict: boolean;
+  notice_ids: string[];
   versions: Array<{
     notice_id: string;
     posted_date: string | null;
@@ -187,10 +191,10 @@ export function resolveFromCandidateRows(
   const withId = rows.filter((r) => r.notice_id);
   // UUID is a record pointer: keep THAT version. Sol# / description-id
   // are family pointers: pick posted_date DESC.
+  // UUID is a record pointer: THAT version only. Never fall through to the
+  // first family row — that is how a UUID lookup inherited an amendment deadline.
   const canonical = matchedBy === 'notice_id'
-    ? withId.find((r) => normalizeNoticeUuid(r.notice_id) === normalizeNoticeUuid(queried))
-      ?? withId[0]
-      ?? null
+    ? withId.find((r) => normalizeNoticeUuid(r.notice_id) === normalizeNoticeUuid(queried)) ?? null
     : selectCanonicalVersion(withId);
   if (!canonical) return null;
   const versions = [...withId]
@@ -205,6 +209,9 @@ export function resolveFromCandidateRows(
       response_deadline: r.response_deadline,
       active: r.active,
     }));
+  const deadlineDays = new Set(
+    versions.map((v) => deadlineDay(v.response_deadline)).filter((d): d is string => !!d),
+  );
   return {
     queried,
     notice: canonical,
@@ -215,6 +222,9 @@ export function resolveFromCandidateRows(
     identifiers: identifiersFor(queried, canonical),
     version_count: versions.length,
     source: 'sam_opportunities',
+    deadline_conflict: matchedBy !== 'notice_id' && (deadlineDays.size > 1 || versions.some((v, i) =>
+      i > 0 && deadlinesConflict(v.response_deadline, canonical.response_deadline))),
+    notice_ids: versions.map((v) => v.notice_id),
     versions,
   };
 }
@@ -359,6 +369,8 @@ export function toResolvedNoticeFields(canonical: CanonicalSolicitation): {
   amendment: string | null;
   matched_by: SolicitationMatchBy;
   version_count: number;
+  deadline_conflict: boolean;
+  notice_ids: string[];
 } {
   const n = canonical.notice;
   return {
@@ -380,5 +392,7 @@ export function toResolvedNoticeFields(canonical: CanonicalSolicitation): {
     amendment: canonical.amendment,
     matched_by: canonical.matched_by,
     version_count: canonical.version_count,
+    deadline_conflict: canonical.deadline_conflict,
+    notice_ids: canonical.notice_ids,
   };
 }

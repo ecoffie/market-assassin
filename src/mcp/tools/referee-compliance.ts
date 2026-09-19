@@ -43,6 +43,15 @@ export interface RefereeComplianceResult {
     partial: number;
     missing: number;
     score: number;
+    timeout_trace?: {
+      budget_ms: number;
+      elapsed_ms: number;
+      batches_planned: number;
+      batches_completed: number;
+      batches_skipped: number;
+      timed_out: boolean;
+      reason: string | null;
+    };
   };
 }
 
@@ -89,6 +98,7 @@ export async function refereeProposalCompliance(input: RefereeComplianceInput): 
       partial: r.summary.partial,
       missing: r.summary.missing,
       score: r.summary.score,
+      timeout_trace: r.timeout_trace,
     },
   };
 
@@ -96,6 +106,8 @@ export async function refereeProposalCompliance(input: RefereeComplianceInput): 
     result._ai_hint = {
       summary: !r.ok
         ? 'The independent referee model was unavailable on every batch — treat as temporarily unavailable, not as "all requirements missing". Retry shortly.'
+        : r.timeout_trace.timed_out
+        ? `Refereed ${r.timeout_trace.batches_completed} of ${r.timeout_trace.batches_planned} batches before the ${r.timeout_trace.budget_ms}ms budget. Remaining requirements are UNEVALUATED, not missing. ${r.timeout_trace.reason}`
         : `Refereed ${r.summary.total} requirement(s): ${r.summary.met} met, ${r.summary.partial} partial, ${r.summary.missing} missing (compliance score ${r.summary.score}%). ${r.summary.missing + r.summary.partial > 0 ? `Fix the ${r.summary.missing} missing + ${r.summary.partial} partial item(s) before submission.` : 'All requirements addressed.'}`,
       how_to_use:
         'Each verdict is one requirement judged against the draft: "missing" = not addressed at all (fix first), "partial" = touched but vague/incomplete, "met" = clearly satisfied. The `evidence` note says where it is addressed or what is absent. Address every missing/partial item, then re-referee.',

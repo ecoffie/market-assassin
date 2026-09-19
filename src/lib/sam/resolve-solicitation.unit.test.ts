@@ -175,6 +175,18 @@ describe('status truth', () => {
     expect(resolved?.matched_by).toBe('notice_id');
     expect(resolved?.response_deadline).toMatch(/^2026-07-21/);
     expect(resolved?.status).not.toBe('open');
+    expect(resolved?.deadline_conflict).toBe(false);
+  });
+  it('sol# of the same family flags deadline conflict; UUID of one notice does not inherit the later date', () => {
+    const bySol = resolveFromCandidateRows('N0017425RFPREQIHDMDept0002', MASA, 'solicitation_number', NOW);
+    const byUuid = resolveFromCandidateRows(ORIGINAL.notice_id, MASA, 'notice_id', NOW);
+    expect(bySol?.deadline_conflict).toBe(true);
+    expect(byUuid?.deadline_conflict).toBe(false);
+    expect(byUuid?.notice.notice_id).not.toBe(bySol?.notice.notice_id);
+    expect(byUuid?.response_deadline).toMatch(/^2026-07-21/);
+    expect(bySol?.response_deadline).toMatch(/^2026-08-27/);
+    expect(bySol?.notice_ids).toContain(ORIGINAL.notice_id);
+    expect(bySol?.notice_ids).toContain(AMD3.notice_id);
   });
   it('H. older deadline passed + newer deadline future → OPEN', () => {
     const now = new Date('2026-08-10T12:00:00.000Z');

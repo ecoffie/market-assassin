@@ -16,7 +16,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
-import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
+import { deriveSubAgencyEvidence } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
@@ -251,6 +251,9 @@ export interface FederalContact {
   role_category_label: string | null; // classified bucket (Contracting Officer, Small Business, …)
   poc_label: string | null;
   sub_agency: string | null;
+  /** How sub_agency was derived. Email-only or a prefix/email conflict is uncertain. */
+  sub_agency_evidence?: 'solicitation_prefix' | 'email_domain' | 'both_agree' | 'conflict' | 'none';
+  sub_agency_uncertain?: boolean;
   derived_office: string | null;
   dodaac: string | null;
   is_osbp?: boolean;
@@ -409,6 +412,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // role — so a buying-office POC ("Primary Contact", role_category="contracting") reads as
       // "Contracting" instead of null. The title-derived bucket still WINS when present (more specific).
       const roleCatLabel = roleCategory || roleCategoryLabel(r.role_category);
+      const sub = deriveSubAgencyEvidence(r.contact_email, r.solicitation_number);
       return {
         // Display value: SAM's appended phone/DSN/email stripped. The raw observation in
         // federal_contacts is untouched — this is presentation only.
@@ -420,7 +424,9 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         role: normRole,
         role_category_label: roleCatLabel,
         poc_label: pocLabel,
-        sub_agency: deriveSubAgency(r.contact_email, r.solicitation_number),
+        sub_agency: sub.label,
+        sub_agency_evidence: sub.evidence,
+        sub_agency_uncertain: sub.uncertain,
         derived_office: officeName,
         dodaac: dod?.dodaac || null,
       } as FederalContact;

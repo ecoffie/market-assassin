@@ -7000,3 +7000,14 @@ Current notice `f1aa309fa39040a4929d90a7d88fd091`, Amendment 0003, deadline
 pipeline-touched families / 10,316 versions / 3,022 pursuits on older siblings.
 The 44,560-family fleet population is out of scope.
 
+---
+
+## MCP decision integrity — evidence, not guesses (2026-09-18)
+
+**What.** MCP notice, contact, incumbent, spend, OSBP, and entity tools now refuse to treat a guess as a fact. A notice UUID keeps that notice's deadline; a solicitation-number family with conflicting close dates is flagged. Contacts that only match by email domain stay uncertain. An incumbent is named only when PSC or distinctive title evidence supports it. Spend that could not be fetched is unavailable, not $0. An agency missing from the OSBP directory is a coverage gap, not "no office." An entity lookup that failed is not an unregistered business; DBA names are searched without picking the first ambiguous match.
+
+**Why.** Bid decisions were being made from the wrong amendment, the wrong office, or an unsupported prior award. Empty results looked like "$0" or "not registered" when the real answer was "we don't know." Compliance-matrix extraction on a notice ID was truncating attachment text that a manual paste of the same documents extracted fully.
+
+**SEO.** SAM.gov solicitation deadline, federal incumbent identification, OSBP contact, SAM entity lookup, compliance matrix from SAM notice.
+
+**Proof.** Units 2026-09-18: `notice-identity` UUID vs solicitation-number deadline conflict + 28-shall paste vs 20k cap; `incumbent-evidence` NAICS-alone never grounds; `derive-subagency` email domain is not a verdict (`@state.gov` on Navy `N40084…` is conflict, not State; `@uscg.mil` on a Navy prefix is conflict, not Coast Guard); `resolve-solicitation` MASA UUID keeps the original close date; `annual-obligations` unavailable ≠ $0; `federal-osbp-provenance` not_in_directory ≠ no_osbp_listed; `sam-entity-empty-success` lookup_failed ≠ unregistered + DBA + Tanaq-family ambiguous; contractor-resolution punctuation / first-match / corpus-miss controls unchanged. Pricing (`packages.ts` / `TOOL_CREDITS`) untouched. A notice-ID matrix that returns 96 rows with `truncated_attachments: 5` proves retrieval and honest truncation, not extraction completeness.

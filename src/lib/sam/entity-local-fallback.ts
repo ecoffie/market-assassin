@@ -176,19 +176,55 @@ export async function localEntityByUEI(uei: string): Promise<LocalEntityHit | nu
 /**
  * Look a legal business name up in the local mirror.
  * Uses the legal-name stem so ", LLC" and "LLC" resolve to the same row.
+ * Also searches DBA so a trade name is not reported as unregistered.
  */
-export async function localEntitiesByName(name: string, limit = 10): Promise<LocalEntityHit[]> {
+export async function lookupLocalEntitiesByName(name: string, limit = 10): Promise<
+  | { status: 'found'; hits: LocalEntityHit[] }
+  | { status: 'absent' }
+  | { status: 'unavailable'; detail: string }
+> {
   const sb = db();
-  if (!sb || !name.trim()) return [];
-  const { data, error } = await sb
+  if (!sb) return { status: 'unavailable', detail: 'Supabase client unavailable' };
+  if (!name.trim()) return { status: 'absent' };
+  const cap = Math.min(Math.max(limit, 1), 25);
+  const pattern = legalNameIlikePattern(name);
+
+  const { data: legal, error: legalErr } = await sb
     .from('sam_entities')
     .select(LOCAL_ENTITY_COLUMNS)
-    .ilike('legal_business_name', legalNameIlikePattern(name))
-    .limit(Math.min(Math.max(limit, 1), 25));
-  if (error) { console.error('[sam-local-fallback] name query failed:', error.message); return []; }
-  if (!data?.length) return [];
-  return (data as unknown as Record<string, unknown>[]).map((row) => ({
-    entity: toSamEntity(row),
-    asOf: typeof row.synced_at === 'string' ? row.synced_at : null,
-  }));
+    .ilike('legal_business_name', pattern)
+    .limit(cap);
+  if (legalErr) {
+    console.error('[sam-local-fallback] legal-name query failed:', legalErr.message);
+    return { status: 'unavailable', detail: legalErr.message };
+  }
+
+  const { data: dba, error: dbaErr } = await sb
+    .from('sam_entities')
+    .select(LOCAL_ENTITY_COLUMNS)
+    .ilike('dba_name', pattern)
+    .limit(cap);
+  if (dbaErr) {
+    console.error('[sam-local-fallback] dba-name query failed:', dbaErr.message);
+    return { status: 'unavailable', detail: dbaErr.message };
+  }
+
+  const byUei = new Map<string, LocalEntityHit>();
+  for (const row of [...(legal || []), ...(dba || [])] as unknown as Record<string, unknown>[]) {
+    const hit: LocalEntityHit = {
+      entity: toSamEntity(row),
+      asOf: typeof row.synced_at === 'string' ? row.synced_at : null,
+    };
+    const uei = hit.entity.ueiSAM || String(row.uei || '');
+    if (!uei || byUei.has(uei)) continue;
+    byUei.set(uei, hit);
+    if (byUei.size >= cap) break;
+  }
+  if (byUei.size === 0) return { status: 'absent' };
+  return { status: 'found', hits: [...byUei.values()] };
+}
+
+export async function localEntitiesByName(name: string, limit = 10): Promise<LocalEntityHit[]> {
+  const r = await lookupLocalEntitiesByName(name, limit);
+  return r.status === 'found' ? r.hits : [];
 }
