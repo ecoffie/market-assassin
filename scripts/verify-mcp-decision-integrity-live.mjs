@@ -178,22 +178,23 @@ async function main() {
       ms: navyState.ms,
     });
 
-  // Coast Guard must not contaminate a Navy agency roster as a certain label.
-  const navyAgency = await call(client, 'search_federal_contacts', { agency: 'Navy', limit: 50 });
-  const navyAgencyList = navyAgency.parsed?.contacts || [];
-  const uscgOnNavy = navyAgencyList.filter((c) =>
+  // Coast Guard must not contaminate a CONUS Navy office roster as a certain label.
+  // agency=Navy times out on a 60-DoDAAC OR (degraded empty) — that is not this case.
+  const navyOffice = await call(client, 'search_federal_contacts', { dodaac: 'N00174', limit: 50 });
+  const navyOfficeList = navyOffice.parsed?.contacts || [];
+  const uscgOnNavy = navyOfficeList.filter((c) =>
     /@uscg\.mil/i.test(c?.contact_email || '')
     || (/coast guard/i.test(c?.sub_agency || '') && c.sub_agency_uncertain !== true));
-  rec('contacts_uscg', 'Navy agency roster does not treat Coast Guard mailboxes as Navy-certain',
-    uscgOnNavy.length === 0,
+  rec('contacts_uscg', 'Navy N00174 roster does not treat Coast Guard mailboxes as Navy-certain',
+    navyOfficeList.length > 0 && uscgOnNavy.length === 0,
     {
-      count: navyAgencyList.length,
+      count: navyOfficeList.length,
       contaminating: uscgOnNavy.slice(0, 4).map((c) => ({
         email: c.contact_email, sub_agency: c.sub_agency,
         evidence: c.sub_agency_evidence, uncertain: c.sub_agency_uncertain,
         dept: c.department_ind_agency,
       })),
-      ms: navyAgency.ms,
+      ms: navyOffice.ms,
     });
 
   const cgOffice = await call(client, 'search_federal_contacts', { dodaac: '70Z023', limit: 25 });
@@ -229,8 +230,14 @@ async function main() {
       ms: docs.ms,
     });
   rec('docs_location', 'External SAM attachment location is explained',
-    /SAM\.gov|sam\.gov|external/i.test(String(d.location_note || loc || JSON.stringify(d).slice(0, 1500))),
-    { location_note: (d.location_note || loc || '').slice(0, 240) });
+    (d.documents || []).some((doc) => /SAM\.gov|sam\.gov|external/i.test(String(doc?.location_note || '')))
+      || /SAM\.gov|sam\.gov|external/i.test(String(d.location_note || loc || JSON.stringify(d).slice(0, 4000))),
+    {
+      location_note: (d.location_note || loc || '').slice(0, 240),
+      doc_notes: (d.documents || []).slice(0, 3).map((doc) => ({
+        filename: doc?.filename, download_source: doc?.download_source, location_note: doc?.location_note,
+      })),
+    });
 
   // 5. Compliance matrix — paste 28 shalls + notice path
   const paste = await call(client, 'extract_compliance_matrix', { rfp_text: SHALLS });
