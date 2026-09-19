@@ -89,6 +89,11 @@ describe('normalize + identity shape', () => {
     }
     expect(isSolicitationIdentifier('too-short')).toBe(false);
     expect(isSolicitationIdentifier('N00174')).toBe(false);
+    expect(isSolicitationIdentifier('EMAIL')).toBe(false);
+    expect(isSolicitationIdentifier('RFP')).toBe(false);
+    expect(isSolicitationIdentifier('0001')).toBe(false);
+    expect(isSolicitationIdentifier('2026')).toBe(false);
+    expect(isSolicitationIdentifier('07152026')).toBe(false);
   });
   it('recognizes notice UUIDs', () => {
     expect(isNoticeUuid('f1aa309fa39040a4929d90a7d88fd091')).toBe(true);
