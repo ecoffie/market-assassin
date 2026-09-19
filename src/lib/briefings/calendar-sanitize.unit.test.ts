@@ -8,10 +8,13 @@ import {
 } from './calendar-sanitize';
 
 describe('sanitizeBriefingCalendar — source-grounded, no year repair', () => {
+  // Must stay strictly after CI's UTC calendar day. 2026-09-18 was "today" when
+  // the fixture shipped and started failing on 2026-09-19 (`date < today` drop).
+  const GROUNDED_DAY = '2026-12-15';
   const sources = [
     verifiedCalendarSource({
       sourceId: 'N00178-21-D-1234',
-      date: '2026-09-18',
+      date: GROUNDED_DAY,
       event: 'NIWC cyber expires',
     })!,
     verifiedCalendarSource({
@@ -25,9 +28,9 @@ describe('sanitizeBriefingCalendar — source-grounded, no year repair', () => {
     const { kept, dropped } = sanitizeBriefingCalendar(
       [
         { date: '2023-03-15', event: 'Industry day' },
-        { date: '2026-09-18', event: 'Invented this year, no source' },
+        { date: GROUNDED_DAY, event: 'Invented this year, no source' },
         { date: 'March 30, 2026', event: 'Unparseable prose date', sourceId: 'N00178-21-D-1234' },
-        { sourceId: 'N00178-21-D-1234', date: '2026-09-18', event: 'Grounded' },
+        { sourceId: 'N00178-21-D-1234', date: GROUNDED_DAY, event: 'Grounded' },
       ],
       sources,
     );
@@ -53,9 +56,9 @@ describe('sanitizeBriefingCalendar — source-grounded, no year repair', () => {
 
   it('send-time cached templates: omit rows without sourceId or ISO date', () => {
     const { kept, dropped } = sanitizeBriefingCalendar([
-      { date: '2026-09-18', event: 'LLM leftover' },
+      { date: GROUNDED_DAY, event: 'LLM leftover' },
       { sourceId: 'N00178-21-D-1234', date: 'not a date', event: 'Bad date' },
-      { sourceId: 'N00178-21-D-1234', date: '2026-09-18', event: 'Cached grounded' },
+      { sourceId: 'N00178-21-D-1234', date: GROUNDED_DAY, event: 'Cached grounded' },
       { sourceId: 'OLD', date: '2015-12-31', event: 'Verified but already past' },
     ]);
     expect(dropped).toHaveLength(3);
