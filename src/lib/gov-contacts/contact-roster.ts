@@ -389,7 +389,11 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
   let contacts: FederalContact[] = rows
     .filter((r) => {
       const hay = `${r.office || ''} ${r.sub_tier || ''} ${r.contact_email || ''}`;
-      if (FOREIGN_OFFICE_RE.test(hay)) return false;
+      // Named DoDAAC = that office, including overseas. The foreign filter
+      // exists to stop department-wide Navy lists filling with Yokosuka, not
+      // to empty an office the caller asked for by code (N40084 NAVFAC Far East
+      // carries the measured @state.gov Navy POCs).
+      if (!validDodaac && FOREIGN_OFFICE_RE.test(hay)) return false;
       // Belt-and-suspenders (see the query-level ILIKE exclusion above): drop a
       // card too incomplete to be useful — a placeholder/garbage name, or a
       // name with no org and no contactable field.
@@ -431,8 +435,9 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         dodaac: dod?.dodaac || null,
       } as FederalContact;
     })
-    // second-pass foreign filter on the DECODED office name
-    .filter((c) => !FOREIGN_OFFICE_RE.test(c.derived_office || ''));
+    // second-pass foreign filter on the DECODED office name — skipped when
+    // the caller named the office by DoDAAC.
+    .filter((c) => validDodaac || !FOREIGN_OFFICE_RE.test(c.derived_office || ''));
 
   // Soft role filter: prefer contacts whose title matches the requested role (by bucket
   // or title substring), but NEVER return empty on a role miss — fall back to the full
