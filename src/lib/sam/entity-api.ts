@@ -80,6 +80,7 @@ export interface SAMEntity {
 
 export interface EntitySearchParams {
   legalBusinessName?: string;
+  dbaName?: string;
   uei?: string;
   cageCode?: string;
   naicsCode?: string;
@@ -331,6 +332,10 @@ export async function searchEntities(
 
   if (params.legalBusinessName) {
     queryParams.legalBusinessName = params.legalBusinessName;
+  }
+
+  if (params.dbaName) {
+    queryParams.dbaName = params.dbaName;
   }
 
   if (params.uei) {

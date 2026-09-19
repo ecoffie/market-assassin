@@ -81,7 +81,7 @@ export async function solicitationDocuments(
         : 'No grounded documents; tell the user none were found rather than inventing solicitation content.',
       key_caveats: [
         'download_url expires (~1h) — re-call the tool to mint a fresh link.',
-        'extracted_text is truncated for inline delivery; the full text is in the downloadable file (char_count is the true length).',
+        'extracted_text is truncated for inline delivery; the full text is in the downloadable file (char_count is the true length). Check location_note — a SAM.gov URL is an external attachment, not a Mindy-stored copy.',
         'Not every notice has attachments — an empty documents list can be legitimate (e.g. a Sources Sought with only body text).',
       ],
     };

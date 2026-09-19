@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getCached, setCached } from '@/lib/mcp/external-cache';
 import { fetchAndExtractNoticeFiles, normalizeNoticeId } from '@/lib/sam/fetch-pursuit-docs';
 import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
+import { assembleNoticeSourceText, attachmentLocationNote } from '@/lib/sam/notice-identity';
 
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
@@ -39,10 +40,12 @@ export interface SolicitationDocument {
   mime_type: string | null;
   page_count: number | null;
   char_count: number | null; // TRUE length of the extracted text (not the inline cap)
-  extracted_text: string; // inline, capped at INLINE_CAP
+  extracted_text: string; // inline; capped unless textMode='full'
   extracted_text_truncated: boolean;
   download_url: string | null; // signed Storage URL (~1h) or public SAM fallback
   download_source: 'mindy_signed' | 'sam_public' | null;
+  /** Where the file actually lives — SAM.gov vs Mindy storage. Always set. */
+  location_note: string;
 }
 
 export interface SolicitationDocumentsResult {
@@ -57,6 +60,9 @@ export interface SolicitationDocumentsResult {
   documents: SolicitationDocument[];
   source: 'cache' | 'on_demand' | 'none'; // where the documents came from
   degraded: boolean;
+  /** Assembled SOW + body + attachment text. Full when textMode='full'. */
+  source_text?: string;
+  truncated_attachments?: number;
 }
 
 interface CachedDocMeta {
@@ -99,11 +105,13 @@ async function signUrl(
 async function toOutputDocs(
   supabase: ReturnType<typeof sb>,
   metas: CachedDocMeta[],
+  inlineCap: number,
 ): Promise<SolicitationDocument[]> {
   return Promise.all(
     metas.map(async (m) => {
       const { url, source } = await signUrl(supabase, m.storagePath, m.samUrl, m.filename);
-      const inline = cap(m.extractedText, INLINE_CAP);
+      const inline = cap(m.extractedText, inlineCap);
+      const cacheTruncated = (m.charCount ?? m.extractedText.length) > m.extractedText.length;
       return {
         filename: m.filename,
         doc_kind: m.docKind,
@@ -111,17 +119,23 @@ async function toOutputDocs(
         page_count: m.pageCount,
         char_count: m.charCount,
         extracted_text: inline.text,
-        extracted_text_truncated: inline.truncated,
+        extracted_text_truncated: inline.truncated || cacheTruncated,
         download_url: url,
         download_source: source,
+        location_note: attachmentLocationNote(source) ?? 'No downloadable copy was located for this file.',
       };
     }),
   );
 }
 
-export async function getSolicitationDocuments(input: { noticeId: string }): Promise<SolicitationDocumentsResult> {
+export async function getSolicitationDocuments(input: {
+  noticeId: string;
+  /** inline (default) caps extracted_text for MCP payloads. full is required for compliance-matrix. */
+  textMode?: 'inline' | 'full';
+}): Promise<SolicitationDocumentsResult> {
   const noticeId = normalizeNoticeId((input.noticeId || '').trim());
   const supabase = sb();
+  const inlineCap = input.textMode === 'full' ? Number.MAX_SAFE_INTEGER : INLINE_CAP;
 
   const base: SolicitationDocumentsResult = {
     notice_id: noticeId,
@@ -181,10 +195,10 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
     // description may still be a noticedesc URL on the ~5% not yet backfilled;
     // only surface it as text if it isn't a bare link.
     const desc = typeof opp.description === 'string' && !/^https?:\/\//i.test(opp.description.trim()) ? opp.description : '';
-    const dCap = cap(desc, INLINE_CAP);
+    const dCap = cap(desc, inlineCap);
     base.description = dCap.text;
     base.description_truncated = dCap.truncated;
-    const sCap = cap(opp.sow_text, INLINE_CAP);
+    const sCap = cap(opp.sow_text, inlineCap);
     base.sow_text = sCap.text;
     base.sow_text_truncated = sCap.truncated;
   }
@@ -220,22 +234,22 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
         extractedText: String(r.extracted_text || ''),
       });
     }
-    base.documents = await toOutputDocs(supabase, metas);
+    base.documents = await toOutputDocs(supabase, metas, inlineCap);
     base.source = 'cache';
-    return base;
+    return finishDocs(base, input.textMode);
   }
 
   // ── Layer 2: COLD CACHE — a prior MCP on-demand fetch ─────────────────────
   const cached = await getCached<CachedDocMeta[]>('solicitation_docs', { noticeId: resolvedNoticeId });
   if (cached && cached.length > 0) {
-    base.documents = await toOutputDocs(supabase, cached);
+    base.documents = await toOutputDocs(supabase, cached, inlineCap);
     base.source = 'cache';
-    return base;
+    return finishDocs(base, input.textMode);
   }
 
   // ── Layer 3: COLD FETCH — on-demand download + extract (public SAM) ────────
   const fetched = await fetchAndExtractNoticeFiles({
-    noticeId,
+    noticeId: resolvedNoticeId,
     solicitationNumber: base.solicitation_number,
     title: base.title,
     agency: base.agency,
@@ -246,14 +260,14 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
     // No attachments (many notices legitimately have none). Inline text (if any)
     // is still returned above; the caller sees an honest empty documents list.
     base.source = 'none';
-    return base;
+    return finishDocs(base, input.textMode);
   }
 
   // Upload each raw blob to Storage under a notice-level path, build metadata.
   const metas: CachedDocMeta[] = [];
   for (const f of fetched.documents) {
     const safe = `${f.fileId}-${(f.filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_')}`.slice(0, 400);
-    const storagePath = `_notices/${noticeId}/${safe}`;
+    const storagePath = `_notices/${resolvedNoticeId}/${safe}`;
     let finalPath: string | null = null;
     try {
       const { error } = await supabase.storage.from(BUCKET).upload(storagePath, f.buffer, {
@@ -274,14 +288,29 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
       docKind: f.docKind ?? null,
       storagePath: finalPath,
       samUrl: f.samUrl, // best-effort fallback if the signed Storage copy is unavailable
-      extractedText: f.extractedText.slice(0, CACHE_TEXT_CAP),
+      extractedText: input.textMode === 'full' ? f.extractedText : f.extractedText.slice(0, CACHE_TEXT_CAP),
     });
   }
 
   // Cache the metadata (NOT signed URLs — those are minted fresh each call).
-  await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, metas, CACHE_TTL);
+  const cacheMetas = metas.map((m) => ({ ...m, extractedText: m.extractedText.slice(0, CACHE_TEXT_CAP) }));
+  await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, cacheMetas, CACHE_TTL);
 
-  base.documents = await toOutputDocs(supabase, metas);
+  base.documents = await toOutputDocs(supabase, metas, inlineCap);
   base.source = 'on_demand';
+  return finishDocs(base, input.textMode);
+}
+
+function finishDocs(
+  base: SolicitationDocumentsResult,
+  textMode?: 'inline' | 'full',
+): SolicitationDocumentsResult {
+  const assembled = assembleNoticeSourceText({
+    sow_text: base.sow_text,
+    description: base.description,
+    documents: base.documents,
+  });
+  base.truncated_attachments = assembled.truncated_attachments;
+  if (textMode === 'full') base.source_text = assembled.text;
   return base;
 }

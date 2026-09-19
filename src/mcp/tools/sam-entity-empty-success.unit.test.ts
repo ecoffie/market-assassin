@@ -23,6 +23,24 @@ vi.mock('@/lib/sam/entity-api', () => ({
 vi.mock('@/lib/sam/entity-local-fallback', () => ({
   localEntitiesByName: (n: string, l: number) => mockLocalName(n, l),
   localEntityByUEI: (u: string) => mockLocalUei(u),
+  lookupLocalEntitiesByName: async (n: string, l: number) => {
+    try {
+      const hits = await mockLocalName(n, l);
+      if (!hits?.length) return { status: 'absent' };
+      return { status: 'found', hits };
+    } catch (e) {
+      return { status: 'unavailable', detail: String(e) };
+    }
+  },
+  lookupLocalEntityByUEI: async (u: string) => {
+    try {
+      const hit = await mockLocalUei(u);
+      if (!hit) return { status: 'absent' };
+      return { status: 'found', hit };
+    } catch (e) {
+      return { status: 'unavailable', detail: String(e) };
+    }
+  },
 }));
 
 const { lookupSamEntity } = await import('./sam-entity');
@@ -110,7 +128,29 @@ describe('CHAIN-1 — live empty must be reconciled before asserting absence', (
     mockByUei.mockResolvedValue(FLUIDYNE);
     const r = await lookupSamEntity({ name: 'Fluidyne' });
     expect(r.matches).toHaveLength(2);
-    expect(r.entity?.ueiSAM).toBe('RG3VUTDYFNF8');
     expect(r._meta.match_count).toBe(2);
+    // "Fluidyne" exact-stems to FLUIDYNE CORPORATION, not the longer SERVICES name.
+    expect(r._meta.lookup_status).toBe('found');
+    expect(r.entity?.ueiSAM).toBe('RG3VUTDYFNF8');
+  });
+
+  it('an ambiguous family never selects the first match', async () => {
+    const a = { ...FLUIDYNE, ueiSAM: 'AAAA00000001', legalBusinessName: 'FLUIDYNE SUPPORT SERVICES LLC' };
+    const b = { ...FLUIDYNE, ueiSAM: 'BBBB00000002', legalBusinessName: 'FLUIDYNE MANAGEMENT SERVICES LLC' };
+    mockSearch.mockResolvedValue({ entities: [a, b] });
+    const r = await lookupSamEntity({ name: 'Fluidyne' });
+    expect(r.matches).toHaveLength(2);
+    expect(r.entity).toBeNull();
+    expect(r._meta.lookup_status).toBe('ambiguous');
+    expect(mockByUei).not.toHaveBeenCalled();
+  });
+
+  it('an unsuccessful lookup is lookup_failed, not an unregistered business', async () => {
+    mockSearch.mockRejectedValue(new Error('all API keys are rate-limited (429)'));
+    mockLocalName.mockRejectedValue(new Error('mirror unreachable'));
+    const r = await lookupSamEntity({ name: 'Fluidyne Corporation' });
+    expect(r._meta.lookup_status).toBe('lookup_failed');
+    expect(r._meta.grounded).toBe(false);
+    expect(r._meta.degraded).toBe(true);
   });
 });
