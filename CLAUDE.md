@@ -231,6 +231,14 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
+### Solicitation identity sequence — FROZEN 2026-09-19
+Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Historical discovery next → targeted backfill later → PAE later.**
+- **#1557 Solicitation Truth** — merged, production-proven (`741ec0d3`).
+- **#1558 Family v1** — merged `bb9a4c55`. Empty migration applied. Production canary 2026-09-19 PASS: one MASA family (`c870f3c7-dea2-46ef-9943-3018d566afc9`), four versions, current=Amd 0003, customer RFP alias present, Original pursuit (`ce85c48d…` / `hello@icrestiq.com`) kept its `notice_id`. The other MASA pursuit (`kurtgraham@achieversmgt.com`) remains `family_id=null` — proof there was no hidden fleet backfill.
+- **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Historical lookup (#1560) collapses families at query time; learn from it whether persisted families are worth populating at all.
+- **Next: #1560 Historical Solicitation Discovery** (`feat/lookup-solicitation`, PR open). This is the original customer-visible failure: Mindy could not find MASA without the number. Family persistence is infrastructure; historical discovery is what the customer experiences. **STOP BEFORE MERGE** until Eric approves. Do not deploy from that PR.
+- **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
+
 ### Potato v1 — ✅ SHIPPED → CLOSED 2026-09-17
 Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.”
 - Journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → TALENT THIN → POSITION → ACT → MONITOR. Then STOP.
