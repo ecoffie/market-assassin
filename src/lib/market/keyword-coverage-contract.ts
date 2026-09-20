@@ -13,6 +13,24 @@ export const KEYWORD_COVERAGE_SENSES_AVAILABLE = [
   'product_psc',
 ] as const;
 
+/**
+ * Phase 0 semantic split (Owned Evidence Architecture).
+ *
+ * Keyword coverage answers a DIFFERENT question than Market Research
+ * "Relevant spending" / fpds-top-n / spend-query:
+ *   - coverage = description-matched obligations in ONE complete FY
+ *   - market size dashboards = MARKET_SPEND_WINDOW (3 FYs, category/code scope)
+ *
+ * Never present coverage.totalMarket as interchangeable with 3-FY market $.
+ */
+export const KEYWORD_COVERAGE_WINDOW_KIND = 'latest_complete_fy' as const;
+export const KEYWORD_COVERAGE_QUESTION =
+  'description_matched_fy_distribution' as const;
+
+export function keywordCoverageWindowLabel(fiscalYear: number): string {
+  return `FY${fiscalYear} (1 complete fiscal year · description match)`;
+}
+
 export type KeywordCoverageSense = (typeof KEYWORD_COVERAGE_SENSES_AVAILABLE)[number];
 
 export type CoverageEvidenceStatus =

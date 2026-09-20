@@ -15,9 +15,12 @@ import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fisc
 import { termOfArtSynonyms } from './sector-expansions';
 import {
   KEYWORD_COVERAGE_PRIMARY_SENSE,
+  KEYWORD_COVERAGE_QUESTION,
   KEYWORD_COVERAGE_SOURCE,
+  KEYWORD_COVERAGE_WINDOW_KIND,
   KeywordCoverageNotEstablishedError,
   descriptionMatchPattern,
+  keywordCoverageWindowLabel,
   type CoverageEvidenceStatus,
 } from './keyword-coverage-contract';
 import type { KeywordCoverageBqRow } from './keyword-coverage-bq';
@@ -49,6 +52,9 @@ export {
   KEYWORD_COVERAGE_PRIMARY_SENSE,
   KEYWORD_COVERAGE_SENSES_AVAILABLE,
   KEYWORD_COVERAGE_SOURCE,
+  KEYWORD_COVERAGE_WINDOW_KIND,
+  KEYWORD_COVERAGE_QUESTION,
+  keywordCoverageWindowLabel,
   KeywordCoverageNotEstablishedError,
   type CoverageEvidenceStatus,
 } from './keyword-coverage-contract';
@@ -277,6 +283,15 @@ export interface KeywordCoverage {
   transactionCount: number;
   uniqueAwardCount: number;
   fiscalYear: number;
+  /** Phase 0: always latest_complete_fy — not MARKET_SPEND_WINDOW. */
+  windowKind: typeof KEYWORD_COVERAGE_WINDOW_KIND;
+  /** Host-facing window label (includes FY + "description match"). */
+  windowLabel: string;
+  /**
+   * Phase 0: this total answers description-matched FY distribution — NOT the
+   * 3-FY category/code market-size question used by TMR Relevant spending.
+   */
+  questionKind: typeof KEYWORD_COVERAGE_QUESTION;
   source: typeof KEYWORD_COVERAGE_SOURCE;
   sourceMaxActionDate: string | null;
   allAgencies: { name: string; amount: number; pct: number }[];
@@ -404,6 +419,9 @@ function rowToCoverage(row: KeywordCoverageBqRow, coverageTarget: number): Keywo
     transactionCount: row.transactionCount,
     uniqueAwardCount: row.uniqueAwardCount,
     fiscalYear: row.fiscalYear,
+    windowKind: KEYWORD_COVERAGE_WINDOW_KIND,
+    windowLabel: keywordCoverageWindowLabel(row.fiscalYear),
+    questionKind: KEYWORD_COVERAGE_QUESTION,
     source: KEYWORD_COVERAGE_SOURCE,
     sourceMaxActionDate: row.maxActionDate,
     allAgencies: agencies,
@@ -522,7 +540,17 @@ export async function codeMarketSize(opts: {
   naics?: string;
   signal?: AbortSignal;
   perFetchMs?: number;
-}): Promise<{ totalMarket: number; topPsc: { code: string; name: string } | null; basis: 'psc' | 'naics'; leadName?: string } | null> {
+}): Promise<{
+  totalMarket: number;
+  topPsc: { code: string; name: string } | null;
+  basis: 'psc' | 'naics';
+  leadName?: string;
+  /** Phase 0: live USASpending 1-FY category total — not MARKET_SPEND_WINDOW. */
+  windowKind: 'latest_complete_fy_live_api';
+  windowLabel: string;
+  questionKind: 'code_pinned_fy_category_total';
+  fiscalYear: number;
+} | null> {
   const psc = (opts.psc || '').trim();
   const naics = (opts.naics || '').trim();
   if (!psc && !naics) return null;
@@ -530,8 +558,10 @@ export async function codeMarketSize(opts: {
 
   // Prefer PSC (literal product bought); fall back to NAICS (vendor industry).
   const basis: 'psc' | 'naics' = psc ? 'psc' : 'naics';
+  const fyPeriod = fiscalYearTimePeriod();
+  const fiscalYear = latestCompleteFiscalYear();
   const filters: Record<string, unknown> = {
-    time_period: [fiscalYearTimePeriod()],
+    time_period: [fyPeriod],
     award_type_codes: ['A', 'B', 'C', 'D'],
   };
   if (basis === 'psc') filters.psc_codes = [psc];
@@ -571,7 +601,16 @@ export async function codeMarketSize(opts: {
     const leadName = basis === 'naics'
       ? (naicsRows.find((r: { code: string; name?: string }) => r.code === naics)?.name || undefined)
       : undefined;
-    return { totalMarket: total, topPsc, basis, leadName };
+    return {
+      totalMarket: total,
+      topPsc,
+      basis,
+      leadName,
+      windowKind: 'latest_complete_fy_live_api',
+      windowLabel: keywordCoverageWindowLabel(fiscalYear) + ' · live USASpending category',
+      questionKind: 'code_pinned_fy_category_total',
+      fiscalYear,
+    };
   } catch (err) {
     if (err instanceof CoverageDeadlineError) throw err;
     if (opts.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {

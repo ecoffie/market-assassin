@@ -22,6 +22,10 @@ export interface MarketCoverage {
   ranking_label?: string;
   uses_psc_ranking?: boolean;
   keywords?: string[];           // search terms to add to alerts
+  /** Phase 0: FY label for description-match total — not 3-FY market size. */
+  fiscal_year?: number;
+  window_label?: string;
+  question_kind?: string;
 }
 
 const fmt$ = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(0)}M` : `$${Math.round(n).toLocaleString()}`;
@@ -36,6 +40,11 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
   // This market concentrates in one dominant NAICS, so rankings follow that code
   // (not keyword/PSC award text). Keeps the lesson honest vs the actual chart.
   const naicsRanked = coverage.ranking_mode === 'naics';
+  const windowLabel =
+    coverage.window_label ||
+    (coverage.fiscal_year
+      ? `FY${coverage.fiscal_year} (1 complete fiscal year · description match)`
+      : null);
 
   async function addKeywords() {
     if (!email || keywords.length === 0) return;
@@ -54,8 +63,18 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
     <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-blue-900/15 to-purple-600/10 p-4 mb-4">
       <div className="flex items-baseline justify-between mb-2.5">
         <div className="text-sm font-semibold text-white">📊 Market coverage for &ldquo;{coverage.keyword}&rdquo;</div>
-        <div className="text-sm font-semibold text-emerald-300">{fmt$(coverage.total_market)} market</div>
+        <div className="text-right">
+          <div className="text-sm font-semibold text-emerald-300">{fmt$(coverage.total_market)}</div>
+          {windowLabel && (
+            <div className="text-[10px] text-faint mt-0.5">{windowLabel}</div>
+          )}
+        </div>
       </div>
+      <p className="text-[11px] text-muted mb-2.5 leading-relaxed">
+        Description-matched obligations in one complete FY — the NAICS/PSC
+        distribution lesson. Not the same figure as Relevant spending
+        (3 fiscal years by category/code).
+      </p>
 
       {/* Ranking teaching moment — PSC/keyword vs NAICS */}
       <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/30 px-3 py-2.5 mb-3">

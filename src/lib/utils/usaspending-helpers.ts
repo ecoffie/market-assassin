@@ -13,6 +13,12 @@ import type { AlternativeSearchOption } from '@/types/federal-market-assassin';
 export const MARKET_SPEND_WINDOW = { start_date: '2022-10-01', end_date: '2025-09-30' } as const;
 /** Human label for that window, shown next to spend figures so users know the scope. */
 export const MARKET_SPEND_WINDOW_LABEL = 'FY2023–2025 (3 fiscal years)';
+/**
+ * Phase 0: the question this window answers. Distinct from keyword-coverage's
+ * `KEYWORD_COVERAGE_QUESTION` (1-FY description-match distribution).
+ */
+export const MARKET_SPEND_QUESTION = 'category_or_code_market_size_3fy' as const;
+export const MARKET_SPEND_WINDOW_KIND = 'three_complete_fiscal_years' as const;
 
 // Map business types to USAspending set-aside codes
 export const setAsideMap: Record<string, string[]> = {

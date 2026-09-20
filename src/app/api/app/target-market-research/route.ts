@@ -462,6 +462,11 @@ export async function POST(request: NextRequest) {
       naics_identity_status: coverage.naicsIdentityStatus,
       uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
       keywords: deriveCoverageKeywords(coverage),
+      // Phase 0 semantic split — must not be read as MARKET_SPEND_WINDOW $
+      fiscal_year: coverage.fiscalYear,
+      window_kind: coverage.windowKind,
+      window_label: coverage.windowLabel,
+      question_kind: coverage.questionKind,
     } : null;
 
     // Cache schema version. Bump when the COMPUTED figures change so stale rows
@@ -480,7 +485,9 @@ export async function POST(request: NextRequest) {
     // sv9 = keyword coverage no longer collapses ranking to the lead NAICS from a
     // BQ description-match share (HVAC≠236220, drones≠336411). Stale sv8 rows that
     // stored ranking_mode=naics for those phrases must recompute.
-    const SPEND_SCHEMA_VERSION = 'sv9';
+    // sv10 = Phase 0 window/question labels on keyword_coverage (1-FY description
+    // match ≠ MARKET_SPEND_WINDOW 3-FY market size).
+    const SPEND_SCHEMA_VERSION = 'sv10';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different
