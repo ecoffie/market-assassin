@@ -240,7 +240,7 @@ export function osbpContactForAgency(agency: string): {
   const emailDomainFlag = !!(
     command && contact?.email && emailDomainFlagsDifferentCommand(contact.email, command, commands)
   );
-  if (!contact || (!contact.director && !contact.email)) {
+  if (!command || !contact || (!contact.director && !contact.email)) {
     return { contact: null, command: command || null, reason: 'not_established', emailDomainFlag };
   }
   if ((contact.email || '').toLowerCase() === GENERIC_SBA_EMAIL) {
