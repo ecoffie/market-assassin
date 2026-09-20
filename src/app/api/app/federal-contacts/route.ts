@@ -19,7 +19,7 @@ import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
-import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
+import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 
@@ -619,8 +619,8 @@ export async function GET(request: NextRequest) {
   // command-info directory, NOT federal_contacts). Prepend the agency's
   // small-business contact so the user gets the OSBP person, not just KOs.
   if (agency) {
-    const osbp = getEnhancedAgencyInfo(agency, agency, agency).smallBusinessContact;
-    if (osbp?.director && osbp.director !== `${agency} OSBP Director`) {
+    const { contact: osbp, reason } = osbpContactForAgency(agency);
+    if (reason === 'established' && osbp?.director && osbp.director !== `${agency} OSBP Director`) {
       // Hybrid freshness: the office + mailbox is always the starting point; a
       // named director that was verified against an official source carries a
       // "verified <Mon YYYY>" stamp so the user knows how much to trust the name.

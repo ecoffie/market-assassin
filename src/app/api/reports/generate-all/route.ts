@@ -535,7 +535,9 @@ export async function POST(request: NextRequest) {
             );
 
             // Use OSBP from agency if available (from expanded DOD agencies), otherwise from command lookup
-            const osbpContact = agency.osbp || commandInfo?.smallBusinessContact || null;
+            const osbpContact = agency.osbp
+              || (commandInfo?.osbpSource === 'directory' ? commandInfo.smallBusinessContact : null)
+              || null;
 
             // Debug: Log civilian agencies without OSBP
             if (!osbpContact && agency.parentAgency && !agency.parentAgency.includes('Defense')) {

@@ -18,7 +18,7 @@ import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { deriveSubAgencyEvidence } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
-import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
+import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
@@ -460,16 +460,13 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     }
   }
 
-  // Prepend the OSBP small-business contact for the agency (the front door).
+  // Prepend the OSBP small-business contact only when agency identity is established
+  // and the directory row is not a different agency (STATE ⊂ UNITED STATES COAST GUARD).
   const includeOsbp = input.includeOsbp ?? !!agency;
   if (includeOsbp && agency) {
     try {
-      const osbp = getEnhancedAgencyInfo(agency, agency, agency).smallBusinessContact;
-      // Skip the GENERIC SBA fallback (email gcbd@sba.gov, reached when NOTHING matched)
-      // — otherwise a nonsense agency looks "grounded" with a boilerplate SBA mailbox.
-      // Real agency OSBPs carry their own agency email (VA osdbu@va.gov, NAVFAC …).
-      const isGenericFallback = (osbp?.email || '').toLowerCase() === 'gcbd@sba.gov';
-      if (!isGenericFallback && (osbp?.director || osbp?.email)) {
+      const { contact: osbp, reason, emailDomainFlag } = osbpContactForAgency(agency);
+      if (reason === 'established' && osbp && (osbp.director || osbp.email)) {
         contacts.unshift({
           contact_fullname: osbp.director || null,
           contact_title: 'Office of Small Business Programs',
@@ -485,6 +482,11 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
           is_osbp: true,
           director_verified: osbp.directorVerified || null,
         });
+        if (emailDomainFlag) {
+          trace.push('osbp email domain flags a different directory mailbox (not excluded)');
+        }
+      } else if (reason !== 'established') {
+        trace.push(`osbp prepend skipped (${reason})`);
       }
     } catch { /* OSBP prepend is best-effort */ }
   }

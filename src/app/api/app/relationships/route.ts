@@ -462,7 +462,7 @@ function mapOSBPCandidates(search: string, agency: string) {
 
   for (const agencyName of commonAgencies) {
     const enhanced = getEnhancedAgencyInfo(agencyName, agencyName, agencyName);
-    if (!enhanced.smallBusinessContact) continue;
+    if (enhanced.osbpSource !== 'directory' || !enhanced.smallBusinessContact) continue;
 
     const candidate = mapOSBPContact(
       enhanced.smallBusinessContact,
