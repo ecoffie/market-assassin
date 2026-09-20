@@ -14,6 +14,7 @@
  * parallel). tier: metered, credits: 20. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { extractComplianceMatrixFromText, type ComplianceRequirement } from '@/lib/proposal/compliance-matrix';
+import { auditSourceSpecCoverage, type SourceSpecCoverage } from '@/lib/proposal/matrix-source-coverage';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
 import { assembleNoticeSourceText } from '@/lib/sam/notice-identity';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -38,10 +39,12 @@ export interface ComplianceMatrixResult {
     truncated_attachments?: number;
     /**
      * A non-zero count proves retrieval/extraction ran. Completeness vs the RFP
-     * is unproven whenever attachments or source text were truncated — and is
-     * never claimed from count alone.
+     * is unproven whenever attachments or source text were truncated, OR when
+     * named source specs (LOA, flight deck, SCIF, berthing, magazine) are in
+     * the source and missing from the matrix. Row count is not coverage.
      */
     extraction_completeness: 'unproven' | 'source_text';
+    source_spec_coverage?: SourceSpecCoverage;
     resolved_notice_id?: string;
     model: string;
   };
@@ -107,6 +110,7 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         truncated: false,
         truncated_attachments: truncatedAttachments,
         extraction_completeness: 'unproven',
+        source_spec_coverage: { present_in_source: [], extracted: [], missing_from_matrix: [] },
         model: '',
       },
     };
@@ -126,6 +130,9 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
 
   const ex = await extractComplianceMatrixFromText(sourceText, { userEmail: input.userEmail ?? null });
   const grounded = ex.requirements.length > 0;
+  const coverage = auditSourceSpecCoverage(sourceText, ex.requirements);
+  const completenessUnproven =
+    ex.truncated || truncatedAttachments > 0 || coverage.missing_from_matrix.length > 0;
 
   const result: ComplianceMatrixResult = {
     requirements: ex.requirements,
@@ -138,10 +145,8 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
       count: ex.requirements.length,
       truncated: ex.truncated || truncatedAttachments > 0,
       truncated_attachments: truncatedAttachments,
-      extraction_completeness:
-        source === 'text' && !ex.truncated && truncatedAttachments === 0
-          ? 'source_text'
-          : 'unproven',
+      extraction_completeness: completenessUnproven ? 'unproven' : 'source_text',
+      source_spec_coverage: coverage,
       model: ex.model,
     },
   };
@@ -157,8 +162,9 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         'Use this as the compliance matrix: every row is one obligation the bid must address (category = submission/evaluation/technical/past_performance/pricing/admin/other; section = the L/M/C clause when detected). Build the proposal outline from it; where a source_quote is present, verify it against the RFP.',
       key_caveats: [
         'Every requirement is derived from the provided solicitation text; when a source_quote is present it is verbatim. Do not add requirements the RFP does not state.',
+        'Completeness is source-spec coverage (LOA, flight deck, SCIF, berthing, magazine when those strings are in the source), not the row count. missing_from_matrix means those specs were in the RFP and not extracted.',
         'Single-doc extraction: it does NOT merge amendments over the base RFP. Pass the amendment text too (or the full package) if closing dates/specs were revised.',
-        'Truncated at 50K chars per call — for a very long RFP, extract Section L, M, and C separately for full coverage.',
+        'Truncated at 50K chars per call — Section 3.0 is windowed in when it would otherwise fall off the front of the file.',
       ],
     };
   }

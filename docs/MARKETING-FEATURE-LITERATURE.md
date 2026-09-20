@@ -7103,3 +7103,33 @@ measures — including S. 4784 and S. 1071, both of which the old fixed-window s
 missed entirely. An incremental pass covered **3,163 of 3,163** in 13 pages. The old
 6-page configuration now reports `coverage: partial` with the cursor unmoved instead of
 a confident empty result.
+
+---
+
+## NAVSEA command intel, Navy spend grain, DBA lookup, matrix source coverage (2026-09-20)
+
+**What.** Commands are what users type. `get_agency_intel("Naval Sea Systems Command")`
+now resolves NAVSEA instead of returning `agency:null`. Navy contract dollars stay
+labeled as Department of the Navy parent-service spend — never as a NAVSEA total.
+Small-business percentages are three different metrics: set-aside codes, small-business
+recipients, and the SBA 23% goaling figure. Trade-name lookup (`Monarch Yachts`) finds
+the SAM DBA. A compliance matrix is complete only when named source specs that exist
+in the RFP are in the matrix — not when the row count looks non-zero.
+
+**Why.** Round 2 of the Monarch MCP log still had NAVSEA identity null and Monarch's
+DBA as `not_found`. The matrix "fix" of 25 rows had missed LOA, flight deck, SCIF,
+berthing, and magazine from Section 3.0. Navy $176.6B with toptier 097 was being
+read as DoD-wide spend, and 3.4% set-aside was being compared to the 23% statutory
+goal as if they shared a denominator.
+
+**SEO.** NAVSEA market intelligence / Navy small-business spend / SAM DBA search /
+compliance matrix completeness / SYSCOM vs military department spending.
+
+**Proof.** Directory grain tests: NAVSEA → PARENT_SERVICE / command spend
+NOT_ESTABLISHED; Navy → REQUESTED $ at the service. Measured FY2025 USASpending
+A/B/C/D: Navy subtier **$176.56B**, DoD toptier **$491.77B**, Navy small-business
+recipients **$22.13B (12.5%)**. DBA exact-stem unique-picks Monarch Marine Works
+among live Monarch* legal names. Matrix coverage test fails a 25-row extract that
+misses the five Section 3.0 specs. Original `lookup_federal_osbp("United States
+Coast Guard")` payload → Maria L. Kersey-Robinson, uscg-smallbusiness@uscg.mil,
+director_verified 2026-06 (issue-log #6).

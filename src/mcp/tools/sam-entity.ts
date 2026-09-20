@@ -66,8 +66,17 @@ function mergeEntities(groups: SAMEntity[][]): SAMEntity[] {
   for (const list of groups) {
     for (const e of list) {
       const uei = String(e.ueiSAM || '').trim().toUpperCase();
-      if (!uei || byUei.has(uei)) continue;
-      byUei.set(uei, e);
+      if (!uei) continue;
+      const prev = byUei.get(uei);
+      if (!prev) {
+        byUei.set(uei, e);
+        continue;
+      }
+      // Live legal-name hits often omit dbaName. Overlay it from a later DBA/local row
+      // so "Monarch Yachts" can unique-pick the same UEI.
+      if (!prev.dbaName && e.dbaName) {
+        byUei.set(uei, { ...prev, dbaName: e.dbaName });
+      }
     }
   }
   return [...byUei.values()];
@@ -80,10 +89,11 @@ function pickUniqueEntity(
   const classified = classifyNameHits(
     name,
     matches.map((m) => ({
-      name: m.legalBusinessName || m.dbaName || '',
+      name: m.legalBusinessName || '',
       uei: m.ueiSAM,
       total_obligated: 0,
       award_count: 0,
+      dba: m.dbaName,
     })),
     matches.length,
   );
@@ -170,24 +180,12 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     }
   }
 
-  // ── CHAIN-1 (2026-08-25): EMPTY SUCCESS IS NOT ABSENCE ──────────────────────────────────
-  // The fallback above only ran inside `catch`. But live SAM can return a perfectly
-  // successful 200 with ZERO results — nothing throws, so the mirror was never consulted
-  // and the tool reported `grounded=false, degraded=false`, which asserts "we checked and
-  // this company does not exist."
-  //
-  // MEASURED: lookup_sam_entity({name:'Fluidyne Corporation'}) returned exactly that while
-  // FLUIDYNE CORPORATION (RG3VUTDYFNF8, Active, NJ) sat in `sam_entities`, synced the SAME
-  // DAY, with 8 award rows behind it. By UEI the same company resolved fine — so the failure
-  // hit precisely the user who types a company NAME, which is how a human asks.
-  //
-  // THE INVARIANT (Eric): for identity resolution, a live EMPTY result must be reconciled
-  // against the local registry BEFORE Mindy may assert nonexistence. `grounded=false,
-  // degraded=false` must mean BOTH sources genuinely agreed there was no entity.
-  //
-  // DEFECT-7 hardened the THROW path. This closes the EMPTY-SUCCESS path — the same class
-  // (an evidence gap rendered as a world fact) reached by a different route.
-  if (!degraded && !entity && matches.length === 0 && mode !== 'empty') {
+  // ── CHAIN-1 (2026-08-25) + DBA uniqueness (2026-09-20) ────────────────────────────────
+  // Empty live success is not absence. Ambiguous live legal-name hits are also not
+  // absence of a DBA: "Monarch Yachts" can return several Monarch* legal names while
+  // the DBA sits on one local/live row. Reconcile the mirror whenever the lookup
+  // did not uniquely pick — never only when matches.length === 0.
+  if (!degraded && lookupStatus !== 'found' && !usedLocal && mode !== 'empty') {
     try {
       if (mode === 'uei') {
         const looked = await lookupLocalEntityByUEI(uei);
@@ -196,19 +194,26 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       } else {
         const looked = await lookupLocalEntitiesByName(name, limit);
         if (looked.status === 'found') {
-          matches = looked.hits.map((h) => h.entity);
+          const liveUeis = new Set(matches.map((m) => String(m.ueiSAM || '').toUpperCase()).filter(Boolean));
+          matches = mergeEntities([matches, looked.hits.map((h) => h.entity)]);
           const picked = pickUniqueEntity(name, matches);
           lookupStatus = picked.status;
           entity = picked.entity;
-          localAsOf = looked.hits[0]?.asOf ?? null;
-          usedLocal = true;
+          const pickedUei = String(entity?.ueiSAM || '').toUpperCase();
+          if (picked.status === 'found' && pickedUei && !liveUeis.has(pickedUei)) {
+            usedLocal = true;
+            localAsOf = looked.hits[0]?.asOf ?? null;
+          } else if (matches.length > 0 && liveUeis.size === 0) {
+            usedLocal = true;
+            localAsOf = looked.hits[0]?.asOf ?? null;
+          }
         } else if (looked.status === 'unavailable') {
           degraded = true;
           lookupStatus = 'lookup_failed';
         }
       }
       if (usedLocal) {
-        console.warn(`[mcp:lookup_sam_entity] live SAM returned EMPTY for ${mode}="${mode === 'uei' ? uei : name}" but the local registry has it — reconciled, not reported as absent.`);
+        console.warn(`[mcp:lookup_sam_entity] live SAM missed a unique pick for ${mode}="${mode === 'uei' ? uei : name}" — reconciled against the local registry, not reported as absent.`);
       }
     } catch (reconcileErr) {
       degraded = true;

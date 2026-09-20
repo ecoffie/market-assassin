@@ -55,4 +55,17 @@ describe('classifyNameHits', () => {
     const r = classifyNameHits('Tanaq Global Solutions LLC', [], 0);
     expect(r.status).toBe('none');
   });
+
+  it('one exact DBA stem among many legal names is that entity, not a guess', () => {
+    const rows: AwardNameCandidate[] = [
+      { name: 'MONARCH INC', uei: 'OTHER1', total_obligated: 9, award_count: 1 },
+      { name: 'MONARCH MARINE WORKS INC', uei: 'MMWUEI000001', total_obligated: 2, award_count: 4, dba: 'Monarch Yachts' },
+      { name: 'MONARCH CONSULTING LLC', uei: 'OTHER2', total_obligated: 1, award_count: 1 },
+    ];
+    const r = classifyNameHits('Monarch Yachts', rows, 3);
+    expect(r.status).toBe('unique');
+    if (r.status !== 'unique') return;
+    expect(r.uei).toBe('MMWUEI000001');
+    expect(r.match).toBe('exact_dba_stem');
+  });
 });
