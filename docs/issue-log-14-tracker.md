@@ -64,9 +64,23 @@ Reviewed before closeout work:
 |---|---|---|---|---|---|
 | 5 Navy FY2025 | `get_agency_spending_detail` `{ agency: "Navy", fiscal_year: 2025 }` | Navy ≠ DoD total; scope/percentage honesty; set-aside share ≠ SBA goaling | **PASS (agent)** — agency `Department of the Navy`; scope `REQUESTED`; total **~$176.6B**; toptier `097` = DoD parent code (not “all of DoD”); `small_business_share`/`set_aside_share` **3.4%**; `recipient_small_business_share` **12.5%**; grounded | `tasks/issue-log-14-navy-fy2025-agent-2026-09-20.json` | Round-PDF independence still unknown |
 | 12 required retrieval recheck | sol + UUID as above | **Successful** body retrieval (required for #12 audit closure) | **FAIL for closure** — `retrieval_success: false`; both inputs still empty; all-key **429 (quota)** with per-key disclosure. Disclosure PASS ≠ retrieval proof. | `tasks/issue-log-14-noticedesc-recheck-2026-09-20.json` | **#12 cannot close** until a non-empty description is retrieved |
-| 13 comparable-size representative | 17 req + ~15k draft (labeled, not original) | Exercise comparable draft size; keep original-unavailable label | **Labeled only** — draft **14,343** chars; grounded; score 24; no timeout under 45s budget. Input saved. Not the original payload. | `tasks/issue-log-14-referee-15k-input-2026-09-20.json` + `…-result-2026-09-20.json` | Original still missing |
+| 13 comparable-size representative | 17 req + ~15k draft (labeled, not original) | Exercise comparable draft size; keep original-unavailable label | **PASS (representative)** — checked_at **2026-09-20T19:42:36.160Z**; draft **14,343** chars; wall **8,009 ms**; grounded; score **24**; verdicts met 0 / partial 8 / missing 9 / unevaluated 0; timeout_trace timed_out=false (budget 45s, 2/2 batches). Input saved for future regressions. **Not** the original payload. | `tasks/issue-log-14-referee-15k-input-2026-09-20.json` + `…-result-2026-09-20.json` | Original exact-input: preserved **evidence limitation** (do not hold audit indefinitely) |
 
 **Code this wave:** noticedesc tracks per-key outcomes; discloses network/timeout (no invented HTTP status), empty HTTP 200, and mixed 401+429 (credentials vs quota). Mocked execution tests cover failover success, all-key failure, timeout, empty body. Merge with `origin/main` resolved (`sourced-pain-points` keeps dollar-omit **and** unsupported-budget-claim guards).
+
+## Release readiness vs audit gaps (do not collapse)
+
+Reviewed head for release approval: **`73089220`**. CI (2026-09-20): `verify` **success**; Vercel status **success**; `live-smoke` / `maps-account-prod` **skipped** (PR path). PR `mergeable: true`, `mergeable_state: clean`. Focused unit recheck on this head: noticedesc failover + dollar-omit — **18/18 pass**.
+
+| Bucket | Items | Blocks release? | Blocks audit closure? |
+|---|---|---|---|
+| **Release-ready code on this PR** | Dollar-omit (no restore); noticedesc failover + per-key disclosure; merge with main; #5/#7/#13 representative evidence | **No** — ready for Eric’s **separate** release approval | — |
+| **Post-release verification** | Public-domain LEGACY_MANUAL `$` suppression on getmindy.ai / mcp aliases | Does not block merge decision once approved; **must** run after release | Yes until verified on public domains |
+| **Open audit (track separately)** | **#12** successful same non-empty sourced description for sol + UUID | No (disclosure shipped; retrieval is upstream/audit) | **Yes** — disclosure alone does not close #12 |
+| **Preserved evidence limitation** | **#13** original 17-req / ~15k payload lost | No | Original-input verification remains unavailable; **representative PASS** is the regression baseline going forward — do not hold the audit indefinitely for the lost payload |
+| **Independent Round-PDF** | Recorded UTC + serving commit still unknown | No | Yes for “independently verified” labels |
+
+**No merge or deployment is authorized by this tracker update.** Release requires Eric’s explicit approval after final review of `73089220`.
 
 ## Per-issue evidence ledger
 
@@ -85,8 +99,8 @@ For each original issue: exact input · expected · observed · tested commit/en
 | 9 | `build_pursuit_dossier` | `N00024-26-R-2200` | Compact + `_meta.omitted` | Agent PASS | prod `5cc700d7` | recheck JSON | — |
 | 10 | `get_solicitation_incumbent` | `N00024-26-R-2200` | Lot deadline conflict; no grounded incumbent | Agent PASS | prod `5cc700d7` | recheck JSON | — |
 | 11 | `extract_statement_of_work` | `N00024-26-R-2200` | Disclose PIEE unread | Agent PASS (disclosure) | prod `5cc700d7` | recheck JSON | **Unsupported:** PIEE auto-extract |
-| 12 | `get_solicitation_documents` | sol `N00024-26-R-4160` + UUID `85a62e9a…` | Shared identity; **successful** shared body (closure requires success) | **Identity PASS**; **retrieval still FAIL** (all-key 429). Disclosure improved (per-key quota). `audit_closure_ready_for_12: false` | local wave3 | probe + `issue-log-14-noticedesc-recheck-2026-09-20.json` | **Required successful retrieval outstanding** — disclosure ≠ proof |
-| 13 | `referee_proposal_compliance` | Original 17 req / ~15k draft | Exact-input retest | **Original unavailable.** Short representative (1837) + **comparable-size** representative (14343 chars, input saved). Neither is the original. | local wave2+3 | short result + `referee-15k-input/result` | Missing original payload |
+| 12 | `get_solicitation_documents` | sol `N00024-26-R-4160` + UUID `85a62e9a…` | Shared identity; **same non-empty sourced description** (audit close requires success) | **Identity PASS**; **retrieval still open** (all-key 429). Disclosure PASS ≠ close. | local wave3 | probe + `issue-log-14-noticedesc-recheck-2026-09-20.json` | Keep open until both inputs return the same non-empty sourced body |
+| 13 | `referee_proposal_compliance` | Original 17 req / ~15k draft | Exact-input retest | **Original unavailable** (preserved limitation). **Representative PASS:** 14,343 chars · 8,009 ms · 2026-09-20T19:42:36Z · score 24 · no timeout. Use saved input for future regressions. | local wave2+3 | `referee-15k-input/result` | Do not hold audit for lost payload |
 | 14 | `lookup_sam_entity` | `"Monarch Yachts"` | Honest miss + reconcile | Agent PASS | prod `5cc700d7` | recheck JSON | Zero hits ≠ eternal nonregistration |
 
 ## Status by issue (summary)
@@ -104,8 +118,8 @@ For each original issue: exact input · expected · observed · tested commit/en
 | 9 | **fixed** | developer + agent | — |
 | 10 | **fixed** | developer + agent | — |
 | 11 | **fixed** (disclosure) | agent + **unsupported** PIEE extract | — |
-| 12 | **fixed** (identity + failover/disclosure); retrieval **not proven** | agent — **split**; `audit_closure_ready_for_12: false` | **Successful retrieval required** for closure |
-| 13 | **fixed** (prior engine); **original retest unavailable** | short + ~15k labeled representatives only | Not original |
+| 12 | **fixed** (identity + failover/disclosure); retrieval **open** | agent — split; disclosure ≠ close | Audit: wait for same non-empty sourced body on both inputs |
+| 13 | **fixed** (engine); original **unavailable** | **representative PASS** (14,343 / 8,009 ms); original limitation preserved | Future regressions use saved ~15k input |
 | 14 | **reconciled** | agent | — |
 
 ## Scorecard (do not misread)
@@ -116,31 +130,31 @@ For each original issue: exact input · expected · observed · tested commit/en
 | Round 2 | claims several; **missed SCIF** | **none proven here** (date/commit unknown) | #3, #6, #8–#13 + SCIF |
 | Round 3 | claims #4+#14 newly; “6 of 6 retestable” scorecard | **none proven here** without recorded UTC+SHA in-PDF | #3, #6, #8–#13; **no fresh SCIF** |
 
-**No 14/14 closure.** Agent waves closed many live inputs but outstanding blockers remain below.
+**Audit is not 14/14 closed** (#12 retrieval open; Round-PDF independence weak). **Release readiness of `73089220` is separate** — see table above; awaiting Eric approval. No merge/deploy from this note.
 
 ## Distinctions (not open product bugs)
 
 - **#8:** attribution honesty fixed; missing USASpending source columns = **upstream data gap**.
 - **#11:** PIEE disclosure fixed; automatic PIEE extraction = **unsupported capability**.
-- **#12:** identity passed; body retrieval **not proven** (all-key noticedesc 429). Honest limitation disclosure is verified and is **not** sufficient for #12 closure.
-- **#4 follow-up:** unsourced LEGACY_MANUAL `$` omitted; dollar-only claims emptied → **omitted** (never restored via `out \|\| text`). Sourced dollars unchanged.
+- **#12:** identity passed; retrieval **remains open for audit** until sol + UUID return the **same non-empty sourced description**. Disclosure alone does not close it.
+- **#4 follow-up:** unsourced LEGACY_MANUAL `$` omitted locally; **verify on public domains after approved release**.
 - **#14:** zero hits = unsupported prior claim / honest miss — not proof of nonregistration forever.
 - **#7:** historical Round patrol total ≠ current ~$903M measurement.
-- **#13:** representative regression ≠ original exact-input retest.
+- **#13:** original exact-input unavailable (preserved evidence limitation). Comparable-size representative **passed** (14,343 chars, 8,009 ms, 2026-09-20T19:42:36Z) — that is the regression baseline; do not hold the audit indefinitely for the lost payload.
 
-## Still open (audit not fully closed)
+## Still open — audit gaps (track separately from release)
 
-- **#12 retrieval success** — **required for closure**; still blocked by all-key noticedesc 429. Honest disclosure is verified; retrieval is **not**.
-- **#13** — original exact-input retest unavailable (comparable-size representative saved; not a substitute).
-- **#4 dollar omission on public aliases** — verify only after a separately approved release of this PR.
-- **Round-PDF independence** — needs recorded execution UTC + serving commit before “independently verified” labels harden.
+- **#12 retrieval** — open until both inputs return the same non-empty sourced description.
+- **#4 / dollar suppression** — public-domain check **after** approved release only.
+- **Round-PDF independence** — needs recorded execution UTC + serving commit for “independently verified” labels.
+- **#13 original payload** — preserved limitation only; representative regression is the forward path.
 
 ## Post-release checks (do not skip)
 
 1. **Public-domain suppression of unsourced priority dollars** — after separately approved release of PR #1577, call `get_agency_intel` for `"Naval Sea Systems Command"` on **production aliases** and assert LEGACY_MANUAL priority claims contain **no** `$` / `Allocated $…` while qualitative non-dollar priorities remain and SOURCE_FACT dollars (if any) stay.
 2. Re-measure serving commit on `getmindy.ai` / `mcp.getmindy.ai` before treating release as live.
-3. **#12 required:** when SAM noticedesc quota recovers (or a cached description exists), re-run sol + UUID for `N00024-26-R-4160` and confirm both return the **same non-empty** description before calling #12 closed.
+3. **#12 (audit, not release gate):** when SAM noticedesc quota recovers (or a cached description exists), re-run sol + UUID for `N00024-26-R-4160` and confirm both return the **same non-empty sourced** description before calling #12 closed.
 
 ## Not reopened
 
-Pricing, credits, backfills (`--go` writer, 3,729-family, 44,560 fleet), PAE, #1560, agency-identity architecture beyond NAVSEA grain already shipped. No new collectors. No customer messages. **Stop before merge or deployment** unless Eric separately approves.
+Pricing, credits, backfills (`--go` writer, 3,729-family, 44,560 fleet), PAE, #1560, agency-identity architecture beyond NAVSEA grain already shipped. No new collectors. No customer messages. **No merge or deployment authorized** until Eric explicitly approves release of `73089220`.
