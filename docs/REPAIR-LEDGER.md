@@ -942,3 +942,50 @@ NASA read-path test stayed green.
 **Provenance.** opp-intel previously DROPPED the `painPointCitations` the shared reader handed it
 — which is why 516 of 549 contaminated blobs carried no label. It now carries them through, and
 omits them rather than inventing one when none is supplied.
+
+### Phase-12 production closeout — 2026-09-20
+
+**Serving build pinned, not inferred.** Production was still serving `5cc700d7` (the
+pre-merge commit) for three minutes AFTER the GitHub merge. Proven by the
+`maps-account-build` stamp on the live `/opportunity-map` bundle, which flipped to
+`8f37c5bb…` at **19:34:37Z**. A merge is not a deploy.
+
+**Regenerated contamination before the final pass: 0.** No `precompute-opp-intel` run
+occurred between the data repair (~19:20Z) and the deploy (19:34Z) — the 19:00Z run
+predated it — so the old bundle never got a chance to re-stamp. The repair re-ran
+clean (0 rows, 0 blobs), proving idempotency.
+
+**One real scheduled run held through.** The 20:00Z `precompute-opp-intel` fired
+against the NEW bundle and re-stamped **34 opportunities**:
+
+| | |
+|---|---|
+| recurrence of the claim | **0** |
+| either legacy vintage | **0** |
+| any per-agency figure ≥ $5,000B | **0** |
+| blobs carrying `citations` | **34 / 34** |
+
+⚠️ `precompute-opp-intel` records `status='dispatched'`, `http_status=NULL` and never
+resolves — the same unresolved-outcome pattern flagged for `institute-legislation-sync`.
+Its job row cannot prove success, so the run was proven by its EFFECT
+(`intel_computed_at` advancing), never by the job row. Left as backlog, not fixed here.
+
+**Provenance now survives, and only where earned.** A newly stamped DoD blob carries a
+`SOURCE_FACT` citation — `GAO-26-107781`, `gao.gov/products/gao-26-107781`, published
+2026-09-03, with its `institute_source_id` — beside a `LEGACY_MANUAL` priority that
+keeps its honest inline label and received **no invented citation**.
+
+**NASA, the fixture.** Its public page no longer renders the "FY26 funding priorities"
+section AT ALL — that agency's only priority was the fabrication, so the correct
+outcome is no section rather than a substitute number. `Total obligated` appears 0 times.
+
+**A verification that was vacuously passing.** The first harness checked the runtime
+static-corpus read path via `/api/pain-points`, which returns **401** — so "no claim in
+the response" was true only because the response was an auth error. Replaced with
+`/api/agency-sources` (unauthenticated, HTTP 200), which reads the same corpus and
+returns clean output while still carrying legitimate priorities ($1.5B SDA Tranche 2,
+$900M GPS III). A check that cannot fail is not a check.
+
+**Final state:** 6/6 surfaces clean · 111/111 `contract_pattern` rows retained with
+`source_url` · 3 GAO titles containing "Congressional" preserved · 53,809 opportunities
+still carrying legitimate priorities. No broad string deletion.
