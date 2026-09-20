@@ -30,7 +30,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
-  discoverBills,
   collectBillDocuments,
   resolveLegislationAgency,
   congressApiKey,
@@ -40,6 +39,14 @@ import {
   LEGISLATIVE_SOURCE_TYPES,
   type BillRef,
 } from '@/lib/institute/legislation';
+import {
+  discoverSince,
+  knownMeasures,
+  mergeMeasures,
+  decodeDiscoveryCursor,
+  encodeDiscoveryCursor,
+  watermarkFor,
+} from '@/lib/institute/legislation-discovery';
 import { ingestInstituteDocument } from '@/lib/institute/sources';
 import { deriveFromInstituteSource } from '@/lib/strategic-intel/derive';
 import {
@@ -121,8 +128,36 @@ export async function GET(request: NextRequest) {
   const db = sb();
   const names = Object.keys(CODES as Record<string, unknown>);
 
-  // ── 1. DISCOVERY (dynamic — no hardcoded bill number) ────────────────────
-  const discovery = await discoverBills({ pattern: NDAA_TITLE_PATTERN, congress, maxPages });
+  // ── 1. DISCOVERY + TRACKING (two jobs, deliberately separate) ───────────
+  //
+  // ⚠️ Discovery finds NEW measures over a bounded, watermarked window whose
+  // completeness is MEASURED against the API's own total. Tracking re-polls measures
+  // already in the corpus BY IDENTITY, so a known bill stays tracked forever even
+  // after thousands of unrelated bills push it out of any recent-update window.
+  // Production defect 2026-09-20: S.4784 sat at feed position 2948 and silently
+  // vanished from a 1500-row scan that still claimed pollOk/complete.
+  const srcRowEarly = await db
+    .from('data_sources')
+    // unranged-ok: single row by the unique key.
+    .select('notes')
+    .eq('key', SOURCE_KEY)
+    .maybeSingle();
+
+  const cursor = decodeDiscoveryCursor((srcRowEarly.data?.notes as string) ?? null);
+  // A cursor from another Congress is NOT a watermark for this one -> full pass.
+  const since = watermarkFor(cursor, congress);
+
+  const discovery = await discoverSince({
+    congress,
+    since,
+    pattern: NDAA_TITLE_PATTERN,
+    maxPages,
+    budgetMs: Math.min(120_000, budgetMs),
+  });
+
+  // Known measures are polled regardless of discovery's outcome — a discovery
+  // failure must never stop us tracking what we already hold.
+  const known = await knownMeasures(db, congress);
 
   if (!discovery.pollOk) {
     return NextResponse.json(
@@ -131,33 +166,48 @@ export async function GET(request: NextRequest) {
         pollOk: false,
         status: 'ingest_broken',
         discoveryState: 'source_unavailable',
+        coverage: discovery.coverage,
         reason: 'source_fetch_failed',
         error: discovery.error,
         congress,
-        billsScanned: discovery.billsSeen,
+        billsScanned: discovery.scanned,
         documentsSeen: null,
         evidenceInserted: 0,
         sourceWatermark: null, // explicitly NOT advanced
+        watermarkAdvanced: false,
         note: 'Congress API fetch failed. This is NOT "0 new legislation" and NOT upstream_quiet.',
       },
       { status: 502 },
     );
   }
 
-  // The API answered and the measure does not exist yet. A REAL observation.
-  if (discovery.matched.length === 0) {
+  const measures = mergeMeasures(discovery.matched, known.measures);
+
+  // Nothing discovered AND nothing already known.
+  if (measures.length === 0) {
+    const completelyScanned = discovery.coverage === 'complete';
     return NextResponse.json({
       success: true,
       pollOk: true,
-      status: 'no_new_evidence',
-      discoveryState: 'not_yet_introduced',
+      // ⚠️ Only a COMPLETE scan may claim the measure does not exist. A ceiling
+      // makes this coverage_incomplete — never a confident "not yet introduced".
+      status: completelyScanned ? 'no_new_evidence' : 'coverage_incomplete',
+      discoveryState: completelyScanned ? 'not_yet_introduced' : 'unknown_incomplete_scan',
+      coverage: discovery.coverage,
+      partial: !completelyScanned,
       congress,
-      billsScanned: discovery.billsSeen,
+      billsScanned: discovery.scanned,
+      reportedTotal: discovery.reportedTotal,
+      windowFrom: discovery.windowFrom,
       matchedBills: 0,
+      knownMeasures: known.measures.length,
       documentsSeen: 0,
       evidenceInserted: 0,
       sourceWatermark: null,
-      note: 'Congress answered; no measure matching the watched subject exists yet in this Congress. This is distinct from a source failure.',
+      watermarkAdvanced: false,
+      note: completelyScanned
+        ? 'Congress answered and the interval was COMPLETELY scanned; no matching measure exists. Distinct from a source failure.'
+        : 'Scan hit a ceiling before covering the interval. Absence is NOT established — this is not "no legislation".',
     });
   }
 
@@ -180,7 +230,7 @@ export async function GET(request: NextRequest) {
   let collectFailures = 0;
   let partial = false;
 
-  for (const ref of discovery.matched) {
+  for (const ref of measures) {
     if (Date.now() - started > budgetMs) {
       partial = true;
       break;
@@ -234,9 +284,16 @@ export async function GET(request: NextRequest) {
       mode,
       pollOk: true,
       discoveryState,
+      coverage: discovery.coverage,
+      partial: partial || discovery.coverage !== 'complete',
       congress,
-      billsScanned: discovery.billsSeen,
+      billsScanned: discovery.scanned,
+      reportedTotal: discovery.reportedTotal,
+      windowFrom: discovery.windowFrom,
       matchedBills: discovery.matched.length,
+      knownMeasures: known.measures.length,
+      measuresTracked: measures.length,
+      knownReadError: known.error ?? null,
       families,
       documentsSeen: allDocs.length,
       documents: allDocs.map(({ doc }) => ({
@@ -250,7 +307,6 @@ export async function GET(request: NextRequest) {
       })),
       sourceWatermark,
       collectFailures,
-      partial,
       note: 'preview — nothing written',
     });
   }
@@ -300,12 +356,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ── 5. CLOCKS — each advances ONLY on its own real event ────────────────
-  const { data: srcRow } = await db
-    .from('data_sources')
-    // unranged-ok: single row by the unique key.
-    .select('notes')
-    .eq('key', SOURCE_KEY)
-    .maybeSingle();
+  const srcRow = srcRowEarly.data ? { notes: srcRowEarly.data.notes } : null;
 
   // ⚠️ BOTH of these MUST be scoped to the LEGISLATIVE corpus.
   //
@@ -351,9 +402,27 @@ export async function GET(request: NextRequest) {
   };
   const lastInstituteIngest = (newestIngest?.discovered_at as string) ?? null;
 
-  const stampable = !partial && failed === 0 && blocked === 0 && collectFailures === 0 && clocksReadable;
+  const stampable = !partial && failed === 0 && blocked === 0 && collectFailures === 0 && clocksReadable
+    && !known.error;
+
+  // ⚠️ THE WATERMARK ADVANCES ONLY ON PROVEN COVERAGE. A partial scan leaves the
+  // cursor where it was, so the next run re-covers the same interval instead of
+  // skipping an unscanned gap. This is the difference between "we checked" and "we
+  // believe we checked".
+  const watermarkAdvanced = stampable
+    && discovery.coverage === 'complete'
+    && Boolean(discovery.nextWatermark);
+
   if (stampable) {
-    const notes = encodeLegislationClocks((srcRow?.notes as string) ?? null, clocks);
+    let notes = encodeLegislationClocks((srcRow?.notes as string) ?? null, clocks);
+    if (watermarkAdvanced && discovery.nextWatermark) {
+      notes = encodeDiscoveryCursor(notes, {
+        lastCompleteDiscoveryAt: discovery.nextWatermark,
+        congress,
+        reportedTotal: discovery.reportedTotal,
+        scanned: discovery.scanned,
+      });
+    }
     await db.from('data_sources').update({ last_built: pollAt.slice(0, 10), notes }).eq('key', SOURCE_KEY);
   }
 
@@ -373,10 +442,16 @@ export async function GET(request: NextRequest) {
     pollOk: true,
     status,
     discoveryState,
+    coverage: discovery.coverage,
     partial,
     congress,
-    billsScanned: discovery.billsSeen,
+    billsScanned: discovery.scanned,
+    reportedTotal: discovery.reportedTotal,
+    windowFrom: discovery.windowFrom,
     matchedBills: discovery.matched.length,
+    knownMeasures: known.measures.length,
+    measuresTracked: measures.length,
+    watermarkAdvanced,
     families,
     documentsSeen: allDocs.length,
     evidenceInserted,
