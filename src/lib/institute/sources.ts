@@ -55,6 +55,8 @@ export interface IngestResult {
   documentNumber: string;
   instituteSourceId: string | null;
   inserted: boolean;                 // false = already in the corpus (idempotent)
+  /** true only on the repair path: an existing row's attribution was refreshed. */
+  updated?: boolean;
   resolution: AgencyResolution;
   error?: string;
 }
@@ -135,13 +137,54 @@ export function auditDocumentAgency(doc: InstituteDocument, canonicalNames: stri
  *
  * The record is kept REGARDLESS of whether any intelligence is later derived from it.
  */
+/**
+ * Options for collectors whose agency identity is established BEFORE ingestion.
+ *
+ * ⚠️ WHY THIS EXISTS (production defect, Gate 3, 2026-09-20). The legislative route
+ * resolved each NDAA document to Department of Defense correctly
+ * (`resolveLegislationAgency`, method `exact_name`), then threw that result away and
+ * passed only a NAME LIST here — so this function re-resolved from the title with the
+ * GAO matcher. An NDAA title reads "National Defense Authorization Act" and never
+ * contains the literal string "Department of Defense", so 28 of 29 rows persisted
+ * with `canonical_agency = null`.
+ *
+ * The fix is to CARRY the grounded resolution through, not to loosen matching:
+ * `agencyResolution` is used VERBATIM when supplied, and the title matcher is not
+ * consulted at all. Nothing is guessed, nothing is hardcoded, and a collector that
+ * supplies no resolution keeps the previous behaviour exactly (GAO is untouched).
+ */
+export interface IngestOptions {
+  /**
+   * A resolution the CALLER already established from authoritative structure
+   * (e.g. a bill's own subject), not from fuzzy title text. Used as-is.
+   * An unresolved resolution stays unresolved — this never upgrades a null.
+   */
+  agencyResolution?: AgencyResolution;
+  /**
+   * Re-apply provenance + attribution to a row that already exists, keyed on the
+   * SAME (source_type, document_number). Never changes identity, never inserts a
+   * second row. Off by default so existing callers keep insert-or-noop semantics.
+   */
+  updateExisting?: boolean;
+}
+
 export async function ingestInstituteDocument(
   db: SupabaseClient,
   doc: InstituteDocument,
   canonicalNames: string[],
+  options: IngestOptions = {},
 ): Promise<IngestResult> {
   const audit = auditDocumentAgency(doc, canonicalNames);
-  const resolution = audit.resolution;
+  // A caller-supplied resolution WINS. It was derived from the document's own
+  // structure; re-deriving it from the title here is what lost it.
+  const resolution = options.agencyResolution ?? audit.resolution;
+
+  const rawPayload = {
+    ...(doc.raw ?? { title: doc.title, url: doc.url, publicationDate: doc.publicationDate }),
+    agencyClassification: audit.classification,
+    agencyCandidates: audit.candidates,
+    agencyNote: audit.note,
+  };
 
   const { data: existing } = await db
     .from('institute_sources')
@@ -150,7 +193,27 @@ export async function ingestInstituteDocument(
     .eq('source_type', doc.sourceType).eq('document_number', doc.documentNumber).maybeSingle();
 
   if (existing?.id) {
-    return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, resolution };
+    if (!options.updateExisting) {
+      return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, resolution };
+    }
+    // Repair path: same identity, refreshed attribution/provenance. No new row.
+    const { error: updErr } = await db.from('institute_sources').update({
+      canonical_agency: resolution.canonicalAgency,
+      toptier_code: resolution.toptierCode,
+      resolution_method: resolution.method,
+      resolution_confidence: resolution.confidence,
+      raw: rawPayload,
+      updated_at: new Date().toISOString(),
+    }).eq('id', existing.id);
+
+    return {
+      documentNumber: doc.documentNumber,
+      instituteSourceId: existing.id as string,
+      inserted: false,
+      updated: !updErr,
+      resolution,
+      ...(updErr ? { error: updErr.message } : {}),
+    };
   }
 
   const { data, error } = await db.from('institute_sources').insert({
@@ -166,16 +229,9 @@ export async function ingestInstituteDocument(
     resolution_confidence: resolution.confidence,
     source_watermark: doc.sourceWatermark ?? doc.publicationDate,
     abstract: doc.abstract,
-    // The agency-classification audit ALWAYS travels with the row (from main).
-    // A collector-supplied provenance payload is merged on top of the default
-    // descriptors — dropping it would silently discard every legislative fact
-    // (congress, chamber, version, action dates, retrievedAt).
-    raw: {
-      ...(doc.raw ?? { title: doc.title, url: doc.url, publicationDate: doc.publicationDate }),
-      agencyClassification: audit.classification,
-      agencyCandidates: audit.candidates,
-      agencyNote: audit.note,
-    },
+    // The agency-classification audit ALWAYS travels with the row, merged over any
+    // collector-supplied provenance payload (congress, chamber, version, dates).
+    raw: rawPayload,
   }).select('id').maybeSingle();
 
   if (error) {
