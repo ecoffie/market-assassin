@@ -23,8 +23,11 @@ vi.mock('@/lib/bigquery/recipients', () => ({
     return { rollup_uei: 'UEI1', rollup_name: 'Leidos', child_ueis: ['UEI1'], city: 'Reston', state: 'VA', total_obligated: 5e9, award_count: 1200, distinct_agency_count: 40, first_action_date: '2008-01-01', last_action_date: '2026-06-01' };
   }),
   getRecipientByUei: vi.fn(async () => null),
-  getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ piid: 'X', obligated: 1000 }]),
-  getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ agency: 'DoD', total: 4e9 }]),
+  getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ award_id: 'A1', piid: 'X', mod_number: '0', obligation_amount: 1000, action_date: '2025-01-01' }]),
+  getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ awarding_agency: 'DoD', total_amount: 4e9, pct_of_total: 1 }]),
+  getYearlyTotalsForRecipient: vi.fn(async () => ([
+    { fiscal_year: 2025, total_obligated: 1e6, positive_obligations: 1e6, deobligations: 0, award_count: 10 },
+  ])),
   findCapableSmallBusinesses: vi.fn(async ({ liveBq = false, limit }: { liveBq?: boolean; limit?: number }) => {
     bqCalls.push({ fn: 'findCapableSmallBusinesses', liveBq, limit });
     if (!liveBq && !capableWarm) return { rows: [], total: 0 };
