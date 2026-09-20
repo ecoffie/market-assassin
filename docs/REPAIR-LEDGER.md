@@ -876,3 +876,69 @@ is documented as dead.
 overlap **0**. `updated_at` newest stayed at the 16:00 scheduled run — the backfill bumped no
 writer clock, so the drain's change semantics are intact. Both control-plane instances derive
 `held_population` from `contact_kind`: active 205,517, frozen vendor 82,017.
+
+---
+
+## 2026-09-20 — Strategic Intelligence: a government-wide constant served as 111 agencies' own budget evidence
+
+**Proof anchor:** `src/lib/strategic-intel/unsupported-budget-claim.ts` ·
+`describeAgencySpending` in `src/lib/agency-intelligence/fetchers/usaspending.ts`
+
+**The defect.** `fetchAgencySpendingPatterns` read USASpending
+`/api/v2/references/toptier_agencies/` and emitted, per agency:
+
+```
+Total obligated: $<budget_authority_amount>B. Congressional justification outlay: $<current_total_budget_authority_amount>B
+```
+
+`current_total_budget_authority_amount` is a **GOVERNMENT-WIDE CONSTANT** — the denominator
+behind `percentage_of_total_budget_authority`. Measured live 2026-09-20 against the API:
+**exactly ONE distinct value across all 111 agencies** ($15,495,311,418,794.12). It is not
+agency-specific and it is not an outlay. `budget_authority_amount` is not obligations either —
+the real `obligated_amount` sat unused in the same payload.
+
+So NASA was shown *"Total obligated: $43.3B. Congressional justification outlay: $13541.1B"*
+against a real obligated figure of **$20.6B**. A $13.5-trillion "outlay" attributed to a ~$25B
+agency, on a live biddable opportunity.
+
+**Why two vintages.** The constant drifts each fiscal quarter, so ingests at different times
+captured different values: $13,541.1B and $16,047.1B were both in production, and **521
+opportunities carried BOTH at once** — one drawer asserting two contradictory trillion-dollar
+figures for the same agency.
+
+**Six surfaces, not one.** The audit found two; the repair found six:
+
+| Surface | Contamination |
+|---|---|
+| `src/lib/.../usaspending.ts` | the producer |
+| `agency_intelligence.description` | 111 rows |
+| `sam_opportunities.intel_agency` | 549 opportunities (174 active), 33 labeled |
+| `src/data/agency-pain-points.json` | **158 claims across 111 agencies** — the corpus 23 modules import directly |
+| `src/data/agencies-seo.ts` | 4 agencies on **public, sitemap-indexed** `/agencies/*` pages |
+| proposal drafting (`lib/proposal/agency-context.ts`) | consumed the corpus as *"Stated strategic priorities"* |
+
+**The category error that carried it.** `getUnifiedAgencyIntelligence` promoted a
+`contract_pattern` **spending observation** into `priorities` — a *stated agency priority*.
+That promotion is what put a spending number into the opportunity drawer as strategy. Spending
+now stays in `spendingPatterns` and never becomes a priority claim.
+
+**The guard is structural, not a blocklist.** Blocking the two known numbers would let the next
+vintage through. `isUnsupportedBudgetClaim` rejects the derivation at any magnitude AND any
+per-agency figure ≥ `PLAUSIBLE_AGENCY_CEILING_B` ($5,000B) — comfortably above the largest real
+entry (DoD ≈ $2,575B), far below the government-wide total. Proven: it rejects $15,495.3B, a
+value it had never seen.
+
+**No claim, not a better number.** There is no agency-specific source for the figure, so the
+repair DELETES it everywhere rather than recomputing one. 51 agencies now have an empty
+priorities list — the correct outcome. `stripUnsupportedBudgetClaims` removed 158 of 2,658
+priorities and **0 of 3,043 pain points**; the `agency-pain-points.json` diff was proven to be a
+pure deletion (60 comma reflows + 51 `"priorities": []` collapses, zero new content).
+
+**Defense in depth.** `lib/utils/pain-points.ts` sanitizes the corpus **once at module load**, so
+every raw-JSON consumer — proposal drafting included — inherits the guard even if a stale corpus
+ships. Demonstrated: with the corpus deliberately re-poisoned, the corpus test went red while the
+NASA read-path test stayed green.
+
+**Provenance.** opp-intel previously DROPPED the `painPointCitations` the shared reader handed it
+— which is why 516 of 549 contaminated blobs carried no label. It now carries them through, and
+omits them rather than inventing one when none is supplied.

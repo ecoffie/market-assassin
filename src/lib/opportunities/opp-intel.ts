@@ -17,7 +17,25 @@ import { getComparableAwardRange } from '@/lib/opportunities/value-range';
 
 export type OppIntel = {
   predecessor: { incumbent: string | null; incumbentState: string | null; value: string | null; expires: string | null; vehicle: string | null; confidence: string | null } | null;
-  agency: { painPoints: string[]; priorities: string[] } | null;
+  /**
+   * Agency strategic context. `citations` carries the provenance the shared reader
+   * already supplies and this blob previously DISCARDED — so a claim shown in the
+   * drawer can be traced to its source document, URL and date instead of standing
+   * as an unattributed sentence. Absent citations mean LEGACY_MANUAL (the claim
+   * string carries its own inline label); they are never invented.
+   */
+  agency: {
+    painPoints: string[];
+    priorities: string[];
+    citations?: Array<{
+      claim: string;
+      provenance: string;
+      source_type?: string | null;
+      document_number?: string | null;
+      source_url?: string | null;
+      published_at?: string | null;
+    }>;
+  } | null;
   pricing: { rates: Array<{ labor_category: string; hourly_rate: number | null; size: string | null }>; summary: string | null } | null;
   // Grounded $ value range — the card "price" hook, branded M-Estimate(TM). Predecessor value
   // preferred; else comparable awards (median + 25th–75th pct from USASpending). null when neither
@@ -79,6 +97,11 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
     agency: ai ? {
       painPoints: (ai.painPoints || []).slice(0, 4).map(asText).filter(Boolean) as string[],
       priorities: (ai.priorities || []).slice(0, 3).map(asText).filter(Boolean) as string[],
+      // Carry provenance through instead of dropping it (Phase 8). Only what the
+      // reader actually supplied — never a manufactured citation.
+      ...(Array.isArray(ai.painPointCitations) && ai.painPointCitations.length > 0
+        ? { citations: ai.painPointCitations.slice(0, 4) }
+        : {}),
     } : null,
     pricing: topVendors.length ? {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
