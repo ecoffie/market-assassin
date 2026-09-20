@@ -13,6 +13,7 @@
 import { getEntityByUEI, searchEntities, type SAMEntity } from '@/lib/sam/entity-api';
 import { lookupLocalEntitiesByName, lookupLocalEntityByUEI } from '@/lib/sam/entity-local-fallback';
 import { classifyNameHits } from '@/lib/contractor/name-resolution';
+import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SamEntityInput {
@@ -317,16 +318,12 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       ? {
           ...entity,
           // Defense in depth — blank PSC rows must never reach clients.
-          pscList: (entity.pscList || []).filter(
-            (p) => String(p.pscCode || '').trim() || String(p.pscDescription || '').trim(),
-          ),
+          pscList: filterBlankPscList(entity.pscList),
         }
       : null,
     matches: matches.map((m) => ({
       ...m,
-      pscList: (m.pscList || []).filter(
-        (p) => String(p.pscCode || '').trim() || String(p.pscDescription || '').trim(),
-      ),
+      pscList: filterBlankPscList(m.pscList),
     })),
     ...(certProvenance.length ? { cert_provenance: certProvenance } : {}),
     _meta: {

@@ -1,38 +1,58 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assessDateRange,
   buildCountingBases,
-  dateRangeIssue,
+  classifyModNumber,
+  currentFederalFiscalYear,
+  dateRangeValidFlag,
   deriveActivityFromSeries,
   describeCoverageTimestamp,
   filterBlankPscList,
-  isBaseModNumber,
   isModificationAction,
   summarizeHistoricalSetAsides,
   SHORT_TOTALS_NOTE,
 } from './award-history-shape';
 
-describe('isModificationAction / isBaseModNumber', () => {
-  it('treats empty/0 as base and P00015/17 as modifications', () => {
-    expect(isBaseModNumber(null)).toBe(true);
-    expect(isBaseModNumber('')).toBe(true);
-    expect(isBaseModNumber('0')).toBe(true);
+describe('classifyModNumber / isModificationAction', () => {
+  it('treats only explicit 0 as base; null/blank stay unknown', () => {
+    expect(classifyModNumber(null)).toBe('unknown');
+    expect(classifyModNumber('')).toBe('unknown');
+    expect(classifyModNumber('   ')).toBe('unknown');
+    expect(classifyModNumber('0')).toBe('base');
+    expect(classifyModNumber('P00015')).toBe('modification');
+    expect(classifyModNumber('17')).toBe('modification');
+    expect(isModificationAction(null)).toBeNull();
+    expect(isModificationAction('')).toBeNull();
     expect(isModificationAction('0')).toBe(false);
     expect(isModificationAction('P00015')).toBe(true);
-    expect(isModificationAction('17')).toBe(true);
   });
 
   it('does not infer modification from repeated PIID alone', () => {
-    // Same PIID can be base or mod — only mod_number decides.
     expect(isModificationAction('0')).toBe(false);
     expect(isModificationAction('1')).toBe(true);
   });
 });
 
-describe('dateRangeIssue', () => {
-  it('flags end before start while preserving comparison on ISO dates', () => {
-    expect(dateRangeIssue('2018-07-20', '2018-06-19')).toBe('end_before_start');
-    expect(dateRangeIssue('2018-07-20', '2018-08-19')).toBe(null);
-    expect(dateRangeIssue(null, '2018-06-19')).toBe(null);
+describe('assessDateRange / dateRangeValidFlag', () => {
+  it('flags end before start as invalid', () => {
+    expect(assessDateRange('2018-07-20', '2018-06-19')).toEqual({
+      assessment: 'invalid',
+      issue: 'end_before_start',
+    });
+    expect(dateRangeValidFlag('2018-07-20', '2018-06-19')).toBe(false);
+  });
+
+  it('marks complete ISO ranges valid', () => {
+    expect(assessDateRange('2018-07-20', '2018-08-19').assessment).toBe('valid');
+    expect(dateRangeValidFlag('2018-07-20', '2018-08-19')).toBe(true);
+  });
+
+  it('treats missing or malformed dates as unassessable, not valid', () => {
+    expect(assessDateRange(null, '2018-06-19').assessment).toBe('unassessable');
+    expect(assessDateRange('2018-07-20', null).assessment).toBe('unassessable');
+    expect(assessDateRange('not-a-date', '2018-06-19').assessment).toBe('unassessable');
+    expect(dateRangeValidFlag(null, '2018-06-19')).toBeNull();
+    expect(dateRangeValidFlag('2018-07-20', null)).toBeNull();
   });
 });
 
@@ -49,39 +69,85 @@ describe('filterBlankPscList', () => {
 });
 
 describe('deriveActivityFromSeries', () => {
-  it('finds last positive FY and marks dormant when later nets are non-positive', () => {
-    const r = deriveActivityFromSeries([
-      { fiscalYear: 2019, totalObligations: 800_000, positiveObligations: 800_000, deobligations: 0, awardCount: 3 },
-      { fiscalYear: 2020, totalObligations: -727_600, positiveObligations: 50_000, deobligations: -777_600, awardCount: 7 },
-      { fiscalYear: 2022, totalObligations: -310_540, positiveObligations: 0, deobligations: -310_540, awardCount: 3 },
-      { fiscalYear: 2026, totalObligations: 0, positiveObligations: 0, deobligations: 0, awardCount: 1 },
-    ]);
+  it('marks dormant only when the reference window has adequate coverage', () => {
+    const r = deriveActivityFromSeries(
+      [
+        { fiscalYear: 2019, totalObligations: 800_000, positiveObligations: 800_000, deobligations: 0, awardCount: 3 },
+        { fiscalYear: 2020, totalObligations: -727_600, positiveObligations: 50_000, deobligations: -777_600, awardCount: 7 },
+        { fiscalYear: 2022, totalObligations: -310_540, positiveObligations: 0, deobligations: -310_540, awardCount: 3 },
+        { fiscalYear: 2025, totalObligations: 0, positiveObligations: 0, deobligations: 0, awardCount: 2 },
+        { fiscalYear: 2026, totalObligations: 0, positiveObligations: 0, deobligations: 0, awardCount: 1 },
+      ],
+      { referenceFiscalYear: 2026, lookbackYears: 2 },
+    );
     expect(r.last_positive_obligation_fy).toBe(2020);
     expect(r.activity_status).toBe('dormant');
+    expect(r.observation_period.series_coverage).toBe('adequate');
+    expect(r.observation_period.window_start_fy).toBe(2025);
+    expect(r.activity_note).toMatch(/Period-scoped observation/i);
     expect(r.activity_note).toMatch(/not company revenue/i);
   });
 
-  it('does not treat a negative net year as proof of zero positive obligations', () => {
-    const r = deriveActivityFromSeries([
-      {
-        fiscalYear: 2020,
-        totalObligations: -100,
-        positiveObligations: 500,
-        deobligations: -600,
-        awardCount: 2,
-      },
-    ]);
+  it('does not claim active from an old sole positive FY outside the window', () => {
+    const r = deriveActivityFromSeries(
+      [
+        {
+          fiscalYear: 2020,
+          totalObligations: -100,
+          positiveObligations: 500,
+          deobligations: -600,
+          awardCount: 2,
+        },
+      ],
+      { referenceFiscalYear: 2026, lookbackYears: 2 },
+    );
     expect(r.last_positive_obligation_fy).toBe(2020);
-    expect(r.activity_status).toBe('active');
+    expect(r.activity_status).toBe('unknown');
+    expect(r.observation_period.series_coverage).toBe('missing');
+    expect(r.activity_note).toMatch(/not established/i);
   });
 
-  it('labels deobligating when latest FY has only negative dollars', () => {
-    const r = deriveActivityFromSeries([
-      { fiscalYear: 2019, totalObligations: 100, positiveObligations: 100, deobligations: 0, awardCount: 1 },
-      { fiscalYear: 2022, totalObligations: -50, positiveObligations: 0, deobligations: -50, awardCount: 1 },
-    ]);
+  it('never infers positive/deobligation components from net totals', () => {
+    const r = deriveActivityFromSeries(
+      [
+        { fiscalYear: 2025, totalObligations: 1_000_000, awardCount: 1 },
+        { fiscalYear: 2026, totalObligations: 500_000, awardCount: 1 },
+      ],
+      { referenceFiscalYear: 2026, lookbackYears: 2 },
+    );
+    expect(r.last_positive_obligation_fy).toBeNull();
+    expect(r.activity_status).toBe('unknown');
+    expect(r.activity_note).toMatch(/not used|not fully established|Components are never inferred/i);
+  });
+
+  it('labels deobligating only inside an adequately covered window', () => {
+    const r = deriveActivityFromSeries(
+      [
+        { fiscalYear: 2019, totalObligations: 100, positiveObligations: 100, deobligations: 0, awardCount: 1 },
+        { fiscalYear: 2025, totalObligations: 0, positiveObligations: 0, deobligations: 0, awardCount: 1 },
+        { fiscalYear: 2026, totalObligations: -50, positiveObligations: 0, deobligations: -50, awardCount: 1 },
+      ],
+      { referenceFiscalYear: 2026, lookbackYears: 2 },
+    );
     expect(r.activity_status).toBe('deobligating');
     expect(r.last_positive_obligation_fy).toBe(2019);
+  });
+
+  it('refuses current inactivity claims when recent years are missing from the series', () => {
+    const r = deriveActivityFromSeries(
+      [
+        { fiscalYear: 2019, totalObligations: 100, positiveObligations: 100, deobligations: 0, awardCount: 1 },
+        { fiscalYear: 2022, totalObligations: -50, positiveObligations: 0, deobligations: -50, awardCount: 1 },
+      ],
+      { referenceFiscalYear: 2026, lookbackYears: 2 },
+    );
+    expect(r.activity_status).toBe('unknown');
+    expect(r.observation_period.years_missing).toEqual([2025, 2026]);
+  });
+
+  it('defaults reference FY to the current federal fiscal year', () => {
+    expect(currentFederalFiscalYear(new Date('2026-09-20T12:00:00Z'))).toBe(2026);
+    expect(currentFederalFiscalYear(new Date('2026-10-02T12:00:00Z'))).toBe(2027);
   });
 });
 
@@ -120,6 +186,19 @@ describe('summarizeHistoricalSetAsides', () => {
     expect(s.labels).toContain('8(A) SOLE SOURCE');
     expect(s.last_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
     expect(s.note).toMatch(/does not establish graduation/i);
+  });
+
+  it('uses null — not fiscal year 0 — when the year is unknown', () => {
+    const s = summarizeHistoricalSetAsides([{ setAside: '8(A) SOLE SOURCE', fiscalYear: null }]);
+    expect(s.last_fy_by_label['8(A) SOLE SOURCE']).toBeNull();
+    expect(Object.values(s.last_fy_by_label)).not.toContain(0);
+  });
+
+  it('surfaces unavailable coverage so empty labels are not treated as none', () => {
+    const s = summarizeHistoricalSetAsides([], { coverage: 'unavailable' });
+    expect(s.labels).toEqual([]);
+    expect(s.coverage).toBe('unavailable');
+    expect(s.note).toMatch(/not retrieved/i);
   });
 });
 

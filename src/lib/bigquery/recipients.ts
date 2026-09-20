@@ -18,10 +18,12 @@ import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
 import {
   buildCountingBases,
-  dateRangeIssue,
+  dateRangeValidFlag,
+  assessDateRange,
   deriveActivityFromSeries,
   describeCoverageTimestamp,
   isModificationAction,
+  classifyModNumber,
   summarizeHistoricalSetAsides,
 } from '@/lib/contractor/award-history-shape';
 
@@ -1531,13 +1533,17 @@ export async function getBqContractorHistory(opts: {
   // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
   // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
   // empty arrays mean "not retrieved", not "none exist".
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v1-m`;
+  const setAsideUnavailable =
+    awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
   const detailIncomplete =
     awardCount > 0 &&
     (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v3-m`, yearly.length) ||
       bqUnavailable(`rollup:${cacheKey}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`, agencies.length) ||
       bqUnavailable(`rollup:${cacheKey}:top-naics:8:v2-m`, naics.length) ||
       bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v4-m`, recent.length) ||
-      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length));
+      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length) ||
+      setAsideUnavailable);
   const enrichmentStatus: 'complete' | 'budget_limited' = detailIncomplete
     ? 'budget_limited'
     : 'complete';
@@ -1556,8 +1562,11 @@ export async function getBqContractorHistory(opts: {
   .map(y => ({
     fiscalYear: y.fiscal_year,
     totalObligations: Number(y.total_obligated || 0),
-    positiveObligations: Number(y.positive_obligations || 0),
-    deobligations: Number(y.deobligations || 0),
+    // Pass through only when the v3 query field is present — never invent from net.
+    positiveObligations:
+      y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+    deobligations:
+      y.deobligations == null ? undefined : Number(y.deobligations),
     awardCount: Number(y.award_count || 0),
     agencyBreakdown: byYear.get(y.fiscal_year) || [],
   }));
@@ -1574,10 +1583,13 @@ export async function getBqContractorHistory(opts: {
     lastRecipientActionDate: profile.last_action_date || null,
   });
   const historicalSetAsides = summarizeHistoricalSetAsides(
-    setAsideHist.map((r) => ({
-      setAside: r.set_aside,
-      fiscalYear: r.last_fy == null ? null : Number(r.last_fy),
-    })),
+    setAsideUnavailable
+      ? []
+      : setAsideHist.map((r) => ({
+          setAside: r.set_aside,
+          fiscalYear: r.last_fy == null ? null : Number(r.last_fy),
+        })),
+    { coverage: setAsideUnavailable ? 'unavailable' : 'complete' },
   );
   const agenciesServed = Number(profile.distinct_agency_count || agencies.length);
   const topAgenciesCapped = agenciesServed > agencies.length;
@@ -1612,6 +1624,7 @@ export async function getBqContractorHistory(opts: {
       last_positive_obligation_fy: activity.last_positive_obligation_fy,
       activity_status: activity.activity_status,
       activity_note: activity.activity_note,
+      activity_observation_period: activity.observation_period,
       // Federal obligations ≠ company revenue.
       obligations_are_not_revenue: true,
     },
@@ -1638,12 +1651,13 @@ export async function getBqContractorHistory(opts: {
     recentAwards: recent.map(r => {
       const startDate = r.pop_start_date || null;
       const endDate = r.pop_end_date || null;
-      const rangeIssue = dateRangeIssue(startDate, endDate);
+      const range = assessDateRange(startDate, endDate);
       const modNumber = r.mod_number ?? null;
       return {
         id: r.award_id,
         piid: r.piid || null,
         modNumber,
+        modClassification: classifyModNumber(modNumber),
         isModification: isModificationAction(modNumber),
         title: (r.description || r.piid || r.award_id || '').slice(0, 160),
         agency: r.awarding_agency || '—',
@@ -1654,8 +1668,9 @@ export async function getBqContractorHistory(opts: {
         actionDate: r.action_date || null,
         startDate,
         endDate,
-        dateRangeValid: rangeIssue == null,
-        dateRangeIssue: rangeIssue,
+        dateRangeAssessment: range.assessment,
+        dateRangeValid: dateRangeValidFlag(startDate, endDate),
+        dateRangeIssue: range.issue,
         state: r.pop_state || null,
         setAside: r.set_aside || null,
         url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,

@@ -366,7 +366,7 @@ export default function ContractorSalesHistoryDrawer({
                           <h4 className="line-clamp-2 text-sm font-semibold text-white">{award.title}</h4>
                           <p className="mt-1 text-xs text-faint">
                             {award.agency} · {formatDate(award.actionDate || award.startDate)}
-                            {award.isModification ? ' · modification' : ''}
+                            {award.isModification === true ? ' · modification' : ''}
                             {award.dateRangeIssue === 'end_before_start' ? ' · ⚠ end date before start' : ''}
                           </p>
                         </div>

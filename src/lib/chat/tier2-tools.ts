@@ -40,8 +40,10 @@ import {
   type ColdBqTurnState,
 } from '@/lib/bigquery/cold-budget';
 import {
+  assessDateRange,
   buildCountingBases,
-  dateRangeIssue,
+  classifyModNumber,
+  dateRangeValidFlag,
   deriveActivityFromSeries,
   describeCoverageTimestamp,
   isModificationAction,
@@ -330,8 +332,10 @@ export function makeTier2Tools(email: string) {
     const series = yearly.map((y) => ({
       fiscalYear: y.fiscal_year,
       totalObligations: Number(y.total_obligated || 0),
-      positiveObligations: Number(y.positive_obligations || 0),
-      deobligations: Number(y.deobligations || 0),
+      // Pass through only when present — never invent from net.
+      positiveObligations:
+        y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+      deobligations: y.deobligations == null ? undefined : Number(y.deobligations),
       awardCount: Number(y.award_count || 0),
     }));
     const activity = deriveActivityFromSeries(series);
@@ -344,12 +348,14 @@ export function makeTier2Tools(email: string) {
       lastRecipientActionDate: profile.last_action_date ?? null,
     });
     const agenciesServed = profile.distinct_agency_count ?? agencies.length;
+    // Recent-awards sample only — not a full-history set-aside census.
+    // Labels with null years; coverage is partial by construction.
     const historicalSetAsides = summarizeHistoricalSetAsides(
       awards.map((a) => ({
         setAside: a.set_aside,
-        // Profile sample does not carry fiscal_year — labels only, no FY claim.
         fiscalYear: null,
       })),
+      { coverage: 'partial' },
     );
 
     const shapedAgencies = agencies.map((a) => ({
@@ -362,12 +368,13 @@ export function makeTier2Tools(email: string) {
     }));
 
     const shapedAwards = awards.map((r) => {
-      const rangeIssue = dateRangeIssue(r.pop_start_date, r.pop_end_date);
+      const range = assessDateRange(r.pop_start_date, r.pop_end_date);
       const modNumber = r.mod_number ?? null;
       return {
         award_id: r.award_id,
         piid: r.piid,
         mod_number: modNumber,
+        mod_classification: classifyModNumber(modNumber),
         is_modification: isModificationAction(modNumber),
         awarding_agency: r.awarding_agency,
         awarding_office: r.awarding_office,
@@ -378,8 +385,9 @@ export function makeTier2Tools(email: string) {
         action_date: r.action_date,
         pop_start_date: r.pop_start_date,
         pop_end_date: r.pop_end_date,
-        date_range_valid: rangeIssue == null,
-        date_range_issue: rangeIssue,
+        date_range_assessment: range.assessment,
+        date_range_valid: dateRangeValidFlag(r.pop_start_date, r.pop_end_date),
+        date_range_issue: range.issue,
         pop_state: r.pop_state,
         set_aside: r.set_aside,
         grain: 'obligation_action' as const,
@@ -416,6 +424,7 @@ export function makeTier2Tools(email: string) {
         last_positive_obligation_fy: activity.last_positive_obligation_fy,
         activity_status: activity.activity_status,
         activity_note: activity.activity_note,
+        activity_observation_period: activity.observation_period,
         obligations_are_not_revenue: true,
       },
       counting_bases: counting,

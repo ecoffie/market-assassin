@@ -65,6 +65,7 @@ export interface ContractorAwardHistoryToolResult {
     counting_bases?: unknown;
     activity_status?: string;
     last_positive_obligation_fy?: number | null;
+    activity_observation_period?: unknown;
     award_history_elsewhere?: boolean;
     award_history_sources?: string[];
     note?: string;
@@ -163,6 +164,9 @@ async function byUei(
         ? {
             activity_status: history.summary.activity_status,
             last_positive_obligation_fy: history.summary.last_positive_obligation_fy ?? null,
+            ...(history.summary.activity_observation_period
+              ? { activity_observation_period: history.summary.activity_observation_period }
+              : {}),
           }
         : {}),
       ...(enrichment

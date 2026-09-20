@@ -13,6 +13,7 @@ import {
   getSAMAPIConfig,
   makeSAMRequest, getAllDistinctSAMKeys} from './utils';
 import { fromEntityApiNaicsList, type NaicsSbMap } from './naics-small-business';
+import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 
 // Types
 export interface SAMEntity {
@@ -235,12 +236,12 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
 
   // PSC list — drop blank-only rows so clients do not render empty PSC lines.
   const pscRaw = (goodsServices.pscList as Array<Record<string, unknown>>) || (raw.pscList as Array<Record<string, unknown>>) || [];
-  const pscList = pscRaw
-    .map(p => ({
+  const pscList = filterBlankPscList(
+    pscRaw.map(p => ({
       pscCode: String(p.pscCode || ''),
-      pscDescription: String(p.pscDescription || '')
-    }))
-    .filter(p => p.pscCode.trim().length > 0 || p.pscDescription.trim().length > 0);
+      pscDescription: String(p.pscDescription || ''),
+    })),
+  );
 
   // Addresses
   const physAddr = (core.physicalAddress as Record<string, unknown>) || (raw.physicalAddress as Record<string, unknown>) || {};

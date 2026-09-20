@@ -5,7 +5,7 @@ import {
   type Contractor,
 } from '@/lib/contractor-database';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
-import { dateRangeIssue } from '@/lib/contractor/award-history-shape';
+import { dateRangeValidFlag, assessDateRange } from '@/lib/contractor/award-history-shape';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -89,6 +89,15 @@ export interface ContractorSalesHistory {
     last_positive_obligation_fy?: number | null;
     activity_status?: 'active' | 'dormant' | 'deobligating' | 'unknown';
     activity_note?: string;
+    activity_observation_period?: {
+      reference_fy: number;
+      lookback_years: number;
+      window_start_fy: number;
+      window_end_fy: number;
+      series_coverage: 'adequate' | 'partial' | 'missing';
+      years_present: number[];
+      years_missing: number[];
+    };
     obligations_are_not_revenue?: boolean;
   };
   series: Array<{
@@ -131,9 +140,11 @@ export interface ContractorSalesHistory {
     url: string | null;
     piid?: string | null;
     modNumber?: string | null;
-    isModification?: boolean;
+    isModification?: boolean | null;
+    modClassification?: 'base' | 'modification' | 'unknown';
     actionDate?: string | null;
-    dateRangeValid?: boolean;
+    dateRangeValid?: boolean | null;
+    dateRangeAssessment?: 'valid' | 'invalid' | 'unassessable';
     dateRangeIssue?: 'end_before_start' | null;
     setAside?: string | null;
     grain?: 'obligation_action' | 'award';
@@ -451,7 +462,7 @@ function buildHistory(
   const recentAwards = sortedAwards.slice(0, awardLimit).map((award) => {
     const startDate = award.start_date;
     const endDate = award.end_date;
-    const rangeIssue = dateRangeIssue(startDate, endDate);
+    const range = assessDateRange(startDate, endDate);
     return {
       id: award.award_id,
       title: award.description || award.contract_type || 'Federal award',
@@ -462,8 +473,9 @@ function buildHistory(
       amount: amountToNumber(award.award_amount),
       startDate,
       endDate,
-      dateRangeValid: rangeIssue == null,
-      dateRangeIssue: rangeIssue,
+      dateRangeAssessment: range.assessment,
+      dateRangeValid: dateRangeValidFlag(startDate, endDate),
+      dateRangeIssue: range.issue,
       state: award.pop_state,
       url: award.usaspending_id ? `https://www.usaspending.gov/award/${award.usaspending_id}` : null,
       grain: 'award' as const,
