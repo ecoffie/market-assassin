@@ -61,6 +61,21 @@
   "delta": {
     "profile_recent_awards": "0 \u2192 5",
     "set_aside_fields": "last_fy/partial-from-sample \u2192 last_observed_action_fy + award_origin_fy via warehouse aggregation",
-    "8A_COMPETED_origin": "null (unknown) while last_observed_action_fy=2023 \u2014 deobligation/action FY is not award origin"
+    "8A_COMPETED_origin": "null (unknown) while last_observed_action_fy=2023 \u2014 deobligation/action FY is not award origin",
+    "correction": "award_origin_fy \u2192 first_observed_positive_action_fy; Pass-2 uses bqUnavailable; scope note UEI set"
+  },
+  "after_correction": {
+    "recent_len": 5,
+    "has_award_origin_field": false,
+    "first_observed_positive_action_fy_by_label": {
+      "8(A) SOLE SOURCE": 2016,
+      "8A COMPETED": null
+    },
+    "last_observed_action_fy_by_label": {
+      "8(A) SOLE SOURCE": 2022,
+      "8A COMPETED": 2023
+    },
+    "note_has_uei_set": true,
+    "note_denies_award_origin": true
   }
 }

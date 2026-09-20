@@ -1,6 +1,6 @@
 # Cyrus profile / set-aside follow-up — evidence (2026-09-20)
 
-Follow-up to #1581. Two targeted repairs only. **Not merged/deployed.**
+Follow-up to #1581. Two targeted repairs + one correction batch. **Not merged/deployed.**
 
 ## Root causes (traced, not assumed)
 
@@ -9,28 +9,34 @@ Follow-up to #1581. Two targeted repairs only. **Not merged/deployed.**
    - History keys: `rollup:single:{uei}:recent-awards:25:v4-m` (different namespace + limit)  
    - Pass-2 gate required `awards.length===0 && agencies.length===0`. Cyrus had warm agencies + cold awards → Pass-2 skipped → `recent_awards:[]` with `enrichment_status:"complete"`.
 
-2. **`last_fy` mixed deobligations into “award year”**  
+2. **Action FY conflated with award origin**  
    - Warehouse `MAX(fiscal_year)` is last *action* FY.  
-   - Profile previously sampled capped `recent_awards` with `coverage:"partial"` and empty labels when that sample was empty.
+   - `MIN(positive obligation FY)` is first observed *positive action* FY — a later positive modification is not award origin.
+
+## Correction batch (post-review on `78f1ee6d`)
+
+1. Renamed `award_origin_fy` → `first_observed_positive_action_fy` (cache key v3). Award origin remains unknown unless a dedicated origin signal exists.
+2. Pass-2 cold-fill gated on `bqUnavailable` (miss/failed), not `length === 0`. Warm-empty + denied cold budget stays `complete`.
+3. Profile scope note says "UEI set" (rollup children), not "this UEI".
 
 ## Before (prod acceptance, post-#1581)
 
 | Surface | Evidence | Result |
 |---------|----------|--------|
 | Profile | `before-profile-prod.json` | `recent_awards: []`, `enrichment_status: complete`, award_count 17, set-asides partial/empty |
-| History | `before-history-prod.json` | recent awards present (25 rows in fixture) |
+| History | `before-history-prod.json` | recent awards present |
 
-## After (local worktree, this branch)
+## After (local)
 
 | Surface | Evidence | Result |
 |---------|----------|--------|
-| Profile | `after-local-repro.json` | `recent_len: 5`, enrichment complete, warehouse set-aside aggregation |
-| History | same | set-asides match profile labels/FYs; `8A COMPETED` origin `null`, last action FY 2023 |
+| Profile (initial fix) | `after-local-repro.json` | `recent_len: 5` |
+| Profile (correction) | `after-correction-local.json` | no `award_origin_fy_*`; `first_observed_positive_action_fy_*`; scope "UEI set"; origin denied in note |
 
 See `summary.json` for the delta.
 
 ## Regressions
 
-- `tier2-tools.unit.test.ts` — warm path; Cyrus warm-agencies/cold-awards Pass-2; failed retrieval → `budget_limited`
-- `award-history-shape.unit.test.ts` — deobligation FY ≠ origin; unknown origin stays null
-- `bq-history-completeness.unit.test.ts` — v2 set-aside fields + unavailable coverage
+- `tier2-tools.unit.test.ts` — warm path; Cyrus Pass-2; failed→`budget_limited`; **warm-empty set-aside + cold budget denied stays complete**
+- `award-history-shape.unit.test.ts` — deobligation ≠ origin; **older award + later positive mod ≠ award origin**
+- `bq-history-completeness.unit.test.ts` — v3 set-aside fields + unavailable coverage

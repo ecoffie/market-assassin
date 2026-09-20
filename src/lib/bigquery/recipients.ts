@@ -640,9 +640,10 @@ export interface SetAsideHistoryRow {
   last_action_fy: number | null;
   /**
    * Earliest fiscal_year with a positive obligation under this set-aside.
-   * Null when no positive-obligation evidence exists (unknown — never invent).
+   * A later positive modification can land years after award creation — this is
+   * NOT award origin. Null when no positive-obligation action exists.
    */
-  award_origin_fy: number | null;
+  first_observed_positive_action_fy: number | null;
   total_obligated: number;
 }
 
@@ -651,17 +652,18 @@ export async function getSetAsideHistoryForRecipient(
   rollupUei: string,
   liveBq = false,
 ): Promise<SetAsideHistoryRow[]> {
-  // v2: split last-action FY from award-origin FY so a later deobligation
-  // cannot be read as a new award year or certification event.
+  // v3: last_action_fy vs first_observed_positive_action_fy. Positive-obligation
+  // MIN is not award origin (mods can arrive years later). Award origin stays
+  // unknown unless a dedicated origin signal exists.
   return queryCached<SetAsideHistoryRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:set-aside-history:v2-m`,
+    cacheKey: `rollup:${rollupUei}:set-aside-history:v3-m`,
     query: `
       SELECT
         set_aside,
         COUNT(DISTINCT award_id) AS award_count,
         MAX(fiscal_year) AS last_action_fy,
-        MIN(IF(obligation_amount > 0, fiscal_year, NULL)) AS award_origin_fy,
+        MIN(IF(obligation_amount > 0, fiscal_year, NULL)) AS first_observed_positive_action_fy,
         SUM(obligation_amount) AS total_obligated
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei IN UNNEST(@ueis)
@@ -1543,7 +1545,7 @@ export async function getBqContractorHistory(opts: {
   // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
   // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
   // empty arrays mean "not retrieved", not "none exist".
-  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v2-m`;
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v3-m`;
   const setAsideUnavailable =
     awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
   const detailIncomplete =
@@ -1598,12 +1600,15 @@ export async function getBqContractorHistory(opts: {
       : setAsideHist.map((r) => ({
           setAside: r.set_aside,
           lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
-          awardOriginFy: r.award_origin_fy == null ? null : Number(r.award_origin_fy),
+          firstObservedPositiveActionFy:
+            r.first_observed_positive_action_fy == null
+              ? null
+              : Number(r.first_observed_positive_action_fy),
         })),
     {
       coverage: setAsideUnavailable ? 'unavailable' : 'complete',
       scopeNote:
-        'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample).',
+        'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query.',
     },
   );
   const agenciesServed = Number(profile.distinct_agency_count || agencies.length);

@@ -291,7 +291,7 @@ export function makeTier2Tools(email: string) {
     const awardsCacheKey = `rollup:${profile.rollup_uei}:recent-awards:${RECENT_LIMIT}:v4-m`;
     const agenciesCacheKey = `rollup:${profile.rollup_uei}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`;
     const yearlyCacheKey = `rollup:${profile.rollup_uei}:yearly-totals:v3-m`;
-    const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v2-m`;
+    const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v3-m`;
 
     // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
     let [awards, agencies, yearly, setAsideHist] = await Promise.all([
@@ -301,17 +301,16 @@ export function makeTier2Tools(email: string) {
       getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
     ]);
 
-    // Pass 2 — per-surface cold fill. CRITICAL: do NOT require ALL enrichment keys
-    // to miss before filling. Cyrus reproduced warm agencies + cold recent-awards:5
-    // (history uses recent-awards:25 / single: prefix — different key). The old
-    // `awards.length===0 && agencies.length===0` gate skipped Pass 2 and returned
-    // recent_awards:[] with enrichment_status=complete.
+    // Pass 2 — per-surface cold fill only when the cache marks a MISS/FAILURE.
+    // A successfully cached empty [] is confirmed emptiness (bqResultState='empty')
+    // and must NOT consume cold budget or become budget_limited when permission is denied.
+    // Cyrus: warm agencies + unavailable recent-awards:5 still fills awards alone.
     let enrichmentStatus: 'complete' | 'budget_limited' = 'complete';
     const hasAwards = (profile.award_count ?? 0) > 0;
-    const needAwards = hasAwards && awards.length === 0;
-    const needAgencies = hasAwards && agencies.length === 0;
-    const needYearly = hasAwards && yearly.length === 0;
-    const needSetAside = hasAwards && setAsideHist.length === 0;
+    const needAwards = hasAwards && bqUnavailable(awardsCacheKey, awards.length);
+    const needAgencies = hasAwards && bqUnavailable(agenciesCacheKey, agencies.length);
+    const needYearly = hasAwards && bqUnavailable(yearlyCacheKey, yearly.length);
+    const needSetAside = hasAwards && bqUnavailable(setAsideCacheKey, setAsideHist.length);
     if (needAwards || needAgencies || needYearly || needSetAside) {
       if (resolvedCold || (await allowColdLookup())) {
         const [a2, g2, y2, s2] = await Promise.all([
@@ -342,7 +341,7 @@ export function makeTier2Tools(email: string) {
       }
     }
 
-    // Still-empty after attempt + unavailable cache marker → not a genuine zero.
+    // Still-unavailable after attempt → not a genuine zero.
     if (
       hasAwards &&
       (bqUnavailable(awardsCacheKey, awards.length) ||
@@ -383,12 +382,17 @@ export function makeTier2Tools(email: string) {
         : setAsideHist.map((r) => ({
             setAside: r.set_aside,
             lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
-            awardOriginFy: r.award_origin_fy == null ? null : Number(r.award_origin_fy),
+            firstObservedPositiveActionFy:
+              r.first_observed_positive_action_fy == null
+                ? null
+                : Number(r.first_observed_positive_action_fy),
           })),
       {
         coverage: setAsideUnavailable ? 'unavailable' : 'complete',
         scopeNote:
-          'Aggregated across warehouse award actions for this UEI (not derived from the capped recent_awards sample).',
+          childUeis.length > 1
+            ? `Aggregated across warehouse award actions for this profile's UEI set (${childUeis.length} UEIs on the rollup; not derived from the capped recent_awards sample). Award origin is not established by this query.`
+            : `Aggregated across warehouse award actions for this profile's UEI set (not derived from the capped recent_awards sample). Award origin is not established by this query.`,
       },
     );
 
