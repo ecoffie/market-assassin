@@ -56,7 +56,10 @@ INSERT INTO public.data_source_instances
   (dataset_key, source_key, name, discovery_url, ingest_mode, owner, watch_cadence_days,
    held_population, source_state, intervention_state, runbook_path)
 VALUES
-  ('opportunities', 'sam_opportunities',
+  -- dataset_key is a FOREIGN KEY to data_sources(key). 'sam_opportunities' is an
+  -- existing dataset there; an invented key ('opportunities') fails the FK — which
+  -- is how the first apply attempt was caught, and correctly rolled back.
+  ('sam_opportunities', 'sam_opportunities_sam_gov',
    'SAM.gov opportunities (backs RES-003)',
    'https://api.sam.gov/opportunities/v2/search',
    'automated', 'data-core', 1,

@@ -43,6 +43,15 @@ describe('RES-003 rests on a controlled input', () => {
     expect(sql).toMatch(/WHEN max\(posted_date\) IS NULL\s+THEN 'unmeasured'/);
   });
 
+  it('dataset_key references an EXISTING data_sources key', () => {
+    const sql = readFileSync(join(process.cwd(), MIGRATION), 'utf8');
+    // data_source_instances.dataset_key is a FK to data_sources(key). The first
+    // apply attempt used an invented 'opportunities' and was rejected (23503),
+    // rolling back cleanly. Pin the real key so it cannot regress.
+    expect(sql).toMatch(/\('sam_opportunities', 'sam_opportunities_sam_gov'/);
+    expect(sql).not.toMatch(/VALUES\s*\n\s*\('opportunities'/);
+  });
+
   it('registration is idempotent', () => {
     const sql = readFileSync(join(process.cwd(), MIGRATION), 'utf8');
     expect(sql).toContain('ON CONFLICT (source_key) DO NOTHING');
