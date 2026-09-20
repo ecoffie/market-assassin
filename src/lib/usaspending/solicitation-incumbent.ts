@@ -25,7 +25,7 @@ import {
   type SolicitationStatus,
 } from '@/lib/sam/resolve-solicitation';
 import { isNoticeUuid, normalizeNoticeUuid } from '@/lib/sam/notice-identity';
-import { groundIncumbent, type IncumbentCertainty } from '@/lib/usaspending/incumbent-evidence';
+import { groundIncumbent, namedIncumbent, type IncumbentCertainty } from '@/lib/usaspending/incumbent-evidence';
 
 const SAM_SEARCH = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_PUBLIC = 'https://sam.gov/api/prod/sgs/v1/search/';
@@ -65,6 +65,8 @@ export interface ResolvedNotice {
   matched_by?: SolicitationMatchBy;
   version_count?: number;
   deadline_conflict?: boolean;
+  deadline_conflict_reasons?: import('@/lib/sam/notice-identity').DeadlineConflictReason[];
+  lot_deadlines?: import('@/lib/sam/notice-identity').LotDeadline[];
   notice_ids?: string[];
   deadline_source?: 'responseDeadLine' | 'responseDate' | 'cache' | null;
 }
@@ -639,12 +641,13 @@ export async function resolveSolicitationIncumbent(query: string): Promise<Solic
     matchConfidence: incumbent.matchConfidence,
   } : null);
   if (incumbent) incumbent.incumbent_certainty = grounding.certainty;
+  const named = namedIncumbent(grounding, incumbent);
   return {
     queried: q,
     notice,
-    incumbent,
+    incumbent: named,
     prior_awards: prior,
-    summary: summarizeSolicitationIncumbent(notice, incumbent),
+    summary: summarizeSolicitationIncumbent(notice, named),
     _meta: {
       grounded_notice: !!notice,
       grounded_incumbent: grounding.grounded,

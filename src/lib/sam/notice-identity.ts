@@ -37,6 +37,70 @@ export function deadlinesConflict(a: string | null | undefined, b: string | null
   return da !== db;
 }
 
+const ENGLISH_MONTH: Record<string, string> = {
+  january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
+  july: '07', august: '08', september: '09', october: '10', november: '11', december: '12',
+};
+
+/** "13 August 2026" → YYYY-MM-DD. Used for lot due-dates written in the synopsis. */
+export function parseEnglishDate(value: string): string | null {
+  const m = String(value || '').trim().match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (!m) return deadlineDay(value);
+  const month = ENGLISH_MONTH[m[2].toLowerCase()];
+  if (!month) return null;
+  return `${m[3]}-${month}-${m[1].padStart(2, '0')}`;
+}
+
+export interface LotDeadline {
+  lot: string;
+  date: string;
+  excerpt: string;
+}
+
+export type DeadlineConflictReason = 'sibling_notices' | 'lot_due_dates';
+
+/**
+ * Lot 1 / Lot 2 due dates in the notice body. Sibling-notice calendar
+ * disagreement is a different class — this is one synopsis naming two dates.
+ */
+export function extractLotDeadlines(text: string): LotDeadline[] {
+  if (!text) return [];
+  const out: LotDeadline[] = [];
+  const seen = new Set<string>();
+  const re = /\bLot\s+(\d+)[\s\S]{0,240}?\bdue\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const date = parseEnglishDate(m[2]);
+    if (!date) continue;
+    const lot = `Lot ${m[1]}`;
+    const key = `${lot}|${date}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      lot,
+      date,
+      excerpt: m[0].replace(/\s+/g, ' ').trim().slice(0, 160),
+    });
+  }
+  return out;
+}
+
+export function lotDeadlinesConflict(
+  samDeadline: string | null | undefined,
+  lots: LotDeadline[],
+): boolean {
+  if (!lots.length) return false;
+  const days = new Set(lots.map((l) => l.date));
+  if (days.size > 1) return true;
+  const only = [...days][0];
+  return deadlinesConflict(only, samDeadline);
+}
+
+/** PIEE / WAWF lives in the synopsis, not a SOW heading. */
+export function detectPiee(text: string): boolean {
+  return /\bPIEE\b|Procurement Integrated Enterprise Environment|piee\.eb\.mil|\bWAWF\b/i.test(text || '');
+}
+
 export type CachedNoticeRow = {
   notice_id: string;
   solicitation_number: string | null;

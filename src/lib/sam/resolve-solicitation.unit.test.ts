@@ -188,6 +188,25 @@ describe('status truth', () => {
     expect(bySol?.notice_ids).toContain(ORIGINAL.notice_id);
     expect(bySol?.notice_ids).toContain(AMD3.notice_id);
   });
+  it('Lot 1 vs Lot 2 vs SAM field is a deadline conflict even on UUID lookup', () => {
+    const desc = [
+      'Lot 1 proposals and Lot 2 proposals from offerors not submitting a proposal for the initial APL Delivery Order are due 13 August 2026.',
+      'Lot 2 proposals from offerors submitting a proposal for the initial APL Delivery Order are due 31 August 2026.',
+    ].join('\n');
+    const scb = row({
+      notice_id: '3a6a586d85964c15aa010ccc7a5914ed',
+      solicitation_number: 'N00024-26-R-2200',
+      posted_date: '2026-07-01T00:00:00Z',
+      response_deadline: '2026-08-31T19:00:00+00:00',
+      active: false,
+      description: desc,
+    });
+    const byUuid = resolveFromCandidateRows(scb.notice_id, [scb], 'notice_id', NOW);
+    expect(byUuid?.deadline_conflict).toBe(true);
+    expect(byUuid?.deadline_conflict_reasons).toContain('lot_due_dates');
+    expect(byUuid?.lot_deadlines.some((l) => l.lot === 'Lot 1' && l.date === '2026-08-13')).toBe(true);
+    expect(byUuid?.lot_deadlines.some((l) => l.lot === 'Lot 2' && l.date === '2026-08-31')).toBe(true);
+  });
   it('H. older deadline passed + newer deadline future → OPEN', () => {
     const now = new Date('2026-08-10T12:00:00.000Z');
     const older = row({

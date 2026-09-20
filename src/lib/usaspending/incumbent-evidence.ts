@@ -49,3 +49,8 @@ export function groundIncumbent(ev: IncumbentEvidence | null | undefined): Incum
       'Do not identify an incumbent from this match. NAICS agreement or disagreement is not evidence.',
   };
 }
+
+/** Name an incumbent only when grounding says so. Uncertain candidates stay in prior_awards. */
+export function namedIncumbent<T>(grounding: IncumbentGrounding, candidate: T | null | undefined): T | null {
+  return grounding.grounded && candidate ? candidate : null;
+}

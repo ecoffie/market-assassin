@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groundIncumbent } from './incumbent-evidence';
+import { groundIncumbent, namedIncumbent } from './incumbent-evidence';
 
 describe('unsupported incumbent identification', () => {
   it('a high-confidence guess with only a NAICS match is NOT grounded', () => {
@@ -39,5 +39,16 @@ describe('unsupported incumbent identification', () => {
   it('no candidate is none, not a fabricated incumbent', () => {
     expect(groundIncumbent(null).certainty).toBe('none');
     expect(groundIncumbent(null).grounded).toBe(false);
+  });
+
+  it('does not name an ungrounded candidate as the incumbent', () => {
+    const grounding = groundIncumbent({
+      distinctiveHits: 0,
+      pscMatch: false,
+      naicsMatch: true,
+      matchConfidence: 'high',
+    });
+    const mazak = { recipientName: 'MAZAK OPTONICS CORP' };
+    expect(namedIncumbent(grounding, mazak)).toBeNull();
   });
 });

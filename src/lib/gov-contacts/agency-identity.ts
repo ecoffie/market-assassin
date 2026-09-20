@@ -19,6 +19,7 @@
  * Reuses `resolveAgency` for toptier identity. Directory command matching
  * is whole-token / identity-key only.
  */
+import commandInfoData from '@/data/dod-command-info.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 
 export type IdentityMethod =
@@ -272,4 +273,149 @@ export function legacySubstringContains(haystack: string, needle: string): boole
   const h = (haystack || '').toUpperCase();
   const n = (needle || '').toUpperCase();
   return n.length > 0 && h.includes(n);
+}
+
+// ── Spending grain (NAVSEA lock, 2026-09-20) ──────────────────────────────
+// A SYSCOM stays a SYSCOM. Parent-service dollars may be shown only as
+// PARENT_SERVICE. Command-level spend abstains (NOT_ESTABLISHED). Never
+// label Navy $176.6B as NAVSEA total_obligated.
+//
+// Measured FY2025 USASpending contract obligations (A/B/C/D):
+//   Department of the Navy subtier = $176.56B (awarding_agency still says DoD)
+//   Department of Defense toptier  = $491.77B
+// The $135B comment on the old Navy path was a stale FY snapshot.
+
+export const DOD_PARENT = 'Department of Defense';
+
+export const MILITARY_SERVICES = [
+  'Department of the Navy',
+  'Department of the Army',
+  'Department of the Air Force',
+] as const;
+
+export type SpendingScope = 'REQUESTED' | 'PARENT_SERVICE' | 'NOT_ESTABLISHED';
+export type CommandSpendingStatus = 'NOT_ESTABLISHED' | 'NOT_APPLICABLE';
+
+export interface RequestedIdentity {
+  command: string | null;
+  service: string | null;
+  parent: string | null;
+}
+
+export interface IdentitySpendingGrain {
+  established: boolean;
+  displayName: string | null;
+  identity: RequestedIdentity;
+  spendingScope: SpendingScope;
+  spendingScopeName: string | null;
+  commandSpending: CommandSpendingStatus;
+  /** Military-department USASpending subtler (Navy / Army / AF under DoD 097). */
+  serviceFetch: { subAgency: string } | null;
+  /** Civilian / self-parented toptier name for the USASpending toptier list. */
+  toptierName: string | null;
+}
+
+export function directoryCommands(): Record<string, DirectoryCommandLike> {
+  return commandInfoData.commands as Record<string, DirectoryCommandLike>;
+}
+
+export function isMilitaryService(name: string): boolean {
+  return MILITARY_SERVICES.some((s) => identityEstablishedEqual(name, s));
+}
+
+export function militaryServiceCanonical(name: string): string | null {
+  const hit = MILITARY_SERVICES.find(
+    (s) => identityEstablishedEqual(name, s) || queryIdentifiesCandidate(name, s),
+  );
+  return hit ?? null;
+}
+
+const EMPTY_GRAIN: IdentitySpendingGrain = {
+  established: false,
+  displayName: null,
+  identity: { command: null, service: null, parent: null },
+  spendingScope: 'NOT_ESTABLISHED',
+  spendingScopeName: null,
+  commandSpending: 'NOT_APPLICABLE',
+  serviceFetch: null,
+  toptierName: null,
+};
+
+/**
+ * Whole-string directory identity → how (or whether) to fetch USASpending.
+ * Substring containment cannot establish identity or spending grain.
+ */
+export function resolveIdentitySpendingGrain(query: string): IdentitySpendingGrain {
+  const raw = (query || '').trim();
+  if (!raw) return EMPTY_GRAIN;
+
+  const dir = resolveDirectoryIdentity(raw, directoryCommands());
+
+  if (dir.kind === 'command') {
+    const info = dir.info;
+    const self = identityEstablishedEqual(info.fullName, info.parentAgency);
+    if (self) {
+      return {
+        established: true,
+        displayName: info.fullName,
+        identity: { command: info.abbreviation, service: null, parent: info.fullName },
+        spendingScope: 'REQUESTED',
+        spendingScopeName: info.fullName,
+        commandSpending: 'NOT_APPLICABLE',
+        serviceFetch: null,
+        toptierName: info.fullName,
+      };
+    }
+    const service = militaryServiceCanonical(info.parentAgency);
+    if (service) {
+      return {
+        established: true,
+        displayName: info.fullName,
+        identity: { command: info.abbreviation, service, parent: DOD_PARENT },
+        spendingScope: 'PARENT_SERVICE',
+        spendingScopeName: service,
+        commandSpending: 'NOT_ESTABLISHED',
+        serviceFetch: { subAgency: service },
+        toptierName: null,
+      };
+    }
+    return {
+      established: true,
+      displayName: info.fullName,
+      identity: { command: info.abbreviation, service: null, parent: info.parentAgency },
+      spendingScope: 'NOT_ESTABLISHED',
+      spendingScopeName: null,
+      commandSpending: 'NOT_ESTABLISHED',
+      serviceFetch: null,
+      toptierName: null,
+    };
+  }
+
+  if (dir.kind === 'parent_roster') {
+    const service = militaryServiceCanonical(dir.parentLabel);
+    if (service) {
+      return {
+        established: true,
+        displayName: service,
+        identity: { command: null, service, parent: DOD_PARENT },
+        spendingScope: 'REQUESTED',
+        spendingScopeName: service,
+        commandSpending: 'NOT_APPLICABLE',
+        serviceFetch: { subAgency: service },
+        toptierName: null,
+      };
+    }
+    return {
+      established: true,
+      displayName: dir.parentLabel,
+      identity: { command: null, service: null, parent: dir.parentLabel },
+      spendingScope: 'REQUESTED',
+      spendingScopeName: dir.parentLabel,
+      commandSpending: 'NOT_APPLICABLE',
+      serviceFetch: null,
+      toptierName: dir.parentLabel,
+    };
+  }
+
+  return EMPTY_GRAIN;
 }

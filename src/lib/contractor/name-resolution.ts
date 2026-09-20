@@ -24,6 +24,8 @@ export interface AwardNameCandidate {
   uei: string;
   total_obligated: number;
   award_count: number;
+  /** Trade name / DBA. An exact DBA stem among many legal names is unique, not a guess. */
+  dba?: string;
 }
 
 export type AwardNameResolution =
@@ -33,8 +35,8 @@ export type AwardNameResolution =
       name: string;
       total_obligated: number;
       award_count: number;
-      /** slug = the same suffix-variant slug the profile tool uses. sole_hit = the name index returned one row. exact_stem = one complete-list row's stem equals the query. */
-      match: 'sole_hit' | 'exact_stem' | 'slug';
+      /** slug = the same suffix-variant slug the profile tool uses. sole_hit = the name index returned one row. exact_stem = one complete-list row's stem equals the query. exact_dba_stem = one complete-list row's DBA stem equals the query. */
+      match: 'sole_hit' | 'exact_stem' | 'exact_dba_stem' | 'slug';
     }
   | {
       status: 'ambiguous';
@@ -95,6 +97,21 @@ export function classifyNameHits(
         total_obligated: row.total_obligated,
         award_count: row.award_count,
         match: 'exact_stem',
+      };
+    }
+    // Users type the trade name. Legal-name stems of Monarch* firms are not
+    // "Monarch Yachts"; the DBA on one of those rows is. Exact DBA stem among
+    // a complete list is the entity they named, not a guess among ties.
+    const exactDba = rows.filter((row) => row.dba && namesMatchLegalStem(query, row.dba) === 'exact');
+    if (exactDba.length === 1) {
+      const row = exactDba[0];
+      return {
+        status: 'unique',
+        uei: row.uei,
+        name: row.name,
+        total_obligated: row.total_obligated,
+        award_count: row.award_count,
+        match: 'exact_dba_stem',
       };
     }
   }

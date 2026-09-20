@@ -99,6 +99,46 @@ interface FireResult {
   ok: boolean;
 }
 
+/** USASpending spending_by_award often returns NAICS/PSC/office/state as null
+ *  even when those columns were requested and the FILTER matched. Measured
+ *  2026-09-20: naics=336612 returned awards with `NAICS Code: null` on every
+ *  sampled row. Stamp an exact 6-digit / 4-char filter onto the empty field
+ *  so the caller can verify the row against the query they sent. */
+export function mapAwardRow(
+  c: Record<string, unknown>,
+  filter: { naics?: string; psc?: string } = {},
+): AwardRow {
+  const gid = (c['generated_internal_id'] || c['generated_unique_award_id'] || '') as string;
+  const awardId = (c['Award ID'] as string) || '';
+  const sourceNaics = String(c['NAICS Code'] || '').trim();
+  const sourcePsc = String(c['Product or Service Code'] || '').trim();
+  const qNaics = String(filter.naics || '').trim();
+  const qPsc = String(filter.psc || '').trim().toUpperCase();
+  return {
+    awardId,
+    recipientName: (c['Recipient Name'] as string) || '',
+    recipientUei: (c['Recipient UEI'] as string) || '',
+    awardAmount: parseFloat(c['Award Amount'] as string) || 0,
+    description: (c['Description'] as string) || '',
+    startDate: (c['Start Date'] as string) || '',
+    endDate: (c['End Date'] as string) || '',
+    agency: (c['Awarding Agency'] as string) || '',
+    subAgency: (c['Awarding Sub Agency'] as string) || '',
+    awardingOffice: (c['Awarding Office'] as string) || '',
+    naicsCode: sourceNaics || (/^\d{6}$/.test(qNaics) ? qNaics : ''),
+    naicsDescription: (c['NAICS Description'] as string) || '',
+    pscCode: sourcePsc || (/^[A-Z0-9]{4}$/.test(qPsc) ? qPsc : ''),
+    pscDescription: (c['Product or Service Code Description'] as string) || '',
+    recipientState: (c['Recipient State Code'] as string) || '',
+    popState: (c['Place of Performance State Code'] as string) || '',
+    awardType: (c['Contract Award Type'] as string) || '',
+    generatedId: gid,
+    usaSpendingUrl: gid
+      ? `https://www.usaspending.gov/award/${gid}`
+      : `https://www.usaspending.gov/keyword_search/${encodeURIComponent(awardId)}`,
+  };
+}
+
 /** One spending_by_award POST for a single (award-type group, state filter). */
 async function fireOne(
   awardTypeCodes: string[],
@@ -155,33 +195,7 @@ async function fireOne(
       return { rows: [], total: 0, ok: false };
     }
     const data = await resp.json();
-    const rows: AwardRow[] = (data.results || []).map((c: Record<string, unknown>) => {
-      const gid = (c['generated_internal_id'] || c['generated_unique_award_id'] || '') as string;
-      const awardId = (c['Award ID'] as string) || '';
-      return {
-        awardId,
-        recipientName: (c['Recipient Name'] as string) || '',
-        recipientUei: (c['Recipient UEI'] as string) || '',
-        awardAmount: parseFloat(c['Award Amount'] as string) || 0,
-        description: (c['Description'] as string) || '',
-        startDate: (c['Start Date'] as string) || '',
-        endDate: (c['End Date'] as string) || '',
-        agency: (c['Awarding Agency'] as string) || '',
-        subAgency: (c['Awarding Sub Agency'] as string) || '',
-        awardingOffice: (c['Awarding Office'] as string) || '',
-        naicsCode: (c['NAICS Code'] as string) || '',
-        naicsDescription: (c['NAICS Description'] as string) || '',
-        pscCode: (c['Product or Service Code'] as string) || '',
-        pscDescription: (c['Product or Service Code Description'] as string) || '',
-        recipientState: (c['Recipient State Code'] as string) || '',
-        popState: (c['Place of Performance State Code'] as string) || '',
-        awardType: (c['Contract Award Type'] as string) || '',
-        generatedId: gid,
-        usaSpendingUrl: gid
-          ? `https://www.usaspending.gov/award/${gid}`
-          : `https://www.usaspending.gov/keyword_search/${encodeURIComponent(awardId)}`,
-      };
-    });
+    const rows: AwardRow[] = (data.results || []).map((c: Record<string, unknown>) => mapAwardRow(c, opts));
     return { rows, total: data.page_metadata?.total ?? rows.length, ok: true };
   } catch (err) {
     console.error('[usaspending:awards-search] fetch failed:', err);

@@ -53,6 +53,17 @@ describe('OSBP contact provenance is always in the payload', () => {
     expect(r._meta.coverage).toBe('hit');
     expect(r._meta.grounded).toBe(true);
   });
+
+  it('United States Coast Guard is a directory hit (issue-log #6 original payload)', () => {
+    const r = lookupFederalOsbp({ agency: 'United States Coast Guard' });
+    expect(r._meta.match).toBe('command');
+    expect(r._meta.coverage).toBe('hit');
+    expect(r._meta.grounded).toBe(true);
+    expect(r._meta.office_count).toBeGreaterThan(0);
+    expect(r.office?.email).toMatch(/uscg\.mil$/i);
+    expect(r.office?.osbp_director).toMatch(/Kersey-Robinson/i);
+    expect(r.office?.director_verified).toBe('2026-06');
+  });
 });
 
 describe('OSBP coverage classification', () => {

@@ -36,6 +36,11 @@ import {
   formatPainPointForDisplay,
   toCitation,
 } from '@/lib/strategic-intel/sourced-pain-points';
+import {
+  directoryCommands,
+  identityEstablishedEqual,
+  resolveDirectoryIdentity,
+} from '@/lib/gov-contacts/agency-identity';
 
 // Types
 export interface UnifiedAgencyResult {
@@ -190,6 +195,16 @@ export async function getAgency(
 ): Promise<UnifiedAgencyResult | null> {
   const opts = { ...defaultOptions, ...options };
 
+  // Directory identity first — alias/pain keys miss "Naval Sea Systems Command"
+  // (pain is keyed NAVSEA). Commands are what users type.
+  const dir = resolveDirectoryIdentity(identifier, directoryCommands());
+  if (dir.kind === 'command') {
+    return buildAgencyResultFromDirectory(dir.info, opts);
+  }
+  if (dir.kind === 'parent_roster') {
+    return buildAgencyResult(dir.parentLabel, 'exact', 100, opts);
+  }
+
   // Try CGAC code
   if (/^\d{3}$/.test(identifier)) {
     const cgacAgency = resolveCgacCode(identifier);
@@ -221,6 +236,29 @@ export async function getAgency(
   }
 
   return null;
+}
+
+async function buildAgencyResultFromDirectory(
+  info: { fullName: string; abbreviation: string; parentAgency: string },
+  options: UnifiedSearchOptions,
+): Promise<UnifiedAgencyResult | null> {
+  const result = await buildAgencyResult(info.fullName, 'exact', 100, options);
+  if (!result) return null;
+  result.shortName = info.abbreviation;
+  result.parent = info.parentAgency;
+  result.parentPath = `${info.parentAgency} > ${info.fullName}`;
+  result.level = identityEstablishedEqual(info.fullName, info.parentAgency) ? 'department' : 'agency';
+  // Directory SYSCOMs are not USASpending toptiers — do not display a borrowed CGAC.
+  result.cgacCode = null;
+  if (result.painPoints.length === 0) {
+    const pain = getPainPointsForAgency(info.abbreviation) || getPainPointsForAgency(info.fullName);
+    if (pain?.painPoints.length) {
+      result.painPoints = pain.painPoints;
+      result.priorities = pain.priorities;
+      if (!result.sources.includes('pain_points')) result.sources.push('pain_points');
+    }
+  }
+  return result;
 }
 
 /**

@@ -153,4 +153,45 @@ describe('CHAIN-1 — live empty must be reconciled before asserting absence', (
     expect(r._meta.grounded).toBe(false);
     expect(r._meta.degraded).toBe(true);
   });
+
+  it('Monarch Yachts unique-picks the DBA row among live Monarch* legal names', async () => {
+    const marine = {
+      ueiSAM: 'MMWUEI000001',
+      legalBusinessName: 'MONARCH MARINE WORKS INC',
+      dbaName: 'Monarch Yachts',
+      registrationStatus: 'Active',
+    };
+    const otherA = { ueiSAM: 'OTHER1XXXXXX', legalBusinessName: 'MONARCH INC', registrationStatus: 'Active' };
+    const otherB = { ueiSAM: 'OTHER2XXXXXX', legalBusinessName: 'MONARCH CONSULTING LLC', registrationStatus: 'Active' };
+    mockSearch.mockImplementation((a: { legalBusinessName?: string; dbaName?: string }) => {
+      if (a.dbaName) return { entities: [] };
+      return { entities: [otherA, marine, otherB] };
+    });
+    mockByUei.mockResolvedValue(marine);
+    const r = await lookupSamEntity({ name: 'Monarch Yachts' });
+    expect(r._meta.lookup_status).toBe('found');
+    expect(r.entity?.legalBusinessName).toBe('MONARCH MARINE WORKS INC');
+    expect(r.entity?.dbaName).toBe('Monarch Yachts');
+    expect(r._meta.source).toBe('sam_live');
+    expect(mockLocalName).not.toHaveBeenCalled();
+  });
+
+  it('Monarch Yachts still unique-picks when live legal hits omit DBA and the mirror has it', async () => {
+    const liveMarine = {
+      ueiSAM: 'MMWUEI000001',
+      legalBusinessName: 'MONARCH MARINE WORKS INC',
+      registrationStatus: 'Active',
+    };
+    const otherA = { ueiSAM: 'OTHER1XXXXXX', legalBusinessName: 'MONARCH INC', registrationStatus: 'Active' };
+    mockSearch.mockResolvedValue({ entities: [otherA, liveMarine] });
+    mockLocalName.mockResolvedValue([{
+      entity: { ...liveMarine, dbaName: 'Monarch Yachts' },
+      asOf: '2026-09-18',
+    }]);
+    mockByUei.mockResolvedValue({ ...liveMarine, dbaName: 'Monarch Yachts' });
+    const r = await lookupSamEntity({ name: 'Monarch Yachts' });
+    expect(r._meta.lookup_status).toBe('found');
+    expect(r.entity?.ueiSAM).toBe('MMWUEI000001');
+    expect(r._meta.source).toBe('sam_live');
+  });
 });

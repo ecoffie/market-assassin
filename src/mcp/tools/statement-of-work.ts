@@ -13,6 +13,7 @@
  */
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
+import { detectPiee } from '@/lib/sam/notice-identity';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface StatementOfWorkInput {
@@ -34,6 +35,7 @@ export interface StatementOfWorkResult {
     method: 'sow_heading' | 'classified_sow' | 'clin_scope' | 'none';
     sow_chars: number;
     has_clin_scope: boolean;
+    piee: boolean;
   };
 }
 
@@ -73,6 +75,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
     source = 'notice_id';
   }
 
+  const piee = detectPiee(`${combined}\n${classifiedSow}`);
   const buildMiss = (): StatementOfWorkResult => {
     const result: StatementOfWorkResult = {
       found: false,
@@ -87,6 +90,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
         method: 'none',
         sow_chars: 0,
         has_clin_scope: false,
+        piee,
       },
     };
     if (mcpFlags.aiHint) {
@@ -97,7 +101,10 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
             ? `No standalone SOW/PWS block found in notice ${noticeId}, and no CLIN schedule to reconstruct from — the scope is likely spread across attachments. Try get_solicitation_documents to pull the raw files.`
             : 'Provide rfp_text (the solicitation text) or a notice_id to extract the SOW from.',
         how_to_use: 'No SOW was recovered — do NOT invent scope. Pull the raw docs (get_solicitation_documents) and inspect.',
-        key_caveats: ['grounded=false means no SOW block was detected, not that the RFP has no scope of work.'],
+        key_caveats: [
+          'grounded=false means no SOW block was detected, not that the RFP has no scope of work.',
+          ...(piee ? ['PIEE/WAWF is required in the synopsis even though no SOW heading was found.'] : []),
+        ],
       };
     }
     return result;
@@ -146,6 +153,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
       method,
       sow_chars: sowText.length,
       has_clin_scope: clin !== null,
+      piee,
     },
   };
 

@@ -18,6 +18,7 @@ import {
   osbpContradictsRequestedAgency,
   queryIdentifiesCandidate,
   resolveDirectoryIdentity,
+  resolveIdentitySpendingGrain,
 } from './agency-identity';
 import {
   getAgencyInfoByParentAgency,
@@ -379,5 +380,64 @@ describe('getEnhancedAgencyInfo reports fallback', () => {
     expect(r.osbpSource).toBe('directory');
     expect(r.smallBusinessContact?.genericFallback).not.toBe(true);
     expect(r.smallBusinessContact?.directorVerified).toBe('2026-06');
+  });
+});
+
+describe('agency identity — spending grain (NAVSEA lock)', () => {
+  it('NAVSEA and Naval Sea Systems Command share the locked parent-service grain', () => {
+    for (const q of ['NAVSEA', 'Naval Sea Systems Command', 'navsea']) {
+      const g = resolveIdentitySpendingGrain(q);
+      expect(g.established, q).toBe(true);
+      expect(g.identity, q).toEqual({
+        command: 'NAVSEA',
+        service: 'Department of the Navy',
+        parent: 'Department of Defense',
+      });
+      expect(g.spendingScope, q).toBe('PARENT_SERVICE');
+      expect(g.spendingScopeName, q).toBe('Department of the Navy');
+      expect(g.commandSpending, q).toBe('NOT_ESTABLISHED');
+      expect(g.serviceFetch, q).toEqual({ subAgency: 'Department of the Navy' });
+      expect(g.displayName, q).toBe('Naval Sea Systems Command');
+    }
+  });
+
+  it('Navy dollars are REQUESTED service spend, not a first-won SYSCOM', () => {
+    for (const q of ['Navy', 'Department of the Navy']) {
+      const g = resolveIdentitySpendingGrain(q);
+      expect(g.established, q).toBe(true);
+      expect(g.identity.command, q).toBeNull();
+      expect(g.identity.service, q).toBe('Department of the Navy');
+      expect(g.identity.parent, q).toBe('Department of Defense');
+      expect(g.spendingScope, q).toBe('REQUESTED');
+      expect(g.commandSpending, q).toBe('NOT_APPLICABLE');
+      expect(g.serviceFetch, q).toEqual({ subAgency: 'Department of the Navy' });
+    }
+  });
+
+  it('United States Coast Guard is USCG, not State, and does not borrow DHS dollars', () => {
+    const g = resolveIdentitySpendingGrain('United States Coast Guard');
+    expect(g.identity.command).toBe('USCG');
+    expect(g.identity.parent).toBe('Department of Homeland Security');
+    expect(g.spendingScope).toBe('NOT_ESTABLISHED');
+    expect(g.commandSpending).toBe('NOT_ESTABLISHED');
+    expect(g.serviceFetch).toBeNull();
+    expect(g.identity.command).not.toBe('State');
+  });
+
+  it('STATE still resolves to Department of State as REQUESTED toptier spend', () => {
+    const g = resolveIdentitySpendingGrain('STATE');
+    expect(g.identity.command).toBe('State');
+    expect(g.spendingScope).toBe('REQUESTED');
+    expect(g.toptierName).toBe('Department of State');
+    expect(g.commandSpending).toBe('NOT_APPLICABLE');
+  });
+
+  it('NAVAIR and NAVSUP follow the same SYSCOM grain as NAVSEA — no special case', () => {
+    for (const q of ['NAVAIR', 'NAVSUP']) {
+      const g = resolveIdentitySpendingGrain(q);
+      expect(g.spendingScope, q).toBe('PARENT_SERVICE');
+      expect(g.identity.service, q).toBe('Department of the Navy');
+      expect(g.commandSpending, q).toBe('NOT_ESTABLISHED');
+    }
   });
 });

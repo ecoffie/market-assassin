@@ -456,6 +456,9 @@ describe('lookup tool contract', () => {
       provenance: 'sam_opportunities',
       not_biddable: true,
       version_count: 4,
+      deadline_conflict: false,
+      deadline_conflict_reasons: [],
+      lot_deadlines: [],
     };
     const prompt = pickHandoff([item], false);
     expect(prompt).toMatch(/award isn't in Mindy yet/i);

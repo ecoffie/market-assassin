@@ -100,6 +100,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   const a = anchor.value;
   const notice = a?.notice ?? null;
   const incumbent = a?.incumbent ?? null;
+  const groundedIncumbent = a?._meta?.grounded_incumbent === true;
   if (!notice) {
     return miss('Solicitation identifier did not resolve to a stored notice.', sol, started);
   }
@@ -108,7 +109,8 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   const agency = pick(notice, 'agency', 'department', 'subTier', 'fullParentPathName');
   const office = pick(notice, 'office', 'officeAddress', 'dodaac');
   const noticeId = pick(notice, 'notice_id', 'noticeId') || sol;
-  const incumbentName = (incumbent as { recipientName?: string } | null)?.recipientName;
+  const namedIncumbentRow = groundedIncumbent ? incumbent : null;
+  const incumbentName = (namedIncumbentRow as { recipientName?: string } | null)?.recipientName;
 
   // 2) Fan out — parallel, each guarded — on what the notice gave us.
   const [docs, depth, pricing, contacts, financials] = await Promise.all([
@@ -129,7 +131,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   return {
     subject: input.client_name || pick(notice, 'title') || `Solicitation ${sol}`,
     opportunity: notice,
-    incumbent,
+    incumbent: namedIncumbentRow,
     incumbent_financials: financials.value,
     prior_awards: a?.prior_awards ?? [],
     competition: depth.value,

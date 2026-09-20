@@ -15,6 +15,12 @@ import {
   type SolicitationIntent,
 } from '@/lib/sam/solicitation-intent';
 import {
+  extractLotDeadlines,
+  lotDeadlinesConflict,
+  type DeadlineConflictReason,
+  type LotDeadline,
+} from '@/lib/sam/notice-identity';
+import {
   deriveSolicitationStatus,
   extractAmendmentLabel,
   isNoticeUuid,
@@ -82,6 +88,9 @@ export interface LookupItem {
   provenance: string;
   not_biddable: boolean;
   version_count: number;
+  deadline_conflict: boolean;
+  deadline_conflict_reasons: DeadlineConflictReason[];
+  lot_deadlines: LotDeadline[];
 }
 
 export interface LookupSolicitationResult {
@@ -310,12 +319,21 @@ function toItem(
   query: string,
   now: Date,
   versionCount: number,
+  extras?: {
+    deadline_conflict?: boolean;
+    deadline_conflict_reasons?: DeadlineConflictReason[];
+    lot_deadlines?: LotDeadline[];
+  },
 ): LookupItem {
   const status = deriveSolicitationStatus(row, now);
   const buyerLeaf = String(row.agency_hierarchy || '').split('.').filter(Boolean).pop()
     || row.sub_tier
     || row.department
     || null;
+  const lot_deadlines = extras?.lot_deadlines ?? extractLotDeadlines(row.description || '');
+  const lotConflict = lotDeadlinesConflict(row.response_deadline, lot_deadlines);
+  const reasons = extras?.deadline_conflict_reasons
+    ?? (lotConflict ? ['lot_due_dates'] satisfies DeadlineConflictReason[] : []);
   return {
     kind,
     title: row.title,
@@ -336,6 +354,9 @@ function toItem(
     provenance,
     not_biddable: status !== 'open',
     version_count: versionCount,
+    deadline_conflict: extras?.deadline_conflict ?? lotConflict,
+    deadline_conflict_reasons: reasons,
+    lot_deadlines,
   };
 }
 
@@ -554,6 +575,11 @@ export async function lookupSolicitation(
       query || resolved.queried,
       now,
       resolved.version_count,
+      {
+        deadline_conflict: resolved.deadline_conflict,
+        deadline_conflict_reasons: resolved.deadline_conflict_reasons,
+        lot_deadlines: resolved.lot_deadlines,
+      },
     );
     item.status = resolved.status;
     item.latest_amendment = resolved.amendment;
@@ -642,6 +668,11 @@ export async function lookupSolicitation(
   const UPGRADE_CAP = 10;
   const upgraded: Array<{ row: LookupRow; why: WhyMatched[]; score: number }> = [];
   const versionCounts = new Map<string, number>();
+  const deadlineExtras = new Map<string, {
+    deadline_conflict: boolean;
+    deadline_conflict_reasons: DeadlineConflictReason[];
+    lot_deadlines: LotDeadline[];
+  }>();
   for (let i = 0; i < preScored.length; i++) {
     const cur = preScored[i];
     const sol = String(cur.row.solicitation_number || '').trim();
@@ -655,6 +686,11 @@ export async function lookupSolicitation(
           points_of_contact: cur.row.points_of_contact,
         });
         versionCounts.set(row.notice_id, canon.version_count);
+        deadlineExtras.set(row.notice_id, {
+          deadline_conflict: canon.deadline_conflict,
+          deadline_conflict_reasons: canon.deadline_conflict_reasons,
+          lot_deadlines: canon.lot_deadlines,
+        });
         const family = listingKey(row);
         const why = whyMatchedFor(row, needles, {
           fromHistory: historySet.has(normalizeNoticeUuid(row.notice_id)) || historyFamilyKeys.has(family),
@@ -684,6 +720,7 @@ export async function lookupSolicitation(
       query,
       now,
       versionCounts.get(s.row.notice_id) || 1,
+      deadlineExtras.get(s.row.notice_id),
     );
   });
 
