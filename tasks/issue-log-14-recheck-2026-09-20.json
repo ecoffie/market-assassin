@@ -1,0 +1,326 @@
+{
+  "started_utc": "2026-09-20T18:54:52.843Z",
+  "finished_utc": "2026-09-20T18:56:12.750Z",
+  "base": "https://getmindy.ai",
+  "serving_commit_from_maps_account_build": "5cc700d79517687a934867c7244ec8d4bd8f994e",
+  "production_deploy_id_observed": "dpl_DE5v71VKaWFaq6J9UXL8omhYEWFm",
+  "checks": [
+    {
+      "id": 1,
+      "tool": "extract_compliance_matrix",
+      "input": {
+        "notice_id": "6552b25bf0e648f39b44228275998eef"
+      },
+      "ms": 32503,
+      "isError": false,
+      "pass": true,
+      "note": "All five present \u2260 full-document completeness",
+      "evidence": {
+        "count": 52,
+        "recovered": [
+          "scif"
+        ],
+        "present_in_source": [
+          "loa_range",
+          "flight_deck",
+          "scif",
+          "berthing",
+          "magazine"
+        ],
+        "missing_from_matrix": [],
+        "extraction_completeness": "source_text",
+        "named_specs_in_matrix_blob": {
+          "scif": true,
+          "loa": true,
+          "flight deck": true,
+          "berthing": true,
+          "magazine": true
+        }
+      }
+    },
+    {
+      "id": 2,
+      "tool": "search_federal_contacts",
+      "input": {
+        "agency": "United States Coast Guard",
+        "search": "small business",
+        "limit": 5
+      },
+      "ms": 4706,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded": true,
+        "count": 1,
+        "sample": [
+          {}
+        ]
+      }
+    },
+    {
+      "id": "3+9",
+      "tool": "build_pursuit_dossier",
+      "input": {
+        "solicitation_number": "N00024-26-R-2200"
+      },
+      "ms": 12420,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "size_bytes": 19183,
+        "incumbent": null,
+        "incumbent_name": null,
+        "grounded_incumbent": false,
+        "mazak_in_prior_awards_only": true,
+        "omitted": {
+          "competition_businesses_omitted": 185,
+          "competition_businesses_returned": 15,
+          "competition_businesses_available": 200,
+          "document_text_chars_omitted": 1249,
+          "document_text_chars_returned": 1500,
+          "note": "Dossier omits records for size. competition lists a capped firm sample \u2014 call assess_market_depth for the full scored list. Document bodies are truncated here \u2014 call get_solicitation_documents for full attachment text."
+        },
+        "grounded": true
+      }
+    },
+    {
+      "id": 4,
+      "tool": "get_agency_intel",
+      "input": {
+        "agency": "Naval Sea Systems Command"
+      },
+      "ms": 2042,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "matchType": "exact",
+        "requested_identity": {
+          "command": "NAVSEA",
+          "service": "Department of the Navy",
+          "parent": "Department of Defense"
+        },
+        "command_spending": {
+          "status": "NOT_ESTABLISHED"
+        },
+        "spending_scope": "PARENT_SERVICE",
+        "scope_name": "Department of the Navy",
+        "totalObligations": null,
+        "parent_service_total": 176557193879.18,
+        "priorities_have_dollar_on_prod": true,
+        "provenanceNote": "Provenance unavailable \u2014 10 legacy-manual claim(s) only. Do not treat as GAO fact."
+      }
+    },
+    {
+      "id": "4-local-dollar-omission",
+      "tool": "get_agency_intel",
+      "input": {
+        "agency": "Naval Sea Systems Command"
+      },
+      "surface": "local_worktree_not_prod",
+      "pass": true,
+      "evidence": {
+        "matchType": "exact",
+        "spending_scope": "PARENT_SERVICE",
+        "command_spending": "NOT_ESTABLISHED",
+        "parent_service_total": 176557193879.18,
+        "totalObligations": null,
+        "priority_count": 10,
+        "priorities_have_dollar": false,
+        "sample_priorities": [
+          "Columbia-class submarine program (FY2025) \u2014 design and construction support opportunities for shipbuilding contractors. Dollar amounts omitted until sourced.",
+          "Virginia-class submarine Block V production (FY2025-2026) \u2014 opportunities for suppliers and subsystem integrators in upcoming solicitations. Dollar amounts omitted until sourced.",
+          "DDG-51 Arleigh Burke-class destroyer modernization (FY2025) \u2014 combat systems upgrades and shipyard services. Dollar amounts omitted until sourced."
+        ],
+        "provenanceNote": "Provenance unavailable \u2014 10 legacy-manual claim(s) only. Do not treat as GAO fact. Unsourced dollar amounts are omitted from default priority text until sourced.",
+        "provenance": [
+          "LEGACY_MANUAL",
+          "LEGACY_MANUAL",
+          "LEGACY_MANUAL"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "tool": "lookup_federal_osbp",
+      "input": {
+        "agency": "United States Coast Guard"
+      },
+      "ms": 2569,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded": true
+      }
+    },
+    {
+      "id": 8,
+      "tool": "search_past_contracts",
+      "input": {
+        "naics": "336612",
+        "limit": 5
+      },
+      "ms": 1489,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded": true,
+        "row_count": 5,
+        "queried": {
+          "state_scope": "pop",
+          "naics": "336612"
+        },
+        "first_naicsCode": "",
+        "empty_source_naics_with_query_filter": true,
+        "first_pscCode": "",
+        "first_awardingOffice": "",
+        "first_recipientState": "",
+        "first_popState": "LA",
+        "field_status": {
+          "naics": "source_or_empty",
+          "psc": "source_or_empty",
+          "recipient_state": "source_or_empty",
+          "pop_state": "place_of_performance_not_recipient_hq",
+          "note": "naicsCode/pscCode/recipientState are USASpending source fields (empty when the API returns null). queriedNaics/queriedPsc are the filter you sent \u2014 not award evidence. popState is place of performance only; it does not establish recipient HQ."
+        }
+      }
+    },
+    {
+      "id": 10,
+      "tool": "get_solicitation_incumbent",
+      "input": {
+        "solicitation_number": "N00024-26-R-2200"
+      },
+      "ms": 3466,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded_notice": true,
+        "grounded_incumbent": false,
+        "incumbent": null,
+        "deadline_conflict": true,
+        "lot_deadlines": [
+          {
+            "lot": "Lot 1",
+            "date": "2026-08-13",
+            "excerpt": "Lot 1 proposals and Lot 2 proposals from offerors not submitting a proposal for the initial APL Delivery Order are due 13 August 2026"
+          },
+          {
+            "lot": "Lot 2",
+            "date": "2026-08-31",
+            "excerpt": "Lot 2 proposals from offerors submitting a proposal for the initial APL Delivery Order are due 31 August 2026"
+          }
+        ],
+        "response_deadline": "2026-08-31T19:00:00+00:00",
+        "notice_id": "3a6a586d85964c15aa010ccc7a5914ed"
+      }
+    },
+    {
+      "id": 11,
+      "tool": "extract_statement_of_work",
+      "input": {
+        "notice_id": "N00024-26-R-2200"
+      },
+      "ms": 5002,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded": false,
+        "piee": true,
+        "piee_links": [
+          "https://piee.eb.mil/sol/xhtml/unauth/search/oppMgmtLink.xhtml?noticeId=N0002426R220X&noticeType=CombinedSynopsisSolicitation"
+        ],
+        "retrieval_limitation": "Scope documents are hosted on PIEE (external), not as SAM.gov resourceLinks. Mindy did not retrieve or read those attachments \u2014 absence of a SOW heading in the synopsis text does not establish that no SOW exists in the unread PIEE package. External link(s): https://piee.eb.mil/sol/xhtml/unauth/search/oppMgmtLink.xhtml?noticeId=N0002426R220X&noticeType=CombinedSynopsisSolicitation",
+        "unread_attachments": 1
+      }
+    },
+    {
+      "id": 12,
+      "tool": "get_solicitation_documents",
+      "input": {
+        "notice_id_sol": "N00024-26-R-4160",
+        "notice_id_uuid": "85a62e9a3f4f4f54b0ade7aa855fcc89"
+      },
+      "ms": 4065,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "sol": {
+          "notice_id": "85a62e9a3f4f4f54b0ade7aa855fcc89",
+          "desc_chars": 0,
+          "grounded": false,
+          "doc_count": 0
+        },
+        "uuid": {
+          "notice_id": "85a62e9a3f4f4f54b0ade7aa855fcc89",
+          "desc_chars": 0,
+          "grounded": false,
+          "doc_count": 0
+        },
+        "identity_consistent": true,
+        "body_available": false,
+        "body_note": "DB description empty; live SAM noticedesc returned 429 during local probe; doc_count 0 (no resourceLinks) remains honest. Prior 8,649-char body not currently available \u2014 not a sol\u2194UUID divergence."
+      }
+    },
+    {
+      "id": 13,
+      "tool": "referee_proposal_compliance",
+      "input": null,
+      "pass": null,
+      "skipped": true,
+      "reason": "Original 17-requirements / ~15k-draft payload is not in the repo or attachments. Never invent a missing original payload."
+    },
+    {
+      "id": 14,
+      "tool": "lookup_sam_entity",
+      "input": {
+        "name": "Monarch Yachts"
+      },
+      "ms": 5817,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded": false,
+        "degraded": false,
+        "reconciliation": {
+          "outcome": "not_found",
+          "sources_checked": [
+            {
+              "source": "sam_live_legal",
+              "hits": 0,
+              "status": "ok"
+            },
+            {
+              "source": "sam_live_dba",
+              "hits": 0,
+              "status": "ok"
+            },
+            {
+              "source": "local_registry",
+              "hits": 0,
+              "status": "ok"
+            }
+          ],
+          "note": "Live SAM legal-name search, live SAM DBA search, and the local sam_entities mirror all returned no unique match. This is not a missed DBA classifier \u2014 when a DBA row exists, lookup_sam_entity unique-picks it. A prior claim that this trade name maps to a registered entity is not supported by current sources."
+        }
+      }
+    },
+    {
+      "id": "market-depth-336612",
+      "tool": "assess_market_depth",
+      "input": {
+        "naics": "336612"
+      },
+      "ms": 1441,
+      "isError": false,
+      "pass": true,
+      "evidence": {
+        "grounded": true
+      }
+    }
+  ],
+  "summary": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 1
+  }
+}

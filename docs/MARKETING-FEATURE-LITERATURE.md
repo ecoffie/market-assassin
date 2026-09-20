@@ -7244,10 +7244,10 @@ and still drops Dale Carnegie / dirty IT slivers.
 
 ## LEGACY_MANUAL priority dollars omitted until sourced (2026-09-20)
 
-**What.** `get_agency_intel` / shared sourced-pain-points reader no longer surfaces unsourced dollar figures from LEGACY_MANUAL priority prose (NAVSEA Columbia-class / Virginia-class / SIOP / etc.). Qualitative program and opportunity framing stays, still labeled LEGACY_MANUAL. Issue-log tracker now separates developer-verified vs independently verified (Round 3 = 6 of 6 *retestable*, not 14/14; actual test date 2026-09-20, serving commit `6b14507f`).
+**What.** `get_agency_intel` / shared sourced-pain-points reader no longer surfaces unsourced dollar figures from LEGACY_MANUAL priority prose (NAVSEA Columbia-class / Virginia-class / SIOP / etc.). Qualitative program and opportunity framing stays, still labeled LEGACY_MANUAL. Issue-log tracker separates developer-verified, Round-PDF independently verified, agent recheck, and documented limitations (Round 3 = 6 of 6 *retestable*, not 14/14).
 
 **Why.** Round 3 correctly flagged that LEGACY_MANUAL NAVSEA lines carrying "$2.3B / $1.1B / …" read as budget fact to a skimmer even when provenance is labeled. Those amounts were curated editorial content with null source_url — not SCN/CRS-backed figures.
 
 **SEO.** NAVSEA priorities / agency intel provenance / LEGACY_MANUAL / Columbia-class / SIOP.
 
-**Proof.** Unit: `omitUnsourcedDollarAmounts` strips `$2.3B` while keeping Columbia-class + shipbuilding contractors; `loadLegacyPainPointsForAgency('NAVSEA')` priorities contain no `$`; SOURCE_FACT claims keep sourced dollars. Tracker: `docs/issue-log-14-tracker.md` verification layers + Round 3 date/commit.
+**Proof.** Unit: `omitUnsourcedDollarAmounts` strips `$2.3B` while keeping Columbia-class + shipbuilding contractors; `loadLegacyPainPointsForAgency('NAVSEA')` priorities contain no `$`; SOURCE_FACT claims keep sourced dollars. Agent recheck 2026-09-20T18:54Z UTC on prod serving `5cc700d7` (aliases getmindy.ai / mcp.getmindy.ai): outstanding live inputs pass except #13 (original referee payload absent); #4 dollar omission confirmed local-only until this deploys. Tracker + artifact: `docs/issue-log-14-tracker.md`, `tasks/issue-log-14-recheck-2026-09-20.json`.
