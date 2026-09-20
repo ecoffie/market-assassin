@@ -27,6 +27,7 @@ import {
   resolveCanonicalSlug,
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
+  getYearlyTotalsForRecipient,
   getRecipientByUei,
   findCapableSmallBusinesses,
   recipientSlug,
@@ -38,6 +39,17 @@ import {
   allowColdBqLookup,
   type ColdBqTurnState,
 } from '@/lib/bigquery/cold-budget';
+import {
+  assessDateRange,
+  buildCountingBases,
+  classifyModNumber,
+  dateRangeValidFlag,
+  deriveActivityFromSeries,
+  describeCoverageTimestamp,
+  isModificationAction,
+  SHORT_TOTALS_NOTE,
+  summarizeHistoricalSetAsides,
+} from '@/lib/contractor/award-history-shape';
 
 /** Clamp a caller-supplied result limit to [1, max], defaulting when absent/invalid. */
 function resolveLimit(raw: unknown, def: number, max: number): number {
@@ -272,11 +284,13 @@ export function makeTier2Tools(email: string) {
     //   2. cold + budget ok    -> one live BQ scan, result cached for everyone after
     //   3. cold + budget spent -> profile + explicit partial/degraded state, never false-empty
     const childUeis = profile.child_ueis?.length ? profile.child_ueis : [profile.rollup_uei];
+    const TOP_AGENCIES_LIMIT = 5;
 
     // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
-    let [awards, agencies] = await Promise.all([
+    let [awards, agencies, yearly] = await Promise.all([
       getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
-      getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
+      getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, false).catch(() => []),
+      getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
     ]);
 
     // Pass 2 — only if warm missed AND the company actually HAS awards (award_count comes
@@ -290,9 +304,10 @@ export function makeTier2Tools(email: string) {
       if (resolvedCold || (await allowColdLookup())) {
         // resolvedCold: we already spent a unit resolving THIS company this turn — the
         // enrichment is the same company, so no extra unit is consumed.
-        [awards, agencies] = await Promise.all([
+        [awards, agencies, yearly] = await Promise.all([
           getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
-          getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
+          getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, true).catch(() => []),
+          getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, true).catch(() => []),
         ]);
       } else {
         // Budget denied. We did NOT look, so we must not claim there is nothing to find.
@@ -306,18 +321,93 @@ export function makeTier2Tools(email: string) {
           award_count: profile.award_count,
         }));
       }
+    } else if (hasAwards && yearly.length === 0 && enrichmentStatus === 'complete') {
+      // Awards/agencies can be warm while the new yearly-totals:v3 key is still cold.
+      // Activity fields need the series — fill yearly alone when budget allows.
+      if (resolvedCold || (await allowColdLookup())) {
+        yearly = await getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, true).catch(() => []);
+      }
     }
+
+    const series = yearly.map((y) => ({
+      fiscalYear: y.fiscal_year,
+      totalObligations: Number(y.total_obligated || 0),
+      // Pass through only when present — never invent from net.
+      positiveObligations:
+        y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+      deobligations: y.deobligations == null ? undefined : Number(y.deobligations),
+      awardCount: Number(y.award_count || 0),
+    }));
+    const activity = deriveActivityFromSeries(series);
+    const counting = buildCountingBases({
+      uniqueAwards: profile.award_count ?? 0,
+      series,
+      recentActions: awards.map((a) => ({ awardId: a.award_id })),
+    });
+    const coverageTs = describeCoverageTimestamp({
+      lastRecipientActionDate: profile.last_action_date ?? null,
+    });
+    const agenciesServed = profile.distinct_agency_count ?? agencies.length;
+    // Recent-awards sample only — not a full-history set-aside census.
+    // Labels with null years; coverage is partial by construction.
+    const historicalSetAsides = summarizeHistoricalSetAsides(
+      awards.map((a) => ({
+        setAside: a.set_aside,
+        fiscalYear: null,
+      })),
+      { coverage: 'partial' },
+    );
+
+    const shapedAgencies = agencies.map((a) => ({
+      awarding_agency: a.awarding_agency,
+      total_amount: a.total_amount,
+      pct_of_total: a.pct_of_total,
+      // Never fabricate zero award counts when the query does not return them.
+      count: null as number | null,
+      count_unavailable: true,
+    }));
+
+    const shapedAwards = awards.map((r) => {
+      const range = assessDateRange(r.pop_start_date, r.pop_end_date);
+      const modNumber = r.mod_number ?? null;
+      return {
+        award_id: r.award_id,
+        piid: r.piid,
+        mod_number: modNumber,
+        mod_classification: classifyModNumber(modNumber),
+        is_modification: isModificationAction(modNumber),
+        awarding_agency: r.awarding_agency,
+        awarding_office: r.awarding_office,
+        naics_code: r.naics_code,
+        naics_description: r.naics_description,
+        description: r.description,
+        obligation_amount: r.obligation_amount,
+        action_date: r.action_date,
+        pop_start_date: r.pop_start_date,
+        pop_end_date: r.pop_end_date,
+        date_range_assessment: range.assessment,
+        date_range_valid: dateRangeValidFlag(r.pop_start_date, r.pop_end_date),
+        date_range_issue: range.issue,
+        pop_state: r.pop_state,
+        set_aside: r.set_aside,
+        grain: 'obligation_action' as const,
+      };
+    });
 
     return {
       ok: true,
       found: true,
       resolution: 'unique',
+      match_status: 'unique',
       source: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
       coverage: {
         dataset: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
         measure: 'total_obligated',
         scope: totalsScope,
+        // Recipient last action — NOT warehouse ingest freshness.
         as_of: profile.last_action_date ?? null,
+        as_of_meaning: coverageTs.last_recipient_action_meaning,
+        freshness_note: coverageTs.freshness_note,
         not_equivalent_to: totalsScope === 'single_uei'
           ? 'recipients_rollup.total_obligated'
           : 'recipients.total_obligated',
@@ -328,19 +418,37 @@ export function makeTier2Tools(email: string) {
         location: [profile.city, profile.state].filter(Boolean).join(', ') || null,
         total_obligated: profile.total_obligated,
         award_count: profile.award_count,
-        agencies_served: profile.distinct_agency_count,
+        agencies_served: agenciesServed,
         first_award: profile.first_action_date,
         last_award: profile.last_action_date,
+        last_positive_obligation_fy: activity.last_positive_obligation_fy,
+        activity_status: activity.activity_status,
+        activity_note: activity.activity_note,
+        activity_observation_period: activity.observation_period,
+        obligations_are_not_revenue: true,
       },
-      top_agencies: agencies,
-      recent_awards: awards,
+      counting_bases: counting,
+      top_agencies: shapedAgencies,
+      top_agencies_returned: shapedAgencies.length,
+      top_agencies_limit: TOP_AGENCIES_LIMIT,
+      top_agencies_capped: agenciesServed > shapedAgencies.length,
+      top_agencies_note:
+        agenciesServed > shapedAgencies.length
+          ? `Showing top ${shapedAgencies.length} of ${agenciesServed} agencies by net obligations (includes $0/negative nets). Cap is explicit.`
+          : 'Agency list includes $0 and negative net totals when present.',
+      recent_awards: shapedAwards,
+      recent_awards_note:
+        'recent_awards are dollar-bearing obligation actions (often modifications). See counting_bases for unique awards in this sample.',
+      historical_set_asides: {
+        ...historicalSetAsides,
+        note:
+          historicalSetAsides.note +
+          ' Sampled from recent_awards on this profile call — not a full-history census.',
+      },
       // P0-2 invariant: when award_count > 0 and enrichment was not actually queried,
       // empty arrays must NEVER be presented as complete data.
       enrichment_status: enrichmentStatus,
-      totals_note:
-        'total_obligated is this coverage snapshot (recipients_rollup for a slug hit, recipients for a UEI loaded after the slug missed). ' +
-        'get_contractor_award_history reports recipients.total_obligated for one UEI, plus a fiscal-year series summed from usaspending.awards. ' +
-        'The same award_count can still differ. Do not treat the two dollar figures as one total.',
+      totals_note: SHORT_TOTALS_NOTE,
       ...(enrichmentStatus === 'budget_limited'
         ? {
             partial: true,

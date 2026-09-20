@@ -16,6 +16,16 @@ import { bqUnavailable } from './cache';
 import { readServedPage } from '../awards-serving';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
+import {
+  buildCountingBases,
+  dateRangeValidFlag,
+  assessDateRange,
+  deriveActivityFromSeries,
+  describeCoverageTimestamp,
+  isModificationAction,
+  classifyModNumber,
+  summarizeHistoricalSetAsides,
+} from '@/lib/contractor/award-history-shape';
 
 // Queries that scan the full `awards` table filtered by recipient_uei
 // can exceed the BQ client's 5 GiB default maximumBytesBilled for
@@ -525,6 +535,8 @@ export async function getTopNaicsForRecipient(
 export interface RecentAwardRow {
   award_id: string;
   piid: string | null;
+  /** Modification number from FPDS/USASpending — empty/0 = base action. */
+  mod_number: string | null;
   awarding_agency: string | null;
   awarding_office: string | null;
   naics_code: string | null;
@@ -548,13 +560,17 @@ export async function getRecentAwardsForRecipient(
   // instead of BigQuery's wrapper objects ({value: 'YYYY-MM-DD'}) which
   // break our formatDate(). Also filter to dollar-bearing transactions —
   // $0 modifications dominate the recent timeline but tell users nothing.
+  // Grain = obligation ACTIONS (often mods). Same award_id can appear more
+  // than once; do NOT treat this list as unique awards. mod_number is the
+  // modification signal — never PIID repetition alone.
   return queryCached<RecentAwardRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v3-m`,
+    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v4-m`,
     query: `
       SELECT
         award_id,
         piid,
+        CAST(mod_number AS STRING) AS mod_number,
         awarding_agency,
         awarding_office,
         naics_code,
@@ -579,7 +595,13 @@ export async function getRecentAwardsForRecipient(
 
 export interface YearlyTotalRow {
   fiscal_year: number;
+  /** Net obligations (positive + negative). Not revenue. */
   total_obligated: number;
+  /** Sum of obligation_amount where amount > 0. */
+  positive_obligations: number;
+  /** Sum of obligation_amount where amount < 0 (negative number). */
+  deobligations: number;
+  /** Distinct award_id with any action in this FY — not additive across years. */
   award_count: number;
 }
 
@@ -590,16 +612,54 @@ export async function getYearlyTotalsForRecipient(
 ): Promise<YearlyTotalRow[]> {
   return queryCached<YearlyTotalRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:yearly-totals:v2-m`,
+    cacheKey: `rollup:${rollupUei}:yearly-totals:v3-m`,
     query: `
       SELECT
         fiscal_year,
         SUM(obligation_amount) AS total_obligated,
+        SUM(IF(obligation_amount > 0, obligation_amount, 0)) AS positive_obligations,
+        SUM(IF(obligation_amount < 0, obligation_amount, 0)) AS deobligations,
         COUNT(DISTINCT award_id) AS award_count
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei IN UNNEST(@ueis)
       GROUP BY fiscal_year
       ORDER BY fiscal_year ASC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface SetAsideHistoryRow {
+  set_aside: string;
+  award_count: number;
+  first_fy: number | null;
+  last_fy: number | null;
+  total_obligated: number;
+}
+
+export async function getSetAsideHistoryForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  liveBq = false,
+): Promise<SetAsideHistoryRow[]> {
+  return queryCached<SetAsideHistoryRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:set-aside-history:v1-m`,
+    query: `
+      SELECT
+        set_aside,
+        COUNT(DISTINCT award_id) AS award_count,
+        MIN(fiscal_year) AS first_fy,
+        MAX(fiscal_year) AS last_fy,
+        SUM(obligation_amount) AS total_obligated
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND set_aside IS NOT NULL
+        AND set_aside != ''
+        AND NOT STARTS_WITH(UPPER(set_aside), 'NO SET ASIDE')
+      GROUP BY set_aside
+      ORDER BY award_count DESC
     `,
     params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
@@ -1459,25 +1519,31 @@ export async function getBqContractorHistory(opts: {
   // collide with the page's full-child-set result. Prefix keeps them separate.
   const cacheKey = `single:${uei}`;
 
-  const [yearly, agencies, naics, recent, yearlyByAgency] = await Promise.all([
+  const TOP_AGENCIES_LIMIT = 8;
+  const [yearly, agencies, naics, recent, yearlyByAgency, setAsideHist] = await Promise.all([
     getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
-    getTopAgenciesForRecipient(ueiSet, cacheKey, 8, liveBq),
+    getTopAgenciesForRecipient(ueiSet, cacheKey, TOP_AGENCIES_LIMIT, liveBq),
     getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
     getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
     getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
+    getSetAsideHistoryForRecipient(ueiSet, cacheKey, liveBq),
   ]);
 
   const awardCount = Number(profile.award_count || 0);
   // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
   // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
   // empty arrays mean "not retrieved", not "none exist".
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v1-m`;
+  const setAsideUnavailable =
+    awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
   const detailIncomplete =
     awardCount > 0 &&
-    (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v2-m`, yearly.length) ||
-      bqUnavailable(`rollup:${cacheKey}:top-agencies:8:v4-m`, agencies.length) ||
+    (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v3-m`, yearly.length) ||
+      bqUnavailable(`rollup:${cacheKey}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`, agencies.length) ||
       bqUnavailable(`rollup:${cacheKey}:top-naics:8:v2-m`, naics.length) ||
-      bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v3-m`, recent.length) ||
-      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length));
+      bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v4-m`, recent.length) ||
+      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length) ||
+      setAsideUnavailable);
   const enrichmentStatus: 'complete' | 'budget_limited' = detailIncomplete
     ? 'budget_limited'
     : 'complete';
@@ -1496,18 +1562,46 @@ export async function getBqContractorHistory(opts: {
   .map(y => ({
     fiscalYear: y.fiscal_year,
     totalObligations: Number(y.total_obligated || 0),
+    // Pass through only when the v3 query field is present — never invent from net.
+    positiveObligations:
+      y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+    deobligations:
+      y.deobligations == null ? undefined : Number(y.deobligations),
     awardCount: Number(y.award_count || 0),
     agencyBreakdown: byYear.get(y.fiscal_year) || [],
   }));
   const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
   const topAgency = agencies[0]?.awarding_agency || null;
   const totalObligations = Number(profile.total_obligated || 0);
+  const activity = deriveActivityFromSeries(series);
+  const counting = buildCountingBases({
+    uniqueAwards: awardCount,
+    series,
+    recentActions: recent.map((r) => ({ awardId: r.award_id })),
+  });
+  const coverageTs = describeCoverageTimestamp({
+    lastRecipientActionDate: profile.last_action_date || null,
+  });
+  const historicalSetAsides = summarizeHistoricalSetAsides(
+    setAsideUnavailable
+      ? []
+      : setAsideHist.map((r) => ({
+          setAside: r.set_aside,
+          fiscalYear: r.last_fy == null ? null : Number(r.last_fy),
+        })),
+    { coverage: setAsideUnavailable ? 'unavailable' : 'complete' },
+  );
+  const agenciesServed = Number(profile.distinct_agency_count || agencies.length);
+  const topAgenciesCapped = agenciesServed > agencies.length;
 
   return {
     success: true,
     source: 'bigquery_normalized',
     coverage: enrichmentStatus === 'budget_limited' ? 'limited' : 'cached',
+    // lastUpdated remains for compatibility — it is the recipient's last action,
+    // NOT warehouse ingest freshness (see coverage_timestamp).
     lastUpdated: profile.last_action_date || null,
+    coverage_timestamp: coverageTs,
     contractor: {
       company: profile.recipient_name,
       slug: recipientSlug(profile.recipient_name),
@@ -1517,36 +1611,76 @@ export async function getBqContractorHistory(opts: {
       contractCount: awardCount,
       hasContact: false, hasEmail: false, hasPhone: false,
     },
-    match: { method: 'recipient_name', confidence: 'high', name: profile.recipient_name },
+    match: {
+      method: 'recipient_uei',
+      confidence: 'high',
+      name: profile.recipient_name,
+      // Shared vocabulary across MCP tools (profile resolution / SAM lookup_status / history).
+      match_status: 'unique',
+    },
     summary: {
       totalObligations, awardCount, latestFiscalYear, topAgency,
       averageAwardSize: awardCount > 0 ? totalObligations / awardCount : 0,
+      last_positive_obligation_fy: activity.last_positive_obligation_fy,
+      activity_status: activity.activity_status,
+      activity_note: activity.activity_note,
+      activity_observation_period: activity.observation_period,
+      // Federal obligations ≠ company revenue.
+      obligations_are_not_revenue: true,
     },
+    counting_bases: counting,
     series,
-    // count: 0 here is a sentinel — the BQ top-agencies query intentionally
-    // doesn't return per-agency award_count (cost). We surface `share`
-    // (pct_of_total, 0-1) instead; renderers fall back to count only when
-    // share is undefined (i.e. the static-contractor path).
+    // Per-agency award_count is intentionally not queried here (scan cost).
+    // count=null means unavailable — never fabricate 0. share can be ≤0 for
+    // deobligation-only agencies (still a real relationship).
     topAgencies: agencies.map(a => ({
       agency: a.awarding_agency,
       amount: Number(a.total_amount || 0),
-      count: 0,
+      count: null as number | null,
+      count_unavailable: true,
       share: Number(a.pct_of_total || 0),
     })),
+    top_agencies_returned: agencies.length,
+    top_agencies_limit: TOP_AGENCIES_LIMIT,
+    agencies_served: agenciesServed,
+    top_agencies_capped: topAgenciesCapped,
+    top_agencies_note: topAgenciesCapped
+      ? `Showing top ${agencies.length} of ${agenciesServed} agencies by net obligations (includes $0 and negative nets). Cap is explicit — omitted agencies are not "no relationship".`
+      : 'Agency list includes $0 and negative net totals when present; negative net is deobligation evidence, not proof the agency was filtered out.',
     topNaics: naics.map(n => ({ naics: n.naics_code, description: n.naics_description || null, amount: Number(n.total_amount || 0), count: Number(n.award_count || 0) })),
-    recentAwards: recent.map(r => ({
-      id: r.award_id,
-      title: (r.description || r.piid || r.award_id || '').slice(0, 160),
-      agency: r.awarding_agency || '—',
-      subAgency: r.awarding_office || null,
-      naics: r.naics_code || null,
-      naicsDescription: r.naics_description || null,
-      amount: Number(r.obligation_amount || 0),
-      startDate: r.pop_start_date || null,
-      endDate: r.pop_end_date || null,
-      state: r.pop_state || null,
-      url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
-    })),
+    recentAwards: recent.map(r => {
+      const startDate = r.pop_start_date || null;
+      const endDate = r.pop_end_date || null;
+      const range = assessDateRange(startDate, endDate);
+      const modNumber = r.mod_number ?? null;
+      return {
+        id: r.award_id,
+        piid: r.piid || null,
+        modNumber,
+        modClassification: classifyModNumber(modNumber),
+        isModification: isModificationAction(modNumber),
+        title: (r.description || r.piid || r.award_id || '').slice(0, 160),
+        agency: r.awarding_agency || '—',
+        subAgency: r.awarding_office || null,
+        naics: r.naics_code || null,
+        naicsDescription: r.naics_description || null,
+        amount: Number(r.obligation_amount || 0),
+        actionDate: r.action_date || null,
+        startDate,
+        endDate,
+        dateRangeAssessment: range.assessment,
+        dateRangeValid: dateRangeValidFlag(startDate, endDate),
+        dateRangeIssue: range.issue,
+        state: r.pop_state || null,
+        setAside: r.set_aside || null,
+        url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
+        grain: 'obligation_action' as const,
+      };
+    }),
+    recent_awards_note:
+      'recentAwards are dollar-bearing obligation actions (often modifications of the same award_id). ' +
+      'Use counting_bases.recent_unique_awards for distinct awards in this sample.',
+    historical_set_asides: historicalSetAsides,
     gated: { fullHistory: false, contacts: false, workflowActions: false, exports: false },
     enrichment_status: enrichmentStatus,
     ...(enrichmentStatus === 'budget_limited'

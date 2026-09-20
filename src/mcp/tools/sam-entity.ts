@@ -13,6 +13,7 @@
 import { getEntityByUEI, searchEntities, type SAMEntity } from '@/lib/sam/entity-api';
 import { lookupLocalEntitiesByName, lookupLocalEntityByUEI } from '@/lib/sam/entity-local-fallback';
 import { classifyNameHits } from '@/lib/contractor/name-resolution';
+import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SamEntityInput {
@@ -69,6 +70,7 @@ export interface SamEntityResult {
      * empty = no query.
      */
     lookup_status: 'found' | 'ambiguous' | 'not_found' | 'lookup_failed' | 'empty';
+    match_status?: string;
     /**
      * Present on name-mode `not_found` only. Documents that legal-name, DBA, and the
      * local mirror were consulted — so a prior claim that "Monarch Yachts" is a DBA of
@@ -312,8 +314,17 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
 
   const result: SamEntityResult = {
     queried: { ...(uei ? { uei } : {}), ...(name ? { name } : {}), ...(state ? { state } : {}) },
-    entity,
-    matches,
+    entity: entity
+      ? {
+          ...entity,
+          // Defense in depth — blank PSC rows must never reach clients.
+          pscList: filterBlankPscList(entity.pscList),
+        }
+      : null,
+    matches: matches.map((m) => ({
+      ...m,
+      pscList: filterBlankPscList(m.pscList),
+    })),
     ...(certProvenance.length ? { cert_provenance: certProvenance } : {}),
     _meta: {
       grounded, degraded, match_count: matchCount, mode,
@@ -321,6 +332,8 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       // check — 'local' means "registered as of `as_of`", not "verified just now".
       source: usedLocal ? 'local_registry' : 'sam_live',
       lookup_status: lookupStatus,
+      // Shared vocabulary with get_contractor_profile (resolution) and award history (match_status).
+      match_status: lookupStatus === 'found' ? 'unique' : lookupStatus,
       ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
       ...(reconciliation ? { reconciliation } : {}),
     },

@@ -20,6 +20,7 @@ import { getContractorSalesHistory, type ContractorSalesHistory } from '@/lib/co
 import { establishAwardHistory, type AwardHistoryEvidence } from '@/lib/contractor/award-history-existence';
 import { getContractorHistoryByUei } from '@/lib/contractor/history-by-uei';
 import { resolveAwardCorpusByName, type AwardNameCandidate } from '@/lib/contractor/name-resolution';
+import { buildCountingBases } from '@/lib/contractor/award-history-shape';
 import { isWellFormedUei } from '@/lib/sam/resolve-uei';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -43,6 +44,8 @@ export interface ContractorAwardHistoryToolResult {
     award_count: number;
     total_obligations: number;
     resolution?: string;
+    /** Shared vocabulary with profile.resolution and SAM lookup_status. */
+    match_status?: string;
     name_resolution?: string;
     match_count?: number;
     coverage?: {
@@ -54,10 +57,15 @@ export interface ContractorAwardHistoryToolResult {
     };
     source?: string | null;
     asOf?: string | null;
+    as_of_meaning?: string;
     aggregates_cover?: string | null;
     cache?: string;
     enrichment_status?: 'complete' | 'budget_limited';
     partial?: boolean;
+    counting_bases?: unknown;
+    activity_status?: string;
+    last_positive_obligation_fy?: number | null;
+    activity_observation_period?: unknown;
     award_history_elsewhere?: boolean;
     award_history_sources?: string[];
     note?: string;
@@ -68,7 +76,25 @@ function clipRecent(history: ContractorSalesHistory, limit?: number): Contractor
   if (!limit || !Array.isArray(history.recentAwards) || history.recentAwards.length <= limit) {
     return history;
   }
-  return { ...history, recentAwards: history.recentAwards.slice(0, limit) };
+  const recentAwards = history.recentAwards.slice(0, limit);
+  const next: ContractorSalesHistory & { counting_bases?: ReturnType<typeof buildCountingBases> } = {
+    ...history,
+    recentAwards,
+  };
+  if (next.counting_bases || (history as { counting_bases?: unknown }).counting_bases) {
+    next.counting_bases = buildCountingBases({
+      uniqueAwards: history.summary?.awardCount ?? 0,
+      series: (history.series || []).map((y) => ({
+        fiscalYear: y.fiscalYear,
+        totalObligations: y.totalObligations,
+        positiveObligations: y.positiveObligations,
+        deobligations: y.deobligations,
+        awardCount: y.awardCount,
+      })),
+      recentActions: recentAwards.map((r) => ({ awardId: r.id })),
+    });
+  }
+  return next;
 }
 
 async function byUei(
@@ -106,6 +132,15 @@ async function byUei(
     r.resolution === 'found' ||
     (r.resolution === 'registered_zero' && !!history);
 
+  // enrichment_status lives on history — keep a single copy in _meta for MCP
+  // consumers that only read _meta (compat). Do not also echo partial twice
+  // without the history object carrying the same truth.
+  const enrichment = history?.enrichment_status;
+  const matchStatus =
+    r.resolution === 'found' || r.resolution === 'registered_zero'
+      ? 'unique'
+      : r.resolution;
+
   return {
     queried: { uei: r.uei },
     history,
@@ -115,12 +150,27 @@ async function byUei(
       award_count: awardCount,
       total_obligations: history?.summary?.totalObligations ?? 0,
       resolution: r.resolution,
+      match_status: matchStatus,
       source: r.source,
       asOf: r.asOf,
+      as_of_meaning:
+        'Recipient last action_date in the warehouse profile — not the ingest run date.',
       aggregates_cover: r.aggregates_cover,
       cache: r.cache,
-      ...(history?.enrichment_status
-        ? { enrichment_status: history.enrichment_status, partial: history.partial === true }
+      ...(history && 'counting_bases' in history
+        ? { counting_bases: (history as { counting_bases?: unknown }).counting_bases }
+        : {}),
+      ...(history?.summary?.activity_status
+        ? {
+            activity_status: history.summary.activity_status,
+            last_positive_obligation_fy: history.summary.last_positive_obligation_fy ?? null,
+            ...(history.summary.activity_observation_period
+              ? { activity_observation_period: history.summary.activity_observation_period }
+              : {}),
+          }
+        : {}),
+      ...(enrichment
+        ? { enrichment_status: enrichment, partial: history?.partial === true }
         : {}),
       ...(r.resolution === 'registered_zero'
         ? {
