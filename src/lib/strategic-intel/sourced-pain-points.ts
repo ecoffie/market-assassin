@@ -222,8 +222,11 @@ const INTRO_VERB_AMOUNT_RE =
   /\b(allocated|allocating|investing|budgeting|committing|funding|dedicating|planning)\s+\$[\d,]+(?:\.\d+)?\s*(?:[BbMmKk](?:illion)?)?\s*(?:for|to|in|through)?\s*/gi;
 
 export function omitUnsourcedDollarAmounts(text: string): {
+  /** Sanitized claim. Empty string when the claim was only an unsourced dollar amount — callers must omit, never restore the original. */
   text: string;
   omitted: string[];
+  /** True when dollars were stripped and nothing qualitative remained. */
+  emptied: boolean;
 } {
   const omitted: string[] = [];
   // Prefer verb+$amount+preposition as one unit so grammar stays readable.
@@ -236,7 +239,7 @@ export function omitUnsourcedDollarAmounts(text: string): {
     omitted.push(m.trim());
     return '';
   });
-  if (omitted.length === 0) return { text, omitted: [] };
+  if (omitted.length === 0) return { text, omitted: [], emptied: false };
 
   out = out
     .replace(/\s{2,}/g, ' ')
@@ -246,10 +249,15 @@ export function omitUnsourcedDollarAmounts(text: string): {
   if (out && /^[a-z]/.test(out)) {
     out = out.charAt(0).toUpperCase() + out.slice(1);
   }
-  return { text: out || text, omitted };
+  // Never fall back to `text` — that re-introduces the dollar amount we just removed
+  // (e.g. "$2.3B" or "Allocated $2.3B" would sanitize to "" then restore the original).
+  return { text: out, omitted, emptied: out.length === 0 };
 }
 
-/** Apply default-path dollar omission to a LEGACY_MANUAL claim. */
+/**
+ * Apply default-path dollar omission to a LEGACY_MANUAL claim.
+ * Returns "" when the claim empties — callers must drop the claim, not re-emit it.
+ */
 export function sanitizeLegacyClaimText(text: string): string {
   return omitUnsourcedDollarAmounts(text).text;
 }
@@ -269,6 +277,7 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
     if (!entry) continue;
     for (const pp of entry.painPoints ?? []) {
       const claim = sanitizeLegacyClaimText(pp);
+      if (!claim) continue; // dollar-only claims are omitted, not restored
       painPoints.push({
         agency: key,
         pain_point: claim,
@@ -283,6 +292,7 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
     }
     for (const pr of entry.priorities ?? []) {
       const claim = sanitizeLegacyClaimText(pr);
+      if (!claim) continue; // dollar-only claims are omitted, not restored
       priorities.push({
         agency: key,
         pain_point: claim,
@@ -353,8 +363,9 @@ export function formatPainPointForDisplay(p: SourcedPainPoint): string {
   }
   if (p.provenance === 'LEGACY_MANUAL') {
     // Defense in depth: never surface unsourced $ amounts even if a caller
-    // bypassed loadLegacyPainPointsForAgency.
+    // bypassed loadLegacyPainPointsForAgency. Empty = omit (do not restore).
     const claim = sanitizeLegacyClaimText(p.pain_point);
+    if (!claim) return '';
     if (/\(legacy/i.test(claim) || /provenance unavailable/i.test(claim)) return claim;
     return `${claim} [LEGACY_MANUAL — provenance unavailable]`;
   }
@@ -377,6 +388,8 @@ export function toCitation(p: SourcedPainPoint): {
 } {
   const claim =
     p.provenance === 'LEGACY_MANUAL' ? sanitizeLegacyClaimText(p.pain_point) : p.pain_point;
+  // Empty LEGACY_MANUAL claim means the row should have been filtered upstream;
+  // still never re-emit an unsourced dollar amount via citation.claim.
   return {
     claim,
     provenance: p.provenance,

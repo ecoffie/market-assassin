@@ -43,8 +43,9 @@ function initializeCaches() {
       agencyName,
       // LEGACY_MANUAL dollar figures are not sourced budget data — omit from
       // default customer responses; keep qualitative program framing.
-      painPoints: (data.painPoints || []).map(sanitizeLegacyClaimText),
-      priorities: (data.priorities || []).map(sanitizeLegacyClaimText),
+      // Dollar-only claims sanitize to "" and are dropped (never restored).
+      painPoints: (data.painPoints || []).map(sanitizeLegacyClaimText).filter(Boolean),
+      priorities: (data.priorities || []).map(sanitizeLegacyClaimText).filter(Boolean),
       matchedAliases: []
     });
   }

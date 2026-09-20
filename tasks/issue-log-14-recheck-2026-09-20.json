@@ -14,7 +14,7 @@
       "ms": 32503,
       "isError": false,
       "pass": true,
-      "note": "All five present \u2260 full-document completeness",
+      "note": "All five present \u2260 full-document completeness Round-PDF SCIF independence not established (R2 missed; R3 no fresh SCIF).",
       "evidence": {
         "count": 52,
         "recovered": [
@@ -36,7 +36,8 @@
           "berthing": true,
           "magazine": true
         }
-      }
+      },
+      "verification": "agent_rechecked"
     },
     {
       "id": 2,
@@ -242,7 +243,7 @@
       },
       "ms": 4065,
       "isError": false,
-      "pass": true,
+      "pass": null,
       "evidence": {
         "sol": {
           "notice_id": "85a62e9a3f4f4f54b0ade7aa855fcc89",
@@ -258,8 +259,11 @@
         },
         "identity_consistent": true,
         "body_available": false,
-        "body_note": "DB description empty; live SAM noticedesc returned 429 during local probe; doc_count 0 (no resourceLinks) remains honest. Prior 8,649-char body not currently available \u2014 not a sol\u2194UUID divergence."
-      }
+        "body_note": "DB description empty; live SAM noticedesc 429; doc_count 0. Identity OK; retrieval incomplete."
+      },
+      "identity_pass": true,
+      "retrieval_complete": false,
+      "verdict": "identity_passed; retrieval_incomplete"
     },
     {
       "id": 13,
@@ -267,7 +271,8 @@
       "input": null,
       "pass": null,
       "skipped": true,
-      "reason": "Original 17-requirements / ~15k-draft payload is not in the repo or attachments. Never invent a missing original payload."
+      "reason": "Original 17-requirements / ~15k-draft payload is not in the repo or attachments. Prior developer result is historical only \u2014 not an exact rerun. Unverified in this pass.",
+      "unverified_this_pass": true
     },
     {
       "id": 14,
@@ -319,8 +324,10 @@
     }
   ],
   "summary": {
-    "passed": 12,
+    "passed": 11,
     "failed": 0,
-    "skipped": 1
-  }
+    "skipped_or_split": 2,
+    "audit_fully_closed": false
+  },
+  "review_corrections_utc": "pending-push"
 }

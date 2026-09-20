@@ -8,6 +8,7 @@ import {
   loadLegacyPainPointsForAgency,
   formatPainPointForDisplay,
   omitUnsourcedDollarAmounts,
+  sanitizeLegacyClaimText,
   toCitation,
   type SourcedPainPoint,
 } from './sourced-pain-points';
@@ -88,8 +89,9 @@ describe('sourced pain points — provenance contract', () => {
   it('omits unsourced dollar amounts from LEGACY_MANUAL default claims', () => {
     const raw =
       'NAVSEA allocated $2.3B for the Columbia-class submarine program in FY2025, with ongoing contracts for design and construction support open to shipbuilding contractors.';
-    const { text, omitted } = omitUnsourcedDollarAmounts(raw);
+    const { text, omitted, emptied } = omitUnsourcedDollarAmounts(raw);
     expect(omitted.some((a) => /2\.3/i.test(a))).toBe(true);
+    expect(emptied).toBe(false);
     expect(text).not.toMatch(/\$/);
     expect(text).toMatch(/Columbia-class submarine program/i);
     expect(text).toMatch(/shipbuilding contractors/i);
@@ -98,6 +100,7 @@ describe('sourced pain points — provenance contract', () => {
     expect(bundle.priorities.length).toBeGreaterThan(0);
     for (const p of bundle.priorities) {
       expect(p.pain_point).not.toMatch(/\$/);
+      expect(p.pain_point.length).toBeGreaterThan(0);
       expect(p.provenance).toBe('LEGACY_MANUAL');
     }
     // Qualitative program names survive.
@@ -105,6 +108,18 @@ describe('sourced pain points — provenance contract', () => {
     expect(joined).toMatch(/Columbia-class/i);
     expect(joined).toMatch(/Virginia-class/i);
     expect(joined).toMatch(/SIOP|Shipyard Infrastructure/i);
+  });
+
+  it('does not restore a claim that sanitizes to empty (dollar-only)', () => {
+    // Regression: `out || text` used to re-emit the original amount.
+    for (const raw of ['$2.3B', 'Allocated $2.3B', 'allocated $2.3B for']) {
+      const { text, omitted, emptied } = omitUnsourcedDollarAmounts(raw);
+      expect(omitted.length).toBeGreaterThan(0);
+      expect(emptied).toBe(true);
+      expect(text).toBe('');
+      expect(text).not.toMatch(/\$|2\.3/i);
+      expect(sanitizeLegacyClaimText(raw)).toBe('');
+    }
   });
 
   it('keeps sourced dollar claims (SOURCE_FACT) intact', () => {

@@ -160,14 +160,16 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       sourcedCount = bundle.meta.sourcedCount;
       legacyCount = bundle.meta.legacyCount;
       hasSourced = bundle.meta.provenanceAvailable;
-      painPointCitations = bundle.painPoints.map(toCitation);
-      priorityCitations = bundle.priorities.map(toCitation);
-      painPoints = resolved.painPoints?.length
+      painPointCitations = bundle.painPoints.map(toCitation).filter((c) => c.claim.length > 0);
+      priorityCitations = bundle.priorities.map(toCitation).filter((c) => c.claim.length > 0);
+      painPoints = (resolved.painPoints?.length
         ? resolved.painPoints
-        : bundle.painPoints.map((p) => p.pain_point);
-      priorities = resolved.priorities?.length
+        : bundle.painPoints.map((p) => p.pain_point)
+      ).filter((s) => s.trim().length > 0);
+      priorities = (resolved.priorities?.length
         ? resolved.priorities
-        : bundle.priorities.map((p) => p.pain_point);
+        : bundle.priorities.map((p) => p.pain_point)
+      ).filter((s) => s.trim().length > 0);
       provenanceNote = hasSourced
         ? `${sourcedCount} living GAO-sourced claim(s) with citations; ${legacyCount} legacy-manual fallback claim(s).`
         : legacyCount > 0
