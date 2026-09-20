@@ -49,7 +49,16 @@ describe('outbound email: only a Resend-verified sender', () => {
   it('no route sets a `from:` on the unverified apex domain', () => {
     const offenders: string[] = [];
     for (const file of walk(SRC)) {
-      const code = strip(readFileSync(file, 'utf8'));
+      // Parallel vitest suites can create+delete probe files under src/ between
+      // walk() and readFileSync (ENOENT on __selftest_probe__/…). Skip vanished.
+      let raw: string;
+      try {
+        raw = readFileSync(file, 'utf8');
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') continue;
+        throw err;
+      }
+      const code = strip(raw);
       for (const line of code.split('\n')) {
         if (!UNVERIFIED_SENDER.test(line)) continue;
         if (VERIFIED.test(line)) continue; // @mail.getmindy.ai is the verified one
