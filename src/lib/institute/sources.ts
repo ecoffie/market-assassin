@@ -57,6 +57,8 @@ export interface IngestResult {
   inserted: boolean;                 // false = already in the corpus (idempotent)
   /** true only on the repair path: an existing row's attribution was refreshed. */
   updated?: boolean;
+  /** true when the identity exists and NOTHING source-derived changed (genuine no-op). */
+  unchanged?: boolean;
   resolution: AgencyResolution;
   error?: string;
 }
@@ -132,6 +134,70 @@ export function auditDocumentAgency(doc: InstituteDocument, canonicalNames: stri
 }
 
 /**
+ * Fields inside `raw` that are OPERATIONAL, not source-derived: they change on every
+ * poll regardless of whether the government changed anything.
+ *
+ * ⚠️ COMPARING THESE DEFEATS THE WHOLE POINT. `retrievedAt` is stamped at fetch time,
+ * so including it makes every unchanged artifact look modified — which is exactly the
+ * `evidenceUpdated: 29`-every-run churn this change removes.
+ */
+const OPERATIONAL_RAW_KEYS = new Set(['retrievedAt']);
+
+/** Stable, order-independent projection of `raw` limited to source-derived facts. */
+function sourceDerivedRaw(raw: unknown): string {
+  if (raw === null || raw === undefined) return 'null';
+  if (Array.isArray(raw)) return JSON.stringify(raw.map((v) => JSON.parse(sourceDerivedRaw(v))));
+  if (typeof raw !== 'object') return JSON.stringify(raw);
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(raw as Record<string, unknown>).sort()) {
+    if (OPERATIONAL_RAW_KEYS.has(k)) continue;
+    const v = (raw as Record<string, unknown>)[k];
+    out[k] = v !== null && typeof v === 'object' ? JSON.parse(sourceDerivedRaw(v)) : v;
+  }
+  return JSON.stringify(out);
+}
+
+/** The persisted columns a re-ingest may legitimately change. */
+export interface PersistedSourceFields {
+  title: string;
+  source_url: string;
+  publication_date: string | null;
+  canonical_agency: string | null;
+  toptier_code: string | null;
+  resolution_method: string | null;
+  resolution_confidence: string | null;
+  source_watermark: string | null;
+  abstract: string | null;
+  raw: unknown;
+}
+
+/**
+ * Has anything SOURCE-DERIVED actually changed?
+ *
+ * Identity columns (source_type, document_number) are excluded by construction — they
+ * are the key, not a payload. `updated_at` is never compared: it is a consequence of
+ * writing, so comparing it would make every row look changed forever.
+ *
+ * A real change (a new latest action, a corrected date, a newly grounded agency) MUST
+ * still produce an UPDATE. This only suppresses writes that would change nothing.
+ */
+export function hasSourceFieldChanges(
+  existing: Partial<PersistedSourceFields> | null | undefined,
+  incoming: PersistedSourceFields,
+): boolean {
+  if (!existing) return true;
+  const scalars: Array<keyof PersistedSourceFields> = [
+    'title', 'source_url', 'publication_date', 'canonical_agency',
+    'toptier_code', 'resolution_method', 'resolution_confidence',
+    'source_watermark', 'abstract',
+  ];
+  for (const k of scalars) {
+    if ((existing[k] ?? null) !== (incoming[k] ?? null)) return true;
+  }
+  return sourceDerivedRaw(existing.raw) !== sourceDerivedRaw(incoming.raw);
+}
+
+/**
  * Add one document to the Institute corpus. Idempotent on
  * (source_type, document_number) — re-ingesting cannot duplicate it.
  *
@@ -186,23 +252,50 @@ export async function ingestInstituteDocument(
     agencyNote: audit.note,
   };
 
-  const { data: existing } = await db
+  const { data: existing, error: lookupError } = await db
     .from('institute_sources')
     // unranged-ok: single row by the unique (source_type, document_number) key.
-    .select('id')
+    // Selects the comparison columns so an unchanged artifact can be a genuine no-op.
+    .select('id, title, source_url, publication_date, canonical_agency, toptier_code, resolution_method, resolution_confidence, source_watermark, abstract, raw')
     .eq('source_type', doc.sourceType).eq('document_number', doc.documentNumber).maybeSingle();
+
+  // ⚠️ A FAILED LOOKUP IS NOT "NO SUCH ROW". Treating it as absence would fall through
+  // to the insert path and attempt a DUPLICATE of an identity we already hold — the
+  // unique key would reject it, but the run would report a spurious failure and, on a
+  // table without that key, would genuinely duplicate. Surface it instead.
+  if (lookupError) {
+    return { documentNumber: doc.documentNumber, instituteSourceId: null, inserted: false, resolution, error: lookupError.message };
+  }
 
   if (existing?.id) {
     if (!options.updateExisting) {
       return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, resolution };
     }
-    // Repair path: same identity, refreshed attribution/provenance. No new row.
-    const { error: updErr } = await db.from('institute_sources').update({
+
+    const incoming: PersistedSourceFields = {
+      title: doc.title,
+      source_url: doc.url,
+      publication_date: doc.publicationDate,
       canonical_agency: resolution.canonicalAgency,
       toptier_code: resolution.toptierCode,
       resolution_method: resolution.method,
       resolution_confidence: resolution.confidence,
+      source_watermark: doc.sourceWatermark ?? doc.publicationDate,
+      abstract: doc.abstract,
       raw: rawPayload,
+    };
+
+    // ⚠️ CHANGE-AWARE. An artifact the government has not touched must be a genuine
+    // no-op: no UPDATE, no updated_at churn. Before this, a steady-state cron
+    // rewrote all 29 rows every cycle and reported evidenceUpdated:29 forever, which
+    // makes a REAL change indistinguishable from routine noise.
+    if (!hasSourceFieldChanges(existing as Partial<PersistedSourceFields>, incoming)) {
+      return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, updated: false, unchanged: true, resolution };
+    }
+
+    // Something source-derived really changed -> write it. Identity is never touched.
+    const { error: updErr } = await db.from('institute_sources').update({
+      ...incoming,
       updated_at: new Date().toISOString(),
     }).eq('id', existing.id);
 
