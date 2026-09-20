@@ -81,38 +81,54 @@ COMMENT ON FUNCTION public.research_expected_sources() IS
 -- held_population is stamped from the live tables at apply time. upstream_population
 -- stays NULL: none of these four expose a countable upstream total, and a guessed
 -- denominator is worse than an absent one.
+-- `data_source_instances.dataset_key` is a FOREIGN KEY to `data_sources(key)`, so
+-- a dataset must exist before its sources can be registered. An invented key
+-- ('specialty_feeds') fails with 23503 — which is exactly how the sibling
+-- sam_opportunities migration was caught, and correctly rolled back.
+--
+-- `grants_gov` already exists as a dataset. DIBBS and the multi-source research
+-- corpus do not, so they are created here — truthfully, with the real cadence and
+-- NO last_built claim (that is what the advancement oracle above is for).
+INSERT INTO public.data_sources (key, name, category, refresh_cadence, is_active, notes)
+VALUES
+  ('dibbs_rfqs', 'DLA DIBBS RFQs', 'live_api', 'daily', TRUE,
+   'DLA DIBBS flat-file RFQs. Producer cron/sync-dibbs (0 8 * * *).'),
+  ('research_multisite', 'Research & Lab funding (multi-source)', 'built_curated', 'daily', TRUE,
+   'NIH RePORTER + Grants.gov slice + DARPA BAA + NSF SBIR into aggregated_opportunities. Per-SOURCE advancement via research_source_advancement(); the dataset-level clock masks dormant sources.')
+ON CONFLICT (key) DO NOTHING;
+
 INSERT INTO public.data_source_instances
   (dataset_key, source_key, name, discovery_url, ingest_mode, owner, watch_cadence_days,
    held_population, source_state, intervention_state, runbook_path)
 VALUES
-  ('specialty_feeds', 'dibbs_rfqs',
+  ('dibbs_rfqs', 'dibbs_dla_flat_files',
    'DLA DIBBS RFQs', 'https://www.dibbs.bsm.dla.mil/', 'automated', 'data-core', 1,
    (SELECT count(*) FROM public.dibbs_rfqs),
    'current', 'none_required', 'docs/data-core-reliability-dibbs-grants-sbir.md'),
 
-  ('specialty_feeds', 'grants_gov',
+  ('grants_gov', 'grants_gov_api',
    'Grants.gov opportunities', 'https://www.grants.gov/', 'automated', 'data-core', 1,
    (SELECT count(*) FROM public.grants_cache),
    'current', 'none_required', 'docs/data-core-reliability-dibbs-grants-sbir.md'),
 
-  ('specialty_feeds', 'research_nih_reporter',
+  ('research_multisite', 'research_nih_reporter',
    'NIH RePORTER (research + the ONLY SBIR feed)', 'https://api.reporter.nih.gov/', 'automated', 'data-core', 1,
    (SELECT count(*) FROM public.aggregated_opportunities WHERE source = 'nih_reporter'),
    'content_stale', 'required', 'docs/data-core-reliability-dibbs-grants-sbir.md'),
 
-  ('specialty_feeds', 'research_darpa_baa',
+  ('research_multisite', 'research_darpa_baa',
    'DARPA BAA', 'https://www.darpa.mil/work-with-us/opportunities', 'automated', 'data-core', 7,
    (SELECT count(*) FROM public.aggregated_opportunities WHERE source = 'darpa_baa'),
    'content_stale', 'required', 'docs/data-core-reliability-dibbs-grants-sbir.md'),
 
-  ('specialty_feeds', 'research_grants_gov_slice',
+  ('research_multisite', 'research_grants_gov_slice',
    'Grants.gov research slice', 'https://www.grants.gov/', 'automated', 'data-core', 7,
    (SELECT count(*) FROM public.aggregated_opportunities WHERE source = 'grants_gov'),
    'content_stale', 'required', 'docs/data-core-reliability-dibbs-grants-sbir.md'),
 
   -- NEVER produced a row. `unmeasured` is the honest state: we have never observed
   -- this source, so we cannot claim it is stale (that would imply it once worked).
-  ('specialty_feeds', 'research_nsf_sbir',
+  ('research_multisite', 'research_nsf_sbir',
    'NSF SBIR', 'https://www.nsf.gov/funding/', 'automated', 'data-core', 7,
    (SELECT count(*) FROM public.aggregated_opportunities WHERE source = 'nsf_sbir'),
    'unmeasured', 'required', 'docs/data-core-reliability-dibbs-grants-sbir.md')

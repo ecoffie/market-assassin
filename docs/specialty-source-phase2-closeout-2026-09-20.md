@@ -78,11 +78,14 @@ a countable upstream total, and a guessed denominator is worse than an absent on
 2. Verify through PostgREST: `npm run db:check -- data_source_instances source_key`
 3. `select * from research_source_advancement();` → nih 6d, grants_gov 161d, darpa 168d
 4. `select * from research_expected_sources();` → `nsf_sbir` present, `ever_advanced=false`
-5. `npm run db -- data_source_instances --eq dataset_key=specialty_feeds --select source_key,source_state`
-   → 6 rows; `research_nsf_sbir` = `unmeasured`
+5. `npm run db -- data_source_instances --eq dataset_key=research_multisite --select source_key,source_state`
+   → 4 rows; `research_nsf_sbir` = `unmeasured`
+   `npm run db -- data_source_instances --eq dataset_key=dibbs_rfqs --select source_key,source_state` → 1 row
+   `npm run db -- data_source_instances --eq dataset_key=grants_gov --select source_key,source_state` → 1 row
 
 **Rollback:** `DROP FUNCTION research_source_advancement, research_expected_sources;`
-and `DELETE FROM data_source_instances WHERE dataset_key='specialty_feeds';`
+and `DELETE FROM data_source_instances WHERE source_key IN ('dibbs_dla_flat_files','grants_gov_api','research_nih_reporter','research_darpa_baa','research_grants_gov_slice','research_nsf_sbir');`
+plus `DELETE FROM data_sources WHERE key IN ('dibbs_rfqs','research_multisite');`
 No source data is touched.
 
 ## Decisions the reviewer still owns
