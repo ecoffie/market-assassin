@@ -45,6 +45,8 @@ export interface ComplianceMatrixResult {
      */
     extraction_completeness: 'unproven' | 'source_text';
     source_spec_coverage?: SourceSpecCoverage;
+    /** Spec ids recovered from source after the LLM missed them (e.g. SCIF). */
+    recovered_source_specs?: string[];
     resolved_notice_id?: string;
     model: string;
   };
@@ -147,6 +149,9 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
       truncated_attachments: truncatedAttachments,
       extraction_completeness: completenessUnproven ? 'unproven' : 'source_text',
       source_spec_coverage: coverage,
+      ...(ex.recovered_source_specs?.length
+        ? { recovered_source_specs: ex.recovered_source_specs }
+        : {}),
       model: ex.model,
     },
   };

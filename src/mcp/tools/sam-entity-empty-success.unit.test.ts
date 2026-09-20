@@ -87,7 +87,13 @@ describe('CHAIN-1 — live empty must be reconciled before asserting absence', (
     const r = await lookupSamEntity({ name: 'ZZQX NO SUCH COMPANY ZZZ' });
     expect(r._meta.grounded).toBe(false);
     expect(r._meta.degraded).toBe(false);
+    expect(r._meta.lookup_status).toBe('not_found');
     expect(mockLocalName).toHaveBeenCalled();   // absence was ESTABLISHED, not assumed
+    expect(r._meta.reconciliation?.outcome).toBe('not_found');
+    expect(r._meta.reconciliation?.sources_checked.map((s) => s.source)).toEqual([
+      'sam_live_legal', 'sam_live_dba', 'local_registry',
+    ]);
+    expect(r._meta.reconciliation?.sources_checked.every((s) => s.hits === 0 && s.status === 'ok')).toBe(true);
   });
 
   it('a live HIT never gets overturned by the mirror', async () => {
@@ -193,5 +199,21 @@ describe('CHAIN-1 — live empty must be reconciled before asserting absence', (
     expect(r._meta.lookup_status).toBe('found');
     expect(r.entity?.ueiSAM).toBe('MMWUEI000001');
     expect(r._meta.source).toBe('sam_live');
+  });
+
+  it('Monarch Yachts with zero live+local hits is reconciled not_found (not a missed DBA)', async () => {
+    mockSearch.mockResolvedValue({ entities: [] });
+    mockLocalName.mockResolvedValue([]);
+    const r = await lookupSamEntity({ name: 'Monarch Yachts' });
+    expect(r._meta.lookup_status).toBe('not_found');
+    expect(r._meta.grounded).toBe(false);
+    expect(r._meta.degraded).toBe(false);
+    expect(r.entity).toBeNull();
+    expect(r._meta.reconciliation?.note).toMatch(/not a missed DBA classifier/i);
+    expect(r._meta.reconciliation?.sources_checked).toEqual([
+      { source: 'sam_live_legal', hits: 0, status: 'ok' },
+      { source: 'sam_live_dba', hits: 0, status: 'ok' },
+      { source: 'local_registry', hits: 0, status: 'ok' },
+    ]);
   });
 });

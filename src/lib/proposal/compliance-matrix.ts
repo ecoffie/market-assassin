@@ -14,6 +14,7 @@
  */
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { callLLM } from '@/lib/llm/call-llm';
+import { recoverMissingSourceSpecs } from '@/lib/proposal/matrix-source-coverage';
 
 export const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 
@@ -176,6 +177,8 @@ export interface MatrixExtraction {
   inputChars: number;
   originalChars: number;
   truncated: boolean;
+  /** Named source-spec anchors recovered deterministically after the LLM pass. */
+  recovered_source_specs?: string[];
 }
 
 /**
@@ -207,18 +210,38 @@ export async function extractComplianceMatrixFromText(
   // our 7-way enum (the model often echoes the doc's own headings, which breaks
   // downstream alignment — Eric QC).
   const seen = new Set<string>();
-  const requirements = merged
+  const llmRequirements = merged
     .filter((r) => {
       const k = (r.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
       if (!k || seen.has(k)) return false;
       seen.add(k);
       return true;
     })
-    .map((r, i) => ({
+    .map((r) => ({
       ...r,
-      id: `REQ-${String(i + 1).padStart(3, '0')}`,
       category: normalizeCategory(r.category as string | undefined, r.requirement),
     }));
 
-  return { requirements, ok, model: GROQ_MODEL, inputChars: inputText.length, originalChars, truncated };
+  // Named Section 3.0 specs (LOA, flight deck, SCIF, …) often appear as capability
+  // lines without shall/must — the LLM skips them. Recover from the source sentence
+  // so completeness is not luck-dependent (SCIF on notice 6552b25b…).
+  const recovered = recoverMissingSourceSpecs(text, llmRequirements);
+  const requirements = recovered.requirements.map((r, i) => ({
+    ...r,
+    id: `REQ-${String(i + 1).padStart(3, '0')}`,
+    category: normalizeCategory(
+      (r as ComplianceRequirement).category as string | undefined,
+      (r as ComplianceRequirement).requirement,
+    ),
+  })) as ComplianceRequirement[];
+
+  return {
+    requirements,
+    ok,
+    model: GROQ_MODEL,
+    inputChars: inputText.length,
+    originalChars,
+    truncated,
+    recovered_source_specs: recovered.recovered_ids,
+  };
 }

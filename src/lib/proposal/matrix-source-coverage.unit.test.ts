@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { prioritizeExtractionWindows } from '@/lib/proposal/compliance-matrix';
-import { auditSourceSpecCoverage } from '@/lib/proposal/matrix-source-coverage';
+import {
+  auditSourceSpecCoverage,
+  recoverMissingSourceSpecs,
+} from '@/lib/proposal/matrix-source-coverage';
 
 describe('matrix source-spec coverage — missing requirements, not row count', () => {
   const section3 = [
@@ -46,6 +49,35 @@ describe('matrix source-spec coverage — missing requirements, not row count', 
     ]);
     expect(coverage.missing_from_matrix).toEqual([]);
     expect(coverage.extracted).toHaveLength(5);
+  });
+});
+
+describe('recoverMissingSourceSpecs — SCIF notional capability line', () => {
+  const smvSnippet = [
+    'Modularity & C2',
+    'Command and Control (C2) space capability for mission planning and execution with Secure and unsecure communications capability (SIPR/NIPR). Notional 750 sq ft SCIF and 200 sq ft Radio Room.',
+    'Modular compartment architecture designed for rapid reconfiguration and modernization',
+    'Berthing & Accommodations',
+    'Total required berthing for up to 59 personnel',
+  ].join('\n');
+
+  it('recovers SCIF from a notional capability line the LLM skipped', () => {
+    const before = [
+      { requirement: 'Provide C2 space with SIPR/NIPR', source_quote: 'Secure and unsecure communications capability (SIPR/NIPR)' },
+    ];
+    expect(auditSourceSpecCoverage(smvSnippet, before).missing_from_matrix).toContain('scif');
+    const { requirements, recovered_ids } = recoverMissingSourceSpecs(smvSnippet, before);
+    expect(recovered_ids).toContain('scif');
+    expect(requirements.some((r) => /SCIF/i.test(`${r.requirement} ${r.source_quote || ''}`))).toBe(true);
+    expect(auditSourceSpecCoverage(smvSnippet, requirements).missing_from_matrix).not.toContain('scif');
+  });
+
+  it('does not invent SCIF when the source never states it', () => {
+    const { recovered_ids } = recoverMissingSourceSpecs(
+      'Section L. Offerors shall submit a technical volume.',
+      [{ requirement: 'Submit a technical volume', source_quote: 'submit a technical volume' }],
+    );
+    expect(recovered_ids).toEqual([]);
   });
 });
 
