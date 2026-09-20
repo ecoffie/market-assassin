@@ -62,7 +62,10 @@ const BASIS = 'set-aside-CODE obligations (USASpending) vs. statutory government
 export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoalingResult> {
   const detail = await getAgencySpendingDetail({ agency: input.agency, fiscalYear: input.fiscal_year });
   const resolved = detail.agency !== null;
-  const grounded = resolved && detail.total_obligated > 0 && !detail.degraded;
+  // Command grain (NAVSEA) has parent-service dollars, not command dollars — no scorecard.
+  const requestedTotal = detail.spending.scope === 'REQUESTED' ? detail.total_obligated : null;
+  const grounded = resolved && typeof requestedTotal === 'number' && requestedTotal > 0 && !detail.degraded;
+  const sbShare = grounded && typeof detail.small_business_share === 'number' ? detail.small_business_share : 0;
 
   // FM-U03 (Eric/QA 2026-07-29): when the agency doesn't resolve (or reported $0), emit NO scorecard.
   // Building the goals off an empty breakdown produced all-ZEROS rows — every category read "below
@@ -84,13 +87,13 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
   const result: SbaGoalingResult = {
     agency: detail.agency,
     fiscal_year: detail.fiscal_year,
-    total_obligated: detail.total_obligated,
+    total_obligated: requestedTotal ?? 0,
     goals,
     _meta: {
       grounded,
       degraded: detail.degraded,
       fiscal_year: detail.fiscal_year,
-      small_business_setaside_share: detail.small_business_share,
+      small_business_setaside_share: sbShare,
       meets_small_business_goal: meetsSb,
       basis: BASIS,
     },
