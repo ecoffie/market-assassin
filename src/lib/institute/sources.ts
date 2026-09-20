@@ -41,6 +41,14 @@ export interface InstituteDocument {
   publicationDate: string | null;
   abstract: string | null;
   sourceWatermark?: string | null;
+  /**
+   * Optional structured provenance, stored verbatim in institute_sources.raw.
+   * GAO documents carry none; legislative documents carry congress / chamber /
+   * bill number / legislative version / action dates / retrievedAt, which is the
+   * difference between a citation and a guess. Collectors that omit it keep the
+   * previous minimal shape.
+   */
+  raw?: Record<string, unknown>;
 }
 
 export interface IngestResult {
@@ -158,10 +166,12 @@ export async function ingestInstituteDocument(
     resolution_confidence: resolution.confidence,
     source_watermark: doc.sourceWatermark ?? doc.publicationDate,
     abstract: doc.abstract,
+    // The agency-classification audit ALWAYS travels with the row (from main).
+    // A collector-supplied provenance payload is merged on top of the default
+    // descriptors — dropping it would silently discard every legislative fact
+    // (congress, chamber, version, action dates, retrievedAt).
     raw: {
-      title: doc.title,
-      url: doc.url,
-      publicationDate: doc.publicationDate,
+      ...(doc.raw ?? { title: doc.title, url: doc.url, publicationDate: doc.publicationDate }),
       agencyClassification: audit.classification,
       agencyCandidates: audit.candidates,
       agencyNote: audit.note,
