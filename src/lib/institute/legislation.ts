@@ -399,6 +399,19 @@ export function billVersionsToDocuments(
 }
 
 /**
+ * Congress appends a qualifier after the citation number for errata and other
+ * supplemental prints ("S. Rept. 119-39,Errata"). That qualifier is the ONLY thing
+ * distinguishing two otherwise-identical report identities, so it belongs in the key.
+ * A bare citation yields '' and the id is unchanged (no churn for normal reports).
+ */
+export function citationSuffix(citation: string): string {
+  const after = citation.split(',').slice(1).join(' ').trim();
+  if (!after) return '';
+  const slug = after.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toUpperCase();
+  return slug ? `-${slug}` : '';
+}
+
+/**
  * A committee report is EVIDENCE IN ITS OWN RIGHT, not an attribute of the bill —
  * report language is where congressional direction actually lives. Conference reports
  * are flagged from the API's own `isConferenceReport`, never guessed from the title.
@@ -424,8 +437,18 @@ export function committeeReportToDocument(
   return {
     sourceOrg: 'Congress',
     sourceType: 'committee_report',
-    // Part is in the key: multi-part reports are distinct documents.
-    documentNumber: `${congress}-${type}-${number}${part && part > 1 ? `-PT${part}` : ''}`,
+    // Part AND citation-suffix are in the key: multi-part reports and errata/
+    // supplemental prints are distinct documents.
+    //
+    // ⚠️ Congress lists SEPARATE artifacts under ONE report number. Observed live on
+    // S.2296: `S. Rept. 119-39` and `S. Rept. 119-39,Errata` both come back with
+    // part=1. Keying on number+part alone collapsed them to one id, so a backfill
+    // would have inserted the first and SILENTLY DROPPED the errata on the unique
+    // key — losing a correction to the report language, which is exactly the kind of
+    // provenance this corpus exists to preserve.
+    documentNumber: `${congress}-${type}-${number}`
+      + (part && part > 1 ? `-PT${part}` : '')
+      + citationSuffix(citation),
     title: `${title} [${citation}${isConference ? ' — Conference Report' : ''}]`,
     url: `https://www.congress.gov/congressional-report/${congress}th-congress/${
       type === 'HRPT' ? 'house-report' : 'senate-report'

@@ -8,6 +8,7 @@ import {
   discoverBills,
   billVersionsToDocuments,
   committeeReportToDocument,
+  citationSuffix,
   readStatus,
   parseReportRef,
   resolveLegislationAgency,
@@ -364,5 +365,44 @@ describe('legislative clocks are scoped to the legislative corpus', () => {
 
     // And a failed clock read must not stamp (null would erase real history).
     expect(code).toContain('clocksReadable');
+  });
+});
+
+/**
+ * REGRESSION (found in production preview 2026-09-20): Congress lists SEPARATE
+ * artifacts under ONE report number. S.2296 returns both `S. Rept. 119-39` and
+ * `S. Rept. 119-39,Errata`, each with part=1. Keying on number+part alone produced
+ * ONE id for both, so a backfill would have inserted the report and silently dropped
+ * the errata on the unique key — losing a correction to report language.
+ */
+describe('committee report errata do not collapse into the base report', () => {
+  const rpt = (citation: string, part = 1) => committeeReportToDocument(
+    { type: 'SRPT', number: 39, congress: 119, part, isConferenceReport: false,
+      citation, issueDate: '2025-07-15T04:00:00Z', title: 'NDAA FY2026', chamber: 'Senate' }, 'T')!;
+
+  it('gives the errata its own document_number', () => {
+    const base = rpt('S. Rept. 119-39');
+    const errata = rpt('S. Rept. 119-39,Errata');
+    expect(base.documentNumber).toBe('119-SRPT-39');
+    expect(errata.documentNumber).toBe('119-SRPT-39-ERRATA');
+    expect(base.documentNumber).not.toBe(errata.documentNumber);
+  });
+
+  it('leaves an ordinary report id unchanged (no churn for existing ids)', () => {
+    expect(rpt('S. Rept. 119-39').documentNumber).toBe('119-SRPT-39');
+    const hrpt = committeeReportToDocument(
+      { type: 'HRPT', number: 698, congress: 119, part: 1, citation: 'H. Rept. 119-698', title: 'X' }, 'T')!;
+    expect(hrpt.documentNumber).toBe('119-HRPT-698');
+  });
+
+  it('still distinguishes multi-part reports, and combines part + suffix', () => {
+    expect(rpt('S. Rept. 119-39', 2).documentNumber).toBe('119-SRPT-39-PT2');
+    expect(rpt('S. Rept. 119-39,Errata', 2).documentNumber).toBe('119-SRPT-39-PT2-ERRATA');
+  });
+
+  it('citationSuffix is empty for a plain citation', () => {
+    expect(citationSuffix('S. Rept. 119-39')).toBe('');
+    expect(citationSuffix('S. Rept. 119-39,Errata')).toBe('-ERRATA');
+    expect(citationSuffix('S. Rept. 119-39, Part 2 Supplemental')).toBe('-PART-2-SUPPLEMENTAL');
   });
 });
