@@ -39,6 +39,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   matchesSubject,
   chamberOf,
+  undecorateTitle,
   congressApiKey,
   NDAA_TITLE_PATTERN,
   LEGISLATIVE_SOURCE_TYPES,
@@ -254,7 +255,19 @@ export async function knownMeasures(
       congress: c,
       billType: t,
       number: n,
-      title: String(row.title ?? ''),
+      /**
+       * ⚠️ THE AUTHORITATIVE UNDECORATED TITLE, never the persisted `title` column.
+       *
+       * Production incident 2026-09-20: reading the decorated column here fed a
+       * already-suffixed title back into billVersionsToDocuments, which decorated it
+       * AGAIN — one extra suffix per tracking run (H.R. 5180 reached five copies).
+       * `raw.billTitle` is what Congress actually returned. `undecorateTitle` is the
+       * fallback for rows written before billTitle existed; it strips only Mindy's
+       * own decoration format.
+       */
+      title: typeof raw.billTitle === 'string' && raw.billTitle
+        ? raw.billTitle
+        : undecorateTitle(String(row.title ?? '')),
       updateDate: null,
       originChamber: chamberOf(t),
     });
