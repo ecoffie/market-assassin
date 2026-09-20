@@ -45,6 +45,13 @@ WITH r AS (
   FROM public.agency_intelligence ai
   WHERE ai.intelligence_type = 'gao_high_risk'
 ),
+doc_counts AS (
+  SELECT r.source_document_id,
+         count(*)                     AS rows_for_document,
+         count(DISTINCT r.agency_name) AS agencies_for_document
+  FROM r
+  GROUP BY r.source_document_id
+),
 f AS (
   SELECT r.*,
     -- Does the title lead with something agency-shaped?
@@ -54,10 +61,13 @@ f AS (
     (r.agency_name IN ('General Government', 'Department of the', 'Department of Health',
                        'Department of Veterans', 'for Agency', 'Governing Agency'))
       AS stored_agency_is_artifact,
-    count(*)        OVER (PARTITION BY r.source_document_id) AS rows_for_document,
-    count(DISTINCT r.agency_name)
-                    OVER (PARTITION BY r.source_document_id) AS agencies_for_document
+    -- Pre-aggregated per document. Postgres does NOT implement DISTINCT inside a
+    -- window function (0A000), so the per-document fan-out is counted in a CTE
+    -- and joined back rather than computed with count(DISTINCT ...) OVER (...).
+    d.rows_for_document,
+    d.agencies_for_document
   FROM r
+  JOIN doc_counts d ON d.source_document_id = r.source_document_id
 )
 SELECT
   f.id,
