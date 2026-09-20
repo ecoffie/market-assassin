@@ -17,12 +17,25 @@
  * DELIVERY: extracted text is returned INLINE (capped); the raw file is a
  * short-lived SIGNED URL to our Storage copy (SAM API key never leaves the
  * server). SAM attachments are PUBLIC federal data — no entitlement gate.
+ *
+ * Honesty (issue-log #11/#12): resolve noticedesc when the description column
+ * is empty/URL; list unread attachments; surface PIEE external links with a
+ * retrieval_limitation so "no SOW heading" is not read as "no scope exists".
  */
 import { createClient } from '@supabase/supabase-js';
 import { getCached, setCached } from '@/lib/mcp/external-cache';
 import { fetchAndExtractNoticeFiles, normalizeNoticeId } from '@/lib/sam/fetch-pursuit-docs';
 import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
-import { assembleNoticeSourceText, attachmentLocationNote } from '@/lib/sam/notice-identity';
+import {
+  assembleNoticeSourceText,
+  attachmentLocationNote,
+  detectPiee,
+  extractPieeLinks,
+  pieeRetrievalLimitation,
+} from '@/lib/sam/notice-identity';
+import { parseSamAttachment } from '@/lib/sam/attachment-metadata';
+import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
+import { getRotatedSAMKey } from '@/lib/sam/utils';
 
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
@@ -48,6 +61,13 @@ export interface SolicitationDocument {
   location_note: string;
 }
 
+export interface ListedAttachment {
+  filename: string;
+  url: string | null;
+  has_extracted_text: boolean;
+  location: 'sam_public' | 'piee_external' | 'unknown';
+}
+
 export interface SolicitationDocumentsResult {
   notice_id: string;
   title: string | null;
@@ -63,6 +83,14 @@ export interface SolicitationDocumentsResult {
   /** Assembled SOW + body + attachment text. Full when textMode='full'. */
   source_text?: string;
   truncated_attachments?: number;
+  /** Every attachment named on the notice, including unread ones. */
+  listed_attachments: ListedAttachment[];
+  attachments_listed: number;
+  attachments_with_text: number;
+  piee: boolean;
+  piee_links: string[];
+  /** Null when no external-host limitation applies. */
+  retrieval_limitation: string | null;
 }
 
 interface CachedDocMeta {
@@ -128,6 +156,95 @@ async function toOutputDocs(
   );
 }
 
+function listedFromAttachmentsColumn(attachments: unknown): ListedAttachment[] {
+  if (!Array.isArray(attachments)) return [];
+  const out: ListedAttachment[] = [];
+  for (const entry of attachments) {
+    const parsed = parseSamAttachment(entry);
+    if (!parsed) continue;
+    out.push({
+      filename: parsed.name || 'SAM attachment',
+      url: parsed.url,
+      has_extracted_text: false,
+      location: 'sam_public',
+    });
+  }
+  return out;
+}
+
+function mergeListed(...groups: ListedAttachment[][]): ListedAttachment[] {
+  const byKey = new Map<string, ListedAttachment>();
+  for (const group of groups) {
+    for (const item of group) {
+      const key = (item.url || item.filename).toLowerCase();
+      const prev = byKey.get(key);
+      if (!prev) {
+        byKey.set(key, item);
+        continue;
+      }
+      byKey.set(key, {
+        ...prev,
+        ...item,
+        has_extracted_text: prev.has_extracted_text || item.has_extracted_text,
+      });
+    }
+  }
+  return [...byKey.values()];
+}
+
+function applyHonestyMeta(
+  base: SolicitationDocumentsResult,
+  listedGroups: ListedAttachment[],
+  textMode?: 'inline' | 'full',
+): SolicitationDocumentsResult {
+  const pieeCorpus = `${base.description}\n${base.sow_text}`;
+  const pieeLinks = extractPieeLinks(pieeCorpus);
+  const pieeListed: ListedAttachment[] = pieeLinks.map((url) => ({
+    filename: 'PIEE Combined Synopsis / Solicitation (external)',
+    url,
+    has_extracted_text: false,
+    location: 'piee_external',
+  }));
+
+  const listed = mergeListed(listedGroups, pieeListed);
+  for (const d of base.documents) {
+    if (!(d.extracted_text || '').trim()) continue;
+    const hit = listed.find(
+      (l) =>
+        (l.url && d.download_url && l.url === d.download_url) ||
+        l.filename.toLowerCase() === d.filename.toLowerCase(),
+    );
+    if (hit) hit.has_extracted_text = true;
+    else {
+      listed.push({
+        filename: d.filename,
+        url: d.download_url,
+        has_extracted_text: true,
+        location:
+          d.download_source === 'mindy_signed' || d.download_source === 'sam_public'
+            ? 'sam_public'
+            : 'unknown',
+      });
+    }
+  }
+
+  base.listed_attachments = listed;
+  base.attachments_listed = listed.length;
+  base.attachments_with_text = listed.filter((l) => l.has_extracted_text).length;
+  base.piee = detectPiee(pieeCorpus) || pieeLinks.length > 0;
+  base.piee_links = pieeLinks;
+  base.retrieval_limitation = pieeRetrievalLimitation(pieeLinks);
+
+  const assembled = assembleNoticeSourceText({
+    sow_text: base.sow_text,
+    description: base.description,
+    documents: base.documents,
+  });
+  base.truncated_attachments = assembled.truncated_attachments;
+  if (textMode === 'full') base.source_text = assembled.text;
+  return base;
+}
+
 export async function getSolicitationDocuments(input: {
   noticeId: string;
   /** inline (default) caps extracted_text for MCP payloads. full is required for compliance-matrix. */
@@ -149,12 +266,19 @@ export async function getSolicitationDocuments(input: {
     documents: [],
     source: 'none',
     degraded: false,
+    listed_attachments: [],
+    attachments_listed: 0,
+    attachments_with_text: 0,
+    piee: false,
+    piee_links: [],
+    retrieval_limitation: null,
   };
 
   if (!noticeId) return base;
 
   // ── Base fields from the opportunity cache (title + inline body/SOW text) ──
-  const OPP_COLS = 'notice_id, title, solicitation_number, department, agency_hierarchy, description, sow_text';
+  const OPP_COLS =
+    'notice_id, title, solicitation_number, department, agency_hierarchy, description, sow_text, attachments, raw_data';
   let { data: opp, error: oppError } = await supabase
     .from('sam_opportunities')
     .select(OPP_COLS)
@@ -188,14 +312,39 @@ export async function getSolicitationDocuments(input: {
   // From here on, use the RESOLVED notice_id (a sol#-input now points at the real UUID).
   const resolvedNoticeId = base.notice_id;
 
+  const listedFromCache = listedFromAttachmentsColumn(opp?.attachments);
+  let descriptionText = '';
   if (opp) {
     base.title = opp.title ?? null;
     base.solicitation_number = opp.solicitation_number ?? null;
     base.agency = opp.department ?? opp.agency_hierarchy ?? null;
     // description may still be a noticedesc URL on the ~5% not yet backfilled;
-    // only surface it as text if it isn't a bare link.
-    const desc = typeof opp.description === 'string' && !/^https?:\/\//i.test(opp.description.trim()) ? opp.description : '';
-    const dCap = cap(desc, inlineCap);
+    // only surface it as text if it isn't a bare link. Otherwise resolve on demand
+    // so sol# and UUID both return the same body (issue-log #12).
+    const storedDesc = typeof opp.description === 'string' ? opp.description : '';
+    const rawDesc =
+      opp.raw_data && typeof opp.raw_data === 'object'
+        ? String((opp.raw_data as { description?: unknown }).description || '')
+        : '';
+    if (storedDesc && !isDescriptionLink(storedDesc) && !/^https?:\/\//i.test(storedDesc.trim())) {
+      descriptionText = storedDesc;
+    } else {
+      const linkOrId = isDescriptionLink(storedDesc)
+        ? storedDesc
+        : isDescriptionLink(rawDesc)
+          ? rawDesc
+          : resolvedNoticeId;
+      const apiKey = getRotatedSAMKey();
+      if (apiKey) {
+        try {
+          descriptionText = await fetchNoticeDescription(linkOrId, apiKey);
+        } catch (err) {
+          console.error('[getSolicitationDocuments] noticedesc', err);
+          base.degraded = true;
+        }
+      }
+    }
+    const dCap = cap(descriptionText, inlineCap);
     base.description = dCap.text;
     base.description_truncated = dCap.truncated;
     const sCap = cap(opp.sow_text, inlineCap);
@@ -204,23 +353,32 @@ export async function getSolicitationDocuments(input: {
   }
 
   // ── Layer 1: WARM — notice-level dedup already in pursuit_documents ────────
+  // Include rows WITHOUT extracted_text so listed-but-unread files are visible.
   const { data: warmRows, error: warmError } = await supabase
     .from('pursuit_documents')
     .select('sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind')
     .eq('notice_id', resolvedNoticeId)
     .eq('doc_source', 'sam_public')
-    .not('extracted_text', 'is', null)
     .order('char_count', { ascending: false });
   if (warmError) {
     console.error('[getSolicitationDocuments] warm cache', warmError.message);
     base.degraded = true;
   }
 
+  const warmListed: ListedAttachment[] = [];
   if (warmRows && warmRows.length > 0) {
     const seen = new Set<string>();
     const metas: CachedDocMeta[] = [];
     for (const r of warmRows) {
-      if (seen.has(r.sam_file_id)) continue; // dedup across pursuits by file
+      const hasText = !!(r.extracted_text && String(r.extracted_text).trim());
+      warmListed.push({
+        filename: r.filename || 'SAM attachment',
+        url: r.sam_url ?? null,
+        has_extracted_text: hasText,
+        location: 'sam_public',
+      });
+      if (!hasText) continue;
+      if (seen.has(r.sam_file_id)) continue;
       seen.add(r.sam_file_id);
       metas.push({
         fileId: r.sam_file_id,
@@ -234,17 +392,25 @@ export async function getSolicitationDocuments(input: {
         extractedText: String(r.extracted_text || ''),
       });
     }
-    base.documents = await toOutputDocs(supabase, metas, inlineCap);
-    base.source = 'cache';
-    return finishDocs(base, input.textMode);
+    if (metas.length > 0) {
+      base.documents = await toOutputDocs(supabase, metas, inlineCap);
+      base.source = 'cache';
+      return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode);
+    }
   }
 
   // ── Layer 2: COLD CACHE — a prior MCP on-demand fetch ─────────────────────
   const cached = await getCached<CachedDocMeta[]>('solicitation_docs', { noticeId: resolvedNoticeId });
   if (cached && cached.length > 0) {
+    const cachedListed = cached.map((m) => ({
+      filename: m.filename,
+      url: m.samUrl,
+      has_extracted_text: !!(m.extractedText && m.extractedText.trim()),
+      location: 'sam_public' as const,
+    }));
     base.documents = await toOutputDocs(supabase, cached, inlineCap);
     base.source = 'cache';
-    return finishDocs(base, input.textMode);
+    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, cachedListed), input.textMode);
   }
 
   // ── Layer 3: COLD FETCH — on-demand download + extract (public SAM) ────────
@@ -254,17 +420,18 @@ export async function getSolicitationDocuments(input: {
     title: base.title,
     agency: base.agency,
   });
-  base.degraded = fetched.degraded;
+  base.degraded = base.degraded || fetched.degraded;
 
   if (fetched.documents.length === 0) {
-    // No attachments (many notices legitimately have none). Inline text (if any)
-    // is still returned above; the caller sees an honest empty documents list.
-    base.source = 'none';
-    return finishDocs(base, input.textMode);
+    // No SAM resourceLinks (many notices legitimately have none — PIEE-hosted packages).
+    // Inline description (resolved above) still returns; listed_attachments may name PIEE.
+    base.source = base.description || base.sow_text ? 'on_demand' : 'none';
+    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode);
   }
 
   // Upload each raw blob to Storage under a notice-level path, build metadata.
   const metas: CachedDocMeta[] = [];
+  const fetchedListed: ListedAttachment[] = [];
   for (const f of fetched.documents) {
     const safe = `${f.fileId}-${(f.filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_')}`.slice(0, 400);
     const storagePath = `_notices/${resolvedNoticeId}/${safe}`;
@@ -279,6 +446,13 @@ export async function getSolicitationDocuments(input: {
     } catch (err) {
       console.warn('[solicitation-docs] storage upload threw:', err);
     }
+    const hasText = !!(f.extractedText && f.extractedText.trim());
+    fetchedListed.push({
+      filename: f.filename,
+      url: f.samUrl,
+      has_extracted_text: hasText,
+      location: 'sam_public',
+    });
     metas.push({
       fileId: f.fileId,
       filename: f.filename,
@@ -287,30 +461,15 @@ export async function getSolicitationDocuments(input: {
       charCount: f.extractedText.length,
       docKind: f.docKind ?? null,
       storagePath: finalPath,
-      samUrl: f.samUrl, // best-effort fallback if the signed Storage copy is unavailable
+      samUrl: f.samUrl,
       extractedText: input.textMode === 'full' ? f.extractedText : f.extractedText.slice(0, CACHE_TEXT_CAP),
     });
   }
 
-  // Cache the metadata (NOT signed URLs — those are minted fresh each call).
   const cacheMetas = metas.map((m) => ({ ...m, extractedText: m.extractedText.slice(0, CACHE_TEXT_CAP) }));
   await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, cacheMetas, CACHE_TTL);
 
   base.documents = await toOutputDocs(supabase, metas, inlineCap);
   base.source = 'on_demand';
-  return finishDocs(base, input.textMode);
-}
-
-function finishDocs(
-  base: SolicitationDocumentsResult,
-  textMode?: 'inline' | 'full',
-): SolicitationDocumentsResult {
-  const assembled = assembleNoticeSourceText({
-    sow_text: base.sow_text,
-    description: base.description,
-    documents: base.documents,
-  });
-  base.truncated_attachments = assembled.truncated_attachments;
-  if (textMode === 'full') base.source_text = assembled.text;
-  return base;
+  return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, fetchedListed), input.textMode);
 }

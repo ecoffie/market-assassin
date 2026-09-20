@@ -49,15 +49,22 @@ export interface AwardRow {
   agency: string;
   subAgency: string;
   awardingOffice: string;
+  /** Source NAICS only — never stamped from the query filter. Empty when USASpending returns null. */
   naicsCode: string;
   naicsDescription: string;
+  /** Source PSC only — never stamped from the query filter. */
   pscCode: string;
   pscDescription: string;
+  /** Recipient HQ state. Empty when source null — do NOT treat popState as a substitute. */
   recipientState: string;
+  /** Place of performance state (not recipient HQ). */
   popState: string;
   awardType: string;
   generatedId: string;
   usaSpendingUrl: string;
+  /** Exact filter the caller sent; not source evidence that the award carries this NAICS. */
+  queriedNaics?: string;
+  queriedPsc?: string;
 }
 
 export interface AwardsByLocationResult {
@@ -102,8 +109,10 @@ interface FireResult {
 /** USASpending spending_by_award often returns NAICS/PSC/office/state as null
  *  even when those columns were requested and the FILTER matched. Measured
  *  2026-09-20: naics=336612 returned awards with `NAICS Code: null` on every
- *  sampled row. Stamp an exact 6-digit / 4-char filter onto the empty field
- *  so the caller can verify the row against the query they sent. */
+ *  sampled row. Keep source fields empty when null — never stamp the filter into
+ *  naicsCode/pscCode (that made query criteria look like award evidence). Carry
+ *  the filter separately as queriedNaics/queriedPsc. popState is place of
+ *  performance and must not be read as recipient HQ. */
 export function mapAwardRow(
   c: Record<string, unknown>,
   filter: { naics?: string; psc?: string } = {},
@@ -125,9 +134,9 @@ export function mapAwardRow(
     agency: (c['Awarding Agency'] as string) || '',
     subAgency: (c['Awarding Sub Agency'] as string) || '',
     awardingOffice: (c['Awarding Office'] as string) || '',
-    naicsCode: sourceNaics || (/^\d{6}$/.test(qNaics) ? qNaics : ''),
+    naicsCode: sourceNaics,
     naicsDescription: (c['NAICS Description'] as string) || '',
-    pscCode: sourcePsc || (/^[A-Z0-9]{4}$/.test(qPsc) ? qPsc : ''),
+    pscCode: sourcePsc,
     pscDescription: (c['Product or Service Code Description'] as string) || '',
     recipientState: (c['Recipient State Code'] as string) || '',
     popState: (c['Place of Performance State Code'] as string) || '',
@@ -136,6 +145,8 @@ export function mapAwardRow(
     usaSpendingUrl: gid
       ? `https://www.usaspending.gov/award/${gid}`
       : `https://www.usaspending.gov/keyword_search/${encodeURIComponent(awardId)}`,
+    ...(qNaics ? { queriedNaics: qNaics } : {}),
+    ...(qPsc ? { queriedPsc: qPsc } : {}),
   };
 }
 

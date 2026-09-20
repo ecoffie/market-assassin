@@ -13,7 +13,7 @@
  * cold path downloads + extracts). `_meta` always ships; `_ai_hint` OFF by
  * default. SAM attachments are PUBLIC federal data — no tier gate.
  */
-import { getSolicitationDocuments, type SolicitationDocument } from '@/lib/sam/solicitation-documents';
+import { getSolicitationDocuments, type SolicitationDocument, type ListedAttachment } from '@/lib/sam/solicitation-documents';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SolicitationDocumentsToolInput {
@@ -30,6 +30,7 @@ export interface SolicitationDocumentsToolResult {
   sow_text: string;
   sow_text_truncated: boolean;
   documents: SolicitationDocument[];
+  listed_attachments: ListedAttachment[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -37,6 +38,11 @@ export interface SolicitationDocumentsToolResult {
     doc_count: number;
     source: 'cache' | 'on_demand' | 'none';
     signed_url_ttl_seconds: number;
+    attachments_listed: number;
+    attachments_with_text: number;
+    piee: boolean;
+    piee_links: string[];
+    retrieval_limitation: string | null;
   };
 }
 
@@ -59,12 +65,18 @@ export async function solicitationDocuments(
     sow_text: res.sow_text,
     sow_text_truncated: res.sow_text_truncated,
     documents: res.documents,
+    listed_attachments: res.listed_attachments,
     _meta: {
       grounded,
       degraded: res.degraded,
       doc_count: res.documents.length,
       source: res.source,
       signed_url_ttl_seconds: 3600,
+      attachments_listed: res.attachments_listed,
+      attachments_with_text: res.attachments_with_text,
+      piee: res.piee,
+      piee_links: res.piee_links,
+      retrieval_limitation: res.retrieval_limitation,
     },
   };
 
@@ -83,6 +95,7 @@ export async function solicitationDocuments(
         'download_url expires (~1h) — re-call the tool to mint a fresh link.',
         'extracted_text is truncated for inline delivery; the full text is in the downloadable file (char_count is the true length). Check location_note — a SAM.gov URL is an external attachment, not a Mindy-stored copy.',
         'Not every notice has attachments — an empty documents list can be legitimate (e.g. a Sources Sought with only body text).',
+        ...(res.retrieval_limitation ? [res.retrieval_limitation] : []),
       ],
     };
   }
