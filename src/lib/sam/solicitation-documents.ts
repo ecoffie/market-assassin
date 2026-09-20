@@ -34,8 +34,12 @@ import {
   pieeRetrievalLimitation,
 } from '@/lib/sam/notice-identity';
 import { parseSamAttachment } from '@/lib/sam/attachment-metadata';
-import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
-import { getRotatedSAMKey } from '@/lib/sam/utils';
+import {
+  fetchNoticeDescriptionWithFailover,
+  isDescriptionLink,
+  noticedescRetrievalLimitation,
+  type NoticedescFetchResult,
+} from '@/lib/sam/notice-description';
 
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
@@ -196,6 +200,7 @@ function applyHonestyMeta(
   base: SolicitationDocumentsResult,
   listedGroups: ListedAttachment[],
   textMode?: 'inline' | 'full',
+  noticedescLimitation: string | null = null,
 ): SolicitationDocumentsResult {
   const pieeCorpus = `${base.description}\n${base.sow_text}`;
   const pieeLinks = extractPieeLinks(pieeCorpus);
@@ -233,7 +238,10 @@ function applyHonestyMeta(
   base.attachments_with_text = listed.filter((l) => l.has_extracted_text).length;
   base.piee = detectPiee(pieeCorpus) || pieeLinks.length > 0;
   base.piee_links = pieeLinks;
-  base.retrieval_limitation = pieeRetrievalLimitation(pieeLinks);
+  // PIEE unread is the stronger scope-host disclosure when both apply; otherwise
+  // surface the noticedesc quota/miss so empty body ≠ "no scope".
+  base.retrieval_limitation =
+    pieeRetrievalLimitation(pieeLinks) ?? noticedescLimitation;
 
   const assembled = assembleNoticeSourceText({
     sow_text: base.sow_text,
@@ -314,6 +322,7 @@ export async function getSolicitationDocuments(input: {
 
   const listedFromCache = listedFromAttachmentsColumn(opp?.attachments);
   let descriptionText = '';
+  let noticedescLimitation: string | null = null;
   if (opp) {
     base.title = opp.title ?? null;
     base.solicitation_number = opp.solicitation_number ?? null;
@@ -334,13 +343,23 @@ export async function getSolicitationDocuments(input: {
         : isDescriptionLink(rawDesc)
           ? rawDesc
           : resolvedNoticeId;
-      const apiKey = getRotatedSAMKey();
-      if (apiKey) {
-        try {
-          descriptionText = await fetchNoticeDescription(linkOrId, apiKey);
-        } catch (err) {
-          console.error('[getSolicitationDocuments] noticedesc', err);
-          base.degraded = true;
+      // Bounded multi-key failover (entity pattern) — single rotated key used to
+      // leave the body empty on a 429 day even when another key still had quota.
+      const fetched: NoticedescFetchResult = await fetchNoticeDescriptionWithFailover(linkOrId);
+      descriptionText = fetched.text;
+      if (!fetched.text.trim()) {
+        base.degraded = true;
+        noticedescLimitation = noticedescRetrievalLimitation(fetched);
+      } else {
+        // Persist so sol# and UUID both hit cache next time (no re-burn of quota).
+        const now = new Date().toISOString();
+        const { error: persistErr } = await supabase
+          .from('sam_opportunities')
+          .update({ description: fetched.text, description_checked_at: now })
+          .eq('notice_id', resolvedNoticeId);
+        if (persistErr) {
+          console.error('[getSolicitationDocuments] persist description', persistErr.message);
+          // Non-fatal — caller still gets the body this request.
         }
       }
     }
@@ -395,7 +414,7 @@ export async function getSolicitationDocuments(input: {
     if (metas.length > 0) {
       base.documents = await toOutputDocs(supabase, metas, inlineCap);
       base.source = 'cache';
-      return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode);
+      return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode, noticedescLimitation);
     }
   }
 
@@ -410,7 +429,7 @@ export async function getSolicitationDocuments(input: {
     }));
     base.documents = await toOutputDocs(supabase, cached, inlineCap);
     base.source = 'cache';
-    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, cachedListed), input.textMode);
+    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, cachedListed), input.textMode, noticedescLimitation);
   }
 
   // ── Layer 3: COLD FETCH — on-demand download + extract (public SAM) ────────
@@ -426,7 +445,7 @@ export async function getSolicitationDocuments(input: {
     // No SAM resourceLinks (many notices legitimately have none — PIEE-hosted packages).
     // Inline description (resolved above) still returns; listed_attachments may name PIEE.
     base.source = base.description || base.sow_text ? 'on_demand' : 'none';
-    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode);
+    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode, noticedescLimitation);
   }
 
   // Upload each raw blob to Storage under a notice-level path, build metadata.
@@ -471,5 +490,5 @@ export async function getSolicitationDocuments(input: {
 
   base.documents = await toOutputDocs(supabase, metas, inlineCap);
   base.source = 'on_demand';
-  return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, fetchedListed), input.textMode);
+  return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, fetchedListed), input.textMode, noticedescLimitation);
 }

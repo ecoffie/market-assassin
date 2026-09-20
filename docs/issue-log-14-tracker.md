@@ -1,12 +1,12 @@
 # Issue-log 14-item tracker (NAVSEA / Monarch / matrix / spend)
 
-Verification has **four** layers. Do not collapse them. **This audit is not fully closed.**
+Verification has **four** layers. Do not collapse them. **This audit is not fully closed.** Do **not** claim 14/14 closure.
 
 | Layer | Meaning |
 |---|---|
 | **Developer-verified** | Closed by our live tool runs / fixtures on a named serving commit (includes the honesty PRs #1565 / #1571 / #1572 / #1575). Historical — does not substitute for a fresh recheck. |
 | **Independently verified** | Confirmed by an external retest PDF **with a recorded execution time and serving commit**. PDF *upload* / file mtime / cover-date alone do **not** establish either. |
-| **Agent rechecked** | Fresh tool runs in this follow-up (UTC timestamps below) against production aliases and/or the local worktree. Not a Round PDF. |
+| **Agent rechecked** | Fresh tool runs in this follow-up (UTC timestamps below) against production aliases and/or the local worktree. Not a Round PDF. Not independent acceptance. |
 | **Documented limitation** | Expected honest miss or upstream gap — not an open product bug. |
 
 ## Production serving (measured)
@@ -14,6 +14,8 @@ Verification has **four** layers. Do not collapse them. **This audit is not full
 | When (UTC) | Alias evidence | Deploy | Git |
 |---|---|---|---|
 | 2026-09-20T18:54Z (agent recheck) | `maps-account-build:5cc700d79517687a934867c7244ec8d4bd8f994e` on `https://getmindy.ai/` | `dpl_DE5v71VKaWFaq6J9UXL8omhYEWFm` (Ready; aliases include `getmindy.ai` / `mcp.getmindy.ai`) | **`5cc700d7`** (#1576) |
+
+PR #1577 worktree head at closeout push: see latest commit on `fix/navsea-priority-dollars-and-tracker` (starts from reviewed `f4bf5d0b`). **Not on public aliases until a separately approved release.**
 
 Do not assume an older commit remains production. Re-measure.
 
@@ -29,43 +31,70 @@ Do not assume an older commit remains production. Re-measure.
 
 Prior developer honesty retest (not independent): serving commit `15c6b861` · deploy `dpl_3qA6JSAwyJwYUPyAHkRPXsiZqQTM` · PR #1572 · prior merge `73b607cb` (#1571).
 
-## Agent recheck (2026-09-20T18:54:52Z → 18:56:12Z UTC)
+## Corrected diff review (`f4bf5d0b`)
 
-**Method:** OAuth MCP session against `https://mcp.getmindy.ai/mcp` (aliases of getmindy.ai) on serving commit **`5cc700d7`**, plus a **local worktree** call for #4 dollar-omission (not on prod until a separately approved release). Artifact: `tasks/issue-log-14-recheck-2026-09-20.json`. Script: `scripts/issue-log-14-recheck.mjs`.
+Reviewed before closeout work:
 
-| # | Tool | Exact input | Result |
-|---|------|-------------|--------|
-| 1 | `extract_compliance_matrix` | `notice_id: "6552b25bf0e648f39b44228275998eef"` | **Agent-rechecked PASS** — 52 rows; `recovered: ["scif"]`; `present_in_source`: loa_range, flight_deck, scif, berthing, magazine; `missing_from_matrix: []`. All five present ≠ full-document completeness. **Not Round-PDF independent SCIF proof** (R2 missed SCIF; R3 did not freshly verify). |
-| 2 | `search_federal_contacts` | USCG + `small business` | **PASS** — `uscg-smallbusiness@uscg.mil`; not State. |
-| 3+9 | `build_pursuit_dossier` | `N00024-26-R-2200` | **PASS** — `incumbent: null`; Mazak only in `prior_awards`; compact dossier + `_meta.omitted`. |
-| 4 | `get_agency_intel` | `"Naval Sea Systems Command"` | **PASS (prod identity/spend)** — `NOT_ESTABLISHED` command spend; `PARENT_SERVICE` Navy total. **Prod still emits unsourced priority `$` until separately approved release of this PR.** Local: priorities have no `$` after omit-empty fix. |
-| 6 | `lookup_federal_osbp` | USCG | **PASS** — Kersey-Robinson / `uscg-smallbusiness@uscg.mil`. |
-| 8 | `search_past_contracts` | `naics: "336612"` | **PASS** — attribution honesty; empty source fields; `popState` ≠ recipient HQ. |
-| 10 | `get_solicitation_incumbent` | `N00024-26-R-2200` | **PASS** — Lot 1 `2026-08-13` / Lot 2 `2026-08-31`; `deadline_conflict: true`; no grounded incumbent. |
-| 11 | `extract_statement_of_work` | `N00024-26-R-2200` | **PASS (disclosure)** — PIEE unread disclosed; auto-extract unsupported. |
-| 12 | `get_solicitation_documents` | `N00024-26-R-4160` **and** UUID `85a62e9a…` | **Split verdict:** **identity PASSED** (both → `85a62e9a…`). **Retrieval INCOMPLETE** — DB description empty; live SAM noticedesc **429**; `doc_count: 0`. Do not collapse into a single overall pass. |
-| 13 | `referee_proposal_compliance` | 17 requirements, ~15k draft | **UNVERIFIED in this pass** — original payload absent. Prior developer result is historical only; not an exact rerun. |
-| 14 | `lookup_sam_entity` | `"Monarch Yachts"` | **PASS** — reconciled `not_found` across legal/DBA/local. |
-| — | `assess_market_depth` | `naics: "336612"` | **PASS** — grounded. |
+| Check | Result |
+|---|---|
+| Empty dollar-only LEGACY_MANUAL claims | Remain empty; loaders `if (!claim) continue` — no `out \|\| text` restore |
+| Sourced dollar amounts (SOURCE_FACT) | Unchanged |
+| Tracker layers | Distinguishes historical / agent recheck / independent / unresolved limitations |
 
-## Status by issue
+## Agent recheck wave 1 (2026-09-20T18:54:52Z → 18:56:12Z UTC)
 
-| # | Tool | Exact input | Fix status | Verification | Evidence |
-|---|------|-------------|------------|--------------|----------|
-| 1 | `extract_compliance_matrix` | matrix notice | **fixed** | **agent-rechecked** 2026-09-20T18:54Z on `5cc700d7`. Round-PDF SCIF independence **not established** (R2 missed; R3 no fresh SCIF). | SCIF recovered; five named specs present. Completeness ≠ full document. |
-| 2 | `search_federal_contacts` | USCG + small business | **fixed** | Round PDF claims exist; **execution date/commit unknown**. **Agent-rechecked.** | USCG mailbox, not State. |
-| 3 | `build_pursuit_dossier` | `N00024-26-R-2200` | **fixed** | **developer-verified** (historical) + **agent-rechecked** | Incumbent null; Mazak prior_awards only. |
-| 4 | `get_agency_intel` | NAVSEA | **fixed** (+ dollar-omission) | Round 3 PDF claims identity/spend; **execution date unknown**. **Agent-rechecked** identity/spend. Dollar omission **local-only until separately approved release**; emptied dollar-only claims are dropped (not restored). | Navy parent-service $ ≠ NAVSEA command $. |
-| 5 | `get_agency_spending_detail` | Navy FY2025 | **fixed** | Round PDF claims; **execution date/commit unknown**. Not re-run in agent recheck. | Navy ≠ DoD (prior). |
-| 6 | `lookup_federal_osbp` | USCG | **fixed** | **developer-verified** + **agent-rechecked** | Same USCG OSBP mailbox. |
-| 7 | `get_keyword_coverage` | `"patrol"` | **fixed** | Round PDF cited **~$6.67B / 106 NAICS** historically. That figure does **not** independently validate today’s ~**$903M** contract/BQ measurement. **Current figure not independently revalidated in this pass.** | Do not equate old and new patrol totals. |
-| 8 | `search_past_contracts` | `336612` | **fixed** (attribution) | **developer-verified** + **agent-rechecked** | **Limitation:** empty USASpending source columns. |
-| 9 | `build_pursuit_dossier` | `N00024-26-R-2200` | **fixed** | **developer-verified** + **agent-rechecked** | Compact dossier + `_meta.omitted`. |
-| 10 | `get_solicitation_incumbent` | `N00024-26-R-2200` | **fixed** | **developer-verified** + **agent-rechecked** | Lot deadline conflict. |
-| 11 | `extract_statement_of_work` | `N00024-26-R-2200` | **fixed** (disclosure) | **developer-verified** + **agent-rechecked** | **Limitation:** PIEE auto-extract unsupported. |
-| 12 | `get_solicitation_documents` | sol + UUID | **fixed** (identity) | **agent-rechecked — split** | **Identity passed; retrieval incomplete** (empty body / 429). |
-| 13 | `referee_proposal_compliance` | 17 req / ~15k draft | **fixed** (prior) | **Unverified in this pass.** Prior developer result = historical only. | Missing original payload. |
-| 14 | `lookup_sam_entity` | Monarch Yachts | **reconciled** | Round 3 PDF claims; **execution date unknown**. **Agent-rechecked.** | Honest miss + reconciliation. |
+**Method:** OAuth MCP session against `https://mcp.getmindy.ai/mcp` on serving commit **`5cc700d7`**, plus local worktree for #4 dollar-omission. Artifact: `tasks/issue-log-14-recheck-2026-09-20.json`. Script: `scripts/issue-log-14-recheck.mjs`.
+
+## Agent verification wave 2 (2026-09-20T19:29Z → 19:31Z UTC) — closeout
+
+**Method:** Local worktree (post-`f4bf5d0b` + noticedesc failover). **Agent verification only — not independent acceptance.**
+
+| # | Exact input | Expected | Observed | Env / commit | Evidence | Remaining limitation |
+|---|---|---|---|---|---|---|
+| 1 SCIF + five named specs | `extract_compliance_matrix` `notice_id=6552b25bf0e648f39b44228275998eef` | SCIF + loa_range, flight_deck, berthing, magazine present in matrix/source path | **PASS (agent)** — 51 rows; all five named specs hit; `grounded=true`. Named-spec presence ≠ full-document completeness. | local worktree @ closeout | `tasks/issue-log-14-scif-agent-2026-09-20.json` | Round-PDF SCIF independence still not established |
+| 7 patrol | `keywordCoverage("patrol")` current FY2025 BQ | Honest current total; not Round PDF figure | **PASS (agent)** — **~$902.6M** / **121 NAICS**; top 336611 ~78.6%; PSC 1905. Historical Round ~$6.67B/106 **not** validated here. | local worktree @ closeout | `tasks/issue-log-14-patrol-agent-2026-09-20.json` | 1-FY window vs marketing/3-FY contract drift |
+| 12 identity + retrieval | `get_solicitation_documents` `N00024-26-R-4160` **and** UUID `85a62e9a3f4f4f54b0ade7aa855fcc89` | Same resolved notice; body from cache or noticedesc; honest miss if upstream blocked | **Split:** identity **PASS** (both → `85a62e9a…`). Retrieval **INCOMPLETE** — DB description empty; `pursuit_documents=0`; `mcp_external_cache` miss; **both** configured SAM keys **noticedesc 429**. Failover tried 2/2; `retrieval_limitation` disclosed. No content invented. | local worktree @ closeout | `tasks/issue-log-14-noticedesc-probe-2026-09-20.json` | **Upstream quota** — code fix (multi-key + persist + disclosure) shipped in PR; body still empty until a key succeeds or cache is warm |
+| 13 referee | Original 17-req / ~15k draft | Exact-input retest | **Original exact-input retest unavailable** (not in repo/tasks/attachments/transcripts). **Labeled representative regression only:** 17 synthetic reqs, 1837-char draft → grounded, score 38, 13 partial / 4 missing, no timeout. **Do not present as original.** | local worktree @ closeout | `tasks/issue-log-14-referee-representative-2026-09-20.json` | Missing original payload |
+
+## Per-issue evidence ledger
+
+For each original issue: exact input · expected · observed · tested commit/env · evidence · remaining limitation. Keep **code fix** / **upstream data gap** / **unsupported capability** distinct.
+
+| # | Tool | Exact input | Expected behavior | Observed result | Tested commit / env | Evidence artifact | Remaining limitation |
+|---|------|-------------|-------------------|-----------------|---------------------|-------------------|----------------------|
+| 1 | `extract_compliance_matrix` | `6552b25bf0e648f39b44228275998eef` | Recover SCIF; five named specs present when in source | Agent PASS (wave1 on `5cc700d7` + wave2 local): specs present; ~51–52 rows | prod `5cc700d7` + local closeout | recheck JSON + `issue-log-14-scif-agent-2026-09-20.json` | Completeness ≠ full document; Round-PDF SCIF independence **not** established |
+| 2 | `search_federal_contacts` | USCG + `small business` | USCG mailbox, not State | Agent PASS | prod `5cc700d7` | recheck JSON | Round-PDF date/commit unknown |
+| 3 | `build_pursuit_dossier` | `N00024-26-R-2200` | Incumbent null; Mazak prior_awards only | Agent PASS | prod `5cc700d7` | recheck JSON | — |
+| 4 | `get_agency_intel` | `"Naval Sea Systems Command"` | Honest spend grain; no unsourced priority `$` | Prod: identity/spend PASS; **still emits unsourced `$` until release**. Local: emptied dollar-only claims omitted (not restored) | prod `5cc700d7` + PR worktree | recheck JSON + sourced-pain-points tests | **Post-release check required** for public-domain `$` suppression |
+| 5 | `get_agency_spending_detail` | Navy FY2025 | Navy ≠ DoD | Historical developer / Round claims; **not re-run in agent waves** | prior | — | Not re-agent-checked this closeout |
+| 6 | `lookup_federal_osbp` | USCG | Kersey-Robinson / uscg-smallbusiness | Agent PASS | prod `5cc700d7` | recheck JSON | — |
+| 7 | `get_keyword_coverage` | `"patrol"` | Current BQ contract figure | Agent ~**$902.6M** / 121 NAICS (wave2). Round ~$6.67B/106 is **historical only** | local closeout | `issue-log-14-patrol-agent-2026-09-20.json` | Do not equate old/new totals; 1-FY measurement |
+| 8 | `search_past_contracts` | `naics: "336612"` | Attribution honesty | Agent PASS | prod `5cc700d7` | recheck JSON | **Upstream:** empty USASpending source columns |
+| 9 | `build_pursuit_dossier` | `N00024-26-R-2200` | Compact + `_meta.omitted` | Agent PASS | prod `5cc700d7` | recheck JSON | — |
+| 10 | `get_solicitation_incumbent` | `N00024-26-R-2200` | Lot deadline conflict; no grounded incumbent | Agent PASS | prod `5cc700d7` | recheck JSON | — |
+| 11 | `extract_statement_of_work` | `N00024-26-R-2200` | Disclose PIEE unread | Agent PASS (disclosure) | prod `5cc700d7` | recheck JSON | **Unsupported:** PIEE auto-extract |
+| 12 | `get_solicitation_documents` | sol `N00024-26-R-4160` + UUID `85a62e9a…` | Shared identity; shared body; honest retrieval miss | **Identity PASS**; **retrieval incomplete** (all-key noticedesc 429). **Code:** multi-key failover + persist-on-success + `retrieval_limitation` | local closeout (post-`f4bf5d0b`) | `issue-log-14-noticedesc-probe-2026-09-20.json` | **Upstream SAM quota** — not inventable; recheck when a key returns 200 |
+| 13 | `referee_proposal_compliance` | Original 17 req / ~15k draft | Exact-input retest | **Original unavailable.** Representative regression grounded (not a substitute for original) | local closeout | `issue-log-14-referee-representative-2026-09-20.json` | Missing original payload |
+| 14 | `lookup_sam_entity` | `"Monarch Yachts"` | Honest miss + reconcile | Agent PASS | prod `5cc700d7` | recheck JSON | Zero hits ≠ eternal nonregistration |
+
+## Status by issue (summary)
+
+| # | Fix status | Verification layer | Notes |
+|---|------------|--------------------|-------|
+| 1 | **fixed** | **agent-rechecked** (not independent SCIF) | Named specs present |
+| 2 | **fixed** | agent-rechecked; Round date/commit unknown | — |
+| 3 | **fixed** | developer + agent | — |
+| 4 | **fixed** (+ dollar-omission in PR) | agent identity/spend; dollar omit **local until release** | Post-release public `$` check |
+| 5 | **fixed** | historical; not agent-rechecked this closeout | — |
+| 6 | **fixed** | developer + agent | — |
+| 7 | **fixed** | **agent-rechecked current ~$903M**; Round figure historical | — |
+| 8 | **fixed** (attribution) | agent + **limitation** (empty source cols) | — |
+| 9 | **fixed** | developer + agent | — |
+| 10 | **fixed** | developer + agent | — |
+| 11 | **fixed** (disclosure) | agent + **unsupported** PIEE extract | — |
+| 12 | **fixed** (identity + failover/disclosure); retrieval **still incomplete under 429** | agent — **split verdict** | Upstream blocker |
+| 13 | **fixed** (prior engine); **original retest unavailable** | representative regression only | Not original |
+| 14 | **reconciled** | agent | — |
 
 ## Scorecard (do not misread)
 
@@ -75,24 +104,32 @@ Prior developer honesty retest (not independent): serving commit `15c6b861` · d
 | Round 2 | claims several; **missed SCIF** | **none proven here** (date/commit unknown) | #3, #6, #8–#13 + SCIF |
 | Round 3 | claims #4+#14 newly; “6 of 6 retestable” scorecard | **none proven here** without recorded UTC+SHA in-PDF | #3, #6, #8–#13; **no fresh SCIF** |
 
-Agent recheck closed many live-input items but **does not close the audit**. Outstanding: #13 unverified this pass; #12 retrieval incomplete; #4 dollar omission awaits separately approved public-domain release verification; Round-PDF independence remains under-documented on date/commit.
+**No 14/14 closure.** Agent waves closed many live inputs but outstanding blockers remain below.
 
-## Distinctions (not open bugs)
+## Distinctions (not open product bugs)
 
-- **#8:** attribution honesty fixed; missing USASpending source columns remain a data limitation.
-- **#11:** PIEE disclosure fixed; automatic PIEE extraction remains unsupported.
-- **#12:** report **identity passed; retrieval incomplete** — do not call the issue fully passed.
-- **#4 follow-up:** unsourced LEGACY_MANUAL `$` omitted; dollar-only claims emptied → **omitted** (never restored via `out \|\| text`).
+- **#8:** attribution honesty fixed; missing USASpending source columns = **upstream data gap**.
+- **#11:** PIEE disclosure fixed; automatic PIEE extraction = **unsupported capability**.
+- **#12:** identity passed; body retrieval blocked by **upstream SAM noticedesc 429 on all configured keys** after code failover. Do not call fully passed.
+- **#4 follow-up:** unsourced LEGACY_MANUAL `$` omitted; dollar-only claims emptied → **omitted** (never restored via `out \|\| text`). Sourced dollars unchanged.
 - **#14:** zero hits = unsupported prior claim / honest miss — not proof of nonregistration forever.
 - **#7:** historical Round patrol total ≠ current ~$903M measurement.
+- **#13:** representative regression ≠ original exact-input retest.
 
 ## Still open (audit not fully closed)
 
-- **#13** — unverified this pass (payload missing).
-- **#12 retrieval** — incomplete under 429 / empty description.
+- **#13** — original exact-input retest unavailable.
+- **#12 retrieval** — incomplete under all-key noticedesc 429 (code disclosure/failover present).
 - **#4 dollar omission on public aliases** — verify only after a separately approved release of this PR.
 - **Round-PDF independence** — needs recorded execution UTC + serving commit before “independently verified” labels harden.
+- **#5** — not re-agent-checked in closeout wave.
+
+## Post-release checks (do not skip)
+
+1. **Public-domain suppression of unsourced priority dollars** — after separately approved release of PR #1577, call `get_agency_intel` for `"Naval Sea Systems Command"` on **production aliases** and assert LEGACY_MANUAL priority claims contain **no** `$` / `Allocated $…` while qualitative non-dollar priorities remain and SOURCE_FACT dollars (if any) stay.
+2. Re-measure serving commit on `getmindy.ai` / `mcp.getmindy.ai` before treating release as live.
+3. Optional: when SAM noticedesc quota recovers, re-run sol + UUID for `N00024-26-R-4160` and confirm both return the **same non-empty** description (or the same honest limitation).
 
 ## Not reopened
 
-Pricing, credits, backfills (`--go` writer, 3,729-family, 44,560 fleet), PAE, #1560, agency-identity architecture beyond NAVSEA grain already shipped.
+Pricing, credits, backfills (`--go` writer, 3,729-family, 44,560 fleet), PAE, #1560, agency-identity architecture beyond NAVSEA grain already shipped. No new collectors. No customer messages. **Stop before merge or deployment** unless Eric separately approves.
