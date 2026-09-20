@@ -28,6 +28,7 @@ import {
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
   getYearlyTotalsForRecipient,
+  getSetAsideHistoryForRecipient,
   getRecipientByUei,
   findCapableSmallBusinesses,
   recipientSlug,
@@ -39,6 +40,7 @@ import {
   allowColdBqLookup,
   type ColdBqTurnState,
 } from '@/lib/bigquery/cold-budget';
+import { bqUnavailable } from '@/lib/bigquery/cache';
 import {
   assessDateRange,
   buildCountingBases,
@@ -285,49 +287,74 @@ export function makeTier2Tools(email: string) {
     //   3. cold + budget spent -> profile + explicit partial/degraded state, never false-empty
     const childUeis = profile.child_ueis?.length ? profile.child_ueis : [profile.rollup_uei];
     const TOP_AGENCIES_LIMIT = 5;
+    const RECENT_LIMIT = 5;
+    const awardsCacheKey = `rollup:${profile.rollup_uei}:recent-awards:${RECENT_LIMIT}:v4-m`;
+    const agenciesCacheKey = `rollup:${profile.rollup_uei}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`;
+    const yearlyCacheKey = `rollup:${profile.rollup_uei}:yearly-totals:v3-m`;
+    const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v2-m`;
 
     // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
-    let [awards, agencies, yearly] = await Promise.all([
-      getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
+    let [awards, agencies, yearly, setAsideHist] = await Promise.all([
+      getRecentAwardsForRecipient(childUeis, profile.rollup_uei, RECENT_LIMIT, false).catch(() => []),
       getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, false).catch(() => []),
       getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
+      getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
     ]);
 
-    // Pass 2 — only if warm missed AND the company actually HAS awards (award_count comes
-    // from the free recipients row, so a genuinely award-less company never costs a scan).
-    // Budget is consumed only here, on a real miss — allowColdLookup() increments a counter,
-    // so it must never be called speculatively.
+    // Pass 2 — per-surface cold fill. CRITICAL: do NOT require ALL enrichment keys
+    // to miss before filling. Cyrus reproduced warm agencies + cold recent-awards:5
+    // (history uses recent-awards:25 / single: prefix — different key). The old
+    // `awards.length===0 && agencies.length===0` gate skipped Pass 2 and returned
+    // recent_awards:[] with enrichment_status=complete.
     let enrichmentStatus: 'complete' | 'budget_limited' = 'complete';
-    const enrichmentMissed = awards.length === 0 && agencies.length === 0;
     const hasAwards = (profile.award_count ?? 0) > 0;
-    if (enrichmentMissed && hasAwards) {
+    const needAwards = hasAwards && awards.length === 0;
+    const needAgencies = hasAwards && agencies.length === 0;
+    const needYearly = hasAwards && yearly.length === 0;
+    const needSetAside = hasAwards && setAsideHist.length === 0;
+    if (needAwards || needAgencies || needYearly || needSetAside) {
       if (resolvedCold || (await allowColdLookup())) {
-        // resolvedCold: we already spent a unit resolving THIS company this turn — the
-        // enrichment is the same company, so no extra unit is consumed.
-        [awards, agencies, yearly] = await Promise.all([
-          getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
-          getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, true).catch(() => []),
-          getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, true).catch(() => []),
+        const [a2, g2, y2, s2] = await Promise.all([
+          needAwards
+            ? getRecentAwardsForRecipient(childUeis, profile.rollup_uei, RECENT_LIMIT, true).catch(() => [])
+            : Promise.resolve(awards),
+          needAgencies
+            ? getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, true).catch(() => [])
+            : Promise.resolve(agencies),
+          needYearly
+            ? getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, true).catch(() => [])
+            : Promise.resolve(yearly),
+          needSetAside
+            ? getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, true).catch(() => [])
+            : Promise.resolve(setAsideHist),
         ]);
+        awards = a2;
+        agencies = g2;
+        yearly = y2;
+        setAsideHist = s2;
       } else {
-        // Budget denied. We did NOT look, so we must not claim there is nothing to find.
         enrichmentStatus = 'budget_limited';
-        // Measured, not guessed: if authenticated users hit this often, allowColdLookup()
-        // limits are too tight for a metered tool's promise and should be tuned SEPARATELY.
-        // Do not "fix" a high rate here by bypassing the guard — that reopens the June 2026
-        // BQ cost incident.
         console.warn('[p0-2] enrichment budget_limited', JSON.stringify({
           tool: 'get_contractor_profile', rollup_uei: profile.rollup_uei,
           award_count: profile.award_count,
+          need: { awards: needAwards, agencies: needAgencies, yearly: needYearly, setAside: needSetAside },
         }));
       }
-    } else if (hasAwards && yearly.length === 0 && enrichmentStatus === 'complete') {
-      // Awards/agencies can be warm while the new yearly-totals:v3 key is still cold.
-      // Activity fields need the series — fill yearly alone when budget allows.
-      if (resolvedCold || (await allowColdLookup())) {
-        yearly = await getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, true).catch(() => []);
-      }
     }
+
+    // Still-empty after attempt + unavailable cache marker → not a genuine zero.
+    if (
+      hasAwards &&
+      (bqUnavailable(awardsCacheKey, awards.length) ||
+        bqUnavailable(agenciesCacheKey, agencies.length) ||
+        bqUnavailable(yearlyCacheKey, yearly.length) ||
+        bqUnavailable(setAsideCacheKey, setAsideHist.length))
+    ) {
+      enrichmentStatus = 'budget_limited';
+    }
+
+    const setAsideUnavailable =
+      hasAwards && bqUnavailable(setAsideCacheKey, setAsideHist.length);
 
     const series = yearly.map((y) => ({
       fiscalYear: y.fiscal_year,
@@ -348,14 +375,21 @@ export function makeTier2Tools(email: string) {
       lastRecipientActionDate: profile.last_action_date ?? null,
     });
     const agenciesServed = profile.distinct_agency_count ?? agencies.length;
-    // Recent-awards sample only — not a full-history set-aside census.
-    // Labels with null years; coverage is partial by construction.
+    // Reuse warehouse set-aside aggregation (same query as award-history drawer).
+    // Do NOT invent "complete" from a capped recent-action sample.
     const historicalSetAsides = summarizeHistoricalSetAsides(
-      awards.map((a) => ({
-        setAside: a.set_aside,
-        fiscalYear: null,
-      })),
-      { coverage: 'partial' },
+      setAsideUnavailable
+        ? []
+        : setAsideHist.map((r) => ({
+            setAside: r.set_aside,
+            lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
+            awardOriginFy: r.award_origin_fy == null ? null : Number(r.award_origin_fy),
+          })),
+      {
+        coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+        scopeNote:
+          'Aggregated across warehouse award actions for this UEI (not derived from the capped recent_awards sample).',
+      },
     );
 
     const shapedAgencies = agencies.map((a) => ({
@@ -439,12 +473,7 @@ export function makeTier2Tools(email: string) {
       recent_awards: shapedAwards,
       recent_awards_note:
         'recent_awards are dollar-bearing obligation actions (often modifications). See counting_bases for unique awards in this sample.',
-      historical_set_asides: {
-        ...historicalSetAsides,
-        note:
-          historicalSetAsides.note +
-          ' Sampled from recent_awards on this profile call — not a full-history census.',
-      },
+      historical_set_asides: historicalSetAsides,
       // P0-2 invariant: when award_count > 0 and enrichment was not actually queried,
       // empty arrays must NEVER be presented as complete data.
       enrichment_status: enrichmentStatus,

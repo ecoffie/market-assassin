@@ -60,7 +60,13 @@ const RECENT = [{
   obligation_amount: 1000, action_date: '2025-01-01',
   pop_start_date: null, pop_end_date: null, pop_state: 'AK', set_aside: null,
 }];
-const SET_ASIDE = [{ set_aside: '8(A) SOLE SOURCE', award_count: 2, first_fy: 2019, last_fy: 2022, total_obligated: 1_000_000 }];
+const SET_ASIDE = [{
+  set_aside: '8(A) SOLE SOURCE',
+  award_count: 2,
+  last_action_fy: 2022,
+  award_origin_fy: 2019,
+  total_obligated: 1_000_000,
+}];
 
 function seedCompleteDetails(uei: string) {
   const k = `single:${uei}`;
@@ -69,7 +75,7 @@ function seedCompleteDetails(uei: string) {
   detailByKey.set(`rollup:${k}:top-naics:8:v2-m`, NAICS);
   detailByKey.set(`rollup:${k}:recent-awards:25:v4-m`, RECENT);
   detailByKey.set(`rollup:${k}:yearly-by-agency:v2-m`, []);
-  detailByKey.set(`rollup:${k}:set-aside-history:v1-m`, SET_ASIDE);
+  detailByKey.set(`rollup:${k}:set-aside-history:v2-m`, SET_ASIDE);
 }
 
 beforeEach(() => {
@@ -99,9 +105,12 @@ describe('getBqContractorHistory — source + completeness', () => {
     expect(h.counting_bases.unique_awards).toBe(35);
     expect(h.coverage_timestamp.last_recipient_action_meaning).toMatch(/not the ingest/i);
     expect(h.historical_set_asides.labels).toContain('8(A) SOLE SOURCE');
+    expect(h.historical_set_asides.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
+    expect(h.historical_set_asides.award_origin_fy_by_label['8(A) SOLE SOURCE']).toBe(2019);
     expect(h.historical_set_asides.last_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
     expect(h.historical_set_asides.coverage).toBe('complete');
-    expect(h.historical_set_asides.note).toMatch(/does not establish graduation/i);
+    expect(h.historical_set_asides.note).toMatch(/does not establish graduation|not.*certification/i);
+    expect(h.historical_set_asides.note).toMatch(/last_observed_action_fy|deobligation/i);
     expect(h.recentAwards[0].isModification).toBe(false);
     expect(h.recentAwards[0].modClassification).toBe('base');
     expect(h.recentAwards[0].dateRangeValid).toBeNull();
@@ -191,8 +200,8 @@ describe('getBqContractorHistory — source + completeness', () => {
     profileRows = [PROFILE];
     seedCompleteDetails('FCJCDUZV7RM3');
     const k = 'single:FCJCDUZV7RM3';
-    unavailableKeys.add(`rollup:${k}:set-aside-history:v1-m`);
-    detailByKey.delete(`rollup:${k}:set-aside-history:v1-m`);
+    unavailableKeys.add(`rollup:${k}:set-aside-history:v2-m`);
+    detailByKey.delete(`rollup:${k}:set-aside-history:v2-m`);
 
     const h = await getBqContractorHistory({ uei: 'FCJCDUZV7RM3', liveBq: false });
     expect(h.enrichment_status).toBe('budget_limited');
@@ -215,7 +224,7 @@ describe('getBqContractorHistory — source + completeness', () => {
     unavailableKeys.add(`rollup:${k}:top-naics:8:v2-m`);
     unavailableKeys.add(`rollup:${k}:recent-awards:25:v4-m`);
     unavailableKeys.add(`rollup:${k}:yearly-by-agency:v2-m`);
-    unavailableKeys.add(`rollup:${k}:set-aside-history:v1-m`);
+    unavailableKeys.add(`rollup:${k}:set-aside-history:v2-m`);
 
     const h = await getBqContractorHistory({ uei: 'FCJCDUZV7RM3', liveBq: false });
     expect(h.source).toBe('bigquery_normalized');

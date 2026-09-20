@@ -633,8 +633,16 @@ export async function getYearlyTotalsForRecipient(
 export interface SetAsideHistoryRow {
   set_aside: string;
   award_count: number;
-  first_fy: number | null;
-  last_fy: number | null;
+  /**
+   * Latest fiscal_year on ANY warehouse action carrying this set-aside code
+   * (includes later deobligations). Not award origin and not certification.
+   */
+  last_action_fy: number | null;
+  /**
+   * Earliest fiscal_year with a positive obligation under this set-aside.
+   * Null when no positive-obligation evidence exists (unknown — never invent).
+   */
+  award_origin_fy: number | null;
   total_obligated: number;
 }
 
@@ -643,15 +651,17 @@ export async function getSetAsideHistoryForRecipient(
   rollupUei: string,
   liveBq = false,
 ): Promise<SetAsideHistoryRow[]> {
+  // v2: split last-action FY from award-origin FY so a later deobligation
+  // cannot be read as a new award year or certification event.
   return queryCached<SetAsideHistoryRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:set-aside-history:v1-m`,
+    cacheKey: `rollup:${rollupUei}:set-aside-history:v2-m`,
     query: `
       SELECT
         set_aside,
         COUNT(DISTINCT award_id) AS award_count,
-        MIN(fiscal_year) AS first_fy,
-        MAX(fiscal_year) AS last_fy,
+        MAX(fiscal_year) AS last_action_fy,
+        MIN(IF(obligation_amount > 0, fiscal_year, NULL)) AS award_origin_fy,
         SUM(obligation_amount) AS total_obligated
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei IN UNNEST(@ueis)
@@ -1533,7 +1543,7 @@ export async function getBqContractorHistory(opts: {
   // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
   // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
   // empty arrays mean "not retrieved", not "none exist".
-  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v1-m`;
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v2-m`;
   const setAsideUnavailable =
     awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
   const detailIncomplete =
@@ -1587,9 +1597,14 @@ export async function getBqContractorHistory(opts: {
       ? []
       : setAsideHist.map((r) => ({
           setAside: r.set_aside,
-          fiscalYear: r.last_fy == null ? null : Number(r.last_fy),
+          lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
+          awardOriginFy: r.award_origin_fy == null ? null : Number(r.award_origin_fy),
         })),
-    { coverage: setAsideUnavailable ? 'unavailable' : 'complete' },
+    {
+      coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+      scopeNote:
+        'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample).',
+    },
   );
   const agenciesServed = Number(profile.distinct_agency_count || agencies.length);
   const topAgenciesCapped = agenciesServed > agencies.length;
