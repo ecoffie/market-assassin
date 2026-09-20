@@ -30,7 +30,7 @@ export interface ResolvedPathwayIdentity {
   uei: string | null;
   legal_name: string | null;
   resolution: PathwayIdentityResolution;
-  name_match?: 'sole_hit' | 'exact_stem' | 'slug';
+  name_match?: 'sole_hit' | 'exact_stem' | 'exact_dba_stem' | 'slug';
   match_count?: number;
   candidates?: AwardNameCandidate[];
   note?: string;
