@@ -14,6 +14,7 @@ import {
   getCommandInfo,
   getSmallBusinessContact,
   getCommandsByParentAgency,
+  osbpContactForAgency,
   type CommandInfo,
 } from '@/lib/utils/command-info';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -68,6 +69,11 @@ export interface FederalOsbpToolResult {
      * "the directory lists the command but has no OSBP office".
      */
     coverage: 'hit' | 'not_in_directory' | 'no_osbp_listed' | 'empty_query';
+    /**
+     * Diagnostic: the OSBP mailbox domain uniquely maps to a different
+     * directory command. Never a promotion veto — identity stays on the office.
+     */
+    email_domain_flag: boolean;
   };
 }
 
@@ -120,13 +126,15 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         grounded: false, degraded: false, match: 'none', office_count: 0,
         director_verified: false, directors_verified: 0, directors_unverified: 0,
         coverage: 'empty_query',
+        email_domain_flag: false,
       },
     };
   }
 
   // 1. Direct command match (NAVFAC, USACE, DLA Aviation, ...).
   const direct = getCommandInfo(agency);
-  const office = direct ? toOffice(direct) : null;
+  const prepend = osbpContactForAgency(agency);
+  let office = direct && prepend.reason !== 'contradiction' ? toOffice(direct) : null;
 
   // 2. Parent-agency roster (e.g. "Navy" → NAVFAC, NAVSUP, SPAWAR, ...).
   //    Exclude the direct match if it's already surfaced above.
@@ -187,6 +195,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
       directors_verified: allOffices.filter((o) => o.director_status === 'verified').length,
       directors_unverified: allOffices.filter((o) => o.director_status === 'unverified').length,
       coverage,
+      email_domain_flag: prepend.emailDomainFlag,
     },
   };
 

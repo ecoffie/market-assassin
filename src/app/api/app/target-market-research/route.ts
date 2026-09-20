@@ -198,10 +198,13 @@ function resolveOsbp(office?: string, subAgency?: string, parentAgency?: string)
       if (entry.keys.some(k => k.length >= 3 && (officeU.includes(k) || k.includes(officeU)))) return entry.sb;
     }
   }
-  // Fall back to the agency-level OSBP (sub-agency, then parent).
-  return getEnhancedAgencyInfo(office || subAgency || parentAgency || '', subAgency || '', parentAgency || '').smallBusinessContact
-    || getEnhancedAgencyInfo(subAgency || '', subAgency || '', parentAgency || '').smallBusinessContact
-    || null;
+  // Fall back to the agency-level OSBP (sub-agency, then parent). Generic
+  // fallbacks are labeled, not asserted as that agency's OSBP.
+  const primary = getEnhancedAgencyInfo(office || subAgency || parentAgency || '', subAgency || '', parentAgency || '');
+  if (primary.osbpSource === 'directory' && primary.smallBusinessContact) return primary.smallBusinessContact;
+  const secondary = getEnhancedAgencyInfo(subAgency || '', subAgency || '', parentAgency || '');
+  if (secondary.osbpSource === 'directory' && secondary.smallBusinessContact) return secondary.smallBusinessContact;
+  return null;
 }
 
 interface FindAgenciesAgency {

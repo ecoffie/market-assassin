@@ -7002,6 +7002,18 @@ preserved). Targeted 3,729-family backfill and the 44,560-family fleet are
 blocked. Do not build a `--go` writer until historical discovery (#1560) shows
 persisted families are worth populating.
 
+## OSBP / federal-contact agency identity (2026-09-20)
+
+**What.** Federal contact search and OSBP lookup now share one agency-identity matcher. Substring containment is not identity: "STATE" no longer matches "UNITED STATES COAST GUARD", so Gail Clark / `sdbupolicy@state.gov` is not prepended as a Coast Guard OSBP. Coast Guard resolves to the directory USCG row (Maria L. Kersey-Robinson, `uscg-smallbusiness@uscg.mil`, `directorVerified` 2026-06). Parent queries return the parent record or a roster — never the first child. Email domains may flag a mismatch; they do not override an established office identity. Unknown report agencies get a labeled generic fallback, not an asserted OSBP.
+
+**Why.** `search_federal_contacts({ agency: "United States Coast Guard", role: "small business" })` returned a State OSDBU contact with no uncertainty flag, while `lookup_federal_osbp` correctly said the name was not in the directory. Contractors would have emailed the wrong office.
+
+**SEO.** Coast Guard OSBP / USCG small business / federal OSDBU contact / Department of Homeland Security OSBP / Navy OSBP roster.
+
+**Proof.** Units 2026-09-20: `agency-identity.unit.test.ts` Coast Guard gold + independent State/DOE/DOT/DHS/Navy identities + parent first-wins property + email flag-without-veto + before/after collision audit on the tested query set (STATE collisions > 100; ENERGY → BOEM ×2; TRANSPORTATION → TSA ×2 — counts describe that query set, not the production population). `command-info-osbp-alias.unit.test.ts` FM-06 aliases stay bounded, resolve to known directory keys, and do not capture Navy/DHS/USCG parent queries. Reports fallback: unknown agency → `osbpSource: 'generic_fallback'`, labeled, no `directorVerified`. 79 tests across identity, alias, provenance, roster, and no-fabrication. Directory provenance for USCG is June 2026 verification, not a fresh contact check. **Stop before merge** — PR only.
+
+---
+
 ## Historical Solicitation Discovery — lookup_solicitation (2026-09-18)
 
 **What.** A dedicated MCP tool looks up a solicitation the customer already worked — by known id or by memory ("I submitted a Navy manufacturing bid at Indian Head recently") — including closed and archived notices. Closed is not gone. Closed is not awarded.

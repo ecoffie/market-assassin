@@ -2,6 +2,15 @@
 // Provides access to DoD command and Civilian agency websites, forecast URLs, and OSBP contacts
 
 import commandInfoData from '@/data/dod-command-info.json';
+import {
+  identityEstablishedEqual,
+  identityKey,
+  emailDomainFlagsDifferentCommand,
+  matchDirectoryCommand,
+  osbpContradictsRequestedAgency,
+  parentAgencyCommands,
+  queryIdentifiesCandidate,
+} from '@/lib/gov-contacts/agency-identity';
 
 // Types for command information
 export interface SmallBusinessOffice {
@@ -16,7 +25,14 @@ export interface SmallBusinessOffice {
   phone: string;
   email: string;
   address: string;
+  /**
+   * Set when the contact is a labeled generic fallback, not a directory OSBP.
+   * Reports must not treat this as an asserted agency identity or verified person.
+   */
+  genericFallback?: boolean;
 }
+
+export const GENERIC_OSBP_FALLBACK_LABEL = 'Generic fallback';
 
 export interface AcquisitionOffice {
   name: string;
@@ -58,7 +74,7 @@ export interface ServiceBranchInfo {
 // "Army Contracting Command", and `service` asserts the resolved command's parentAgency matches the
 // service the alias belongs to — a future abbreviation collision fails closed (returns null) instead
 // of routing to the wrong service.
-const OSBP_PARENT_ALIASES: Array<{ re: RegExp; parent: string; service: string }> = [
+export const OSBP_PARENT_ALIASES: Array<{ re: RegExp; parent: string; service: string }> = [
   // Navy field activities under NAVSEA (NSWC/NUWC warfare centers).
   { re: /\b(indian head|nswc|nuwc|naval surface warfare|naval undersea warfare|carderock|dahlgren|crane|port hueneme)\b/i, parent: 'NAVSEA', service: 'Navy' },
   // Army armament / munitions — Picatinny is an ACC contracting center; PEO Ammunition + JMC are
@@ -70,7 +86,8 @@ const OSBP_PARENT_ALIASES: Array<{ re: RegExp; parent: string; service: string }
 
 // A resolved command belongs to the service the alias claims (guards the ACC collision above).
 function commandMatchesService(info: CommandInfo, service: string): boolean {
-  return (info.parentAgency || '').toUpperCase().includes(service.toUpperCase());
+  return identityEstablishedEqual(info.parentAgency, service)
+    || queryIdentifiesCandidate(service, info.parentAgency);
 }
 
 export function getCommandInfo(command: string): CommandInfo | null {
@@ -100,13 +117,10 @@ export function getCommandInfo(command: string): CommandInfo | null {
     }
   }
 
-  // Try partial match (for variations like "Naval Facilities" matching "NAVFAC")
-  for (const [key, info] of Object.entries(commands)) {
-    if (key.toUpperCase().includes(commandUpper) ||
-        info.fullName.toUpperCase().includes(commandUpper)) {
-      return info;
-    }
-  }
+  // Canonical identity (exact / normalized alias / unique phrase). Replaces
+  // unanchored `includes` so "STATE" cannot match "UNITED STATES COAST GUARD".
+  const identity = matchDirectoryCommand(command, commands);
+  if (identity) return identity.info;
 
   return null;
 }
@@ -120,13 +134,10 @@ export function getServiceBranchInfo(branch: string): ServiceBranchInfo | null {
     return branches[branch];
   }
 
-  // Try partial match
-  const branchUpper = branch.toUpperCase();
-  for (const [key, info] of Object.entries(branches)) {
-    if (key.toUpperCase().includes(branchUpper)) {
-      return info;
-    }
-  }
+  const hits = Object.entries(branches).filter(([key]) =>
+    identityEstablishedEqual(branch, key) || queryIdentifiesCandidate(branch, key),
+  );
+  if (hits.length === 1) return hits[0][1];
 
   return null;
 }
@@ -139,11 +150,7 @@ export function getAllCommands(): CommandInfo[] {
 // Get commands by parent agency
 export function getCommandsByParentAgency(parentAgency: string): CommandInfo[] {
   const commands = commandInfoData.commands as Record<string, CommandInfo>;
-  const parentUpper = parentAgency.toUpperCase();
-
-  return Object.values(commands).filter(cmd =>
-    cmd.parentAgency.toUpperCase().includes(parentUpper)
-  );
+  return parentAgencyCommands(parentAgency, commands);
 }
 
 // Get forecast URL for a command or agency
@@ -209,6 +216,48 @@ export function getSmallBusinessContact(commandOrAgency: string): {
   };
 }
 
+const GENERIC_SBA_EMAIL = 'gcbd@sba.gov';
+
+/**
+ * OSBP contact that may be prepended for an agency query.
+ * Identity must be established; a contradictory office/email is excluded,
+ * not presented as that agency's OSBP. Generic SBA fallback is not a hit.
+ */
+export function osbpContactForAgency(agency: string): {
+  contact: SmallBusinessOffice | null;
+  command: CommandInfo | null;
+  reason: 'established' | 'not_established' | 'contradiction' | 'generic_fallback';
+  /** Diagnostic only. Never sets `reason` and never drops the contact. */
+  emailDomainFlag: boolean;
+} {
+  const q = (agency || '').trim();
+  if (!q || !identityKey(q)) {
+    return { contact: null, command: null, reason: 'not_established', emailDomainFlag: false };
+  }
+  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const command = getCommandInfo(q) || getAgencyInfoByParentAgency(q);
+  const contact = command?.smallBusinessOffice || null;
+  const emailDomainFlag = !!(
+    command && contact?.email && emailDomainFlagsDifferentCommand(contact.email, command, commands)
+  );
+  if (!command || !contact || (!contact.director && !contact.email)) {
+    return { contact: null, command: command || null, reason: 'not_established', emailDomainFlag };
+  }
+  if ((contact.email || '').toLowerCase() === GENERIC_SBA_EMAIL) {
+    return { contact: null, command, reason: 'generic_fallback', emailDomainFlag };
+  }
+  if (osbpContradictsRequestedAgency({
+    requestedAgency: q,
+    selectedCommand: command,
+    osbpName: contact.name,
+    osbpEmail: contact.email,
+    osbpParentAgency: command.parentAgency,
+  }, commands)) {
+    return { contact: null, command, reason: 'contradiction', emailDomainFlag };
+  }
+  return { contact, command, reason: 'established', emailDomainFlag };
+}
+
 // Get website for a command or agency
 export function getCommandWebsite(commandOrAgency: string): string | null {
   const commandInfo = getCommandInfo(commandOrAgency);
@@ -237,6 +286,7 @@ export function getEnhancedAgencyInfo(
   samForecastUrl: string;
   smallBusinessContact: SmallBusinessOffice | null;
   website: string | null;
+  osbpSource: 'directory' | 'generic_fallback' | null;
 } {
   const commands = getAllCommands();
   const officeUpper = officeName.toUpperCase();
@@ -250,7 +300,8 @@ export function getEnhancedAgencyInfo(
     forecastUrl: cmd.forecastUrl,
     samForecastUrl: cmd.samForecastUrl,
     smallBusinessContact: cmd.smallBusinessOffice,
-    website: cmd.website
+    website: cmd.website,
+    osbpSource: 'directory' as const,
   });
 
   // 1. Try detected command first (from FPDS API)
@@ -259,6 +310,17 @@ export function getEnhancedAgencyInfo(
     if (info) {
       return returnCommandInfo(info);
     }
+  }
+
+  // 1b. Canonical identity on the strings the caller actually passed. This is
+  // what makes "United States Coast Guard" resolve to USCG (same identity as
+  // "U.S. Coast Guard") instead of falling through to a STATE substring hit.
+  const identityHit =
+    getCommandInfo(officeName)
+    || (subAgency && subAgency !== officeName ? getCommandInfo(subAgency) : null)
+    || (parentAgency && parentAgency !== officeName && parentAgency !== subAgency ? getCommandInfo(parentAgency) : null);
+  if (identityHit) {
+    return returnCommandInfo(identityHit);
   }
 
   // 2. PRIORITY: Try to match specific sub-agencies/offices using the mapping table
@@ -415,7 +477,12 @@ export function getEnhancedAgencyInfo(
     'NAVAL AIR WARFARE CENTER': 'NAWC',
   };
 
-  const mappedAbbr = subAgencyToParentMap[officeUpper] || subAgencyToParentMap[subAgencyUpper];
+  const mappedAbbr =
+    subAgencyToParentMap[officeUpper]
+    || subAgencyToParentMap[subAgencyUpper]
+    || (identityKey(officeName) ? subAgencyToParentMap[identityKey(officeName)] : undefined)
+    || (identityKey(subAgency) ? subAgencyToParentMap[identityKey(subAgency)] : undefined)
+    || Object.entries(subAgencyToParentMap).find(([k]) => identityEstablishedEqual(officeName, k) || identityEstablishedEqual(subAgency, k))?.[1];
   if (mappedAbbr) {
     const mappedCmd = commands.find(cmd => cmd.abbreviation.toUpperCase() === mappedAbbr.toUpperCase());
     if (mappedCmd) {
@@ -425,7 +492,8 @@ export function getEnhancedAgencyInfo(
         forecastUrl: mappedCmd.forecastUrl,
         samForecastUrl: mappedCmd.samForecastUrl,
         smallBusinessContact: mappedCmd.smallBusinessOffice,
-        website: mappedCmd.website
+        website: mappedCmd.website,
+        osbpSource: 'directory',
       };
     }
   }
@@ -439,7 +507,8 @@ export function getEnhancedAgencyInfo(
       forecastUrl: branchInfo.smallBusinessWebsite,
       samForecastUrl: `https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=${encodeURIComponent(parentAgency)}`,
       smallBusinessContact: branchInfo.smallBusinessOffice,
-      website: branchInfo.website
+      website: branchInfo.website,
+      osbpSource: 'directory',
     };
   }
 
@@ -453,7 +522,8 @@ export function getEnhancedAgencyInfo(
         forecastUrl: subBranchInfo.smallBusinessWebsite,
         samForecastUrl: `https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=${encodeURIComponent(subAgency)}`,
         smallBusinessContact: subBranchInfo.smallBusinessOffice,
-        website: subBranchInfo.website
+        website: subBranchInfo.website,
+        osbpSource: 'directory',
       };
     }
   }
@@ -467,12 +537,13 @@ export function getEnhancedAgencyInfo(
       forecastUrl: civilianAgencyInfo.forecastUrl,
       samForecastUrl: civilianAgencyInfo.samForecastUrl,
       smallBusinessContact: civilianAgencyInfo.smallBusinessOffice,
-      website: civilianAgencyInfo.website
+      website: civilianAgencyInfo.website,
+      osbpSource: 'directory',
     };
   }
 
-  // Final fallback: Create a generic OSBP contact based on parent agency
-  // This ensures EVERY agency gets an OSBP contact, even if we don't have specific data
+  // Final fallback: labeled generic only. Never an asserted command identity
+  // or a verified named contact.
   const genericOSBP = createGenericOSBP(parentAgency, subAgency);
 
   return {
@@ -481,7 +552,8 @@ export function getEnhancedAgencyInfo(
     forecastUrl: null,
     samForecastUrl: `https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=${encodeURIComponent(parentAgency)}`,
     smallBusinessContact: genericOSBP,
-    website: null
+    website: null,
+    osbpSource: 'generic_fallback',
   };
 }
 
@@ -659,22 +731,29 @@ function createGenericOSBP(parentAgency: string, subAgency: string): SmallBusine
     }
   };
 
-  // Try to find matching OSBP from directory
-  const parentUpper = parentAgency.toUpperCase();
-
-  for (const [key, osbp] of Object.entries(osbpDirectory)) {
-    if (parentUpper.includes(key) || key.includes(parentUpper)) {
-      return osbp;
-    }
+  const parentKey = identityKey(parentAgency);
+  const hits = Object.entries(osbpDirectory).filter(([key]) =>
+    identityEstablishedEqual(parentAgency, key) || (parentKey.length > 0 && queryIdentifiesCandidate(parentAgency, key)),
+  );
+  if (hits.length === 1) {
+    const hit = hits[0][1];
+    return {
+      name: `${GENERIC_OSBP_FALLBACK_LABEL} — ${hit.name}`,
+      director: `${GENERIC_OSBP_FALLBACK_LABEL} — not a verified contact`,
+      phone: hit.phone,
+      email: hit.email,
+      address: hit.address,
+      genericFallback: true,
+    };
   }
 
-  // If still no match, return a generic federal OSBP contact
   return {
-    name: `${parentAgency} Office of Small Business Programs`,
-    director: 'OSBP Director',
-    phone: '(202) 205-6460',  // SBA main line as backup
-    email: 'gcbd@sba.gov',    // SBA GC as backup
-    address: 'Washington, DC'
+    name: `${GENERIC_OSBP_FALLBACK_LABEL} — not a directory OSBP`,
+    director: `${GENERIC_OSBP_FALLBACK_LABEL} — not a verified contact`,
+    phone: '(202) 205-6460',
+    email: 'gcbd@sba.gov',
+    address: 'Washington, DC',
+    genericFallback: true,
   };
 }
 
@@ -707,7 +786,6 @@ export function isCivilianAgency(parentAgency: string): boolean {
 // Get agency info by parent agency name (for civilian agencies)
 export function getAgencyInfoByParentAgency(parentAgency: string): CommandInfo | null {
   const commands = commandInfoData.commands as Record<string, CommandInfo>;
-  const parentUpper = parentAgency.toUpperCase();
 
   // Common abbreviations mapping
   const abbreviationMap: Record<string, string[]> = {
@@ -733,28 +811,21 @@ export function getAgencyInfoByParentAgency(parentAgency: string): CommandInfo |
     'OPM': ['PERSONNEL MANAGEMENT']
   };
 
-  // Try direct match first
-  for (const [key, info] of Object.entries(commands)) {
-    if (info.parentAgency.toUpperCase() === parentUpper) {
-      return info;
-    }
-  }
+  // Self-identity only. Never first-wins a child that happens to share this parent.
+  const identity = matchDirectoryCommand(parentAgency, commands);
+  if (identity) return identity.info;
 
-  // Try abbreviation mapping
+  // Explicit abbreviation aliases — identity-key equality only, never includes.
   for (const [abbr, keywords] of Object.entries(abbreviationMap)) {
+    if (identityEstablishedEqual(parentAgency, abbr)) {
+      const info = commands[abbr];
+      if (info) return info;
+    }
     for (const keyword of keywords) {
-      if (parentUpper.includes(keyword)) {
+      if (identityEstablishedEqual(parentAgency, keyword)) {
         const info = commands[abbr];
         if (info) return info;
       }
-    }
-  }
-
-  // Try partial match
-  for (const [key, info] of Object.entries(commands)) {
-    if (info.parentAgency.toUpperCase().includes(parentUpper) ||
-        parentUpper.includes(info.parentAgency.toUpperCase())) {
-      return info;
     }
   }
 
@@ -776,7 +847,6 @@ export function getDoDCommands(): CommandInfo[] {
 // Get commands by sub-agency (e.g., "Department of the Navy" -> NAVFAC, NAVSEA, etc.)
 export function getCommandsBySubAgency(subAgency: string): CommandInfo[] {
   const commands = commandInfoData.commands as Record<string, CommandInfo>;
-  const subAgencyUpper = subAgency.toUpperCase();
 
   // Map sub-agency names to parent agency for matching
   const subAgencyToParent: Record<string, string> = {
@@ -794,7 +864,7 @@ export function getCommandsBySubAgency(subAgency: string): CommandInfo[] {
   // Find the matching parent agency
   let targetParent: string | null = null;
   for (const [key, parent] of Object.entries(subAgencyToParent)) {
-    if (subAgencyUpper.includes(key)) {
+    if (identityEstablishedEqual(subAgency, key) || queryIdentifiesCandidate(subAgency, key) || identityEstablishedEqual(subAgency, parent)) {
       targetParent = parent;
       break;
     }

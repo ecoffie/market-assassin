@@ -26,6 +26,10 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## OSBP / federal-contact agency identity
+
+| 2026-09-20 | **OSBP promotion matches agency identity, not substring containment.** `STATE` inside `UNITED STATES COAST GUARD` prepended Gail Clark / `sdbupolicy@state.gov`. Shared matcher: unique identity or parent roster or not established. Parent queries do not first-win a child. Email domains flag, they do not override. Unknown report agencies are labeled `Generic fallback`, not an asserted directory OSBP. | `GENERIC_OSBP_FALLBACK_LABEL` → `src/lib/utils/command-info.ts` | 79 unit tests (identity, alias, provenance, roster, no-fabrication). Collision audit is a tested-query-set before/after, not a production population. Stop before merge. | IN REVIEW |
+
 ## Contractor name resolution
 
 | 2026-09-16 | **Company name now resolves to the UEI history path; a multi-match is not "not found".** `get_contractor_award_history` company path was null for every name form because it never called the warehouse UEI loader. A unique slug (same suffix sweep as profile) or a unique award-index hit now loads by UEI and is not guessed from the largest substring. Several hits return `resolution: ambiguous` and candidates. Zero rows in the award index is `none_in_award_corpus`, distinct from `lookup_failed`. The existence flag still runs on a miss, including a no-comma variant. Profile and history dollars are not the same field: measured 2026-09-16, UEI UM53UXL5QNF5, same 54 awards, child_count 1 — recipients_rollup $259,934,761.21 as-of 2026-08-28 vs recipients $261,903,825.70 as-of 2026-09-09. | `award_corpus_name_to_uei` → `src/mcp/tools/contractor-award-history.ts` | name-resolution.unit.test.ts refuses to pick the first of 13. Live BQ: "Tanaq Support Services" and the no-comma form → UM53UXL5QNF5; "Tanaq" ambiguous 13, not picked; "Tanaq Global Solutions LLC" and a garbage control → none. | IN REVIEW |
