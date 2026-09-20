@@ -313,6 +313,7 @@ export async function GET(request: NextRequest) {
 
   // ── 3. INGEST + 4. DERIVATION ───────────────────────────────────────────
   let evidenceInserted = 0,
+    evidenceUpdated = 0,
     alreadyHeld = 0,
     resolved = 0,
     unresolved = 0;
@@ -327,18 +328,26 @@ export async function GET(request: NextRequest) {
       break;
     }
     const resolution = resolveLegislationAgency(doc, names);
-    // Reuse the GAO ingest verbatim; agency is resolved by the legislative rule and
-    // passed through as a single-name hint so the shared function behaves identically.
-    const ing = await ingestInstituteDocument(
-      db,
-      doc,
-      resolution.canonicalAgency ? [resolution.canonicalAgency] : [],
-    );
+    // ⚠️ PASS THE RESOLUTION, NOT A NAME LIST.
+    //
+    // Gate 3 defect: this previously handed `[resolution.canonicalAgency]` to the
+    // ingest, which then RE-RESOLVED from the title using the GAO matcher. An NDAA
+    // title never contains the literal "Department of Defense", so 28 of 29 rows
+    // persisted with canonical_agency = null even though the resolver had already
+    // answered correctly. The grounded result now travels through verbatim.
+    //
+    // `updateExisting` makes a re-run REPAIR the attribution on the same identity
+    // rather than early-returning as a no-op. Identity is unchanged; no row is added.
+    const ing = await ingestInstituteDocument(db, doc, names, {
+      agencyResolution: resolution,
+      updateExisting: true,
+    });
     if (ing.error) {
       failed++;
       continue;
     }
     if (ing.inserted) evidenceInserted++;
+    else if (ing.updated) evidenceUpdated++;
     else alreadyHeld++;
     if (ing.resolution.resolved) resolved++;
     else unresolved++;
@@ -455,6 +464,7 @@ export async function GET(request: NextRequest) {
     families,
     documentsSeen: allDocs.length,
     evidenceInserted,
+    evidenceUpdated,
     alreadyHeld,
     resolved,
     unresolved,
