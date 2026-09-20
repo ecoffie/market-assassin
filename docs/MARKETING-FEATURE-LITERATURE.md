@@ -19,7 +19,23 @@ tool, federal market research.*
 
 ---
 
-## MCP honesty — award fields, PIEE attachments, dossier omissions (Sep 2026)
+## Owned evidence Phase 0–1 — market window honesty + CAI compose contract (Sep 2026)
+
+**What:** Market coverage totals are labeled as one-FY description-match
+distribution — never interchangeable with 3-FY Relevant spending. Current
+Acquisition Intelligence compose contract is locked in code against owned living
+corpora only (no FR/pain as “what changed”).
+
+**Why:** Twin market definitions and ungrounded “policy change” claims destroy
+trust in bid decisions.
+
+**SEO / content hooks:** GovCon market research honesty · acquisition
+intelligence provenance · SAM recompete change detection.
+
+**Proof:** `MARKET_SPEND_WINDOW_LABEL` vs `keywordCoverageWindowLabel`;
+`src/lib/cai/compose-contract.ts` killer rule + routing tests.
+
+---
 
 **What:** Past-contract rows no longer pretend a NAICS filter is award source data. Place-of-performance state is labeled separately from recipient HQ. Pursuit dossiers name omitted competition firms and truncated document text. When the Combined Synopsis lives on PIEE, SOW/document tools say so — “no SOW heading” is not “no SOW exists.” Solicitation number and UUID both resolve the same notice body (on-demand noticedesc when the cache column is empty).
 

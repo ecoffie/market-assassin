@@ -37,6 +37,9 @@ export interface KeywordCoverageToolResult {
     unique_award_count?: number | null;
     fiscal_year?: number | null;
     source?: string | null;
+    window_kind?: string | null;
+    window_label?: string | null;
+    question_kind?: string | null;
   };
 }
 
@@ -90,6 +93,9 @@ export async function getKeywordCoverage(input: KeywordCoverageToolInput): Promi
       unique_award_count: grounded ? coverage!.uniqueAwardCount : null,
       fiscal_year: grounded ? coverage!.fiscalYear : null,
       source: grounded ? coverage!.source : (degraded ? null : 'bigquery_usaspending_awards'),
+      window_kind: grounded ? coverage!.windowKind : null,
+      window_label: grounded ? coverage!.windowLabel : null,
+      question_kind: grounded ? coverage!.questionKind : null,
     },
   };
 

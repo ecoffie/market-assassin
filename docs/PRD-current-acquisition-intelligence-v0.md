@@ -7,6 +7,32 @@
 **Journey slot:** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY → POSITION`
 **Date:** 2026-09-15
 **Next gate:** `docs/PRD-pathway-talent-gate.md`
+**Owned Evidence Phase 0+1 (2026-09-20):** market-window semantic split shipped; architecture compose contract (`src/lib/cai/compose-contract.ts`) locks internal-first routing + forbidden sources for CAI — **no CAI behavior change**, **no strategic ingest**.
+
+---
+
+## 0. Owned Evidence Architecture — Phase 0 / Phase 1 (additive)
+
+### Phase 0 — market window semantic split
+
+Keyword coverage answers **description-matched obligations in one complete FY**.
+TMR Relevant spending / fpds-top-n / spend-query answer **`MARKET_SPEND_WINDOW` (3 FYs)**.
+Hosts must show `window_label` / `spend_window_label`. Guard:
+`src/lib/market/market-window-semantic-split.unit.test.ts`.
+
+### Phase 1 — architecture compose contract (owned living stack)
+
+`src/lib/cai/compose-contract.ts` is the product/architecture registry for:
+
+- allowed CAI sources (same owned living set as frozen CAI)
+- forbidden buyer-fact sources (pain, budget JSON, FR passthrough, Institute pilot, SBLO, podcast, 1-FY coverage-as-size)
+- `routeCaiEvidenceNeed()` internal-first decision table
+- killer-rule helpers (`passesCaiKillerRule` / `filterByCaiKillerRule`)
+
+Frozen CAI compose (`current-acquisition-intelligence.ts`) remains the production path.
+This contract does **not** reopen CAI polish and does **not** authorize strategic persistence.
+
+**Stop before:** FR/IG/legislation/appropriations collectors.
 
 ---
 
@@ -376,18 +402,16 @@ Same agent/host discipline as FIND/UNDERSTAND. **HOLD until PASS on all three:**
 
 ---
 
-## 12. Implementation sketch (for the next PR — not this design doc)
+## 12. Implementation status
 
-| Piece | Location (proposed) |
-|-------|---------------------|
-| Compose lib | `src/lib/opportunities/current-acquisition-intelligence.ts` |
-| Unit tests | killer rule + pathway establishment + empty do_differently |
-| MCP wrapper | `src/mcp/tools/current-acquisition-intelligence.ts` |
-| Registry | `tool-registry.ts` + `server.ts` + catalog surfaces (same commit) |
-| Credits | `TOOL_CREDITS` provisional 8 |
-| Journey docs | CLAUDE in-flight sequencing update |
+| Piece | Location | Status |
+|-------|----------|--------|
+| Compose lib | `src/lib/opportunities/current-acquisition-intelligence.ts` | **FROZEN COMPLETE** (PR #1539) |
+| MCP wrapper + registry | `src/mcp/tools/current-acquisition-intelligence.ts` | **FROZEN COMPLETE** |
+| Architecture compose contract + routing | `src/lib/cai/compose-contract.ts` | **Phase 1 SHIPPED** (additive) |
+| Phase 0 window split | `keyword-coverage-contract.ts` + TMR + banner | **Phase 0 SHIPPED** |
 
-**Ship gate:** unit tests for killer rule; three host packages; HOLD until PASS — same as #1537.
+**Explicitly blocked without new GO:** strategic persistence, PAE ingest, FR collector, CAI polish, new MCP search_* for GAO/IG.
 
 ---
 
