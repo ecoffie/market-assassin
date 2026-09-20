@@ -15,7 +15,8 @@ import {
 import { resolveCommand } from '@/lib/gov-contacts/commands';
 import { resolveOperationalCustomer } from '@/lib/gov-identity/operational-customer';
 import { queryKeywordCoverage, type KeywordCoverage } from '@/lib/market/keyword-coverage';
-import { US_STATE_NAMES, normalizeStateCode } from '@/lib/utils/us-states';
+import { geographyDisplayName, normalizeStateCode } from '@/lib/utils/us-states';
+export { geographyDisplayName };
 import { extractDodaac } from './market-scope';
 import type { Requirement } from './types';
 
@@ -590,9 +591,4 @@ export async function interpretMarketQuestion(
     intake: confirmationToRequirement(question, confirmation),
     unresolved,
   };
-}
-
-export function geographyDisplayName(code: string | undefined): string | undefined {
-  if (!code) return undefined;
-  return US_STATE_NAMES[code] ?? code;
 }

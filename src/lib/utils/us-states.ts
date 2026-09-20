@@ -74,3 +74,9 @@ export function normalizeStateCode(input: string): string | null {
 }
 
 export { CODE_TO_NAME as US_STATE_NAMES };
+
+/** Human label for a 2-letter state code (falls back to the code). */
+export function geographyDisplayName(code: string | undefined): string | undefined {
+  if (!code) return undefined;
+  return CODE_TO_NAME[code] ?? code;
+}

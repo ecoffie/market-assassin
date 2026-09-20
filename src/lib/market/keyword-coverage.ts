@@ -18,10 +18,9 @@ import {
   KEYWORD_COVERAGE_SOURCE,
   KeywordCoverageNotEstablishedError,
   descriptionMatchPattern,
-  runKeywordCoverageBq,
   type CoverageEvidenceStatus,
-  type KeywordCoverageBqRow,
-} from './keyword-coverage-bq';
+} from './keyword-coverage-contract';
+import type { KeywordCoverageBqRow } from './keyword-coverage-bq';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 
@@ -52,7 +51,7 @@ export {
   KEYWORD_COVERAGE_SOURCE,
   KeywordCoverageNotEstablishedError,
   type CoverageEvidenceStatus,
-} from './keyword-coverage-bq';
+} from './keyword-coverage-contract';
 
 export interface KeywordCoverageQueryResult {
   status: CoverageEvidenceStatus;
@@ -462,6 +461,9 @@ export async function queryKeywordCoverage(
 
   const signal = fetchSignal(opts);
   try {
+    // Dynamic import keeps @google-cloud/bigquery out of any Client Component
+    // graph that touches pure helpers / types from this module.
+    const { runKeywordCoverageBq } = await import('./keyword-coverage-bq');
     const row = await runKeywordCoverageBq({
       keyword: raw,
       fiscalYear: latestCompleteFiscalYear(),

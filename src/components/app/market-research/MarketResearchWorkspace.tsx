@@ -17,7 +17,7 @@ import type { Phase1ReviewDto, ReviewFinding, ReviewState } from '@/lib/mrr/work
 import type { DecisionBrief } from '@/lib/mrr/decision-brief';
 import type { EvidenceBucket, EvidenceBuckets } from '@/lib/mrr/evidence-buckets';
 import type { InterpretMarketResult, MarketConfirmation } from '@/lib/mrr/interpret-market';
-import { geographyDisplayName } from '@/lib/mrr/interpret-market';
+import { geographyDisplayName } from '@/lib/utils/us-states';
 import {
   DEMO_PROGRESS_STAGES,
   demoProgressIndex,
