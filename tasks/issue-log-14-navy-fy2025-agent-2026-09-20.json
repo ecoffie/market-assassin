@@ -1,0 +1,47 @@
+{
+  "label": "AGENT_VERIFICATION_NOT_INDEPENDENT_ACCEPTANCE",
+  "checked_at": "2026-09-20T19:42:25.249Z",
+  "exact_input": {
+    "agency": "Navy",
+    "fiscal_year": 2025
+  },
+  "expected": "Navy spending scope/percentage distinct from DoD parent; small_business_share is set-aside share not SBA goaling",
+  "observed": {
+    "agency": "Department of the Navy",
+    "toptier_code": "097",
+    "fiscal_year": 2025,
+    "total_obligated": 176557193879.18,
+    "spending": {
+      "scope": "REQUESTED",
+      "scope_name": "Department of the Navy",
+      "total": 176557193879.18
+    },
+    "command_spending": {
+      "status": "NOT_APPLICABLE"
+    },
+    "requested_identity": {
+      "command": null,
+      "service": "Department of the Navy",
+      "parent": "Department of Defense"
+    },
+    "small_business_share": 3.4,
+    "set_aside_share": 3.4,
+    "recipient_small_business_share": 12.5,
+    "sub_agency_count": 1,
+    "top_sub_agencies": [
+      {
+        "name": "Department of the Navy",
+        "amount": 176557193879.18,
+        "pct": null
+      }
+    ],
+    "grounded": true,
+    "degraded": false,
+    "spending_scope": "REQUESTED"
+  },
+  "scope_checks": {
+    "navy_not_labeled_as_dod_total": true,
+    "toptier_097_note": "097 is DoD parent code on Navy rows \u2014 not a claim dollars are all of DoD"
+  },
+  "provenance": "agent recheck local worktree; not independent acceptance"
+}
