@@ -326,6 +326,48 @@ export function readStatus(bill: Record<string, unknown>): LegislativeStatus {
   };
 }
 
+// ── TITLE DECORATION (idempotent by construction) ────────────────────────────
+/**
+ * Mindy's own version decoration: ` [HR 8800 — Introduced in House]`.
+ *
+ * ⚠️ PRODUCTION INCIDENT 2026-09-20. `knownMeasures` rebuilt a BillRef from the
+ * PERSISTED (already-decorated) title, and `billVersionsToDocuments` decorated it
+ * again — so every tracking-path run appended one more suffix. Observed live on
+ * H.R. 5180: four stacked copies, growing to five on the next run. Identity,
+ * attribution and raw data were untouched; only `title` compounded.
+ *
+ * The real fix is that the tracking path now carries `raw.billTitle` (the
+ * authoritative undecorated title). This matcher exists for (a) idempotence as a
+ * belt-and-braces guarantee and (b) repairing rows written before that fix.
+ *
+ * The pattern is deliberately NARROW — it matches only Mindy's exact format:
+ * a space, `[`, the bill type + number, a spaced em dash, a version label, `]`,
+ * anchored to the END of the string. A legitimate source title containing brackets
+ * or an em dash in its own text is NOT touched.
+ */
+const MINDY_TITLE_SUFFIX = /\s\[(?:[A-Z]+\.? ?\d+|[A-Z]\.\s?Rept\.[^\]]*) — [^\]]*\]$/;
+
+/** Strip EVERY trailing Mindy decoration, however many have accumulated. */
+export function undecorateTitle(title: string): string {
+  let out = title;
+  // Bounded: a compounded title has a handful of suffixes, never hundreds. The cap
+  // makes this terminate even on a pathological input rather than spinning.
+  for (let i = 0; i < 16; i++) {
+    const next = out.replace(MINDY_TITLE_SUFFIX, '');
+    if (next === out) break;
+    out = next;
+  }
+  return out.trim();
+}
+
+/**
+ * Apply EXACTLY ONE decoration. Idempotent: decorate(decorate(x)) === decorate(x),
+ * and a title carrying N stacked suffixes converges to exactly one.
+ */
+export function decorateTitle(title: string, suffix: string): string {
+  return `${undecorateTitle(title)} [${suffix}]`;
+}
+
 // ── VERSION -> INSTITUTE DOCUMENT (pure) ─────────────────────────────────────
 /**
  * Build ONE InstituteDocument per bill text version.
@@ -372,7 +414,10 @@ export function billVersionsToDocuments(
       sourceOrg: 'Congress',
       sourceType: isEnactedText ? 'enacted_law' : 'introduced_bill',
       documentNumber: `${ref.congress}-${ref.billType}${ref.number}-${code}`,
-      title: `${ref.title} [${ref.billType} ${ref.number} — ${label}]`,
+      // decorateTitle() is IDEMPOTENT — see its contract. The undecorated title is
+      // ALSO persisted in raw.billTitle so the tracking path never has to recover it
+      // from presentation text.
+      title: decorateTitle(ref.title, `${ref.billType} ${ref.number} — ${label}`),
       url: preferred,
       publicationDate: date,
       abstract: null,
@@ -380,6 +425,13 @@ export function billVersionsToDocuments(
       raw: {
         congress: ref.congress,
         chamber,
+        /**
+         * THE AUTHORITATIVE, UNDECORATED bill title exactly as Congress returned it.
+         * The tracking path reads THIS, never the decorated `title` column — that is
+         * what made decoration compound (raw -> decorated -> read back as raw ->
+         * decorated again, one suffix per run).
+         */
+        billTitle: undecorateTitle(ref.title),
         billType: ref.billType,
         billNumber: ref.number,
         legislativeVersion: label,
