@@ -36,6 +36,12 @@ import {
   formatPainPointForDisplay,
   toCitation,
 } from '@/lib/strategic-intel/sourced-pain-points';
+import {
+  directoryCommands,
+  identityEstablishedEqual,
+  resolveDirectoryIdentity,
+  type DirectoryCommandLike,
+} from '@/lib/gov-contacts/agency-identity';
 
 // Types
 export interface UnifiedAgencyResult {
@@ -190,6 +196,16 @@ export async function getAgency(
 ): Promise<UnifiedAgencyResult | null> {
   const opts = { ...defaultOptions, ...options };
 
+  // Directory identity first — alias/pain keys miss "Naval Sea Systems Command"
+  // (pain is keyed NAVSEA) and substring matchers steal STATE from UNITED STATES.
+  const dir = resolveDirectoryIdentity(identifier, directoryCommands());
+  if (dir.kind === 'command') {
+    return buildAgencyResultFromDirectory(dir.info, opts);
+  }
+  if (dir.kind === 'parent_roster') {
+    return buildAgencyResult(dir.parentLabel, 'exact', 100, opts);
+  }
+
   // Try CGAC code
   if (/^\d{3}$/.test(identifier)) {
     const cgacAgency = resolveCgacCode(identifier);
@@ -223,6 +239,42 @@ export async function getAgency(
   return null;
 }
 
+function exactPainPoints(term: string) {
+  const pain = getPainPointsForAgency(term);
+  if (!pain) return null;
+  if (pain.agencyName.toLowerCase() === term.toLowerCase()) return pain;
+  if (identityEstablishedEqual(pain.agencyName, term)) return pain;
+  return null;
+}
+
+async function buildAgencyResultFromDirectory(
+  info: DirectoryCommandLike,
+  options: UnifiedSearchOptions,
+): Promise<UnifiedAgencyResult | null> {
+  const lookupNames = [info.abbreviation, info.fullName].filter(Boolean);
+  const result = await buildAgencyResult(info.fullName, 'exact', 100, options, lookupNames);
+  if (!result) return null;
+  result.shortName = info.abbreviation;
+  result.parent = info.parentAgency;
+  result.parentPath = `${info.parentAgency} > ${info.fullName}`;
+  result.level = identityEstablishedEqual(info.fullName, info.parentAgency) ? 'department' : 'agency';
+  // Directory identity is not a USASpending toptier — do not display the
+  // corrupt agency-aliases.json cgacCodes map (097=NRC, 021=State, …).
+  result.cgacCode = null;
+  if (result.painPoints.length === 0) {
+    for (const key of lookupNames) {
+      const pain = exactPainPoints(key);
+      if (pain?.painPoints.length) {
+        result.painPoints = pain.painPoints;
+        result.priorities = pain.priorities;
+        if (!result.sources.includes('pain_points')) result.sources.push('pain_points');
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 /**
  * Build a unified result from agency name
  */
@@ -230,7 +282,8 @@ async function buildAgencyResult(
   agencyName: string,
   matchType: UnifiedAgencyResult['matchType'],
   matchScore: number,
-  options: UnifiedSearchOptions
+  options: UnifiedSearchOptions,
+  intelLookupNames?: string[],
 ): Promise<UnifiedAgencyResult | null> {
   const sources: string[] = [];
 
@@ -281,21 +334,23 @@ async function buildAgencyResult(
   let hasSourcedIntelligence = false;
   if (options.includePainPoints !== false) {
     try {
-      const bundle = await getAgencySourcedIntelligence(agencyName, {
-        sourcedLimit: 30,
-        legacyLimit: 30,
-      });
-      if (bundle.painPoints.length > 0) {
+      const lookupNames = intelLookupNames?.length ? intelLookupNames : [agencyName];
+      for (const lookupName of lookupNames) {
+        const bundle = await getAgencySourcedIntelligence(lookupName, {
+          sourcedLimit: 30,
+          legacyLimit: 30,
+        });
+        if (bundle.painPoints.length === 0) continue;
         painPoints = bundle.painPoints.map(formatPainPointForDisplay);
         priorities = bundle.priorities.map(formatPainPointForDisplay);
         sourcedPainPoints = bundle.painPoints.map(toCitation);
         hasSourcedIntelligence = bundle.meta.sourcedCount > 0;
-        // Recompute sources honestly from the shared reader.
         const nextSources = sources.filter((s) => s !== 'pain_points');
         if (bundle.meta.sourcedCount > 0) nextSources.push('institute_gao');
         if (bundle.meta.legacyCount > 0) nextSources.push('pain_points');
         sources.length = 0;
         sources.push(...nextSources);
+        break;
       }
     } catch (err) {
       console.error('[buildAgencyResult] sourced intel failed, legacy only:', err);

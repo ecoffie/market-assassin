@@ -427,9 +427,10 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
-      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
-      'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
-      'points are curated intel, not an official statement. grounded=false when no agency matches — do not guess.',
+      'identity + hierarchy, curated GovCon pain points & priorities, and live USASpending obligations labeled by ' +
+      'spending.scope. Command identity (NAVSEA) is not collapsed into parent-service dollars — those are ' +
+      'PARENT_SERVICE with command_spending NOT_ESTABLISHED. Pain points are curated intel, not an official ' +
+      'statement. grounded=false when no agency matches — do not guess.',
     inputSchema: {
       agency: z
         .string()
@@ -1316,8 +1317,10 @@ server.registerTool(
       '"Who inside this department buys, and can a small business win here." Complements get_agency_intel with the ' +
       'sub-agency (component) spending breakdown + the set-aside distribution (Small Business / 8(a) / SDVOSB / WOSB / ' +
       'HUBZone shares + overall small-business share) — the small-business easy-entry read. Live USASpending contract ' +
-      'obligations (award types A/B/C/D) for a fiscal year. grounded=false = no toptier agency matched; degraded=true = ' +
-      'USASpending errored (not $0). Contract obligations only, NOT total agency budget.',
+      'obligations (award types A/B/C/D) for a fiscal year. A SYSCOM (NAVSEA) stays a SYSCOM: spending.scope ' +
+      'PARENT_SERVICE is the military department\'s dollars, not the command\'s; command_spending is NOT_ESTABLISHED; ' +
+      'total_obligated is null at command grain. grounded=false = identity and dollars both unestablished; ' +
+      'degraded=true = USASpending errored (not $0). Contract obligations only, NOT total agency budget.',
     inputSchema: {
       agency: z.string().describe('Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".'),
       fiscal_year: z.number().int().optional().describe('Fiscal year (defaults to the latest complete FY).'),

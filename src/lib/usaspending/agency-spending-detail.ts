@@ -15,6 +15,13 @@
 import { fetchAllUSASpendingAgencies } from '@/lib/utils/agency-list-builder';
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
 import { DOD_SUBTIER_ALIASES } from '@/lib/usaspending/awarding-agency-filter';
+import {
+  identityEstablishedEqual,
+  resolveIdentitySpendingGrain,
+  type CommandSpendingStatus,
+  type RequestedIdentity,
+  type SpendingScope,
+} from '@/lib/gov-contacts/agency-identity';
 
 const USASPENDING = 'https://api.usaspending.gov/api/v2';
 const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
@@ -37,16 +44,30 @@ export interface AgencySpendingDetailInput {
 export interface SetAsideSlice { label: string; codes: string[]; amount: number; pct_of_total: number }
 export interface SubAgencySlice { name: string; amount: number; pct_of_total: number }
 
+export interface NestedSpending {
+  scope: SpendingScope;
+  scope_name: string | null;
+  total: number | null;
+}
+
 export interface AgencySpendingDetailResult {
   agency: string | null;
   toptier_code: string | null;
   fiscal_year: number;
   window: { start_date: string; end_date: string };
-  total_obligated: number;
+  /**
+   * Dollars at the REQUESTED grain only. Null when the requested entity is a
+   * command whose own spend is NOT_ESTABLISHED — parent-service dollars live
+   * on `spending`, never here.
+   */
+  total_obligated: number | null;
   sub_agencies: SubAgencySlice[];
   set_aside_breakdown: SetAsideSlice[];
   /** Sum of all set-aside buckets ÷ total — the small-business share of contract $. */
-  small_business_share: number;
+  small_business_share: number | null;
+  requested_identity: RequestedIdentity;
+  spending: NestedSpending;
+  command_spending: { status: CommandSpendingStatus };
   degraded: boolean;
   trace: string[];
 }
@@ -68,26 +89,28 @@ function acronymOf(name: string): string {
 
 // FM-U09 aliases live in awarding-agency-filter.ts (shared with spending_by_award).
 
-async function resolveAgency(
+function findDod(list: Array<{ name: string; toptierCode: string; abbreviation: string }>) {
+  return list.find((a) => a.toptierCode === '097' || identityEstablishedEqual(a.name, 'Department of Defense'));
+}
+
+/** Exact / alias / acronym only. Substring containment cannot establish a toptier. */
+async function resolveToptier(
   input: string,
 ): Promise<{ name: string; toptierCode: string; subAgency?: string } | null> {
   const raw = input.trim();
   if (!raw) return null;
   const list = await agencyList();
   const rl = raw.toLowerCase();
-  // Military-department alias → DoD toptier + a sub-tier filter (checked FIRST so "Air Force" doesn't
-  // fall through to a loose contains-match on some unrelated toptier).
-  const dod = list.find((a) => a.toptierCode === '097' || /department of defense/i.test(a.name));
+  const dod = findDod(list);
   const alias = DOD_SUBTIER_ALIASES.find((x) => x.re.test(raw));
   if (alias && dod) {
     return { name: dod.name, toptierCode: dod.toptierCode, subAgency: alias.subAgency };
   }
-  // exact name → abbreviation → acronym → contains
   return (
     list.find((a) => a.name.toLowerCase() === rl) ||
     list.find((a) => a.abbreviation && a.abbreviation.toLowerCase() === rl) ||
     list.find((a) => acronymOf(a.name) === raw.toUpperCase().replace(/[^A-Z]/g, '')) ||
-    (raw.length >= 4 ? list.find((a) => a.name.toLowerCase().includes(rl) || rl.includes(a.name.toLowerCase())) : undefined) ||
+    list.find((a) => identityEstablishedEqual(a.name, raw)) ||
     null
   );
 }
@@ -124,35 +147,98 @@ async function spendingByCategory(
   return j.results || [];
 }
 
+const EMPTY_IDENTITY: RequestedIdentity = { command: null, service: null, parent: null };
+
+function emptyResult(
+  fy: number,
+  window: { start_date: string; end_date: string },
+  trace: string[],
+  extras: Partial<AgencySpendingDetailResult> = {},
+): AgencySpendingDetailResult {
+  return {
+    agency: null,
+    toptier_code: null,
+    fiscal_year: fy,
+    window,
+    total_obligated: null,
+    sub_agencies: [],
+    set_aside_breakdown: [],
+    small_business_share: null,
+    requested_identity: EMPTY_IDENTITY,
+    spending: { scope: 'NOT_ESTABLISHED', scope_name: null, total: null },
+    command_spending: { status: 'NOT_APPLICABLE' },
+    degraded: false,
+    trace,
+    ...extras,
+  };
+}
+
 export async function getAgencySpendingDetail(input: AgencySpendingDetailInput): Promise<AgencySpendingDetailResult> {
   const trace: string[] = [];
   const fy = input.fiscalYear || latestCompleteFiscalYear();
   const window = fiscalYearTimePeriod(fy);
+  const grain = resolveIdentitySpendingGrain(input.agency || '');
 
-  const empty: AgencySpendingDetailResult = {
-    agency: null, toptier_code: null, fiscal_year: fy, window,
-    total_obligated: 0, sub_agencies: [], set_aside_breakdown: [], small_business_share: 0,
-    degraded: false, trace,
-  };
+  if (grain.established) {
+    trace.push(
+      `identity "${input.agency}" → command=${grain.identity.command ?? 'none'} ` +
+      `service=${grain.identity.service ?? 'none'} parent=${grain.identity.parent ?? 'none'} ` +
+      `spend=${grain.spendingScope}`,
+    );
+  }
 
   let resolved: { name: string; toptierCode: string; subAgency?: string } | null = null;
   try {
-    resolved = await resolveAgency(input.agency || '');
+    if (grain.serviceFetch) {
+      const list = await agencyList();
+      const dod = findDod(list);
+      if (!dod) {
+        trace.push('DoD toptier 097 missing from USASpending agency list');
+      } else {
+        resolved = { name: dod.name, toptierCode: dod.toptierCode, subAgency: grain.serviceFetch.subAgency };
+      }
+    } else if (grain.toptierName) {
+      resolved = await resolveToptier(grain.toptierName);
+    } else if (!grain.established) {
+      resolved = await resolveToptier(input.agency || '');
+    }
   } catch (e) {
     trace.push(`agency resolve failed: ${e instanceof Error ? e.message : String(e)}`);
-    return { ...empty, degraded: true };
+    return emptyResult(fy, window, trace, {
+      agency: grain.displayName,
+      requested_identity: grain.identity,
+      spending: { scope: grain.spendingScope, scope_name: grain.spendingScopeName, total: null },
+      command_spending: { status: grain.commandSpending },
+      degraded: true,
+    });
   }
+
+  if (grain.established && grain.spendingScope === 'NOT_ESTABLISHED') {
+    trace.push(`command spend NOT_ESTABLISHED for "${grain.displayName}" — not borrowing parent dollars`);
+    return emptyResult(fy, window, trace, {
+      agency: grain.displayName,
+      requested_identity: grain.identity,
+      spending: { scope: 'NOT_ESTABLISHED', scope_name: null, total: null },
+      command_spending: { status: 'NOT_ESTABLISHED' },
+    });
+  }
+
   if (!resolved) {
     trace.push(`no toptier agency matched "${input.agency}"`);
-    return empty;
+    return emptyResult(fy, window, trace, grain.established
+      ? {
+          agency: grain.displayName,
+          requested_identity: grain.identity,
+          spending: { scope: grain.spendingScope, scope_name: grain.spendingScopeName, total: null },
+          command_spending: { status: grain.commandSpending },
+        }
+      : {});
   }
+
   const sub = resolved.subAgency;
-  // The display name is the SERVICE when a sub-tier was resolved (Navy/Army/AF), else the toptier.
-  const displayName = sub || resolved.name;
+  const displayName = grain.displayName || sub || resolved.name;
   trace.push(`resolved "${input.agency}" → ${displayName}${sub ? ` (sub-tier under ${resolved.name})` : ''} (${resolved.toptierCode})`);
 
-  // Total + sub-agency breakdown + each set-aside bucket, in parallel. Each is an exact
-  // single-value aggregate (agency-filtered), so no top-N under-count.
   const [totalRows, subRows, ...bucketRows] = await Promise.all([
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`total: ${e.message}`); return null; }),
     spendingByCategory('awarding_subagency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`subagency: ${e.message}`); return null; }),
@@ -161,42 +247,73 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
     ),
   ]);
 
+  const identityFields = grain.established
+    ? {
+        requested_identity: grain.identity,
+        command_spending: { status: grain.commandSpending } as { status: CommandSpendingStatus },
+      }
+    : {
+        requested_identity: {
+          command: null,
+          service: sub || null,
+          parent: sub ? 'Department of Defense' : displayName,
+        } satisfies RequestedIdentity,
+        command_spending: { status: 'NOT_APPLICABLE' as const },
+      };
+
   if (totalRows === null) {
-    // The core total failed — report degraded rather than a misleading 0.
-    return { ...empty, agency: displayName, toptier_code: resolved.toptierCode, degraded: true };
+    return emptyResult(fy, window, trace, {
+      agency: displayName,
+      toptier_code: resolved.toptierCode,
+      ...identityFields,
+      spending: { scope: grain.established ? grain.spendingScope : 'REQUESTED', scope_name: grain.spendingScopeName || displayName, total: null },
+      degraded: true,
+    });
   }
 
   const total = (totalRows || []).reduce((s, r) => s + (r.amount || 0), 0);
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0);
+  const parentService = grain.spendingScope === 'PARENT_SERVICE';
 
-  const sub_agencies: SubAgencySlice[] = (subRows || [])
-    .map((r) => ({ name: r.name || '', amount: r.amount || 0, pct_of_total: pct(r.amount || 0) }))
-    // Drop the parent self-row (single-component agencies report only themselves) so
-    // DoD keeps its real components and VA honestly shows no sub-agency split.
-    .filter((s) => s.name && s.amount > 0 && s.name.toLowerCase() !== resolved!.name.toLowerCase())
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 15);
+  const sub_agencies: SubAgencySlice[] = parentService
+    ? []
+    : (subRows || [])
+      .map((r) => ({ name: r.name || '', amount: r.amount || 0, pct_of_total: pct(r.amount || 0) }))
+      .filter((s) => s.name && s.amount > 0 && s.name.toLowerCase() !== resolved!.name.toLowerCase())
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 15);
 
-  const set_aside_breakdown: SetAsideSlice[] = SET_ASIDE_BUCKETS.map((b, i) => {
-    const rows = bucketRows[i];
-    const amount = (rows || []).reduce((s, r) => s + (r.amount || 0), 0);
-    return { label: b.label, codes: b.codes, amount, pct_of_total: pct(amount) };
-  });
+  const set_aside_breakdown: SetAsideSlice[] = parentService
+    ? []
+    : SET_ASIDE_BUCKETS.map((b, i) => {
+      const rows = bucketRows[i];
+      const amount = (rows || []).reduce((s, r) => s + (r.amount || 0), 0);
+      return { label: b.label, codes: b.codes, amount, pct_of_total: pct(amount) };
+    });
 
-  // Small-business share = sum of the non-overlapping set-aside buckets ÷ total. The
-  // buckets are mutually exclusive by set_aside code, so summing is a valid total.
   const sbTotal = set_aside_breakdown.reduce((s, b) => s + b.amount, 0);
-  const small_business_share = total > 0 ? Math.round((sbTotal / total) * 1000) / 10 : 0;
+  const small_business_share = parentService
+    ? null
+    : (total > 0 ? Math.round((sbTotal / total) * 1000) / 10 : 0);
+
+  const spendingScope: SpendingScope = grain.established ? grain.spendingScope : 'REQUESTED';
+  const spendingScopeName = grain.established ? grain.spendingScopeName : displayName;
 
   return {
     agency: displayName,
     toptier_code: resolved.toptierCode,
     fiscal_year: fy,
     window,
-    total_obligated: total,
+    total_obligated: parentService ? null : total,
     sub_agencies,
     set_aside_breakdown,
     small_business_share,
+    ...identityFields,
+    spending: {
+      scope: spendingScope,
+      scope_name: spendingScopeName,
+      total,
+    },
     degraded: false,
     trace,
   };

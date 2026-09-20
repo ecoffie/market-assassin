@@ -7103,3 +7103,31 @@ measures — including S. 4784 and S. 1071, both of which the old fixed-window s
 missed entirely. An incremental pass covered **3,163 of 3,163** in 13 pages. The old
 6-page configuration now reports `coverage: partial` with the cursor unmoved instead of
 a confident empty result.
+
+---
+
+## Agency identity grain — NAVSEA is not $176.6B (2026-09-20)
+
+**What it does (plain English):** Asking Mindy about **NAVSEA** now keeps NAVSEA
+as NAVSEA. Navy contract dollars can appear only as **parent-service** spending
+(`Department of the Navy`). Command-level spend is **not established** — Mindy
+will not relabel the Navy's ~$176.6B FY2025 obligations as NAVSEA's.
+
+**Why it's different:** USASpending has no Navy/Army/Air Force toptier (only DoD
+097). The old matcher promoted `navsea` into all-Navy dollars and missed
+"Naval Sea Systems Command" entirely. The same identity layer already refuses
+to treat "UNITED STATES COAST GUARD" as the State Department because `STATE`
+is a substring of `UNITED STATES`.
+
+**SEO angles:**
+- "NAVSEA spending vs Department of the Navy"
+- "Naval Sea Systems Command OSBP and market size"
+- "DoD command vs military department contract dollars"
+
+**Proof.** Identity contract (directory, no substring): NAVSEA / Naval Sea
+Systems Command → `requested_identity.command=NAVSEA`,
+`service=Department of the Navy`, `parent=Department of Defense`;
+`spending.scope=PARENT_SERVICE`; `command_spending.status=NOT_ESTABLISHED`;
+`total_obligated` at command grain is null. Coast Guard → USCG, not Gail Clark
+/ sdbupolicy@state.gov. Guarded by `agency-identity.unit.test.ts`.
+

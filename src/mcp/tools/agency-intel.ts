@@ -7,7 +7,13 @@
  * report. No fabricated source URLs.
  */
 import { getAgency, type UnifiedAgencyResult } from '@/lib/agency-hierarchy/unified-search';
-import { getAgencySpending, type AgencySpending } from '@/lib/agency-hierarchy/spending-stats';
+import { getAgencySpendingDetail } from '@/lib/usaspending/agency-spending-detail';
+import {
+  resolveIdentitySpendingGrain,
+  type CommandSpendingStatus,
+  type RequestedIdentity,
+  type SpendingScope,
+} from '@/lib/gov-contacts/agency-identity';
 import {
   getAgencySourcedIntelligence,
   toCitation,
@@ -33,8 +39,24 @@ export interface AgencyIntelCitation {
   agency: string;
 }
 
+export interface AgencyIntelSpending {
+  scope: SpendingScope;
+  scope_name: string | null;
+  total: number | null;
+  fiscal_year: number;
+  toptier_code: string | null;
+  /**
+   * Dollars at the REQUESTED grain only. Null when spending.scope is
+   * PARENT_SERVICE or NOT_ESTABLISHED — do not treat `total` as this command's
+   * obligated amount.
+   */
+  totalObligations: number | null;
+}
+
 export interface AgencyIntelResult {
   queried: { agency: string; fiscal_year?: number };
+  requested_identity: RequestedIdentity;
+  command_spending: { status: CommandSpendingStatus };
   /** Resolved agency identity + GovCon intel (null when no agency matched). */
   agency: {
     name: string;
@@ -52,13 +74,14 @@ export interface AgencyIntelResult {
     hasSourcedIntelligence: boolean;
     provenanceNote: string;
   } | null;
-  /** Live USASpending obligations for the FY (null when USASpending has no match). */
-  spending: AgencySpending | null;
+  /** Live USASpending obligations, labeled by spending.scope. */
+  spending: AgencyIntelSpending | null;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
     degraded: boolean;
     has_spending: boolean;
+    spending_scope: SpendingScope;
     sourced_pain_points: number;
     legacy_pain_points: number;
   };
@@ -67,20 +90,29 @@ export interface AgencyIntelResult {
 export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyIntelResult> {
   const agencyQuery = String(input.agency ?? '').trim();
   const fiscalYear = Number.isInteger(input.fiscal_year) ? Number(input.fiscal_year) : undefined;
+  const grain = resolveIdentitySpendingGrain(agencyQuery);
+  const emptyIdentity: RequestedIdentity = grain.identity;
+  const emptyMeta = {
+    grounded: false as const,
+    degraded: false,
+    has_spending: false,
+    spending_scope: grain.spendingScope,
+    sourced_pain_points: 0,
+    legacy_pain_points: 0,
+  };
 
   let resolved: UnifiedAgencyResult | null = null;
-  let spending: AgencySpending | null = null;
+  let spending: AgencyIntelSpending | null = null;
   let degraded = false;
 
   if (!agencyQuery) {
     return {
       queried: { agency: agencyQuery },
+      requested_identity: { command: null, service: null, parent: null },
+      command_spending: { status: 'NOT_APPLICABLE' },
       agency: null,
       spending: null,
-      _meta: {
-        grounded: false, degraded: false, has_spending: false,
-        sourced_pain_points: 0, legacy_pain_points: 0,
-      },
+      _meta: { ...emptyMeta, spending_scope: 'NOT_ESTABLISHED' },
     };
   }
 
@@ -91,8 +123,25 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
     console.error('[mcp:get_agency_intel] agency resolve failed:', err);
   }
 
-  // Shared reader is the authority for pain-point provenance — even when identity
-  // resolved via hierarchy/alias without JSON coverage.
+  if (!resolved && grain.established && grain.displayName) {
+    resolved = {
+      name: grain.displayName,
+      shortName: grain.identity.command,
+      cgacCode: null,
+      fpdsCodes: [],
+      parent: grain.identity.service || grain.identity.parent,
+      parentPath: [grain.identity.parent, grain.identity.service, grain.displayName].filter(Boolean).join(' > '),
+      level: grain.identity.command ? 'agency' : 'department',
+      children: [],
+      painPoints: [],
+      priorities: [],
+      relatedContractors: [],
+      matchType: 'exact',
+      matchScore: 100,
+      sources: ['directory'],
+    };
+  }
+
   let sourcedCount = 0;
   let legacyCount = 0;
   let painPointCitations: AgencyIntelCitation[] = [];
@@ -104,23 +153,31 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
 
   if (resolved) {
     try {
-      const bundle = await getAgencySourcedIntelligence(resolved.name);
-      sourcedCount = bundle.meta.sourcedCount;
-      legacyCount = bundle.meta.legacyCount;
-      hasSourced = bundle.meta.provenanceAvailable;
-      painPointCitations = bundle.painPoints.map(toCitation);
-      priorityCitations = bundle.priorities.map(toCitation);
-      painPoints = resolved.painPoints?.length
-        ? resolved.painPoints
-        : bundle.painPoints.map((p) => p.pain_point);
-      priorities = resolved.priorities?.length
-        ? resolved.priorities
-        : bundle.priorities.map((p) => p.pain_point);
-      provenanceNote = hasSourced
-        ? `${sourcedCount} living GAO-sourced claim(s) with citations; ${legacyCount} legacy-manual fallback claim(s).`
-        : legacyCount > 0
-          ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact.`
-          : 'No pain-point claims for this agency.';
+      const lookupNames = [resolved.shortName, resolved.name].filter((n): n is string => !!n);
+      for (const lookupName of lookupNames) {
+        const bundle = await getAgencySourcedIntelligence(lookupName);
+        if (bundle.painPoints.length === 0 && bundle.priorities.length === 0) continue;
+        sourcedCount = bundle.meta.sourcedCount;
+        legacyCount = bundle.meta.legacyCount;
+        hasSourced = bundle.meta.provenanceAvailable;
+        painPointCitations = bundle.painPoints.map(toCitation);
+        priorityCitations = bundle.priorities.map(toCitation);
+        painPoints = resolved.painPoints?.length
+          ? resolved.painPoints
+          : bundle.painPoints.map((p) => p.pain_point);
+        priorities = resolved.priorities?.length
+          ? resolved.priorities
+          : bundle.priorities.map((p) => p.pain_point);
+        provenanceNote = hasSourced
+          ? `${sourcedCount} living GAO-sourced claim(s) with citations; ${legacyCount} legacy-manual fallback claim(s).`
+          : legacyCount > 0
+            ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact.`
+            : 'No pain-point claims for this agency.';
+        break;
+      }
+      if (!painPointCitations.length && !resolved.painPoints?.length) {
+        provenanceNote = 'No pain-point claims for this agency.';
+      }
     } catch (err) {
       degraded = true;
       console.error('[mcp:get_agency_intel] sourced intel failed:', err);
@@ -128,7 +185,19 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
     }
 
     try {
-      spending = await getAgencySpending(resolved.name, fiscalYear);
+      const detail = await getAgencySpendingDetail({ agency: agencyQuery, fiscalYear });
+      if (detail.degraded) degraded = true;
+      const parentService = detail.spending.scope === 'PARENT_SERVICE';
+      spending = {
+        scope: detail.spending.scope,
+        scope_name: detail.spending.scope_name,
+        total: detail.spending.total,
+        fiscal_year: detail.fiscal_year,
+        toptier_code: detail.toptier_code,
+        totalObligations: parentService || detail.spending.scope === 'NOT_ESTABLISHED'
+          ? null
+          : detail.total_obligated,
+      };
     } catch (err) {
       degraded = true;
       console.error('[mcp:get_agency_intel] spending fetch failed:', err);
@@ -138,6 +207,8 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
   const grounded = !!resolved;
   const result: AgencyIntelResult = {
     queried: { agency: agencyQuery, ...(fiscalYear ? { fiscal_year: fiscalYear } : {}) },
+    requested_identity: grain.established ? grain.identity : emptyIdentity,
+    command_spending: { status: grain.established ? grain.commandSpending : 'NOT_APPLICABLE' },
     agency: resolved
       ? {
           name: resolved.name,
@@ -158,7 +229,8 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
     _meta: {
       grounded,
       degraded,
-      has_spending: !!spending,
+      has_spending: typeof spending?.total === 'number' && spending.total > 0,
+      spending_scope: spending?.scope ?? grain.spendingScope,
       sourced_pain_points: sourcedCount,
       legacy_pain_points: legacyCount,
     },
@@ -168,19 +240,24 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
     result._ai_hint = {
       summary: degraded && !resolved
         ? 'Agency lookup degraded; no grounded identity.'
-        : hasSourced
-          ? `Grounded agency intel with ${sourcedCount} cited GAO claim(s).`
-          : grounded
-            ? 'Agency identity grounded; pain points are legacy-manual (provenance unavailable).'
-            : 'No agency matched.',
-      how_to_use: 'Prefer painPointCitations[].source_url + document_number. Never invent a URL for LEGACY_MANUAL rows.',
+        : grain.commandSpending === 'NOT_ESTABLISHED' && grounded
+          ? `${resolved?.name} identity is established. Command-level spending is NOT_ESTABLISHED.`
+          : hasSourced
+            ? `Grounded agency intel with ${sourcedCount} cited GAO claim(s).`
+            : grounded
+              ? 'Agency identity grounded; pain points are legacy-manual (provenance unavailable).'
+              : 'No agency matched.',
+      how_to_use:
+        'Prefer painPointCitations[].source_url + document_number. Never invent a URL for LEGACY_MANUAL rows. spending.scope names whose dollars spending.total is — PARENT_SERVICE is the military department, not the command.',
       key_caveats: [
         'SOURCE_FACT = living Institute/GAO citation.',
         'LEGACY_MANUAL = static JSON; provenance unavailable.',
         'MINDY_INTERPRETATION = derived claim, not direct GAO wording.',
+        'Never attribute PARENT_SERVICE totals to the requested command.',
       ],
     };
   }
 
   return result;
 }
+
