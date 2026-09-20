@@ -2,6 +2,7 @@
 import agencyPainPointsData from '@/data/agency-pain-points.json';
 import componentAgencyRulesData from '@/data/component-agency-rules.json';
 import usaceOfficePainPointsData from '@/data/usace-office-specific-pain-points.json';
+import { stripUnsupportedBudgetClaims } from '@/lib/strategic-intel/unsupported-budget-claim';
 
 interface AgencyData {
   painPoints: string[];
@@ -21,7 +22,30 @@ interface ComponentAgencyRules {
   }>;
 }
 
-const painPointsDB = agencyPainPointsData as PainPointsDatabase;
+/**
+ * Sanitize the legacy corpus ONCE, at load.
+ *
+ * Every accessor in this module reads `painPointsDB`, and this module is the raw-JSON
+ * path used by proposal drafting (`lib/proposal/agency-context.ts`), market research and
+ * the agency-hierarchy linker — surfaces that never see the provenance-aware reader. A
+ * single sanitized load covers all of them, so an unsupported government-wide budget
+ * figure cannot re-enter through any of them even if a stale corpus ships.
+ *
+ * Only the fabricated claim is removed. Every other claim passes through untouched.
+ */
+function sanitizeCorpus(raw: PainPointsDatabase): PainPointsDatabase {
+  const agencies: Record<string, AgencyData> = {};
+  for (const [name, data] of Object.entries(raw.agencies ?? {})) {
+    agencies[name] = {
+      ...data,
+      painPoints: stripUnsupportedBudgetClaims(data.painPoints),
+      priorities: stripUnsupportedBudgetClaims(data.priorities),
+    };
+  }
+  return { agencies };
+}
+
+const painPointsDB = sanitizeCorpus(agencyPainPointsData as PainPointsDatabase);
 const componentAgencyRules = componentAgencyRulesData as any;
 const usaceOfficePainPoints = usaceOfficePainPointsData as any;
 

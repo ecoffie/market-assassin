@@ -15,6 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
+import { isUnsupportedBudgetClaim } from '@/lib/strategic-intel/unsupported-budget-claim';
 
 export type ClaimProvenance =
   | 'SOURCE_FACT'           // GAO wording (title) cited with Institute evidence
@@ -222,6 +223,7 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
       ?? Object.entries(STATIC.agencies).find(([n]) => n.toLowerCase() === key.toLowerCase())?.[1];
     if (!entry) continue;
     for (const pp of entry.painPoints ?? []) {
+      if (isUnsupportedBudgetClaim(pp)) continue;
       painPoints.push({
         agency: key,
         pain_point: pp,
@@ -235,6 +237,10 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
       });
     }
     for (const pr of entry.priorities ?? []) {
+      // An unsupported government-wide budget figure is not a legacy claim to be
+      // labeled — it is a fabrication to be dropped. LEGACY_MANUAL means
+      // "provenance unavailable", never "true but uncited".
+      if (isUnsupportedBudgetClaim(pr)) continue;
       priorities.push({
         agency: key,
         pain_point: pr,

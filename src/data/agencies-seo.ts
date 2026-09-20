@@ -666,9 +666,7 @@ export const AGENCIES_SEO: AgencySeo[] = [
     "budgetTrend": "cut",
     "budgetChangePct": 0.758065,
     "painPoints": [],
-    "priorities": [
-      "Total obligated: $43.3B. Congressional justification outlay: $13541.1B"
-    ],
+    "priorities": [],
     "procurement": {
       "primarySources": [
         "sam.gov",
@@ -985,9 +983,7 @@ export const AGENCIES_SEO: AgencySeo[] = [
     "budgetTrend": "declining",
     "budgetChangePct": 0.847458,
     "painPoints": [],
-    "priorities": [
-      "Total obligated: $78.0B. Congressional justification outlay: $13541.1B"
-    ],
+    "priorities": [],
     "procurement": {
       "primarySources": [],
       "secondarySources": [],
@@ -2202,9 +2198,7 @@ export const AGENCIES_SEO: AgencySeo[] = [
     "budgetTrend": "stable",
     "budgetChangePct": 1.0,
     "painPoints": [],
-    "priorities": [
-      "Total obligated: $0.1B. Congressional justification outlay: $13541.1B"
-    ],
+    "priorities": [],
     "procurement": {
       "primarySources": [],
       "secondarySources": [],
@@ -2301,9 +2295,7 @@ export const AGENCIES_SEO: AgencySeo[] = [
     "budgetTrend": null,
     "budgetChangePct": null,
     "painPoints": [],
-    "priorities": [
-      "Total obligated: $2.2B. Congressional justification outlay: $13541.1B"
-    ],
+    "priorities": [],
     "procurement": {
       "primarySources": [],
       "secondarySources": [],
