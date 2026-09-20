@@ -15,6 +15,7 @@ import { fetchAgencySpendingPatterns, fetchNAICSSpending, fetchSubtierAgencies }
 import { batchVerify, quickVerify } from './verifier';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
+import { isUnsupportedBudgetClaim, stripUnsupportedBudgetClaims } from '@/lib/strategic-intel/unsupported-budget-claim';
 
 // Type for static pain points JSON
 interface AgencyPainPointsData {
@@ -369,7 +370,9 @@ export async function getUnifiedAgencyIntelligence(
         ...staticAgency.painPoints.map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`),
       );
       result.priorities.push(
-        ...staticAgency.priorities.map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`),
+        ...stripUnsupportedBudgetClaims(staticAgency.priorities).map(
+          (p) => `${p} [LEGACY_MANUAL — provenance unavailable]`,
+        ),
       );
       result.sources.push('static');
     }
@@ -387,17 +390,20 @@ export async function getUnifiedAgencyIntelligence(
           result.gaoReports.push(`${gaoEntry} [LEGACY_GOVINFO — not living Institute]`);
         }
       } else if (record.intelligence_type === 'contract_pattern') {
-        const spendingEntry = record.description || record.title;
-        if (!result.spendingPatterns.includes(spendingEntry)) {
+        // A spending OBSERVATION is not a stated agency PRIORITY. Promoting it to
+        // `priorities` is what carried the fabricated government-wide
+        // "Congressional justification outlay" figure into opp-intel and onto 549
+        // customer-visible opportunities. Spending stays in `spendingPatterns`;
+        // it never becomes a priority claim again.
+        const spendingEntry = record.description;
+        if (spendingEntry && !isUnsupportedBudgetClaim(spendingEntry)
+            && !result.spendingPatterns.includes(spendingEntry)) {
           result.spendingPatterns.push(spendingEntry);
-          const shortText = spendingEntry.slice(0, 50);
-          if (!result.priorities.some(p => p.includes(shortText))) {
-            result.priorities.push(`${spendingEntry} [LEGACY_MANUAL — provenance unavailable]`);
-          }
         }
       } else if (record.intelligence_type === 'budget_priority') {
         const priority = record.description || record.title;
-        if (!result.priorities.some(p => p.includes(priority.slice(0, 50)))) {
+        if (!isUnsupportedBudgetClaim(priority)
+            && !result.priorities.some(p => p.includes(priority.slice(0, 50)))) {
           result.priorities.push(`${priority} [LEGACY_MANUAL — provenance unavailable]`);
         }
       }

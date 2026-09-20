@@ -7,6 +7,48 @@ import { AgencyIntelligence, FetcherOptions } from '../types';
 const USASPENDING_API = 'https://api.usaspending.gov/api/v2';
 
 /**
+ * Describe ONE agency's spending from the toptier_agencies payload.
+ *
+ * ⚠️ `current_total_budget_authority_amount` is a GOVERNMENT-WIDE CONSTANT — the
+ * denominator behind `percentage_of_total_budget_authority`. Measured live
+ * 2026-09-20: exactly ONE distinct value across all 111 agencies
+ * ($15,495,311,418,794.12). It is not agency-specific and it is not an outlay.
+ *
+ * It was previously emitted per agency as "Congressional justification outlay",
+ * which stamped the same multi-trillion-dollar figure onto every agency and
+ * reached 549 customer-visible opportunities (NASA shown as a $13,541.1B
+ * "Congressional justification outlay" against a real ~$20.6B obligated).
+ * It is NEVER emitted again. There is no agency-specific source for that claim,
+ * so the correct replacement is NO CLAIM — not a better-looking number.
+ *
+ * `budget_authority_amount` is ALSO not obligations; it was mislabeled "Total
+ * obligated" while the real `obligated_amount` sat unused in the same payload.
+ * Each figure is now emitted under its own name, and a figure the payload does
+ * not carry is OMITTED rather than defaulted to zero (Bug Prevention Rule #11).
+ */
+export function describeAgencySpending(agency: {
+  obligated_amount?: number | null;
+  outlay_amount?: number | null;
+  budget_authority_amount?: number | null;
+}): string | undefined {
+  const b = (v: number | null | undefined): string | null =>
+    typeof v === 'number' && Number.isFinite(v)
+      ? `$${(v / 1_000_000_000).toFixed(1)}B`
+      : null;
+
+  const parts: string[] = [];
+  const obligated = b(agency.obligated_amount);
+  const outlay = b(agency.outlay_amount);
+  const authority = b(agency.budget_authority_amount);
+  if (obligated) parts.push(`Obligated: ${obligated}`);
+  if (outlay) parts.push(`Outlayed: ${outlay}`);
+  if (authority) parts.push(`Budget authority: ${authority}`);
+
+  // No establishable figure → no sentence. Never a fabricated or zero-filled claim.
+  return parts.length > 0 ? parts.join('. ') : undefined;
+}
+
+/**
  * Fetch agency spending patterns from USASpending
  */
 export async function fetchAgencySpendingPatterns(
@@ -43,7 +85,7 @@ export async function fetchAgencySpendingPatterns(
         agency_code: agency.toptier_code,
         intelligence_type: 'contract_pattern',
         title: `FY${fiscalYear} Contract Spending: ${agency.agency_name}`,
-        description: `Total obligated: $${(agency.budget_authority_amount / 1_000_000_000).toFixed(1)}B. Congressional justification outlay: $${(agency.current_total_budget_authority_amount / 1_000_000_000).toFixed(1)}B`,
+        description: describeAgencySpending(agency),
         keywords: ['spending', 'contracts', 'procurement', 'budget'],
         fiscal_year: fiscalYear,
         source_name: 'USASpending API',
