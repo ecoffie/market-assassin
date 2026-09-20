@@ -101,7 +101,9 @@ export async function seedClientProfile(
   primaryEmail?: string | null,
 ): Promise<SeedResult> {
   const p = await buildProfileFromText(text);
+  // Company NAICS identity only — never promote coverageCandidates into naics_codes.
   const naics = (p?.naics || []).filter((c) => isKnownNaicsCode(c));
+  const coverageCandidates = (p?.coverageCandidates || []).filter((c) => isKnownNaicsCode(c));
   const psc = p?.topPsc ? [p.topPsc.code] : [];
   const keywords = p?.keywords || [];
   const states = p?.states || [];
@@ -118,12 +120,14 @@ export async function seedClientProfile(
     set_aside_certifications: setAsides,
     business_type: 'Small Business',
     primary_industry: businessName,
-    alerts_enabled: true,
+    // Alerts stay off until company NAICS is corroborated / user-confirmed.
+    alerts_enabled: naics.length > 0,
     alert_frequency: 'weekly',   // gentle for a tracked client, not daily spam
     is_active: true,
   }, { onConflict: 'user_email' });
 
-  // Pre-load the top buying agencies into the client's Target List (who to talk to).
+  // Pre-load top buyers of the MEASURED market (coverage candidates) into Target List.
+  // source_naics cites measured candidates, not company identity.
   let agenciesSeeded = 0;
   if (p?.agencies?.length) {
     const targets = p.agencies.slice(0, 6).map((a) => ({
@@ -133,7 +137,7 @@ export async function seedClientProfile(
       set_aside_spending: a.amount,
       status: 'targeting',
       added_from: 'capability_text_seed',
-      source_naics: naics.join(','),
+      source_naics: coverageCandidates.join(','),
     }));
     const { error } = await supabase.from('user_target_list').insert(targets);
     if (!error) agenciesSeeded = targets.length;

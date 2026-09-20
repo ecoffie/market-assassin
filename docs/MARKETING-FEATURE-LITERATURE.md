@@ -7104,6 +7104,7 @@ missed entirely. An incremental pass covered **3,163 of 3,163** in 13 pages. The
 6-page configuration now reports `coverage: partial` with the cursor unmoved instead of
 a confident empty result.
 
+<<<<<<< HEAD
 ---
 
 ## NAVSEA command intel, Navy spend grain, DBA lookup, matrix source coverage (2026-09-20)
@@ -7156,3 +7157,49 @@ submission.
 **Proof.** Fixture is the SCB MAC synopsis. Unit tests: Lot 1 2026-08-13 + Lot 2
 2026-08-31 vs SAM 2026-08-31 → `lot_due_dates`; `namedIncumbent` returns null for
 a high-confidence NAICS-only Mazak hit; `detectPiee` true on the PIEE paragraph.
+=======
+## Keyword coverage measures the market — it does not name it (2026-09-20)
+
+**What.** `get_keyword_coverage` now measures federal contract actions in BigQuery
+(`usaspending.awards`) for the latest complete fiscal year: word-boundary match on
+the award description, `SUM(obligation_amount)` at transaction grain. It returns
+the measured NAICS/PSC/agency distribution. It does **not** decide that the
+customer's market *is* the lead NAICS.
+
+**Why.** The old live USASpending path mixed description text with NAICS/PSC
+titles, then a 40% "dominant NAICS" gate treated the lead share as identity.
+On warehouse description-match, HVAC's dollar-lead is commercial building
+construction and drones' dollar-lead is aircraft manufacturing. Those are
+measured categories in the matched set. They are not "HVAC means 236220" or
+"drones means 336411." Ranking stays on the keyword until a later
+interpretation layer (Senses v2) exists.
+
+**Honest scope.** Warehouse failure is unknown, not $0. No live API fallback.
+`codeMarketSize()` is still the live USASpending API (candidate for a later
+warehouse cutover). Senses v2 is not built.
+
+**Not established by coverage alone (neutralized 2026-09-20):**
+- company primary NAICS / company market identity (`profile-from-text` keeps
+  `naics: []` and surfaces `coverageCandidates` for display / user confirm)
+- forecast / recompete / set-aside tile routing (`market-overview` uses
+  corroborated `?naics=` or keyword language — never `coverageCodes` alone)
+- opportunity eligibility on `/try` (coverage sector is a relevance signal;
+  dollar-peak sector is not an exclusionary identity gate)
+
+Company/market identity requires corroborating graph evidence (SAM registration,
+award history, user-confirmed codes, vault). Capability Market Match remains the
+pattern: coverage candidate + SAM/award overlap → corroborated node.
+
+**SEO.** Federal market size by keyword / NAICS is the wrong primary key /
+description-match contract spend.
+
+**Proof.** Unit tests fail if HVAC at 52% 236220, drones at 64% 336411, or
+patrol at 78.6% 336611 collapse ranking to `keyword_naics`. Live BQ FY2025
+description match: patrol ≈ $903M lead 336611 (measured shipbuilding share,
+not identity); HVAC ≈ $1.26B lead 236220 52%; drones ≈ $90M lead 336411 64%.
+V1/V2/V3 identity-boundary unit suites: profile-from-text keeps `naics: []` when
+coverage leads 236220/336411; market-overview never calls tile helpers with
+coverageCodes alone; beginner relevance admits 238220/336612 same-sector siblings
+and still drops Dale Carnegie / dirty IT slivers.
+
+>>>>>>> a998d8a9 (feat(market): BigQuery keyword coverage as measurement, not identity)

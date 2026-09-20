@@ -1,9 +1,10 @@
 /**
  * Plain-language market intake → a confirmable MarketScope.
  *
- * The operator types one question. Codes (NAICS, PSC, DoDAAC, hierarchy) are
- * resolved from existing Mindy directories and keyword coverage — never required
- * as input. Load-bearing uncertainty asks ONE clarification. Nothing is guessed.
+ * The operator types one question. Offices and buyers are resolved from existing
+ * Mindy directories. Keyword coverage MEASURES a NAICS/PSC distribution; it does
+ * not establish market identity. Load-bearing uncertainty asks ONE clarification.
+ * Nothing is guessed.
  */
 import { createClient } from '@supabase/supabase-js';
 import { DLA_DODAAC_LOCATIONS } from '@/data/dla-dodaac-locations';
@@ -13,7 +14,7 @@ import {
 } from '@/lib/gov-contacts/dodaac-directory';
 import { resolveCommand } from '@/lib/gov-contacts/commands';
 import { resolveOperationalCustomer } from '@/lib/gov-identity/operational-customer';
-import { keywordCoverage, type KeywordCoverage } from '@/lib/market/keyword-coverage';
+import { queryKeywordCoverage, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { US_STATE_NAMES, normalizeStateCode } from '@/lib/utils/us-states';
 import { extractDodaac } from './market-scope';
 import type { Requirement } from './types';
@@ -32,7 +33,9 @@ export interface OfficeCandidate {
 
 export interface CoverageSnapshot {
   keyword: string;
+  /** Measured dollar-lead / name-matched candidate. Display only — not confirmation identity. */
   leadNaics?: { code: string; name: string };
+  /** Measured top PSC. Display only — not confirmation identity. */
   topPsc?: { code: string; name: string };
 }
 
@@ -220,7 +223,7 @@ const GENERIC_NAICS_TOKENS = new Set([
   'general',
 ]);
 
-/** Prefer a coverage NAICS whose name matches the operator's words over a dollar-lead. */
+/** Label a measured coverage candidate. Not market identity — do not write onto confirmation. */
 export function selectCoverageNaics(
   keyword: string,
   candidates: Array<{ code: string; name: string }>,
@@ -349,13 +352,9 @@ export async function defaultInterpretLookups(): Promise<InterpretLookups> {
     },
 
     async coverageFor(keyword: string): Promise<CoverageSnapshot | null> {
-      try {
-        const coverage = await keywordCoverage(keyword);
-        return coverageSnapshotFromKeywordCoverage(coverage);
-      } catch (error) {
-        console.error('[interpret-market] keyword coverage failed', error);
-        return null;
-      }
+      const result = await queryKeywordCoverage(keyword);
+      if (result.status !== 'MARKET_EVIDENCE_FOUND') return null;
+      return coverageSnapshotFromKeywordCoverage(result.coverage);
     },
   };
 }
@@ -370,7 +369,6 @@ function buildConfirmation(args: {
   office: OfficeCandidate;
   installation?: string;
   geography?: string;
-  coverage: CoverageSnapshot | null;
 }): MarketConfirmation {
   const operational = resolveOperationalCustomer({
     subTier: args.office.subAgency,
@@ -412,8 +410,6 @@ function buildConfirmation(args: {
     contractingOfficeCode: args.office.dodaac,
     requirementLabel: args.keyword,
     ...(geography ? { geography } : {}),
-    ...(args.coverage?.leadNaics ? { naics: args.coverage.leadNaics.code } : {}),
-    ...(args.coverage?.topPsc ? { psc: args.coverage.topPsc.code } : {}),
     keyword: args.keyword,
   };
 }
@@ -450,34 +446,6 @@ function rankOfficeOptions(hits: OfficeCandidate[]): OfficeCandidate[] {
     if (aNotices !== bNotices) return bNotices - aNotices;
     return a.dodaac.localeCompare(b.dodaac);
   });
-}
-
-function distinctiveKeywordTokens(keyword: string): string[] {
-  return keyword
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 4 && !GENERIC_NAICS_TOKENS.has(token));
-}
-
-function leadMissesQuestionTokens(keyword: string, leadName: string | undefined): boolean {
-  if (!leadName) return true;
-  const name = leadName.toLowerCase();
-  return distinctiveKeywordTokens(keyword).some((token) => !name.includes(token));
-}
-
-async function coverageForQuestion(
-  live: InterpretLookups,
-  keyword: string,
-): Promise<CoverageSnapshot | null> {
-  const primary = await live.coverageFor(keyword);
-  if (!leadMissesQuestionTokens(keyword, primary?.leadNaics?.name)) return primary;
-  const tighter = distinctiveKeywordTokens(keyword).join(' ');
-  if (!tighter || tighter === keyword.toLowerCase()) return primary;
-  const retry = await live.coverageFor(tighter);
-  if (retry?.leadNaics && !leadMissesQuestionTokens(keyword, retry.leadNaics.name)) {
-    return retry;
-  }
-  return primary;
 }
 
 function pickClarifiedOffice(
@@ -590,7 +558,6 @@ export async function interpretMarketQuestion(
   }
 
   const office = offices[0]!;
-  const coverage = await coverageForQuestion(live, keyword);
   const installation =
     place && !placeLooksLikeCommand
       ? place
@@ -601,7 +568,6 @@ export async function interpretMarketQuestion(
     office,
     installation,
     geography: geographyFromText,
-    coverage,
   });
 
   if (!confirmation.buyerDepartment) {

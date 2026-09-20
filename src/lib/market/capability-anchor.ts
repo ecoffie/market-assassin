@@ -76,8 +76,6 @@ const MISSION_ADJECTIVE_RE =
 const SOCIOECONOMIC_FRAGMENT_RE =
   /^(woman-owned|service-disabled|veteran-owned|service-disabled veteran-owned|disabled veteran|small business)$/;
 
-const GENERIC_SERVICES_NAICS = new Set(['561210', '561990', '541990', '561499', '541611', '541618']);
-
 /** TAM bounds — outside these ranges downgrade confidence (not hard reject alone). */
 export const TAM_TOO_BROAD_USD = 500_000_000_000; // $500B — national catch-all markets
 export const TAM_TOO_NARROW_USD = 500_000; // $500K — likely keyword miss / empty slice
@@ -421,11 +419,12 @@ export function evaluateTamSanity(opts: {
   }
 
   const leadSlice =
-    opts.coverage?.allNaics?.find((n) => n.code === opts.leadNaics)?.amount ??
-    opts.coverage?.allNaics?.[0]?.amount ??
-    null;
+    opts.leadNaics
+      ? (opts.coverage?.allNaics?.find((n) => n.code === opts.leadNaics)?.amount ?? null)
+      : null;
 
-  // Lead-slice relative: TAM wildly exceeds the NAICS slice the anchor actually maps to
+  // Lead-slice relative only when a NAICS was established outside coverage share
+  // (SAM / award evidence). Do not treat allNaics[0] / topCodePct as identity.
   if (leadSlice != null && leadSlice > 0) {
     if (total > leadSlice * 80) return 'too_broad';
     if (total < leadSlice * 0.002 && total < 10_000_000) return 'too_narrow';
@@ -438,12 +437,6 @@ export function evaluateTamSanity(opts: {
     if (awardNaics && opts.leadNaics && awardNaics.slice(0, 3) === opts.leadNaics.slice(0, 3)) {
       if (total < opts.evidence.awardObligatedUsd * 0.05) return 'too_narrow';
     }
-  }
-
-  // Multi-NAICS spread vs meaningless anchor: many codes but tiny per-code share
-  const naicsCount = opts.coverage?.naicsCount ?? 0;
-  if (naicsCount > 40 && (opts.coverage?.topCodePct ?? 100) < 5 && total > 100_000_000_000) {
-    return 'too_broad';
   }
 
   // Trade anchors with absurd absolute federal totals (Morris $1,328 concrete class)
@@ -497,10 +490,8 @@ export function validateMarketAnchor(opts: {
   coverage: KeywordCoverage | null;
   leadNaics: string | null;
   evidence?: AnchorEvidence;
-  topCodeShare?: number;
 }): AnchorValidationResult {
   const { anchor, coverage, leadNaics } = opts;
-  const topCodeShare = opts.topCodeShare ?? coverage?.topCodePct ?? 0;
   const totalMarket = coverage?.totalMarket ?? null;
   const evidence = opts.evidence ?? emptyAnchorEvidence();
   const rejectReasons: string[] = [];
@@ -535,19 +526,9 @@ export function validateMarketAnchor(opts: {
 
   const hasCoverage = Boolean(coverage);
   const corroborated = hasCorroboratingEvidence(evidence);
-  // A concentrated NAICS is a keyword-miss tell ONLY when nothing outside the
-  // company's own prose agrees with it. Unique SAM/award NAICS in the same family
-  // means the concentration is the actual market (Greenup civil construction).
-  const evidenceAgreesWithLead =
-    corroborated &&
-    Boolean(leadNaics) &&
-    [...evidence.samNaics, ...evidence.awardNaics].some(
-      (c) => c.slice(0, 3) === leadNaics!.slice(0, 3),
-    );
-  const dominanceFlag = topCodeShare >= 50 && !evidenceAgreesWithLead;
-  if (dominanceFlag) rejectReasons.push('single_naics_dominance');
+  // Coverage NAICS share is a measured distribution, not market identity.
   const anchorUnverified =
-    leadIsGeneric || dominanceFlag || sectorContradiction || tamFlag != null || score < 20;
+    leadIsGeneric || sectorContradiction || tamFlag != null || score < 20;
 
   let anchor_confidence: AnchorConfidence = 'unverified';
   if (!anchorUnverified && hasCoverage && corroborated) anchor_confidence = 'high';
@@ -562,8 +543,6 @@ export function validateMarketAnchor(opts: {
     anchor_note = `Proposed NAICS ${leadNaics} contradicts SAM registration or award-history evidence. Treat as unverified.`;
   } else if (leadIsGeneric) {
     anchor_note = `Anchored on the generic term "${anchor}", which does not identify an industry. Confirm against SAM registration or award history.`;
-  } else if (dominanceFlag) {
-    anchor_note = `A single NAICS holds ${Math.round(topCodeShare)}% of spend for "${anchor}", which usually means keyword text-match in an unrelated market. Confirm against SAM registration or award history.`;
   } else if (tamFlag === 'too_broad') {
     anchor_note = `Total market $${Math.round((totalMarket ?? 0) / 1e9)}B is implausibly broad for this capability — anchor confidence reduced.`;
   } else if (tamFlag === 'too_narrow') {
@@ -586,14 +565,6 @@ export function validateMarketAnchor(opts: {
     tamFlag,
     sectorContradiction,
   };
-}
-
-export function pickLeadNaicsFromCoverage(coverage: KeywordCoverage | null | undefined): string | null {
-  if (!coverage) return null;
-  const isPscPinned = Boolean(coverage.pinnedPscCodes?.length);
-  const nonGenericLead = coverage.allNaics?.find((n) => !GENERIC_SERVICES_NAICS.has(n.code))?.code;
-  if (isPscPinned) return nonGenericLead ?? coverage.allNaics?.[0]?.code ?? null;
-  return coverage.allNaics?.[0]?.code ?? coverage.coverageCodes?.[0] ?? null;
 }
 
 /** True when competitor lookup must NOT use keyword/name substring search. */

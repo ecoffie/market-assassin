@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { keywordCoverage } from '@/lib/market/keyword-coverage';
+import { queryKeywordCoverage } from '@/lib/market/keyword-coverage';
 
 /**
  * GET /api/app/keyword-coverage?keyword=demolition&have=562910,236220
@@ -15,9 +15,9 @@ import { keywordCoverage } from '@/lib/market/keyword-coverage';
  * the ones in that ~90% set the user doesn't have, ranked by dollars, so they can
  * confirm full coverage and add the gaps.
  *
- * Every number reconciles with a USASpending keyword search on the same term —
- * that's the point: the user can fact-check it. Read-only, no auth (the numbers
- * are public USASpending aggregates; no user data is returned).
+ * Every number is measured from BigQuery usaspending.awards (description match,
+ * latest complete FY, SUM(obligation_amount)). Read-only, no auth (public
+ * federal contract aggregates; no user data is returned).
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,9 +34,18 @@ export async function GET(request: NextRequest) {
       .split(',').map((c) => c.trim()).filter(Boolean),
   );
 
-  const cov = await keywordCoverage(keyword).catch(() => null);
+  const result = await queryKeywordCoverage(keyword);
+  if (result.status === 'NOT_ESTABLISHED') {
+    return NextResponse.json({
+      coverage: null,
+      evidence_status: result.status,
+      degraded: true,
+      error: 'Market coverage is not established',
+    }, { status: 503 });
+  }
+  const cov = result.coverage;
   if (!cov) {
-    return NextResponse.json({ coverage: null });
+    return NextResponse.json({ coverage: null, evidence_status: result.status, degraded: false });
   }
 
   // PREFIX-AWARE "held" check — a coverage code (e.g. 236220) is HELD if the user
@@ -104,13 +113,19 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     coverage: {
-      keyword: cov.keyword,            // the term actually searched (may broaden, e.g. "demolition services" -> "demolition")
+      keyword: cov.keyword,            // the term actually searched
+      evidence_status: result.status,
+      source: cov.source,
+      fiscalYear: cov.fiscalYear,
+      transactionCount: cov.transactionCount,
+      uniqueAwardCount: cov.uniqueAwardCount,
       totalMarket: cov.totalMarket,    // $ across the whole keyword market (incl. adjacent industries)
       sectorMarket,                    // $ in the USER'S line of work (same-sector codes only)
       naicsCount: cov.naicsCount,      // distinct NAICS that bought it
       coverageCount: cov.coverageCodes.length, // codes that together cover ~90%
       coveragePct: cov.coveragePct,    // what the FULL coverage set captures (~0.9)
       heldPct,                         // % of the USER'S LINE OF WORK they cover (sector-scoped)
+      naics_identity_status: cov.naicsIdentityStatus,
       coverageCodes: coverageDetail,   // the ~90% set, each marked have/missing + $
       missing,                         // coverage codes the user is NOT tracking, ranked $
       // "What was bought" — the sub-markets a single keyword spans (building demo

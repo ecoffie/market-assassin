@@ -9,20 +9,35 @@
  * codes). Use gpt-4o-mini to read the text and say WHAT THE COMPANY DOES, then
  * ground THAT in real USASpending. The LLM only LABELS the industry; every FACT
  * (codes, $, agencies) still comes from real data.
+ *
+ * IDENTITY BOUNDARY (2026-09-20): keyword coverage returns measured candidate
+ * codes + dollars + distributions. It does NOT establish company NAICS identity.
+ * `naics` stays empty on the text-only path; coverage lives in
+ * `coverageCandidates` for display / later corroboration.
  */
 import { callLLM } from '@/lib/llm/call-llm';
-import { keywordCoverage, deriveCoverageKeywords } from './keyword-coverage';
+import { queryKeywordCoverage, deriveCoverageKeywords } from './keyword-coverage';
 import { sanitizeKeywords, distinctiveKeywords } from './keyword-sanitize';
 import { deriveSemanticKeywords } from './semantic-keywords';
 
 export interface ExtractedProfile {
   industryPhrase: string;          // what the LLM decided this company does
-  naics: string[];                 // grounded 90%-coverage set
+  /**
+   * Company NAICS identity. Only from company-side evidence (SAM registration,
+   * vault, user-confirmed codes, verified awards). Never filled from keyword
+   * coverage alone.
+   */
+  naics: string[];
+  /**
+   * Measured keyword-coverage candidate codes (~90% set). Display + corroboration
+   * evidence only — not company identity, not alert routing by itself.
+   */
+  coverageCandidates: string[];
   topPsc: { code: string; name: string } | null;
   keywords: string[];
   states: string[];
   setAsides: string[];             // SDVOSB / 8(a) / WOSB / HUBZone …
-  agencies: { name: string; amount: number }[];   // top buyers of these NAICS
+  agencies: { name: string; amount: number }[];   // top buyers of the measured market
   totalMarket: number;
   naicsCount: number;
   source: 'llm' | 'keyword-fallback';
@@ -115,7 +130,7 @@ async function llmIndustryPhrase(text: string): Promise<string | null> {
   }
 }
 
-/** Top agencies buying a set of NAICS — "who to talk to". */
+/** Top agencies buying a measured NAICS set — display of the measured market, not company identity. */
 async function topAgencies(naics: string[]): Promise<{ name: string; amount: number }[]> {
   if (!naics.length) return [];
   try {
@@ -165,14 +180,18 @@ export async function buildProfileFromText(text: string): Promise<ExtractedProfi
     source = 'keyword-fallback';
   }
 
-  // 2) Ground the industry phrase in real USASpending (codes + $ + PSC).
-  const cov = await keywordCoverage(industryPhrase).catch(() => null);
-  const naics = cov?.coverageCodes?.slice(0, 8) || [];
+  // 2) Ground the industry phrase in warehouse description-match (codes + $ + PSC).
+  // Coverage candidates are MEASUREMENT — not company NAICS identity.
+  const covResult = await queryKeywordCoverage(industryPhrase);
+  const cov = covResult.status === 'MARKET_EVIDENCE_FOUND' ? covResult.coverage : null;
+  const coverageCandidates = cov?.coverageCodes?.slice(0, 8) || [];
+  // Text-only path has no SAM / vault / award corroboration → company NAICS unset.
+  const naics: string[] = [];
 
-  // 3) The rest — states, set-asides, and who-buys (all from real data / text).
+  // 3) The rest — states, set-asides, and who-buys (measured market buyers for display).
   const states = detectStates(t);
   const setAsides = detectSetAsides(t);
-  const agencies = await topAgencies(naics);
+  const agencies = await topAgencies(coverageCandidates);
 
   // 4) KEYWORDS BY MEANING — the fix. Single-word tokenization of the sentence
   //    ("commercial HVAC systems" → only "hvac") leaves a thin, generic profile
@@ -225,6 +244,7 @@ export async function buildProfileFromText(text: string): Promise<ExtractedProfi
   return {
     industryPhrase,
     naics,
+    coverageCandidates,
     topPsc: cov?.topPsc || null,
     keywords,
     states,

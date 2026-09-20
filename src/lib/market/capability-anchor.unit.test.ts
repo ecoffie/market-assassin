@@ -124,6 +124,25 @@ describe('TAM sanity (scope-relative)', () => {
     });
     expect(flag).toBe('too_narrow');
   });
+
+  it('a specific phrase with a sprawling low-share distribution is not too_broad from topCodePct', () => {
+    const flag = evaluateTamSanity({
+      anchor: 'janitorial services',
+      coverage: {
+        totalMarket: 200_000_000_000,
+        naicsCount: 50,
+        topCodePct: 3,
+        allNaics: [{ code: '561720', name: 'Janitorial', amount: 6e9 }],
+        topPscList: [],
+        coverageCodes: [],
+        pinnedPscCodes: [],
+        leadCodePct: 3,
+      },
+      evidence: ev(),
+      leadNaics: null,
+    });
+    expect(flag).toBeNull();
+  });
 });
 
 describe('forbidden anchor patterns (Morehouse Ascend)', () => {
@@ -236,6 +255,26 @@ describe('grounded semantics', () => {
     });
     expect(vNoEvidence.grounded).toBe(false);
     expect(vNoEvidence.anchor_confidence).not.toBe('high');
+  });
+
+  it('a high coverage NAICS share does not unverify the anchor as market identity', () => {
+    const v = validateMarketAnchor({
+      anchor: 'drones',
+      coverage: {
+        totalMarket: 90_000_000,
+        naicsCount: 12,
+        topCodePct: 64,
+        allNaics: [{ code: '336411', name: 'Aircraft Manufacturing', amount: 57_600_000 }],
+        topPscList: [],
+        coverageCodes: ['336411'],
+        pinnedPscCodes: [],
+        leadCodePct: 64,
+      } as never,
+      leadNaics: '336411',
+      evidence: resolved({ samNaics: ['336411'], awardNaics: ['336411'], awardObligatedUsd: 2_000_000 }),
+    });
+    expect(v.rejectReasons).not.toContain('single_naics_dominance');
+    expect(v.anchor_confidence).toBe('high');
   });
 
   it('a unique identity with a malformed UEI cannot go high or grounded', () => {

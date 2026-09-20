@@ -10,7 +10,7 @@
  *  bracketed for the CO — we never invent an IGE or a determination.)
  */
 import { procurementHistoryByCode, findCapableSmallBusinesses, type ProcurementHistoryRow, type CapableSmbRow } from '@/lib/bigquery/recipients';
-import { keywordCoverage, codeMarketSize } from '@/lib/market/keyword-coverage';
+import { queryKeywordCoverage, codeMarketSize } from '@/lib/market/keyword-coverage';
 
 export interface MrrInput {
   psc?: string;
@@ -60,7 +60,12 @@ export async function buildMrr(input: MrrInput): Promise<MrrResult> {
     findCapableSmallBusinesses({ psc, naics, maxObligated: 100_000_000, limit: 50, liveBq: true }).catch(() => ({ rows: [] as CapableSmbRow[], total: 0 })),
     findCapableSmallBusinesses({ psc, naics, maxObligated: 25_000_000, limit: 1, liveBq: true }).catch(() => ({ rows: [] as CapableSmbRow[], total: 0 })),
     (psc || naics) ? codeMarketSize({ psc, naics }).catch(() => null) : Promise.resolve(null),
-    keyword ? keywordCoverage(keyword).catch(() => null) : Promise.resolve(null),
+    keyword
+      ? queryKeywordCoverage(keyword).then((r) => {
+          if (r.status === 'NOT_ESTABLISHED') return null;
+          return r.coverage;
+        })
+      : Promise.resolve(null),
   ]);
 
   const suppliers = smbAll.rows;

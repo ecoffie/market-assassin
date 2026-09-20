@@ -125,7 +125,7 @@ describe('interpretMarketQuestion', () => {
     expect(result.confirmation?.buyerDepartment).toBe('Department of the Air Force');
     expect(result.confirmation?.service).toMatch(/Space Force/i);
     expect(result.confirmation?.keyword).toBe('SABER');
-    expect(result.intake?.naics).toBe('236220');
+    expect(result.intake?.naics).toBeUndefined();
     expect(result.intake?.office).toMatch(/FA4610/);
     expect(JSON.stringify(result.confirmation)).not.toMatch(/W912PL/);
   });
@@ -169,7 +169,7 @@ describe('interpretMarketQuestion', () => {
     expect(result.status).toBe('ready');
     expect(result.confirmation?.contractingOfficeCode).toBe('SPE4A1');
     expect(result.confirmation?.geography).toBe('WY');
-    expect(result.intake?.naics).toBe('111110');
+    expect(result.intake?.naics).toBeUndefined();
   });
 
   it('does not invent a buyer when nothing resolves', async () => {
@@ -200,6 +200,15 @@ describe('interpretMarketQuestion', () => {
       topPscPct: 0,
       topPscList: [],
       pinnedPscCodes: null,
+      transactionCount: 1,
+      uniqueAwardCount: 1,
+      fiscalYear: 2025,
+      source: 'bigquery_usaspending_awards',
+      sourceMaxActionDate: '2025-09-30',
+      allAgencies: [],
+      primarySense: 'work_text',
+      evidenceStatus: 'MARKET_EVIDENCE_FOUND',
+      naicsIdentityStatus: 'NOT_ESTABLISHED',
     } satisfies KeywordCoverage);
     expect(snapshot?.leadNaics?.code).toBe('111110');
   });

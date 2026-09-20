@@ -35,6 +35,15 @@ function coverageFixture(over: Partial<KeywordCoverage> = {}): KeywordCoverage {
     topPscPct: 0.4,
     topPscList: [{ code: '9530', name: 'Bars and Rods', amount: 200_000_000, pct: 0.4 }],
     pinnedPscCodes: null,
+    transactionCount: 10,
+    uniqueAwardCount: 8,
+    fiscalYear: 2025,
+    source: 'bigquery_usaspending_awards',
+    sourceMaxActionDate: '2025-09-30',
+    allAgencies: [],
+    primarySense: 'work_text',
+    evidenceStatus: 'MARKET_EVIDENCE_FOUND',
+    naicsIdentityStatus: 'NOT_ESTABLISHED',
     ...over,
   };
 }
@@ -78,7 +87,6 @@ vi.mock('@/lib/market/capability-anchor', async () => {
       score: 10,
       source: 'capability',
     })),
-    pickLeadNaicsFromCoverage: vi.fn(() => '332710'),
     resolveLeadNaicsWithEvidence: vi.fn(() => '332710'),
     validateMarketAnchor: vi.fn(() => ({
       grounded: true,

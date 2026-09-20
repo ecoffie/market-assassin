@@ -48,6 +48,15 @@ function coverageOk(keyword: string, naics: string[]): KeywordCoverageToolResult
       topPscPct: 0.8,
       topPscList: [{ code: 'S201', name: 'Housekeeping and Janitorial Services', amount: 800, pct: 0.8 }],
       pinnedPscCodes: null,
+      transactionCount: 1,
+      uniqueAwardCount: 1,
+      fiscalYear: 2025,
+      source: 'bigquery_usaspending_awards',
+      sourceMaxActionDate: '2025-09-30',
+      allAgencies: [],
+      primarySense: 'work_text',
+      evidenceStatus: 'MARKET_EVIDENCE_FOUND',
+      naicsIdentityStatus: 'NOT_ESTABLISHED',
     },
     _meta: { grounded: true, degraded: false, naics_count: naics.length, total_market: 1_000_000 },
   };
@@ -105,7 +114,7 @@ describe('resolveBusiness', () => {
     expect(resolved.state).toBe('structured');
     expect(resolved.searchKeyword).toBe('cleaning');
     expect(resolved.naicsCodes).toEqual({ status: 'known', items: ['561720', '561210'] });
-    expect(resolved.primaryNaics).toBe('561720');
+    expect(resolved.primaryNaics).toBeNull();
     expect(resolved.psc?.name).toBe('Housekeeping and Janitorial Services');
     expect(resolved.contextLabel).toBeNull();
     expect(resolved.followUpPrompt).toBeNull();
@@ -198,7 +207,7 @@ describe('resolveBusiness', () => {
     expect(seen).not.toContain('I clean office buildings');
     expect(resolved.state).toBe('structured');
     expect(resolved.searchKeyword).toBe('cleaning');
-    expect(resolved.primaryNaics).toBe('561720');
+    expect(resolved.primaryNaics).toBeNull();
   });
 
   it('omits PSC when coverage has a code but no trusted name', async () => {
@@ -234,7 +243,7 @@ describe('resolveBusiness', () => {
     );
     expect(resolved.state).toBe('structured');
     expect(resolved.searchKeyword).toBe('door repair');
-    expect(resolved.primaryNaics).toBe('236220');
+    expect(resolved.primaryNaics).toBeNull();
     expect(seen[0]).toBe('door repair');
     expect(resolved.followUpPrompt).toBeNull();
   });

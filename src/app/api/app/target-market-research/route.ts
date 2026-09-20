@@ -54,7 +54,7 @@ import {
 import { getAgencySourcedIntelligence } from '@/lib/strategic-intel/sourced-pain-points';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
-import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
+import { keywordCoverage, CoverageDeadlineError, KeywordCoverageNotEstablishedError, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL, setAsideMap, veteranMap } from '@/lib/utils/usaspending-helpers';
 import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
@@ -377,7 +377,17 @@ export async function POST(request: NextRequest) {
       // suggest-codes chips into formData for report generation — but the agency
       // search MUST use the full 90%-coverage set from the keyword, not those
       // top-8 chips (Eric: every keyword returned the same ~96 agencies).
-      coverage = await keywordCoverage(keywordForCoverage);
+      try {
+        coverage = await keywordCoverage(keywordForCoverage);
+      } catch (err) {
+        if (err instanceof KeywordCoverageNotEstablishedError || err instanceof CoverageDeadlineError) {
+          return NextResponse.json({
+            error: 'Market coverage is not established',
+            evidence_status: 'NOT_ESTABLISHED',
+          }, { status: 503 });
+        }
+        throw err;
+      }
       if (coverage && coverage.coverageCodes.length) {
         naicsCode = coverage.coverageCodes.join(', ');
       }
@@ -435,14 +445,8 @@ export async function POST(request: NextRequest) {
     // ONCE here so it can be both returned live AND persisted to the cache — that
     // way a keyword search can be cached without the coverage vanishing on a hit
     // (the original reason keyword searches skipped the cache).
-    // A keyword search whose market concentrates in one NAICS ranks by that code
-    // (buildMarketFilter suppressed the keyword/PSC filter — DOMINANT_NAICS_SHARE).
-    // Reflect that in the lesson banner so it doesn't claim "ranks by keyword" while
-    // the chart is actually NAICS-ranked (Eric's NASA-for-236220 report, Jul 15).
-    const rankedByDominantNaics = Boolean(coverage?.keyword) && !marketFilter;
-    const dominantNaicsCode = rankedByDominantNaics
-      ? (coverage!.allNaics?.[0]?.code || coverage!.coverageCodes[0] || '')
-      : '';
+    // Coverage NAICS/PSC shares are measured distribution, not market identity.
+    // Ranking stays on the keyword (or a curated term-of-art PSC pin).
     const keywordCoveragePayload = coverage ? {
       keyword: coverage.keyword,
       total_market: coverage.totalMarket,
@@ -453,12 +457,9 @@ export async function POST(request: NextRequest) {
       psc_count: coverage.pscCount,
       top_psc: coverage.topPsc,
       top_psc_pct: Math.round(coverage.topPscPct * 100),
-      ranking_mode: marketFilter?.mode || (rankedByDominantNaics ? 'naics' : 'keyword'),
-      // Quotes leadCodePct, not topCodePct: dominantNaicsCode IS allNaics[0] (the lead),
-      // so the % must be the LEAD's share or the label misstates its own code.
-      ranking_label: marketFilter?.rankingLabel || (rankedByDominantNaics
-        ? `NAICS ${dominantNaicsCode} (${Math.round(coverage.leadCodePct * 100)}% of this market)`
-        : `keyword "${coverage.keyword}"`),
+      ranking_mode: marketFilter?.mode || 'keyword',
+      ranking_label: marketFilter?.rankingLabel || `keyword "${coverage.keyword}"`,
+      naics_identity_status: coverage.naicsIdentityStatus,
       uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
       keywords: deriveCoverageKeywords(coverage),
     } : null;
@@ -476,7 +477,10 @@ export async function POST(request: NextRequest) {
     // fallback that showed State #1 at $13.5B for NAICS 236220 vs its true $2.9B,
     // and a $45.1B headline vs the real $94.4B). The compute has been correct since
     // 40fb9413 (Jul 8); this bump orphans every old entry so no stale render survives.
-    const SPEND_SCHEMA_VERSION = 'sv8';
+    // sv9 = keyword coverage no longer collapses ranking to the lead NAICS from a
+    // BQ description-match share (HVAC≠236220, drones≠336411). Stale sv8 rows that
+    // stored ranking_mode=naics for those phrases must recompute.
+    const SPEND_SCHEMA_VERSION = 'sv9';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different

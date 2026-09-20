@@ -69,6 +69,15 @@ function coverageOk(keyword: string): KeywordCoverageToolResult {
       topPscPct: 0.8,
       topPscList: [{ code: 'S201', name: 'Housekeeping and Janitorial Services', amount: 800, pct: 0.8 }],
       pinnedPscCodes: null,
+      transactionCount: 1,
+      uniqueAwardCount: 1,
+      fiscalYear: 2025,
+      source: 'bigquery_usaspending_awards',
+      sourceMaxActionDate: '2025-09-30',
+      allAgencies: [],
+      primarySense: 'work_text',
+      evidenceStatus: 'MARKET_EVIDENCE_FOUND',
+      naicsIdentityStatus: 'NOT_ESTABLISHED',
     },
     _meta: { grounded: true, degraded: false, naics_count: 2, total_market: 1_000_000_000 },
   };
@@ -343,7 +352,7 @@ describe('searchBeginnerHiddenMarket', () => {
       },
     );
     expect(result.resolution.state).toBe('structured');
-    expect(result.resolution.primaryNaics).toBe('236220');
+    expect(result.resolution.primaryNaics).toBeNull();
     expect(keywords).toContain('doors');
     expect(result.direct.items.map((i) => i.solicitation)).toEqual(['DOOR-1', 'DOOR-2']);
     const view = toHiddenMarketLandingView(result, { nowMs: NOW });

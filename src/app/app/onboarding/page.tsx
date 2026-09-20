@@ -544,12 +544,15 @@ export default function OnboardingPage() {
   // Best-effort market-overview load — powers the reveal counters AND the confirm
   // screen's MarketDataMap (handed down as initialData → one fetch, not two).
   // Never blocks the reveal: on failure it shows market $ + codes + source count.
+  // Pass ONLY corroborated company NAICS as ?naics= — never coverageCandidates
+  // (that was coverage-identity laundering into forecast/recompete scope).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function loadOverview(profile: any) {
     try {
       const qs = new URLSearchParams();
       if (profile?.industryPhrase) qs.set('keyword', profile.industryPhrase);
-      if ((profile?.naics || []).length) qs.set('naics', (profile.naics || []).join(','));
+      const companyNaics = (profile?.naics || []).filter((c: string) => /^\d{2,6}$/.test(c));
+      if (companyNaics.length) qs.set('naics', companyNaics.join(','));
       if (email) qs.set('email', email);
       const r = await fetch(`/api/market-overview?${qs.toString()}`);
       const j = await r.json();
@@ -567,13 +570,13 @@ export default function OnboardingPage() {
     const tileCount = (k: string) => tiles.find((t) => t.key === k)?.count || 0;
     const market = overview?.market?.totalMarket || autoProfile.totalMarket || 0;
     // Two DIFFERENT numbers, labeled honestly:
-    //  • marketCodeCount = how many NAICS the money spreads across (the real,
-    //    paginated market breadth) → "NAICS codes in your market".
-    //  • appliedCodeCount = the tight ~90%-coverage set Mindy actually watches.
-    // The old label "NAICS codes mapped" on the big number was wrong — we don't map
-    // 122 codes onto the profile, we watch the 6 that hold the money.
-    const marketCodeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
-    const appliedCodeCount = (autoProfile.naics || []).length || 0;
+    //  • marketCodeCount = how many NAICS the money spreads across (measured coverage).
+    //  • appliedCodeCount = company NAICS identity (SAM / user-confirmed) — may be 0
+    //    until the user picks codes from coverage candidates.
+    const measured = (autoProfile.coverageCandidates || []) as string[];
+    const companyNaics = (autoProfile.naics || []) as string[];
+    const marketCodeCount = autoProfile.naicsCount || measured.length || 0;
+    const appliedCodeCount = companyNaics.length;
     const contractors = overview?.scope?.contractors || 0;
     const agencies = overview?.scope?.agencies || 0;
     const stats: RevealData['stats'] = [];
@@ -628,7 +631,8 @@ export default function OnboardingPage() {
       )).slice(0, 6).map((name) => ({ name }));
       setAutoProfile({
         industryPhrase: (oneLiner || identity.legal_name || 'Your business').slice(0, 80),
-        naics,
+        naics,                       // SAM-established company identity
+        coverageCandidates: [],      // no coverage laundering on UEI path
         naicsCount: naics.length,
         // Semantic keywords from the company's own words (one-liner + pitch +
         // AI-drafted capabilities + NAICS titles) so the UEI path isn't keyword-empty
@@ -792,7 +796,12 @@ export default function OnboardingPage() {
   const [codeSuggestions, setCodeSuggestions] = useState<CodeSuggestion[]>([]);
   useEffect(() => {
     const phrase = autoProfile?.industryPhrase;
-    const have: string[] = autoProfile?.naics || [];
+    // Seed "have" from measured candidates + any company-confirmed codes so
+    // suggestions fill gaps in the measured market — without treating candidates
+    // as already-persisted company identity.
+    const measured: string[] = autoProfile?.coverageCandidates || [];
+    const company: string[] = autoProfile?.naics || [];
+    const have = [...new Set([...measured, ...company])];
     if (!phrase || have.length === 0) { setCodeSuggestions([]); return; }
     let cancelled = false;
     (async () => {
@@ -809,21 +818,20 @@ export default function OnboardingPage() {
       } catch { /* suggestions are optional — never block the confirm screen */ }
     })();
     return () => { cancelled = true; };
-    // Re-run when the derived codes change (user removes one → re-evaluate gaps).
-  }, [autoProfile?.industryPhrase, (autoProfile?.naics || []).join(','), email, accessToken]);
+  }, [autoProfile?.industryPhrase, (autoProfile?.coverageCandidates || []).join(','), (autoProfile?.naics || []).join(','), email, accessToken]);
 
   function addSuggestedNaics(code: string) {
     setAutoProfile((p: { naics?: string[] } | null) => p ? { ...p, naics: [...new Set([...(p.naics || []), code])] } : p);
     setCodeSuggestions((s) => s.filter((x) => x.code !== code));
   }
 
-  // "Buyers also say …" — the REAL words federal buyers use in award text for the
-  // user's NAICS (naics_vocabulary, mined from real awards). One-tap capability
-  // words grounded in data instead of the user guessing which terms catch opps.
-  // Optional: never blocks the confirm screen.
+  // "Buyers also say …" — grounded vocab. Prefer company NAICS; fall back to
+  // measured candidates for display suggestions only (not identity).
   const [vocabSuggestions, setVocabSuggestions] = useState<string[]>([]);
   useEffect(() => {
-    const codes: string[] = autoProfile?.naics || [];
+    const codes: string[] = (autoProfile?.naics?.length
+      ? autoProfile.naics
+      : autoProfile?.coverageCandidates) || [];
     if (codes.length === 0) { setVocabSuggestions([]); return; }
     let cancelled = false;
     (async () => {
@@ -840,7 +848,7 @@ export default function OnboardingPage() {
       } catch { /* suggestions are optional — never block the confirm screen */ }
     })();
     return () => { cancelled = true; };
-  }, [(autoProfile?.naics || []).join(','), email, accessToken]);
+  }, [(autoProfile?.naics || []).join(','), (autoProfile?.coverageCandidates || []).join(','), email, accessToken]);
 
   // Add a suggested buyer-term straight into the user's keywords (sanitized, same
   // as a typed one) and drop it from the suggestion row.
@@ -1196,50 +1204,41 @@ export default function OnboardingPage() {
                   ? <>Pulled from SAM.gov{autoProfile.legalName ? ` — ${autoProfile.legalName}` : ''}{autoProfile.pastPerfCount ? ` · ${autoProfile.pastPerfCount} past awards found` : ''}. Look right? Fix anything below.</>
                   : <>Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</>}
               </div>
-              {/* Coverage hero — the wow moment. The HEADLINE number is the coverage
-                  SET Mindy actually applies to your profile (the chips below — 6 for
-                  demolition). The lesson cites the FULL market ($ + total codes that
-                  bought it) so the user sees what the single-code crowd misses. All
-                  numbers fact-check on USASpending by searching the core keyword
-                  (Eric QC, demolition: "Demolition Services" exact-phrase was
-                  under-reporting $1.4B as $8M — fixed in keyword-coverage). */}
-              {(autoProfile.naics?.length || 0) > 1 && (
+              {/* Coverage hero — measured market distribution, NOT company identity.
+                  Company NAICS chips below start empty on the text path until the
+                  user taps candidates (or arrives via SAM UEI). */}
+              {((autoProfile.coverageCandidates?.length || 0) > 1) && (
                 <div className="mb-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-4">
-                  {/* ONE story, two numbers: the HERO is the tight applied set (the
-                      chips below — e.g. 6). The supporting proof is the FULL market —
-                      $ + how many codes the money actually spreads across (now a REAL
-                      paginated count, not the old cap-shaped "100"). Framing makes the
-                      small number the thing we watch and the big number why it matters,
-                      instead of two competing "how many codes?" claims. */}
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-emerald-400">{autoProfile.naics.length}</span>
+                    <span className="text-3xl font-black text-emerald-400">{autoProfile.coverageCandidates.length}</span>
                     <span className="text-sm font-semibold text-white">
                       {autoProfile.totalMarket ? (
-                        <>codes cover ~90% of your{' '}
+                        <>measured codes cover ~90% of a{' '}
                           <span className="text-emerald-300">
                             {autoProfile.totalMarket >= 1e9
                               ? `$${(autoProfile.totalMarket / 1e9).toFixed(1)}B`
                               : `$${Math.round(autoProfile.totalMarket / 1e6)}M`}
-                          </span>{' '}market</>
-                      ) : <>NAICS codes cover ~90% of your market</>}
+                          </span>{' '}federal phrase market</>
+                      ) : <>measured NAICS codes cover ~90% of this phrase market</>}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
-                    Most contractors track just the one obvious code.
-                    {autoProfile.naicsCount && autoProfile.naicsCount > autoProfile.naics.length ? (
-                      <> Federal buyers actually spread this work across{' '}
+                    These are coverage candidates from award descriptions — not your company NAICS yet.
+                    {autoProfile.naicsCount && autoProfile.naicsCount > autoProfile.coverageCandidates.length ? (
+                      <> Federal buyers spread this work across{' '}
                         <span className="text-emerald-300 font-semibold">{autoProfile.naicsCount}</span> codes
                         {autoProfile.topPsc ? <> (top buy: PSC <span className="text-emerald-300 font-semibold">{autoProfile.topPsc.code}</span>)</> : null}
-                        {' '}— Mindy watches the {autoProfile.naics.length} that hold the money, so your alerts catch what the single-code crowd misses.</>
+                        . Tap codes below to add them to your profile.</>
                     ) : (
-                      <> Mindy tracks all {autoProfile.naics.length} so your alerts catch what the single-code crowd misses.</>
+                      <> Tap codes below to confirm which belong on your company profile.</>
                     )}
                   </p>
                 </div>
               )}
               {/* Market Data Map (#4) — the conversion teaser: what's IN your
                   market right now (forecasts, recompetes, grants, competitors).
-                  Counts + $ are free; the detail behind each is Pro. */}
+                  Counts + $ are free; the detail behind each is Pro.
+                  Pass company NAICS only when corroborated — keyword otherwise. */}
               {(autoProfile.industryPhrase || (autoProfile.naics?.length || 0) > 0) && (
                 <div className="mb-4">
                   <MarketDataMap
@@ -1284,6 +1283,33 @@ export default function OnboardingPage() {
                   onRemove={removeAutoNaics}
                   onAddSuggested={addSuggestedNaics}
                 />
+                {/* Measured coverage candidates — tap to promote into company NAICS. */}
+                {(autoProfile.coverageCandidates?.length || 0) > 0 && (
+                  <div className="rounded-lg border border-slate-600/40 bg-slate-900/40 p-2.5">
+                    <div className="text-xs font-medium text-slate-300 mb-1.5">
+                      Measured market codes — tap to add to your company profile:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(autoProfile.coverageCandidates as string[]).map((code: string) => {
+                        const already = (autoProfile.naics || []).includes(code);
+                        return (
+                          <button
+                            key={code}
+                            disabled={already}
+                            onClick={() => addSuggestedNaics(code)}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                              already
+                                ? 'border-slate-600 text-faint cursor-default'
+                                : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'
+                            }`}
+                          >
+                            {already ? '✓' : '+'} {code}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
                 {/* Same-sector suggestions — high-value codes in the user's own
                     line of work they don't have yet. One tap to add. Never suggests

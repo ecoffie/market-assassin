@@ -63,20 +63,23 @@ export default function CapabilityNudge({ email, onUpdated }: Props) {
         body: JSON.stringify({ email, text: t }),
       });
       const ex = await exRes.json().catch(() => null);
-      if (!exRes.ok || !ex?.success || !(ex?.profile?.naics?.length)) {
+      if (!exRes.ok || !ex?.success || !ex?.profile?.industryPhrase) {
         setError(ex?.error || 'Couldn’t read that — try naming the service + state.');
         return;
       }
-      // 2) Commit exactly like onboarding's describe path (tight/precise codes + real keywords).
+      // 2) Persist keywords + description. Company NAICS only when already
+      //    company-side established — never promote coverageCandidates into identity.
+      const companyNaics = Array.isArray(ex.profile.naics) ? ex.profile.naics : [];
       const saveRes = await authedFetch('/api/mindy/profile', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           businessDescription: t,
-          naicsCodes: ex.profile.naics || [],
-          precise: true,
           keywords: ex.profile.keywords || [],
+          ...(companyNaics.length > 0
+            ? { naicsCodes: companyNaics, precise: true }
+            : {}),
         }),
       });
       const sd = await saveRes.json().catch(() => null);

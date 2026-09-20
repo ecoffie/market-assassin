@@ -160,3 +160,17 @@ Timestamps and provenance are being preserved now so those become possible later
 `feat/institute-federal-register` — the FR adapter, admission gate (tuned against a
 real 200-document batch: 18/200 admitted), collector route and 16 tests are **pushed
 but unmerged and unscheduled**. It is Phase II item #6, not Phase I.
+
+---
+
+## INTERNAL DATA FIRST AUDIT — CANDIDATES
+
+Sources still on a live public API (or mixed path) that should be evaluated for
+warehouse-first measurement the same way `get_keyword_coverage` moved to BigQuery
+`usaspending.awards`. **Candidates only — not this change.**
+
+| Candidate | Current source | Why it's a candidate | Status |
+|---|---|---|---|
+| `codeMarketSize()` (`src/lib/market/keyword-coverage.ts`) | Live USASpending `spending_by_category` | Same honesty class as keyword coverage was: API miss can look like a small/empty market; grain and FY window disagree with BQ action obligations | **CANDIDATE** — left on the live API in the keyword-coverage BQ cutover |
+| Keyword-coverage Senses v2 (`industry_title`, `product_psc`) | Not wired | Named in `keyword-coverage-bq.ts`; do not implement until interpretation is a separate product | **HOLD** |
+
