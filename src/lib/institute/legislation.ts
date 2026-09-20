@@ -237,6 +237,17 @@ export function matchesSubject(bill: { title?: string | null }, pattern: RegExp)
  * NO BILL NUMBER, FISCAL YEAR, OR CONGRESS IS HARDCODED. `congress` defaults to
  * whatever Congress is sitting today, so the FY2028 cycle needs no code change.
  */
+/**
+ * @deprecated SUPERSEDED 2026-09-20 by `discoverSince` in legislation-discovery.ts.
+ *
+ * ⚠️ DO NOT WIRE THIS BACK INTO A COLLECTOR. It scans a FIXED number of recent-update
+ * pages, which silently misses any measure that has drifted past the window: on prod,
+ * S.4784 sat at position 2948 and vanished from a 1500-row scan that still reported
+ * pollOk:true / partial:false / 'introduced'. A page count can never prove coverage —
+ * only comparison against the API's own `pagination.count` for a watermarked window
+ * can. Retained solely because its unit tests pin the shared discovery predicate,
+ * chamber/version parsing and the %2B sort-encoding guard.
+ */
 export async function discoverBills(opts: {
   pattern?: RegExp;
   congress?: number;

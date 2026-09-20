@@ -7061,3 +7061,33 @@ S. Rept. 119-127) and **S. 1071** (FY2026 NDAA, correctly typed `enacted_law` �
 Public Law 119-60). Five discovery states proven distinguishable in the same run:
 `source_unavailable` · `not_yet_introduced` · `introduced` · `diverging` · `enacted`
 — so "Mindy has nothing" can never again read the same as "nothing exists."
+
+---
+
+## Legislative discovery that can prove its own coverage (2026-09-20)
+
+**What.** Mindy's legislative watcher now does two separate jobs. *Discovery* looks for
+newly-introduced measures across a time-bounded window and checks its own work against
+the count Congress reports for that same window. *Tracking* re-polls every bill Mindy
+already knows about by name, forever. A bill does not have to stay "recently updated"
+to keep being followed.
+
+**Why.** The first version scanned a fixed slice of the most-recently-updated bills.
+That is fine the week a bill moves and silently wrong a month later: on production,
+S. 4784 had drifted to position 2,948 in the feed and simply vanished from the results
+— while the run still reported success. Raising the page count would have bought a few
+weeks and returned the same silent gap. Coverage is now a measured fact: if Mindy
+cannot finish the window, it says so and refuses to advance its cursor, rather than
+reporting an empty result as an answer.
+
+**Honest scope.** Still the document layer — no section-level provision extraction.
+
+**SEO.** NDAA bill tracking / defense authorization status / federal legislation
+monitoring for contractors.
+
+**Proof.** Live against api.congress.gov 2026-09-20: a full pass covered **18,962 of
+18,962** bills in the 119th Congress (`coverage: complete`) and found **14** NDAA-titled
+measures — including S. 4784 and S. 1071, both of which the old fixed-window scan
+missed entirely. An incremental pass covered **3,163 of 3,163** in 13 pages. The old
+6-page configuration now reports `coverage: partial` with the cursor unmoved instead of
+a confident empty result.
