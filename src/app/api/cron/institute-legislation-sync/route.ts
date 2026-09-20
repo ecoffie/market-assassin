@@ -314,6 +314,7 @@ export async function GET(request: NextRequest) {
   // ── 3. INGEST + 4. DERIVATION ───────────────────────────────────────────
   let evidenceInserted = 0,
     evidenceUpdated = 0,
+    evidenceUnchanged = 0,
     alreadyHeld = 0,
     resolved = 0,
     unresolved = 0;
@@ -348,7 +349,8 @@ export async function GET(request: NextRequest) {
     }
     if (ing.inserted) evidenceInserted++;
     else if (ing.updated) evidenceUpdated++;
-    else alreadyHeld++;
+    else evidenceUnchanged++;     // genuine no-op: nothing source-derived changed
+    if (!ing.inserted) alreadyHeld++;
     if (ing.resolution.resolved) resolved++;
     else unresolved++;
 
@@ -465,6 +467,7 @@ export async function GET(request: NextRequest) {
     documentsSeen: allDocs.length,
     evidenceInserted,
     evidenceUpdated,
+    evidenceUnchanged,
     alreadyHeld,
     resolved,
     unresolved,
