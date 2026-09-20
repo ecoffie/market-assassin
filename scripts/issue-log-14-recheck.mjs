@@ -8,6 +8,7 @@
  * ~15k-draft payload is absent — never invent it.
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,10 +28,10 @@ const DOCS_SOL = 'N00024-26-R-4160';
 const DOCS_UUID = '85a62e9a3f4f4f54b0ade7aa855fcc89';
 const NAICS = '336612';
 
-const b64url = (b: Buffer) =>
+const b64url = (b) =>
   b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-function parseTool(res: { content?: Array<{ type: string; text?: string }>; isError?: boolean }) {
+function parseTool(res) {
   const text = res?.content?.find((c) => c.type === 'text')?.text;
   if (!text) return { _parse_error: 'no text', raw: res };
   try {
@@ -40,10 +41,14 @@ function parseTool(res: { content?: Array<{ type: string; text?: string }>; isEr
   }
 }
 
-async function mintMiAuthToken(): Promise<string> {
+async function mintMiAuthToken() {
   if (process.env.MI_AUTH_TOKEN) return process.env.MI_AUTH_TOKEN;
-  const { createMIAuthSessionToken } = await import('../src/lib/two-factor-session.ts');
-  return createMIAuthSessionToken(EMAIL);
+  // Avoid .ts import paths (tsc / allowImportingTsExtensions) — same pattern as
+  // scripts/verify-mcp-decision-integrity-live.mjs.
+  return execSync(
+    "npx tsx -e \"import { createMIAuthSessionToken } from './src/lib/two-factor-session.ts'; console.log(createMIAuthSessionToken('eric@govcongiants.com'))\"",
+    { cwd: ROOT, encoding: 'utf8' },
+  ).trim();
 }
 
 async function oauthClient() {
@@ -90,7 +95,7 @@ async function oauthClient() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        code: code!,
+        code: code,
         code_verifier: verifier,
         client_id: reg.client_id,
         redirect_uri: REDIRECT,
@@ -108,34 +113,45 @@ async function oauthClient() {
   return client;
 }
 
-async function call(client: Client, name: string, args: Record<string, unknown>) {
+async function call(client, name, args) {
   const t0 = Date.now();
   const res = await client.callTool({ name, arguments: args });
-  return { ms: Date.now() - t0, parsed: parseTool(res as never), isError: !!(res as { isError?: boolean })?.isError };
+  return { ms: Date.now() - t0, parsed: parseTool(res), isError: !!res?.isError };
 }
 
-function textBlob(v: unknown): string {
+function textBlob(v) {
   return JSON.stringify(v ?? '').toLowerCase();
 }
 
 async function localAgencyIntelDollarCheck() {
-  const { getAgencyIntel } = await import('../src/mcp/tools/agency-intel.ts');
-  const r = await getAgencyIntel({ agency: 'Naval Sea Systems Command' });
-  const pri = r.agency?.priorities ?? [];
-  const cites = r.agency?.priorityCitations ?? [];
-  const joined = [...pri, ...cites.map((c) => c.claim)].join('\n');
-  return {
-    matchType: r.agency?.matchType,
-    spending_scope: r.spending?.scope,
-    command_spending: r.command_spending?.status,
-    parent_service_total: r.spending?.parent_service_total ?? null,
-    totalObligations: r.spending?.totalObligations ?? null,
-    priority_count: pri.length,
-    priorities_have_dollar: /\$/.test(joined),
-    sample_priorities: pri.slice(0, 3),
-    provenanceNote: r.agency?.provenanceNote,
-    provenance: cites.slice(0, 3).map((c) => c.provenance),
-  };
+  // Spawn tsx so this .mts file never imports application .ts paths (tsc gate).
+  const raw = execSync(
+    `npx tsx -e ${JSON.stringify(`
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local', quiet: true });
+import { getAgencyIntel } from './src/mcp/tools/agency-intel.ts';
+const r = await getAgencyIntel({ agency: 'Naval Sea Systems Command' });
+const pri = r.agency?.priorities ?? [];
+const cites = r.agency?.priorityCitations ?? [];
+const joined = [...pri, ...cites.map((c) => c.claim)].join('\\n');
+console.log(JSON.stringify({
+  matchType: r.agency?.matchType,
+  spending_scope: r.spending?.scope,
+  command_spending: r.command_spending?.status,
+  parent_service_total: r.spending?.parent_service_total ?? null,
+  totalObligations: r.spending?.totalObligations ?? null,
+  priority_count: pri.length,
+  priorities_have_dollar: /\\$/.test(joined),
+  sample_priorities: pri.slice(0, 3),
+  provenanceNote: r.agency?.provenanceNote,
+  provenance: cites.slice(0, 3).map((c) => c.provenance),
+}));
+`)}`,
+    { cwd: ROOT, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 },
+  ).trim();
+  const line = raw.split('\n').filter((l) => l.startsWith('{')).pop();
+  if (!line) throw new Error(`local agency intel probe produced no JSON: ${raw.slice(0, 400)}`);
+  return JSON.parse(line);
 }
 
 async function main() {
@@ -145,7 +161,7 @@ async function main() {
   const servingCommit = m?.[1] ?? null;
 
   const client = await oauthClient();
-  const checks: Array<Record<string, unknown>> = [];
+  const checks = [];
 
   // #1 SCIF recovery + named specs
   {
@@ -197,7 +213,7 @@ async function main() {
       evidence: {
         grounded: parsed?._meta?.grounded,
         count: parsed?.contacts?.length ?? parsed?._meta?.count,
-        sample: (parsed?.contacts ?? []).slice(0, 2).map((c: { name?: string; email?: string; agency?: string }) => ({
+        sample: (parsed?.contacts ?? []).slice(0, 2).map((c) => ({
           name: c.name,
           email: c.email,
           agency: c.agency,

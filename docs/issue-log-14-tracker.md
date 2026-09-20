@@ -31,7 +31,7 @@ Prior developer honesty retest (not independent): serving commit `15c6b861` · d
 
 ## Agent recheck (2026-09-20T18:54:52Z → 18:56:12Z UTC)
 
-**Method:** OAuth MCP session against `https://mcp.getmindy.ai/mcp` (aliases of getmindy.ai) on serving commit **`5cc700d7`**, plus a **local worktree** call for #4 dollar-omission (not yet on prod). Artifact: `tasks/issue-log-14-recheck-2026-09-20.json`. Script: `scripts/issue-log-14-recheck.mts`.
+**Method:** OAuth MCP session against `https://mcp.getmindy.ai/mcp` (aliases of getmindy.ai) on serving commit **`5cc700d7`**, plus a **local worktree** call for #4 dollar-omission (not yet on prod). Artifact: `tasks/issue-log-14-recheck-2026-09-20.json`. Script: `scripts/issue-log-14-recheck.mjs`.
 
 | # | Tool | Exact input | Result |
 |---|------|-------------|--------|
