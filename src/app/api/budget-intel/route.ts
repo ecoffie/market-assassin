@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import painPointsData from '@/data/agency-pain-points.json';
+import { getAgencyLegacyClaimsSync } from '@/lib/strategic-intel/strategic-claims';
 import budgetData from '@/data/agency-budget-data.json';
 import agencyAliases from '@/data/agency-aliases.json';
 import { getNaics } from '@/lib/codes/lookup';
@@ -146,7 +147,10 @@ async function getAgencyIntel(
   );
 
   // Parse priorities for funding amounts
-  const parsedPriorities = parsePriorities(painPointEntry?.priorities || [], agencyName);
+  // Read through the strategic-claim boundary so the public response carries the
+  // #1577 dollar sanitization and cannot emit an uncited amount as prose either.
+  const boundaryPriorities = getAgencyLegacyClaimsSync(agencyName).priorities.map((c) => c.claim);
+  const parsedPriorities = parsePriorities(boundaryPriorities, agencyName);
 
   // Get programs from database if available
   let programs: any[] = [];
@@ -625,9 +629,21 @@ function categorizePainPoints(painPoints: string[]): Record<string, string[]> {
 
 function parsePriorities(priorities: string[], agency: string): any[] {
   return priorities.map((p) => {
-    // Extract funding amount
-    const fundingMatch = p.match(/\$[\d.,]+[BMK]?/i);
-    const fundingAmount = fundingMatch ? parseFundingAmount(fundingMatch[0]) : null;
+    // ⚠️ `fundingAmount` IS DELIBERATELY ALWAYS NULL ON THIS PATH.
+    //
+    // This endpoint is PUBLIC (HTTP 200, no auth). It used to parse the dollar
+    // figure out of an uncited prose priority and publish it as a STRUCTURED
+    // number — turning curated prose into a machine-readable financial fact with
+    // no source. Two measured defects made that worse, both still in the corpus:
+    //   · 51 priorities spell the unit out ("$135 billion"). The regex
+    //     /\$[\d.,]+[BMK]?/ matches "$135" with no suffix, so parseFundingAmount
+    //     returned 135 DOLLARS — a billion-fold understatement.
+    //   · 58 priorities carry more than one amount; only the first was taken.
+    //   · "$1.2T" has no T branch at all and returned 1.2.
+    // A number nobody can source should not be emitted as a number at all
+    // (docs/engineering/a-number-is-a-product-feature.md). The prose is still
+    // returned, now dollar-sanitized by the strategic-claim boundary.
+    const fundingAmount: number | null = null;
 
     // Extract fiscal year
     const fyMatch = p.match(/FY\s*20\d{2}(?:-\d{2,4})?/gi);

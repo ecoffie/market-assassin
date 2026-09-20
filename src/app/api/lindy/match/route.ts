@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import agencyPainPoints from '@/data/agency-pain-points.json';
+import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 
 interface UserKB {
   capabilities?: string[];
@@ -285,7 +286,13 @@ function scoreOpportunityMatch(
   const agencyData = (agencyPainPoints as Record<string, { painPoints?: string[]; priorities?: string[] }>)[opp.agencyAcronym] ||
                      (agencyPainPoints as Record<string, { painPoints?: string[]; priorities?: string[] }>)[opp.agency];
   if (agencyData) {
-    for (const pain of agencyData.painPoints || []) {
+    // Sanitize before matching AND before pushing into painPointMatches — the
+    // matched text is returned to the caller, so an unsourced dollar figure here
+    // becomes an assertion in whatever Lindy renders.
+    const sanitizedPains = (agencyData.painPoints || [])
+      .map(sanitizeLegacyClaimText)
+      .filter((t): t is string => Boolean(t && t.trim()));
+    for (const pain of sanitizedPains) {
       for (const cap of kb.capabilities || []) {
         if (pain.toLowerCase().includes(cap.toLowerCase()) ||
             cap.toLowerCase().includes(pain.toLowerCase().split(' ')[0])) {
