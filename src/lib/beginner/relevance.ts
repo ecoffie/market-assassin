@@ -6,12 +6,19 @@
  * Building a Stronger Team" (NAICS 611430 training). One off-topic card
  * poisons the /try aha.
  *
- * When resolveBusiness grounded a NAICS set, keep the primary 2-digit sector
- * (do not admit every code in a dirty coverage set — 541512 inside HVAC is
- * not the market). Also keep a listing whose title carries a distinctive user
- * word (lidar, drone) even if the NAICS sector differs — drones/lidar span
- * manufacturing and surveying. Missing NAICS with no user-word hit is still
- * dropped. Homonyms without the user word (Dale Carnegie "Building") stay out.
+ * Coverage NAICS sectors are a relevance SIGNAL across the measured candidate
+ * set — not an exclusionary identity gate pinned to the dollar-leading sector.
+ *
+ * Admission:
+ *  1. Distinctive USER tokens in the title always admit (lidar / drone / patrol
+ *     across sectors).
+ *  2. Item sector must be among measured candidate sectors.
+ *  3. Dollar-peak sector admits as a soft boost (same-sector 236220 / 238220,
+ *     336611 / 336612 stay discoverable).
+ *  4. Non-peak measured sectors need phrase corroboration (blocks a dirty IT
+ *     sliver like 541512 inside an HVAC coverage histogram).
+ *
+ * Missing NAICS with no user-word hit is still dropped.
  */
 
 import type { ResolvedBusiness, SamSearchItem } from './types';
@@ -43,16 +50,20 @@ export function naicsSector(code: string | null | undefined): string | null {
   return digits.slice(0, 2);
 }
 
+/** All 2-digit sectors present in the measured coverage candidate set. */
 export function resolvedMarketSectors(resolution: ResolvedBusiness): Set<string> {
   if (resolution.naicsCodes.status !== 'known') return new Set();
-  const items = resolution.naicsCodes.items;
-  const primarySector = naicsSector(resolution.primaryNaics);
-  if (primarySector) {
-    return new Set(
-      items.map(naicsSector).filter((sector): sector is string => sector === primarySector),
-    );
-  }
-  return new Set(items.map(naicsSector).filter((s): s is string => Boolean(s)));
+  return new Set(
+    resolution.naicsCodes.items
+      .map(naicsSector)
+      .filter((s): s is string => Boolean(s)),
+  );
+}
+
+/** Dollar-leading sector of the measured histogram (items[0]). Soft boost only. */
+export function peakMarketSector(resolution: ResolvedBusiness): string | null {
+  if (resolution.naicsCodes.status !== 'known') return null;
+  return naicsSector(resolution.naicsCodes.items[0]);
 }
 
 function distinctiveTokensFrom(phrases: readonly string[]): string[] {
@@ -89,15 +100,23 @@ function distinctiveUserTokens(resolution: ResolvedBusiness): string[] {
 export function isRelevantOpportunity(item: SamSearchItem, resolution: ResolvedBusiness): boolean {
   const title = (item.title || '').toLowerCase();
   const sectors = resolvedMarketSectors(resolution);
+  const peak = peakMarketSector(resolution);
   const itemSector = naicsSector(item.naics);
+  const userTokens = distinctiveUserTokens(resolution);
+  const searchTokens = distinctiveSearchTokens(resolution);
+
+  // Phrase-first: user's own distinctive words admit across sectors.
+  if (userTokens.some((tok) => title.includes(tok))) return true;
+
   if (sectors.size > 0) {
-    if (itemSector && sectors.has(itemSector)) return true;
-    // Drones/lidar span many NAICS. Primary-sector-only would drop surveying
-    // LiDAR (541370) when coverage led with aircraft manufacturing (336411).
-    // Match the user's own words, not coverage synonyms (door ≠ automobile doors).
-    return distinctiveUserTokens(resolution).some((tok) => title.includes(tok));
+    if (!itemSector || !sectors.has(itemSector)) return false;
+    // Soft boost: dollar-peak sector of the measured set (same-sector siblings stay in).
+    if (peak && itemSector === peak) return true;
+    // Non-peak measured sector needs phrase corroboration (not coverage alone).
+    return searchTokens.some((tok) => title.includes(tok));
   }
-  const tokens = distinctiveSearchTokens(resolution);
+
+  const tokens = searchTokens;
   if (tokens.length === 0) return true;
   return tokens.some((tok) => title.includes(tok));
 }

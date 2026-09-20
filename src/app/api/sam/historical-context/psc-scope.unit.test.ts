@@ -44,8 +44,12 @@ describe('market-overview — agency count keys on PSC when the market is PSC-dr
     expect(overview).toContain('{ naics_codes: codes }');
     expect(overview).toContain('if (psc && n < 2 && codes.length) return agencyCount(codes, null)');
   });
-  it('PSC is used ONLY when specific + dominant (topPscPct ≥ 40%) — the keywordCoverage gate', () => {
-    expect(overview).toContain("(coverage.topPscPct ?? 0) >= 0.40) ? coverage.topPsc.code : null");
-    expect(overview).toContain('agencyCount(codes, agencyPsc)');
+  it('does NOT auto-apply coverage topPsc for agency count — needs corroborated NAICS', () => {
+    // Coverage PSC is measurement display only (returned as market.topPsc). Pinning
+    // agencyCount to a dominant coverage PSC was identity laundering (V2).
+    expect(overview).not.toContain("(coverage.topPscPct ?? 0) >= 0.40) ? coverage.topPsc.code : null");
+    expect(overview).toContain('agencyCount(corroboratedCodes, null)');
+    expect(overview).toContain('topPsc: coverage?.topPsc ?? null');
+    expect(overview).toContain('awaitingMarketConfirmation');
   });
 });

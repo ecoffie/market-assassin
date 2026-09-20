@@ -44,6 +44,31 @@ describe('isRelevantOpportunity', () => {
     );
   });
 
+  it('admits 238220 when coverage dollar-leads 236220 (same sector, not peak-only identity)', () => {
+    const r = resolution({
+      primaryNaics: null,
+      naicsCodes: { status: 'known', items: ['236220', '238220', '541512'] },
+    });
+    expect(isRelevantOpportunity(item({ naics: '238220', title: 'HVAC maintenance Building 12' }), r)).toBe(true);
+  });
+
+  it('admits 336612 when coverage dollar-leads 336611 (patrol-boat sibling)', () => {
+    const r = resolution({
+      original: 'I manufacture patrol boats',
+      searchKeyword: 'patrol boats',
+      coverageKeyword: 'patrol boats',
+      keywords: { status: 'known', items: ['patrol', 'boats'] },
+      naicsCodes: { status: 'known', items: ['336611', '336612'] },
+      primaryNaics: null,
+    });
+    expect(
+      isRelevantOpportunity(
+        item({ title: 'PATROL BOAT CONSTRUCTION PSC 1940', naics: '336612', solicitation: 'PB-1' }),
+        r,
+      ),
+    ).toBe(true);
+  });
+
   it('drops the Dale Carnegie training contract that only matched Building', () => {
     const r = resolution();
     expect(
@@ -59,7 +84,7 @@ describe('isRelevantOpportunity', () => {
   });
 
   it('does not let a dirty coverage IT code admit an IT listing into an HVAC market', () => {
-    const r = resolution();
+    const r = resolution({ primaryNaics: null });
     expect(naicsSector('541512')).toBe('54');
     expect(isRelevantOpportunity(item({ title: 'Cybersecurity support', naics: '541512' }), r)).toBe(false);
   });

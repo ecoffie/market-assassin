@@ -11,6 +11,14 @@ TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 63.
 
 ---
 
+## September 2026 — get_keyword_coverage BigQuery measurement (identity decoupled)
+
+**Changed tool:** `get_keyword_coverage` (still 5 credits). Deterministic source is BigQuery `usaspending.awards`, latest complete FY, description match, `SUM(obligation_amount)` at transaction grain. Warehouse failure is `NOT_ESTABLISHED` (not $0). Ranked NAICS/PSC shares are a **measured distribution**, not the user's market identity — downstream ranking no longer collapses a keyword to its lead NAICS because the share crossed 40%. Senses v2 (interpretation) is not in this change.
+
+**Consumer neutralization (same pass):** `profile-from-text` keeps company `naics: []` and surfaces `coverageCandidates` for display/confirm; `market-overview` routes forecast/recompete/set-aside via corroborated `?naics=` or keyword language (never `coverageCodes` alone); beginner `/try` relevance treats coverage sector as a signal, not a peak-sector exclusion gate. `pickLeadNaicsFromCoverage` removed. Capability Market Match still requires SAM/award overlap (`resolveLeadNaicsWithEvidence(..., null)`).
+
+---
+
 ## September 2026 — lookup_solicitation (catalog 62 → 63)
 
 **New tool:** `lookup_solicitation` (5 credits, scan-class, local `sam_opportunities` — no web, no sow_text). Historical / known-id solicitation lookup. Closed ≠ gone. Short-circuits Potato P2 FIND-first. `MATCHED_CANDIDATE` is not identity. Amendments collapse at query time via #1557. Does not modify `find_opportunities`.

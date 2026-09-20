@@ -27,7 +27,7 @@ import {
 } from './types';
 
 export const BEGINNER_KEYWORD_RULE =
-  "Use the first distinctive coverage candidate that get_keyword_coverage grounds with a usable (not diffuse) NAICS set. First-person sentences and generic singles are skipped. If derivation or coverage cannot establish codes, search a distinctive user phrase and label the results 'Based on your description'. The selected coverage phrase is recorded because USASpending is exact-phrase.";
+  "Use the first distinctive coverage candidate that get_keyword_coverage grounds with a usable (not diffuse) NAICS set. First-person sentences and generic singles are skipped. If derivation or coverage cannot establish codes, search a distinctive user phrase and label the results 'Based on your description'. The selected coverage phrase is recorded because USASpending is exact-phrase. Coverage NAICS shares are a measured distribution; they do not set primaryNaics.";
 
 /** Coverage with this many NAICS is a phrase that matched the whole federal catalog, not a market. */
 export const DIFFUSE_COVERAGE_NAICS = 400;
@@ -336,7 +336,6 @@ export async function resolveBusiness(
   if (coverageKeyword && coverageResult?.coverage) {
     const cov = coverageResult.coverage;
     const naics = dedupeStrings(cov.coverageCodes.length ? cov.coverageCodes : cov.allNaics.map((n) => n.code));
-    const primary = cov.allNaics[0]?.code ?? naics[0] ?? null;
     let psc: ResolvedPsc | null = null;
     if (cov.topPsc?.code && cov.topPsc.name && cov.topPsc.name.trim()) {
       psc = { code: cov.topPsc.code, name: cov.topPsc.name.trim() };
@@ -348,7 +347,8 @@ export async function resolveBusiness(
       contextLabel: null,
       keywords,
       naicsCodes: known(naics),
-      primaryNaics: primary,
+      // coverageCodes / allNaics are a measured 90% set, not a declared primary NAICS.
+      primaryNaics: null,
       psc,
       coverageKeyword,
       confidence: 'high',

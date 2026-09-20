@@ -23,6 +23,7 @@ import {
   buildMarketFilter,
   keywordCoverage,
   marketFilterToUsaspending,
+  marketKeywords,
   type KeywordCoverage,
   type MarketFilter,
 } from '@/lib/market/keyword-coverage';
@@ -57,30 +58,31 @@ export type MarketBasis = 'keyword' | 'keyword_psc' | 'keyword_naics' | 'psc' | 
 
 export interface MarketScope {
   basis: MarketBasis;
-  /** Set for keyword/PSC ranking; null when the dominant-NAICS path took over. */
+  /** Set for keyword/PSC ranking. Null only for explicit NAICS / honest miss. */
   marketFilter: MarketFilter | null;
-  /** Set for NAICS ranking (explicit code, or the dominant keyword's coverage set). */
+  /** Set for explicit NAICS ranking. Never filled from coverage leadCodePct. */
   naicsCodes: string[];
-  /** Present for keyword scopes — the coverage lesson (total market, all NAICS, PSC). */
+  /** Present for keyword scopes — measured distribution, not market identity. */
   coverage: KeywordCoverage | null;
-  /** True when a keyword's market concentrates in its lead code → ranked by NAICS. */
+  /**
+   * Always false for keyword coverage. Lead NAICS % is a measured share, not
+   * identity. Kept on the type so reports can still say they did not collapse.
+   */
   rankedByDominantNaics: boolean;
-  /** Human-readable, for the UI/report ("keyword \"drones\"" / "NAICS 561612 (99% …)"). */
+  /** Human-readable, for the UI/report ("keyword \"drones\""). */
   label: string;
 }
 
 /**
  * Resolve WHAT market we're measuring — the single decision every surface must share.
  *
- * keyword → keyword/PSC ranking, UNLESS the market concentrates in the keyword's lead
- * code (DOMINANT_NAICS_SHARE), in which case that market effectively IS that code and
- * we rank by the ~90% coverage set instead.
+ * keyword → keyword ranking (curated term-of-art PSC pins still apply). Coverage
+ * NAICS/PSC percentages are measured distribution, not identity: HVAC at 52%
+ * 236220 and drones at 64% 336411 stay keyword-ranked. Explicit `naics` /
+ * `naicsCodes` still rank by code because the caller named the code.
  *
- * ⚠️ The dominant path returns naicsCodes — it is NOT an error. fpds-top-n used to
- * treat buildMarketFilter()'s null as "no market" and 404 with
- * `No federal market found for keyword "security guard"` — for a $6B market. The
- * gate's contract always said callers "fall through to their NAICS path"; nobody
- * implemented the fall-through. This is that fall-through.
+ * fpds-top-n used to 404 `No federal market found` when buildMarketFilter returned
+ * null. A keyword with coverage always keeps a keyword filter now.
  */
 export async function resolveMarketScope(opts: {
   keyword?: string;
@@ -120,55 +122,20 @@ export async function resolveMarketScope(opts: {
     const coverage = opts.coverage ?? (await keywordCoverage(keyword));
     if (!coverage) return null;
 
-    const marketFilter = buildMarketFilter({ coverage, keyword, pscCode: pscCode || undefined });
-    if (marketFilter) {
-      // 'keyword_naics' = the dominant-code case. It RANKS by the lead NAICS (so
-      // rankedByDominantNaics stays true and the headline is re-measured on the same
-      // basis) while the filter KEEPS the keyword, so the sections no longer widen to
-      // the whole code. Before this, the dominant case returned null here and every
-      // section silently measured the entire NAICS — see buildMarketFilter.
-      const dominant = marketFilter.mode === 'keyword_naics';
-      const basis: MarketBasis =
-        marketFilter.mode === 'keyword_psc' ? 'keyword_psc'
-        : dominant ? 'keyword_naics'
-        : 'keyword';
-      return {
-        basis,
-        marketFilter,
-        // Pinned code travels in the marketFilter (AND-ed with the keyword). Leaving
-        // naicsCodes empty keeps filtersForScope from ALSO setting a bare naics_codes
-        // and re-widening what we just narrowed.
-        naicsCodes: [],
-        coverage,
-        rankedByDominantNaics: dominant,
-        label: marketFilter.rankingLabel || `keyword "${keyword}"`,
+    const marketFilter = buildMarketFilter({ coverage, keyword, pscCode: pscCode || undefined })
+      ?? {
+        keywords: marketKeywords(keyword),
+        mode: 'keyword' as const,
+        rankingLabel: `keyword "${keyword}"`,
       };
-    }
-
-    // Dominant-NAICS fall-through — now only reached when buildMarketFilter could not
-    // pin a lead code (no coverage.allNaics). The normal dominant path returns a
-    // 'keyword_naics' filter above and never lands here.
-    //
-    // HISTORICAL (why this branch is shaped this way): it used to be THE dominant path,
-    // and it dropped the keyword. Keeping it as the no-lead-code safety net.
-    //
-    // ⚠️ The coverage set is WRONG here, measurably. "roofing" is dominated by 238160
-    // Roofing Contractors (78%), but its coverage set also carries 236220 General
-    // Building Construction — where roofing is a $79M sliver of a $60B+ code. Filtering
-    // on the set stops measuring roofing and starts measuring ALL federal building
-    // construction: top-3 agencies $77.7B (DoD $60.9B) vs $1.34B (DoD $1.1B) for the
-    // lead code alone, against a $578M keyword market. Same reading as the gate's own
-    // rationale ("rank by the code") and TMR's dominantNaicsCode label. For a
-    // single-code market (security guard, janitorial) the two are identical anyway.
-    const lead = coverage.allNaics?.[0];
-    if (!lead?.code) return null;
+    const basis: MarketBasis = marketFilter.mode === 'keyword_psc' ? 'keyword_psc' : 'keyword';
     return {
-      basis: 'naics',
-      marketFilter: null,
-      naicsCodes: expandNAICSCodes([lead.code], false),
+      basis,
+      marketFilter,
+      naicsCodes: [],
       coverage,
-      rankedByDominantNaics: true,
-      label: `NAICS ${lead.code} (${Math.round(coverage.leadCodePct * 100)}% of this market)`,
+      rankedByDominantNaics: false,
+      label: marketFilter.rankingLabel || `keyword "${keyword}"`,
     };
   }
 

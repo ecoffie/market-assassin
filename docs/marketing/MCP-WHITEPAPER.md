@@ -44,7 +44,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `search_sam_opportunities` | Open federal solicitations by keyword / NAICS / set-aside |
 | `lookup_solicitation` | Historical or known-id solicitation lookup — closed ≠ gone |
 | `get_market_vocabulary` | The real terms buyers use for a market |
-| `get_keyword_coverage` | Total market $ for a product + every buying NAICS ("NAICS is the wrong primary key") |
+| `get_keyword_coverage` | Measured FY description-match market $ + NAICS/PSC distribution (shares are not market identity; does not set company NAICS, forecast/recompete scope, or opportunity eligibility) |
 | `search_grants` | Federal grant (assistance) opportunities |
 | `get_agency_forecasts` | Planned procurements 6–18 months before solicitation |
 | `search_sbir` | SBIR/STTR small-business R&D awards + open notices |

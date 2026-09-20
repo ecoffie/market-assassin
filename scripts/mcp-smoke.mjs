@@ -316,15 +316,16 @@ try {
   if (ecS._meta?.degraded) fail('expiring-contracts: degraded=true (Supabase recompete_opportunities unreachable)');
   if (!ecS._meta?.grounded) console.error('⚠ expiring-contracts: grounded=false for NAICS 541 in 24mo — NON-FATAL (may be a genuinely thin window)');
 
-  // ── get_keyword_coverage (USASpending spending-by-category) ────────────────
+  // ── get_keyword_coverage (BQ usaspending.awards description match) ────────
   console.error('\n→ calling get_keyword_coverage({ keyword: "drones" })');
   const kc = await client.callTool({ name: 'get_keyword_coverage', arguments: { keyword: 'drones' } });
   const kcS = kc.structuredContent;
   if (!kcS) fail('keyword-coverage: no structuredContent');
-  console.error(`✓ grounded=${kcS._meta?.grounded} · degraded=${kcS._meta?.degraded} · naics_count=${kcS._meta?.naics_count} · total_market=$${kcS._meta?.total_market}${kcS.coverage?.topPsc ? ` · topPSC=${kcS.coverage.topPsc.code} ${kcS.coverage.topPsc.name}` : ''}`);
-  if (kcS._meta?.degraded) console.error('⚠ keyword-coverage: degraded=true (USASpending unreachable/rate-limited) — NON-FATAL');
-  else if (!kcS._meta?.grounded) console.error('⚠ keyword-coverage: grounded=false for "drones" — NON-FATAL (upstream hiccup)');
+  console.error(`✓ grounded=${kcS._meta?.grounded} · degraded=${kcS._meta?.degraded} · status=${kcS._meta?.evidence_status} · naics_count=${kcS._meta?.naics_count} · total_market=${kcS._meta?.total_market}`);
+  if (kcS._meta?.degraded) console.error('⚠ keyword-coverage: NOT_ESTABLISHED (warehouse query failed) — NON-FATAL');
+  else if (!kcS._meta?.grounded) fail('keyword-coverage: grounded=false for "drones" after a healthy BQ query — description-match should find a market');
   else if (kcS.coverage && kcS.coverage.naicsCount < 2) fail('keyword-coverage: "drones" should span many NAICS but naicsCount < 2 — coverage math broken');
+  else if (kcS._meta?.total_market == null) fail('keyword-coverage: grounded but total_market is null');
 
   // ── search_idv_contracts (USASpending live IDV search) ─────────────────────
   console.error('\n→ calling search_idv_contracts({ naics: "541512", search_type: "idv", limit: 5 })');

@@ -753,15 +753,16 @@ const KEYWORD_COVERAGE_TOOL_DEF = {
   function: {
     name: 'get_keyword_coverage',
     description:
-      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones", "demolition"). Returns the TOTAL federal ' +
-      'market ($), EVERY NAICS that bought it (ranked), the smallest NAICS set covering ~90%, and the top PSCs ' +
-      '("what was actually bought"). The lesson: a single obvious NAICS is often only ~28% of the market — search ' +
-      'it alone and you MISS the rest. Use this to derive the RIGHT NAICS set for alerts/searches. grounded=false ' +
-      'when no spending matches the keyword.',
+      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones", "demolition"). Measures BigQuery ' +
+      'usaspending.awards in the latest complete FY: description match (not NAICS/PSC titles), ' +
+      'SUM(obligation_amount) at transaction grain. Returns TOTAL federal market ($), ranked NAICS, the smallest ' +
+      'NAICS set covering ~90%, and top PSCs. Ranked NAICS shares are a measured distribution, not market identity — ' +
+      'do not collapse the keyword to the lead NAICS. grounded=false + degraded=true means NOT ESTABLISHED (not $0). ' +
+      'grounded=false + degraded=false means no description matches.',
     parameters: {
       type: 'object',
       properties: {
-        keyword: { type: 'string', description: 'Product/service term. Single significant words match best (USASpending keyword search is exact-phrase).' },
+        keyword: { type: 'string', description: 'Product/service phrase. Matched as a word-boundary phrase against award descriptions. Not expanded into synonyms.' },
         coverage_target: { type: 'number', description: 'Fraction of the market the returned NAICS set should cover (0.5–0.99, default 0.9).' },
       },
       required: ['keyword'],

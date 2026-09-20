@@ -27,7 +27,6 @@ import type { RecipientSearchRow as RecipientRow } from '@/lib/bigquery/recipien
 import {
   pickBestAnchor,
   pickLeadKeyword,
-  pickLeadNaicsFromCoverage,
   validateMarketAnchor,
   resolveLeadNaicsWithEvidence,
   type AnchorConfidence,
@@ -209,7 +208,7 @@ function miss(note: string, started: number, partial?: Partial<CapabilityMarketM
  */
 function deadlineMiss(started: number, partial?: Partial<CapabilityMarketMatchResult>): CapabilityMarketMatchResult {
   const base = miss(
-    'Analysis stopped early — market coverage timed out before USASpending finished. This is not "no market found"; retry or narrow the capability statement.',
+    'Analysis stopped early — market coverage timed out before the warehouse query finished. This is not "no market found"; retry or narrow the capability statement.',
     started,
     partial,
   );
@@ -330,23 +329,18 @@ async function capabilityMarketMatchInner(
     coverage = null;
   }
 
-  const GENERIC_SERVICES = new Set(['561210', '561990', '541990', '561499', '541611', '541618']);
   const isPscPinned = Boolean(coverage?.pinnedPscCodes?.length);
   const pinnedPsc = coverage?.pinnedPscCodes?.[0];
-  const nonGenericLead = coverage?.allNaics?.find((n) => !GENERIC_SERVICES.has(n.code))?.code;
-  const rawLeadNaics = isPscPinned
-    ? (nonGenericLead ?? coverage?.allNaics?.[0]?.code)
-    : pickLeadNaicsFromCoverage(coverage);
-
   const evidence = await loadAnchorEvidence(input.client_name);
-  const leadNaics = resolveLeadNaicsWithEvidence(coverage, evidence, rawLeadNaics ?? null);
+  // Coverage dollar-lead / topCodePct is not market identity. Proposed NAICS
+  // only from SAM/award evidence overlapping the measured distribution.
+  const leadNaics = resolveLeadNaicsWithEvidence(coverage, evidence, null);
 
   const validation = validateMarketAnchor({
     anchor: lead,
     coverage,
     leadNaics: leadNaics ?? null,
     evidence,
-    topCodeShare: coverage?.topCodePct,
   });
 
   /**

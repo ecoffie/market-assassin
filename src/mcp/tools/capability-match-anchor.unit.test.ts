@@ -1,23 +1,16 @@
 /**
- * capability_market_match capability-anchoring (FM-U10, Eric/QA 2026-07-29).
+ * capability_market_match capability-anchoring (FM-U10, Eric/QA 2026-07-29;
+ * identity decouple 2026-09-20).
  *
  * Original symptom: for a HARDWARE maker (EOD tools) the lead NAICS resolved to 561210 Facilities
  * Support (67% by $ — base-ops contracts that merely MENTION EOD), dragging vocabulary and competitors
  * to LOGCAP/KBR.
  *
- * The FIRST fix (generic-services skip) moved the lead OFF 561210 but landed on 334511 (detection/
- * instruments) — the biggest PRODUCT NAICS in the pinned PSC, but far broader than the capability. So a
- * NAICS competitor search returned radar/instrument primes (Raytheon/Lockheed/Northrop), NOT EOD-tool
- * peers, and the PSC vocab table (no rows for 1385/1386) left buyer_vocabulary EMPTY. Re-verified live
- * 2026-07-29 and REOPENED as PARTIAL.
- *
- * The COMPLETE fix (this file locks it): when the coverage is PSC-pinned, (a) source COMPETITORS from
- * the actual recipients of the pinned PSC (topRecipientsByPsc → VideoRay/Tomahawk/L3Harris Fuzing/
- * Vidisco — real EOD makers, verified live), not a broad product NAICS; and (b) when the PSC vocab table
- * is empty, fall back buyer_vocabulary to the curated term-of-art terms + official PSC titles. Both are
- * authoritative real data, never LLM-invented. The lead NAICS is still the top non-generic code (334511)
- * — the honest #1 product code by dollars; the earlier "332993 Ammunition Mfg" claim never matched the
- * live data (332993 isn't in the PSC 1385/1386 breakdown) and is NOT asserted here.
+ * Completing that fix: coverage NAICS share is measurement, not identity. Lead NAICS is proposed
+ * only from SAM/award evidence overlapping the measured distribution. When coverage is PSC-pinned,
+ * (a) source COMPETITORS from the actual recipients of the pinned PSC (topRecipientsByPsc), and
+ * (b) when the PSC vocab table is empty, fall back buyer_vocabulary to curated term-of-art terms
+ * + official PSC titles.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -26,9 +19,10 @@ import { join } from 'node:path';
 const src = readFileSync(join(__dirname, 'capability-market-match.ts'), 'utf8');
 
 describe('FM-U10 source assertions', () => {
-  it('has a generic-services skip set so the lead NAICS avoids facilities-support catch-alls', () => {
-    expect(src).toContain('GENERIC_SERVICES');
-    expect(src).toContain("'561210'"); // Facilities Support — the exact culprit
+  it('does not pick lead NAICS from coverage dollar-share (including generic-services skip)', () => {
+    expect(src).not.toContain('GENERIC_SERVICES');
+    expect(src).toContain('resolveLeadNaicsWithEvidence(coverage, evidence, null)');
+    expect(src).not.toContain('pickLeadNaicsFromCoverage');
   });
   it('sources vocabulary from the PSC when the coverage is PSC-pinned', () => {
     expect(src).toMatch(/isPscPinned && pinnedPsc[\s\S]*getVocabulary\(pinnedPsc, \{ codeType: 'psc'/);
@@ -46,25 +40,26 @@ describe('FM-U10 source assertions', () => {
   });
 });
 
-// Pure-logic mirror of the lead-NAICS anchoring.
 describe('lead-NAICS anchoring logic (mirror)', () => {
-  const GENERIC = new Set(['561210', '561990', '541990', '561499', '541611', '541618']);
-  const pickLead = (allNaics: Array<{ code: string }>, pinned: boolean) => {
-    const nonGeneric = allNaics.find((n) => !GENERIC.has(n.code))?.code;
-    return pinned ? (nonGeneric ?? allNaics[0]?.code) : allNaics[0]?.code;
+  const pickLead = (
+    allNaics: Array<{ code: string }>,
+    evidenceNaics: string[],
+  ): string | null => {
+    for (const code of evidenceNaics) {
+      const hit = allNaics.find(
+        (n) => n.code === code || n.code.slice(0, 3) === code.slice(0, 3),
+      );
+      if (hit) return hit.code;
+    }
+    return null;
   };
-  it('PSC-pinned: skips 561210 to the real top product code (334511 for EOD, per live data)', () => {
-    // The live PSC 1385/1386 NAICS order: 561210 (generic, skipped) → 334511 → 336992.
+  it('does not treat the coverage dollar-lead as identity when evidence is empty', () => {
     const naics = [{ code: '561210' }, { code: '334511' }, { code: '336992' }];
-    expect(pickLead(naics, true)).toBe('334511');
+    expect(pickLead(naics, [])).toBeNull();
   });
-  it('not pinned: keeps the promoted lead as-is (unchanged behavior)', () => {
-    const naics = [{ code: '541512' }, { code: '541519' }];
-    expect(pickLead(naics, false)).toBe('541512');
-  });
-  it('pinned but ALL generic: falls back to the top (no non-generic exists)', () => {
-    const naics = [{ code: '561210' }, { code: '561990' }];
-    expect(pickLead(naics, true)).toBe('561210');
+  it('proposes a NAICS only when SAM/award evidence overlaps the measured set', () => {
+    const naics = [{ code: '561210' }, { code: '334511' }, { code: '336992' }];
+    expect(pickLead(naics, ['334511'])).toBe('334511');
   });
 });
 

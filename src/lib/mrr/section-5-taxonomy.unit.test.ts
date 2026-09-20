@@ -69,15 +69,16 @@ describe('§5 Taxonomy', () => {
   });
 
   it('does NOT pretend derive_company_keywords returned codes', async () => {
-    // The tool returns keyword PHRASES. Even when it returns something code-like,
-    // the primary NAICS must come from coverage/supplied input — never from here.
+    // Even when it returns something code-like, coverage must not become primary NAICS.
     calls.impl = (t) => (t === 'derive_company_keywords'
       ? { keywords: ['999999', 'bogus code'], _meta: { grounded: true, degraded: false } }
       : COVERAGE_OK);
     const s = await buildSection5({ ...REQ, naics: undefined });
-    expect(s.primaryNaics).toMatchObject({ state: 'value', value: '541715' }); // from coverage
-    expect(s.primaryNaicsOrigin).toBe('derived');
+    expect(s.primaryNaics.state).toBe('unknown');
+    expect(s.primaryNaicsOrigin).toBe('none');
+    expect(s.coverageSet.state).toBe('value');
     expect(JSON.stringify(s.primaryNaics)).not.toContain('999999');
+    expect(JSON.stringify(s.primaryNaics)).not.toContain('541715');
   });
 
   it('records the coverage keyword AND the deterministic selection rule', async () => {
