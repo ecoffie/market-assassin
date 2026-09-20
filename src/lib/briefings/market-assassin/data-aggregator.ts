@@ -12,6 +12,7 @@
 import { BudgetShift, PainPointUpdate, CompetitorActivity, CaptureSignal, MAUserProfile } from './types';
 import { fetchAllRSSFeeds, filterRSSByKeywords, filterRecentRSS } from '../web-intel/rss';
 import agencyPainPoints from '@/data/agency-pain-points.json';
+import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 import agencyBudgetData from '@/data/agency-budget-data.json';
 
 const USASPENDING_API = 'https://api.usaspending.gov/api/v2';
@@ -208,8 +209,16 @@ export async function fetchPainPointUpdates(
     // Get pain points - if user has capabilities, filter by them; otherwise return top pain points
     let matchingPainPoints: string[];
 
+    // Sanitize through the strategic-intel boundary BEFORE matching or emitting.
+    // These claims land in a customer market-research report; the corpus carries
+    // no source URL for any of them, so an unsourced dollar figure must not ride
+    // along into the deliverable. Dollar-only claims sanitize to "" and drop.
+    const sanitizedPainPoints = (data.painPoints || [])
+      .map(sanitizeLegacyClaimText)
+      .filter((t): t is string => Boolean(t && t.trim()));
+
     if (profile.capabilities.length > 0) {
-      matchingPainPoints = (data.painPoints || []).filter(pp => {
+      matchingPainPoints = sanitizedPainPoints.filter(pp => {
         const ppLower = pp.toLowerCase();
         return profile.capabilities.some(cap =>
           ppLower.includes(cap.toLowerCase()) ||
@@ -218,7 +227,7 @@ export async function fetchPainPointUpdates(
       });
     } else {
       // No capabilities set - return top pain points for the agency
-      matchingPainPoints = (data.painPoints || []).slice(0, 3);
+      matchingPainPoints = sanitizedPainPoints.slice(0, 3);
     }
 
     for (const painPoint of matchingPainPoints.slice(0, 2)) {

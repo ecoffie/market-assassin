@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import spendingData from '@/data/agency-spending-complete.json';
 import painPointsData from '@/data/agency-pain-points.json';
+import { getAgencyLegacyClaimsSync, DISPLAY_DISCLOSURE } from '@/lib/strategic-intel/strategic-claims';
 
 // Type definitions
 interface SecondarySource {
@@ -61,6 +62,12 @@ interface AgencySourceResponse {
   tips: string;
   painPoints?: string[];
   priorities?: string[];
+  /** Claim type per returned claim + one-line disclosure. Never omitted. */
+  claimProvenance?: {
+    painPoints: string[];
+    priorities: string[];
+    disclosure: string;
+  };
 }
 
 // Agency aliases for flexible lookup
@@ -207,9 +214,16 @@ function buildAgencyResponse(agencyName: string): AgencySourceResponse | null {
     recommendations.push(`Key vehicles to pursue: ${vehicleNames}`);
   }
 
-  // Add pain point-based recommendation
-  if (painPointInfo?.painPoints && painPointInfo.painPoints.length > 0) {
-    recommendations.push(`Top agency challenge: ${painPointInfo.painPoints[0]}`);
+  // PUBLIC endpoint (HTTP 200, no auth). Strategic claims are read through the
+  // boundary so the response carries the #1577 dollar sanitization and so no
+  // consumer can mistake hand-curated context for an agency statement. Measured:
+  // 2,500 priorities, 0 with a source URL.
+  const boundaryClaims = getAgencyLegacyClaimsSync(agencyName);
+
+  // "Top agency challenge:" asserts the agency has this challenge. Softened to
+  // match what the evidence supports.
+  if (boundaryClaims.painPoints.length > 0) {
+    recommendations.push(`Commonly cited challenge (unsourced context): ${boundaryClaims.painPoints[0].claim}`);
   }
 
   return {
@@ -226,8 +240,15 @@ function buildAgencyResponse(agencyName: string): AgencySourceResponse | null {
     topVehicles: spendingInfo.topVehicles,
     recommendations,
     tips: spendingInfo.tips,
-    painPoints: painPointInfo?.painPoints?.slice(0, 5),
-    priorities: painPointInfo?.priorities?.slice(0, 3),
+    painPoints: boundaryClaims.painPoints.slice(0, 5).map((c) => c.claim),
+    priorities: boundaryClaims.priorities.slice(0, 3).map((c) => c.claim),
+    // Provenance travels WITH the claims so a consumer cannot render them as
+    // sourced fact. Every claim on this path is LEGACY_MANUAL today.
+    claimProvenance: {
+      painPoints: boundaryClaims.painPoints.slice(0, 5).map((c) => c.claimType),
+      priorities: boundaryClaims.priorities.slice(0, 3).map((c) => c.claimType),
+      disclosure: DISPLAY_DISCLOSURE.LEGACY_MANUAL,
+    },
   };
 }
 
