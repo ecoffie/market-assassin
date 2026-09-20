@@ -26,6 +26,17 @@ export interface SamEntityInput {
   limit?: number;
 }
 
+/** Evidence for a name miss: legal + DBA live + local mirror were checked (Monarch #14). */
+export interface SamEntityReconciliation {
+  outcome: 'not_found';
+  sources_checked: Array<{
+    source: 'sam_live_legal' | 'sam_live_dba' | 'local_registry';
+    hits: number;
+    status: 'ok' | 'unavailable' | 'skipped';
+  }>;
+  note: string;
+}
+
 export interface SamEntityResult {
   queried: { uei?: string; name?: string; state?: string };
   /** Exact entity when a UEI was given. */
@@ -58,6 +69,13 @@ export interface SamEntityResult {
      * empty = no query.
      */
     lookup_status: 'found' | 'ambiguous' | 'not_found' | 'lookup_failed' | 'empty';
+    /**
+     * Present on name-mode `not_found` only. Documents that legal-name, DBA, and the
+     * local mirror were consulted — so a prior claim that "Monarch Yachts" is a DBA of
+     * a registered firm is reconciled as: sources currently return no match (not a
+     * missed DBA classifier).
+     */
+    reconciliation?: SamEntityReconciliation;
   };
 }
 
@@ -117,6 +135,12 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   let usedLocal = false;
   let localAsOf: string | null = null;
   let lookupStatus: SamEntityResult['_meta']['lookup_status'] = mode === 'empty' ? 'empty' : 'not_found';
+  // Name-miss evidence (Monarch #14): count every source consulted before asserting absence.
+  let liveLegalHits = 0;
+  let liveDbaHits = 0;
+  let liveDbaStatus: 'ok' | 'unavailable' | 'skipped' = mode === 'name' ? 'skipped' : 'skipped';
+  let localHits = 0;
+  let localStatus: 'ok' | 'unavailable' | 'skipped' = 'skipped';
 
   try {
     if (mode === 'uei') {
@@ -124,11 +148,15 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       if (entity) lookupStatus = 'found';
     } else if (mode === 'name') {
       const legal = await searchEntities({ legalBusinessName: name, stateCode: state || undefined, size: limit });
+      liveLegalHits = (legal.entities || []).length;
       let dbaEntities: SAMEntity[] = [];
       try {
         const dba = await searchEntities({ dbaName: name, stateCode: state || undefined, size: limit });
         dbaEntities = dba.entities || [];
+        liveDbaHits = dbaEntities.length;
+        liveDbaStatus = 'ok';
       } catch (dbaErr) {
+        liveDbaStatus = 'unavailable';
         console.warn('[mcp:lookup_sam_entity] DBA live search failed; legal-name results still used:', dbaErr);
       }
       matches = mergeEntities([legal.entities || [], dbaEntities]);
@@ -159,12 +187,15 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     try {
       if (mode === 'uei') {
         const looked = await lookupLocalEntityByUEI(uei);
-        if (looked.status === 'found') { entity = looked.hit.entity; localAsOf = looked.hit.asOf; usedLocal = true; lookupStatus = 'found'; }
-        else if (looked.status === 'unavailable') { lookupStatus = 'lookup_failed'; }
+        if (looked.status === 'found') { entity = looked.hit.entity; localAsOf = looked.hit.asOf; usedLocal = true; lookupStatus = 'found'; localHits = 1; localStatus = 'ok'; }
+        else if (looked.status === 'unavailable') { lookupStatus = 'lookup_failed'; localStatus = 'unavailable'; }
+        else { localStatus = 'ok'; localHits = 0; }
       } else if (mode === 'name') {
         const looked = await lookupLocalEntitiesByName(name, limit);
         if (looked.status === 'found') {
           matches = looked.hits.map((h) => h.entity);
+          localHits = looked.hits.length;
+          localStatus = 'ok';
           const picked = pickUniqueEntity(name, matches);
           lookupStatus = picked.status;
           entity = picked.entity;
@@ -172,10 +203,15 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
           usedLocal = true;
         } else if (looked.status === 'unavailable') {
           lookupStatus = 'lookup_failed';
+          localStatus = 'unavailable';
+        } else {
+          localStatus = 'ok';
+          localHits = 0;
         }
       }
     } catch (fallbackErr) {
       lookupStatus = 'lookup_failed';
+      localStatus = 'unavailable';
       console.error('[mcp:lookup_sam_entity] local fallback also failed:', fallbackErr);
     }
   }
@@ -189,11 +225,14 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     try {
       if (mode === 'uei') {
         const looked = await lookupLocalEntityByUEI(uei);
-        if (looked.status === 'found') { entity = looked.hit.entity; localAsOf = looked.hit.asOf; usedLocal = true; lookupStatus = 'found'; }
-        else if (looked.status === 'unavailable') { degraded = true; lookupStatus = 'lookup_failed'; }
+        if (looked.status === 'found') { entity = looked.hit.entity; localAsOf = looked.hit.asOf; usedLocal = true; lookupStatus = 'found'; localHits = 1; localStatus = 'ok'; }
+        else if (looked.status === 'unavailable') { degraded = true; lookupStatus = 'lookup_failed'; localStatus = 'unavailable'; }
+        else { localStatus = 'ok'; localHits = 0; }
       } else {
         const looked = await lookupLocalEntitiesByName(name, limit);
         if (looked.status === 'found') {
+          localHits = looked.hits.length;
+          localStatus = 'ok';
           const liveUeis = new Set(matches.map((m) => String(m.ueiSAM || '').toUpperCase()).filter(Boolean));
           matches = mergeEntities([matches, looked.hits.map((h) => h.entity)]);
           const picked = pickUniqueEntity(name, matches);
@@ -210,6 +249,10 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         } else if (looked.status === 'unavailable') {
           degraded = true;
           lookupStatus = 'lookup_failed';
+          localStatus = 'unavailable';
+        } else {
+          localStatus = 'ok';
+          localHits = 0;
         }
       }
       if (usedLocal) {
@@ -218,6 +261,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     } catch (reconcileErr) {
       degraded = true;
       lookupStatus = 'lookup_failed';
+      localStatus = 'unavailable';
       console.error('[mcp:lookup_sam_entity] local reconciliation failed:', reconcileErr);
     }
   }
@@ -250,6 +294,22 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     add('WOSB', entity.hasWOSB, 'self');     // SAM self-identified
   }
 
+  const reconciliation: SamEntityReconciliation | undefined =
+    mode === 'name' && lookupStatus === 'not_found'
+      ? {
+          outcome: 'not_found',
+          sources_checked: [
+            { source: 'sam_live_legal', hits: liveLegalHits, status: 'ok' },
+            { source: 'sam_live_dba', hits: liveDbaHits, status: liveDbaStatus === 'skipped' ? 'unavailable' : liveDbaStatus },
+            { source: 'local_registry', hits: localHits, status: localStatus === 'skipped' ? 'unavailable' : localStatus },
+          ],
+          note:
+            'Live SAM legal-name search, live SAM DBA search, and the local sam_entities mirror all returned no unique match. '
+            + 'This is not a missed DBA classifier — when a DBA row exists, lookup_sam_entity unique-picks it. '
+            + 'A prior claim that this trade name maps to a registered entity is not supported by current sources.',
+        }
+      : undefined;
+
   const result: SamEntityResult = {
     queried: { ...(uei ? { uei } : {}), ...(name ? { name } : {}), ...(state ? { state } : {}) },
     entity,
@@ -262,6 +322,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       source: usedLocal ? 'local_registry' : 'sam_live',
       lookup_status: lookupStatus,
       ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
+      ...(reconciliation ? { reconciliation } : {}),
     },
   };
 
@@ -279,13 +340,16 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         ? mode === 'uei'
           ? `${entity!.legalBusinessName || uei} — registration ${entity!.registrationStatus || 'unknown'}.`
           : `${matches.length} SAM match${matches.length === 1 ? '' : 'es'} for "${name}".`
-        : `No SAM registration found for ${uei || name}. Do not claim the business is unregistered; say the lookup did not return a row.`,
+        : `No SAM registration found for ${uei || name} after legal-name, DBA, and local-mirror checks. Do not invent a UEI; say current sources returned no match.`,
       how_to_use: grounded
         ? 'Cite registration status + certifications straight from the record. An Inactive/Expired registration means they cannot currently receive an award.'
-        : 'No grounded entity; say the vendor is not found in SAM rather than assuming.',
+        : 'No grounded entity; say the vendor is not found in current SAM/mirror sources rather than assuming they are unregistered forever.',
       key_caveats: [
         'Set-aside eligibility depends on the CURRENT registration status + certifications shown — not on past awards.',
         'SDVOSB and WOSB here are SAM SELF-IDENTIFIED, not the authoritative SBA VetCert determination — a firm may be VetCert-certified while SAM shows self-cert false, or vice-versa. 8(a) and HUBZone come from SBA-certified SAM codes and are authoritative. See cert_provenance.',
+        ...(reconciliation
+          ? ['See _meta.reconciliation for the legal / DBA / local hit counts that established this miss.']
+          : []),
       ],
     };
   }

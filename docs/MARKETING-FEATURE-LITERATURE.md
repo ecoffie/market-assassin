@@ -7214,3 +7214,14 @@ V1/V2/V3 identity-boundary unit suites: profile-from-text keeps `naics: []` when
 coverage leads 236220/336411; market-overview never calls tile helpers with
 coverageCodes alone; beginner relevance admits 238220/336612 same-sector siblings
 and still drops Dale Carnegie / dirty IT slivers.
+
+
+### SCIF recovery + Monarch Yachts reconciliation (2026-09-20)
+
+**What.** Compliance-matrix extraction now deterministically recovers named Section 3.0 specs (including SCIF) when the LLM skips notional capability lines without shall/must. `lookup_sam_entity` on a genuine miss returns `_meta.reconciliation` proving live legal-name, live DBA, and local mirror were all checked.
+
+**Why.** Notice `6552b25b…` states "Notional 750 sq ft SCIF" in source but the matrix omitted it. Monarch Yachts was framed as a DBA lookup failure; current SAM + mirror return no row — the DBA classifier works on fixtures, so the honest product answer is reconciled `not_found`, not a phantom UEI.
+
+**SEO.** SCIF / compliance matrix / SAM entity DBA lookup / Monarch Yachts registration.
+
+**Proof.** Unit: SCIF recovery from the notional sentence; Monarch zero-hit reconciliation meta. Live: notice `6552b25bf0e648f39b44228275998eef` → `FULL_HAS_SCIF true`, `missing_from_matrix: []`; `lookup_sam_entity({name:"Monarch Yachts"})` → `not_found` with legal/DBA/local hits all 0.
