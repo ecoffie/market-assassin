@@ -1,0 +1,25 @@
+{
+  "label": "AGENT_VERIFICATION_NOT_INDEPENDENT_ACCEPTANCE",
+  "checked_at": "2026-09-20T19:30:54.017Z",
+  "notice_id": "6552b25bf0e648f39b44228275998eef",
+  "row_count": 51,
+  "recovered": null,
+  "present_in_source": {
+    "loa_range": true,
+    "flight_deck": true,
+    "scif": true,
+    "berthing": true,
+    "magazine": true
+  },
+  "missing_from_matrix": null,
+  "named_spec_hits": {
+    "loa_range": true,
+    "flight_deck": true,
+    "scif": true,
+    "berthing": true,
+    "magazine": true
+  },
+  "grounded": true,
+  "degraded": false,
+  "note": "Named-spec presence \u2260 full-document extraction completeness. Agent verification only."
+}

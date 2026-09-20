@@ -7,6 +7,7 @@
 
 import agencyPainPointsData from '@/data/agency-pain-points.json';
 import agencyAliasesData from '@/data/agency-aliases.json';
+import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 
 // Types
 export interface AgencyPainPoints {
@@ -40,8 +41,11 @@ function initializeCaches() {
   for (const [agencyName, data] of Object.entries(agencies)) {
     painPointsCache.set(agencyName.toLowerCase(), {
       agencyName,
-      painPoints: data.painPoints || [],
-      priorities: data.priorities || [],
+      // LEGACY_MANUAL dollar figures are not sourced budget data — omit from
+      // default customer responses; keep qualitative program framing.
+      // Dollar-only claims sanitize to "" and are dropped (never restored).
+      painPoints: (data.painPoints || []).map(sanitizeLegacyClaimText).filter(Boolean),
+      priorities: (data.priorities || []).map(sanitizeLegacyClaimText).filter(Boolean),
       matchedAliases: []
     });
   }

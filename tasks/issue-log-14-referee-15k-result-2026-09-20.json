@@ -1,0 +1,33 @@
+{
+  "label": "REPRESENTATIVE_REGRESSION_COMPARABLE_SIZE_NOT_ORIGINAL",
+  "original_exact_input_retest": "unavailable",
+  "checked_at": "2026-09-20T19:42:36.160Z",
+  "requirement_count": 17,
+  "draft_chars": 14343,
+  "input_artifact": "tasks/issue-log-14-referee-15k-input-2026-09-20.json",
+  "elapsed_ms": 8009,
+  "_meta": {
+    "grounded": true,
+    "degraded": false,
+    "total": 17,
+    "met": 0,
+    "partial": 8,
+    "missing": 9,
+    "score": 24,
+    "timeout_trace": {
+      "budget_ms": 45000,
+      "elapsed_ms": 8007,
+      "batches_planned": 2,
+      "batches_completed": 2,
+      "batches_skipped": 0,
+      "timed_out": false,
+      "reason": null
+    }
+  },
+  "verdict_statuses": {
+    "met": 0,
+    "partial": 8,
+    "missing": 9,
+    "unevaluated": 0
+  }
+}
