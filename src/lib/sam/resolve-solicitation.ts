@@ -11,7 +11,14 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { deadlineDay, deadlinesConflict } from '@/lib/sam/notice-identity';
+import {
+  deadlineDay,
+  deadlinesConflict,
+  extractLotDeadlines,
+  lotDeadlinesConflict,
+  type DeadlineConflictReason,
+  type LotDeadline,
+} from '@/lib/sam/notice-identity';
 
 export const SOLICITATION_RESOLVE_COLS =
   'notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link';
@@ -51,8 +58,10 @@ export interface CanonicalSolicitation {
   identifiers: string[];
   version_count: number;
   source: 'sam_opportunities';
-  /** True when family members disagree on calendar-day deadline. UUID lookup is never a conflict. */
+  /** True when sibling notices disagree on calendar day AND/OR the synopsis names lot due-dates that disagree with SAM. */
   deadline_conflict: boolean;
+  deadline_conflict_reasons: DeadlineConflictReason[];
+  lot_deadlines: LotDeadline[];
   notice_ids: string[];
   versions: Array<{
     notice_id: string;
@@ -212,6 +221,13 @@ export function resolveFromCandidateRows(
   const deadlineDays = new Set(
     versions.map((v) => deadlineDay(v.response_deadline)).filter((d): d is string => !!d),
   );
+  const siblingConflict = matchedBy !== 'notice_id' && (deadlineDays.size > 1 || versions.some((v, i) =>
+    i > 0 && deadlinesConflict(v.response_deadline, canonical.response_deadline)));
+  const lot_deadlines = extractLotDeadlines(withId.map((r) => r.description || '').join('\n\n'));
+  const lotConflict = lotDeadlinesConflict(canonical.response_deadline, lot_deadlines);
+  const deadline_conflict_reasons: DeadlineConflictReason[] = [];
+  if (siblingConflict) deadline_conflict_reasons.push('sibling_notices');
+  if (lotConflict) deadline_conflict_reasons.push('lot_due_dates');
   return {
     queried,
     notice: canonical,
@@ -222,8 +238,9 @@ export function resolveFromCandidateRows(
     identifiers: identifiersFor(queried, canonical),
     version_count: versions.length,
     source: 'sam_opportunities',
-    deadline_conflict: matchedBy !== 'notice_id' && (deadlineDays.size > 1 || versions.some((v, i) =>
-      i > 0 && deadlinesConflict(v.response_deadline, canonical.response_deadline))),
+    deadline_conflict: siblingConflict || lotConflict,
+    deadline_conflict_reasons,
+    lot_deadlines,
     notice_ids: versions.map((v) => v.notice_id),
     versions,
   };
@@ -370,6 +387,8 @@ export function toResolvedNoticeFields(canonical: CanonicalSolicitation): {
   matched_by: SolicitationMatchBy;
   version_count: number;
   deadline_conflict: boolean;
+  deadline_conflict_reasons: DeadlineConflictReason[];
+  lot_deadlines: LotDeadline[];
   notice_ids: string[];
 } {
   const n = canonical.notice;
@@ -393,6 +412,8 @@ export function toResolvedNoticeFields(canonical: CanonicalSolicitation): {
     matched_by: canonical.matched_by,
     version_count: canonical.version_count,
     deadline_conflict: canonical.deadline_conflict,
+    deadline_conflict_reasons: canonical.deadline_conflict_reasons,
+    lot_deadlines: canonical.lot_deadlines,
     notice_ids: canonical.notice_ids,
   };
 }

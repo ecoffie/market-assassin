@@ -7133,3 +7133,26 @@ among live Monarch* legal names. Matrix coverage test fails a 25-row extract tha
 misses the five Section 3.0 specs. Original `lookup_federal_osbp("United States
 Coast Guard")` payload → Maria L. Kersey-Robinson, uscg-smallbusiness@uscg.mil,
 director_verified 2026-06 (issue-log #6).
+
+---
+
+## Lot due-dates, ungrounded incumbents, PIEE (2026-09-20)
+
+**What.** A SAM `response_deadline` is not the only date on a multi-lot RFP.
+`lookup_solicitation` / `get_solicitation_incumbent` now surface Lot 1 vs Lot 2
+due-dates from the synopsis and flag `deadline_conflict` when they disagree with
+the SAM field. An ungrounded prior-award candidate (Mazak on SCB MAC) is no
+longer copied into `incumbent` / `incumbent_name`. PIEE/WAWF is detected from
+the synopsis even when there is no SOW heading.
+
+**Why.** Original N00024-26-R-2200 failed because Lot 1 is due 13 August 2026
+and Lot 2 / SAM is 31 August 2026 — sibling UUID days were the wrong conflict
+class. Naming Mazak while `grounded_incumbent` was false repeated the original
+unsupported-incumbent failure.
+
+**SEO.** SAM solicitation deadline conflict / incumbent evidence / PIEE proposal
+submission.
+
+**Proof.** Fixture is the SCB MAC synopsis. Unit tests: Lot 1 2026-08-13 + Lot 2
+2026-08-31 vs SAM 2026-08-31 → `lot_due_dates`; `namedIncumbent` returns null for
+a high-confidence NAICS-only Mazak hit; `detectPiee` true on the PIEE paragraph.

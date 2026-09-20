@@ -67,8 +67,19 @@ export interface MarketDepthToolResult {
   data_as_of: string;
   caveats: string[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; market_depth: number; capable_depth: number; rule_of_two_met: boolean | null };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    market_depth: number;
+    capable_depth: number;
+    rule_of_two_met: boolean | null;
+    businesses_returned: number;
+    businesses_available: number;
+  };
 }
+
+/** MCP list cap — census counts stay full; a 50-firm scored list blew past 100KB. */
+const MCP_BUSINESS_LIST_CAP = 15;
 
 export async function assessMarketDepth(input: MarketDepthToolInput): Promise<MarketDepthToolResult> {
   const naics = (input.naics || '').trim();
@@ -102,6 +113,9 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
 
   const capableDepth = res?.capableDepth ?? 0;
   const emergingCount = (res?.counts?.emerging ?? 0);
+  const allBusinesses = res?.businesses ?? [];
+  const listCap = Math.min(Math.max(1, input.limit ?? MCP_BUSINESS_LIST_CAP), MCP_BUSINESS_LIST_CAP);
+  const businesses = allBusinesses.slice(0, listCap);
   const result: MarketDepthToolResult = {
     queried,
     market_depth: res?.marketDepth ?? 0,
@@ -130,7 +144,7 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     small_status_unknown: res?.smallStatusUnknown ?? 0,
     counts: res?.counts ?? {},
     registered_only_count: res?.registeredOnlyCount ?? 0,
-    businesses: res?.businesses ?? [],
+    businesses,
     data_as_of: res?.dataAsOf ?? '',
     caveats: res?.caveats ?? [],
     _meta: {
@@ -141,6 +155,8 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
       // null = could not assess (BQ degraded). NEVER coerce to false: an agent reads
     // false as a finding and repeats it as fact.
     rule_of_two_met: res?.ruleOfTwoMet ?? null,
+      businesses_returned: businesses.length,
+      businesses_available: allBusinesses.length,
     },
   };
 

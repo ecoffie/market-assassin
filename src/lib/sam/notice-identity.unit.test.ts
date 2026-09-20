@@ -3,6 +3,9 @@ import {
   assembleNoticeSourceText,
   attachmentLocationNote,
   deadlinesConflict,
+  detectPiee,
+  extractLotDeadlines,
+  lotDeadlinesConflict,
   normalizeNoticeUuid,
   resolveCachedNotices,
 } from './notice-identity';
@@ -99,5 +102,26 @@ describe('external attachment locations', () => {
     expect(attachmentLocationNote('sam_public')).toMatch(/SAM\.gov/i);
     expect(attachmentLocationNote('mindy_signed')).toMatch(/Mindy/i);
     expect(attachmentLocationNote(null)).toMatch(/No downloadable copy/i);
+  });
+});
+
+describe('lot due-dates vs SAM field (N00024-26-R-2200 SCB MAC)', () => {
+  const synopsis = `
+Proposal Due Dates:
+ 1. Lot 1 proposals and Lot 2 proposals from offerors not submitting a proposal for the initial APL Delivery Order are due 13 August 2026.
+ 2. Lot 2 proposals from offerors submitting a proposal for the initial APL Delivery Order are due 31 August 2026.
+Offerors must have an active account in the Procurement Integrated Enterprise Environment (PIEE).
+`.trim();
+
+  it('extracts Lot 1 13 Aug and Lot 2 31 Aug from the synopsis', () => {
+    const lots = extractLotDeadlines(synopsis);
+    expect(lots.some((l) => l.lot === 'Lot 1' && l.date === '2026-08-13')).toBe(true);
+    expect(lots.some((l) => l.lot === 'Lot 2' && l.date === '2026-08-31')).toBe(true);
+    expect(lotDeadlinesConflict('2026-08-31T19:00:00+00:00', lots)).toBe(true);
+  });
+
+  it('detects PIEE in the synopsis even with no SOW heading', () => {
+    expect(detectPiee(synopsis)).toBe(true);
+    expect(detectPiee('Section C Statement of Work. Paint the hull.')).toBe(false);
   });
 });
