@@ -70,17 +70,26 @@ Reviewed before closeout work:
 
 ## Release readiness vs audit gaps (do not collapse)
 
-Reviewed head for release approval: **`73089220`**. CI (2026-09-20): `verify` **success**; Vercel status **success**; `live-smoke` / `maps-account-prod` **skipped** (PR path). PR `mergeable: true`, `mergeable_state: clean`. Focused unit recheck on this head: noticedesc failover + dollar-omit — **18/18 pass**.
+| Bucket | Items | Status after release |
+|---|---|---|
+| **Released on prod** | Dollar-omit; noticedesc failover + per-key disclosure; #5/#7/#13 representative evidence | **Merged + serving** |
+| **Post-release `$` verification** | Public-domain LEGACY_MANUAL `$` suppression | **PASS** 2026-09-20T22:10Z — see release record below |
+| **Open audit (track separately)** | **#12** same non-empty sourced description for sol + UUID | **Still open** — disclosure ≠ close |
+| **Preserved evidence limitation** | **#13** original payload lost | Representative **PASS**; do not hold audit for lost payload |
+| **Independent Round-PDF** | Recorded UTC + serving commit still unknown | Open for independence labels only |
 
-| Bucket | Items | Blocks release? | Blocks audit closure? |
-|---|---|---|---|
-| **Release-ready code on this PR** | Dollar-omit (no restore); noticedesc failover + per-key disclosure; merge with main; #5/#7/#13 representative evidence | **No** — ready for Eric’s **separate** release approval | — |
-| **Post-release verification** | Public-domain LEGACY_MANUAL `$` suppression on getmindy.ai / mcp aliases | Does not block merge decision once approved; **must** run after release | Yes until verified on public domains |
-| **Open audit (track separately)** | **#12** successful same non-empty sourced description for sol + UUID | No (disclosure shipped; retrieval is upstream/audit) | **Yes** — disclosure alone does not close #12 |
-| **Preserved evidence limitation** | **#13** original 17-req / ~15k payload lost | No | Original-input verification remains unavailable; **representative PASS** is the regression baseline going forward — do not hold the audit indefinitely for the lost payload |
-| **Independent Round-PDF** | Recorded UTC + serving commit still unknown | No | Yes for “independently verified” labels |
+## Release record (PR #1577)
 
-**No merge or deployment is authorized by this tracker update.** Release requires Eric’s explicit approval after final review of `73089220`.
+| Field | Value |
+|---|---|
+| PR tip merged | `dbdf664c` |
+| Merge commit on `main` | **`297e3136`** (`Merge pull request #1577…`, 2026-09-20T22:04:19Z) |
+| Serving deployment | `market-assassin-a1n55a7ea` · **Ready** · production |
+| Aliases | `https://getmindy.ai` · `https://mcp.getmindy.ai` (same deploy) |
+| Serving proof | `getmindy.ai/opportunity-map` HTML stamp `maps-account-build:297e3136e18c08fb4f651297b9e58b409d401486` |
+| Vercel build log | Cloned `main` @ `297e313` |
+| NAVSEA `$` check | `tasks/issue-log-14-navsea-dollar-prod-2026-09-20.json` — LEGACY_MANUAL priorities: **0** `$` amounts; **10** qualitative priorities remain; **0** SOURCE_FACT citations on this agency (nothing to strip; unit tests still preserve SOURCE_FACT `$`) |
+| Audit status | **Not fully closed** — #12 retrieval remains open |
 
 ## Per-issue evidence ledger
 
@@ -91,7 +100,7 @@ For each original issue: exact input · expected · observed · tested commit/en
 | 1 | `extract_compliance_matrix` | `6552b25bf0e648f39b44228275998eef` | Recover SCIF; five named specs present when in source | Agent PASS (wave1 on `5cc700d7` + wave2 local): specs present; ~51–52 rows | prod `5cc700d7` + local closeout | recheck JSON + `issue-log-14-scif-agent-2026-09-20.json` | Completeness ≠ full document; Round-PDF SCIF independence **not** established |
 | 2 | `search_federal_contacts` | USCG + `small business` | USCG mailbox, not State | Agent PASS | prod `5cc700d7` | recheck JSON | Round-PDF date/commit unknown |
 | 3 | `build_pursuit_dossier` | `N00024-26-R-2200` | Incumbent null; Mazak prior_awards only | Agent PASS | prod `5cc700d7` | recheck JSON | — |
-| 4 | `get_agency_intel` | `"Naval Sea Systems Command"` | Honest spend grain; no unsourced priority `$` | Prod: identity/spend PASS; **still emits unsourced `$` until release**. Local: emptied dollar-only claims omitted (not restored) | prod `5cc700d7` + PR worktree | recheck JSON + sourced-pain-points tests | **Post-release check required** for public-domain `$` suppression |
+| 4 | `get_agency_intel` | `"Naval Sea Systems Command"` | Honest spend grain; no unsourced priority `$` | **Post-release PASS** on serving `297e3136`: 10 qualitative LEGACY priorities, **0** `$` in priorities/pain/legacy citations; SOURCE_FACT citations on NAVSEA = 0 (unit tests preserve SOURCE_FACT `$`) | prod aliases + merge SHA | `issue-log-14-navsea-dollar-prod-2026-09-20.json` | — |
 | 5 | `get_agency_spending_detail` | Navy FY2025 | Navy ≠ DoD; honest scope/% | **Agent PASS** — Navy ~$176.6B REQUESTED; 097 parent code noted; set-aside 3.4% ≠ recipient SB 12.5% | local wave3 | `issue-log-14-navy-fy2025-agent-2026-09-20.json` | — |
 | 6 | `lookup_federal_osbp` | USCG | Kersey-Robinson / uscg-smallbusiness | Agent PASS | prod `5cc700d7` | recheck JSON | — |
 | 7 | `get_keyword_coverage` | `"patrol"` | Current BQ contract figure | Agent ~**$902.6M** / 121 NAICS (wave2). Round ~$6.67B/106 is **historical only** | local closeout | `issue-log-14-patrol-agent-2026-09-20.json` | Do not equate old/new totals; 1-FY measurement |
@@ -110,7 +119,7 @@ For each original issue: exact input · expected · observed · tested commit/en
 | 1 | **fixed** | **agent-rechecked** (not independent SCIF) | Named specs present |
 | 2 | **fixed** | agent-rechecked; Round date/commit unknown | — |
 | 3 | **fixed** | developer + agent | — |
-| 4 | **fixed** (+ dollar-omission in PR) | agent identity/spend; dollar omit **local until release** | Post-release public `$` check |
+| 4 | **fixed** (+ dollar-omission) | **post-release verified** on `297e3136` | Public `$` suppression confirmed |
 | 5 | **fixed** | **agent-rechecked** Navy FY2025 | Scope/share distinctions recorded |
 | 6 | **fixed** | developer + agent | — |
 | 7 | **fixed** | **agent-rechecked current ~$903M**; Round figure historical | — |
@@ -145,16 +154,15 @@ For each original issue: exact input · expected · observed · tested commit/en
 ## Still open — audit gaps (track separately from release)
 
 - **#12 retrieval** — open until both inputs return the same non-empty sourced description.
-- **#4 / dollar suppression** — public-domain check **after** approved release only.
 - **Round-PDF independence** — needs recorded execution UTC + serving commit for “independently verified” labels.
 - **#13 original payload** — preserved limitation only; representative regression is the forward path.
 
-## Post-release checks (do not skip)
+## Post-release checks
 
-1. **Public-domain suppression of unsourced priority dollars** — after separately approved release of PR #1577, call `get_agency_intel` for `"Naval Sea Systems Command"` on **production aliases** and assert LEGACY_MANUAL priority claims contain **no** `$` / `Allocated $…` while qualitative non-dollar priorities remain and SOURCE_FACT dollars (if any) stay.
-2. Re-measure serving commit on `getmindy.ai` / `mcp.getmindy.ai` before treating release as live.
+1. ~~Public-domain unsourced priority `$` suppression~~ — **done** on serving `297e3136` (artifact above).
+2. ~~Re-measure serving commit~~ — **done** (`maps-account-build:297e3136…` on getmindy.ai; both aliases on Ready deploy `a1n55a7ea`).
 3. **#12 (audit, not release gate):** when SAM noticedesc quota recovers (or a cached description exists), re-run sol + UUID for `N00024-26-R-4160` and confirm both return the **same non-empty sourced** description before calling #12 closed.
 
 ## Not reopened
 
-Pricing, credits, backfills (`--go` writer, 3,729-family, 44,560 fleet), PAE, #1560, agency-identity architecture beyond NAVSEA grain already shipped. No new collectors. No customer messages. **No merge or deployment authorized** until Eric explicitly approves release of `73089220`.
+Pricing, credits, backfills (`--go` writer, 3,729-family, 44,560 fleet), PAE, #1560, agency-identity architecture beyond NAVSEA grain already shipped. No new collectors. No customer messages. **Entire audit is not closed.**
