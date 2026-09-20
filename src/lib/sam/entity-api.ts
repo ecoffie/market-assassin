@@ -233,12 +233,14 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
   // Tri-state map: 'Y' | 'N' | ABSENT. Absent means SAM did not say — never "not small".
   const naicsSmallBusiness = fromEntityApiNaicsList(naicsList);
 
-  // PSC list
+  // PSC list — drop blank-only rows so clients do not render empty PSC lines.
   const pscRaw = (goodsServices.pscList as Array<Record<string, unknown>>) || (raw.pscList as Array<Record<string, unknown>>) || [];
-  const pscList = pscRaw.map(p => ({
-    pscCode: String(p.pscCode || ''),
-    pscDescription: String(p.pscDescription || '')
-  }));
+  const pscList = pscRaw
+    .map(p => ({
+      pscCode: String(p.pscCode || ''),
+      pscDescription: String(p.pscDescription || '')
+    }))
+    .filter(p => p.pscCode.trim().length > 0 || p.pscDescription.trim().length > 0);
 
   // Addresses
   const physAddr = (core.physicalAddress as Record<string, unknown>) || (raw.physicalAddress as Record<string, unknown>) || {};

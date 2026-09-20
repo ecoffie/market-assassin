@@ -319,9 +319,11 @@ export default function ContractorSalesHistoryDrawer({
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium text-slate-200">{agency.agency}</div>
                           <div className="text-xs text-faint">
-                            {typeof agency.share === 'number' && agency.share > 0
+                            {typeof agency.share === 'number'
                               ? `${(agency.share * 100).toFixed(1)}% of total obligations`
-                              : `${agency.count} ${agency.count === 1 ? 'award' : 'awards'}`}
+                              : agency.count == null || agency.count_unavailable
+                                ? 'Award count unavailable'
+                                : `${agency.count} ${agency.count === 1 ? 'award' : 'awards'}`}
                           </div>
                         </div>
                         <div className="text-sm font-semibold text-emerald-400">{formatCurrency(agency.amount)}</div>
@@ -357,13 +359,15 @@ export default function ContractorSalesHistoryDrawer({
               <section className="rounded-xl border border-surface bg-ground p-5">
                 <h3 className="text-lg font-semibold text-white">Recent Awards</h3>
                 <div className="mt-4 space-y-3">
-                  {history.recentAwards.length ? history.recentAwards.map((award) => (
-                    <div key={award.id} className="rounded-lg border border-surface bg-ground-deep p-4">
+                  {history.recentAwards.length ? history.recentAwards.map((award, idx) => (
+                    <div key={`${award.id}:${award.modNumber ?? ''}:${award.actionDate ?? ''}:${idx}`} className="rounded-lg border border-surface bg-ground-deep p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <h4 className="line-clamp-2 text-sm font-semibold text-white">{award.title}</h4>
                           <p className="mt-1 text-xs text-faint">
-                            {award.agency} · {formatDate(award.startDate)}
+                            {award.agency} · {formatDate(award.actionDate || award.startDate)}
+                            {award.isModification ? ' · modification' : ''}
+                            {award.dateRangeIssue === 'end_before_start' ? ' · ⚠ end date before start' : ''}
                           </p>
                         </div>
                         <div className="shrink-0 text-sm font-bold text-emerald-400">
