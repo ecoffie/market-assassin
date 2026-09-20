@@ -7104,7 +7104,6 @@ missed entirely. An incremental pass covered **3,163 of 3,163** in 13 pages. The
 6-page configuration now reports `coverage: partial` with the cursor unmoved instead of
 a confident empty result.
 
-<<<<<<< HEAD
 ---
 
 ## NAVSEA command intel, Navy spend grain, DBA lookup, matrix source coverage (2026-09-20)
@@ -7157,7 +7156,9 @@ submission.
 **Proof.** Fixture is the SCB MAC synopsis. Unit tests: Lot 1 2026-08-13 + Lot 2
 2026-08-31 vs SAM 2026-08-31 → `lot_due_dates`; `namedIncumbent` returns null for
 a high-confidence NAICS-only Mazak hit; `detectPiee` true on the PIEE paragraph.
-=======
+
+---
+
 ## Keyword coverage measures the market — it does not name it (2026-09-20)
 
 **What.** `get_keyword_coverage` now measures federal contract actions in BigQuery
@@ -7201,5 +7202,3 @@ V1/V2/V3 identity-boundary unit suites: profile-from-text keeps `naics: []` when
 coverage leads 236220/336411; market-overview never calls tile helpers with
 coverageCodes alone; beginner relevance admits 238220/336612 same-sector siblings
 and still drops Dale Carnegie / dirty IT slivers.
-
->>>>>>> a998d8a9 (feat(market): BigQuery keyword coverage as measurement, not identity)

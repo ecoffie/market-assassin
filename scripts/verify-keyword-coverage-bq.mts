@@ -16,10 +16,10 @@ const PRIMARY = '/Users/ericcoffie/Market Assasin/market-assassin';
 config({ path: join(WORKTREE, '.env.local'), quiet: true });
 config({ path: join(PRIMARY, '.env.local'), quiet: true });
 
-const { queryKeywordCoverage } = await import('../src/lib/market/keyword-coverage.ts');
-const { runKeywordCoverageBq, descriptionMatchPattern } = await import('../src/lib/market/keyword-coverage-bq.ts');
-const { latestCompleteFiscalYear } = await import('../src/lib/utils/fiscal-year.ts');
-const { bqQuery, BQ_TABLES, bqJobOptions } = await import('../src/lib/bigquery/client.ts');
+const { queryKeywordCoverage } = await import('../src/lib/market/keyword-coverage');
+const { runKeywordCoverageBq, descriptionMatchPattern } = await import('../src/lib/market/keyword-coverage-bq');
+const { latestCompleteFiscalYear } = await import('../src/lib/utils/fiscal-year');
+const { bqQuery, BQ_TABLES, bqJobOptions } = await import('../src/lib/bigquery/client');
 
 const KEYWORDS = [
   'patrol',

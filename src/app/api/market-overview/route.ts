@@ -126,7 +126,9 @@ async function forecastTileByNaics(codes: string[]): Promise<{ count: number; va
       .from('agency_forecasts')
       .select('id, estimated_value_max, estimated_value_min')
       .in('naics_code', codes)
-      .limit(5000);
+      // PostgREST hard-caps at 1,000 rows; a larger limit is a lie. Count+value on
+      // this teaser tile are a floor when the market exceeds 1k forecasts.
+      .limit(1000);
     if (error) {
       console.error('[market-overview] forecast tile query failed:', error.message);
       return null;
@@ -153,7 +155,8 @@ async function forecastTileByKeyword(keyword: string): Promise<{ count: number; 
       .from('agency_forecasts')
       .select('id, estimated_value_max, estimated_value_min')
       .or(`title.ilike.%${kw}%,description.ilike.%${kw}%`)
-      .limit(5000);
+      // PostgREST hard-caps at 1,000 — teaser tile floor, not a hard market total.
+      .limit(1000);
     if (error) {
       console.error('[market-overview] forecast keyword tile failed:', error.message);
       return null;
@@ -196,7 +199,9 @@ async function recompeteTileByNaics(
       .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0])
       .is('quality_flag', null)
       .or(orFilter)
-      .limit(3000);
+      // PostgREST hard-caps at 1,000; `count: 'exact'` is the real population size.
+      // Value sum is a floor over the first page only.
+      .limit(1000);
     if (error) {
       console.warn('[market-overview] recompete query failed:', error.message);
       return null;
@@ -241,7 +246,8 @@ async function recompeteTileByKeyword(
       .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0])
       .is('quality_flag', null)
       .ilike('description', `%${kw}%`)
-      .limit(3000);
+      // PostgREST hard-caps at 1,000; `count: 'exact'` is the real population size.
+      .limit(1000);
     if (error) {
       console.warn('[market-overview] recompete keyword query failed:', error.message);
       return null;
