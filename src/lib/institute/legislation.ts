@@ -499,18 +499,29 @@ export async function fetchTextVersions(
   return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : [];
 }
 
+/**
+ * ⚠️ RETURNS EVERY ARTIFACT UNDER THE REPORT NUMBER, not just the first.
+ *
+ * One report number can carry several distinct artifacts. Verified live on
+ * /committee-report/119/SRPT/39, which returns TWO entries:
+ *   [0] 'S. Rept. 119-39'         part=1 issueDate=2025-07-15
+ *   [1] 'S. Rept. 119-39,Errata'  part=1 issueDate=null
+ * Taking `arr[0]` silently discarded the errata — a correction to report language —
+ * and made the bill's two list entries both resolve to the same record, which is how
+ * the production preview produced 29 documents with only 28 distinct identities.
+ */
 export async function fetchCommitteeReport(
   congress: number,
   type: string,
   number: number | string,
   fetchImpl: typeof fetch = fetch,
-): Promise<Record<string, unknown> | null> {
+): Promise<Array<Record<string, unknown>>> {
   const payload = await getJson(
     withKey(`/committee-report/${congress}/${type.toUpperCase()}/${number}`),
     fetchImpl,
   );
   const arr = (payload as { committeeReports?: unknown[] })?.committeeReports;
-  return Array.isArray(arr) && arr.length > 0 ? (arr[0] as Record<string, unknown>) : null;
+  return Array.isArray(arr) ? (arr as Array<Record<string, unknown>>) : [];
 }
 
 /** `committeeReports[].url` -> (type, number), so we never hand-build report ids. */
@@ -536,14 +547,24 @@ export async function collectBillDocuments(
   const versions = await fetchTextVersions(ref, fetchImpl);
   const documents = billVersionsToDocuments(ref, versions, status, retrievedAt);
 
+  // The bill lists one entry PER ARTIFACT but every entry points at the SAME report
+  // URL, so fetch each report number ONCE and expand it into all of its artifacts.
+  // Fetching per list-entry would re-request the same document and, before the
+  // arr[0] fix, yield the same record twice.
   const reports = (detail.committeeReports ?? []) as Array<{ url?: string }>;
+  const seenReportRefs = new Set<string>();
   for (const r of reports) {
     const parsed = r.url ? parseReportRef(r.url) : null;
     if (!parsed) continue;
-    const rpt = await fetchCommitteeReport(ref.congress, parsed.type, parsed.number, fetchImpl);
-    if (!rpt) continue;
-    const doc = committeeReportToDocument(rpt, retrievedAt);
-    if (doc) documents.push(doc);
+    const refKey = `${parsed.type}/${parsed.number}`;
+    if (seenReportRefs.has(refKey)) continue;
+    seenReportRefs.add(refKey);
+
+    const artifacts = await fetchCommitteeReport(ref.congress, parsed.type, parsed.number, fetchImpl);
+    for (const rpt of artifacts) {
+      const doc = committeeReportToDocument(rpt, retrievedAt);
+      if (doc) documents.push(doc);
+    }
   }
 
   return { documents, status };

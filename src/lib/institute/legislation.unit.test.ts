@@ -8,6 +8,7 @@ import {
   discoverBills,
   billVersionsToDocuments,
   committeeReportToDocument,
+  collectBillDocuments,
   citationSuffix,
   readStatus,
   parseReportRef,
@@ -404,5 +405,77 @@ describe('committee report errata do not collapse into the base report', () => {
     expect(citationSuffix('S. Rept. 119-39')).toBe('');
     expect(citationSuffix('S. Rept. 119-39,Errata')).toBe('-ERRATA');
     expect(citationSuffix('S. Rept. 119-39, Part 2 Supplemental')).toBe('-PART-2-SUPPLEMENTAL');
+  });
+});
+
+/**
+ * REGRESSION (live, 2026-09-20): the REPORT endpoint returns every artifact sharing
+ * a report number, but `fetchCommitteeReport` returned only `arr[0]`, discarding the
+ * errata. The bill also lists one entry per artifact pointing at the SAME url, so
+ * the caller refetched and got that same first record twice. Together they produced
+ * 29 documents with 28 distinct identities — the base report kept, the errata lost.
+ *
+ * The citation-key fix alone did NOT solve this: the key was right, the fetch was
+ * wrong. Caught only by polling the live API, never by the unit fixture.
+ */
+describe('a report number expands into ALL of its artifacts', () => {
+  const REPORT_PAYLOAD = {
+    committeeReports: [
+      { type: 'SRPT', number: 39, congress: 119, part: 1, citation: 'S. Rept. 119-39',
+        issueDate: '2025-07-15T04:00:00Z', title: 'NDAA FY2026', chamber: 'Senate', isConferenceReport: false },
+      { type: 'SRPT', number: 39, congress: 119, part: 1, citation: 'S. Rept. 119-39,Errata',
+        issueDate: null, title: 'NDAA FY2026', chamber: 'Senate', isConferenceReport: false },
+    ],
+  };
+
+  const fetchImpl = (async (u: string) => {
+    if (String(u).includes('/committee-report/')) {
+      return { ok: true, status: 200, statusText: 'OK', json: async () => REPORT_PAYLOAD } as unknown as Response;
+    }
+    if (String(u).includes('/text')) {
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ textVersions: [] }) } as unknown as Response;
+    }
+    // bill detail — TWO list entries, both pointing at the SAME report url
+    return {
+      ok: true, status: 200, statusText: 'OK',
+      json: async () => ({ bill: {
+        latestAction: { actionDate: '2025-11-12', text: 'Held at the desk.' }, laws: null,
+        committeeReports: [
+          { citation: 'S. Rept. 119-39', url: 'https://api.congress.gov/v3/committee-report/119/SRPT/39?format=json' },
+          { citation: 'S. Rept. 119-39,Errata', url: 'https://api.congress.gov/v3/committee-report/119/SRPT/39?format=json' },
+        ],
+      } }),
+    } as unknown as Response;
+  }) as unknown as typeof fetch;
+
+  const ref: BillRef = { congress: 119, billType: 'S', number: '2296', title: 'NDAA FY2026', updateDate: null, originChamber: 'Senate' };
+
+  it('keeps BOTH the base report and its errata as distinct documents', async () => {
+    const { documents } = await collectBillDocuments(ref, fetchImpl, () => 'T');
+    const ids = documents.filter((d) => d.sourceType === 'committee_report').map((d) => d.documentNumber);
+    expect(ids.sort()).toEqual(['119-SRPT-39', '119-SRPT-39-ERRATA']);
+  });
+
+  it('produces NO duplicate identities even though the bill lists the url twice', async () => {
+    const { documents } = await collectBillDocuments(ref, fetchImpl, () => 'T');
+    const keys = documents.map((d) => `${d.sourceType}::${d.documentNumber}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('fetches each report number ONCE regardless of how many list entries cite it', async () => {
+    let reportFetches = 0;
+    const counting = (async (u: string) => {
+      if (String(u).includes('/committee-report/')) reportFetches++;
+      return fetchImpl(u as never);
+    }) as unknown as typeof fetch;
+    await collectBillDocuments(ref, counting, () => 'T');
+    expect(reportFetches).toBe(1);
+  });
+
+  it('is idempotent: two independent collections yield identical persistence keys', async () => {
+    const a = await collectBillDocuments(ref, fetchImpl, () => 'T1');
+    const b = await collectBillDocuments(ref, fetchImpl, () => 'T2');
+    const k = (r: typeof a) => r.documents.map((d) => `${d.sourceType}::${d.documentNumber}`).sort();
+    expect(k(a)).toEqual(k(b));   // (source_type, document_number) IS the unique key
   });
 });
