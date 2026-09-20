@@ -13,7 +13,7 @@
  */
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
-import { detectPiee } from '@/lib/sam/notice-identity';
+import { detectPiee, extractPieeLinks, pieeRetrievalLimitation } from '@/lib/sam/notice-identity';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface StatementOfWorkInput {
@@ -36,14 +36,27 @@ export interface StatementOfWorkResult {
     sow_chars: number;
     has_clin_scope: boolean;
     piee: boolean;
+    piee_links: string[];
+    attachments_listed: number;
+    attachments_with_text: number;
+    unread_attachments: number;
+    retrieval_limitation: string | null;
   };
 }
 
+type NoticeFetch = {
+  combined: string;
+  classifiedSow: string;
+  degraded: boolean;
+  attachments_listed: number;
+  attachments_with_text: number;
+  piee_links: string[];
+  retrieval_limitation: string | null;
+};
+
 /** Fetch a notice's combined body + attachment text, plus any classified sow_text
  *  as a fallback. Mirrors the compliance-matrix notice fetch. */
-async function textFromNotice(
-  noticeId: string,
-): Promise<{ combined: string; classifiedSow: string; degraded: boolean }> {
+async function textFromNotice(noticeId: string): Promise<NoticeFetch> {
   try {
     const docs = await getSolicitationDocuments({ noticeId });
     const parts: string[] = [];
@@ -51,11 +64,46 @@ async function textFromNotice(
     for (const d of docs.documents) {
       if (d.extracted_text) parts.push(`--- ${d.filename || 'attachment'} ---\n${d.extracted_text}`);
     }
-    return { combined: parts.join('\n\n').trim(), classifiedSow: (docs.sow_text || '').trim(), degraded: false };
+    return {
+      combined: parts.join('\n\n').trim(),
+      classifiedSow: (docs.sow_text || '').trim(),
+      degraded: docs.degraded,
+      attachments_listed: docs.attachments_listed,
+      attachments_with_text: docs.attachments_with_text,
+      piee_links: docs.piee_links,
+      retrieval_limitation: docs.retrieval_limitation,
+    };
   } catch (err) {
     console.error('[statement-of-work] notice fetch failed', noticeId, err);
-    return { combined: '', classifiedSow: '', degraded: true };
+    return {
+      combined: '',
+      classifiedSow: '',
+      degraded: true,
+      attachments_listed: 0,
+      attachments_with_text: 0,
+      piee_links: [],
+      retrieval_limitation: null,
+    };
   }
+}
+
+function emptyHonesty(): Pick<
+  StatementOfWorkResult['_meta'],
+  | 'piee'
+  | 'piee_links'
+  | 'attachments_listed'
+  | 'attachments_with_text'
+  | 'unread_attachments'
+  | 'retrieval_limitation'
+> {
+  return {
+    piee: false,
+    piee_links: [],
+    attachments_listed: 0,
+    attachments_with_text: 0,
+    unread_attachments: 0,
+    retrieval_limitation: null,
+  };
 }
 
 export async function extractStatementOfWork(input: StatementOfWorkInput): Promise<StatementOfWorkResult> {
@@ -66,6 +114,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
   let classifiedSow = '';
   let source: 'notice_id' | 'text' | 'none' = rfpText ? 'text' : 'none';
   let fetchDegraded = false;
+  let honesty = emptyHonesty();
 
   if (!rfpText && noticeId) {
     const fetched = await textFromNotice(noticeId);
@@ -73,9 +122,36 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
     classifiedSow = fetched.classifiedSow;
     fetchDegraded = fetched.degraded;
     source = 'notice_id';
+    honesty = {
+      piee: fetched.piee_links.length > 0 || detectPiee(`${combined}\n${classifiedSow}`),
+      piee_links: fetched.piee_links,
+      attachments_listed: fetched.attachments_listed,
+      attachments_with_text: fetched.attachments_with_text,
+      unread_attachments: Math.max(0, fetched.attachments_listed - fetched.attachments_with_text),
+      retrieval_limitation: fetched.retrieval_limitation,
+    };
+  } else if (rfpText) {
+    const links = extractPieeLinks(rfpText);
+    honesty = {
+      piee: detectPiee(rfpText) || links.length > 0,
+      piee_links: links,
+      attachments_listed: links.length,
+      attachments_with_text: 0,
+      unread_attachments: links.length,
+      retrieval_limitation: pieeRetrievalLimitation(links),
+    };
   }
 
-  const piee = detectPiee(`${combined}\n${classifiedSow}`);
+  if (!honesty.piee) {
+    honesty.piee = detectPiee(`${combined}\n${classifiedSow}`);
+  }
+  if (!honesty.piee_links.length) {
+    honesty.piee_links = extractPieeLinks(`${combined}\n${classifiedSow}`);
+  }
+  if (!honesty.retrieval_limitation) {
+    honesty.retrieval_limitation = pieeRetrievalLimitation(honesty.piee_links);
+  }
+
   const buildMiss = (): StatementOfWorkResult => {
     const result: StatementOfWorkResult = {
       found: false,
@@ -90,7 +166,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
         method: 'none',
         sow_chars: 0,
         has_clin_scope: false,
-        piee,
+        ...honesty,
       },
     };
     if (mcpFlags.aiHint) {
@@ -102,8 +178,13 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
             : 'Provide rfp_text (the solicitation text) or a notice_id to extract the SOW from.',
         how_to_use: 'No SOW was recovered — do NOT invent scope. Pull the raw docs (get_solicitation_documents) and inspect.',
         key_caveats: [
-          'grounded=false means no SOW block was detected, not that the RFP has no scope of work.',
-          ...(piee ? ['PIEE/WAWF is required in the synopsis even though no SOW heading was found.'] : []),
+          'grounded=false means no SOW block was detected in readable text, not that the RFP has no scope of work.',
+          ...(honesty.piee
+            ? [
+                'PIEE/WAWF is required in the synopsis. Scope may live in an unread PIEE attachment — do not treat "no SOW heading" as absence of a SOW.',
+              ]
+            : []),
+          ...(honesty.retrieval_limitation ? [honesty.retrieval_limitation] : []),
         ],
       };
     }
@@ -153,7 +234,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
       method,
       sow_chars: sowText.length,
       has_clin_scope: clin !== null,
-      piee,
+      ...honesty,
     },
   };
 
@@ -171,6 +252,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
         'The SOW is detected by heading boundaries; a solicitation with unusual formatting may under- or over-capture — verify the start/end against the source.',
         'This returns the SCOPE text only, not the Section L/M instructions or evaluation factors — pair with extract_compliance_matrix for the full requirement set.',
         'clin_scope is reconstructed from the pricing schedule, not the narrative SOW — it lists what to price, not full performance detail.',
+        ...(honesty.retrieval_limitation ? [honesty.retrieval_limitation] : []),
       ],
     };
   }

@@ -5,8 +5,10 @@ import {
   deadlinesConflict,
   detectPiee,
   extractLotDeadlines,
+  extractPieeLinks,
   lotDeadlinesConflict,
   normalizeNoticeUuid,
+  pieeRetrievalLimitation,
   resolveCachedNotices,
 } from './notice-identity';
 
@@ -123,5 +125,15 @@ Offerors must have an active account in the Procurement Integrated Enterprise En
   it('detects PIEE in the synopsis even with no SOW heading', () => {
     expect(detectPiee(synopsis)).toBe(true);
     expect(detectPiee('Section C Statement of Work. Paint the hull.')).toBe(false);
+  });
+
+  it('extracts the PIEE URL and states the unread-attachment limitation', () => {
+    const withLink = `${synopsis}\nhttps://piee.eb.mil/sol/xhtml/unauth/search/oppMgmtLink.xhtml?noticeId=N0002426R220X&noticeType=CombinedSynopsisSolicitation\n`;
+    const links = extractPieeLinks(withLink);
+    expect(links[0]).toMatch(/piee\.eb\.mil/);
+    const note = pieeRetrievalLimitation(links);
+    expect(note).toMatch(/did not retrieve/i);
+    expect(note).toMatch(/does not establish/i);
+    expect(note).toContain(links[0]);
   });
 });

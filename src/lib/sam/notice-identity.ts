@@ -101,6 +101,32 @@ export function detectPiee(text: string): boolean {
   return /\bPIEE\b|Procurement Integrated Enterprise Environment|piee\.eb\.mil|\bWAWF\b/i.test(text || '');
 }
 
+/** Extract PIEE / WAWF URLs named in synopsis text (external attachment hosts). */
+export function extractPieeLinks(text: string): string[] {
+  const src = text || '';
+  const found = new Set<string>();
+  const re = /https?:\/\/\S*piee\.eb\.mil\S*/gi;
+  for (const m of src.matchAll(re)) {
+    const url = m[0].replace(/[.,;:)\]}>]+$/, '');
+    if (url) found.add(url);
+  }
+  return [...found];
+}
+
+/**
+ * When the Combined Synopsis / SOW lives on PIEE rather than SAM resourceLinks,
+ * "no SOW heading" must not be read as "no scope exists".
+ */
+export function pieeRetrievalLimitation(links: string[]): string | null {
+  if (!links.length) return null;
+  return (
+    'Scope documents are hosted on PIEE (external), not as SAM.gov resourceLinks. ' +
+    'Mindy did not retrieve or read those attachments — absence of a SOW heading in the ' +
+    'synopsis text does not establish that no SOW exists in the unread PIEE package. ' +
+    `External link(s): ${links.join(' | ')}`
+  );
+}
+
 export type CachedNoticeRow = {
   notice_id: string;
   solicitation_number: string | null;

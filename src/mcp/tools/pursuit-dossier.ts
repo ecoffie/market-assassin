@@ -21,6 +21,9 @@ import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { searchFederalContacts } from '@/mcp/tools/federal-contacts';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 
+/** Inline doc text cap inside the dossier — full text is via get_solicitation_documents. */
+const DOSSIER_DOC_TEXT_CAP = 1_500;
+
 export interface PursuitDossierInput {
   /** Solicitation number (e.g. 140L6226Q0013) OR 32-char notice UUID. */
   solicitation_number?: string;
@@ -30,6 +33,15 @@ export interface PursuitDossierInput {
   client_name?: string;
   /** The verified MCP caller (ctx.userEmail) — never from args. */
   userEmail?: string;
+}
+
+export interface PursuitDossierOmitted {
+  competition_businesses_omitted: number;
+  competition_businesses_returned: number;
+  competition_businesses_available: number;
+  document_text_chars_omitted: number;
+  document_text_chars_returned: number;
+  note: string;
 }
 
 export interface PursuitDossierResult {
@@ -50,8 +62,10 @@ export interface PursuitDossierResult {
     naics: string | null;
     agency: string | null;
     incumbent_name: string | null;
+    grounded_incumbent: boolean;
     sections: { docs: boolean; competition: boolean; pricing: boolean; contacts: number; financials: boolean };
     elapsed_ms: number;
+    omitted: PursuitDossierOmitted | null;
     note?: string;
   };
 }
@@ -75,6 +89,52 @@ function pick(obj: unknown, ...keys: string[]): string | undefined {
   return undefined;
 }
 
+function slimDocuments(docs: unknown): { slimmed: unknown; charsReturned: number; charsOmitted: number } {
+  if (!docs || typeof docs !== 'object') {
+    return { slimmed: docs, charsReturned: 0, charsOmitted: 0 };
+  }
+  const d = docs as {
+    description?: string;
+    sow_text?: string;
+    documents?: Array<Record<string, unknown>>;
+    [k: string]: unknown;
+  };
+  let charsReturned = 0;
+  let charsOmitted = 0;
+
+  const capField = (text: string | undefined): string => {
+    const s = text || '';
+    if (s.length <= DOSSIER_DOC_TEXT_CAP) {
+      charsReturned += s.length;
+      return s;
+    }
+    charsReturned += DOSSIER_DOC_TEXT_CAP;
+    charsOmitted += s.length - DOSSIER_DOC_TEXT_CAP;
+    return `${s.slice(0, DOSSIER_DOC_TEXT_CAP)}\n…[truncated in dossier — call get_solicitation_documents for full text]`;
+  };
+
+  const slimDocs = (d.documents || []).map((doc) => {
+    const full = String(doc.extracted_text || '');
+    const capped = capField(full);
+    return {
+      ...doc,
+      extracted_text: capped,
+      extracted_text_truncated: full.length > DOSSIER_DOC_TEXT_CAP || Boolean(doc.extracted_text_truncated),
+    };
+  });
+
+  return {
+    slimmed: {
+      ...d,
+      description: capField(d.description),
+      sow_text: capField(d.sow_text),
+      documents: slimDocs,
+    },
+    charsReturned,
+    charsOmitted,
+  };
+}
+
 function miss(note: string, sol: string | null, started: number): PursuitDossierResult {
   return {
     subject: 'this opportunity',
@@ -84,8 +144,11 @@ function miss(note: string, sol: string | null, started: number): PursuitDossier
     _meta: {
       grounded: false, degraded: false, solicitation: sol, naics: null, agency: null,
       incumbent_name: null,
+      grounded_incumbent: false,
       sections: { docs: false, competition: false, pricing: false, contacts: 0, financials: false },
-      elapsed_ms: Date.now() - started, note,
+      elapsed_ms: Date.now() - started,
+      omitted: null,
+      note,
     },
   };
 }
@@ -128,6 +191,39 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   const degraded = [anchor, docs, depth, pricing, contacts, financials].some((s) => s.degraded);
   const contactRows = (contacts.value as { contacts?: unknown[] } | null)?.contacts ?? [];
 
+  const depthMeta = (depth.value as {
+    _meta?: { businesses_returned?: number; businesses_available?: number };
+    businesses?: unknown[];
+  } | null)?._meta;
+  const businessesReturned = depthMeta?.businesses_returned ??
+    ((depth.value as { businesses?: unknown[] } | null)?.businesses?.length ?? 0);
+  const businessesAvailable = depthMeta?.businesses_available ?? businessesReturned;
+  const competitionOmitted = Math.max(0, businessesAvailable - businessesReturned);
+
+  const { slimmed: slimDocs, charsReturned, charsOmitted } = slimDocuments(docs.value);
+
+  const omitted: PursuitDossierOmitted | null =
+    competitionOmitted > 0 || charsOmitted > 0
+      ? {
+          competition_businesses_omitted: competitionOmitted,
+          competition_businesses_returned: businessesReturned,
+          competition_businesses_available: businessesAvailable,
+          document_text_chars_omitted: charsOmitted,
+          document_text_chars_returned: charsReturned,
+          note:
+            competitionOmitted > 0 || charsOmitted > 0
+              ? 'Dossier omits records for size. competition lists a capped firm sample — call assess_market_depth for the full scored list. Document bodies are truncated here — call get_solicitation_documents for full attachment text.'
+              : 'No records omitted.',
+        }
+      : {
+          competition_businesses_omitted: 0,
+          competition_businesses_returned: businessesReturned,
+          competition_businesses_available: businessesAvailable,
+          document_text_chars_omitted: 0,
+          document_text_chars_returned: charsReturned,
+          note: 'No competition or document-text records omitted from this dossier payload.',
+        };
+
   return {
     subject: input.client_name || pick(notice, 'title') || `Solicitation ${sol}`,
     opportunity: notice,
@@ -137,7 +233,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
     competition: depth.value,
     price_to_win: pricing.value,
     buying_office_contacts: contactRows,
-    documents: docs.value,
+    documents: slimDocs,
     next_step:
       'Run evaluate_bid_decision with your read on the 5 gates, then extract_compliance_matrix to start the response.',
     _meta: {
@@ -147,6 +243,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
       naics: naics ?? null,
       agency: agency ?? null,
       incumbent_name: incumbentName ?? null,
+      grounded_incumbent: groundedIncumbent,
       sections: {
         docs: !!docs.value,
         competition: !!depth.value,
@@ -155,6 +252,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
         financials: !!financials.value,
       },
       elapsed_ms: Date.now() - started,
+      omitted,
     },
   };
 }

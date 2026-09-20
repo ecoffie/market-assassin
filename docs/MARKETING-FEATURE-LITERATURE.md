@@ -19,6 +19,18 @@ tool, federal market research.*
 
 ---
 
+## MCP honesty — award fields, PIEE attachments, dossier omissions (Sep 2026)
+
+**What:** Past-contract rows no longer pretend a NAICS filter is award source data. Place-of-performance state is labeled separately from recipient HQ. Pursuit dossiers name omitted competition firms and truncated document text. When the Combined Synopsis lives on PIEE, SOW/document tools say so — “no SOW heading” is not “no SOW exists.” Solicitation number and UUID both resolve the same notice body (on-demand noticedesc when the cache column is empty).
+
+**Why:** Agents were treating filter-stamped NAICS and empty document lists as evidence. That changes bid decisions.
+
+**SEO / content hooks:** GovCon MCP honesty · SAM PIEE attachments · USASpending field provenance · pursuit dossier size.
+
+**Proof:** Exact inputs `search_past_contracts` naics `336612`; `extract_statement_of_work` / `build_pursuit_dossier` `N00024-26-R-2200`; `get_solicitation_documents` `N00024-26-R-4160` + UUID `85a62e9a3f4f4f54b0ade7aa855fcc89`. Tracker: `docs/issue-log-14-tracker.md`.
+
+---
+
 ## 1. Market Research "Sport Mode" — research ANY federal market on demand
 
 **What it does (plain English):** Type what you do in plain words ("drones",
