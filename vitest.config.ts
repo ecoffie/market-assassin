@@ -23,6 +23,7 @@ export default defineConfig({
     // parity.test.mts) that were written for other runners.
     include: [
       'src/**/*.unit.test.{ts,tsx}',
+      'src/lib/sam/lookup-solicitation.live.test.ts',
       'src/lib/agent-tasks/**/*.e2e.test.ts',
       'src/lib/agent-tasks/**/*.concurrent.test.ts',
       'src/lib/agent-tasks/**/*.race.test.ts',

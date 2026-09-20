@@ -33,6 +33,7 @@ import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { findOpportunitiesTool } from './tools/find-opportunities';
+import { lookupSolicitationTool } from './tools/lookup-solicitation';
 import { currentAcquisitionIntelligenceTool } from './tools/current-acquisition-intelligence';
 import { matchCompanyToPathwaysTool } from './tools/match-company-to-pathways';
 import { understandCustomerTool } from './tools/understand-customer';
@@ -561,6 +562,28 @@ server.registerTool(
   },
   async (args) => {
     const result = await findOpportunitiesTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'lookup_solicitation',
+  {
+    title: 'Look Up Solicitation (historical · known id)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'Look up a specific solicitation by known id OR historical context — closed/archived included. ' +
+      'Closed ≠ gone. Closed is not awarded. MATCHED_CANDIDATE is not identity. Not a market FIND.',
+    inputSchema: {
+      query: z.string().describe('Recall phrase or solicitation number / notice UUID.'),
+      confirm_notice_id: z.string().optional().describe('After user confirms a candidate, that notice_id.'),
+    },
+  },
+  async (args) => {
+    const result = await lookupSolicitationTool(args);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,
