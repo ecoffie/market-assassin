@@ -208,6 +208,52 @@ export async function loadSourcedPainPointsForAgency(
   return out;
 }
 
+/**
+ * LEGACY_MANUAL dollar figures are curated prose, not sourced budget data.
+ * Default customer responses omit the amounts until a living citation supports
+ * them. Qualitative program names and opportunity framing stay.
+ *
+ * Round 3 watch (NAVSEA priorities): a skimmer reads "$2.3B Columbia-class" as
+ * budget fact; the claim is provenance LEGACY_MANUAL with null source_url.
+ */
+const DOLLAR_AMOUNT_RE =
+  /\$[\d,]+(?:\.\d+)?\s*(?:[BbMmKk](?:illion)?)?\b/g;
+const INTRO_VERB_AMOUNT_RE =
+  /\b(allocated|allocating|investing|budgeting|committing|funding|dedicating|planning)\s+\$[\d,]+(?:\.\d+)?\s*(?:[BbMmKk](?:illion)?)?\s*(?:for|to|in|through)?\s*/gi;
+
+export function omitUnsourcedDollarAmounts(text: string): {
+  text: string;
+  omitted: string[];
+} {
+  const omitted: string[] = [];
+  // Prefer verb+$amount+preposition as one unit so grammar stays readable.
+  let out = text.replace(INTRO_VERB_AMOUNT_RE, (m) => {
+    const amt = m.match(DOLLAR_AMOUNT_RE);
+    if (amt) omitted.push(...amt.map((a) => a.trim()));
+    return '';
+  });
+  out = out.replace(DOLLAR_AMOUNT_RE, (m) => {
+    omitted.push(m.trim());
+    return '';
+  });
+  if (omitted.length === 0) return { text, omitted: [] };
+
+  out = out
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .replace(/^[,.\s]+/, '')
+    .trim();
+  if (out && /^[a-z]/.test(out)) {
+    out = out.charAt(0).toUpperCase() + out.slice(1);
+  }
+  return { text: out || text, omitted };
+}
+
+/** Apply default-path dollar omission to a LEGACY_MANUAL claim. */
+export function sanitizeLegacyClaimText(text: string): string {
+  return omitUnsourcedDollarAmounts(text).text;
+}
+
 /** Legacy JSON claims — always LEGACY_MANUAL; never fabricate a source URL. */
 export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): {
   painPoints: SourcedPainPoint[];
@@ -222,12 +268,13 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
       ?? Object.entries(STATIC.agencies).find(([n]) => n.toLowerCase() === key.toLowerCase())?.[1];
     if (!entry) continue;
     for (const pp of entry.painPoints ?? []) {
+      const claim = sanitizeLegacyClaimText(pp);
       painPoints.push({
         agency: key,
-        pain_point: pp,
+        pain_point: claim,
         source_type: 'legacy_manual',
         source_url: null,
-        document_number: extractDocumentNumber(pp),
+        document_number: extractDocumentNumber(claim),
         published_at: null,
         institute_source_id: null,
         provenance: 'LEGACY_MANUAL',
@@ -235,9 +282,10 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
       });
     }
     for (const pr of entry.priorities ?? []) {
+      const claim = sanitizeLegacyClaimText(pr);
       priorities.push({
         agency: key,
-        pain_point: pr,
+        pain_point: claim,
         source_type: 'legacy_manual',
         source_url: null,
         document_number: null,
@@ -304,8 +352,11 @@ export function formatPainPointForDisplay(p: SourcedPainPoint): string {
       : `${p.pain_point} (Source: ${p.document_number})`;
   }
   if (p.provenance === 'LEGACY_MANUAL') {
-    if (/\(legacy/i.test(p.pain_point) || /provenance unavailable/i.test(p.pain_point)) return p.pain_point;
-    return `${p.pain_point} [LEGACY_MANUAL — provenance unavailable]`;
+    // Defense in depth: never surface unsourced $ amounts even if a caller
+    // bypassed loadLegacyPainPointsForAgency.
+    const claim = sanitizeLegacyClaimText(p.pain_point);
+    if (/\(legacy/i.test(claim) || /provenance unavailable/i.test(claim)) return claim;
+    return `${claim} [LEGACY_MANUAL — provenance unavailable]`;
   }
   if (p.provenance === 'MINDY_INTERPRETATION') {
     return `${p.pain_point} [MINDY_INTERPRETATION]`;
@@ -324,8 +375,10 @@ export function toCitation(p: SourcedPainPoint): {
   institute_source_id: string | null;
   agency: string;
 } {
+  const claim =
+    p.provenance === 'LEGACY_MANUAL' ? sanitizeLegacyClaimText(p.pain_point) : p.pain_point;
   return {
-    claim: p.pain_point,
+    claim,
     provenance: p.provenance,
     source_type: p.source_type,
     source_url: p.source_url,

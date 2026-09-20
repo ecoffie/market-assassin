@@ -171,7 +171,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       provenanceNote = hasSourced
         ? `${sourcedCount} living GAO-sourced claim(s) with citations; ${legacyCount} legacy-manual fallback claim(s).`
         : legacyCount > 0
-          ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact.`
+          ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact. Unsourced dollar amounts are omitted from default priority text until sourced.`
           : 'No pain-point claims for this agency.';
     } catch (err) {
       degraded = true;

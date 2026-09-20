@@ -7241,3 +7241,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** SCIF / compliance matrix / SAM entity DBA lookup / Monarch Yachts registration.
 
 **Proof.** Unit: SCIF recovery from the notional sentence; Monarch zero-hit reconciliation meta. Live: notice `6552b25bf0e648f39b44228275998eef` → `FULL_HAS_SCIF true`, `missing_from_matrix: []`; `lookup_sam_entity({name:"Monarch Yachts"})` → `not_found` with legal/DBA/local hits all 0.
+
+## LEGACY_MANUAL priority dollars omitted until sourced (2026-09-20)
+
+**What.** `get_agency_intel` / shared sourced-pain-points reader no longer surfaces unsourced dollar figures from LEGACY_MANUAL priority prose (NAVSEA Columbia-class / Virginia-class / SIOP / etc.). Qualitative program and opportunity framing stays, still labeled LEGACY_MANUAL. Issue-log tracker now separates developer-verified vs independently verified (Round 3 = 6 of 6 *retestable*, not 14/14; actual test date 2026-09-20, serving commit `6b14507f`).
+
+**Why.** Round 3 correctly flagged that LEGACY_MANUAL NAVSEA lines carrying "$2.3B / $1.1B / …" read as budget fact to a skimmer even when provenance is labeled. Those amounts were curated editorial content with null source_url — not SCN/CRS-backed figures.
+
+**SEO.** NAVSEA priorities / agency intel provenance / LEGACY_MANUAL / Columbia-class / SIOP.
+
+**Proof.** Unit: `omitUnsourcedDollarAmounts` strips `$2.3B` while keeping Columbia-class + shipbuilding contractors; `loadLegacyPainPointsForAgency('NAVSEA')` priorities contain no `$`; SOURCE_FACT claims keep sourced dollars. Tracker: `docs/issue-log-14-tracker.md` verification layers + Round 3 date/commit.
