@@ -71,7 +71,7 @@
     "src/app/api/app/naics-search/route.ts:59 (sam_opportunities) [count-null]",
     "src/app/api/cron/backfill-event-offices/route.ts:68 (sam_opportunities)",
     "src/app/api/cron/indexnow-submit/route.ts:26 (sam_opportunities)",
-    "src/app/api/cron/snapshot-multisite/route.ts:293 (aggregated_opportunities)",
+    "src/app/api/cron/snapshot-multisite/route.ts:306 (aggregated_opportunities)",
     "src/app/api/cron/sync-usaspending-awards/route.ts:217 (usaspending_awards)",
     "src/app/api/forecasts/route.ts:629 [count-null]",
     "src/app/api/forecasts/route.ts:632 [count-null]",

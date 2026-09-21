@@ -246,6 +246,23 @@ else
   fail=1
 fi
 
+# 6c) WARN ONLY — deliberately, and this is the interesting part.
+#     This check reads LIVE cron_jobs rows, not the code being pushed. A
+#     pre-push hook governs a diff; it cannot fix a row that already exists in
+#     production. Making it blocking means the very PR that repairs the data is
+#     the one it refuses to let through — which is exactly what happened when it
+#     was first written as a hard block.
+#     So: it reports here, and exits non-zero when run directly (or after a
+#     merge) where the finding IS actionable.
+echo -e "  ${BOLD}6c/13${NC} cron route credentials (warn only — reads live rows)…"
+if node scripts/audit-cron-route-credentials.mjs > /tmp/mindy-prepush-croncreds.log 2>&1; then
+  echo -e "      ${GREEN}✓ no credentials embedded in cron routes${NC}"
+else
+  echo -e "      ${YEL}⚠ credential stored in a live cron_jobs.route:${NC}"
+  cat /tmp/mindy-prepush-croncreds.log | sed 's/^/        /'
+  echo -e "${YEL}        (not blocking — fix the ROW via migration, then re-run this check)${NC}"
+fi
+
 echo -e "  ${BOLD}7/13${NC} rank-then-filter audit…"
 if node scripts/audit-rank-then-filter.mjs > /tmp/mindy-prepush-rankfilter.log 2>&1; then
   echo -e "      ${GREEN}✓ no new rank-globally-then-filter sites${NC}"
