@@ -627,6 +627,29 @@ async function sendAlertEmail(
 
   const showUpgradeToMindyPro = tier === 'free' && totalAvailable > 5;
 
+  /**
+   * The opportunity title opens THAT opportunity IN MINDY — `?opp=<notice_id>`, the map's
+   * typed record address (opportunity-map/route.ts ~8281 -> openOppDrawer), the same contract
+   * Share, Favorites, /today, the daily alert and the saved-search alert all use.
+   *
+   * It used to be `opp.uiLink` -> sam.gov. Measured on prod (`user_engagement`, 30d to
+   * 2026-09-21): 176 of the weekly alert's 1,526 clicks were `sam_gov_opportunity` — the
+   * email's ONLY per-opportunity link, and the one click with the most intent behind it,
+   * spent leaving the product with no path back. Every other alert/briefing surface had
+   * already been moved off SAM for exactly this reason; this one was simply missed.
+   *
+   * ⚠️ RECORD LINK — the id and NOTHING that can exclude it
+   * (docs/engineering/record-links-vs-market-links.md). Do not add naics/agency/state here.
+   *
+   * SAM is still one click away (the drawer carries the notice's own SAM link), and the
+   * meta line keeps an explicit "SAM.gov" link for anyone who wants the source record
+   * directly — nothing was taken away.
+   */
+  const oppHref = (o: SAMOpportunity) =>
+    o.noticeId
+      ? `${MINDY_SITE_URL}/opportunity-map?opp=${encodeURIComponent(o.noticeId)}`
+      : o.uiLink;
+
   const opportunitiesHtml = opportunities.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
     const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
@@ -642,7 +665,7 @@ async function sendAlertEmail(
             ${opp.setAside ? `<span style="background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${opp.setAside}</span>` : ''}
             ${urgencyText ? `<span style="background: ${urgencyColor}20; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${urgencyText}</span>` : ''}
           </div>
-          <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
+          <a href="${trackedUrl(oppHref(opp), 'open_in_map', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
             ${i + 1}. ${opp.title.slice(0, 100)}${opp.title.length > 100 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 13px; margin-top: 6px;">
@@ -650,6 +673,7 @@ async function sendAlertEmail(
             <strong>NAICS:</strong> ${opp.naicsCode || 'N/A'} &nbsp;|&nbsp;
             <strong>Posted:</strong> ${formatDate(opp.postedDate)} &nbsp;|&nbsp;
             <strong style="color: ${urgencyColor};">Due:</strong> <span style="color: ${urgencyColor};">${formatDate(opp.responseDeadline)}</span>
+            ${opp.noticeId && opp.uiLink ? ` &nbsp;|&nbsp; <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId}`)}" style="color: #6b7280; text-decoration: underline;">SAM.gov</a>` : ''}
           </div>
         </td>
       </tr>
