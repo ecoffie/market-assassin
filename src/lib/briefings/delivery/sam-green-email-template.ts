@@ -33,6 +33,14 @@ export interface SamDailyOpportunity {
   daysRemaining: number;
   noticeType: string;
   solicitationNumber: string;
+  /**
+   * The SAM notice_id — the record's TYPED ADDRESS on the map (`?opp=<notice_id>`).
+   *
+   * Carried explicitly (it used to be dropped on the floor here even though the source
+   * row has it) because the card's CTA names ONE opportunity and therefore has to be
+   * able to ADDRESS one. See mapHrefFor below.
+   */
+  noticeId?: string;
   samLink: string;
   quickWinAssessment: string;
   postedDate: string;
@@ -49,7 +57,14 @@ export interface SamDailyBriefing {
     daysRemaining: number;
     samLink: string;
     noticeType: string;
+    /**
+     * ⚠️ Solicitation-number-preferred, NOT the SAM notice_id — it is built as
+     * `solicitationNumber || noticeId` and the mute-opportunity action link keys off it.
+     * Left exactly as it was. Use `samNoticeId` for the map's `?opp=` address.
+     */
     noticeId: string;
+    /** The real SAM notice_id — the map's typed record address. See mapHrefFor. */
+    samNoticeId?: string;
     solicitationNumber?: string;
     agency: string;
     parentAgency?: string;
@@ -678,6 +693,9 @@ Return ONLY valid JSON.`;
       daysRemaining: getDaysUntil(opp.responseDeadline),
       noticeType: opp.noticeType,
       solicitationNumber: opp.solicitationNumber,
+      // The record's typed map address (?opp=). Present on the source row all along;
+      // it simply was never carried onto the card. See mapHrefFor.
+      noticeId: opp.noticeId || opp.solicitationNumber || undefined,
       samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
       // The LLM sentence is only used when it makes NO claim about the reader's odds;
       // otherwise the honest notice-level fallback ships instead.
@@ -711,6 +729,7 @@ Return ONLY valid JSON.`;
         samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
         noticeType: o.noticeType || 'Notice',
         noticeId: o.solicitationNumber || o.noticeId || '',
+        samNoticeId: o.noticeId || o.solicitationNumber || undefined,
         solicitationNumber: o.solicitationNumber,
         agency: buyer.primary,
         parentAgency: buyer.parent,
@@ -791,6 +810,9 @@ export function buildSamGreenBriefing(
       daysRemaining: getDaysUntil(opp.responseDeadline),
       noticeType: opp.noticeType,
       solicitationNumber: opp.solicitationNumber,
+      // The record's typed map address (?opp=). Present on the source row all along;
+      // it simply was never carried onto the card. See mapHrefFor.
+      noticeId: opp.noticeId || opp.solicitationNumber || undefined,
       samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
       quickWinAssessment: strategic.summary,
       postedDate: formatSamDate(opp.postedDate),
@@ -818,6 +840,7 @@ export function buildSamGreenBriefing(
         samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
         noticeType: o.noticeType || 'Notice',
         noticeId: o.solicitationNumber || o.noticeId || '',
+        samNoticeId: o.noticeId || o.solicitationNumber || undefined,
         solicitationNumber: o.solicitationNumber,
         agency: buyer.primary,
         parentAgency: buyer.parent,
@@ -929,26 +952,74 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
 
 
 /**
- * Send the reader to the MAP, filtered to this opportunity's market — not off
- * to sam.gov.
+ * Send the reader to the MAP — never off to sam.gov, and, when the card names ONE
+ * opportunity, to THAT opportunity rather than to a market it is somewhere inside.
  *
- * Every card in this briefing used to exit to SAM. That click leaves Mindy and
- * does not come back, and it was the single most-used link in the product
- * (143 of 199 tracked opportunity clicks). The map is the surface people
- * return to, so the briefing's job is to land them there with a filter already
- * applied.
+ * Every card in this briefing used to exit to SAM. That click leaves Mindy and does
+ * not come back, and it was the single most-used link in the product. The map is the
+ * surface people return to, so the briefing's job is to land them there.
  *
- * Never a bare /opportunity-map — that is 136K unfiltered pins and no answer,
- * the same rule the saved-search email enforces via ?ss=.
+ * ── THE RECORD ADDRESS COMES FIRST (2026-09-21) ───────────────────────────────────
+ * `docs/engineering/record-links-vs-market-links.md` is frozen:
+ *   "Record links identify records. Market links identify markets."
+ * "See it on the map ->" hangs off a single ranked card with a title, so it is a
+ * RECORD link and must carry the record's own typed address, `?opp=<notice_id>` —
+ * the same contract Share, Favorites, /today and the daily alert (PR #1441) already
+ * use, applied by the map's deep-link IIFE (opportunity-map/route.ts ~8281) which
+ * calls openOppDrawer and opens the listing.
+ *
+ * This function used to emit market SCOPE instead — naics + subAgency + state — with
+ * no id at all. Measured on prod (`user_engagement`, 30d to 2026-09-21):
+ *   · 1,613 of 1,984 daily_briefing link clicks (81.3%) came through here, and NOT ONE
+ *     carried a record id. Every reader landed on a filtered market and then had to
+ *     find, by eye, the listing the card had already named for them: click-weighted
+ *     mean destination size 68 open rows (215 for the 236220 x VA link).
+ *   · Worse, 457 of those 1,613 (28.3%) carried a COMMA-bearing sub-agency, and the
+ *     map's `multiVal()` splits `?subAgency=` on commas into an OR. So
+ *     "VETERANS AFFAIRS, DEPARTMENT OF" became `sub_tier ilike %VETERANS AFFAIRS%` OR
+ *     `%DEPARTMENT OF%` -> 3,598 rows where the correct match is 2,849, and
+ *     "HOMELAND SECURITY, DEPARTMENT OF" landed on THE SAME 3,598 rows, of which 0 are
+ *     that sub-agency. Two different links, one wrong market.
+ *   · And a market link is filtered `active = true`, so a card clicked after its
+ *     deadline passes shows a market with the record REMOVED — which is precisely the
+ *     "Deadlines this week" CTA (705 of those clicks). `?opp=` still opens it, because
+ *     opportunity-detail addresses the row, it does not filter a corpus.
+ *
+ * ⚠️ DO NOT add naics/subAgency/state ALONGSIDE `?opp=`. With any scope param present
+ * the map's scope IIFE stops early-returning and applies `__applySavedSearch` inside a
+ * 40x150ms retry loop — the late writer that emptied the map 5,416 -> 0 on prod. The id
+ * ALONE is the fix; that is what makes the IIFE leave the map alone.
+ *
+ * No id at all (the only remaining case) keeps the market fallback, but takes the
+ * sub-agency's FIRST comma segment — a comma there does not narrow, it ORs.
  */
-function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: string; popState?: string }): string {
+function mapHrefFor(opp: {
+  noticeId?: string;
+  naicsCode?: string;
+  agency?: string;
+  parentAgency?: string;
+  popState?: string;
+}): string {
+  if (opp.noticeId) {
+    return `${MINDY_SITE_URL}/opportunity-map?opp=${encodeURIComponent(opp.noticeId)}`;
+  }
   const p = new URLSearchParams();
   if (opp.naicsCode) p.set('naics', opp.naicsCode);
-  if (opp.agency) p.set('subAgency', opp.agency);
-  else if (opp.parentAgency) p.set('agency', opp.parentAgency);
+  if (opp.agency) p.set('subAgency', firstScopeSegment(opp.agency));
+  else if (opp.parentAgency) p.set('agency', firstScopeSegment(opp.parentAgency));
   if (opp.popState) p.set('state', opp.popState);
   const q = p.toString();
   return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
+}
+
+/**
+ * A comma in a map scope param is a MULTI-SELECT separator (`multiVal()` splits on it
+ * and ORs the halves), so passing SAM's inverted agency names through raw — "VETERANS
+ * AFFAIRS, DEPARTMENT OF" — widens the market instead of naming it. Keep the leading
+ * segment, which is the distinctive half and still an honest ilike needle.
+ */
+function firstScopeSegment(value: string): string {
+  return String(value).split(',')[0].trim() || String(value).trim();
 }
 
   const renderOpportunityCard = (opp: SamDailyOpportunity): string => {
@@ -1007,7 +1078,7 @@ function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: s
   const renderDeadlineItem = (d: SamDailyBriefing['deadlinesThisWeek'][number]): string => {
     const typeInfo = getNoticeTypeInfo(d.noticeType);
     const satInfo = getSatBadgeForAgency(d.agency);
-    const mapHref = trackingToken ? generateTrackedLink(trackingToken, mapHrefFor(d), 'open_in_map_deadline') : mapHrefFor(d);
+    const mapHref = trackingToken ? generateTrackedLink(trackingToken, mapHrefFor({ ...d, noticeId: d.samNoticeId || d.noticeId }), 'open_in_map_deadline') : mapHrefFor({ ...d, noticeId: d.samNoticeId || d.noticeId });
     const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}`;
     const daysLabel = d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : `${d.daysRemaining} days`;
     const badges = [
