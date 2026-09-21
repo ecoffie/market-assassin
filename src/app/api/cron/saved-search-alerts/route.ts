@@ -126,6 +126,13 @@ async function stampSearchEvaluation(db: any, id: string, updates: Record<string
 function applyDueSavedSearchScope(q: any, dueFrequencies: readonly string[], excludeIds: readonly string[]) {
   q = q
     .eq('alerts_enabled', true)
+    // ⚠️ DEFENCE IN DEPTH. An anonymous map watch is stored with
+    // alerts_enabled=false and can only become alertable through a VERIFIED
+    // claim, which replaces the anon id with the session's real account. This
+    // predicate is the second lock: even if a row were ever written or migrated
+    // with alerts_enabled wrongly true, an `anon:<uuid>` owner is not an email
+    // address and must never enter an email send.
+    .not('user_email', 'like', 'anon:%')
     .eq('mode', 'open')
     .in('alert_frequency', [...dueFrequencies]);
   if (excludeIds.length > 0) {
