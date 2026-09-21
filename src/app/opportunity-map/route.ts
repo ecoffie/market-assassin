@@ -2258,6 +2258,11 @@ const VIEWPORT_JS = `<script>
   function fetchView(){
     if(window.__suppressFetchView) return;
     _trackMapView();
+    // RETURN CONTINUITY — remember this market (debounced, local only). Placed here
+    // rather than on each control because every filter, search, sort, horizon and
+    // mode change already funnels through fetchView: one hook instead of twenty that
+    // can drift apart.
+    try{ if(window.__rememberMapState)window.__rememberMapState(); }catch(e){}
     // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
     // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
     if(typeof _clearFetchError==='function')_clearFetchError();
@@ -3072,6 +3077,82 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
     return st;
   }
+
+  // ── RETURN CONTINUITY: remember the MARKET, not just the viewport ─────────
+  // Measured 2026-09-21: 8,096 of 9,315 30-day users are one-day-only, and
+  // true-first-seen retention is D1 6.7% / D7 15.9%. The map already remembers
+  // WHERE you were (mi_map_last_view, rewritten on every moveend) but nothing
+  // about WHAT you were looking at — filters, horizons, query and dataset all
+  // reset to defaults on every load, so yesterday's "Navy + 541512 + Virginia"
+  // has to be rebuilt by hand before the map is useful again.
+  //
+  // _mapState() above already emits EXACTLY the {mode, filters} shape
+  // __applySavedSearch accepts; its own comment promised "a future resume needs
+  // no new apply code". So this stores that same object and the boot block hands
+  // it back to the SAME restorer ?ss= and scope links use. No new apply path, no
+  // new data source, no server round-trip, nothing to migrate.
+  var LAST_SEARCH_KEY='mi_map_last_search';
+  // Is there anything here worth coming back to? A bare default map is not a
+  // session: restoring it would be a no-op that still fired a restore event and
+  // still told the user, in the pill, that something had been remembered. It is
+  // ALSO what protects the stored state from the boot fetchView, which runs with
+  // the EMPTY default before any restore lands — an unmeaningful state is never
+  // written, so it can never overwrite a real one. Exposed on window because the
+  // restorer lives in a different <script> block (the documented cross-block trap).
+  window.__mapStateMeaningful=function(f,mode){
+    try{
+      if(!f||typeof f!=='object')return false;
+      if(mode==='recompete')return true;
+      // Horizons are meaningful only when they differ from the boot default.
+      var h=f.horizons;
+      if(h&&typeof h==='object'&&(h.open===false||h.recompete===true||h.forecast===true))return true;
+      // EXACTLY the keys __applySavedSearch can restore: every FILT key it resets,
+      // plus q (which it restores explicitly into Q + #zsearchInput). Deliberately
+      // ABSENT, because remembering what we cannot give back would make the pill lie:
+      //  · strategy — _mapState stores it comma-JOINED, and __applySavedSearch copies
+      //    only keys present on its FILT reset, which has no 'strategy'. It would be
+      //    silently dropped (and FILT.strategy.join in _buildOppUrl expects an ARRAY).
+      //    The lens has its own bridge, window.__applyStrategyBoxes.
+      //  · fsc — the DLA supply-class filter lives on window.__fscFilter, not FILT,
+      //    and dla mode is not stored at all (see _rememberMapState).
+      var keys=['agency','naics','psc','state','setAside','setAsideMulti','noticeType','noticeMulti',
+                'office','subAgency','postedDays','closingDays','valueRange','q',
+                'sap','sapBuyer','likelihood','leadMax','country','hasDocs','hasContact','fullOpen','scope'];
+      for(var i=0;i<keys.length;i++){
+        var v=f[keys[i]];
+        if(v==null||v===''||v===false)continue;
+        if(Array.isArray(v)&&!v.length)continue;
+        return true;
+      }
+    }catch(e){}
+    return false;
+  };
+  function _rememberMapState(){
+    try{
+      var mode=''; try{ mode=window.__mapMode||'open'; }catch(e){}
+      // Only the two datasets __applySavedSearch can restore WHOLE.
+      //  · companies / buyers are sign-in gated (__playersGate) — restoring one
+      //    would greet a returning anonymous visitor with an upgrade modal.
+      //  · dla carries its own FSC filter, which this shape does not hold, so a
+      //    restore would reopen a DIFFERENT map than the one that was left.
+      // A half-restore is worse than none, so those modes simply are not stored.
+      if(mode!=='open'&&mode!=='recompete')return;
+      var st=_mapState(); var f=(st&&st.filters)||{};
+      if(!window.__mapStateMeaningful(f,mode))return;
+      // bbox is deliberately NOT stored: mi_map_last_view already owns the viewport,
+      // is written on moveend (so it is strictly fresher than a filter snapshot) and
+      // is applied synchronously in the map constructor. A second writer moving the
+      // map after boot is the documented race that once emptied it.
+      localStorage.setItem(LAST_SEARCH_KEY,JSON.stringify({mode:mode,filters:f,t:Date.now()}));
+    }catch(e){}
+  }
+  var _rememberT=null;
+  // Debounced: fetchView fires on every pan, filter change and sort. One settled
+  // pass is one memory, not thirty.
+  window.__rememberMapState=function(){ try{ clearTimeout(_rememberT); _rememberT=setTimeout(_rememberMapState,1200); }catch(e){} };
+  // The user asked for a clean slate -> forget the market too, or Clear-all would
+  // quietly undo itself on the next visit.
+  window.__forgetMapState=function(){ try{ localStorage.removeItem(LAST_SEARCH_KEY); }catch(e){} };
   // Captured ONCE at boot: the params that brought the user here, collapsed to a source label.
   try{
     var _qs=location.search||'';
@@ -3171,6 +3252,7 @@ const VIEWPORT_JS = `<script>
   // template literal where a stray backtick is a build error).
   var _cardsT=null, _lastKey='';
   function _emitCardsShown(){
+    try{ if(window.__remarkSaved)window.__remarkSaved(); }catch(e){}   // saved marks survive a repaint (see __remarkSaved)
     try{
       var els=[]; try{ els=document.querySelectorAll('#feed .card'); }catch(e){}
       var n=els.length;
@@ -4653,6 +4735,21 @@ const SAVE_JS = `<script>
   function _anonKey(){ try{ return (typeof window.__anonId==='function')?(window.__anonId()||''):''; }catch(e){ return ''; } }
   function _signedInEmail(){ var t=tok(); return t?email(t):''; }
   // Mark every element whose CANONICAL notice id is in the saved set.
+  // A saved CARD has to SAY so. Setting dataset.saved alone changed nothing the
+  // visitor could see: the browser acceptance gate proved the correct card was
+  // found and flagged (1 of 878 [data-nid] elements) while the screen looked
+  // identical to an unsaved one, so returning told the user nothing. The chip
+  // reuses the card's existing .chip row style; it is not a new surface.
+  function _cardSavedChip(el){
+    try{
+      if(el.querySelector('.chip.saved'))return;            // idempotent across repaints
+      var row=document.createElement('div');
+      row.className='crow1 savedrow';
+      row.innerHTML='<span class="chip saved">\u2713 Saved</span>';
+      var bodyEl=el.querySelector('.cbody');
+      if(bodyEl)bodyEl.insertBefore(row,bodyEl.firstChild); else el.insertBefore(row,el.firstChild);
+    }catch(e){}
+  }
   function _markSaved(ids){
     if(!ids)return;  // a failed read is UNKNOWN, not empty
     for(var i=0;i<ids.length;i++)window.__anonSaved[ids[i]]=1;
@@ -4660,10 +4757,32 @@ const SAVE_JS = `<script>
       var bs=document.querySelectorAll('[data-nid]');
       for(var j=0;j<bs.length;j++){
         var b=bs[j]; if(window.__anonSaved[b.getAttribute('data-nid')]){
-          b.dataset.saved='1'; if(b.tagName==='BUTTON')b.textContent='\u2713 Saved'; }
+          b.dataset.saved='1';
+          if(b.tagName==='BUTTON')b.textContent='\u2713 Saved';
+          else _cardSavedChip(b);
+        }
       }
     }catch(e){}
+    // RACE: the drawer's own detail fetch and this shortlist restore are two
+    // independent requests, and the drawer usually wins — so marking the drawer
+    // only at render time left it unmarked whenever the restore landed second
+    // (measured in the browser: __anonSaved held the notice id while the Save
+    // control still read "Start pursuit"). The drawer Save control carries no
+    // data-nid, so the loop above cannot reach it either. Marking from BOTH
+    // ends means whichever finishes last paints the state; both are idempotent.
+    try{ window.__markDrawerSaved&&window.__markDrawerSaved(); }catch(e){}
   }
+  // Re-apply the marks to a feed that has been REDRAWN. The marks were painted ONCE,
+  // when this block loads — but drawFeed rebuilds every card on each filter change,
+  // pan, sort and horizon switch, so every repaint erased them and a returning visitor
+  // could not see what they had already kept. window.__anonSaved is the in-memory truth
+  // for this page load (seeded by the server read, added to by each save), so re-marking
+  // is free and never re-queries.
+  //
+  // Called from _emitCardsShown (VIEWPORT_JS) on the feed's settled pass, and placed
+  // BEFORE that function's dedupe early-return on purpose: a repaint of the SAME cards
+  // is not a new impression, but it IS new DOM that still needs marking.
+  window.__remarkSaved=function(){ try{ _markSaved(Object.keys(window.__anonSaved||{})); }catch(e){} };
   window.__loadAnonShortlist=function(){
     var t=tok(), em=_signedInEmail();
     // SIGNED IN: transfer anything kept while signed out onto the account, then
@@ -5646,12 +5765,88 @@ const DRAWER_JS = `<script>
   // move rendered as a lone "Try again" with its title and description gone (Eric 2026-08-13).
   // When a title div exists, write into THAT and leave the description alone; otherwise the button
   // is plain text and behaves exactly as before.
+  // Reopening a saved SAM listing must show it as saved. This RENDERS EXISTING
+  // STATE ONLY: it reads window.__anonSaved (already populated by the shortlist
+  // restore) and never POSTs, never creates a pursuit and never asks for
+  // sign-in. saveCurrentOpp already early-returns on dataset.saved==='1', so
+  // setting it here is also what makes a click on a reopened listing a no-op
+  // instead of a second write.
+  //
+  // Gated to a canonical 32-hex sam_opportunities.notice_id, the same test the
+  // save path uses. A DLA solicitation number, a PIID, an fc- id, a UEI or a
+  // contact id can never satisfy it, so a solicitation number cannot collide
+  // with a saved notice id.
+  window.__markDrawerSaved=function(){
+    try{
+      var id=String((CUR&&CUR.id)||'');
+      if(CUR&&CUR.kind)return; if(CUR&&CUR.isDla)return; if(CUR&&CUR.dibbsUrl)return;
+      if(!/^[a-f0-9]{32}$/i.test(id))return;
+      if(!(window.__anonSaved&&window.__anonSaved[id]))return;
+      var bs=document.querySelectorAll('button[onclick*="saveCurrentOpp"]');
+      for(var i=0;i<bs.length;i++){
+        var b=bs[i];
+        if(b.dataset.saved==='1')continue;
+        b.dataset.saved='1'; setBtnLabel(b,'\u2713 Saved'); b.classList.add('saved');
+      }
+    }catch(e){}
+  };
   function setBtnLabel(btn,text){
     var t=btn.querySelector?btn.querySelector('.fc-move-t'):null;
     if(t)t.textContent=text; else btn.textContent=text;
   }
   window.saveCurrentOpp=function(btn,done){
     if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1',btn.dataset.pursuitId||''); return; }
+    // ── ANONYMOUS VISITORS CAN KEEP A LISTING — the REACHABLE path ───────────
+    // #1601 shipped the anonymous shortlist on window.savePursuit, which has ZERO
+    // call sites. Measured on the SERVING production page 2026-09-21: "savePursuit"
+    // appears exactly twice (its own definition and its own sign-in retry callback),
+    // while "saveCurrentOpp" appears 13 times — every live Save / Start-pursuit /
+    // Track button in the drawer calls THIS function, and it had no anonymous branch.
+    // So the feature could not fire from the UI at all, and production agrees:
+    // 0 rows in anonymous_shortlist and 0 shortlist_saved events, ever.
+    // Same contract as #1601: {anonId, noticeId} only, SAM listings only.
+    //
+    // Callers that pass a done callback are deliberately EXCLUDED — openProposalWorkspace and
+    // startCapture use the save as a means to reach a signed-in destination (the
+    // Proposal Workspace / Pursuits tracker), and openProposalWorkspace has already
+    // passed its own sign-in gate before it gets here. Their contract is untouched.
+    if(typeof done!=='function'){
+      var _t0=tok(), _e0=_t0?email(_t0):'';
+      if(!_t0||!_e0){
+        // Only the SAM listing drawer holds a canonical sam_opportunities.notice_id.
+        // render() sets CUR to the opportunity-detail row (no .kind, no .isDla);
+        // renderDla sets a DLA shape whose id is a DIBBS solicitation number, and the
+        // recompete / forecast / company / buyer drawers each set CUR.kind and carry
+        // a PIID, an fc- id, a UEI or a contact id. None of those is a notice id and
+        // we never substitute one, so they fall through to the sign-in path exactly
+        // as they behaved before this branch existed.
+        var _nid=String((CUR&&CUR.id)||'');
+        var _elig=!(CUR&&CUR.kind)&&!(CUR&&CUR.isDla)&&!(CUR&&CUR.dibbsUrl)&&/^[a-f0-9]{32}$/i.test(_nid);
+        var _aid=''; try{ _aid=(typeof window.__anonId==='function')?(window.__anonId()||''):''; }catch(e){}
+        if(_elig&&_aid){
+          setBtnLabel(btn,'Saving\\u2026');
+          // ONLY the notice id. The browser must not be able to manufacture
+          // opportunity metadata; the server resolves the rest from sam_opportunities.
+          fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({anonId:_aid,noticeId:_nid})})
+            .then(function(r){return r.json();}).then(function(d){
+              if(d&&d.success){
+                btn.dataset.saved='1';
+                // A SAVE IS NOT A PURSUIT. The label says Saved — never "Tracked" or
+                // "In pursuits": no user_pipeline row exists and signing in will not
+                // create one. Only an explicit Start Pursuit does that.
+                setBtnLabel(btn,d.duplicate?'\\u2713 Already saved':'\\u2713 Saved');
+                try{ if(window.__anonSaved)window.__anonSaved[_nid]=1; }catch(e){}
+                try{ if(window.__remarkSaved)window.__remarkSaved(); }catch(e){}
+                // Only a NEW save counts, so a repeat click cannot inflate the funnel.
+                try{ if(window.__track && !d.duplicate) window.__track('tool_use','shortlist_saved',
+                  {anonymous:true,notice_id:_nid,agency:String((CUR&&CUR.department)||''),source:'drawer'}); }catch(e){}
+              } else setBtnLabel(btn,'Couldn\\'t save');
+            }).catch(function(){ setBtnLabel(btn,'Couldn\\'t save'); });
+          return;
+        }
+      }
+    }
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     var t=a.t, em=a.em;
     setBtnLabel(btn,'Saving\\u2026');
@@ -7162,6 +7357,8 @@ const DRAWER_JS = `<script>
       if(mktBox)mktBox.innerHTML='';
       loadForecastRoster(agency);   // Buyer intelligence still gets the agency roster
       buildTabs();
+      // Render the saved state the visitor already has (no fetch, no write).
+      try{ window.__markDrawerSaved&&window.__markDrawerSaved(); }catch(e){}
     }
     var id=String((o&&(o.nid||o.sol))||''); if(!id){ fail(); return; }
     fetch('/api/app/forecast-detail?id='+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){
@@ -8479,6 +8676,90 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         return;
       }
       applyScopeLink();
+    })();
+  }catch(e){} })();
+
+  // ── RETURN CONTINUITY: pick up the market you left ───────────────────────
+  // The counterpart to __rememberMapState (VIEWPORT_JS). Hands the remembered
+  // {mode, filters} to __applySavedSearch — the SAME restorer ?ss=, the in-map
+  // picker and the scope links use — so there is ONE apply path and these four
+  // entry points cannot drift into four dialects of "restore a market".
+  (function(){ try{
+    var qs=location.search||'';
+    // NEVER fight an explicit link. A RECORD link (?opp= ?company= ?buyer=
+    // ?recompete= ?forecast=) names ONE record and must not be re-filtered at the
+    // destination -- re-applying a remembered NAICS/state there could only delete
+    // the record that was already chosen for this reader
+    // (docs/engineering/record-links-vs-market-links.md, the 5,416 -> 0 incident).
+    // A MARKET link (?ss= ?agency= ?naics= ?strategy= ...) already says which
+    // market to open. Either way the URL is the more recent instruction and the
+    // memory stands down. ?embed= is a host page's map, not this visitor's.
+    if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
+    var raw=''; try{ raw=localStorage.getItem('mi_map_last_search')||''; }catch(e){ return; }
+    if(!raw)return;
+    var st=null; try{ st=JSON.parse(raw); }catch(e){ return; }
+    if(!st||typeof st!=='object')return;
+    var f=(st.filters&&typeof st.filters==='object')?st.filters:null;
+    if(!f)return;
+    var age=(typeof st.t==='number')?(Date.now()-st.t):null;
+    // Same 30-day horizon mi_map_last_view uses. A missing or stale stamp opens the
+    // default map rather than a fossil -- and an UNDATED memory is unknown, not fresh.
+    if(age==null||age<0||age>30*24*3600*1000)return;
+    var tries=0; (function go(){
+      if(typeof window.__applySavedSearch!=='function'||typeof window.__mapStateMeaningful!=='function'){
+        if(++tries<40)return setTimeout(go,150); return;
+      }
+      var mode=(st.mode==='recompete')?'recompete':'open';
+      // Re-checked on the READ side too, so a state written by an older build can
+      // never produce an empty restore that still claims to have remembered something.
+      if(!window.__mapStateMeaningful(f,mode))return;
+      // NO bbox: mi_map_last_view already restored the viewport synchronously in the
+      // map constructor and is fresher (moveend, not filter-change).
+      window.__applySavedSearch({mode:mode,filters:f});
+      // ── SAY SO ────────────────────────────────────────────────────────────
+      // A map that silently opens filtered is a map whose numbers the user cannot
+      // account for. __applySavedSearch syncs the visible controls, but nothing
+      // would explain WHY they are set, so name what was restored and give a
+      // one-click way out.
+      var bits=[];
+      try{
+        if(f.agency)bits.push(String(f.agency).split('|')[0]);
+        if(f.naics)bits.push(String(f.naics).split(',').slice(0,2).join(', '));
+        if(f.state)bits.push((window.__STATE_NAMES&&window.__STATE_NAMES[f.state])||String(f.state));
+        if(f.setAside)bits.push(String(f.setAside).split(',')[0]);
+        if(f.q)bits.push('\\u201c'+String(f.q).slice(0,28)+'\\u201d');
+        if(!bits.length&&mode==='recompete')bits.push('Awarded contracts');
+      }catch(e){}
+      var human=bits.slice(0,3).join(' \\u00b7 ');
+      try{
+        var host=document.querySelector('.mapwrap')||document.body;
+        var pill=document.createElement('div'); pill.id='resumePill';
+        pill.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;max-width:min(92vw,560px);display:flex;align-items:center;gap:10px;background:#fff;color:#0b1220;border:1px solid #d7dee8;font:600 13px Inter,system-ui,sans-serif;padding:7px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.18)';
+        var txt=document.createElement('span');
+        txt.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        txt.textContent='Picked up where you left off'+(human?(' \\u00b7 '+human):'');
+        pill.appendChild(txt);
+        var x=document.createElement('button'); x.textContent='Start fresh';
+        x.setAttribute('aria-label','Clear the restored search and start fresh');
+        x.style.cssText='all:unset;cursor:pointer;font-weight:700;color:#006aff;white-space:nowrap';
+        x.onclick=function(){
+          try{ if(window.__forgetMapState)window.__forgetMapState(); }catch(e){}
+          // Clear through the SAME restorer, handed an empty market -- it resets FILT,
+          // the free-text query, every visible control and the horizons in one pass.
+          // Half-clearing (filters but not q, or filters but not horizons) would leave
+          // the map narrowed with nothing on screen saying so.
+          try{ window.__applySavedSearch({mode:'open',filters:{horizons:{open:true,recompete:false,forecast:false}}}); }catch(e){}
+          try{ pill.remove(); }catch(e){}
+        };
+        pill.appendChild(x); host.appendChild(pill);
+      }catch(e){}
+      // THE metric for this workstream: a returning visitor who did not have to
+      // rebuild their market. age_hours + returning make "restored" readable
+      // honestly -- a reload seconds later is not a return, and counting it as one
+      // would inflate exactly the number this exists to move.
+      try{ if(window.__track) window.__track('tool_use','returning_session_restored',
+        {restored_mode:mode,age_hours:Math.round(age/3600000),returning:(age>1800000),
+         filter_count:bits.length,restored:human.slice(0,120)}); }catch(e){}
     })();
   }catch(e){} })();
 
