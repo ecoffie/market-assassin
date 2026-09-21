@@ -35,7 +35,24 @@ export default defineConfig({
     ],
     exclude: ['node_modules', '.next', 'tests/fixtures', 'scripts'],
     // Keep runs snappy and deterministic for the pre-commit / CI path.
-    testTimeout: 10_000,
+    //
+    // ⏱ 10s → 45s (2026-09-21). This is ONE global clock shared by two very different kinds of
+    // test. The 10s value was authored for the "fast, browser-less, no DB/network" unit suite
+    // described above — but the `include` list also pulls in the agent-tasks *.e2e.test.ts files,
+    // and each of those cases shells out to REAL version control plus a COLD `tsx` CLI, several
+    // seconds apiece and several per case.
+    //
+    // Measured on CLEAN origin/main (46c4540d), with no branch changes applied:
+    //   • in isolation           → 33/33 PASS
+    //   • full-suite parallel run → 1-3 of them time out at 10s (observed 4, then 1, then 2)
+    // i.e. the repo's own pre-push gate was flaky-RED **on main**, blocking unrelated branches
+    // for a reason none of them caused. A timeout is not a correctness signal here; it only
+    // measured how many worktrees (31) and agent sessions happened to be running.
+    //
+    // This raises ONLY the clock. No test is skipped, relaxed, or excluded, and a genuinely
+    // hung test still fails — it now takes 45s to say so instead of 10s, which is the right
+    // trade against a gate that cries wolf.
+    testTimeout: 45_000,
     passWithNoTests: false,
   },
 });
