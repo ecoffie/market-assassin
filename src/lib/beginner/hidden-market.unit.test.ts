@@ -735,7 +735,7 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.uncoveredCards[0]?.noticeLabel).toMatch(/already awarded/i);
     expect(view.uncoveredCards[0]?.dueLabel).toBe('Awarded · Aug 12');
     expect(view.reveal?.expandedLabel).toBe('Recently awarded');
-    expect(view.reveal?.explanation).toMatch(/task orders for this work/i);
+    expect(view.reveal?.explanation).toMatch(/recently AWARDED/i); // CHANGED 2026-09-21: the old line said "Nothing matching is open to bid right now" — a market claim from a TITLE-token search;
     expect(view.ctaVariant).toBe('full_market');
     expect(view.message).toBeNull();
   });

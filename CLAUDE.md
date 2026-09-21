@@ -247,6 +247,27 @@ support, `install` for roofing, `physical` for security guard, `agency` for staf
   printed *"Mindy found 0 current opportunities"* above three live fence cards — 14 open
   fence notices existed. SAM's title search is an ILIKE substring, so `%fences%` cannot
   match "Fence". Measured after: fences 0→11, roofs 3→24, windows 2→24.
+- ⚠️ **AN EXACT-TOKEN MISS IS NOT MARKET ABSENCE.** `/try` matches the words in a
+  listing's TITLE. Zero open titles contain "lawn" or "mowing", while ~18 open
+  grounds-maintenance notices (NAICS 561730) are exactly that business. No copy may say
+  *"nothing matching is open"* or *"the open market is small"* — both shipped, and the
+  second was live on the garbage case (1 title match reported as a small market beside
+  ~20 open refuse/solid-waste notices). Say which words were searched and that the limit
+  is the SEARCH. Guarded by the live oracle's `no_market_absence_claim` pin.
+- **`detail-evidence.ts` is the rescue, and it READS the notice — it never maps words.**
+  When the direct group is empty it fetches `description`/`sow_text` for the candidates
+  already returned and quotes the line that proves the user's word ("…frequent mowing,
+  weeding, and general lawn maintenance…"). Bounded: empty-only, ≤6 hits, broader group,
+  quote always rendered. ⚠️ Detail terms must be **multi-word or distinctive**, and a
+  multi-word term must appear **within 40 chars** — unguarded, `medical` matched 23
+  unrelated VA notices and "medical staffing" matched any hospital SOW containing both
+  words. **A THIRD synonym hop was measured and rejected: `lawn` → `naics_vocabulary` →
+  333112 LAWN-MOWER MANUFACTURING (df 17)**, same shape as the 562998 → "grease trap"
+  failure. Do not re-propose a word→code→market expansion.
+- **`verify:beginner-try --sample` is a RECALL FLOOR, not a precision score** — nouns are
+  harvested from live titles, and it only asserts not-empty / not-follow-up. A build
+  returning the whole corpus would score 1000/1000. Precision lives in the frozen set and
+  the pinned oracles.
 
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 

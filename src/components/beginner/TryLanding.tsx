@@ -86,60 +86,24 @@ function track(action: string, extra: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * ⚠️ RENDERS `reveal.explanation` — it does NOT write its own copy.
+ *
+ * It used to switch on `revealState` with a hardcoded sentence per branch, a
+ * second copy of strings that already live in `hidden-market.ts`. They drifted:
+ * after the lib's market-absence claims were fixed, "we mow lawns" still
+ * rendered "Mindy translated what you do and found 3 in related government
+ * buying categories" over two AWARD notices that matched the user's literal
+ * words — wrong provenance and a claim the lib had already stopped making.
+ * One source of copy, or the next fix only lands in half the product.
+ */
 function RevealHero({ view }: { view: HiddenMarketLandingView }) {
   const reveal = view.reveal;
   if (view.outcome === 'need_followup' && view.message) {
     return <p className="text-lg text-ink">{view.message}</p>;
   }
-  if (!reveal) return null;
-
-  const direct = reveal.directMatchCount;
-  const expanded = reveal.expandedMatchCount;
-  const total = reveal.totalUniqueCount;
-
-  switch (reveal.revealState) {
-    case 'strong':
-      return (
-        <p className="text-lg text-ink">
-          {total == null ? (
-            <>
-              You&apos;d have found <strong>{direct}</strong>. Mindy found{' '}
-              <strong>{expanded}</strong> more that those words missed.
-            </>
-          ) : (
-            <>
-              You&apos;d have found <strong>{direct}</strong>. Mindy found <strong>{total}</strong>.
-            </>
-          )}{' '}
-          Government buyers describe this work in ways most people would never search.
-        </p>
-      );
-    case 'expanded_only':
-      return (
-        <p className="text-lg text-ink">
-          Your words didn&apos;t match open solicitations directly — but Mindy translated what you
-          do and found <strong>{expanded}</strong> in related government buying categories.
-        </p>
-      );
-    case 'direct_only':
-      return (
-        <p className="text-lg text-ink">
-          Government buys this. Mindy found <strong>{direct}</strong> current{' '}
-          {direct === 1 ? 'opportunity' : 'opportunities'} matching what you described.
-        </p>
-      );
-    case 'thin':
-      return (
-        <p className="text-lg text-ink">
-          Government buys this — the open market is small right now. Mindy found{' '}
-          <strong>{direct}</strong> {direct === 1 ? 'opportunity' : 'opportunities'}.
-        </p>
-      );
-    case 'unavailable':
-      return (
-        <p className="text-lg text-ink">Mindy couldn&apos;t measure the broader market right now.</p>
-      );
-  }
+  if (!reveal?.explanation) return null;
+  return <p className="text-lg text-ink">{reveal.explanation}</p>;
 }
 
 export function TryLanding() {

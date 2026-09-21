@@ -51,6 +51,12 @@ export function BeginnerOpportunityCard({
       {card.amountLabel && <p className="text-sm text-muted">{card.amountLabel}</p>}
       {card.agencyLabel && <p className="text-sm text-muted">{card.agencyLabel}</p>}
       {card.audienceLabel && <p className="mt-1 text-sm text-ink-soft">{card.audienceLabel}</p>}
+      {card.detailPassage && (
+        <p className="mt-2 rounded-lg border border-hairline bg-ground-deep p-2 text-xs text-ink-soft">
+          <span className="font-medium text-muted">Your words are in this listing&rsquo;s details: </span>
+          <q>{card.detailPassage}</q>
+        </p>
+      )}
       {card.searchContext && <p className="mt-2 text-xs text-faint">{card.searchContext}</p>}
       {card.plainMeaning && (
         <p className="mt-3 text-sm text-ink">

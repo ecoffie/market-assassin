@@ -21,6 +21,18 @@
  *   2. Reverse sample: distinctive nouns taken FROM live titles, wrapped in
  *      beginner sentences. By construction the cache contains the noun.
  *
+ * ⚠️ WHAT THE SAMPLE DOES AND DOES NOT MEASURE.
+ * It is a RECALL floor, not a precision score. Each noun is harvested from a
+ * live open title, so a relevant listing provably exists; the only assertions
+ * are that /try does not come back EMPTY and does not ask a follow-up. It says
+ * nothing about whether the other results are any good — a run that returned
+ * the whole corpus for every input would score 1000/1000. Precision lives in
+ * the pinned regressions above and in the frozen set
+ * (src/lib/beginner/__fixtures__/try-relevance-cases.ts), which assert
+ * include/exclude per record. Two further limits: the corpus is one PostgREST
+ * page (1,000 rows), not a census, and the four frames are templates, not real
+ * user prose.
+ *
  * Run:  npm run verify:beginner-try
  *       npm run verify:beginner-try -- --sample 250
  *       npm run verify:beginner-try -- --json
@@ -220,6 +232,18 @@ function distinctiveTokensFromTitle(title) {
       description: 'I help businesses',
       expect: 'need_followup',
     },
+    // ── EXACT-TOKEN MISS IS NOT MARKET ABSENCE (2026-09-21) ─────────────
+    // Zero open TITLES contain "lawn" or "mowing", while ~18 open
+    // grounds-maintenance notices (NAICS 561730) are exactly this business.
+    // Whatever we show, the words must never claim the market is empty.
+    {
+      description: 'we mow lawns',
+      expect: 'no_market_absence_claim',
+    },
+    {
+      description: 'staffing agency',
+      expect: 'no_market_absence_claim',
+    },
     {
       description: 'zzqwxjunkterm999xyz',
       expect: 'no_cards',
@@ -242,6 +266,18 @@ function distinctiveTokensFromTitle(title) {
       if (pin.expect === 'need_followup') {
         const ok = view.outcome === 'need_followup' || result.resolution.state === 'need_followup';
         record(`pinned "${pin.description}" → follow-up`, ok, `outcome=${view.outcome} state=${result.resolution.state}`);
+        continue;
+      }
+      if (pin.expect === 'no_market_absence_claim') {
+        const blob = `${view.message || ''} ${view.reveal?.explanation || ''} ${(view.reveal?.limitations || []).join(' ')}`;
+        const banned = /nothing matching is open|the open market is small|0 current opportunit|no opportunities exist/i;
+        const bad = blob.match(banned);
+        const names = /not a reading of the market|not a sign that nothing is open|limit of this search/i.test(blob);
+        record(
+          `pinned "${pin.description}" → miss, not absence`,
+          !bad && names,
+          bad ? `CLAIMED ABSENCE: "${bad[0]}"` : names ? 'copy names the search limit' : 'copy does not name the search limit',
+        );
         continue;
       }
       if (pin.expect === 'no_cards') {
@@ -364,7 +400,7 @@ if (!PINNED_ONLY) {
 
     const pass = falseEmpty === 0 && falseFollowup === 0 && combinations > 0;
     record(
-      `sample ${tokenSet.length} nouns × 4 frames = ${combinations} searches`,
+      `sample ${tokenSet.length} nouns × 4 frames = ${combinations} searches (RECALL floor only — asserts not-empty / not-follow-up, makes NO precision claim)`,
       pass,
       `ok=${okCount} false-empty=${falseEmpty} false-followup=${falseFollowup}`,
     );

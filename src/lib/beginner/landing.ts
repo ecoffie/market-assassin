@@ -36,6 +36,12 @@ export interface PublicBeginnerCard {
   samUrl: string | null;
   grounded: boolean;
   searchContext: string | null;
+  /**
+   * Set only on a listing admitted because its OWN TEXT proves the user's
+   * words. The quote IS the claim — without it we would be asserting a match
+   * we cannot show.
+   */
+  detailPassage?: string;
 }
 
 export interface BeginnerMarketReveal {
@@ -53,6 +59,13 @@ export interface BeginnerMarketReveal {
   stages?: StageCounts;
   /** Plain-English rendering of `stages`, e.g. "1 open to bid now and 2 …". */
   stageSummary?: string;
+  /**
+   * The words actually sent to SAM. Named in the copy so a zero reads as
+   * "those words are not in any title", never as "the market is empty".
+   */
+  searchedTerms?: string[];
+  /** Listings admitted on the NOTICE TEXT, with the line that proves it. */
+  detailEvidence?: { title: string | null; passage: string }[];
   translatedTerms?: string[];
   revealState: RevealState;
   explanation: string;

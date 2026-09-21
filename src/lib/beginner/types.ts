@@ -30,12 +30,22 @@ export type EligibilityEvidence =
 
 export const FOLLOW_UP_PROMPT = 'What do you actually do for customers?';
 
+/**
+ * ⚠️ AN EXACT-TOKEN MISS IS NOT MARKET ABSENCE.
+ *
+ * This search matches the WORDS IN A LISTING'S TITLE. Measured 2026-09-21,
+ * "we mow lawns": zero open titles contain "lawn" or "mowing", while ~18 open
+ * grounds-maintenance notices (NAICS 561730) are exactly that business —
+ * two of them literally say "frequent mowing, weeding, and general lawn
+ * maintenance" in their details. Copy here must never let a miss read as
+ * "the government is not buying this".
+ */
 export const EMPTY_MATCH_MESSAGE =
-  "We couldn't find matching opportunities from that search. Try describing your business a little differently.";
+  "No open listing's title uses those words. Government often writes the same work differently, so this is not a sign that nothing is open — try describing your business another way.";
 
-/** Coverage grounded a market, but this search has no cards to show. Not "here is what we found." */
+/** Coverage grounded a market, but this search has no cards to show. */
 export const EMPTY_OPEN_MARKET_MESSAGE =
-  'Government buys this kind of work, but nothing matching is open right now. Try describing your business a little differently.';
+  "Government buys this kind of work. No open listing's title uses the words you did, which is a limit of this search, not a reading of the market — try describing your business another way.";
 
 export const UNAVAILABLE_MESSAGE = "We couldn't check opportunities right now. Try again in a moment.";
 
@@ -44,6 +54,9 @@ export const CLASSIFY_UNAVAILABLE_MESSAGE =
 
 /** Live `search_sam_opportunities` item — exact contract, not illustrative names. */
 export interface SamSearchItem {
+  /** SAM notice id. Returned by search_sam_opportunities; used to fetch the
+   *  notice's own text when the TITLE alone cannot establish relevance. */
+  notice_id?: string | null;
   title: string | null;
   agency: string | null;
   naics: string | null;

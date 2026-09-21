@@ -230,3 +230,134 @@ The reported bug is dead. Buyer-name stripping holds (Coast Guard, Marine
 Corps, Border Patrol, Merchant Marine Academy). It could not get a
 code-overlap-only item into the direct group, and it could not make the
 phrase-anchor rule demote a correct result.
+
+
+---
+
+## Round 3 — "we mow lawns", and what the checks actually measure
+
+### An exact-token miss is not market absence
+
+Round 2 closed with *"we mow lawns returns nothing — that is the market, not
+the matcher."* **That was wrong, and it is the same error class this whole
+document is about.** Measured 2026-09-21:
+
+| probe | open titles |
+|---|---|
+| `lawn` | **0** |
+| `mowing` | **0** |
+| `mow` | 4 — all MOWER equipment (NAICS 333112/333111) |
+| `grounds maintenance` | 11 |
+| `groundskeeping` | 4 |
+| `landscap*` | 9 |
+
+17 of the 21 grounds/mowing/landscaping titles carry **NAICS 561730
+Landscaping Services**. A lawn-mowing company has a real, open market of about
+18 notices. Saying "nothing found" described a **vocabulary miss as market
+absence**.
+
+### The interpretation we added — and why it is not the rejected synonym hop
+
+The first instinct was to map `lawn` → "grounds maintenance". Measured, that
+is the grease-trap failure again: `naics_vocabulary` sends **`lawn` → 333112
+LAWN-MOWER MANUFACTURING (df 17)**. `mowing` → 561730 correctly, but `lawn` and
+`mowing` disagree, and nothing in the data breaks the tie. **No synonym hop was
+added.**
+
+What the corpus does support is reading the notice. The tool's body pass
+already returns the right rows — the gate was discarding them because it could
+not see the text. So `src/lib/beginner/detail-evidence.ts` goes and fetches it:
+
+```
+PSW Landscaping Hilo, Hawaii  (561730)
+  "…The purpose of this contract is to have frequent mowing, weeding,
+   and general lawn maintenance year-round…"
+Grounds Maintenance Services, Ft Sill National Cemetery  (561730)
+  "…Mowing, trimming, edging on improved and unimproved turf areas…"
+```
+
+Nothing is inferred; the user's own word is matched against the notice's own
+text on a word boundary, and **the passage is quoted on the card**. Bounded:
+one extra query, only when the direct group is EMPTY, only over candidates the
+search already returned, at most 6 hits, always in the explicitly-broader
+group. `description` is populated on **4,798 of 9,045** active open rows (53%);
+a null description yields no claim, never a guess.
+
+**Two guards the first attempt needed** (both found by measuring, not
+reasoning):
+
+- **A wildcard may not roam a 48 KB SOW.** `medical` matched 23 unrelated
+  notices — VA Medical Center duct work, radiopharmaceuticals, bed-bug pest
+  control. A title is ~8 words, so a broad word is mostly self-limiting there;
+  a description is thousands. Detail terms must be multi-word or distinctive.
+- **A multi-word term must be a PHRASE.** "medical staffing" "matched" any
+  hospital SOW containing both words separately ("…licenses for medical
+  staff…"). Tokens must fall within 40 characters. After both guards: 23 → 1,
+  and the one is *"VA or DoD medical staffing contracts"*.
+
+### Copy that claimed the market, now fixed
+
+The oracle's new no-absence pin caught a site the code review had not:
+
+| was | now |
+|---|---|
+| "Government buys this — **the open market is small right now**" | "Mindy found N listings whose **title** names this work" |
+| "**Nothing matching is open** right now" (structured empty) | "No open listing's **title** uses the words you did, which is a limit of this search, not a reading of the market" |
+| "**Nothing matching is open to bid** right now" (awarded fallback) | "No open listing's title uses those words, so Mindy looked at what government recently AWARDED…" |
+| "Mindy found **0 current opportunities**" | "No open listing's title uses \"x\" or \"y\". Government often writes the same work differently…" |
+
+The first of these was live on the garbage case in the browser screenshot:
+1 title match reported as a small market, while ~20 open refuse/solid-waste
+notices existed under words the user had not typed. The reveal now carries
+`searchedTerms`, so the copy can name what was actually searched.
+
+### What the 1,000-search check measures
+
+`npm run verify:beginner-try -- --sample 250` runs 250 nouns × 4 sentence
+frames. **It is a RECALL FLOOR, not a precision score.** Each noun is harvested
+from a live open title, so a relevant listing provably exists; the only
+assertions are that `/try` does not come back empty and does not ask a
+follow-up. A build that returned the entire corpus for every input would score
+1000/1000. Precision is asserted elsewhere:
+
+| check | what it proves |
+|---|---|
+| frozen set (`try-relevance-cases.ts`) | per-record include / exclude / group, with reasons |
+| pinned oracles | named false positives stay out of the direct group; misses never claim absence |
+| sample 250 × 4 | recall floor only |
+
+Two further limits: the sampled corpus is one PostgREST page (1,000 rows), not
+a census; and the four frames are templates, not real user prose.
+
+### Negative controls — preserved, not quietly dropped
+
+These must keep returning **nothing in the direct group**. They are how we know
+the gate is still a gate:
+
+- `zzqwxjunkterm999xyz` → clarifying question, no cards.
+- `I help businesses`, `I do stuff`, `certified small disadvantaged veteran
+  owned company` → clarifying question. Every content word is context.
+- `staffing agency` → no title match; copy states the search limit and claims
+  nothing about the market.
+- Cross-domain: the three screenshot notices (personnel-security platform,
+  PERSONAL alert device, PERSONAL services contractors) must not appear for any
+  normal business input.
+- Homographs: Coast Guard / National Guard / grill guards / cattle guards for
+  `guard`; "Clean Room" for `clean`; "Market Rent Study" for `rent`; DISK DRIVE
+  for `drive`; "Windows 11 Laptops" for `window`.
+- Broad-code: "ZFW Cafeteria and Vending Services" shares NAICS 722320 with real
+  catering and must never be a described match.
+
+### Rejected experiments — still rejected, kept on the record
+
+1. **Ranking activity words by `naics_vocabulary`** — `physical` (w1481) beats
+   `guard` (w1206); `window` → 114119 agriculture; `garbage` → 561440
+   Collection Agencies (df 5).
+2. **Expanding the market from the direct hits' NAICS** — the one live
+   "garbage" hit is 562998, whose mined vocabulary is *grease trap cleaning*.
+3. **Mapping `lawn` → "grounds maintenance"** (new this round) — `lawn` →
+   333112 lawn-mower manufacturing, df 17. Same shape as (2).
+
+All three fail the same way: a code resolved from one word, then trusted to
+name a market. Evidence read from the notice itself does not have that failure
+mode, which is why the detail-evidence path was acceptable where these were not.
