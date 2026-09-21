@@ -54,8 +54,12 @@ export const CLASSIFY_UNAVAILABLE_MESSAGE =
 
 /** Live `search_sam_opportunities` item — exact contract, not illustrative names. */
 export interface SamSearchItem {
-  /** SAM notice id. Returned by search_sam_opportunities; used to fetch the
-   *  notice's own text when the TITLE alone cannot establish relevance. */
+  /**
+   * SAM notice id. `search_sam_opportunities` really does return this, so the
+   * type is accurate; nothing in the beginner layer reads it today. Kept
+   * because a body-relevance feature would need it to fetch the notice's own
+   * text — see tasks/body-relevance-followup-2026-09-21.md.
+   */
   notice_id?: string | null;
   title: string | null;
   agency: string | null;

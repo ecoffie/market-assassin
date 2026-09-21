@@ -29,7 +29,6 @@ import {
 import { translateOpportunities } from './translate-opportunity';
 import { keyedItems, opportunityKey } from './opportunity-key';
 import { classifyOpportunities, type RelevanceContext } from './relevance';
-import { findDetailEvidence, type DetailEvidenceDeps, type DetailHit } from './detail-evidence';
 import { extractBusinessActivity, type BusinessActivity } from './activity';
 import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 import {
@@ -95,8 +94,6 @@ export interface HiddenMarketResult {
   netNewItems: SamSearchItem[];
   /** Weaker-but-real evidence from either search. Never in the direct group. */
   related: SamSearchItem[];
-  /** Listings whose OWN TEXT proves the user's words, with the quoted line. */
-  detailEvidence: DetailHit[];
   /** What we decided the user actually sells. */
   activity: BusinessActivity;
   /**
@@ -109,7 +106,7 @@ export interface HiddenMarketResult {
   awardedFallback?: boolean;
 }
 
-export interface HiddenMarketDeps extends Partial<ResolveBusinessDeps>, DetailEvidenceDeps {
+export interface HiddenMarketDeps extends Partial<ResolveBusinessDeps> {
   searchSam?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
   /** Award Notices in sam_opportunities (no deadline filter). */
   searchAwarded?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
@@ -446,6 +443,7 @@ function explanationFor(
   state: RevealState,
   reveal: Pick<BeginnerMarketReveal, 'directMatchCount' | 'expandedMatchCount' | 'totalUniqueCount'>,
   stageSummary?: string,
+  args?: { expandedKeyword?: string | null },
 ): string {
   const direct = reveal.directMatchCount;
   const expanded = reveal.expandedMatchCount;
@@ -455,13 +453,18 @@ function explanationFor(
   // coming soon", which does not add up. Only the branches that quote the
   // direct count may carry it.
   const mix = stageSummary ? ` — ${stageSummary}.` : '.';
+  // ⚠️ "Mindy translated what you do" is only true when the broader term came
+  // from COVERAGE. On /try the broader term is usually the user's own second
+  // activity word, so "we do detailing and janitorial" claimed a translation
+  // and then showed listings titled "…Janitorial Services". Name the word.
+  const broader = args?.expandedKeyword ? `"${args.expandedKeyword}"` : 'a broader term';
   switch (state) {
     case 'strong':
       return total == null
-        ? `You'd have found ${direct}. Mindy found ${expanded} more that those words missed. Government buyers describe this work in ways most people would never search.`
-        : `You'd have found ${direct}. Mindy found ${total}. Government buyers describe this work in ways most people would never search.`;
+        ? `You'd have found ${direct}. Searching ${broader} found ${expanded} more that those words missed.`
+        : `You'd have found ${direct}. With ${broader} as well, that is ${total}.`;
     case 'expanded_only':
-      return `Your words didn't match open solicitations directly — but Mindy translated what you do and found ${expanded} in related government buying categories.`;
+      return `No open listing's title uses your first words. Searching ${broader} found ${expanded}.`;
     case 'direct_only':
       return `Government buys this. Mindy found ${direct} current ${direct === 1 ? 'opportunity' : 'opportunities'} matching what you described${mix}`;
     case 'thin':
@@ -505,12 +508,9 @@ export function buildHiddenMarketReveal(args: {
   awardedFallback?: boolean;
   /** The words actually sent to SAM. Named in the copy so a miss is legible. */
   searchedTerms?: readonly string[];
-  /** Items admitted because the NOTICE TEXT (not the title) proves the words. */
-  detailEvidence?: readonly { title: string | null; passage: string }[];
 }): BeginnerMarketReveal {
   const { directStatus, expandedStatus, directItems, expandedItems, translatedTerms, structured } = args;
   const searchedTerms = [...(args.searchedTerms || [])];
-  const detailEvidence = [...(args.detailEvidence || [])];
   const awardedFallback = Boolean(args.awardedFallback);
   const expandedForCount = args.expandedKeyword && !awardedFallback
     ? expandedItems.filter((item) => titleMatchesExpanded(item, args.expandedKeyword as string))
@@ -582,18 +582,11 @@ export function buildHiddenMarketReveal(args: {
   const stages = countStages(directOk ? directItems : []);
   const stageSummary = stages.total > 0 ? describeStageMix(stages) : undefined;
 
-  if (detailEvidence.length > 0) {
-    limitations.push(
-      `${detailEvidence.length} ${detailEvidence.length === 1 ? 'listing does' : 'listings do'} not name this work in the title — Mindy read the notice itself and quotes the line.`,
-    );
-  }
-
   const base: BeginnerMarketReveal = {
     directMatchCount,
     expandedMatchCount,
     totalUniqueCount,
     searchedTerms: searchedTerms.length ? searchedTerms : undefined,
-    detailEvidence: detailEvidence.length ? detailEvidence : undefined,
     stages,
     stageSummary,
     directLabel: DIRECT_GROUP_LABEL,
@@ -611,13 +604,9 @@ export function buildHiddenMarketReveal(args: {
   } else if (directOk && directMatchCount === 0 && revealState !== 'expanded_only') {
     // ⚠️ "Mindy found 0 current opportunities" reads as "the government is not
     // buying this". It means only that no open TITLE carries these words.
-    const found = detailEvidence.length
-      ? ` Mindy read the notices themselves and found ${detailEvidence.length} that ${detailEvidence.length === 1 ? 'mentions' : 'mention'} this work in the details.`
-      : '';
-    base.explanation =
-      `No open listing's title uses ${
-        searchedTerms.length ? searchedTerms.map((t) => `"${t}"`).join(' or ') : 'those words'
-      }. Government often writes the same work differently, so that is a limit of this search, not a reading of the market.${found}`;
+    base.explanation = `No open listing's title uses ${
+      searchedTerms.length ? searchedTerms.map((t) => `"${t}"`).join(' or ') : 'those words'
+    }. Government often writes the same work differently, so that is a limit of this search, not a reading of the market.`;
   } else if (!structured && (revealState === 'direct_only' || revealState === 'thin')) {
     base.explanation =
       revealState === 'thin'
@@ -628,7 +617,9 @@ export function buildHiddenMarketReveal(args: {
             countPhrase(directMatchCount, 'current opportunity', 'current opportunities') || 'matches'
           } from what you described${stageSummary ? ` — ${stageSummary}.` : '.'}`;
   } else {
-    base.explanation = explanationFor(revealState, base, stageSummary);
+    base.explanation = explanationFor(revealState, base, stageSummary, {
+      expandedKeyword: awardedFallback ? null : args.expandedKeyword,
+    });
   }
   if (revealState === 'unavailable') {
     base.expandedMatchCount = expandedMatchCount == null ? null : expandedMatchCount;
@@ -694,7 +685,6 @@ export async function searchBeginnerHiddenMarket(
       expanded: emptyPop,
       netNewItems: [],
       related: [],
-      detailEvidence: [],
       activity,
       reveal: emptyReveal('unavailable'),
     };
@@ -709,7 +699,6 @@ export async function searchBeginnerHiddenMarket(
       expanded: emptyPop,
       netNewItems: [],
       related: [],
-      detailEvidence: [],
       activity,
       reveal: emptyReveal('unavailable', { explanation: resolution.followUpPrompt || FOLLOW_UP_PROMPT, revealState: 'unavailable' }),
     };
@@ -731,7 +720,6 @@ export async function searchBeginnerHiddenMarket(
       expanded: emptyPop,
       netNewItems: [],
       related: [],
-      detailEvidence: [],
       activity,
       needsClarification: true,
       reveal: emptyReveal('unavailable', { explanation: FOLLOW_UP_PROMPT }),
@@ -872,28 +860,6 @@ export async function searchBeginnerHiddenMarket(
     }
   }
 
-  /**
-   * TITLE found nothing. Before saying so, read the notices the search DID
-   * return and see whether they prove the user's words in their own text —
-   * "we mow lawns" has zero open titles and two grounds-maintenance notices
-   * whose descriptions say "frequent mowing … and general lawn maintenance".
-   * Adjacent group only: a proven mention is not a title.
-   */
-  let detailEvidence: DetailHit[] = [];
-  if (directItems.length === 0 && direct.status === 'ok' && !awardedFallback) {
-    const pool = dedupe([...direct.items, ...expandedTitleFiltered]);
-    detailEvidence = await findDetailEvidence(pool, activity.terms, deps);
-    if (detailEvidence.length > 0) {
-      const have = new Set(related.map((i) => opportunityKey(i) || i.title || ''));
-      for (const hit of detailEvidence) {
-        const key = opportunityKey(hit.item) || hit.item.title || '';
-        if (have.has(key)) continue;
-        have.add(key);
-        related.push(hit.item);
-      }
-    }
-  }
-
   const reveal = buildHiddenMarketReveal({
     structured: resolution.state === 'structured',
     directStatus: direct.status,
@@ -904,7 +870,6 @@ export async function searchBeginnerHiddenMarket(
     expandedKeyword: awardedFallback ? null : expandedKeyword,
     awardedFallback,
     searchedTerms: [directKeyword, ...(expandedKeyword ? [expandedKeyword] : [])],
-    detailEvidence: detailEvidence.map((h) => ({ title: h.item.title, passage: h.passage })),
   });
 
   const directKeys = new Set(directItems.map(opportunityKey).filter(Boolean) as string[]);
@@ -925,7 +890,6 @@ export async function searchBeginnerHiddenMarket(
     netNewItems:
       expanded.status === 'ok' && direct.status === 'ok' ? netNewItems(directItems, expandedItems) : [],
     related: relatedOnly,
-    detailEvidence,
     activity,
     reveal,
     awardedFallback,
@@ -1010,24 +974,13 @@ export function toHiddenMarketLandingView(
         .map(toPublicBeginnerCard)
     : [];
 
-  // The quoted line travels with the card: a detail match is only defensible
-  // if the reader can see the words we matched.
-  const passageByKey = new Map<string, string>();
-  for (const hit of result.detailEvidence ?? []) {
-    const key = opportunityKey(hit.item) || hit.item.title || '';
-    if (key) passageByKey.set(key, hit.passage);
-  }
   const relatedCards = translateOpportunities(byStage(relatedItems).slice(0, n), {
     nowMs,
     eligibility,
     searchContext: null,
   })
     .filter((c) => c.grounded)
-    .map((c) => {
-      const pub = toPublicBeginnerCard(c);
-      const passage = passageByKey.get(opportunityKey(c.raw) || c.title || '');
-      return passage ? { ...pub, detailPassage: passage } : pub;
-    });
+    .map(toPublicBeginnerCard);
 
   // A page with ONLY related cards is still a result — an honest, clearly
   // labelled adjacent one. It is not "we found nothing".

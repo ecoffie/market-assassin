@@ -77,6 +77,11 @@ function escapeIlike(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
+// ⚠️ NO `notice_id` here. Harmless today (nothing reads it), but it is why the
+// removed detail-evidence fallback got ZERO coverage from this oracle while it
+// reported 13/13 — every candidate was skipped before any fetch. A future
+// body-relevance feature MUST add it, or this file will pass with that feature
+// disabled. See tasks/body-relevance-followup-2026-09-21.md.
 function toItem(row) {
   return {
     title: row.title ?? null,

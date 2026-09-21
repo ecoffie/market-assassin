@@ -254,16 +254,18 @@ support, `install` for roofing, `physical` for security guard, `agency` for staf
   second was live on the garbage case (1 title match reported as a small market beside
   ~20 open refuse/solid-waste notices). Say which words were searched and that the limit
   is the SEARCH. Guarded by the live oracle's `no_market_absence_claim` pin.
-- **`detail-evidence.ts` is the rescue, and it READS the notice — it never maps words.**
-  When the direct group is empty it fetches `description`/`sow_text` for the candidates
-  already returned and quotes the line that proves the user's word ("…frequent mowing,
-  weeding, and general lawn maintenance…"). Bounded: empty-only, ≤6 hits, broader group,
-  quote always rendered. ⚠️ Detail terms must be **multi-word or distinctive**, and a
-  multi-word term must appear **within 40 chars** — unguarded, `medical` matched 23
-  unrelated VA notices and "medical staffing" matched any hospital SOW containing both
-  words. **A THIRD synonym hop was measured and rejected: `lawn` → `naics_vocabulary` →
-  333112 LAWN-MOWER MANUFACTURING (df 17)**, same shape as the 562998 → "grease trap"
-  failure. Do not re-propose a word→code→market expansion.
+- ⛔ **There is NO body-text rescue, and the one that was built is RETRACTED.** A
+  `detail-evidence.ts` fallback read the notice's description on an empty result and quoted
+  the line; independent review measured **~19 of 26 hits (73%) wrong** — submission
+  boilerplate, a table of contents, FAR clause text, a scope EXCLUSION quoted as proof.
+  Removed 2026-09-21. Its own "multi-word terms must be a PHRASE within 40 chars" guard was
+  **order-free proximity and did not work** (`"the staffing plan shall address medical
+  surveillance requirements"` matched `"medical staffing"`). Evidence + the bar a
+  replacement must clear: `src/lib/beginner/__fixtures__/body-relevance-cases.ts` and
+  `tasks/body-relevance-followup-2026-09-21.md`. **Do not substitute another heuristic
+  without clearing that bar**, and do not re-propose a word→code→market hop — three are now
+  measured and rejected (`physical` outranks `guard`; 562998 → "grease trap"; `lawn` →
+  333112 lawn-mower manufacturing).
 - **`verify:beginner-try --sample` is a RECALL FLOOR, not a precision score** — nouns are
   harvested from live titles, and it only asserts not-empty / not-follow-up. A build
   returning the whole corpus would score 1000/1000. Precision lives in the frozen set and

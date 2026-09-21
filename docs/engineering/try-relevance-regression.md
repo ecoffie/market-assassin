@@ -256,44 +256,51 @@ Landscaping Services**. A lawn-mowing company has a real, open market of about
 18 notices. Saying "nothing found" described a **vocabulary miss as market
 absence**.
 
-### The interpretation we added — and why it is not the rejected synonym hop
+### ⛔ RETRACTED — the detail-evidence fallback was built and REMOVED
 
-The first instinct was to map `lawn` → "grounds maintenance". Measured, that
-is the grease-trap failure again: `naics_vocabulary` sends **`lawn` → 333112
-LAWN-MOWER MANUFACTURING (df 17)**. `mowing` → 561730 correctly, but `lawn` and
-`mowing` disagree, and nothing in the data breaks the tie. **No synonym hop was
-added.**
+A fallback was added that, on an empty direct group, read the notice's
+`description`/`sow_text`, matched the activity term and rendered the passage
+under *"Your words are in this listing's details:"*. **It was removed the same
+day.** Independent review measured it end-to-end against the live cache:
+**26 hits across 10 inputs, ~19 (73%) did not describe the user's work** —
+submission boilerplate (*"a written condition report **detailing** the
+failure"*), a document's table of contents (*"………26 5.4 **Escort**
+Requirements………"*), FAR 12.302 clause text, a scope **exclusion** quoted as
+proof, and wrong word senses (*"collecting, preserving, **interpreting** … the
+history of USACE"*). Because the card asserted the notice's own text as
+evidence, each wrong hit was an affirmative false claim with the proof
+attached — the failure class the rest of this work removes, relocated into the
+Related group.
 
-What the corpus does support is reading the notice. The tool's body pass
-already returns the right rows — the gate was discarding them because it could
-not see the text. So `src/lib/beginner/detail-evidence.ts` goes and fetches it:
+**Three claims made for it are retracted:**
 
-```
-PSW Landscaping Hilo, Hawaii  (561730)
-  "…The purpose of this contract is to have frequent mowing, weeding,
-   and general lawn maintenance year-round…"
-Grounds Maintenance Services, Ft Sill National Cemetery  (561730)
-  "…Mowing, trimming, edging on improved and unimproved turf areas…"
-```
+1. **"A multi-word term must appear as a PHRASE (within 40 chars)."** FALSE.
+   `DETAIL_PHRASE_SPAN` was order-free proximity, not a phrase check.
+   Verified after the fact:
+   `findTermInText("the staffing plan shall address medical surveillance requirements", "medical staffing")`
+   → **MATCH**. The `23 → 1` improvement cited for the medical-staffing case
+   was real for that one text and did not generalise; the guard does not do
+   what its own comment said.
+2. **The "we mow lawns" browser screenshot was NOT this feature.** The detail
+   path is gated `!awardedFallback`, and `we mow lawns` takes the awarded
+   path — the screenshot showed the *awarded* fallback working. The CLI run
+   where the detail hit appeared had `searchAwarded` stubbed off. The feature
+   never fired for its own motivating example.
+3. **`verify:beginner-try` never exercised it.** `toItem()` omits `notice_id`,
+   so every candidate was skipped before any fetch; the 13/13 pinned pass was
+   green with the feature effectively disabled.
 
-Nothing is inferred; the user's own word is matched against the notice's own
-text on a word boundary, and **the passage is quoted on the card**. Bounded:
-one extra query, only when the direct group is EMPTY, only over candidates the
-search already returned, at most 6 hits, always in the explicitly-broader
-group. `description` is populated on **4,798 of 9,045** active open rows (53%);
-a null description yields no claim, never a guess.
+The idea is not dead — the corpus really does connect "mowing" to NAICS 561730
+through the description. The evidence, the classes a replacement must handle,
+and the accounting defects are frozen in
+`src/lib/beginner/__fixtures__/body-relevance-cases.ts` and
+`tasks/body-relevance-followup-2026-09-21.md`. **Do not substitute another
+heuristic without clearing that bar.**
 
-**Two guards the first attempt needed** (both found by measuring, not
-reasoning):
-
-- **A wildcard may not roam a 48 KB SOW.** `medical` matched 23 unrelated
-  notices — VA Medical Center duct work, radiopharmaceuticals, bed-bug pest
-  control. A title is ~8 words, so a broad word is mostly self-limiting there;
-  a description is thousands. Detail terms must be multi-word or distinctive.
-- **A multi-word term must be a PHRASE.** "medical staffing" "matched" any
-  hospital SOW containing both words separately ("…licenses for medical
-  staff…"). Tokens must fall within 40 characters. After both guards: 23 → 1,
-  and the one is *"VA or DoD medical staffing contracts"*.
+**Still true, and kept:** mapping `lawn` → "grounds maintenance" was measured
+and rejected — `naics_vocabulary` sends `lawn` → **333112 LAWN-MOWER
+MANUFACTURING (df 17)**, the third instance of the 562998 → "grease trap"
+failure. No synonym hop was added.
 
 ### Copy that claimed the market, now fixed
 

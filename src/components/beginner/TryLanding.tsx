@@ -97,6 +97,20 @@ function track(action: string, extra: Record<string, unknown> = {}) {
  * words — wrong provenance and a claim the lib had already stopped making.
  * One source of copy, or the next fix only lands in half the product.
  */
+/**
+ * The headline counts a POPULATION; the group renders at most
+ * REVEAL_THRESHOLDS.cardsPerGroup cards. "found 11" above three cards is
+ * technically true and reads as a miscount, so say which it is.
+ */
+function ShowingOf({ shown, total }: { shown: number; total?: number | null }) {
+  if (typeof total !== 'number' || total <= shown) return null;
+  return (
+    <span className="ml-2 font-normal normal-case text-faint">
+      showing {shown} of {total}
+    </span>
+  );
+}
+
 function RevealHero({ view }: { view: HiddenMarketLandingView }) {
   const reveal = view.reveal;
   if (view.outcome === 'need_followup' && view.message) {
@@ -323,6 +337,7 @@ export function TryLanding() {
               <div className="space-y-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
                   {reveal?.directLabel || 'Matches what you described'}
+                  <ShowingOf shown={view.directCards.length} total={reveal?.directMatchCount} />
                 </h2>
                 {view.directCards.map((card) => (
                   <BeginnerOpportunityCard
@@ -345,6 +360,7 @@ export function TryLanding() {
               <div className="space-y-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
                   {reveal?.expandedLabel || 'Opportunities Mindy uncovered'}
+                  <ShowingOf shown={view.uncoveredCards.length} total={reveal?.expandedMatchCount} />
                 </h2>
                 {view.uncoveredCards.map((card) => (
                   <BeginnerOpportunityCard

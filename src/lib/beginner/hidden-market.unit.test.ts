@@ -539,7 +539,11 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(blob).not.toMatch(/\$/);
     expect(blob).not.toMatch(/\bNAICS\b/);
     expect(view.reveal?.explanation).toMatch(/You'd have found 1/);
-    expect(view.reveal?.explanation).toMatch(/Mindy found 4/);
+    // CHANGED 2026-09-21: the headline NAMES the broader term instead of
+    // claiming "Mindy translated what you do" — on /try that term is usually
+    // the user's own second word, so the translation claim was unearned.
+    expect(view.reveal?.explanation).toMatch(/that is 4/);
+    expect(view.reveal?.explanation).not.toMatch(/translated what you do/i);
   });
 
   it('does not render an uncovered group when there is no hidden market', async () => {
