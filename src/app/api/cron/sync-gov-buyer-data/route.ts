@@ -41,6 +41,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+/**
+ * ⚠️ The cron_jobs row is named `sync-decision-makers` while this ROUTE is
+ * `sync-gov-buyer-data`. reportCronOutcome writes by JOB name, so the mapping is
+ * stated explicitly here rather than inferred from the path.
+ */
+const CRON_JOB_NAME = 'sync-decision-makers';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
 import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
@@ -286,9 +294,15 @@ export async function GET(request: NextRequest) {
     }
     out.durationSeconds = Math.round((Date.now() - started) / 1000);
     out.success = true;
+    // The dispatcher fire-and-forgets this route (timeout_ms 290s > its 55s await
+    // cap) and records `dispatched` at 12s, which the watchdog ignores. Without
+    // this the run's real outcome is invisible forever — 71 such runs in 30 days.
+    // A `dry` rehearsal must not overwrite the scheduled job's status.
+    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'success');
     return NextResponse.json(out);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'error', msg).catch(() => {});
     return NextResponse.json({ success: false, error: msg, ...out }, { status: 500 });
   }
 }
