@@ -1,0 +1,168 @@
+import BundleProductPage from '@/components/BundleProductPage';
+
+export default function UltimateBundlePage() {
+  return (
+    <BundleProductPage
+      title="Ultimate GovCon Bundle"
+      tagline="The complete arsenal for dominating federal contracting"
+      description="Get EVERYTHING. Every premium tool, every database, every report, and lifetime Market Intelligence access. The Ultimate Bundle is for contractors who are serious about building a dominant GovCon business and want no limitations."
+      primaryColor="#f59e0b"
+      gradientFrom="#f59e0b"
+      gradientTo="#ea580c"
+      price={1497}
+      originalPrice={3285}
+      checkoutUrl="https://buy.stripe.com/6oU3cwff897ceND84UfnO0t"
+      badge="BEST VALUE - EVERYTHING INCLUDED"
+      accessSummary="One-time payment. Lifetime access to every included tool, including Market Intelligence."
+      accessBadgeLabel="Lifetime MI Included"
+      includedProductsSubtitle="Get lifetime access to every premium product, including Market Intelligence"
+      guaranteeText="30-day money-back guarantee. Lifetime access to the full Ultimate bundle, including Market Intelligence."
+      includedProducts={[
+        {
+          name: 'Market Intelligence - Lifetime Access',
+          description: 'Lifetime access to the unified Market Intelligence platform: daily bid targets, weekly market deep dives, pursuit intelligence, pipeline tracking, teaming CRM, and secure team-ready workspace features.',
+          price: 1497,
+          icon: '🚀',
+          link: '/market-intelligence',
+          features: [
+            'Lifetime Market Intelligence access',
+            'Daily bid target briefings',
+            'Weekly market deep dives',
+            'Pursuit-focused intelligence',
+            'Pipeline and teaming workspace',
+            'Future MI platform updates included',
+          ],
+        },
+        {
+          name: 'Content Reaper (Full Fix)',
+          description: 'The premium tier of Content Reaper with enhanced AI capabilities, more content types, and advanced customization for creating content that converts.',
+          price: 397,
+          icon: '✍️',
+          link: '/content-reaper',
+          features: [
+            'Everything in standard, plus:',
+            'Advanced AI model access',
+            'Premium content templates',
+            'Agency-specific messaging',
+            'Proposal snippet generator',
+            'Capability statement helper',
+            'Priority processing',
+          ],
+        },
+        {
+          name: 'Federal Contractor Database',
+          description: 'Interactive searchable database of 3,500+ federal contractors with SBLO contact info, vendor portals, and teaming partner finder.',
+          price: 497,
+          icon: '📊',
+          link: '/contractor-database-product',
+          features: [
+            '3,500+ federal contractors',
+            'SBLO contact information',
+            'Teaming partner finder',
+            'Vendor portal links',
+            'Advanced filtering',
+            'Export capabilities',
+          ],
+        },
+        {
+          name: 'Recompete Tracker',
+          description: 'Track expiring federal contracts before they hit the market. Get ahead of the competition by knowing exactly when contracts are up for recompete.',
+          price: 397,
+          icon: '📅',
+          link: '/expiring-contracts',
+          features: [
+            'Contracts expiring in 12 months',
+            'Prime contractor details',
+            'NAICS code filtering',
+            'Historical performance data',
+            'Agency breakdown',
+            'Export to CSV',
+          ],
+        },
+        {
+          name: 'Market Assassin Premium',
+          description: 'The full 8-report Market Assassin experience with unlimited generations, enhanced report depth, and all strategic intelligence reports unlocked. Pair it with lifetime MI for ongoing daily execution.',
+          price: 497,
+          icon: '🎯',
+          link: '/market-assassin',
+          features: [
+            'All 8 strategic reports',
+            'Unlimited report generations',
+            'Enhanced report depth',
+            'Subcontracting Opportunities',
+            'IDV Contracts Analysis',
+            'Similar Awards Report',
+            'Tribal Contracting Report',
+            'Priority support',
+          ],
+        },
+        {
+          name: 'Opportunity Hunter Pro',
+          description: 'Find out which government buyers buy what you sell. Identify your ideal federal customers in minutes with detailed agency spending analysis.',
+          price: 49,
+          icon: '🔍',
+          link: '/opportunity-hunter',
+          features: [
+            'Agency spending analysis',
+            'Prime contractor matching',
+            'NAICS-based targeting',
+            'Historical spend data',
+            'Unlimited searches',
+            'Export results',
+          ],
+        },
+      ]}
+      bestFor={[
+        "You want EVERYTHING with no limitations or restrictions",
+        "You want lifetime Market Intelligence included with the full toolkit",
+        "You're building a serious GovCon business and need the best tools",
+        "You want all premium tiers, not standard versions",
+        "You need comprehensive market intelligence (all 8 reports)",
+        "You want to maximize your competitive advantage",
+        "You understand that the right tools pay for themselves many times over",
+      ]}
+      bonuses={[
+        'VIP priority support',
+        'Early access to new features',
+        'All future product updates included',
+        'Lifetime Market Intelligence access included',
+        'GovCon Giants VIP community access',
+        'Quarterly strategy webinar access',
+      ]}
+      highlightTitle="For Contractors Who Refuse to Compromise"
+      highlightText="The Ultimate Bundle includes every tool at its highest tier plus lifetime Market Intelligence access. You get Market Assassin Premium with all 8 reports and unlimited generations. You get Content Reaper Full Fix with advanced AI capabilities. You get every database, every tracker, every tool we offer, and ongoing MI briefings to keep your pipeline moving. This is for contractors who understand that having the best intelligence and tools is the difference between winning and losing contracts worth hundreds of thousands—or millions—of dollars."
+      reviews={[
+        {
+          name: 'Michael S.',
+          date: '1 week ago',
+          rating: 5,
+          text: "I run a $5M GovCon firm and the Ultimate Bundle has become our secret weapon. The Market Assassin Premium reports give us intel that our competitors simply don't have. We've won 3 contracts since getting this bundle.",
+        },
+        {
+          name: 'Jennifer T.',
+          date: '2 weeks ago',
+          rating: 5,
+          text: "Worth every penny. I was hesitant at the price, but the first contract we won using these tools was worth $1.2M. The ROI is insane. The Full Fix content generator alone has transformed our LinkedIn presence.",
+        },
+        {
+          name: 'Anthony R.',
+          date: '3 weeks ago',
+          rating: 5,
+          text: "As an 8(a) firm, we need every advantage. The Ultimate Bundle gives us enterprise-level competitive intelligence at a fraction of what the big primes pay for similar data. Game changer.",
+        },
+        {
+          name: 'Lisa M.',
+          date: '1 month ago',
+          rating: 5,
+          text: "I bought the Pro bundle first, then upgraded to Ultimate within a week. The Premium Market Assassin reports and Full Fix content generator are on another level. Should have just gotten Ultimate from the start.",
+        },
+        {
+          name: 'Carlos D.',
+          date: '1 month ago',
+          rating: 5,
+          text: "Our BD team uses this daily. The combination of all tools working together is powerful. Find opportunities with Recompete Tracker, research with Market Assassin, find teammates with the Database, then promote with Content Reaper. Complete workflow.",
+        },
+      ]}
+    />
+  );
+}

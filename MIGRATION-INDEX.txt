@@ -1,0 +1,265 @@
+================================================================================
+SUPABASE MIGRATION DOCUMENTATION INDEX
+Multisite Aggregation Tables (Moat 6)
+================================================================================
+
+QUICK START: Read these 3 files in this order:
+
+1. EXECUTIVE-SUMMARY.txt
+   ├─ What: High-level overview
+   ├─ Why: Why this migration is needed
+   ├─ When: When to run it
+   └─ Time: 5 minutes to read
+
+2. MIGRATION-EXECUTION-GUIDE.txt
+   ├─ How: Step-by-step instructions
+   ├─ Where: What to click in Supabase
+   ├─ Verify: How to verify success
+   └─ Troubleshoot: What to do if issues
+   └─ Time: 5-10 minutes to execute + verify
+
+3. README-MULTISITE-MIGRATION.md (optional detailed reference)
+   ├─ What: Complete schema documentation
+   ├─ Why: Why each table/column exists
+   ├─ FAQ: Common questions answered
+   └─ Next: What to do after migration
+
+================================================================================
+FILE GUIDE
+================================================================================
+
+EXECUTIVE-SUMMARY.txt (START HERE)
+Status: Top-level findings
+Audience: Decision makers
+Contents:
+  • Migration file verification results
+  • Risk assessment (LOW risk)
+  • Recommended execution method
+  • Expected outcomes
+  • Troubleshooting reference
+Time to read: 5 minutes
+Action: Decide whether to proceed
+
+MIGRATION-EXECUTION-GUIDE.txt (MAIN REFERENCE)
+Status: How to run the migration
+Audience: Person executing migration
+Contents:
+  • Step-by-step instructions (8 steps)
+  • Screenshot reference points
+  • Expected output
+  • Troubleshooting guide
+  • Verification queries
+Time to read: 5 minutes
+Action: Follow steps to run migration
+
+MIGRATION-SUMMARY.txt (DETAILED OVERVIEW)
+Status: Comprehensive technical overview
+Audience: Technical stakeholders
+Contents:
+  • What migration does
+  • Database schema overview
+  • All 21 data sources listed
+  • Performance impact
+  • Next steps (4 phases)
+Time to read: 10 minutes
+Action: Understand full scope
+
+README-MULTISITE-MIGRATION.md (DETAILED REFERENCE)
+Status: Complete reference guide
+Audience: Developers, DBAs
+Contents:
+  • Full schema with code samples
+  • All table definitions
+  • All indexes explained
+  • FAQ with 6 common questions
+  • Resources and contact info
+Time to read: 15 minutes
+Action: Reference during implementation
+
+MIGRATION FILE (THE ACTUAL SQL)
+File: migrations/multisite-aggregation-tables.sql
+Size: 14,159 bytes (safe)
+Lines: 337
+Status: ✅ Verified and ready
+Contains:
+  • 3 CREATE TABLE statements
+  • 11 CREATE INDEX statements
+  • 2 CREATE TRIGGER statements
+  • 1 CREATE FUNCTION statement
+  • 1 INSERT statement (21 sources)
+  • 1 ALTER TABLE statement (2 new columns)
+  • 1 verification query
+
+This is what you'll copy/paste into Supabase.
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+MIGRATION BASICS:
+  Project: Market Assassin (krpyelfrbicmvsmwovti)
+  File: migrations/multisite-aggregation-tables.sql
+  Size: 14,159 bytes
+  Duration: 5-10 minutes
+  Risk: LOW (schema-only, idempotent)
+
+WHAT'S CREATED:
+  Tables: 3 (aggregated_opportunities, multisite_sources, scrape_log)
+  Indexes: 11 (on aggregated_opportunities)
+  Triggers: 2 (auto-update timestamps)
+  Functions: 1 (timestamp helper)
+  Sources: 21 pre-loaded
+
+EXECUTION METHOD:
+  Recommended: Manual via Supabase dashboard
+  URL: https://app.supabase.com/
+  Steps: 9 simple steps
+  Verification: 30 seconds (check results at bottom)
+
+EXPECTED SUCCESS:
+  aggregated_opportunities: 0 rows
+  multisite_sources: 21 rows
+  scrape_log: 0 rows
+
+DATA SOURCES INCLUDED:
+  Tier 1 (high-volume): 4 sources - DLA DIBBS, Navy NECO, Unison, Acquisition Gateway
+  Tier 2 (research): 3 sources - NIH Reporter, DARPA, NSF SBIR
+  Tier 3 (DOE labs): 13 labs - Oak Ridge, Los Alamos, Sandia, NREL, etc.
+
+NEXT STEPS:
+  1. Verify tables exist (30 seconds)
+  2. Build scraper runners (1-2 weeks)
+  3. Populate data (2-4 weeks)
+  4. Launch feature (1 week)
+
+================================================================================
+READING GUIDE BY ROLE
+================================================================================
+
+PROJECT MANAGER
+  1. Read: EXECUTIVE-SUMMARY.txt (5 min) - understand scope, risk, timeline
+  2. Decide: Go/no-go based on risk and timeline
+  3. Reference: MIGRATION-INDEX.txt for quick facts
+
+TECHNICAL LEAD
+  1. Read: EXECUTIVE-SUMMARY.txt (5 min) - understand findings
+  2. Read: MIGRATION-SUMMARY.txt (10 min) - understand database design
+  3. Read: README-MULTISITE-MIGRATION.md (15 min) - full schema details
+  4. Decide: Architectural fit, next steps planning
+
+DATABASE ADMINISTRATOR
+  1. Read: README-MULTISITE-MIGRATION.md (15 min) - schema details
+  2. Read: MIGRATION-EXECUTION-GUIDE.txt (5 min) - execution steps
+  3. Execute: Run migration in Supabase dashboard
+  4. Verify: Run verification queries
+
+DEVELOPER
+  1. Read: README-MULTISITE-MIGRATION.md (15 min) - schema reference
+  2. Understand: How to query aggregated_opportunities
+  3. Build: Scraper runners for each source
+  4. Integrate: Into existing Opportunity Hunter code
+
+================================================================================
+DOCUMENT LOCATIONS
+================================================================================
+
+All files stored in:
+  /Users/ericcoffie/Market Assasin/market-assassin/
+
+Quick access:
+  EXECUTIVE-SUMMARY.txt
+  MIGRATION-EXECUTION-GUIDE.txt
+  MIGRATION-SUMMARY.txt
+  README-MULTISITE-MIGRATION.md
+  MIGRATION-INDEX.txt (this file)
+  migrations/multisite-aggregation-tables.sql (the actual SQL)
+
+================================================================================
+DECISION CHECKLIST
+================================================================================
+
+Before executing migration, verify:
+
+[ ] 1. Have I read EXECUTIVE-SUMMARY.txt?
+[ ] 2. Do I understand the 3 tables being created?
+[ ] 3. Am I aware this is LOW RISK (schema-only)?
+[ ] 4. Do I know it takes 5-10 minutes to run?
+[ ] 5. Am I logged into correct Supabase project?
+[ ] 6. Have I verified I have admin access?
+[ ] 7. Do I understand the verification query results?
+[ ] 8. Am I ready to proceed?
+
+If all checked, proceed to MIGRATION-EXECUTION-GUIDE.txt and follow steps.
+
+================================================================================
+SUCCESS CRITERIA
+================================================================================
+
+Migration is successful when:
+  ✅ No errors in Supabase dashboard
+  ✅ "Success" message appears
+  ✅ Verification query shows:
+     - aggregated_opportunities: 0 rows
+     - multisite_sources: 21 rows
+     - scrape_log: 0 rows
+  ✅ Can query tables directly:
+     SELECT * FROM multisite_sources LIMIT 1;
+  ✅ All 21 sources are pre-populated
+  ✅ 11 indexes created successfully
+
+If all conditions met: Migration is complete.
+If issues: See troubleshooting in MIGRATION-EXECUTION-GUIDE.txt
+
+================================================================================
+TIMELINE
+================================================================================
+
+PHASE 1: PREPARATION (now)
+  • Read documentation: 15 minutes
+  • Verify Supabase access: 5 minutes
+  Total: 20 minutes
+
+PHASE 2: EXECUTION (when ready)
+  • Copy SQL file: 2 minutes
+  • Paste into Supabase: 2 minutes
+  • Run migration: 5-10 minutes
+  • Verify success: 5 minutes
+  Total: 14-19 minutes
+
+PHASE 3: POST-MIGRATION
+  • Build scrapers: 1-2 weeks
+  • Populate data: 2-4 weeks
+  • Launch feature: 1 week
+  Total: 4-7 weeks
+
+END-TO-END: From now to launch: 4-7 weeks
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+Questions about:
+  • WHAT TO RUN → See migration file: migrations/multisite-aggregation-tables.sql
+  • HOW TO RUN → See MIGRATION-EXECUTION-GUIDE.txt
+  • WHAT'S CREATED → See README-MULTISITE-MIGRATION.md
+  • WHY RUN IT → See TOOL-BUILD.md (Moat 6 section)
+  • RISK LEVEL → See EXECUTIVE-SUMMARY.txt
+
+Supabase support:
+  • Dashboard: https://app.supabase.com/
+  • Docs: https://supabase.com/docs
+  • Project: krpyelfrbicmvsmwovti
+
+================================================================================
+VERSION INFO
+================================================================================
+
+Migration Created: April 4, 2026
+Analysis Complete: April 5, 2026
+Status: READY FOR DEPLOYMENT
+Risk Level: LOW
+Approval: Not needed (schema-only, can be re-run)
+
+Documentation Updated: April 5, 2026 07:30 UTC
+
+================================================================================

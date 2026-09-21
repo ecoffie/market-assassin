@@ -1,0 +1,290 @@
+/**
+ * IDV Contract Search Module
+ * GovCon Giants - USASpending.gov API Integration
+ */
+
+import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+
+const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
+
+// Award type codes: shared canonical lists (IDV vs task-order / definitive).
+const TASK_ORDER_CODES = CONTRACT_CODES;
+
+// Types
+export interface IDVSearchOptions {
+  naicsCode?: string;
+  pscCode?: string;
+  agency?: string;
+  minValue?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  state?: string;
+  stateFilterType?: 'recipient' | 'pop' | 'both';
+  limit?: number;
+  page?: number;
+  /** Explicit award-type slice (Eric: drive the toggle, not the state hack). */
+  searchType?: 'idv' | 'task';
+}
+
+export interface IDVContract {
+  awardId: string;
+  recipientName: string;
+  recipientUei: string;
+  awardAmount: number;
+  description: string;
+  startDate: string;
+  endDate: string;
+  agency: string;
+  subAgency: string;
+  naicsCode: string;
+  naicsDescription: string;
+  pscCode: string;
+  pscDescription: string;
+  recipientState: string;
+  popState: string;
+  generatedId: string;
+  usaSpendingUrl: string;
+}
+
+export interface IDVSearchResult {
+  contracts: IDVContract[];
+  totalCount: number;
+  page: number;
+  hasNextPage: boolean;
+  searchType: 'idv_contracts' | 'task_orders';
+}
+
+/**
+ * Search for IDV contracts or task orders
+ */
+export async function searchIDVContracts(options: IDVSearchOptions = {}): Promise<IDVSearchResult> {
+  const {
+    naicsCode,
+    pscCode,
+    agency,
+    minValue = 0,
+    dateFrom,
+    dateTo,
+    state,
+    stateFilterType = 'recipient',
+    limit = 50,
+    page = 1,
+    searchType
+  } = options;
+
+  // stateFilterType 'both' = union of recipient-HQ and place-of-performance.
+  // USASpending ANDs its filters, so run each side as its own request and merge
+  // + dedupe by awardId (same parallel-request pattern as SAM.gov NAICS).
+  if (state && stateFilterType === 'both') {
+    const [recip, pop] = await Promise.all([
+      searchIDVContracts({ ...options, stateFilterType: 'recipient' }),
+      searchIDVContracts({ ...options, stateFilterType: 'pop' }),
+    ]);
+    const byId = new Map<string, IDVContract>();
+    for (const c of [...recip.contracts, ...pop.contracts]) {
+      const key = c.generatedId || c.awardId || `${c.recipientUei}:${c.awardAmount}`;
+      const prev = byId.get(key);
+      if (!prev || c.awardAmount > prev.awardAmount) byId.set(key, c);
+    }
+    const merged = [...byId.values()].sort((a, b) => b.awardAmount - a.awardAmount).slice(0, limit);
+    return {
+      contracts: merged,
+      totalCount: merged.length,
+      page,
+      hasNextPage: recip.hasNextPage || pop.hasNextPage,
+      searchType: recip.searchType,
+    };
+  }
+
+  // Explicit searchType wins; legacy fallback = the old state+pop heuristic.
+  const isTaskOrderSearch = searchType === 'task' || (!searchType && state && stateFilterType === 'pop');
+
+  const requestBody: Record<string, unknown> = {
+    filters: {
+      award_type_codes: isTaskOrderSearch ? TASK_ORDER_CODES : IDV_CODES,
+      award_amounts: [{ lower_bound: minValue }]
+    },
+    fields: [
+      "Award ID",
+      "Recipient Name",
+      "Recipient UEI",
+      "Award Amount",
+      "Total Outlays",
+      "Description",
+      "Start Date",
+      "End Date",
+      "Awarding Agency",
+      "Awarding Sub Agency",
+      "NAICS Code",
+      "NAICS Description",
+      "Product or Service Code",
+      "Product or Service Code Description",
+      "Contract Award Type",
+      "Recipient State Code",
+      "Place of Performance State Code",
+      // generated_internal_id is the id the award API + /award/ deep link need
+      // (generated_unique_award_id is null for contracts/IDVs). Request BOTH so
+      // the field we read (generatedId) is the field we ask for — not silently
+      // dependent on USASpending auto-including it.
+      "generated_internal_id",
+      "generated_unique_award_id"
+    ],
+    page,
+    limit,
+    sort: "Award Amount",
+    order: "desc",
+    subawards: false
+  };
+
+  const filters = requestBody.filters as Record<string, unknown>;
+
+  // Add time period filter
+  if (dateFrom || dateTo) {
+    const effectiveStartDate = dateFrom || '2000-01-01';
+    const effectiveEndDate = dateTo || new Date().toISOString().split('T')[0];
+    filters.time_period = [{
+      start_date: effectiveStartDate,
+      end_date: effectiveEndDate
+    }];
+  }
+
+  // Add NAICS filter - handle comma-separated codes.
+  // USASpending accepts full 6-digit codes in naics_codes.require. The old code
+  // did `substring(0,2)`, collapsing 541512 (IT systems design) → 54 (ALL
+  // professional services) — a 7x over-match (same class as the Market Research
+  // over-expansion). Keep the user's code AS ENTERED: a 6-digit code stays exact;
+  // a typed prefix (2-5 digit) stays a prefix. USASpending prefix-matches require.
+  if (naicsCode) {
+    const codes = naicsCode.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+    const cleanedCodes = codes
+      .map(code => code.replace(/\D/g, ''))   // digits only
+      .filter(code => code.length >= 2 && code.length <= 6);
+    const uniqueCodes = [...new Set(cleanedCodes)];
+    if (uniqueCodes.length) filters.naics_codes = { require: uniqueCodes };
+  }
+
+  // Add PSC code filter
+  if (pscCode) {
+    // PSC codes are typically 4 characters (e.g., "R425", "J045", "Z2JZ")
+    // The API accepts the full code or prefix for broader matching
+    const cleanPsc = pscCode.trim().toUpperCase();
+    // FLAT array — NOT { require: [...] }, which 422s on spending_by_award ("'R425' is not a valid
+    // type (array)"; that tiered form wants an array-of-arrays). Same FM-05 bug as awards-search.ts:
+    // every PSC-filtered IDV search was silently 422ing → degraded/empty. (2026-07-28.)
+    filters.psc_codes = [cleanPsc];
+  }
+
+  // Add agency filter
+  if (agency) {
+    filters.agencies = [{
+      type: "awarding",
+      tier: "toptier",
+      name: agency
+    }];
+  }
+
+  // Add state filter
+  if (state) {
+    if (stateFilterType === 'pop') {
+      filters.place_of_performance_locations = [{
+        country: "USA",
+        state: state
+      }];
+    } else {
+      filters.recipient_locations = [{
+        country: "USA",
+        state: state
+      }];
+    }
+  }
+
+  // Make API request
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    throw new Error(`USASpending API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // Process results
+  const contracts: IDVContract[] = (data.results || []).map((c: Record<string, unknown>) => ({
+    awardId: c['Award ID'] as string || '',
+    recipientName: c['Recipient Name'] as string || '',
+    recipientUei: c['Recipient UEI'] as string || '',
+    awardAmount: parseFloat(c['Award Amount'] as string) || 0,
+    description: c['Description'] as string || '',
+    startDate: c['Start Date'] as string || '',
+    endDate: c['End Date'] as string || '',
+    agency: c['Awarding Agency'] as string || '',
+    subAgency: c['Awarding Sub Agency'] as string || '',
+    naicsCode: c['NAICS Code'] as string || '',
+    naicsDescription: c['NAICS Description'] as string || '',
+    pscCode: c['Product or Service Code'] as string || '',
+    pscDescription: c['Product or Service Code Description'] as string || '',
+    recipientState: c['Recipient State Code'] as string || '',
+    popState: c['Place of Performance State Code'] as string || '',
+    // USASpending's spending_by_award returns the id as `generated_internal_id`
+    // (NOT generated_unique_award_id, which is null — Eric QA: drill-down + the
+    // /award/ deep link were empty). This id powers the award-detail drill-down.
+    generatedId: (c['generated_internal_id'] || c['generated_unique_award_id'] || '') as string,
+    usaSpendingUrl: (c['generated_internal_id'] || c['generated_unique_award_id'])
+      ? `https://www.usaspending.gov/award/${c['generated_internal_id'] || c['generated_unique_award_id']}`
+      : `https://www.usaspending.gov/keyword_search/${encodeURIComponent(c['Award ID'] as string || '')}`
+  }));
+
+  return {
+    contracts,
+    totalCount: contracts.length,
+    page,
+    hasNextPage: data.page_metadata?.hasNext || false,
+    searchType: isTaskOrderSearch ? 'task_orders' : 'idv_contracts'
+  };
+}
+
+/**
+ * Search by contractor headquarters state
+ */
+export async function searchByContractorState(state: string, options: Omit<IDVSearchOptions, 'state' | 'stateFilterType'> = {}) {
+  return searchIDVContracts({ ...options, state, stateFilterType: 'recipient' });
+}
+
+/**
+ * Search by work location (place of performance)
+ */
+export async function searchByWorkLocation(state: string, options: Omit<IDVSearchOptions, 'state' | 'stateFilterType'> = {}) {
+  return searchIDVContracts({ ...options, state, stateFilterType: 'pop' });
+}
+
+/**
+ * List of federal agencies
+ */
+export const AGENCIES = [
+  "Department of Defense",
+  "Department of Health and Human Services",
+  "Department of Homeland Security",
+  "Department of Veterans Affairs",
+  "General Services Administration",
+  "National Aeronautics and Space Administration",
+  "Department of the Interior",
+  "Department of Transportation",
+  "Department of Energy",
+  "Department of Justice",
+  "Department of the Treasury",
+  "Department of State"
+] as const;
+
+/**
+ * List of US state codes
+ */
+export const STATE_CODES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL",
+  "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
+  "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH",
+  "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
+  "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+] as const;

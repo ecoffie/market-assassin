@@ -1,0 +1,880 @@
+{
+  "generated": "2026-04-28T02:16:28.767Z",
+  "summary": {
+    "totalCharges": 1072,
+    "uniquePayingEmails": 113,
+    "matched": 32,
+    "unmatched": 81
+  },
+  "categories": {
+    "refundedOrDisputed": [
+      {
+        "email": "andrew@millpondresearch.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-06-17",
+        "refundedCount": 1,
+        "disputedCount": 0,
+        "products": [
+          "Small Business"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "pete.shimshock@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-06-13",
+        "refundedCount": 1,
+        "disputedCount": 0,
+        "products": [
+          "Small Business"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "brendannzoma@gmail.com",
+        "totalAmount": "799.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-11-13",
+        "refundedCount": 0,
+        "disputedCount": 1,
+        "products": [
+          "brendannzoma@gmail.com | Product: VIP Challenge Ticket"
+        ],
+        "fuzzyMatch": null
+      }
+    ],
+    "emailMismatchCandidate": [],
+    "last12Months": [
+      {
+        "email": "altonseth@gmail.com",
+        "totalAmount": "19.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-04-21",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Subscription creation"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "jason.gunn5@yahoo.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-04-19",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "daphne@yellowbirdtech.com",
+        "totalAmount": "249.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-04-18",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools + CRM + Research / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "keisha.hinds@gmail.com",
+        "totalAmount": "495.00",
+        "chargeCount": 5,
+        "latestCharge": "2026-04-17",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "erickjames13@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-04-13",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "paul@elliottadamsconsulting.com",
+        "totalAmount": "198.00",
+        "chargeCount": 2,
+        "latestCharge": "2026-04-11",
+        "refundedCount": 1,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "atkinsriddick@bullfat.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-04-06",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "tavin@alfordcontracting.com",
+        "totalAmount": "1245.00",
+        "chargeCount": 5,
+        "latestCharge": "2026-04-03",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools + CRM + Research / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "eduardo@trunorthgovx.com",
+        "totalAmount": "747.00",
+        "chargeCount": 3,
+        "latestCharge": "2026-04-03",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools + CRM + Research / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "gmo003@hotmail.com",
+        "totalAmount": "397.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-03-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "trungh@lifestylesolarinc.com",
+        "totalAmount": "12000.00",
+        "chargeCount": 2,
+        "latestCharge": "2026-03-17",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Subscription update",
+          "Subscription creation"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "Ranjit.Chittibabu@belugaconsulting.net",
+        "totalAmount": "693.00",
+        "chargeCount": 7,
+        "latestCharge": "2026-03-16",
+        "refundedCount": 0,
+        "disputedCount": 1,
+        "products": [
+          "AI Tools/mo"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "kydun00@yahoo.com",
+        "totalAmount": "1497.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-03-02",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "fernando.mercado@venerandavalor.com",
+        "totalAmount": "1198.00",
+        "chargeCount": 3,
+        "latestCharge": "2026-02-28",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "brian.smith@ioausa.com",
+        "totalAmount": "397.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-27",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "Carlwhitfield05@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-26",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "scott_taneshia@yahoo.com",
+        "totalAmount": "445.00",
+        "chargeCount": 5,
+        "latestCharge": "2026-02-23",
+        "refundedCount": 1,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools/mo"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "lexbreezyhawaii@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-23",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "azubike.agubokwu@gmail.com",
+        "totalAmount": "397.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-23",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "arthur@alphadevinc.com",
+        "totalAmount": "297.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-13",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "camellechristie35@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-09",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "p.obanua@getgocharter.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-08",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "jonathan.nolan@getdunamis.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-04",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "sylvester.anderson@andslylegacy.com",
+        "totalAmount": "1000.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-02-02",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "ken@hussarsystems.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "byron@kadaygroup.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-30",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "atkinsriddick@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-29",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "jsumrall@diamondscaffold.com",
+        "totalAmount": "497.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-25",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "cnroofs@gmail.com",
+        "totalAmount": "497.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-23",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "dwilzon1@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-20",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "dylanwells25@yahoo.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-16",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "prempuplu@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-16",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "jayvib@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-15",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "austin@durhambrandco.com",
+        "totalAmount": "497.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-12",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "wgreene@aegglobalconsulting.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-10",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "jagomez55@aol.com",
+        "totalAmount": "5997.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-07",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "gall-payable.0c@icloud.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2026-01-05",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "Lnz.Lxndr@gmail.com",
+        "totalAmount": "1043.00",
+        "chargeCount": 3,
+        "latestCharge": "2026-01-02",
+        "refundedCount": 2,
+        "disputedCount": 0,
+        "products": [
+          "Subscription update",
+          "Subscription creation",
+          "Lnz.Lxndr@gmail.com | Product: Better Bid Response Course"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "alfreddwm1@gmail.com",
+        "totalAmount": "249.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-12-12",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools + CRM + Research / Monthly"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "elmbiz5@yahoo.com",
+        "totalAmount": "1294.00",
+        "chargeCount": 4,
+        "latestCharge": "2025-11-25",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Subscription update",
+          "Subscription creation"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "gcruz13@hotmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-11-22",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "daniel.claybrook@guardemsecuritygroup.com",
+        "totalAmount": "198.00",
+        "chargeCount": 2,
+        "latestCharge": "2025-11-15",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools/mo"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "gritsecured@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-10-26",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "shelley@integratedfire.org",
+        "totalAmount": "5997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-10-18",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "Samuelreder0@gmail.com",
+        "totalAmount": "249.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-10-16",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools + CRM + Research/ mo"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "dross@techsecurityglobal.com",
+        "totalAmount": "5997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-10-04",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "smiller@pilieromazza.com",
+        "totalAmount": "1000.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-09-26",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "khaaliq@mcquillarllc.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-09-09",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "info@medsupplydirect.us",
+        "totalAmount": "4997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-08-29",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "brett@fedplace.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-08-20",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "sydixsolution@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-08-16",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "nancycasimirgroup@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-08-05",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "andrew.shimshock@gmail.com",
+        "totalAmount": "297.00",
+        "chargeCount": 3,
+        "latestCharge": "2025-08-03",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "AI Tools/mo"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "scartagena1124@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "salamshahid@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "zknows73@icloud.com",
+        "totalAmount": "1994.00",
+        "chargeCount": 2,
+        "latestCharge": "2025-07-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "williamnagle@littleflowerllc.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "beth@renewablerenegades.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-29",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "eharrison916@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-24",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "contact@bluehalosolutions.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-22",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "revivalheatingandair@gmail.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-17",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "info@vontain.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-16",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "ajosue@astroamc.com",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-10",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "jenotes@comcast.net",
+        "totalAmount": "997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-07-02",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "taheer.nr@gmail.com",
+        "totalAmount": "1997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-06-23",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "ernestobent@avianoprocurement.com",
+        "totalAmount": "1000.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-06-01",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "wepolk@msn.com",
+        "totalAmount": "1997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-05-30",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "rosy_rhoda@yahoo.com",
+        "totalAmount": "1997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-05-30",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "csr@madaco.com",
+        "totalAmount": "1000.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-05-27",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      }
+    ],
+    "staleInactive": [
+      {
+        "email": "ybob247@gmail.com",
+        "totalAmount": "1997.00",
+        "chargeCount": 1,
+        "latestCharge": "2025-01-09",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Seller | ybob247@gmail.com | Product: Federal Group Coaching"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "berlcm@yahoo.com",
+        "totalAmount": "4997.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-12-31",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Seller | berlcm@yahoo.com | Product: LT Federal Group Coaching"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "Raptors_ays@yahoo.com",
+        "totalAmount": "4997.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-12-19",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Seller | Raptors_ays@yahoo.com | Product: LT Federal Group Coaching"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "faryeshyi100@gmail.com",
+        "totalAmount": "49.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-12-05",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "faryeshyi100@gmail.com | Product: Better Bid Response Course"
+        ],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "wholesaletampa@gmail.com",
+        "totalAmount": "600.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-11-04",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "slawson@slprofessionalsolutions.com",
+        "totalAmount": "600.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-08-28",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "edward.olasode@panagate.com",
+        "totalAmount": "600.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-08-26",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "Staketa14@gmail.com",
+        "totalAmount": "250.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-08-17",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [],
+        "fuzzyMatch": null
+      },
+      {
+        "email": "aespejo37@gmail.com",
+        "totalAmount": "599.00",
+        "chargeCount": 1,
+        "latestCharge": "2024-04-07",
+        "refundedCount": 0,
+        "disputedCount": 0,
+        "products": [
+          "Payment for Invoice"
+        ],
+        "fuzzyMatch": null
+      }
+    ]
+  }
+}

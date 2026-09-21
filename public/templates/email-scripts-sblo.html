@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Scripts for SBLO Outreach - GovCon Giants</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 0; font-size: 11px; }
+      .no-print { display: none !important; }
+      .container { box-shadow: none !important; max-width: 100% !important; }
+      .email-card { break-inside: avoid; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; background: #f3f4f6; color: #1f2937; line-height: 1.6; }
+    .no-print {
+      background: #1e40af; color: white; text-align: center; padding: 16px;
+      font-size: 14px; position: sticky; top: 0; z-index: 10;
+    }
+    .no-print button {
+      background: white; color: #1e40af; border: none; padding: 8px 24px;
+      border-radius: 6px; font-weight: 700; cursor: pointer; margin-left: 12px; font-size: 14px;
+    }
+    .container { max-width: 800px; margin: 24px auto; padding: 0 16px; }
+    .page-title {
+      text-align: center; margin-bottom: 32px; padding: 24px;
+      background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .page-title h1 { font-size: 24px; color: #1e40af; margin-bottom: 4px; }
+    .page-title p { font-size: 14px; color: #6b7280; }
+    .email-card {
+      background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 24px; overflow: hidden;
+    }
+    .email-header {
+      background: #1e40af; color: white; padding: 16px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .email-header h2 { font-size: 16px; font-weight: 700; }
+    .email-num {
+      background: rgba(255,255,255,0.2); border-radius: 50%;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px;
+    }
+    .email-body { padding: 24px; }
+    .field { margin-bottom: 16px; }
+    .field-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      color: #1e40af; margin-bottom: 4px;
+    }
+    .field-value {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+      padding: 12px 16px; font-size: 13px; color: #374151; white-space: pre-wrap;
+    }
+    .field-value .placeholder { color: #9ca3af; font-style: italic; }
+    .when-to-send {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+      padding: 12px 16px; font-size: 12px; color: #92400e; margin-bottom: 16px;
+    }
+    .when-to-send strong { color: #78350f; }
+    .pro-tip {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+      padding: 12px 16px; font-size: 12px; color: #1e40af;
+    }
+    .pro-tip strong { color: #1e3a8a; }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    Customize the [BRACKETED] placeholders with your info, then print or save as PDF.
+    <button onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="container">
+    <div class="page-title">
+      <h1>Email Scripts for SBLO Outreach</h1>
+      <p>5 ready-to-use email templates for connecting with Small Business Liaison Officers</p>
+    </div>
+
+    <!-- Email 1 -->
+    <div class="email-card">
+      <div class="email-header">
+        <h2>Initial Introduction</h2>
+        <div class="email-num">1</div>
+      </div>
+      <div class="email-body">
+        <div class="when-to-send">
+          <strong>When to Send:</strong> First contact with a new SBLO. Send Tuesday-Thursday between 9-11 AM ET for best open rates.
+        </div>
+        <div class="field">
+          <div class="field-label">Subject Line</div>
+          <div class="field-value">Introduction: <span class="placeholder">[YOUR COMPANY]</span> - <span class="placeholder">[CERTIFICATION]</span> Small Business in <span class="placeholder">[YOUR INDUSTRY]</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Email Body</div>
+          <div class="field-value">Dear <span class="placeholder">[SBLO NAME]</span>,
+
+My name is <span class="placeholder">[YOUR NAME]</span>, and I am the <span class="placeholder">[YOUR TITLE]</span> of <span class="placeholder">[YOUR COMPANY]</span>, a <span class="placeholder">[CERTIFICATION - e.g., 8(a) certified, WOSB]</span> small business based in <span class="placeholder">[CITY, STATE]</span>.
+
+We specialize in <span class="placeholder">[YOUR PRIMARY SERVICES/PRODUCTS]</span> and have been supporting federal agencies for <span class="placeholder">[X]</span> years. Our capabilities include:
+
+- <span class="placeholder">[Core Capability 1]</span>
+- <span class="placeholder">[Core Capability 2]</span>
+- <span class="placeholder">[Core Capability 3]</span>
+
+I would appreciate the opportunity to introduce our company and learn about <span class="placeholder">[AGENCY NAME]</span>'s upcoming small business contracting opportunities. Would you be available for a brief 15-minute call or virtual meeting in the coming weeks?
+
+I have attached our capability statement for your review. Please feel free to share it with any contracting officers who may benefit from our services.
+
+Thank you for your time, and I look forward to hearing from you.
+
+Best regards,
+<span class="placeholder">[YOUR NAME]</span>
+<span class="placeholder">[YOUR TITLE]</span>
+<span class="placeholder">[YOUR COMPANY]</span>
+<span class="placeholder">[PHONE]</span> | <span class="placeholder">[EMAIL]</span>
+<span class="placeholder">[WEBSITE]</span></div>
+        </div>
+        <div class="pro-tip">
+          <strong>Pro Tip:</strong> Always attach your capability statement. SBLOs often forward these to contracting officers who have active requirements matching your capabilities.
+        </div>
+      </div>
+    </div>
+
+    <!-- Email 2 -->
+    <div class="email-card">
+      <div class="email-header">
+        <h2>7-Day Follow-Up</h2>
+        <div class="email-num">2</div>
+      </div>
+      <div class="email-body">
+        <div class="when-to-send">
+          <strong>When to Send:</strong> 7 days after initial email if no response. Keep it short and add value.
+        </div>
+        <div class="field">
+          <div class="field-label">Subject Line</div>
+          <div class="field-value">Following Up: <span class="placeholder">[YOUR COMPANY]</span> - Small Business Introduction</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Email Body</div>
+          <div class="field-value">Dear <span class="placeholder">[SBLO NAME]</span>,
+
+I wanted to follow up on my email from last week introducing <span class="placeholder">[YOUR COMPANY]</span>. I understand you are busy, so I will keep this brief.
+
+We recently <span class="placeholder">[completed a relevant project / earned a new certification / won a contract with a similar agency]</span>, which demonstrates our ability to support <span class="placeholder">[AGENCY NAME]</span>'s mission.
+
+I am flexible on timing and would welcome even a brief 10-minute conversation to introduce our capabilities. I am also happy to provide any additional information about our company via email if that is more convenient.
+
+Thank you again for your time.
+
+Best regards,
+<span class="placeholder">[YOUR NAME]</span>
+<span class="placeholder">[YOUR COMPANY]</span>
+<span class="placeholder">[PHONE]</span></div>
+        </div>
+        <div class="pro-tip">
+          <strong>Pro Tip:</strong> Don't just repeat the first email. Add something new - a recent win, certification, or relevant news about their agency to show you've done your research.
+        </div>
+      </div>
+    </div>
+
+    <!-- Email 3 -->
+    <div class="email-card">
+      <div class="email-header">
+        <h2>Industry Day / Event Request</h2>
+        <div class="email-num">3</div>
+      </div>
+      <div class="email-body">
+        <div class="when-to-send">
+          <strong>When to Send:</strong> When you learn an agency is hosting an industry day, or proactively ask about upcoming events. Check agency forecast pages quarterly.
+        </div>
+        <div class="field">
+          <div class="field-label">Subject Line</div>
+          <div class="field-value">Upcoming Small Business Events at <span class="placeholder">[AGENCY NAME]</span>?</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Email Body</div>
+          <div class="field-value">Dear <span class="placeholder">[SBLO NAME]</span>,
+
+I hope this message finds you well. I am reaching out to inquire about any upcoming industry days, small business matchmaking events, or vendor outreach sessions that <span class="placeholder">[AGENCY NAME]</span> may be planning.
+
+<span class="placeholder">[YOUR COMPANY]</span> is a <span class="placeholder">[CERTIFICATION]</span> small business specializing in <span class="placeholder">[YOUR SERVICES]</span>. We are eager to participate in any opportunities to connect with <span class="placeholder">[AGENCY NAME]</span>'s procurement team and learn about upcoming requirements.
+
+Specifically, I am interested in:
+- Any scheduled industry days or pre-solicitation conferences
+- Small business matchmaking events
+- Subcontracting partnership opportunities with current prime contractors
+
+Could you please share information about any upcoming events, or direct me to the appropriate point of contact?
+
+Thank you for supporting small businesses in federal contracting.
+
+Best regards,
+<span class="placeholder">[YOUR NAME]</span>
+<span class="placeholder">[YOUR TITLE]</span>
+<span class="placeholder">[YOUR COMPANY]</span>
+<span class="placeholder">[PHONE]</span> | <span class="placeholder">[EMAIL]</span></div>
+        </div>
+        <div class="pro-tip">
+          <strong>Pro Tip:</strong> Many agencies publish forecast lists on their OSDBU websites. Reference a specific upcoming opportunity when possible to show you've done your homework.
+        </div>
+      </div>
+    </div>
+
+    <!-- Email 4 -->
+    <div class="email-card">
+      <div class="email-header">
+        <h2>Subcontracting Directory Request</h2>
+        <div class="email-num">4</div>
+      </div>
+      <div class="email-body">
+        <div class="when-to-send">
+          <strong>When to Send:</strong> When targeting subcontracting opportunities. SBLOs often maintain lists of prime contractors required to meet subcontracting goals.
+        </div>
+        <div class="field">
+          <div class="field-label">Subject Line</div>
+          <div class="field-value">Request: Subcontracting Opportunities at <span class="placeholder">[AGENCY NAME]</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Email Body</div>
+          <div class="field-value">Dear <span class="placeholder">[SBLO NAME]</span>,
+
+I am writing to inquire about subcontracting opportunities with prime contractors currently serving <span class="placeholder">[AGENCY NAME]</span>.
+
+<span class="placeholder">[YOUR COMPANY]</span> provides <span class="placeholder">[YOUR SERVICES]</span> and we are actively seeking teaming and subcontracting partnerships. Our NAICS codes include <span class="placeholder">[PRIMARY NAICS CODES]</span>.
+
+Could you please:
+1. Share a list of prime contractors with active subcontracting plans at <span class="placeholder">[AGENCY NAME]</span>
+2. Recommend any prime contractors who may benefit from our capabilities
+3. Advise on the best way to get listed in your agency's small business vendor database
+
+We hold the following certifications: <span class="placeholder">[LIST CERTIFICATIONS]</span>, which may help prime contractors meet their small business subcontracting goals.
+
+I have attached our capability statement for your reference.
+
+Thank you for your time and support.
+
+Best regards,
+<span class="placeholder">[YOUR NAME]</span>
+<span class="placeholder">[YOUR TITLE]</span>
+<span class="placeholder">[YOUR COMPANY]</span>
+<span class="placeholder">[PHONE]</span> | <span class="placeholder">[EMAIL]</span></div>
+        </div>
+        <div class="pro-tip">
+          <strong>Pro Tip:</strong> SBLOs are required to help small businesses connect with prime contractors. They often know which primes are looking for specific capabilities. Be specific about your NAICS codes and certifications.
+        </div>
+      </div>
+    </div>
+
+    <!-- Email 5 -->
+    <div class="email-card">
+      <div class="email-header">
+        <h2>Relationship Maintenance</h2>
+        <div class="email-num">5</div>
+      </div>
+      <div class="email-body">
+        <div class="when-to-send">
+          <strong>When to Send:</strong> Every 60-90 days to keep your company top of mind. Best sent after a company milestone or when you have new information to share.
+        </div>
+        <div class="field">
+          <div class="field-label">Subject Line</div>
+          <div class="field-value">Update from <span class="placeholder">[YOUR COMPANY]</span> - <span class="placeholder">[BRIEF UPDATE]</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Email Body</div>
+          <div class="field-value">Dear <span class="placeholder">[SBLO NAME]</span>,
+
+I wanted to share a quick update from <span class="placeholder">[YOUR COMPANY]</span>. Since we last connected:
+
+- <span class="placeholder">[Recent accomplishment - e.g., We successfully completed a $X contract with [AGENCY]]</span>
+- <span class="placeholder">[New capability - e.g., We expanded our team with [X] new certified professionals]</span>
+- <span class="placeholder">[Certification update - e.g., We recently obtained our [NEW CERTIFICATION]]</span>
+
+We remain interested in supporting <span class="placeholder">[AGENCY NAME]</span>'s mission and would welcome any opportunities to discuss upcoming requirements or connect with contracting officers in the <span class="placeholder">[SPECIFIC AREA]</span> space.
+
+I have attached our updated capability statement for your files.
+
+Thank you for your continued support of small businesses.
+
+Warm regards,
+<span class="placeholder">[YOUR NAME]</span>
+<span class="placeholder">[YOUR TITLE]</span>
+<span class="placeholder">[YOUR COMPANY]</span>
+<span class="placeholder">[PHONE]</span> | <span class="placeholder">[EMAIL]</span></div>
+        </div>
+        <div class="pro-tip">
+          <strong>Pro Tip:</strong> Consistency is key. SBLOs hear from hundreds of companies. Regular, value-add updates keep you top of mind when relevant opportunities arise. Always include your updated capability statement.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

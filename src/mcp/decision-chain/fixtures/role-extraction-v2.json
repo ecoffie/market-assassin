@@ -1,0 +1,170 @@
+{"contract":"ROLE-CONTRACT-FROZEN.md","extracted":"2026-08-23","cases":{
+  "c24": {
+    "core_primary": "Mental health counseling and community engagement services",
+    "core_secondary": [],
+    "processes": [],
+    "services": ["clinical social work", "community outreach", "health initiative coordination"],
+    "served_markets": ["Black men", "men of color", "community organizations"],
+    "inputs": []
+  },
+  "c08": {
+    "core_primary": "Cybersecurity and compliance services",
+    "core_secondary": [],
+    "processes": ["Risk Management Framework support", "continuous monitoring", "eMASS administration"],
+    "services": ["RMF guidance", "vulnerability management", "security compliance consulting", "operational security"],
+    "served_markets": ["federal agencies", "commercial organizations"],
+    "inputs": []
+  },
+  "c02": {
+    "core_primary": "Cybersecurity and information technology services",
+    "core_secondary": [],
+    "processes": [],
+    "services": ["penetration testing", "vulnerability assessments", "security architecture", "incident response", "network security", "cloud security", "IT infrastructure management", "help desk support"],
+    "served_markets": ["government agencies", "commercial companies"],
+    "inputs": []
+  },
+  "c05": {
+    "core_primary": "Mission-critical energy storage and power equipment",
+    "core_secondary": ["emergency supplies and tactical gear", "supply chain management"],
+    "processes": ["rapid deployment", "drop-ship distribution"],
+    "services": ["equipment sourcing", "vendor coordination", "supply chain execution"],
+    "served_markets": ["federal agencies", "military", "emergency management agencies"],
+    "inputs": ["lithium batteries", "solar photovoltaic modules", "tactical equipment"]
+  },
+  "c23": {
+    "core_primary": "Government procurement and logistics services",
+    "core_secondary": [],
+    "processes": [],
+    "services": ["supply sourcing", "specialized services", "procurement support"],
+    "served_markets": ["federal agencies", "state government", "local government"],
+    "inputs": []
+  },
+  "c04": {
+    "core_primary": "Cybersecurity and compliance consulting",
+    "core_secondary": ["IT staffing and augmentation"],
+    "processes": ["RMF/GRC implementation", "facility security operations"],
+    "services": ["security architecture", "personnel clearance management", "incident response", "IT recruitment and placement", "cloud security"],
+    "served_markets": ["federal agencies", "DoD", "healthcare", "defense", "intelligence community"],
+    "inputs": []
+  },
+  "c09": {
+    "core_primary": "Federal enterprise system modernization and cloud migration",
+    "core_secondary": [],
+    "processes": ["lift-and-shift migration", "application modernization", "DevSecOps"],
+    "services": ["cloud transformation", "ATO process support", "AI-enabled automation"],
+    "served_markets": ["defense agencies", "civilian federal agencies"],
+    "inputs": []
+  },
+  "c12": {
+    "core_primary": "Centrifugal pumping equipment",
+    "core_secondary": ["pump parts and components"],
+    "processes": ["factory performance testing"],
+    "services": ["custom configuration", "parts supply"],
+    "served_markets": [],
+    "inputs": ["impellers", "PTO components", "hose", "couplers"]
+  },
+  "c20": {
+    "core_primary": "Management and technology consulting",
+    "core_secondary": [],
+    "processes": [],
+    "services": ["program and project management", "organizational strategy", "process improvement", "AI strategy and implementation", "cybersecurity consulting", "cloud and IT modernization", "decision intelligence"],
+    "served_markets": ["government agencies", "businesses"],
+    "inputs": []
+  },
+  "c13": {
+    "core_primary": "Micro-purchasing and rapid-delivery supply services",
+    "core_secondary": [],
+    "processes": ["Government Purchase Card processing"],
+    "services": ["emergency order fulfillment", "expedited delivery", "procurement support"],
+    "served_markets": ["federal agencies"],
+    "inputs": []
+  },
+  "c15": {
+    "core_primary": "IT hardware and technology procurement",
+    "core_secondary": ["technology installation and systems integration", "IT asset disposition"],
+    "processes": [],
+    "services": ["rapid quote and fulfillment", "procurement support", "24/7 support", "network and systems integration"],
+    "served_markets": ["federal agencies"],
+    "inputs": ["laptops", "tablets", "desktops", "networking equipment", "telecom equipment"]
+  },
+  "c07": {
+    "core_primary": "Information technology and professional services",
+    "core_secondary": ["training and curriculum development", "facilities support"],
+    "processes": [],
+    "services": ["custom application development", "cybersecurity and compliance support", "program management", "IT systems integration", "facilities maintenance", "construction coordination"],
+    "served_markets": [],
+    "inputs": []
+  },
+  "c16": {
+    "core_primary": "Healthcare privacy and governance consulting",
+    "core_secondary": [],
+    "processes": ["privacy impact assessments", "GRC analysis"],
+    "services": ["privacy and security control design", "regulatory interpretation", "audit-readiness support", "governance program design"],
+    "served_markets": ["healthcare organizations", "financial services"],
+    "inputs": []
+  },
+  "c17": {
+    "core_primary": "IT professional services and custom software development",
+    "core_secondary": ["data engineering and AI/ML solutions", "cloud migration and modernization"],
+    "processes": ["DevOps", "infrastructure-as-code"],
+    "services": ["custom application development", "systems integration", "data engineering", "AI/ML solution development", "cloud migration", "enterprise platform implementation"],
+    "served_markets": ["Department of Health and Human Services", "NIH", "CMS", "FDA", "CDC"],
+    "inputs": []
+  },
+  "c03": {
+    "core_primary": "IT consulting and managed services",
+    "core_secondary": [],
+    "processes": [],
+    "services": ["quantum technology services", "zero trust security", "hybrid cloud strategy", "cybersecurity", "managed services", "program and project management", "hardware and software support", "government mobility services"],
+    "served_markets": ["federal agencies", "state government", "local government"],
+    "inputs": []
+  },
+  "c01": {
+    "core_primary": "Digital services and software development",
+    "core_secondary": [],
+    "processes": ["extreme programming", "DevSecOps"],
+    "services": ["web and mobile app development", "data analytics", "UI/UX design", "cloud migration and hosting", "cybersecurity", "program management"],
+    "served_markets": ["government agencies"],
+    "inputs": []
+  },
+  "w01": {
+    "core_primary": "Precision machining and fabrication services",
+    "core_secondary": [],
+    "processes": ["CNC milling", "CNC turning", "waterjetting", "laser engraving", "welding", "CAD design"],
+    "services": [],
+    "served_markets": ["manufacturing", "automotive", "aerospace", "defense"],
+    "inputs": ["metal stock", "plastic", "tool steel"]
+  },
+  "w02": {
+    "core_primary": "Heavy steel fabrication and precision machining",
+    "core_secondary": [],
+    "processes": ["CNC precision machining", "metal fabrication", "welding", "stress relieving", "gear cutting", "assembling"],
+    "services": ["turnkey manufacturing", "shop drawing detailing", "coatings"],
+    "served_markets": ["moveable bridge machinery", "lock and dam", "heavy industrial", "defense", "aerospace", "automotive", "power", "navy"],
+    "inputs": []
+  },
+  "w03": {
+    "core_primary": "40mm grenade ammunition and fuzing",
+    "core_secondary": ["precision fuzes and firing devices"],
+    "processes": ["precision assembly", "explosive loading", "metal forming", "plating", "primary explosive manufacturing"],
+    "services": [],
+    "served_markets": ["US Department of Defense"],
+    "inputs": ["explosives", "metal components"]
+  },
+  "w04": {
+    "core_primary": "Offset and digital printing presses",
+    "core_secondary": ["printing maintenance products", "cloud-based services"],
+    "processes": [],
+    "services": ["equipment support", "maintenance"],
+    "served_markets": ["magazine and publication printing", "commercial printing"],
+    "inputs": []
+  },
+  "w05": {
+    "core_primary": "Precision metal stamping and progressive dies",
+    "core_secondary": ["deep draw stamping"],
+    "processes": ["progressive die stamping", "tool and die manufacturing"],
+    "services": [],
+    "served_markets": ["automotive", "aerospace"],
+    "inputs": []
+  }
+}}

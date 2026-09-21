@@ -1,0 +1,224 @@
+'use client';
+
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+
+function SuccessContent() {
+  const searchParams = useSearchParams();
+  const product = searchParams.get('product');
+  const productNames: Record<string, string> = {
+    'contractor-database': 'Contractor Database',
+    'recompete-contracts': 'Recompete Tracker',
+    'prime-lookup': 'Prime Lookup',
+    'ai-content-generator': 'Content Reaper',
+    'govcon-starter-bundle': 'GovCon Starter Bundle',
+    'pro-giant-bundle': 'Pro Giant Bundle',
+    'ultimate-govcon-bundle': 'Ultimate GovCon Bundle',
+    briefings: 'Market Intelligence',
+    briefings_monthly: 'Market Intelligence Monthly',
+    briefings_annual: 'Market Intelligence Annual',
+    'founders-lifetime': 'Mindy Founders Lifetime',
+    'bootcamp-lifetime': 'Mindy Lifetime — Bootcamp Special',
+    'mindy-lifetime': 'Mindy Lifetime — Bootcamp Special',
+    fhc_membership: 'Federal Help Center Membership',
+    'opportunity-hunter-pro': 'Opportunity Hunter Pro',
+    'market-assassin-standard': 'Market Assassin Standard',
+    'market-assassin-premium': 'Market Assassin Premium',
+    'market-assassin-premium-upgrade': 'Market Assassin Premium Upgrade',
+    'content-engine': 'Content Reaper',
+    'full-fix': 'Content Reaper Full Fix',
+    'content-full-fix-upgrade': 'Content Reaper Full Fix Upgrade',
+  };
+  const productName = product ? (productNames[product] || product) : 'your purchase';
+  const includesBriefings = product ? [
+    'pro-giant-bundle',
+    'ultimate-govcon-bundle',
+    'founders-lifetime',
+    'bootcamp-lifetime',
+    'mindy-lifetime',
+    'briefings',
+    'briefings_monthly',
+    'briefings_annual',
+    'briefings_lifetime',
+    'fhc_membership',
+  ].includes(product) : false;
+  // Mindy products land the buyer in the canonical app (getmindy.ai/app), NOT
+  // the legacy /briefings dashboard. Matters most for the $2,997 bootcamp
+  // lifetime buyer's first impression.
+  const isMindyProduct = product ? [
+    'founders-lifetime',
+    'bootcamp-lifetime',
+    'mindy-lifetime',
+    'briefings',
+    'briefings_monthly',
+    'briefings_annual',
+    'briefings_lifetime',
+  ].includes(product) : false;
+  const appHref = isMindyProduct ? '/app' : '/briefings';
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-xl font-bold text-blue-700">GovCon</span>
+              <span className="text-xl font-bold text-amber-500">Giants</span>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Success Message */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="mb-6">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Purchase Successful!
+            </h1>
+            <p className="text-lg text-gray-600">
+              Thank you for purchasing {productName}
+            </p>
+          </div>
+
+          <div className="bg-blue-50 rounded-xl p-6 mb-8 text-left">
+            <h2 className="font-bold text-gray-900 mb-4">What happens next:</h2>
+            <ol className="space-y-3 text-gray-700">
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                <span>Check your email for your receipt and license key</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                <span>Use your purchase email or license key to access your tools</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
+                <span>Start winning government contracts!</span>
+              </li>
+            </ol>
+          </div>
+
+          {isMindyProduct && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-left">
+              <h2 className="font-bold text-gray-900 mb-2">Bonus included: Federal Help Center</h2>
+              <p className="text-gray-700 mb-3">
+                Your Mindy purchase also unlocks the <strong>Federal Help Center</strong> — our
+                coaching + training community — at no extra cost. Mindy finds you the contracts;
+                the Federal Help Center helps you <strong>win</strong> them.
+              </p>
+              <p className="text-gray-700 mb-3">
+                <strong>Check your inbox for two emails:</strong>
+              </p>
+              <ul className="space-y-2 text-gray-700 mb-4">
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">→</span>
+                  <span>Your <strong>Mindy login</strong> — that&apos;s your tool access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">→</span>
+                  <span>Your <strong>Federal Help Center access</strong> — coaching, training vault &amp; community</span>
+                </li>
+              </ul>
+              <a
+                href="https://federalhelpcenter.com"
+                target="_blank"
+                rel="noopener"
+                className="inline-block font-semibold text-blue-700 underline"
+              >
+                Access the Federal Help Center →
+              </a>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <Link
+              href={isMindyProduct ? '/app' : '/'}
+              className="block w-full px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors text-center"
+            >
+              {isMindyProduct ? 'Open Mindy →' : 'Access Your Tools'}
+            </Link>
+            {includesBriefings && (
+              <Link
+                href={appHref}
+                className="block w-full px-6 py-3 border border-blue-200 text-blue-700 font-semibold rounded-lg transition-colors text-center hover:bg-blue-50"
+              >
+                {isMindyProduct ? 'Go to your dashboard' : 'Open Your Briefings'}
+              </Link>
+            )}
+            <p className="text-sm text-gray-500">
+              Need help? Contact us at{' '}
+              <a href="mailto:support@getmindy.ai" className="text-blue-600 hover:underline">
+                support@getmindy.ai
+              </a>
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Links */}
+        <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+          <h3 className="font-bold text-gray-900 mb-4">Quick Access</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {includesBriefings && (
+              <Link
+                href={appHref}
+                className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+              >
+                {isMindyProduct ? 'Open Mindy' : 'Daily Briefings'}
+              </Link>
+            )}
+            <Link
+              href="/contractor-database"
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+            >
+              Contractor Database
+            </Link>
+            <Link
+              href="/recompete-contracts"
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+            >
+              Recompete Contracts
+            </Link>
+            <Link
+              href="/prime-lookup"
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+            >
+              Prime Lookup
+            </Link>
+            <Link
+              href="/content-generator-product"
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+            >
+              Content Reaper
+            </Link>
+            <Link
+              href="/opportunity-hunter"
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+            >
+              Opportunity Hunter
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default function PurchaseSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
+  );
+}

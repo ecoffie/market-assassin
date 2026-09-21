@@ -1,0 +1,182 @@
+{
+  "name": "Department of Health and Human Services",
+  "abbreviation": "HHS",
+  "parentAgency": null,
+  "description": "HHS is the United States government's principal agency for protecting the health of all Americans and providing essential human services, especially for those who are least able to help themselves.",
+  "website": "https://www.hhs.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$1.802 trillion",
+    "procurementBudget": "$40+ billion annually"
+  },
+  "painPoints": [
+    {
+      "point": "Cybersecurity vulnerabilities in healthcare systems and electronic health records (EHRs) exposed during major cyber attacks",
+      "source": "HHS Cybersecurity Performance Goals 2024 & GAO Healthcare Cybersecurity Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Legacy IT systems requiring modernization - phasing out decades-old technology across agencies",
+      "source": "HHS Officials IT Modernization Initiatives 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Workforce gaps in procurement, grants management, and human resources revealed during COVID-19 pandemic",
+      "source": "GAO-25-107002 Public Health Preparedness Report",
+      "priority": "high"
+    },
+    {
+      "point": "Fragmented EHR systems - Indian Health Service alone has 200 separate databases requiring unification",
+      "source": "HHS IT Modernization Strategy - PATH EHR System",
+      "priority": "high"
+    },
+    {
+      "point": "Limited visibility into data security - hospitals lack clarity on where data is stored and which third parties have access",
+      "source": "Healthcare Cybersecurity Challenges 2025 - Rubrik Report",
+      "priority": "high"
+    },
+    {
+      "point": "HIPAA Security Rule compliance gaps requiring strengthening of electronic protected health information safeguards",
+      "source": "Federal Register HIPAA Security Rule Update January 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Resource constraints forcing organizations to prioritize operational needs over robust cybersecurity measures",
+      "source": "Healthcare Sector Cybersecurity Strategy December 2023",
+      "priority": "medium"
+    },
+    {
+      "point": "Integration challenges with FDA-approved medical device data and AI for clinical care",
+      "source": "HHS Safety Assurance Factors for EHR Resilience Guides 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting healthcare IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Federal Health IT Strategy implementation (2024-2030) focusing on health equity, public health, AI, and cybersecurity",
+      "source": "HHS Office of National Coordinator Federal Health IT Strategy 2024-2030",
+      "deadline": "FY2030"
+    },
+    {
+      "priority": "Cybersecurity Performance Goals (CPGs) adoption - essential and enhanced goals for healthcare organizations",
+      "source": "HHS Cybersecurity Gateway Performance Goals",
+      "funding": "Voluntary compliance framework"
+    },
+    {
+      "priority": "Electronic Health Records modernization and PATH system deployment for Indian Health Service",
+      "source": "IHS PATH EHR System Initiative",
+      "deadline": "FY2026"
+    },
+    {
+      "priority": "AI-powered cybersecurity and next-generation EHR systems deployment",
+      "source": "HHS IT Modernization Strategy 2025",
+      "priority": "high"
+    },
+    {
+      "priority": "HIPAA Security Rule modernization to address contemporary cybersecurity threats",
+      "source": "Federal Register HIPAA Update January 2025",
+      "deadline": "Final Rule expected FY2025"
+    },
+    {
+      "priority": "Workforce capacity building in procurement, grants management, and IT security",
+      "source": "GAO Public Health Preparedness Recommendations",
+      "priority": "high"
+    },
+    {
+      "priority": "Health data interoperability and system connectivity improvements",
+      "source": "Federal Health IT Strategy 2024-2030",
+      "priority": "high"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO-25-107002 Public Health Preparedness Report - https://files.gao.gov/reports/GAO-25-107002",
+      "HHS FY2025 Budget Request - https://www.congress.gov/crs-product/R48060",
+      "Federal Health IT Strategy 2024-2030 - https://www.healthcareitnews.com/news/hhs-finalizes-2024-2030-federal-health-it-strategy",
+      "HIPAA Security Rule Update January 2025 - https://www.federalregister.gov/documents/2025/01/06/2024-30983",
+      "HHS Cybersecurity Performance Goals - https://hhscyber.hhs.gov/performance-goals.html"
+    ],
+    "secondary": [
+      "Healthcare Sector Cybersecurity Strategy December 2023 - https://aspr.hhs.gov/cyber/Documents/Health-Care-Sector-Cybersecurity-Dec2023-508.pdf",
+      "HHS Safety Assurance Factors for EHR Resilience Guides 2025",
+      "GovCIO HHS IT Modernization Report 2025"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "541611",
+    "541618",
+    "541690",
+    "541714",
+    "541715",
+    "621111",
+    "621511",
+    "621610"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "BPA (Blanket Purchase Agreement)",
+    "GSA MAS (Multiple Award Schedule)",
+    "CIO-SP3 (Chief Information Officer-Solutions and Partners 3)"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - significant small business goals",
+    "WOSB": "Active use - promotes women-owned businesses",
+    "8a": "Regular use for eligible firms",
+    "HUBZone": "Moderate use",
+    "SDVOSB": "Strong preference - veteran-focused programs",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M",
+    "medium": "$10M - $100M",
+    "large": "$100M+ (major IT modernization and EHR systems)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Healthcare IT expertise and HIPAA compliance",
+      "Cybersecurity certifications (FedRAMP, CMMC)",
+      "Electronic health records (EHR) experience",
+      "Public health and epidemiology expertise",
+      "Data analytics and AI/ML capabilities",
+      "GSA MAS or CIO-SP3 contract holders"
+    ],
+    "contractingTimeline": "6-18 months average, faster for urgent public health needs",
+    "competitionLevel": "Highly competitive for major IT contracts, moderate for specialized healthcare services",
+    "evaluationFactors": [
+      "Technical approach and healthcare expertise",
+      "Past performance with HHS or healthcare agencies",
+      "HIPAA and cybersecurity compliance",
+      "Price/cost reasonableness",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Centers for Medicare & Medicaid Services (CMS)",
+    "Centers for Disease Control and Prevention (CDC)",
+    "Food and Drug Administration (FDA)",
+    "National Institutes of Health (NIH)",
+    "Indian Health Service (IHS)",
+    "Administration for Strategic Preparedness and Response (ASPR)",
+    "Office of the National Coordinator for Health IT (ONC)"
+  ],
+  "insights": [
+    "HHS has massive IT modernization needs with $160.7B in contract spending FY2021-2024",
+    "Cybersecurity is a critical priority - healthcare sector major target for attacks",
+    "Electronic health records modernization represents billion-dollar opportunities",
+    "COVID-19 pandemic revealed procurement and workforce capacity gaps",
+    "Strong emphasis on health equity, public health, and AI integration",
+    "HIPAA compliance and cybersecurity certifications are essential for contractors",
+    "GSA MAS and CIO-SP3 are heavily utilized procurement vehicles"
+  ]
+}

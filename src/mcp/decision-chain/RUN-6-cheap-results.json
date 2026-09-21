@@ -1,0 +1,473 @@
+[
+ {
+  "case_id": "c24",
+  "label": "ambiguous",
+  "selected": "621112",
+  "top3": [
+   "621112",
+   "623220",
+   "621111"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "551112",
+   "541611",
+   "523999"
+  ],
+  "core": "Mental health consulting and program support",
+  "type": "service"
+ },
+ {
+  "case_id": "c08",
+  "label": "classifiable",
+  "selected": "561110",
+  "top3": [
+   "561110",
+   "115116",
+   "541611"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541690",
+   "541519"
+  ],
+  "core": "Cybersecurity and risk management services",
+  "type": "service"
+ },
+ {
+  "case_id": "c02",
+  "label": "classifiable",
+  "selected": "541512",
+  "top3": [
+   "541512",
+   "561591",
+   "927110"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541519",
+   "541690"
+  ],
+  "core": "Cybersecurity and information technology solutions",
+  "type": "service"
+ },
+ {
+  "case_id": "c05",
+  "label": "classifiable",
+  "selected": "221114",
+  "top3": [
+   "221114",
+   "237130",
+   "926130"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "423610",
+   "423690",
+   "423840",
+   "423860"
+  ],
+  "core": "Energy storage and solar power systems",
+  "type": "product"
+ },
+ {
+  "case_id": "c23",
+  "label": "classifiable",
+  "selected": "925120",
+  "top3": [
+   "925120",
+   "921190",
+   "926150"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "medium",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "332710",
+   "333248",
+   "541330",
+   "339999"
+  ],
+  "core": "Products and services for government agencies",
+  "type": "product"
+ },
+ {
+  "case_id": "c04",
+  "label": "ambiguous",
+  "selected": "561320",
+  "top3": [
+   "561320",
+   "541690",
+   "541614"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541690",
+   "561320",
+   "541519"
+  ],
+  "core": "Cybersecurity consulting and staffing services",
+  "type": "service"
+ },
+ {
+  "case_id": "c09",
+  "label": "classifiable",
+  "selected": "518210",
+  "top3": [
+   "518210"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "core": "Federal modernization and cloud transformation services",
+  "type": "service"
+ },
+ {
+  "case_id": "c12",
+  "label": "classifiable",
+  "selected": "333914",
+  "top3": [
+   "333914",
+   "423830",
+   "562991"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "333914"
+  ],
+  "core": "Centrifugal pumping equipment",
+  "type": "product"
+ },
+ {
+  "case_id": "c20",
+  "label": "classifiable",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541370",
+   "541360",
+   "541620"
+  ],
+  "core": "Management and technology consulting services",
+  "type": "service"
+ },
+ {
+  "case_id": "c13",
+  "label": "ambiguous",
+  "selected": "622110",
+  "top3": [
+   "622110",
+   "333242",
+   "921190"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "561499",
+   "459999",
+   "455219"
+  ],
+  "core": "Generalized micro-purchasing and procurement services",
+  "type": "service"
+ },
+ {
+  "case_id": "c15",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "332510",
+   "927110",
+   "444140"
+  ],
+  "bucket": "unjustified_abstention",
+  "valid": false,
+  "reject": "evidence_not_in_source",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "423430",
+   "423690"
+  ],
+  "core": "IT hardware and technology products",
+  "type": "product"
+ },
+ {
+  "case_id": "c07",
+  "label": "ambiguous",
+  "selected": "927110",
+  "top3": [
+   "927110",
+   "325412",
+   "712110"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541511",
+   "541512",
+   "541611"
+  ],
+  "core": "Technology services and IT solutions",
+  "type": "service"
+ },
+ {
+  "case_id": "c16",
+  "label": "classifiable",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541611",
+   "541690",
+   "541512"
+  ],
+  "core": "Governance, risk, and compliance consulting services",
+  "type": "service"
+ },
+ {
+  "case_id": "c17",
+  "label": "classifiable",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "core": "IT consulting and managed services",
+  "type": "service"
+ },
+ {
+  "case_id": "c03",
+  "label": "ambiguous",
+  "selected": "561110",
+  "top3": [
+   "561110",
+   "518210",
+   "926150"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541611",
+   "541519"
+  ],
+  "core": "Cloud and business operations services",
+  "type": "service"
+ },
+ {
+  "case_id": "c01",
+  "label": "classifiable",
+  "selected": "921190",
+  "top3": [
+   "921190",
+   "926150",
+   "922190"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541511",
+   "541512"
+  ],
+  "core": "Digital services solutions for government modernization",
+  "type": "service"
+ },
+ {
+  "case_id": "w01",
+  "label": "classifiable",
+  "selected": "311221",
+  "top3": [
+   "311221",
+   "311212",
+   "332710"
+  ],
+  "bucket": "acceptable_candidate_wrong_order",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Loughmiller Machine, Tool & Design",
+  "acceptable": [
+   "332710"
+  ],
+  "core": "Precision machining and fabrication services",
+  "type": "service"
+ },
+ {
+  "case_id": "w02",
+  "label": "classifiable",
+  "selected": "332710",
+  "top3": [
+   "332710",
+   "331210",
+   "331110"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Steward Machine Co., Inc.",
+  "acceptable": [
+   "333998",
+   "332312",
+   "332710"
+  ],
+  "core": "Heavy steel fabrication and precision machine shop services",
+  "type": "service"
+ },
+ {
+  "case_id": "w03",
+  "label": "classifiable",
+  "selected": "332993",
+  "top3": [
+   "332993",
+   "332994",
+   "332992"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "AMTEC Corporation",
+  "acceptable": [
+   "332993"
+  ],
+  "core": "40mm grenade ammunition and fuzing products",
+  "type": "product"
+ },
+ {
+  "case_id": "w04",
+  "label": "classifiable",
+  "selected": "333248",
+  "top3": [
+   "333248",
+   "323111",
+   "323113"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Komori America Corporation",
+  "acceptable": [
+   "333248"
+  ],
+  "core": "Offset and digital printing presses",
+  "type": "product"
+ },
+ {
+  "case_id": "w05",
+  "label": "classifiable",
+  "selected": "332322",
+  "top3": [
+   "332322",
+   "483111",
+   "483112"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Die-Matic Corporation",
+  "acceptable": [
+   "332119",
+   "333514"
+  ],
+  "core": "Precision progressive die stamping services",
+  "type": "service"
+ }
+]

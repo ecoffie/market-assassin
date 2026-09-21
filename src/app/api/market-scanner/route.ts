@@ -1,0 +1,836 @@
+/**
+ * Federal Market Scanner API
+ *
+ * Answers 6 critical questions for any NAICS + Location:
+ * 1. WHO is buying? (agencies, spending breakdown)
+ * 2. HOW are they buying? (procurement methods, vehicles)
+ * 3. WHO has the contracts now? (incumbents, recompete opportunities)
+ * 4. WHAT opportunities exist RIGHT NOW? (SAM.gov, Grants, Forecasts)
+ * 5. WHAT events should you attend? (industry days, matchmaking)
+ * 6. WHO do I talk to? (OSDBU contacts, SBLOs, contracting officers)
+ *
+ * GET /api/market-scanner?naics=238220&state=GA
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Import existing helper functions
+import {
+  industryNames,
+  getBorderingStates,
+} from '@/lib/utils/usaspending-helpers';
+
+import {
+  searchContractAwards,
+  getExpiringContracts,
+} from '@/lib/sam/contract-awards';
+
+import {
+  searchEntities,
+  findTeamingPartners,
+} from '@/lib/sam/entity-api';
+
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
+
+// Types
+interface MarketScannerInput {
+  naics: string;
+  naicsDescription: string;
+  state: string;
+  stateName: string;
+}
+
+interface AgencyBuyer {
+  name: string;
+  annualSpend: number;
+  department: string;
+  location?: string;
+}
+
+interface ProcurementMethod {
+  method: string;
+  /**
+   * NULL until measured. These were hardcoded literals (40, 30) and a
+   * `let totalSamPosted = 30; // Default assumption` — invented at the call
+   * site, then rendered as "45% of spending goes through pre-competed
+   * vehicles". Suppressed 2026-08-16 with the agency-sources archetypes they
+   * came from. The METHOD and the ACTION are real guidance; the number was not.
+   */
+  percentage: number | null;
+  actionRequired: string;
+}
+
+interface Incumbent {
+  company: string;
+  agency: string;
+  contractValue: number;
+  expirationDate: string;
+  isRecompete: boolean;
+  setAside?: string;
+  daysUntilExpiration?: number;
+}
+
+interface AvailableOpportunities {
+  samGov: { count: number; types: string[] };
+  grantsGov: { count: number };
+  gsaEbuy: { count: number; note: string };
+  /** count null = could not read. A real 0 and an unread table must not look alike. */
+  forecasts: { count: number | null; timeframe: string };
+}
+
+interface FederalEvent {
+  name: string;
+  date: string;
+  location: string;
+  type: string;
+}
+
+interface Contact {
+  agency: string;
+  name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  office?: string;
+}
+
+interface MarketScannerResponse {
+  input: MarketScannerInput;
+
+  // 1. WHO is buying?
+  whoIsBuying: {
+    agencies: AgencyBuyer[];
+    totalSpend: number;
+    topBuyer: string;
+    concentration: 'concentrated' | 'distributed' | 'balanced';
+  };
+
+  // 2. HOW are they buying?
+  howAreTheyBuying: {
+    breakdown: ProcurementMethod[];
+    primaryMethod: string;
+    /** Null until measured — see ProcurementMethod.percentage. */
+    visibilityGap: number | null;
+    recommendation: string;
+  };
+
+  // 3. WHO has it now?
+  whoHasItNow: {
+    incumbents: Incumbent[];
+    totalRecompetes: number;
+    urgentRecompetes: number;
+    lowCompetitionCount: number;
+  };
+
+  // 4. WHAT opportunities exist RIGHT NOW?
+  whatIsAvailable: AvailableOpportunities;
+
+  // 5. WHAT events should you attend?
+  whatEvents: FederalEvent[];
+
+  // 6. WHO do I talk to?
+  whoToTalkTo: {
+    osdubuContacts: Contact[];
+    sbSpecialists: Contact[];
+    contractingOfficers: Contact[];
+    teamingPartners: Contact[];
+  };
+
+  generatedAt: string;
+  processingTimeMs: number;
+}
+
+// State name lookup
+const STATE_NAMES: Record<string, string> = {
+  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+  'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+  'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+  'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+  'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+  'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+  'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+  'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+  'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+  'DC': 'District of Columbia'
+};
+
+// Helper Functions
+function getNaicsDescription(code: string): string {
+  if (industryNames[code]) {
+    return industryNames[code];
+  }
+
+  // Try prefix matches
+  for (let i = code.length - 1; i >= 2; i--) {
+    const prefix = code.substring(0, i);
+    if (industryNames[prefix]) {
+      return industryNames[prefix];
+    }
+  }
+
+  return `NAICS ${code}`;
+}
+
+function formatCurrency(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (amount >= 1_000_000) {
+    return `$${(amount / 1_000_000).toFixed(1)}M`;
+  }
+  if (amount >= 1_000) {
+    return `$${(amount / 1_000).toFixed(0)}K`;
+  }
+  return `$${amount.toFixed(0)}`;
+}
+
+/**
+ * 1. WHO is buying? - Fetch spending data from USASpending
+ */
+/**
+ * Did any section of THIS scan fall back to fabricated values?
+ *
+ * Seven catch blocks in this file return zeros/'Unknown' so a partial outage still renders a
+ * page. That is fine for a live response — it is NOT fine to SNAPSHOT, because the snapshot is
+ * replayed later under an "as of {time}" banner, which turns a transient 429 into durable data
+ * a user has every reason to trust.
+ *
+ * The outer isUpstreamOutage() guard could never see these: the inner catch swallows the error,
+ * so nothing reaches it. This flag is how the outer layer finds out.
+ *
+ * Module-scoped and reset at the top of each GET — these handlers are per-request and awaited
+ * within one invocation.
+ */
+let scanDegraded = false;
+function markScanDegraded(section: string, error: unknown): void {
+  scanDegraded = true;
+  console.error(`[market-scanner] ${section} degraded — refusing to snapshot this scan:`, error);
+}
+
+async function getWhoIsBuying(naics: string, states: string[]): Promise<MarketScannerResponse['whoIsBuying']> {
+  try {
+    const filters: Record<string, unknown> = {
+      award_type_codes: ['A', 'B', 'C', 'D'],
+      time_period: [
+        {
+          start_date: '2022-10-01',
+          end_date: '2025-09-30',
+        },
+      ],
+      naics_codes: [naics],
+    };
+
+    if (states.length > 0) {
+      filters.place_of_performance_scope = 'domestic';
+      filters.place_of_performance_locations = states.map((state) => ({
+        country: 'USA',
+        state,
+      }));
+    }
+
+    // ACCURATE "WHO is buying?" ranking — use spending_by_CATEGORY (true
+    // aggregate per agency), NOT spending_by_award limited to the top 100 awards
+    // (which under-counts big-but-low-individual-award buyers and over-weights
+    // a few mega-contracts). Same source as the FPDS leaderboard. (Eric 2026-06)
+    const response = await fetch(
+      'https://api.usaspending.gov/api/v2/search/spending_by_category',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: 'awarding_subagency',
+          filters,
+          subawards: false,
+          limit: 10,
+          page: 1,
+        }),
+        signal: AbortSignal.timeout(30000),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`USASpending API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const results = (data.results || []) as Array<{ name: string; amount: number }>;
+    const totalSpend = results.reduce((s, r) => s + (r.amount || 0), 0);
+
+    const agencies: AgencyBuyer[] = results
+      .map((r) => ({ name: r.name || 'Unknown', annualSpend: r.amount || 0, department: r.name || 'Unknown' }))
+      .sort((a, b) => b.annualSpend - a.annualSpend)
+      .slice(0, 10);
+
+    // Determine concentration
+    const topAgencyPercent = agencies.length > 0 ? (agencies[0].annualSpend / totalSpend) * 100 : 0;
+    let concentration: 'concentrated' | 'distributed' | 'balanced';
+    if (topAgencyPercent > 60) {
+      concentration = 'concentrated';
+    } else if (topAgencyPercent < 30 && agencies.length > 5) {
+      concentration = 'distributed';
+    } else {
+      concentration = 'balanced';
+    }
+
+    return {
+      agencies,
+      totalSpend,
+      topBuyer: agencies.length > 0 ? agencies[0].name : 'Unknown',
+      concentration,
+    };
+  } catch (error) {
+    markScanDegraded('WHO is buying error', error);
+    console.error('[WHO is buying error]', error);
+    return {
+      agencies: [],
+      totalSpend: 0,
+      topBuyer: 'Unknown',
+      concentration: 'balanced',
+    };
+  }
+}
+
+/**
+ * 2. HOW are they buying? - Analyze procurement methods
+ */
+async function getHowTheyAreBuying(
+  naics: string,
+  topAgencies: string[]
+): Promise<MarketScannerResponse['howAreTheyBuying']> {
+  try {
+    // Fetch agency source data for top buying agencies
+    const breakdown: ProcurementMethod[] = [];
+    // No invented default. Null means "we have not measured this", which is
+    // what we actually know, and the consumer renders the method without a %.
+    let totalSamPosted: number | null = null;
+    let hasGSASchedule = false;
+    let hasIDIQ = false;
+
+    // Load agency sources data
+    const agencySourcesUrl = new URL('/api/agency-sources', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+    agencySourcesUrl.searchParams.set('agencies', topAgencies.slice(0, 3).join(','));
+
+    const response = await fetch(agencySourcesUrl.toString());
+    if (response.ok) {
+      const data = await response.json();
+
+      if (data.success && data.agencies) {
+        for (const agency of data.agencies) {
+          if (agency.spendingBreakdown?.breakdown) {
+            const patterns = agency.spendingBreakdown.breakdown;
+
+            if (patterns.gsaSchedule && patterns.gsaSchedule > 20) {
+              hasGSASchedule = true;
+            }
+
+            if (patterns.idiqVehicles && patterns.idiqVehicles > 15) {
+              hasIDIQ = true;
+            }
+
+            // patterns.samPosted is an archetype constant, not a measurement —
+            // deliberately NOT adopted as a percentage. Its presence still tells
+            // us the agency leans on vehicles, which drives the guidance below.
+            void patterns.samPosted;
+          }
+        }
+      }
+    }
+
+    // Build breakdown
+    if (hasGSASchedule) {
+      breakdown.push({
+        method: 'GSA Schedule',
+        percentage: null,
+        actionRequired: 'Get on GSA Schedule (SIN research required)',
+      });
+    }
+
+    if (hasIDIQ) {
+      breakdown.push({
+        method: 'IDIQ/BPA Vehicles',
+        percentage: null,
+        actionRequired: 'Target vehicle holders for subcontracting',
+      });
+    }
+
+    breakdown.push({
+      method: 'Open SAM.gov Competitions',
+      percentage: totalSamPosted,
+      actionRequired: 'Monitor SAM.gov daily for RFPs/RFQs',
+    });
+
+    // "Direct Awards / Sole Source" was sized as 100 minus an invented constant.
+    // The ROUTE is real and worth naming; the share is not something we measured.
+    breakdown.push({
+      method: 'Direct Awards / Sole Source',
+      percentage: null,
+      actionRequired: 'Build agency relationships, capability statements',
+    });
+
+    // No measured percentages left to rank by, so keep discovery order — the
+    // sequence the scan actually established, rather than a fabricated ranking.
+    const primaryMethod = breakdown[0]?.method || 'SAM.gov Competitions';
+
+    // Generate recommendation
+    let recommendation = '';
+    if (hasGSASchedule || hasIDIQ) {
+      recommendation = 'A large share of this market never appears as an open SAM.gov competition. Focus on GSA Schedule, IDIQ vehicles, and direct agency outreach.';
+    } else {
+      recommendation = 'Much of this market is competed openly on SAM.gov — competitive posture and proposal quality are what decide it.';
+    }
+
+    return {
+      breakdown,
+      primaryMethod,
+      // Was 100 minus an invented constant. Null = not measured, which is the
+      // truth; a number here reads as a finding.
+      visibilityGap: null,
+      recommendation,
+    };
+  } catch (error) {
+    markScanDegraded('HOW are they buying error', error);
+    console.error('[HOW are they buying error]', error);
+    return {
+      breakdown: [
+        {
+          method: 'SAM.gov Competitions',
+          // The error path said "Unable to determine procurement methods" and
+          // then returned 30/70 anyway. Nulls now match the sentence.
+          percentage: null,
+          actionRequired: 'Monitor SAM.gov daily',
+        },
+      ],
+      primaryMethod: 'SAM.gov Competitions',
+      visibilityGap: null,
+      recommendation: 'Unable to determine procurement methods. Default to SAM.gov monitoring.',
+    };
+  }
+}
+
+/**
+ * 3. WHO has it now? - Get incumbent contractors and recompete opportunities
+ */
+async function getWhoHasItNow(naics: string, states: string[]): Promise<MarketScannerResponse['whoHasItNow']> {
+  try {
+    // Get expiring contracts (18 months window for recompetes)
+    const expiringContracts = await getExpiringContracts(naics, 18);
+
+    const incumbents: Incumbent[] = expiringContracts.map((contract) => ({
+      company: contract.recipientName,
+      agency: contract.awardingAgencyName,
+      contractValue: contract.currentTotalValueOfAward,
+      expirationDate: contract.periodOfPerformanceCurrentEndDate,
+      isRecompete: (contract.daysUntilExpiration || 999) <= 540, // 18 months
+      setAside: contract.extentCompetedDescription,
+      daysUntilExpiration: contract.daysUntilExpiration,
+    }));
+
+    const totalRecompetes = incumbents.filter((i) => i.isRecompete).length;
+    const urgentRecompetes = incumbents.filter(
+      (i) => i.isRecompete && (i.daysUntilExpiration || 999) <= 180
+    ).length;
+    const lowCompetitionCount = expiringContracts.filter(
+      (c) => c.competitionLevel === 'low' || c.competitionLevel === 'sole_source'
+    ).length;
+
+    return {
+      incumbents: incumbents.slice(0, 15),
+      totalRecompetes,
+      urgentRecompetes,
+      lowCompetitionCount,
+    };
+  } catch (error) {
+    markScanDegraded('WHO has it now error', error);
+    console.error('[WHO has it now error]', error);
+    return {
+      incumbents: [],
+      totalRecompetes: 0,
+      urgentRecompetes: 0,
+      lowCompetitionCount: 0,
+    };
+  }
+}
+
+/**
+ * 4. WHAT opportunities exist RIGHT NOW?
+ */
+async function getWhatIsAvailable(naics: string, state?: string): Promise<AvailableOpportunities> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
+    // SAM.gov opportunities
+    let samCount = 0;
+    let samTypes: string[] = [];
+
+    if (process.env.SAM_API_KEY) {
+      try {
+        const params = new URLSearchParams({
+          api_key: process.env.SAM_API_KEY,
+          ncode: naics,
+          ptype: 'p,r,k,o,s,i',
+          limit: '100',
+        });
+
+        if (state) {
+          params.set('state', state);
+        }
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const formatDate = (d: Date) => {
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          return `${mm}/${dd}/${yyyy}`;
+        };
+        params.set('postedFrom', formatDate(thirtyDaysAgo));
+        params.set('postedTo', formatDate(new Date()));
+
+        const samResponse = await fetch(
+          `https://api.sam.gov/opportunities/v2/search?${params}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+
+        if (samResponse.ok) {
+          const samData = await samResponse.json();
+          const opps = samData.opportunitiesData || [];
+          samCount = opps.length;
+
+          // Extract notice types
+          const typeSet = new Set<string>();
+          opps.forEach((opp: Record<string, unknown>) => {
+            const type = opp.type as string;
+            if (type) typeSet.add(type);
+          });
+          samTypes = Array.from(typeSet);
+        }
+      } catch (samError) {
+        console.error('[SAM.gov fetch error]', samError);
+      }
+    }
+
+    // Grants.gov (using v1 API - POST to api.grants.gov/v1/api/search2)
+    let grantsCount = 0;
+    try {
+      const naicsDesc = getNaicsDescription(naics);
+      const keywords = naicsDesc.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 3);
+
+      const grantsResponse = await fetch(
+        'https://api.grants.gov/v1/api/search2',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            oppStatuses: 'posted',
+            rows: 50,
+            keyword: keywords.slice(0, 3).join(' '),
+          }),
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+
+      if (grantsResponse.ok) {
+        const grantsData = await grantsResponse.json();
+        // v1 API returns data.oppHits array
+        grantsCount = grantsData.data?.oppHits?.length || grantsData.data?.hitCount || 0;
+      }
+    } catch (grantsError) {
+      console.error('[Grants.gov fetch error]', grantsError);
+    }
+
+    // Forecasts
+    // null = we could not read it; 0 = we read it and there are none. Collapsing
+    // the two ("count || 0") is the same fabrication this commit removes — and
+    // it is the forecast table specifically, where a false 0 already shipped a
+    // paywalled "Forecasted buys: 0" to customers with 282 real forecasts.
+    let forecastsCount: number | null = null;
+    try {
+      const { count, error } = await getSupabase()
+        .from('agency_forecasts')
+        .select('*', { count: 'exact', head: true })
+        .eq('naics_code', naics);
+      if (error) console.error('[Forecasts count error]', error.message);
+      else forecastsCount = typeof count === 'number' ? count : null;
+    } catch (forecastError) {
+      console.error('[Forecasts fetch error]', forecastError);
+    }
+
+    // GSA eBuy (mock - no public API)
+    const gsaEbuyCount = 0;
+
+    return {
+      samGov: { count: samCount, types: samTypes },
+      grantsGov: { count: grantsCount },
+      gsaEbuy: { count: gsaEbuyCount, note: 'Requires GSA Schedule to access' },
+      forecasts: { count: forecastsCount, timeframe: '6-18 months ahead' },
+    };
+  } catch (error) {
+    markScanDegraded('WHAT is available error', error);
+    console.error('[WHAT is available error]', error);
+    return {
+      samGov: { count: 0, types: [] },
+      grantsGov: { count: 0 },
+      gsaEbuy: { count: 0, note: 'Requires GSA Schedule' },
+      forecasts: { count: null, timeframe: '6-18 months' },
+    };
+  }
+}
+
+/**
+ * 5. WHAT events should you attend?
+ */
+async function getWhatEvents(naics: string, state?: string): Promise<FederalEvent[]> {
+  try {
+    const eventsUrl = new URL('/api/federal-events', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+    eventsUrl.searchParams.set('naics', naics);
+
+    const response = await fetch(eventsUrl.toString());
+    if (!response.ok) {
+      throw new Error(`Events API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const events: FederalEvent[] = [];
+
+    // Real, dated events from sam_events first — an actual industry day with a
+    // date and a place, not a website that lists them. Each agency group carries
+    // its own match tier (notice > office > agency); we surface the label so a
+    // department-wide DoD event is never passed off as a specific match.
+    if (data.success && Array.isArray(data.liveEventsByAgency)) {
+      for (const group of data.liveEventsByAgency) {
+        for (const ev of group.events || []) {
+          events.push({
+            name: ev.title,
+            date: ev.event_date || 'Date TBD',
+            location: ev.location || ev.office || ev.agency || 'See notice',
+            type: group.matchLabel ? `${ev.event_type} — ${group.matchLabel}` : ev.event_type,
+          });
+        }
+      }
+    }
+
+    // Backfill from the static catalog only when real events are thin. `frequency`
+    // is a publishing cadence ("Daily"), not a date — label it as the recurring
+    // source it is instead of passing it off as an event date.
+    if (events.length < 5 && data.success && data.eventSources) {
+      for (const source of data.eventSources.slice(0, 10 - events.length)) {
+        events.push({
+          name: source.name,
+          date: `Ongoing (${source.frequency})`,
+          location: state ? `${state} or Virtual` : 'Various Locations',
+          type: source.type,
+        });
+      }
+    }
+
+    return events;
+  } catch (error) {
+    markScanDegraded('WHAT events error', error);
+    console.error('[WHAT events error]', error);
+    return [
+      {
+        name: 'OSDBU Events Calendar',
+        date: 'Ongoing',
+        location: 'Check agency websites',
+        type: 'Industry Days / Matchmaking',
+      },
+    ];
+  }
+}
+
+/**
+ * 6. WHO do I talk to?
+ */
+async function getWhoToTalkTo(
+  naics: string,
+  topAgencies: string[],
+  state?: string
+): Promise<MarketScannerResponse['whoToTalkTo']> {
+  try {
+    // OSDBU contacts: the federal_contractors table was dropped (SBLO contacts
+    // now live in JSON files, not Supabase — see tool-health note), so this is
+    // empty. SB Specialists below come from the agency hierarchy.
+    const osdubuContacts: Contact[] = [];
+
+    // SB Specialists (using agency hierarchy)
+    const sbSpecialists: Contact[] = topAgencies.slice(0, 5).map((agency) => ({
+      agency,
+      office: 'Office of Small and Disadvantaged Business Utilization',
+    }));
+
+    // Contracting Officers (placeholder - would need office search)
+    const contractingOfficers: Contact[] = [];
+
+    // Teaming partners from SAM.gov
+    const teamingPartners: Contact[] = [];
+    try {
+      const partners = await findTeamingPartners(naics, undefined, state, 5);
+      partners.forEach((p) => {
+        const govPoc = p.pointsOfContact?.find((poc) => poc.type === 'Government');
+        teamingPartners.push({
+          agency: p.legalBusinessName,
+          name: govPoc?.name,
+          email: govPoc?.email,
+          phone: govPoc?.phone,
+        });
+      });
+    } catch (teamingError) {
+      console.error('[Teaming partners error]', teamingError);
+    }
+
+    return {
+      osdubuContacts: osdubuContacts.slice(0, 5),
+      sbSpecialists,
+      contractingOfficers,
+      teamingPartners,
+    };
+  } catch (error) {
+    markScanDegraded('WHO to talk to error', error);
+    console.error('[WHO to talk to error]', error);
+    return {
+      osdubuContacts: [],
+      sbSpecialists: [],
+      contractingOfficers: [],
+      teamingPartners: [],
+    };
+  }
+}
+
+// Graceful-degradation snapshot key: the 6-question scan is keyed on the
+// NAICS + state that define its result, so an upstream outage (USASpending /
+// SAM / Supabase unreachable) serves the last-good scan (see
+// src/lib/resilience/last-good.ts) instead of an empty panel. Not per-user.
+function marketScannerSnapshotKey(sp: URLSearchParams): string {
+  const parts = ['naics', 'state'].map((k) => `${k}=${(sp.get(k) || '').toUpperCase()}`);
+  return `market-scanner:${parts.join('&')}`;
+}
+
+// Main Handler
+export async function GET(request: NextRequest) {
+  // Reset per request — the flag is module-scoped and a warm lambda serves many scans.
+  scanDegraded = false;
+  const startTime = Date.now();
+  const { searchParams } = new URL(request.url);
+
+  const naics = searchParams.get('naics');
+  const state = searchParams.get('state');
+
+  // Validate
+  if (!naics) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'naics parameter is required',
+        usage: 'GET /api/market-scanner?naics=238220&state=GA',
+      },
+      { status: 400 }
+    );
+  }
+
+  if (naics.length < 5) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'NAICS code must be at least 5 digits for accurate results',
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Build search states
+    const searchStates: string[] = [];
+    if (state) {
+      searchStates.push(state.toUpperCase());
+      const bordering = getBorderingStates(state.toUpperCase());
+      searchStates.push(...bordering.slice(0, 2));
+    }
+
+    console.log(`[Market Scanner] NAICS: ${naics}, States: ${searchStates.join(', ') || 'nationwide'}`);
+
+    // Phase 1: Get WHO IS BUYING first (needed for HOW and WHO TO TALK TO)
+    const whoIsBuying = await getWhoIsBuying(naics, searchStates);
+    const topAgencies = whoIsBuying.agencies.slice(0, 5).map((a) => a.name);
+
+    // Phase 2: Fetch remaining 5 questions in parallel (now that we have top agencies)
+    const [howAreTheyBuying, whoHasItNow, whatIsAvailable, whatEvents, whoToTalkTo] =
+      await Promise.all([
+        getHowTheyAreBuying(naics, topAgencies),
+        getWhoHasItNow(naics, searchStates),
+        getWhatIsAvailable(naics, state || undefined),
+        getWhatEvents(naics, state || undefined),
+        getWhoToTalkTo(naics, topAgencies, state || undefined),
+      ]);
+
+    const response: MarketScannerResponse = {
+      input: {
+        naics,
+        naicsDescription: getNaicsDescription(naics),
+        state: state?.toUpperCase() || 'Nationwide',
+        stateName: state ? STATE_NAMES[state.toUpperCase()] || state : 'All States',
+      },
+      whoIsBuying,
+      howAreTheyBuying,
+      whoHasItNow,
+      whatIsAvailable,
+      whatEvents,
+      whoToTalkTo,
+      generatedAt: new Date().toISOString(),
+      processingTimeMs: Date.now() - startTime,
+    };
+
+    const payload = {
+      success: true,
+      // Tell the caller when a section fabricated its numbers, so a UI can label them rather
+      // than present "$0/year" as measured. Absent on a clean scan.
+      ...(scanDegraded ? { degraded: true } : {}),
+      ...response,
+    };
+    // Snapshot ONLY a clean scan. A degraded one contains fabricated zeros ("Total Market
+    // $0/year", topBuyer 'Unknown'), and persisting that means a transient 429 gets replayed
+    // for hours under an "as of {time}" banner as if it were measured. Better to have no
+    // snapshot than a confident wrong one.
+    if (!scanDegraded) {
+      saveSnapshot(marketScannerSnapshotKey(searchParams), payload).catch(() => {});
+    } else {
+      console.warn('[market-scanner] scan degraded — snapshot skipped, last-good preserved');
+    }
+    return NextResponse.json({ ...payload, ...freshMeta() });
+  } catch (error) {
+    markScanDegraded('Market Scanner Error', error);
+    console.error('[Market Scanner Error]', error);
+
+    // If an upstream data source is unreachable (not an app bug), serve the
+    // last-good scan with an "as of {time}" banner instead of a dead panel.
+    if (isUpstreamOutage(error)) {
+      const snap = await readSnapshot<Record<string, unknown>>(marketScannerSnapshotKey(searchParams));
+      if (snap) {
+        return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+      }
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate market scan',
+        processingTimeMs: Date.now() - startTime,
+      },
+      { status: 500 }
+    );
+  }
+}

@@ -1,0 +1,306 @@
+{
+  "metadata": {
+    "description": "USACE office-specific pain points mapped by mission area and office type",
+    "lastUpdated": "2025-12-21",
+    "source": "Research-based mapping of USACE divisions and their specific contracting focus areas"
+  },
+  "district_mappings": {
+    "civil_works_districts": {
+      "keywords": ["District", "Navigation", "Waterway", "Flood Control", "River", "Lake", "Dam", "Levee", "Dredging"],
+      "locations": {
+        "Baltimore": "civil_works",
+        "Philadelphia": "civil_works",
+        "New York": "civil_works",
+        "Norfolk": "civil_works",
+        "Wilmington": "civil_works",
+        "Charleston": "civil_works",
+        "Savannah": "civil_works",
+        "Jacksonville": "civil_works",
+        "Mobile": "civil_works",
+        "New Orleans": "civil_works",
+        "Galveston": "civil_works",
+        "Fort Worth": "civil_works",
+        "Little Rock": "civil_works",
+        "Memphis": "civil_works",
+        "Vicksburg": "civil_works",
+        "Nashville": "civil_works",
+        "Louisville": "civil_works",
+        "Buffalo": "civil_works",
+        "Detroit": "civil_works",
+        "Chicago": "civil_works",
+        "St. Paul": "civil_works",
+        "St. Louis": "civil_works",
+        "Kansas City": "civil_works",
+        "Omaha": "civil_works",
+        "Portland": "civil_works",
+        "Seattle": "civil_works",
+        "San Francisco": "civil_works",
+        "Los Angeles": "civil_works",
+        "Sacramento": "civil_works",
+        "Walla Walla": "civil_works",
+        "Concord": "civil_works"
+      }
+    },
+    "milcon_offices": {
+      "keywords": ["Depot", "Arsenal", "Base", "Installation", "Fort", "Camp", "Station", "Center", "Huntsville", "Omaha"],
+      "locations": {
+        "Tobyhanna": "military_construction",
+        "Natick": "military_construction",
+        "Huntsville": "military_construction",
+        "Omaha": "military_construction",
+        "Fort Benning": "military_construction",
+        "Benning": "military_construction"
+      },
+      "office_codes": ["W912DY", "W50S8P"]
+    },
+    "environmental_offices": {
+      "keywords": ["Environmental", "FUSRAP", "Superfund", "Cleanup", "Remediation", "PFAS"],
+      "locations": {
+        "Buffalo": "environmental"
+      }
+    }
+  },
+  "usace_mission_areas": {
+    "civil_works": {
+      "description": "Water resource activities including navigation, flood control, and ecosystem restoration",
+      "applicable_offices": [
+        "USACE Civil Works Districts (39 districts across 8 divisions)",
+        "Examples: Baltimore District, Philadelphia District, New Orleans District, etc."
+      ],
+      "painPoints": [
+        {
+          "pain": "Navigation infrastructure backlog - inland waterways locks and dams well beyond 50-year design life",
+          "severity": "critical",
+          "budget_impact": "$56.5M backlog for Atlantic Intracoastal Waterway alone",
+          "sources": ["ASCE Inland Waterways Infrastructure Report 2021", "Atlantic Intracoastal Waterway Association FY2025 Priorities"]
+        },
+        {
+          "pain": "Deferred maintenance tracking gaps - USACE lacked approach for tracking deferred maintenance, limiting management ability",
+          "severity": "high",
+          "sources": ["GAO 2018 Inland Waterways Report", "National Academies Review"]
+        },
+        {
+          "pain": "Climate resilience for flood control infrastructure - need to adapt existing infrastructure to changing climate conditions",
+          "severity": "high",
+          "sources": ["USACE Climate Adaptation Screening", "Bipartisan Infrastructure Law USACE Allocation"]
+        },
+        {
+          "pain": "Inadequate navigation funding - current budget does not provide adequate funding to keep all channels open to authorized levels",
+          "severity": "high",
+          "sources": ["Atlantic Intracoastal Waterway Association", "USACE FY2025 Budget"]
+        },
+        {
+          "pain": "Coastal flood risk management execution challenges - $2.55B BIL allocation requires complex storm risk management project delivery",
+          "severity": "medium",
+          "budget_impact": "$2.55B BIL allocation",
+          "sources": ["Bipartisan Infrastructure Law USACE Allocation", "Resilient Norfolk Project"]
+        },
+        {
+          "pain": "Environmental justice requirements - 25% of BIL inland flood funds must benefit economically disadvantaged communities",
+          "severity": "medium",
+          "sources": ["Infrastructure Investment and Jobs Act USACE Equity Requirements"]
+        },
+        {
+          "pain": "Aquatic ecosystem restoration - need to balance navigation and flood control with environmental restoration mandates",
+          "severity": "medium",
+          "sources": ["USACE Civil Works Mission"]
+        }
+      ]
+    },
+    "military_construction": {
+      "description": "Design and construction of facilities for Army, Air Force, and other DOD agencies at military installations",
+      "applicable_offices": [
+        "USACE Districts with MILCON focus",
+        "Examples: Tobyhanna Army Depot (PA), Huntsville Center, Omaha District, etc."
+      ],
+      "painPoints": [
+        {
+          "pain": "Installation modernization backlogs - aging facilities at military bases require extensive renovation and upgrades",
+          "severity": "critical",
+          "sources": ["DOD Installation Infrastructure Report"]
+        },
+        {
+          "pain": "PFAS contamination at 586 DOD military sites requiring remediation after EPA designated PFOA and PFOS as hazardous substances",
+          "severity": "critical",
+          "budget_impact": "Multi-billion dollar remediation requirements",
+          "sources": ["GAO-25-107401 Persistent Chemicals Report", "EPA PFAS Actions 2024"]
+        },
+        {
+          "pain": "C5ISR facility infrastructure needs - specialized facilities for Command, Control, Communications, Computers, Cyber, Intelligence, Surveillance, and Reconnaissance systems",
+          "severity": "high",
+          "sources": ["Tobyhanna Army Depot Mission"]
+        },
+        {
+          "pain": "Energy efficiency and net-zero goals - DOD mandate to achieve net-zero installations by 2045",
+          "severity": "high",
+          "sources": ["DOD Climate Adaptation Plan", "Army Climate Strategy"]
+        },
+        {
+          "pain": "Cybersecurity infrastructure for critical facilities - need for physical and cyber hardening of sensitive military construction projects",
+          "severity": "high",
+          "sources": ["DOD Cybersecurity Requirements"]
+        },
+        {
+          "pain": "Rapid construction for emerging threats - need to accelerate MILCON timelines to respond to strategic competition",
+          "severity": "medium",
+          "sources": ["National Defense Strategy 2022"]
+        },
+        {
+          "pain": "Design-Build project management complexity - balancing speed with quality in DB contract execution",
+          "severity": "medium",
+          "sources": ["USACE MILCON Contracting Guide"]
+        },
+        {
+          "pain": "Supply chain resilience for critical construction materials - ensuring domestic sourcing compliance and availability",
+          "severity": "medium",
+          "sources": ["Buy American Act", "DOD Supply Chain Resilience"]
+        }
+      ]
+    },
+    "environmental": {
+      "description": "Environmental cleanup, restoration, and regulatory compliance for military and civil sites",
+      "applicable_offices": [
+        "USACE Environmental Districts",
+        "Examples: Buffalo District (Superfund sites), Sacramento District (FUSRAP), etc."
+      ],
+      "painPoints": [
+        {
+          "pain": "PFAS contamination remediation - 586 DOD military sites require investigation and cleanup",
+          "severity": "critical",
+          "budget_impact": "Multi-billion dollar cleanup costs",
+          "sources": ["GAO-25-107401 Persistent Chemicals Report", "EPA PFAS Actions 2024"]
+        },
+        {
+          "pain": "Climate resilience for Superfund sites - 945 sites (60%) in areas affected by flooding, storm surge, wildfires, or sea-level rise",
+          "severity": "high",
+          "sources": ["EPA Superfund Climate Resilience", "USACE Climate Adaptation Screening"]
+        },
+        {
+          "pain": "Hazardous waste infrastructure pressure - PFAS designation increasing site investigations, remediation capacity, and treatment technology needs",
+          "severity": "high",
+          "sources": ["ASCE Hazardous Waste Infrastructure Report Card"]
+        },
+        {
+          "pain": "FUSRAP site completion - Formerly Utilized Sites Remedial Action Program sites require continued cleanup and long-term stewardship",
+          "severity": "medium",
+          "sources": ["USACE FUSRAP Program"]
+        },
+        {
+          "pain": "Emerging contaminants beyond PFAS - 1,4-dioxane, per- and polyfluoroalkyl substances, and other emerging threats",
+          "severity": "medium",
+          "sources": ["EPA Emerging Contaminants List"]
+        },
+        {
+          "pain": "Long-term stewardship and monitoring - need for sustained funding and technology for post-cleanup site monitoring",
+          "severity": "medium",
+          "sources": ["USACE Environmental Stewardship"]
+        }
+      ]
+    },
+    "emergency_operations": {
+      "description": "Disaster response, emergency contracting, and critical infrastructure restoration",
+      "applicable_offices": [
+        "All USACE Districts (emergency response capability)",
+        "Examples: New Orleans District (hurricanes), Jacksonville District (hurricanes), etc."
+      ],
+      "painPoints": [
+        {
+          "pain": "Rapid emergency contracting surge capacity - need to quickly mobilize contractors for disaster response",
+          "severity": "critical",
+          "sources": ["National Response Framework", "USACE Emergency Operations"]
+        },
+        {
+          "pain": "Climate-driven disaster frequency increase - more frequent and severe hurricanes, floods, and wildfires requiring USACE response",
+          "severity": "critical",
+          "sources": ["NOAA Climate Reports", "FEMA Disaster Declarations"]
+        },
+        {
+          "pain": "Critical infrastructure temporary power and repair - providing emergency power and repairs to hospitals, water treatment, etc.",
+          "severity": "high",
+          "sources": ["USACE Emergency Power Mission"]
+        },
+        {
+          "pain": "Debris removal and disposal capacity - managing massive volumes of disaster debris",
+          "severity": "high",
+          "sources": ["FEMA Public Assistance Program"]
+        },
+        {
+          "pain": "Pre-positioned contract readiness - maintaining Advanced Contracting Initiative (ACI) contracts for rapid deployment",
+          "severity": "medium",
+          "sources": ["USACE Emergency Contracting"]
+        }
+      ]
+    }
+  },
+  "sample_office_mappings": {
+    "USACE_Tobyhanna_PA": {
+      "office_name": "USACE contracting support for Tobyhanna Army Depot",
+      "location": "Tobyhanna, PA",
+      "primary_mission": "military_construction",
+      "applicable_pain_points": [
+        "Installation modernization backlogs - aging facilities at military bases require extensive renovation and upgrades",
+        "PFAS contamination at 586 DOD military sites requiring remediation after EPA designated PFOA and PFOS as hazardous substances",
+        "C5ISR facility infrastructure needs - specialized facilities for Command, Control, Communications, Computers, Cyber, Intelligence, Surveillance, and Reconnaissance systems",
+        "Energy efficiency and net-zero goals - DOD mandate to achieve net-zero installations by 2045",
+        "Cybersecurity infrastructure for critical facilities - need for physical and cyber hardening of sensitive military construction projects",
+        "Design-Build project management complexity - balancing speed with quality in DB contract execution",
+        "Supply chain resilience for critical construction materials - ensuring domestic sourcing compliance and availability"
+      ],
+      "not_applicable": [
+        "Navigation infrastructure backlog (Civil Works only)",
+        "Coastal flood risk management (Civil Works only)",
+        "Inland waterways (Civil Works only)"
+      ]
+    },
+    "USACE_Baltimore_District": {
+      "office_name": "USACE Baltimore District",
+      "location": "Baltimore, MD",
+      "primary_mission": "civil_works",
+      "secondary_mission": "environmental",
+      "applicable_pain_points": [
+        "Navigation infrastructure backlog - inland waterways locks and dams well beyond 50-year design life",
+        "Coastal flood risk management execution challenges - $2.55B BIL allocation requires complex storm risk management project delivery",
+        "Climate resilience for flood control infrastructure - need to adapt existing infrastructure to changing climate conditions",
+        "PFAS contamination remediation - 586 DOD military sites require investigation and cleanup",
+        "Climate resilience for Superfund sites - 945 sites (60%) in areas affected by flooding, storm surge, wildfires, or sea-level rise",
+        "Aquatic ecosystem restoration - need to balance navigation and flood control with environmental restoration mandates"
+      ]
+    },
+    "USACE_New_Orleans_District": {
+      "office_name": "USACE New Orleans District",
+      "location": "New Orleans, LA",
+      "primary_mission": "civil_works",
+      "secondary_mission": "emergency_operations",
+      "applicable_pain_points": [
+        "Coastal flood risk management execution challenges - $2.55B BIL allocation requires complex storm risk management project delivery",
+        "Climate resilience for flood control infrastructure - need to adapt existing infrastructure to changing climate conditions",
+        "Navigation infrastructure backlog - inland waterways locks and dams well beyond 50-year design life",
+        "Rapid emergency contracting surge capacity - need to quickly mobilize contractors for disaster response",
+        "Climate-driven disaster frequency increase - more frequent and severe hurricanes, floods, and wildfires requiring USACE response",
+        "Critical infrastructure temporary power and repair - providing emergency power and repairs to hospitals, water treatment, etc."
+      ]
+    },
+    "USACE_Huntsville_Center": {
+      "office_name": "USACE Huntsville Center",
+      "location": "Huntsville, AL",
+      "primary_mission": "military_construction",
+      "secondary_mission": "environmental",
+      "applicable_pain_points": [
+        "Installation modernization backlogs - aging facilities at military bases require extensive renovation and upgrades",
+        "PFAS contamination at 586 DOD military sites requiring remediation after EPA designated PFOA and PFOS as hazardous substances",
+        "Energy efficiency and net-zero goals - DOD mandate to achieve net-zero installations by 2045",
+        "Cybersecurity infrastructure for critical facilities - need for physical and cyber hardening of sensitive military construction projects",
+        "Rapid construction for emerging threats - need to accelerate MILCON timelines to respond to strategic competition",
+        "Hazardous waste infrastructure pressure - PFAS designation increasing site investigations, remediation capacity, and treatment technology needs"
+      ]
+    }
+  },
+  "how_to_use": {
+    "step_1": "Identify the USACE office location and name (e.g., 'USACE Tobyhanna, PA')",
+    "step_2": "Look up the office in SAM.gov or USACE website to determine if it's primarily Civil Works, MILCON, Environmental, or Emergency Operations",
+    "step_3": "Map the office to the appropriate mission area in this file",
+    "step_4": "Use only the pain points listed for that mission area",
+    "step_5": "Cross-reference with recent contract awards to validate alignment",
+    "validation_tip": "Search SAM.gov for recent contracts from that office - if they're awarding navigation/dredging contracts, it's Civil Works. If they're awarding building construction, it's MILCON."
+  }
+}

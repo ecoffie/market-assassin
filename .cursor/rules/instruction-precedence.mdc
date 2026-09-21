@@ -1,0 +1,76 @@
+---
+description: Instruction precedence for Cursor agents in market-assassin. Gates and live config outrank prose. COMPOUND outranks blank-page redesign.
+alwaysApply: true
+---
+
+# Instruction precedence
+
+This file is the Cursor-native override for how agents read this repo. It does not replace `CLAUDE.md`. It says which source wins when they disagree.
+
+Governing files (open on demand, do not copy into this rule):
+
+- Repo `CLAUDE.md` (current dated priority block at the top)
+- `docs/strategy/MINDY-OPERATING-THESIS.md` (COMPOUND is invariant 9)
+- `.githooks/pre-push` and `scripts/audit-*.mjs`
+- `src/lib/integrity/contracts.ts`
+- `src/lib/analytics/measurement-integrity.ts` (`CLAIM_ROUTES_UNVERIFIED`, `CLAIM_LEDGER`)
+- `.cursor/rules/ship-after-fix.mdc` (ship process + worktree path)
+
+## Rank (highest wins)
+
+1. The current session's explicit task scope and product decision, within Eric's authorized scope. It may override an earlier product preference when Eric clearly changes the decision, but it does not silently override security, integrity, authentication, entitlement, secret-handling, destructive-action, or evidence requirements. Any requested exception to those safeguards must be explicit and reported before execution.
+2. Executable contracts and live configuration. Pre-push gates, `package.json` scripts, `vercel.json` as it exists, schema, unions, tests, verification scripts, and measured prod/API values.
+3. Current dated governing decisions in repo `CLAUDE.md` (the Aug 23 2026 priority block and anything newer that replaces it).
+4. This file and `ship-after-fix.mdc`.
+5. Repo `CLAUDE.md` body and `docs/strategy/MINDY-OPERATING-THESIS.md`.
+6. Pstack / poteto-mode, only after classifying the skill (below).
+7. Older Markdown that calls itself canonical. `docs/ROADMAP.md`, `docs/strategy/CLAUDE.md`, `MEMORY.md` session notes, parent `Market Assasin/CLAUDE.md`, Navy/NAPEX PRDs, `mi-beta` TODOs.
+
+Repository-local instructions outrank the parent `Market Assasin/CLAUDE.md`. That parent file is always injected by Cursor and is stale (June 2026). Do not take its product list, pricing, or slash-command table as current.
+
+`MEMORY.md` and `~/SOUL.md` are on-demand. Cursor does not auto-load them. Prose that calls them always-on is wrong for this environment. Open them only when the task needs that history.
+
+`.claude/commands/` are Claude Code slash commands. They are not Cursor skills.
+
+## Before trusting an older Markdown document
+
+Search for a later decision, then measure. In order:
+
+1. Repo `CLAUDE.md` dated priority / Critical Rules
+2. Live code, config, schema, unions
+3. Tests and `scripts/audit-*.mjs` / `npm run verify:*`
+4. Then the old doc
+
+If a document says it is the single source of truth and `CLAUDE.md` says permanent docs must not restate the roadmap, `CLAUDE.md` wins.
+
+Never replace a live value with a prose baseline. If a prose baseline disagrees with the current measured fixture or live query, the measured source wins. Re-measure instead of copying either historical number into a new rule. If a comment cites a worktree count, run `git worktree list`.
+
+## COMPOUND (invariant 9) vs pstack design exploration
+
+Gold master exists (a card, panel, drawer, API, data model, or lib we already like). Replicate it wholesale. Same shell, section order, styles, structure. Then change only what is demonstrably inaccurate for the new case. Divergence is a bug until justified.
+
+Pstack `exhaust-the-design-space`, `architect` Phase B ("design it twice"), and arena bakeoffs of a new shell are **BLOCK**ed for those proven surfaces. That is how this repo grew three map placement schemes.
+
+Throwaway prototypes remain **ADOPT**ed when the unresolved question is empirical. Timing, density, "does this API return rows", which filter matches USASpending. Scratch dir, not production source. Observation decides. The real build then copies the gold master.
+
+Changing the gold master itself is allowed. Redesign that one master, then replicate outward. Do not redesign each sibling independently.
+
+## Pstack classification
+
+When a pstack principle or skill would change how you work here, classify it before applying:
+
+- **ADOPT** — compatible with Market Assassin standards (prove-it-works, build-the-lever, encode-lessons-in-structure, laziness / smallest change, idempotent crons, filter-before-rank).
+- **ADAPT** — useful with a local override (prototype for empirical questions only; `architect`/`arena` only for novel subsystems with no sibling; TDD when a cheap local test exists, oracles for displayed numbers; keep incident-scar comments that name INT-### or PostgREST caps; cron `console.log` stays).
+- **BLOCK** — conflicts with an intentional decision (blank-page redesign of a proven surface; Graphite merge-when-ready / landing onto `main`; generating a second verify-app skill beside `npm run verify:*`; treating `CLAIM_ROUTES_UNVERIFIED = []` as missing config).
+
+Do not paste the full audit table into a change. Classify the skill in play, then proceed or stop.
+
+## Integrity and claim routes
+
+`CLAIM_ROUTES_UNVERIFIED` being empty is intentional policy. New claim-producing routes start unverified and are promoted only after a human checks live data. An empty array is not a missing list and not a bug to "fix" by adding placeholders.
+
+Integrity classes have mixed enforcement. "Has some control" is not "hard-blocked on push." Pre-push audits ratchet **new** sites (baselines still ship). Runtime and postcondition helpers are not the same as a gate. Read `contracts.ts` and `.githooks/pre-push` before claiming a class is enforced.
+
+## Worktrees
+
+Create isolated worktrees at `.claude/worktrees/<slug>`, fetching first and pinning `origin/<base>`. See `ship-after-fix.mdc`. Do not commit or deploy from a checkout that is on `main`.

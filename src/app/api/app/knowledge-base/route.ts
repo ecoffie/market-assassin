@@ -1,0 +1,152 @@
+/**
+ * /api/app/knowledge-base
+ *
+ * Search/browse Mindy's source-document corpus (mindy_rag_documents) — the
+ * "Knowledge Base" page (PRD-knowledge-base-repository). This is the browsable
+ * home for the documents Mindy Chat cites, so "show me the source" lands on a
+ * real, searchable page instead of getting lost.
+ *
+ * GET ?q=&docType=&limit=&offset=  → list (title, type, summary, NAICS).
+ * Full text comes from /api/app/rag-doc?id=<id>.
+ *
+ * Guardrails:
+ *  - has_pii rows are NEVER returned.
+ *  - INTERNAL doc_types (code, meta, raw Q&A) are excluded — only user-useful
+ *    reference material (proposals, templates, training, podcasts) surfaces.
+ *  - Exit-strategy brand rule: we do NOT expose usage_rights / owner identity
+ *    ("eric_owned"); the corpus is presented as "GovCon Giants curriculum".
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
+import { createClient } from '@supabase/supabase-js';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/**
+ * Humanize a raw filename-ish title (Eric QC: KB showed "CYGTW", "red A01+1202SC
+ * 24R2100_Natl+MFSU+RFP_4.4.25_compressed"). Strips extensions, separators,
+ * version/date/junk tokens, and title-cases. Falls back to the summary if the
+ * cleaned title is still cryptic. Keeps already-clean titles (podcasts) as-is.
+ */
+function cleanTitle(raw: string, summary?: string, docTypeLabel?: string): string {
+  // A real human title (spaces + lowercase words, e.g. podcast titles) → keep.
+  if (raw && /\s/.test(raw) && /[a-z]{3,}/.test(raw) && raw.split(/\s+/).length >= 3) return raw;
+  let t = (raw || '')
+    .replace(/\.[a-z0-9]{2,4}$/i, '')                       // extension
+    .replace(/[_+%!]+/g, ' ')                                // separators/junk
+    .replace(/\b(compressed|final|rev\s*\d*|v\d+|draft|copy|sanitized|clean|redacted|volume|vol)\b/gi, '')
+    .replace(/\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\b/g, '')   // dates
+    .replace(/\b[A-Z0-9]{5,}\b/g, '')                        // solicitation IDs / hashes
+    .replace(/\broman\s+numeral\b|\b[IVX]{1,4}\b/gi, '')     // stray volume numerals
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  const words = t.split(' ').filter(w => /[a-z]{3,}/i.test(w));
+  // If after cleaning there aren't ≥2 real words, the filename is junk — prefer
+  // the SUMMARY (describes what it actually is), then a type label fallback.
+  if (words.length < 2) {
+    if (summary && summary.length > 8) return summary.slice(0, 80).replace(/\s+\S*$/, '') + (summary.length > 80 ? '…' : '');
+    return docTypeLabel ? `${docTypeLabel} (untitled)` : 'Untitled document';
+  }
+  return t.split(' ').map(w => /^[A-Z]{2,5}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
+}
+
+// Doc types that are NOT user-facing reference material.
+const EXCLUDED_TYPES = ['planner_app_code', 'meta_doc', 'qa_dataset'];
+
+// Friendly labels for the UI filter pills.
+export const DOC_TYPE_LABELS: Record<string, string> = {
+  proposal_template: 'Proposal Templates',
+  technical_volume: 'Technical Volumes',
+  pricing_volume: 'Pricing Volumes',
+  past_performance: 'Past Performance',
+  cap_statement: 'Capability Statements',
+  sources_sought_loi: 'Sources Sought / LOI',
+  course_material: 'Training',
+  slide_deck: 'Slide Decks',
+  webinar_resource: 'Webinars',
+  estimating_example: 'Estimating',
+  podcast_interview: 'Podcast Insights',
+  misc: 'Reference',
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _sb: any = null;
+function sb() {
+  if (!_sb) _sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  return _sb;
+}
+
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const email = url.searchParams.get('email');
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+
+  const q = (url.searchParams.get('q') || '').trim();
+  const docType = (url.searchParams.get('docType') || '').trim();
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '30', 10) || 30, 1), 60);
+  const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
+
+  let query = sb()
+    .from('mindy_rag_documents')
+    .select('id, title, doc_type, one_line_summary, related_naics, word_count, page_count', { count: 'exact' })
+    .eq('has_pii', false)
+    .not('doc_type', 'in', `(${EXCLUDED_TYPES.join(',')})`)
+    .in('ingestion_status', ['extracted', 'completed', 'embedded']);
+
+  if (docType && !EXCLUDED_TYPES.includes(docType)) {
+    query = query.eq('doc_type', docType);
+  }
+  if (q) {
+    // Search title + summary + tags. (full_text search is heavier — start here.)
+    query = query.or(`title.ilike.%${q}%,one_line_summary.ilike.%${q}%`);
+  }
+
+  query = query.order('word_count', { ascending: false }).range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+  if (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  // doc_type facet counts (for the filter pills) — one cheap grouped pass.
+  // These become the FILTER PILL COUNTS the user clicks. Measured 2026-08-23: 1,357 rows match
+  // this predicate, so an unpaginated read built every pill from ~74% of the corpus — and the
+  // pills also ORDER the doc types (INT-010: partial data corrupts ordering, not just counts).
+  let facetRows: { doc_type: string }[] = [];
+  try {
+    facetRows = await fetchAllPaged<{ doc_type: string }>(() => sb()
+      .from('mindy_rag_documents')
+      .select('doc_type')
+      .eq('has_pii', false)
+      .not('doc_type', 'in', `(${EXCLUDED_TYPES.join(',')})`)
+      .in('ingestion_status', ['extracted', 'completed', 'embedded'])
+      .order('doc_type', { ascending: true }));
+  } catch (e) {
+    console.error('[knowledge-base] facet read failed:', e instanceof Error ? e.message : String(e));
+  }
+  const facets: Record<string, number> = {};
+  for (const r of (facetRows || []) as { doc_type: string }[]) {
+    facets[r.doc_type] = (facets[r.doc_type] || 0) + 1;
+  }
+
+  return NextResponse.json({
+    success: true,
+    total: count || 0,
+    docs: (data || []).map((d: any) => ({
+      id: d.id,
+      title: cleanTitle(d.title || '', d.one_line_summary, DOC_TYPE_LABELS[d.doc_type as string] || (d.doc_type as string)),
+      docType: d.doc_type,
+      docTypeLabel: DOC_TYPE_LABELS[d.doc_type as string] || (d.doc_type as string),
+      summary: d.one_line_summary || '',
+      naics: d.related_naics || null,
+      words: d.word_count || 0,
+      pages: d.page_count || null,
+    })),
+    facets: Object.entries(facets)
+      .map(([t, n]) => ({ docType: t, label: DOC_TYPE_LABELS[t] || t, count: n }))
+      .sort((a, b) => b.count - a.count),
+  });
+}

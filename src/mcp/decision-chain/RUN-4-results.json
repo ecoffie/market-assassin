@@ -1,0 +1,387 @@
+[
+ {
+  "case_id": "c24",
+  "label": "ambiguous",
+  "selected": "624190",
+  "top3": [
+   "624190",
+   "621112",
+   "623220"
+  ],
+  "bucket": "miss",
+  "prev": null,
+  "acceptable": [
+   "551112",
+   "541611",
+   "523999"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c08",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "bucket": "unjustified_abstention",
+  "prev": null,
+  "acceptable": [
+   "541512",
+   "541690",
+   "541519"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c02",
+  "label": "classifiable",
+  "selected": "541512",
+  "top3": [
+   "541512",
+   "561591",
+   "927110"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "561621",
+  "acceptable": [
+   "541512",
+   "541519",
+   "541690"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c05",
+  "label": "classifiable",
+  "selected": "444230",
+  "top3": [
+   "444230",
+   "333612",
+   "333613"
+  ],
+  "bucket": "miss",
+  "prev": "624230",
+  "acceptable": [
+   "423610",
+   "423690",
+   "423840",
+   "423860"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c23",
+  "label": "classifiable",
+  "selected": "541614",
+  "top3": [
+   "541614",
+   "921190",
+   "926150"
+  ],
+  "bucket": "miss",
+  "prev": null,
+  "acceptable": [
+   "332710",
+   "333248",
+   "541330",
+   "339999"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c04",
+  "label": "ambiguous",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "561320",
+  "acceptable": [
+   "541512",
+   "541690",
+   "561320",
+   "541519"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c09",
+  "label": "classifiable",
+  "selected": "518210",
+  "top3": [
+   "518210",
+   "926110",
+   "522299"
+  ],
+  "bucket": "unacceptable_confident",
+  "prev": null,
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c12",
+  "label": "classifiable",
+  "selected": "333914",
+  "top3": [
+   "333914",
+   "423830",
+   "562991"
+  ],
+  "bucket": "acceptable_top",
+  "prev": null,
+  "acceptable": [
+   "333914"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c20",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "541690",
+   "541611",
+   "541614"
+  ],
+  "bucket": "unjustified_abstention",
+  "prev": "541611",
+  "acceptable": [
+   "541370",
+   "541360",
+   "541620"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c13",
+  "label": "ambiguous",
+  "selected": "622110",
+  "top3": [
+   "622110",
+   "336510",
+   "921190"
+  ],
+  "bucket": "miss",
+  "prev": "522210",
+  "acceptable": [
+   "561499",
+   "459999",
+   "455219"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c15",
+  "label": "classifiable",
+  "selected": "332510",
+  "top3": [
+   "332510",
+   "927110",
+   "444140"
+  ],
+  "bucket": "miss",
+  "prev": "541512",
+  "acceptable": [
+   "423430",
+   "423690"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c07",
+  "label": "ambiguous",
+  "selected": "541512",
+  "top3": [
+   "541512",
+   "711211",
+   "561591"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "541512",
+  "acceptable": [
+   "541511",
+   "541512",
+   "541611"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c16",
+  "label": "classifiable",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "acceptable_top",
+  "prev": null,
+  "acceptable": [
+   "541611",
+   "541690",
+   "541512"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c17",
+  "label": "classifiable",
+  "selected": "541511",
+  "top3": [
+   "541511",
+   "513210",
+   "711211"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "513210",
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c03",
+  "label": "ambiguous",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "acceptable_candidate_wrong_order",
+  "prev": null,
+  "acceptable": [
+   "541512",
+   "541611",
+   "541519"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "c01",
+  "label": "classifiable",
+  "selected": "541511",
+  "top3": [
+   "541511",
+   "513210",
+   "541715"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "924110",
+  "acceptable": [
+   "541511",
+   "541512"
+  ],
+  "source": "internal_user_prose",
+  "company": null
+ },
+ {
+  "case_id": "w01",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "238130",
+   "332312",
+   "238390"
+  ],
+  "bucket": "unjustified_abstention",
+  "prev": "332710",
+  "acceptable": [
+   "332710"
+  ],
+  "source": "contractor_website",
+  "company": "Loughmiller Machine, Tool & Design"
+ },
+ {
+  "case_id": "w02",
+  "label": "classifiable",
+  "selected": "331210",
+  "top3": [
+   "331210",
+   "331110",
+   "331222"
+  ],
+  "bucket": "miss",
+  "prev": "332710",
+  "acceptable": [
+   "333998",
+   "332312",
+   "332710"
+  ],
+  "source": "contractor_website",
+  "company": "Steward Machine Co., Inc."
+ },
+ {
+  "case_id": "w03",
+  "label": "classifiable",
+  "selected": "332993",
+  "top3": [
+   "332993",
+   "332994",
+   "332992"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "325920",
+  "acceptable": [
+   "332993"
+  ],
+  "source": "contractor_website",
+  "company": "AMTEC Corporation"
+ },
+ {
+  "case_id": "w04",
+  "label": "classifiable",
+  "selected": "333248",
+  "top3": [
+   "333248",
+   "323111",
+   "323113"
+  ],
+  "bucket": "acceptable_top",
+  "prev": "811310",
+  "acceptable": [
+   "333248"
+  ],
+  "source": "contractor_website",
+  "company": "Komori America Corporation"
+ },
+ {
+  "case_id": "w05",
+  "label": "classifiable",
+  "selected": "332322",
+  "top3": [
+   "332322",
+   "332119",
+   "336370"
+  ],
+  "bucket": "acceptable_candidate_wrong_order",
+  "prev": "332322",
+  "acceptable": [
+   "332119",
+   "333514"
+  ],
+  "source": "contractor_website",
+  "company": "Die-Matic Corporation"
+ }
+]

@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A/E/C Federal Contracting Intel Pack | GovCon Giants</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; }
+            .page-break { page-break-before: always; }
+            .no-print { display: none; }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #1a1a2e;
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            color: white;
+            padding: 50px 40px;
+            text-align: center;
+        }
+
+        .header-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.95;
+            margin-bottom: 15px;
+        }
+
+        .header .event-info {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+
+        .header-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .header-stat {
+            text-align: center;
+        }
+
+        .header-stat .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+
+        .header-stat .label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+        }
+
+        /* CONTENT */
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #7c3aed;
+        }
+
+        .section-number {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            color: white;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.2rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #1e3a8a;
+            font-weight: 700;
+        }
+
+        /* CONTRACT CARDS */
+        .contract-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #7c3aed;
+        }
+
+        .contract-card h3 {
+            color: #1e3a8a;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .contract-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .contract-field {
+            display: flex;
+            gap: 8px;
+        }
+
+        .contract-label {
+            font-weight: 600;
+            color: #64748b;
+            font-size: 0.85rem;
+            min-width: 100px;
+        }
+
+        .contract-value {
+            color: #1a1a2e;
+            font-size: 0.9rem;
+        }
+
+        .contract-value.money {
+            color: #059669;
+            font-weight: 700;
+        }
+
+        .contract-value.urgent {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .vulnerability-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+
+        .vulnerability-box strong {
+            color: #92400e;
+        }
+
+        .vulnerability-box p {
+            color: #78350f;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        /* TEAMING PLAYS */
+        .teaming-card {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #86efac;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .teaming-card h3 {
+            color: #166534;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .teaming-card h3 .play-letter {
+            background: #059669;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .primes-list {
+            background: white;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+
+        .primes-list strong {
+            color: #166534;
+        }
+
+        .opener-script {
+            background: #1e3a8a;
+            color: white;
+            border-radius: 8px;
+            padding: 15px;
+            font-style: italic;
+            font-size: 0.95rem;
+            margin-top: 10px;
+        }
+
+        .opener-script::before {
+            content: '"';
+            font-size: 1.5rem;
+            opacity: 0.5;
+        }
+
+        /* STEP-BY-STEP */
+        .step {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+
+        .step-number {
+            background: #7c3aed;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .step-content h4 {
+            color: #1e3a8a;
+            margin-bottom: 8px;
+        }
+
+        .step-content p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .step-content ul {
+            margin-top: 10px;
+            margin-left: 20px;
+            color: #64748b;
+        }
+
+        .step-content li {
+            margin-bottom: 5px;
+        }
+
+        /* PRO TIP */
+        .pro-tip {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .pro-tip h4 {
+            color: #92400e;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pro-tip ul {
+            margin-left: 20px;
+            color: #78350f;
+        }
+
+        .pro-tip li {
+            margin-bottom: 8px;
+        }
+
+        /* TABLES */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+        }
+
+        tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        tr:hover {
+            background: #f1f5f9;
+        }
+
+        /* CODE BLOCKS */
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            margin: 15px 0;
+        }
+
+        .code-block .comment {
+            color: #64748b;
+        }
+
+        /* AI PROMPT */
+        .ai-prompt {
+            background: #0f172a;
+            border: 2px solid #7c3aed;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .ai-prompt h4 {
+            color: #a78bfa;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        .ai-prompt pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        /* GLOSSARY */
+        .glossary-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .glossary-term {
+            font-weight: 700;
+            color: #7c3aed;
+            min-width: 120px;
+        }
+
+        .glossary-def {
+            color: #64748b;
+        }
+
+        /* RESOURCES */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .resource-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .resource-card h4 {
+            color: #1e3a8a;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .resource-card a {
+            color: #7c3aed;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        /* FOOTER */
+        .footer {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .footer h2 {
+            margin-bottom: 20px;
+        }
+
+        .footer p {
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .footer .cta-box {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .footer .cta-box h3 {
+            margin-bottom: 15px;
+        }
+
+        .footer .links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .footer .links a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.9;
+        }
+
+        .footer .links a:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-badge">April 2026 Intelligence Briefing</div>
+            <h1>A/E/C Federal Contracting Intel Pack</h1>
+            <p class="subtitle">Actionable Data for NAICS 236220, 237xxx, 541330</p>
+            <p class="event-info">Prepared for JTED 2026 AEC Industry Day | MacDill AFB | April 1, 2026</p>
+
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="value">$18.7B+</div>
+                    <div class="label">A/E/C Contract Volume</div>
+                </div>
+                <div class="header-stat">
+                    <div class="value">10</div>
+                    <div class="label">Expiring Contracts</div>
+                </div>
+                <div class="header-stat">
+                    <div class="value">5</div>
+                    <div class="label">Teaming Plays</div>
+                </div>
+                <div class="header-stat">
+                    <div class="value">4</div>
+                    <div class="label">AI Prompts</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- SECTION 1: EXPIRING CONTRACTS -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">1</div>
+                    <h2 class="section-title">10 Expiring A/E/C Contracts Worth Pursuing</h2>
+                </div>
+
+                <p style="margin-bottom: 25px; color: #64748b;">These contracts are expiring in the next 6-18 months. Start engaging NOW for the recompete.</p>
+
+                <!-- Contract 1 -->
+                <div class="contract-card">
+                    <h3>DHS Border Barrier Construction - Fisher Sand & Gravel</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">70B01C26F00000073</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Homeland Security</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Fisher Sand & Gravel Co</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$1.78 Billion</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Hidalgo County, NM</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Massive infrastructure program with multiple task orders. Small business subcontracting goals create teaming opportunities for electrical, HVAC, and security systems.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 2 -->
+                <div class="contract-card">
+                    <h3>USACE Utah Data Center - Balfour Beatty/DPR/Big-D JV</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">W912DR10C0094</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Defense (USACE)</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Balfour Beatty/DPR/Big-D JV</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$1.25 Billion</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Camp Williams, UT</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Data center construction boom driven by AI demand. USACE has ongoing facility sustainment needs. Position now for follow-on work and similar mission-critical facilities.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 3 -->
+                <div class="contract-card">
+                    <h3>Spencer Construction - DHS Border Barrier</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">70B01C26F00000261</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Homeland Security</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Spencer Construction LLC</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$1.14 Billion</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Southwest Border</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Heavy civil construction with urgency. Multiple delivery orders mean multiple teaming opportunities. Small business utilization goals require subcontracting plan.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 4 -->
+                <div class="contract-card">
+                    <h3>VA Southeast Louisiana Medical Center</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">VA101CFMC0064</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Veterans Affairs</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Clark McCarthy Healthcare Partners JV</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$1.05 Billion</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">New Orleans, LA</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>VA healthcare construction surge from PACT Act funding. Complex medical facility work requires specialized subs. Clark McCarthy has SDVOSB teaming requirements.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 5 -->
+                <div class="contract-card">
+                    <h3>DoD Louisville VA Medical Center</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">W912QR21C0027</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Defense (USACE)</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Walsh-Turner JV II</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$954 Million</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Louisville, KY</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>USACE managing VA medical construction. Healthcare facility work continues to grow. Approach Walsh-Turner for subcontracting on similar future work.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 6 -->
+                <div class="contract-card">
+                    <h3>NAVFAC Aircraft Parking Apron - Darwin, Australia</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">N6274225C1308</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Defense (NAVFAC)</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">SLSCO, Ltd.</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$327 Million</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">237310</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Pacific Theater</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Indo-Pacific infrastructure buildup. NAVFAC has $2.4B in Pacific construction planned. Heavy civil contractors with airfield experience in demand.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 7 -->
+                <div class="contract-card">
+                    <h3>Kiewit - NY Bridge Security Improvements</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">W912DS19C0015</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Defense (USACE)</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Kiewit Infrastructure Co.</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$443 Million</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">237310</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">New York, NY</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Critical infrastructure security work. Kiewit needs specialized security systems subs. Bridge and transportation work tied to Bipartisan Infrastructure Law funding.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 8 -->
+                <div class="contract-card">
+                    <h3>State Dept Pakistan Embassy NEC</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">SAQMMA10C0284</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of State</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">BL Harbert International LLC</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$871 Million</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Islamabad, Pakistan</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>State Department OBO has ongoing embassy construction program. Secure facility construction specialists needed. International experience valuable for follow-on work.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 9 -->
+                <div class="contract-card">
+                    <h3>NAVFAC China Lake Airfield Design-Build</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">N6247320F5226</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Defense (NAVFAC)</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Environmental Chemical Corp</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$855 Million</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">China Lake, CA</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Post-earthquake reconstruction continues. MCON projects at China Lake ongoing through 2028. Design-build delivery preference - A/E integration valuable.</p>
+                    </div>
+                </div>
+
+                <!-- Contract 10 -->
+                <div class="contract-card">
+                    <h3>Weston Solutions - Puerto Rico Power Generation</h3>
+                    <div class="contract-grid">
+                        <div class="contract-field">
+                            <span class="contract-label">Contract #:</span>
+                            <span class="contract-value">W9128F23F0065</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Agency:</span>
+                            <span class="contract-value">Dept of Defense (USACE)</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Incumbent:</span>
+                            <span class="contract-value">Weston Solutions Inc</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Value:</span>
+                            <span class="contract-value money">$797 Million</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">NAICS:</span>
+                            <span class="contract-value">236220</span>
+                        </div>
+                        <div class="contract-field">
+                            <span class="contract-label">Location:</span>
+                            <span class="contract-value">Palo Seco, Puerto Rico</span>
+                        </div>
+                    </div>
+                    <div class="vulnerability-box">
+                        <strong>Why Pursue:</strong>
+                        <p>Energy infrastructure resilience work. USACE managing Puerto Rico grid recovery. Electrical and power generation specialists needed as subs.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 2: TEAMING PLAYS -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">2</div>
+                    <h2 class="section-title">5 Teaming Plays for JTED Attendees</h2>
+                </div>
+
+                <p style="margin-bottom: 25px; color: #64748b;">Use these scripts at the industry day to open conversations with potential teaming partners.</p>
+
+                <div class="teaming-card">
+                    <h3><span class="play-letter">A</span> NAVFAC Southeast Small Business MACC</h3>
+                    <p><strong>Theme:</strong> Local Florida presence + small business certification = winning combo</p>
+                    <div class="primes-list">
+                        <strong>Primes to Approach:</strong> PCL Construction, Balfour Beatty, Hensel Phelps, Brasfield & Gorrie
+                    </div>
+                    <div class="opener-script">
+                        I saw you're on the NAVFAC Southeast MACC. We have [8(a)/SDVOSB/HUBZone] certification and local presence in Jacksonville. We specialize in [electrical/mechanical/concrete] and are looking for a prime that needs to meet small business goals on task orders..."
+                    </div>
+                </div>
+
+                <div class="teaming-card">
+                    <h3><span class="play-letter">B</span> USACE Jacksonville Flood Control</h3>
+                    <p><strong>Theme:</strong> Everglades restoration + Bipartisan Infrastructure Law funding surge</p>
+                    <div class="primes-list">
+                        <strong>Primes to Approach:</strong> Granite Construction, Lane Construction, Great Lakes Dredge & Dock
+                    </div>
+                    <div class="opener-script">
+                        With the Everglades restoration funding surge and the Infrastructure Law money flowing, we're looking for a prime that needs [dredging support/pump station work/water control structures]. We've done similar work with [reference]..."
+                    </div>
+                </div>
+
+                <div class="teaming-card">
+                    <h3><span class="play-letter">C</span> VA PACT Act Clinic Construction</h3>
+                    <p><strong>Theme:</strong> $16.6B in new VA healthcare facilities from PACT Act</p>
+                    <div class="primes-list">
+                        <strong>Primes to Approach:</strong> Skanska, Turner Construction, Gilbane, McCarthy Building
+                    </div>
+                    <div class="opener-script">
+                        The PACT Act clinic buildouts are going to need small business subs with healthcare construction experience. We have [ICRA certification/medical gas/infection control] capability and SDVOSB status. Are you bidding the VISN 8 work?"
+                    </div>
+                </div>
+
+                <div class="teaming-card">
+                    <h3><span class="play-letter">D</span> Air Force RAES Vehicle</h3>
+                    <p><strong>Theme:</strong> $3.4B Rapid Airfield Engineering Services vehicle - solicitation expected Q3 2026</p>
+                    <div class="primes-list">
+                        <strong>Primes to Approach:</strong> AECOM, Jacobs, HDR, Pond & Company
+                    </div>
+                    <div class="opener-script">
+                        I understand RAES awards are expected in late 2026. We're positioning as a sub with [airfield paving/lighting/marking/ARFF] capability. Are you putting a team together? We'd like to discuss how we might support your bid..."
+                    </div>
+                </div>
+
+                <div class="teaming-card">
+                    <h3><span class="play-letter">E</span> USACE Design-Build Push</h3>
+                    <p><strong>Theme:</strong> USACE mandate for design-build delivery creates A/E integration opportunity</p>
+                    <div class="primes-list">
+                        <strong>Primes to Approach:</strong> Kiewit, McCarthy, Mortenson, Clark Construction
+                    </div>
+                    <div class="opener-script">
+                        USACE is mandating design-build delivery for most MILCON. We have integrated A/E capability in [civil/structural/MEP] and can provide design-build services as a sub. What design-build pursuits are you looking at in the Southeast?"
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 3: SAM.GOV ALERTS -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">3</div>
+                    <h2 class="section-title">How to Set Up SAM.gov Alerts</h2>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Login to SAM.gov</h4>
+                        <p>Go to <strong>sam.gov</strong> and click "Sign In" in the top right. Use your Login.gov credentials (or create a free account).</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Navigate to Contract Opportunities</h4>
+                        <p>Click "Contract Opportunities" from the main menu, then click "Search" to access the opportunity search page.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Configure Your Filters</h4>
+                        <p>Set up your search criteria. For A/E/C contractors, use these filters:</p>
+                        <ul>
+                            <li><strong>NAICS:</strong> 236220, 237110, 237310, 237990, 541330</li>
+                            <li><strong>Set-Aside:</strong> Small Business, 8(a), SDVOSB, HUBZone, WOSB</li>
+                            <li><strong>State:</strong> FL, GA, AL, SC (your target states)</li>
+                            <li><strong>Agency:</strong> DEPT OF DEFENSE, DEPT OF VETERANS AFFAIRS</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Save Your Search</h4>
+                        <p>Click "Save Search" at the top of the results. Name it something memorable like "AEC Florida Opportunities". Select "Daily" for email frequency.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h4>Create Multiple Saved Searches</h4>
+                        <p>Don't rely on one search. Create separate alerts for different opportunity types:</p>
+                        <ul>
+                            <li>"USACE Construction SAT" - Under $350K, USACE only</li>
+                            <li>"NAVFAC MACCs" - Keywords: MACC, MATOC, IDIQ</li>
+                            <li>"VA Healthcare Construction" - VA + NAICS 236220</li>
+                            <li>"Sources Sought AEC" - Notice Type: Sources Sought only</li>
+                            <li>"Competitor Watch" - Your competitors' names as keywords</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="pro-tip">
+                    <h4>Pro Tips</h4>
+                    <ul>
+                        <li><strong>Separate Sources Sought from Solicitations</strong> - Sources Sought require different responses and timing</li>
+                        <li><strong>Set up competitor alerts</strong> - Use competitor names as keywords to see what they're bidding</li>
+                        <li><strong>Include "Design-Build" and "DB"</strong> - These won't always have NAICS 236220</li>
+                        <li><strong>Check daily</strong> - Email alerts can be delayed; check SAM.gov directly each morning</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 4: USASPENDING RECOMPETES -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">4</div>
+                    <h2 class="section-title">How to Track Recompetes on USASpending</h2>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Go to USASpending.gov</h4>
+                        <p>Navigate to <strong>usaspending.gov</strong> and click "Advanced Search" → "Contracts"</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Set Your Filters</h4>
+                        <ul>
+                            <li><strong>NAICS Code:</strong> 236220 (or 237310, 541330)</li>
+                            <li><strong>Awarding Agency:</strong> Department of Defense (or specific agency)</li>
+                            <li><strong>Time Period:</strong> Contracts ending in next 6-18 months</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Export to CSV</h4>
+                        <p>Click "Download" to export the results. Open in Excel/Google Sheets to build your tracking spreadsheet.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Key Columns to Analyze</h4>
+                        <ul>
+                            <li><strong>recipient_name</strong> = Current incumbent</li>
+                            <li><strong>current_total_value_of_award</strong> = Contract size</li>
+                            <li><strong>period_of_performance_current_end_date</strong> = When to start engaging</li>
+                            <li><strong>number_of_offers_received</strong> = Competition level</li>
+                            <li><strong>awarding_agency_name</strong> = Buyer to research</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="pro-tip">
+                    <h4>Timeline Rule of Thumb</h4>
+                    <ul>
+                        <li><strong>12-18 months out:</strong> Start building relationships with CO and incumbent</li>
+                        <li><strong>9-12 months out:</strong> Respond to Sources Sought notices</li>
+                        <li><strong>6-9 months out:</strong> RFP typically drops</li>
+                        <li><strong>3-6 months out:</strong> Proposal writing and submission</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 5: TOP SAT AGENCIES -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">5</div>
+                    <h2 class="section-title">Top 5 SAT Agencies for A/E/C Work</h2>
+                </div>
+
+                <p style="margin-bottom: 20px; color: #64748b;">The Simplified Acquisition Threshold ($350K) is the sweet spot: fewer competitors, faster awards, build past performance quickly.</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Agency</th>
+                            <th>Why They Matter</th>
+                            <th>SAM.gov Search Prefix</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>1</strong></td>
+                            <td>USACE Districts</td>
+                            <td>Civil works, flood control, base repairs, facility sustainment</td>
+                            <td>W912</td>
+                        </tr>
+                        <tr>
+                            <td><strong>2</strong></td>
+                            <td>NAVFAC Regions</td>
+                            <td>Base maintenance, MILCON, facility sustainment</td>
+                            <td>N00024, N40085</td>
+                        </tr>
+                        <tr>
+                            <td><strong>3</strong></td>
+                            <td>VA VISN</td>
+                            <td>Hospital renovations, PACT Act clinics, facility upgrades</td>
+                            <td>VA VISN + [number]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>4</strong></td>
+                            <td>GSA PBS</td>
+                            <td>Federal building repairs, tenant improvements, modernization</td>
+                            <td>GS- contracts</td>
+                        </tr>
+                        <tr>
+                            <td><strong>5</strong></td>
+                            <td>Air Force CE</td>
+                            <td>Airfield repairs, facility maintenance, MILCON</td>
+                            <td>FA prefix</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="pro-tip">
+                    <h4>SAT Sweet Spot Strategy</h4>
+                    <ul>
+                        <li><strong>Target $50K - $350K contracts</strong> - Typically 5-10 bidders vs 40+ on larger contracts</li>
+                        <li><strong>Awards happen fast</strong> - Often 14-30 days from solicitation close</li>
+                        <li><strong>Build past performance</strong> - Stack 3-5 SAT contracts, then bid larger work</li>
+                        <li><strong>Relationships matter more</strong> - Fewer competitors = CO remembers you</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 6: SOURCES SOUGHT TEMPLATE -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">6</div>
+                    <h2 class="section-title">Sources Sought Response Template</h2>
+                </div>
+
+                <p style="margin-bottom: 20px; color: #64748b;">Copy and customize this template for your next Sources Sought response. Fill in the bracketed fields.</p>
+
+                <div class="code-block">SUBJECT: Sources Sought Response - [Solicitation Number] - [Your Company Name]
+
+1. COMPANY INFORMATION
+   Company Name: [Your Company Legal Name]
+   CAGE Code: [XXXXX]
+   UEI: [XXXXXXXXXXXX]
+   Primary NAICS: 236220 - Commercial and Institutional Building Construction
+   Business Size: Small Business (under $45M annual revenue)
+   Socioeconomic Status: [8(a) / SDVOSB / HUBZone / WOSB / Small Business]
+   Years in Business: [X] years
+   Bonding Capacity: [$X Million]
+
+2. CAPABILITY STATEMENT
+   [Your Company Name] has directly relevant experience performing similar work:
+
+   Past Performance #1:
+   - Contract: [Contract Name/Number]
+   - Agency: [Awarding Agency]
+   - Value: [$X.XM]
+   - Period: [MM/YYYY - MM/YYYY]
+   - Description: [2-3 sentences on scope and relevance]
+   - Reference: [Name, Title, Phone, Email]
+
+   Past Performance #2:
+   - [Same format as above]
+
+   Past Performance #3:
+   - [Same format as above]
+
+3. INTEREST STATEMENT
+   [Your Company Name] is interested in this requirement as a [Prime Contractor / Subcontractor].
+
+   We recommend this requirement be set aside for [8(a) / SDVOSB / HUBZone / Small Business]
+   because [brief justification - e.g., "multiple qualified small businesses exist in this market"].
+
+4. QUESTIONS/RECOMMENDATIONS FOR THE GOVERNMENT
+   - Will this be a firm-fixed-price or cost-reimbursement contract?
+   - What past performance relevance criteria will be used?
+   - Will an industry day be held prior to solicitation release?
+   - Is incumbent contractor information available?
+   - Will bonding requirements exceed $[X] million?
+
+5. TEAMING INTEREST
+   [Your Company Name] is actively seeking teaming partners for this opportunity.
+   We are interested in [priming / subcontracting] and have capacity in:
+   - [Capability 1]
+   - [Capability 2]
+   - [Capability 3]
+
+   Contact for teaming discussions:
+   [Your Name], [Title]
+   [Email] | [Phone]
+   [Company Website]
+
+Respectfully submitted,
+
+[Your Name]
+[Title]
+[Company Name]
+[Email] | [Phone]</div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 7: IDIQ VEHICLES -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">7</div>
+                    <h2 class="section-title">IDIQ/MACC Vehicles Open for Bid</h2>
+                </div>
+
+                <p style="margin-bottom: 20px; color: #64748b;">These contract vehicles are accepting proposals or expected to solicit soon. Get on the vehicle NOW to compete for task orders later.</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th>Agency</th>
+                            <th>Status</th>
+                            <th>Ceiling</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Air Force RAES</strong></td>
+                            <td>USAF</td>
+                            <td>Solicitation Expected Q3 2026</td>
+                            <td>$3.4B</td>
+                            <td>Rapid Airfield Engineering Services - A/E + Construction</td>
+                        </tr>
+                        <tr>
+                            <td><strong>USACE Omaha SDVOSB</strong></td>
+                            <td>USACE</td>
+                            <td>Open - Rolling</td>
+                            <td>$99M</td>
+                            <td>SDVOSB-only construction MATOC</td>
+                        </tr>
+                        <tr>
+                            <td><strong>NAVFAC MACC Southeast</strong></td>
+                            <td>NAVFAC</td>
+                            <td>Task orders ongoing</td>
+                            <td>$950M</td>
+                            <td>Multiple award construction - subcontracting available</td>
+                        </tr>
+                        <tr>
+                            <td><strong>VA T4NG2</strong></td>
+                            <td>VA</td>
+                            <td>Expected 2026</td>
+                            <td>$60B</td>
+                            <td>Transformation Twenty-One Total Technology Next Gen</td>
+                        </tr>
+                        <tr>
+                            <td><strong>GSA OASIS+</strong></td>
+                            <td>GSA</td>
+                            <td>Open - Multiple Pools</td>
+                            <td>Unlimited</td>
+                            <td>Pools 1-4 for various service categories</td>
+                        </tr>
+                        <tr>
+                            <td><strong>DHS Border Construction</strong></td>
+                            <td>DHS/CBP</td>
+                            <td>Ongoing solicitations</td>
+                            <td>$10B+</td>
+                            <td>Barrier, infrastructure, technology - prime and sub</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="pro-tip">
+                    <h4>Vehicle Strategy</h4>
+                    <ul>
+                        <li><strong>Getting ON the vehicle is step one</strong> - You can't bid task orders without the vehicle</li>
+                        <li><strong>Set SAM.gov alerts</strong> for these solicitation numbers and keywords</li>
+                        <li><strong>If you miss the prime slot</strong> - Reach out to winners for subcontracting</li>
+                        <li><strong>Task orders are the real opportunity</strong> - Vehicle ceiling is shared among all awardees</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 8: AI PROMPTS -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">8</div>
+                    <h2 class="section-title">AI Prompts for GovCon</h2>
+                </div>
+
+                <p style="margin-bottom: 25px; color: #64748b;">Copy and paste these prompts into ChatGPT, Claude, or your preferred AI assistant. Fill in the bracketed fields.</p>
+
+                <div class="ai-prompt">
+                    <h4>Prompt 1: Analyze an RFP</h4>
+                    <pre>Analyze this RFP and tell me:
+1. What are the evaluation factors and their weights?
+2. What past performance is required (contract size, relevance, recency)?
+3. What certifications or clearances are needed?
+4. What are the key compliance requirements I can't miss?
+5. What questions should I ask at the industry day?
+6. Who is the likely incumbent and what are their weaknesses?
+
+[Paste RFP text or attach PDF]</pre>
+                </div>
+
+                <div class="ai-prompt">
+                    <h4>Prompt 2: Draft a Capability Statement</h4>
+                    <pre>Create a 1-page capability statement for my company:
+
+Company Name: [Your Company]
+NAICS Codes: 236220 (Commercial/Institutional Construction), 237310 (Highway)
+Certifications: [8(a), SDVOSB, HUBZone, WOSB - pick applicable]
+Years in Business: [X]
+Annual Revenue: [$X Million]
+Bonding Capacity: [$X Million]
+Geographic Coverage: [States/Regions]
+
+Past Performance (include 3):
+1. [Contract name, agency, value, description]
+2. [Contract name, agency, value, description]
+3. [Contract name, agency, value, description]
+
+Differentiators: [What makes you unique - equipment, certifications, staff]
+Target Agencies: USACE, NAVFAC, VA
+
+Format it professionally with sections for: Core Competencies, Past Performance,
+Differentiators, Company Data, and Contact Information.</pre>
+                </div>
+
+                <div class="ai-prompt">
+                    <h4>Prompt 3: Research a Competitor</h4>
+                    <pre>Research [Competitor Name] as a federal contractor:
+
+1. What agencies do they primarily work with?
+2. What NAICS codes do they operate under?
+3. What contract vehicles are they on (MACC, MATOC, IDIQ)?
+4. What major contracts are expiring in the next 18 months?
+5. What are their potential weaknesses based on:
+   - CPARS ratings (if available)
+   - Bid protests filed against them
+   - Contract terminations or modifications
+6. Who are their key personnel and where did they come from?
+7. What teaming relationships do they have?
+
+Use USASpending.gov, SAM.gov, and public records.</pre>
+                </div>
+
+                <div class="ai-prompt">
+                    <h4>Prompt 4: Prepare for Industry Day</h4>
+                    <pre>I'm attending an industry day for [Contract Name] with [Agency].
+
+The requirement is for: [Brief description]
+The estimated value is: [$X]
+The incumbent is: [Company name, if known]
+My company's relevant experience: [Brief summary]
+
+Help me prepare:
+
+1. Three intelligent questions to ask the Contracting Officer that show
+   I understand the requirement (not questions answered in the notice)
+
+2. Talking points for approaching the incumbent about teaming
+   (assuming they'll re-bid and need small business subs)
+
+3. Talking points for approaching potential large business teammates
+   (I'm the small business they might need)
+
+4. Key intelligence to gather while I'm there:
+   - What to observe
+   - Who to talk to
+   - What questions to ask other attendees
+
+5. Follow-up actions for after the industry day</pre>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+
+            <!-- SECTION 9: GLOSSARY -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">9</div>
+                    <h2 class="section-title">A/E/C GovCon Glossary</h2>
+                </div>
+
+                <div class="glossary-item">
+                    <span class="glossary-term">SAT</span>
+                    <span class="glossary-def">Simplified Acquisition Threshold - Currently $350,000. Contracts below this can use streamlined procedures.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">MACC</span>
+                    <span class="glossary-def">Multiple Award Construction Contract - IDIQ vehicle where multiple contractors compete for task orders.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">MATOC</span>
+                    <span class="glossary-def">Multiple Award Task Order Contract - Similar to MACC, commonly used by USACE.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">IDIQ</span>
+                    <span class="glossary-def">Indefinite Delivery/Indefinite Quantity - Contract type where specific quantities are ordered over time.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">D-B / DB</span>
+                    <span class="glossary-def">Design-Build - Project delivery method where one entity provides both design and construction.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">D-B-B</span>
+                    <span class="glossary-def">Design-Bid-Build - Traditional delivery: separate design, then competitive construction bid.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">MILCON</span>
+                    <span class="glossary-def">Military Construction - Congressionally-authorized construction projects for DoD.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">Sources Sought</span>
+                    <span class="glossary-def">Market research notice asking industry for capability information before issuing an RFP.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">SBLO</span>
+                    <span class="glossary-def">Small Business Liaison Officer - Agency contact to help small businesses understand opportunities.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">OSBP</span>
+                    <span class="glossary-def">Office of Small Business Programs - Agency office responsible for small business goals.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">CPARS</span>
+                    <span class="glossary-def">Contractor Performance Assessment Reporting System - Government's official past performance database.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">FAR</span>
+                    <span class="glossary-def">Federal Acquisition Regulation - Primary rules governing federal procurement.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">DFARS</span>
+                    <span class="glossary-def">Defense Federal Acquisition Regulation Supplement - Additional rules for DoD contracts.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">8(a)</span>
+                    <span class="glossary-def">SBA program for socially/economically disadvantaged small businesses. Allows sole-source awards up to $4M.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">SDVOSB</span>
+                    <span class="glossary-def">Service-Disabled Veteran-Owned Small Business - Certification for veteran-owned companies.</span>
+                </div>
+                <div class="glossary-item">
+                    <span class="glossary-term">HUBZone</span>
+                    <span class="glossary-def">Historically Underutilized Business Zone - Certification based on location and employee residence.</span>
+                </div>
+            </div>
+
+            <!-- SECTION 10: RESOURCES -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-number">10</div>
+                    <h2 class="section-title">Key Resources & Links</h2>
+                </div>
+
+                <h3 style="color: #1e3a8a; margin-bottom: 15px;">Free Government Resources</h3>
+                <div class="resource-grid">
+                    <div class="resource-card">
+                        <h4>SAM.gov</h4>
+                        <p>Contract opportunities, entity registration</p>
+                        <a href="https://sam.gov" target="_blank">sam.gov</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>USASpending.gov</h4>
+                        <p>Contract awards, spending data, recompete research</p>
+                        <a href="https://usaspending.gov" target="_blank">usaspending.gov</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>Acquisition Gateway</h4>
+                        <p>Contract vehicles, best practices, forecasts</p>
+                        <a href="https://acquisitiongateway.gov" target="_blank">acquisitiongateway.gov</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>USACE Project Tracker</h4>
+                        <p>Corps of Engineers project database</p>
+                        <a href="https://mrsi.erdc.dren.mil" target="_blank">mrsi.erdc.dren.mil</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>NAVFAC Business Opportunities</h4>
+                        <p>Navy facilities command contracts</p>
+                        <a href="https://navfac.navy.mil/Business-Opportunities/" target="_blank">navfac.navy.mil</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>GSA eLibrary</h4>
+                        <p>GSA schedule information</p>
+                        <a href="https://www.gsaelibrary.gsa.gov/" target="_blank">gsaelibrary.gsa.gov</a>
+                    </div>
+                </div>
+
+                <h3 style="color: #1e3a8a; margin: 30px 0 15px;">GovCon Giants Resources</h3>
+                <div class="resource-grid">
+                    <div class="resource-card">
+                        <h4>Free GovCon Course</h4>
+                        <p>Start your federal contracting journey</p>
+                        <a href="https://govcongiants.org/free-course" target="_blank">govcongiants.org/free-course</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>Market Assassin Pro</h4>
+                        <p>Advanced GovCon intelligence tools</p>
+                        <a href="https://tools.govcongiants.org" target="_blank">tools.govcongiants.org</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>YouTube Channel</h4>
+                        <p>Weekly GovCon training videos</p>
+                        <a href="https://youtube.com/@govcongiants" target="_blank">youtube.com/@govcongiants</a>
+                    </div>
+                    <div class="resource-card">
+                        <h4>Daily Alerts</h4>
+                        <p>Free opportunity alerts to your inbox</p>
+                        <a href="https://tools.govcongiants.org/alerts" target="_blank">tools.govcongiants.org/alerts</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <h2>Ready to Win Federal Contracts?</h2>
+            <p>This intel pack was prepared by GovCon Giants for the JTED 2026 AEC Industry Day.</p>
+            <p>Questions? Email <strong>hello@govcongiants.org</strong></p>
+
+            <div class="cta-box">
+                <h3>Get More Intel Like This</h3>
+                <p>Sign up for free daily alerts customized to your NAICS codes and target agencies.</p>
+                <div class="links">
+                    <a href="https://govcongiants.org/jted-2026">govcongiants.org/jted-2026</a>
+                    <a href="https://tools.govcongiants.org">tools.govcongiants.org</a>
+                    <a href="https://youtube.com/@govcongiants">YouTube</a>
+                </div>
+            </div>
+
+            <p style="margin-top: 30px; opacity: 0.7; font-size: 0.85rem;">
+                Data sourced from USASpending.gov and SAM.gov | April 2026<br>
+                &copy; 2026 GovCon Giants. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

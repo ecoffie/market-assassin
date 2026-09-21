@@ -1,0 +1,385 @@
+/**
+ * AI Analyst — bid/no-bid recommendation per opportunity.
+ *
+ * PRD-ai-bd-department.md Agent #2 (the "Analyst"). Given a SAM.gov
+ * notice ID + the authenticated user, returns a structured AI
+ * recommendation (PURSUE / WATCH / SKIP) with reasoning. Pro-tier
+ * gated. Cached per (notice_id, user_email) in
+ * analyst_bid_no_bid_cache so repeat opens are instant.
+ *
+ * POST /api/analyst/bid-no-bid
+ *   Body: { noticeId: string, email?: string, force?: boolean }
+ *
+ * Response shape:
+ *   {
+ *     success: true,
+ *     cached: boolean,           // hit the DB cache vs fresh LLM
+ *     analysis: {
+ *       recommendation: 'pursue' | 'watch' | 'skip',
+ *       score: number,           // 0-100
+ *       why_pursue: string[],
+ *       concerns: string[],
+ *       competitors_likely: string[],
+ *       effort_estimate: string,
+ *       next_step: string,
+ *     },
+ *     generated_at: string,
+ *     model: string,
+ *   }
+ *
+ * Pro-gated: free tier gets 402 with a teaser shape so the UI can
+ * render an "Upgrade to see the Analyst" card without revealing
+ * the analysis. Internal staff bypass via INTERNAL_TEAM_EMAILS.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { verifyMIAccess } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
+import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
+import { callLLM } from '@/lib/llm/call-llm';
+import { findPredecessorAward, summarizePredecessor } from '@/lib/usaspending/find-predecessor';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+interface AnalystOutput {
+  recommendation: 'pursue' | 'watch' | 'skip';
+  score: number;
+  why_pursue: string[];
+  concerns: string[];
+  competitors_likely: string[];
+  effort_estimate: string;
+  next_step: string;
+}
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/** Real top primes for a NAICS from USASpending (Eric: ground competitors). */
+async function getRealPrimesForNaics(naicsCode?: string): Promise<string[]> {
+  if (!naicsCode) return [];
+  try {
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/recipient/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: { naics_codes: [naicsCode], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+        limit: 6,
+      }),
+    });
+    if (!res.ok) return [];
+    const j = await res.json();
+    return (j.results || []).filter((r: { name?: string }) => r.name).map((r: { name: string }) => r.name);
+  } catch { return []; }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildPrompt(opp: any, profile: any, realCompetitors: string[] = [], predecessorBlock = ''): string {
+  const naicsList = (profile?.naics_codes || []).slice(0, 8).join(', ') || 'not set';
+  const setAsides = (profile?.set_aside_preferences || []).join(', ') || 'not set';
+  const agencies = (profile?.target_agencies || profile?.agencies || []).slice(0, 5).join(', ') || 'not set';
+  const businessType = profile?.business_type || 'not set';
+
+  const description = typeof opp.description === 'string' && opp.description.length > 0
+    ? opp.description.slice(0, 6000)
+    : '(no description text on file)';
+
+  // Tight, structured prompt. We want JSON back; the system message
+  // enforces no-prose, and the user message gives every signal the
+  // Analyst should weigh per the PRD §150 "Bid/No-Bid Analysis" spec.
+  return `You are the "Analyst" agent in a federal contracting BD team. Your job: tell this small business contractor whether to bid on this opportunity.
+
+USER'S COMPANY PROFILE:
+- Business type / certifications: ${businessType}
+- Set-aside preferences: ${setAsides}
+- NAICS codes pursued: ${naicsList}
+- Target agencies: ${agencies}
+
+OPPORTUNITY:
+- Title: ${opp.title || '(untitled)'}
+- Notice type: ${opp.notice_type || '(unknown)'}
+- Agency: ${opp.department || '(unknown)'}${opp.sub_tier ? ` › ${opp.sub_tier}` : ''}${opp.office ? ` › ${opp.office}` : ''}
+- NAICS: ${opp.naics_code || '(none)'}
+- PSC: ${opp.psc_code || '(none)'}
+- Set-aside: ${opp.set_aside_description || opp.set_aside || 'unrestricted'}
+- Posted: ${opp.posted_date || '(unknown)'}
+- Response deadline: ${opp.response_deadline || '(unknown)'}
+- Place of performance: ${[opp.pop_city, opp.pop_state, opp.pop_country].filter(Boolean).join(', ') || '(unknown)'}
+- Solicitation #: ${opp.solicitation_number || '(none)'}
+- Attachments available: ${Array.isArray(opp.attachments) && opp.attachments.length > 0 ? `yes (${opp.attachments.length})` : 'no'}
+${realCompetitors.length > 0 ? `\nTOP PRIMES IN THIS NAICS (real USASpending FY data — use ONLY these for competitors_likely):\n${realCompetitors.map(c => `- ${c}`).join('\n')}` : ''}
+${predecessorBlock ? `\nLIKELY INCUMBENT CONTRACT (real USASpending data — this is the work being recompeted; use it for competitors_likely, effort_estimate, and next_step):\n${predecessorBlock}` : ''}
+
+DESCRIPTION (truncated to 6K chars):
+${description}
+
+Return ONLY valid JSON matching exactly this shape — no markdown, no commentary, no code fences:
+
+{
+  "recommendation": "pursue" | "watch" | "skip",
+  "score": <integer 0-100>,
+  "why_pursue": [<short reasons this is a good fit, max 5, each under 100 chars>],
+  "concerns": [<risks or unknowns the user should verify, max 4, each under 100 chars>],
+  "competitors_likely": [<max 3 — use ONLY names from the "TOP PRIMES IN THIS NAICS" list above (real award data). If that list is empty, return ["(research the predecessor contract on USASpending)"]. NEVER invent company names.>],
+  "effort_estimate": "<one short sentence covering proposal effort + team needs>",
+  "next_step": "<one short imperative sentence the user should do next>"
+}
+
+RULES:
+- "pursue" = strong fit (score 70+), user should commit resources
+- "watch" = monitor (score 40-69), needs verification or partner
+- "skip" = poor fit (score 0-39), wrong cert / wrong size / wrong domain
+- If the opp's set-aside excludes the user's business type, recommend "skip" with the mismatch as the first concern
+- If NAICS doesn't match user's NAICS codes, drop score by at least 30
+- If deadline is within 7 days, mention urgency in concerns
+- Be concrete. Avoid filler like "consider the opportunity carefully"`;
+}
+
+function parseAnalystJson(text: string): AnalystOutput | null {
+  // Use the shared safeParseJSON helper which handles code fences,
+  // wrapper prose, control chars, newlines-in-strings, and 2-pass
+  // sanitization. Returns null fallback if all attempts fail.
+  const parsed = safeParseJSON<unknown>(text, {
+    fallback: null,
+    source: 'analyst.bidNoBid',
+  });
+  if (parsed && validateShape(parsed)) return parsed;
+  return null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function validateShape(obj: any): obj is AnalystOutput {
+  if (!obj || typeof obj !== 'object') return false;
+  if (!['pursue', 'watch', 'skip'].includes(obj.recommendation)) return false;
+  if (typeof obj.score !== 'number') return false;
+  if (!Array.isArray(obj.why_pursue)) return false;
+  if (!Array.isArray(obj.concerns)) return false;
+  if (!Array.isArray(obj.competitors_likely)) return false;
+  if (typeof obj.effort_estimate !== 'string') return false;
+  if (typeof obj.next_step !== 'string') return false;
+  return true;
+}
+
+export async function POST(request: NextRequest) {
+  let body: { noticeId?: string; email?: string; force?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const noticeId = typeof body.noticeId === 'string' ? body.noticeId.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const force = body.force === true;
+
+  if (!noticeId) return NextResponse.json({ success: false, error: 'noticeId required' }, { status: 400 });
+  if (!email) return NextResponse.json({ success: false, error: 'email required' }, { status: 400 });
+
+  // Auth gate: must be a real session for this email.
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
+
+  // Tier gate: only Pro and staff get the Analyst. Free tier gets a
+  // teaser (no LLM call, no DB write). UI uses this to render an
+  // "Upgrade to unlock Mindy Analyst" block.
+  const access = await verifyMIAccess(email);
+  const isPro = access.tier === 'pro' || access.isStaff === true;
+  if (!isPro) {
+    return NextResponse.json(
+      {
+        success: false,
+        teaser: true,
+        error: 'Mindy Analyst is a Mindy Pro feature',
+        upgrade_url: '/market-intelligence',
+      },
+      { status: 402 }
+    );
+  }
+
+  const supabase = getSupabase();
+
+  // Coach Mode: personalize + cache the analysis for the ACTIVE CLIENT, not the
+  // coach — else the bid/no-bid recommendation uses the coach's NAICS/set-asides
+  // and the cached verdict is misfiled under the coach.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
+  // Cache hit (unless force=true).
+  if (!force) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: cached } = await (supabase
+      .from('analyst_bid_no_bid_cache')
+      .select('*') as any)
+      .eq('notice_id', noticeId)
+      .eq('user_email', scopedEmail)
+      .maybeSingle();
+
+    if (cached?.recommendation) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        analysis: cached.recommendation,
+        generated_at: cached.generated_at,
+        model: cached.model_used,
+      });
+    }
+  }
+
+  // Pull the opportunity row.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: opp, error: oppError } = await (supabase
+    .from('sam_opportunities')
+    .select('*') as any)
+    .eq('notice_id', noticeId)
+    .maybeSingle();
+
+  if (oppError || !opp) {
+    return NextResponse.json(
+      { success: false, error: `Opportunity not found: ${noticeId}` },
+      { status: 404 }
+    );
+  }
+
+  // Pull the user profile so the analysis is personalized.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // `target_agencies` is NOT a column here (the real one is `agencies`) — it made
+  // PostgREST fail the whole query, so the bid/no-bid analysis silently ran
+  // un-personalized. Dropped it; surface the error instead of swallowing it.
+  const { data: profile, error: profileErr } = await (supabase
+    .from('user_notification_settings')
+    .select('naics_codes, business_type, set_aside_preferences, agencies') as any)
+    .eq('user_email', scopedEmail)
+    .maybeSingle();
+  if (profileErr) console.error('[bid-no-bid] profile query error:', profileErr.message);
+
+  // callLLM (job:'reasoning') picks from openai/groq/claude — just need one key.
+  if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      { success: false, error: 'AI service not configured' },
+      { status: 500 }
+    );
+  }
+
+  // GROUND the competitors (Eric: was an LLM guess of incumbent names). Pull the
+  // REAL top primes for this NAICS from USASpending and pass them in, so
+  // competitors_likely is award-backed, not invented.
+  // GROUND the recompete intel (#52): find the likely INCUMBENT award (real
+  // ceiling, expiry, parent vehicle) so the analyst reasons about THIS contract,
+  // not a generic market. Best-match inference, labeled as "likely."
+  const [realCompetitors, predecessor] = await Promise.all([
+    getRealPrimesForNaics(opp.naics_code),
+    findPredecessorAward({ naicsCode: opp.naics_code, agencyName: opp.department, keyword: opp.title }),
+  ]);
+  const predecessorBlock = predecessor ? summarizePredecessor(predecessor) : '';
+  const prompt = buildPrompt(opp, profile || {}, realCompetitors, predecessorBlock);
+
+  // job:'reasoning' = gpt-4o-mini first (Eric: go/no-go judgment — gpt-mini is
+  // BOTH cheaper than Groq 70B AND better at this; the audit's clear win). Groq
+  // is the fallback; the chain handles 429/failure.
+  let content: string | undefined;
+  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  try {
+    const result = await callLLM({
+      system: 'You are a federal contracting BD analyst. You return only valid JSON in the exact shape requested — no markdown, no prose, no code fences.',
+      user: prompt,
+      json: true,
+      maxTokens: 1200,
+      temperature: 0.2,
+      job: 'reasoning',
+      // Low volume (per pursuit), high stakes (a wrong call misleads a bid
+      // decision) → opt up to gpt-4o. Groq stays the cheap fallback.
+      openaiModel: 'gpt-4o',
+    });
+    content = result.text;
+    usage = result.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+    // Track cost per user/tool (#37). Fire-and-forget.
+    recordLlmUsage({ userEmail: email, tool: 'bid_no_bid', job: 'reasoning', provider: result.provider, model: result.model, usage }).catch(() => {});
+  } catch (err) {
+    await logToolError({
+      tool: ToolNames.ANALYST,
+      errorType: classifyError(err instanceof Error ? err : new Error(String(err))),
+      errorMessage: err instanceof Error ? err.message : String(err),
+      requestPath: '/api/analyst/bid-no-bid',
+      aiProvider: AIProviders.GROQ,
+      aiModel: GROQ_MODEL,
+    }).catch(() => {});
+    return NextResponse.json({ success: false, error: 'Could not reach AI service' }, { status: 502 });
+  }
+
+  if (!content) {
+    await logToolError({
+      tool: ToolNames.ANALYST,
+      errorType: 'api_error',
+      errorMessage: 'Groq returned empty content',
+      requestPath: '/api/analyst/bid-no-bid',
+      aiProvider: AIProviders.GROQ,
+      aiModel: GROQ_MODEL,
+    }).catch(() => {});
+    return NextResponse.json({ success: false, error: 'Empty AI response' }, { status: 502 });
+  }
+
+  const analysis = parseAnalystJson(content);
+  if (!analysis) {
+    await logToolError({
+      tool: ToolNames.ANALYST,
+      errorType: 'validation',
+      errorMessage: `Could not parse JSON from Groq output: ${content.slice(0, 300)}`,
+      requestPath: '/api/analyst/bid-no-bid',
+      aiProvider: AIProviders.GROQ,
+      aiModel: GROQ_MODEL,
+    }).catch(() => {});
+    return NextResponse.json(
+      { success: false, error: 'AI returned malformed output' },
+      { status: 502 }
+    );
+  }
+
+  // Clamp score to [0, 100] in case the model returned out-of-range.
+  const score = Math.max(0, Math.min(100, Math.round(analysis.score)));
+  analysis.score = score;
+
+  // Cache (upsert so force=true overwrites).
+  const cacheRow = {
+    notice_id: noticeId,
+    user_email: scopedEmail,
+    recommendation: analysis,
+    score,
+    recommendation_label: analysis.recommendation,
+    model_used: GROQ_MODEL,
+    prompt_tokens: usage?.prompt_tokens ?? null,
+    completion_tokens: usage?.completion_tokens ?? null,
+    generated_at: new Date().toISOString(),
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: cacheError } = await (supabase
+    .from('analyst_bid_no_bid_cache')
+    .upsert(cacheRow, { onConflict: 'notice_id,user_email' }) as any);
+
+  if (cacheError) {
+    // Non-fatal — return the analysis even if the cache write failed.
+    // Future requests will just re-run Groq.
+    console.warn('[analyst] cache write failed:', cacheError.message);
+  }
+
+  recordToolSuccess(ToolNames.ANALYST).catch(() => {});
+
+  return NextResponse.json({
+    success: true,
+    cached: false,
+    analysis,
+    generated_at: cacheRow.generated_at,
+    model: GROQ_MODEL,
+  });
+}

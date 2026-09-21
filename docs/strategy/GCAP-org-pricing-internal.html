@@ -1,0 +1,194 @@
+<!doctype html><html><head>
+<meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Org License — Internal Pricing Sheet</title>
+<style>
+  :root {
+    --navy: #1e3a8a; --purple: #7c3aed; --ink: #17191f; --ink-soft: #565b6c;
+    --paper: #f7f6f2; --card: #ffffff; --line: #e6e3db; --line-cool: #d8dce6;
+    --live: #0f9d6a; --live-soft: #e6f5ee; --live-line: #b7e2d0;
+    --prop: #7c3aed; --prop-soft: #f2effb; --prop-line: #ddd4f5;
+    --amber: #b45309; --amber-soft: #fbf1de;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --serif: Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 46px 26px 90px; }
+  .masthead { border-bottom: 3px solid var(--ink); padding-bottom: 22px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--purple); font-weight: 600; display: flex; gap: 11px; align-items: center; flex-wrap: wrap; }
+  .eyebrow .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--line-cool); }
+  .eyebrow .internal { background: var(--amber-soft); color: var(--amber); border: 1px solid #efd9ac; padding: 2px 9px; border-radius: 4px; letter-spacing: 0.08em; }
+  h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(28px, 4.6vw, 40px); line-height: 1.05; letter-spacing: -0.015em; margin: 14px 0 10px; }
+  h1 .accent { background: linear-gradient(105deg, var(--navy), var(--purple)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .standfirst { font-size: 15.5px; color: var(--ink-soft); max-width: 68ch; margin: 0; }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  .band { display: flex; align-items: center; gap: 14px; margin: 44px 0 16px; }
+  .band h2 { font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: -0.01em; margin: 0; white-space: nowrap; }
+  .band .n { font-family: var(--mono); font-size: 12px; color: var(--purple); font-weight: 700; }
+  .band .rule { height: 2px; background: var(--line); flex: 1; }
+
+  /* Anchor hero */
+  .anchor { margin: 28px 0 8px; background: var(--card); border: 1px solid var(--line-cool); border-radius: 12px; padding: 24px 26px; display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+  .anchor .num { font-family: var(--serif); font-size: 52px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .anchor .num span { font-size: 22px; color: var(--ink-soft); font-weight: 400; }
+  .anchor .desc { flex: 1; min-width: 240px; }
+  .anchor .desc h3 { margin: 0 0 5px; font-size: 16px; }
+  .anchor .desc p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+
+  /* Convergence table */
+  table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  td .method { font-weight: 620; }
+  td .calc { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); }
+  td .out { font-family: var(--serif); font-weight: 700; color: var(--navy); font-size: 15px; white-space: nowrap; }
+  tr.conv td { border-top: 2px solid var(--ink); border-bottom: none; padding-top: 14px; }
+  tr.conv .out { color: var(--live); font-size: 17px; }
+
+  .callout { margin: 16px 0; border-radius: 8px; padding: 15px 20px; font-size: 13.5px; }
+  .callout.grounded { background: var(--live-soft); border: 1px solid var(--live-line); border-left: 4px solid var(--live); }
+  .callout.grounded b { color: var(--live); }
+  .callout.caveat { background: var(--amber-soft); border: 1px solid #efd9ac; border-left: 4px solid var(--amber); }
+  .callout.caveat b { color: var(--amber); }
+  .callout.reject { background: #fbeceb; border: 1px solid #f2c9c4; border-left: 4px solid #c0392b; }
+  .callout.reject b { color: #c0392b; }
+
+  /* Feature lists */
+  .feat { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 20px; margin: 6px 0; }
+  .feat .row { display: grid; grid-template-columns: 20px 1fr; gap: 9px; font-size: 14px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .feat .row .mk { font-weight: 700; }
+  .feat .row .mk.y { color: var(--live); }
+  .feat .row small { display: block; color: var(--ink-soft); font-size: 12px; }
+
+  /* Add-on cards */
+  .addons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+  .addon { background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 15px 17px; }
+  .addon .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .addon h4 { margin: 0; font-size: 14.5px; font-weight: 640; }
+  .addon .px { font-family: var(--serif); font-weight: 700; color: var(--navy); font-size: 14px; white-space: nowrap; }
+  .addon p { margin: 5px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  .addon .who { font-family: var(--mono); font-size: 10.5px; color: var(--purple); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; }
+
+  .foot { margin-top: 40px; border-top: 2px solid var(--ink); padding-top: 16px; font-family: var(--mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.03em; line-height: 1.7; }
+
+  @media (max-width: 640px) { .feat, .addons { grid-template-columns: 1fr; } .anchor { gap: 16px; } }
+  @media print {
+    .anchor, .addon, .callout, table { break-inside: avoid; }
+    .band { break-after: avoid; }
+    h1 .accent { padding-right: 0.14em; }
+  }
+</style>
+</head><body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow"><span>GCAP Org License</span><span class="dot"></span><span>NC SBTDC · Pricing derivation</span><span class="dot"></span><span class="internal">Internal — not for client</span></div>
+    <h1>How we price the <span class="accent">GCAP license</span> — and why $36K</h1>
+    <p class="standfirst">For GCAP (Government Contracting Assistance Program, a division of the NC SBTDC) — a <strong>capability-building</strong> program, not a DoD-metrics shop. The number is built <strong>only from our own published prices and GCAP's real footprint</strong> — not from any prior unaccepted quote or competitor number. Three independent methods converge on the same figure. Use this to quote consistently and to explain the number if asked.</p>
+  </header>
+
+  <!-- WHAT WE SELL -->
+  <div class="band"><span class="n">01</span><h2>What the license is</h2><span class="rule"></span></div>
+  <p style="font-size:14.5px; margin:0 0 14px;">One <strong>flat annual org license</strong> — the complete Mindy platform for GCAP's office (pipeline, teaming, 317K contractor DB, all intel, client-workspace management, briefings, alerts, white-label, capability/funder reporting), <strong>minus Proposal Assist</strong>. The 12 certified procurement counselors get seats and manage their businesses' workspaces; businesses aren't sold individual seats. Proposal Assist is carved out because it burns real tokens — it's a metered add-on or counselors bring their own LLM. <strong>GCAP's value is capability-building</strong> (opportunity → assess ability → gap → readiness plan), not contract-chasing — the baseline features below reflect that.</p>
+
+  <!-- THE ANCHOR -->
+  <div class="band"><span class="n">02</span><h2>The anchor</h2><span class="rule"></span></div>
+  <div class="anchor">
+    <div class="num">$36K<span>/yr</span></div>
+    <div class="desc">
+      <h3>GCAP — 8 counselors today, adding 4 (→ 12), ~1,000 businesses served</h3>
+      <p>Confirmed footprint: <strong>8 counselors on staff, 4 more being added (→ 12)</strong>. Anchor the license to the <strong>12 they're committed to</strong>, not today's 8 — you license the account they're becoming, so there's no true-up in 3 months when the 4 seats land. Flat annual, prepaid. This is a LIST anchor — multi-year and prepaid discounts (2yr ~8%, 3yr ~12%) are the concessions a rep trades to close.</p>
+    </div>
+  </div>
+
+  <!-- DERIVATION -->
+  <div class="band"><span class="n">03</span><h2>How $36K is derived — 3 methods converge</h2><span class="rule"></span></div>
+  <p style="font-size:13.5px; color:var(--ink-soft); margin:0 0 10px;">Every input below is <strong>ours</strong>: published Pro price ($149/mo), Teams economics, the real center's counts. No external or unaccepted-quote numbers.</p>
+  <table>
+    <thead><tr><th>Method</th><th>Calculation (our prices × real center)</th><th style="text-align:right">Result</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="method">1 · Seat floor</span></td>
+        <td><span class="calc">12 counselors × $149/mo Pro × 12 mo</span><br><small style="color:var(--ink-soft)">the underprice line — ignores that each manages ~83 clients</small></td>
+        <td style="text-align:right"><span class="out">$21,456</span></td>
+      </tr>
+      <tr>
+        <td><span class="method">2 · Seat × mgmt power</span></td>
+        <td><span class="calc">12 × (1.5–2× Pro)</span><br><small style="color:var(--ink-soft)">a counselor running ~83 workspaces ≠ a solo Pro user</small></td>
+        <td style="text-align:right"><span class="out">$32K–$43K</span></td>
+      </tr>
+      <tr>
+        <td><span class="method">3 · Managed workspaces</span></td>
+        <td><span class="calc">1,000 client workspaces × $2.50–3 / mo</span><br><small style="color:var(--ink-soft)">a deep managed rate, far below the $149 retail a direct login costs</small></td>
+        <td style="text-align:right"><span class="out">$30K–$36K</span></td>
+      </tr>
+      <tr>
+        <td><span class="method">4 · Flat license</span></td>
+        <td><span class="calc">one number at the value ceiling</span></td>
+        <td style="text-align:right"><span class="out">~$36K</span></td>
+      </tr>
+      <tr class="conv">
+        <td><span class="method">→ Convergence</span></td>
+        <td><span class="calc">all three sensible midpoints land together</span></td>
+        <td style="text-align:right"><span class="out">≈ $36,000</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout grounded"><b>Why this survives scrutiny:</b> the convergence uses zero rejected/inferred anchors. It's the number our own economics produce — which is why it holds when the earlier quote-derived numbers don't.</div>
+  <div class="callout caveat"><b>Honest caveat:</b> two inputs are judgment calls, not facts — the <b>1.5–2× management premium</b> and the <b>$2.50–3/workspace</b> rate. They're what <i>produce</i> $36K. Nudge them up (2.5×, $4/wksp) and you land higher. $36K = "our real economics under sensible assumptions," a strong anchor to test — not a law.</div>
+  <div class="callout grounded"><b>On the 8→12 seat count:</b> the seat-basis methods (1, 2) run on <b>12</b> — the team GCAP is committed to, not today's 8. Anchor to 12 and the $36K holds cleanly. If they push to land at 8 now, ~$24–28K is the floor with the 4 adds as built-in expansion — but that leaves money on the table they've <i>already decided to spend</i> and invites a true-up gov buyers dislike. Recommended: quote 12, frame it as "built for your full team, including the four you're adding."</div>
+  <div class="callout reject"><b>Do NOT anchor on these (all discarded):</b> the prior $50K/$68K quote — <b>never accepted</b>, proves nothing. The $35K/$50K ladder — derived <i>from</i> that rejected quote. "$150K State-Network" — inference from an unrelated association doc (1,000 clients ≠ 1,000 paid seats). No org deal has ever closed, so there is no validated market price — this first center IS the data-generating deal.</div>
+
+  <!-- BASELINE FEATURES -->
+  <div class="band"><span class="n">04</span><h2>In the $36K baseline (reframed for GCAP capability-building)</h2><span class="rule"></span></div>
+  <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">GCAP's mission is <strong>capability-building</strong> (opportunity → assess ability → gap → readiness plan), NOT DoD contract-metrics. The baseline reflects that — no CTA/DoD-mandate framing. <span style="color:var(--purple)">⬦ = capability-gap items (GCAP's hero); some are to-build.</span></p>
+  <div class="feat">
+    <div class="row"><span class="mk y">✓</span><span>Pipeline / pursuit tracking per business</span></div>
+    <div class="row"><span class="mk y">✓</span><span>Teaming / find-partners (317K contractor DB)</span></div>
+    <div class="row"><span class="mk y">✓</span><span>All market intel · daily briefings · Market Map</span></div>
+    <div class="row"><span class="mk y">✓</span><span>Coach Mode — director dashboard, My Clients, auto-seed workspaces</span></div>
+    <div class="row"><span class="mk y">✓</span><span>Multi-counselor seats under one org (12 here)</span></div>
+    <div class="row"><span class="mk y">✓</span><span>Matched opportunities per business <small>(federal-first — see scope note)</small></span></div>
+    <div class="row"><span class="mk y">✓</span><span>Bid-readiness scoring + compliance matrix</span></div>
+    <div class="row"><span class="mk y">✓</span><span>White-label as GCAP (subdomain, logo, color, branded reports)</span></div>
+    <div class="row"><span class="mk" style="color:var(--purple)">⬦</span><span>Capability-gap assessment <small>— opportunity vs. the business's ability (the GCAP hero; to-build)</small></span></div>
+    <div class="row"><span class="mk" style="color:var(--purple)">⬦</span><span>Readiness-milestone tracking <small>— SAM/certs/cap-statement/first-bid, rolls up (to-build)</small></span></div>
+    <div class="row"><span class="mk" style="color:var(--purple)">⬦</span><span>Capability & engagement report <small>— mapped to GCAP's SBTDC/SBA reporting (to-build; confirm fields)</small></span></div>
+    <div class="row"><span class="mk" style="color:#c0392b">✕</span><span>Proposal Assist <small>— carved out (metered add-on / BYO-LLM)</small></span></div>
+  </div>
+
+  <!-- ADD-ONS -->
+  <div class="band"><span class="n">05</span><h2>Over-and-above — add-on line items</h2><span class="rule"></span></div>
+  <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">Priced separately from the $36K baseline — include only what GCAP confirms it needs (discovery decides). <span style="color:var(--live)">Green = likely-relevant for GCAP</span> given its SBTDC/SBA affiliation; grey = probably not. (Dollar figures are placeholders to set — flagged, not validated.)</p>
+  <div class="addons">
+    <div class="addon" style="border-color:var(--live-line)"><div class="top"><h4>Guided readiness journeys (5)</h4><span class="px">TBD</span></div><p>New Entrant · Set-Aside · Past-Performance · Bid-Ready (live) · Teaming. GCAP's capability paths — 1 of 5 live, rest built with them.</p><div class="who" style="color:var(--live)">GCAP hero — capability</div></div>
+    <div class="addon" style="border-color:var(--live-line)"><div class="top"><h4>EDMIS export + capital/jobs trackers</h4><span class="px">TBD</span></div><p>SBA reporting fields (capital accessed, jobs created/retained). <b>Now relevant — GCAP is SBTDC/SBA-affiliated</b>, not pure-DoD APEX. Confirm which their grant requires.</p><div class="who" style="color:var(--live)">Likely — confirm in discovery</div></div>
+    <div class="addon" style="border-color:var(--live-line)"><div class="top"><h4>Neoserra / Center IC feed</h4><span class="px">TBD</span></div><p>CSV→API push into their CRM of record. NC SBTDC very likely runs one — feed it, don't replace. Confirm which.</p><div class="who" style="color:var(--live)">Likely — SBTDC uses a CRM</div></div>
+    <div class="addon"><div class="top"><h4>Proposal Assist</h4><span class="px">metered</span></div><p>The only token-burning feature. Credit-pack at token-cost × margin, or counselor BYO-LLM.</p><div class="who">Carved out of all tiers</div></div>
+    <div class="addon"><div class="top"><h4>Training / bootcamp delivery</h4><span class="px">+$25K</span></div><p>GovCon Giants curriculum + live facilitation + office hours. Optional upsell if GCAP wants delivered training on top.</p><div class="who">Optional upsell</div></div>
+    <div class="addon"><div class="top" style="opacity:.6"><h4>State/local opportunity coverage</h4><span class="px">Phase 3</span></div><p style="opacity:.6">GCAP serves local/state/federal, but Mindy is federal-first. State/local data is deferred — flag as a gap, don't sell it.</p><div class="who" style="opacity:.6">Not available — honest gap</div></div>
+    <div class="addon"><div class="top" style="opacity:.6"><h4>County / corporate-diversity rollups</h4><span class="px">n/a</span></div><p style="opacity:.6">EDC / NMSDC-specific report flavors. Not GCAP's funder.</p><div class="who" style="opacity:.6">Probably not GCAP</div></div>
+    <div class="addon"><div class="top" style="opacity:.6"><h4>Industry-vertical snapshot templates</h4><span class="px">n/a</span></div><p style="opacity:.6">Association-specific. Not core to GCAP.</p><div class="who" style="opacity:.6">Probably not GCAP</div></div>
+  </div>
+
+  <!-- CONCERNS -->
+  <div class="band"><span class="n">06</span><h2>Recurring buyer concerns (every org raised)</h2><span class="rule"></span></div>
+  <div class="feat">
+    <div class="row"><span class="mk">•</span><span><b>Capability, not wins</b> — GCAP reports businesses served + milestones hit, NOT DoD contract metrics. Lead with progression, not the 35% mandate.</span></div>
+    <div class="row"><span class="mk">•</span><span><b>Federal-first scope — say it upfront</b> — GCAP serves local/state/federal; Mindy's data is strongest federal. Don't imply full state/local coverage.</span></div>
+    <div class="row"><span class="mk">•</span><span><b>Report must map to GCAP's SBTDC/SBA fields</b> — confirm exactly what they report before building the report (discovery Q1).</span></div>
+    <div class="row"><span class="mk">•</span><span><b>Procurement even at $0</b> — the $0 60-day eval exists to skip the acquisition cycle</span></div>
+    <div class="row"><span class="mk">•</span><span><b>Don't compete with Neoserra / Center IC</b> — feed their CRM, don't replace it</span></div>
+    <div class="row"><span class="mk">•</span><span><b>Budget is grant / fiscal-cycle dependent</b> — annual prepaid, align to SBTDC's cycle; confirm who signs off</span></div>
+  </div>
+
+  <div class="foot">
+    GCAP internal pricing reference · $36K = 3-model convergence on OUR list prices + GCAP footprint (8 counselors → 12, ~1,000 businesses) · anchor to the committed 12 · NOT derived from any prior unaccepted quote<br>
+    No org deal closed to date → $36K is a test anchor, not a validated price · GCAP is the data-generating deal · GCAP = Government Contracting Assistance Program, a division of the NC SBTDC (capability-building; SBA/SBTDC-affiliated) · confirm footprint + reporting fields in discovery before finalizing
+  </div>
+
+</div>
+</body></html>

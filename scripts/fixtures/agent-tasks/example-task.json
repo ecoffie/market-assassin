@@ -1,0 +1,37 @@
+{
+  "id": "TASK-EXAMPLE-001",
+  "title": "Example: extend agent-task registry (fixture only — not live)",
+  "priority": "low",
+  "state": "proposed",
+  "authorizedScope": "PStack Phase 3A prototype — registry schema and CLI only; no production surfaces.",
+  "allowedPaths": [
+    "src/lib/agent-tasks/**",
+    "scripts/agent-task.mts",
+    "docs/engineering/pstack-phase-3a-agent-tasks.md",
+    ".claude/agent-tasks/**"
+  ],
+  "forbiddenPaths": [
+    ".env*",
+    "**/credentials*",
+    "src/app/**",
+    "supabase/migrations/**"
+  ],
+  "dependencies": [],
+  "assignedRole": null,
+  "branch": null,
+  "worktree": null,
+  "baseSha": "13c30b762da10e19e3897079f5e1059dee1fb475",
+  "lease": null,
+  "verificationProfile": ["ma-skills"],
+  "allowSameAgentVerification": false,
+  "checkpoints": [],
+  "auditLog": [],
+  "prRef": null,
+  "mergeSha": null,
+  "deploymentRef": null,
+  "deploySha": null,
+  "allowedMutations": ["read_only", "repo_files", "git_commit"],
+  "approvalRequired": "human_review",
+  "createdAt": "2026-08-30T20:00:00.000Z",
+  "updatedAt": "2026-08-30T20:00:00.000Z"
+}

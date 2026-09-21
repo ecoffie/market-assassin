@@ -1,0 +1,144 @@
+{
+  "name": "National Science Foundation",
+  "abbreviation": "NSF",
+  "parentAgency": null,
+  "description": "The National Science Foundation promotes the progress of science, advances national health, prosperity, and welfare, and secures the national defense.",
+  "website": "https://www.nsf.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$10.2 billion",
+    "procurementBudget": "$300M+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Research proposal and grant management system modernization to improve processing efficiency",
+      "source": "NSF Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "IT infrastructure modernization for scientific data management and research collaboration platforms",
+      "source": "NSF IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity enhancements for protecting scientific research data and intellectual property",
+      "source": "NSF Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Scientific computing and data analytics infrastructure improvements",
+      "source": "NSF Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Research data sharing and collaboration platform development",
+      "source": "NSF Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Legacy grant management system integration and migration challenges",
+      "source": "NSF IT Modernization Strategy",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting research and grant management IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Grant Management System Modernization",
+      "source": "NSF Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "NSF IT Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity Enhancement",
+      "source": "NSF Cybersecurity Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Scientific Computing and Data Infrastructure",
+      "source": "NSF Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "NSF Budget Justification FY2025 - https://www.nsf.gov/about/budget",
+      "NSF Strategic Plan - https://www.nsf.gov/about/strategic-plan",
+      "NSF Procurement Forecast - https://www.nsf.gov/about/contracting/forecast.jsp",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on NSF IT Systems"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715",
+    "541712"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$100K - $3M",
+    "medium": "$3M - $15M",
+    "large": "$15M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Research and grant management system experience",
+      "Scientific computing knowledge",
+      "Cybersecurity capabilities",
+      "Data analytics and scientific data management",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with research or grant management systems",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of Information and Resource Management",
+    "Office of Budget, Finance and Award Management",
+    "Office of Cyberinfrastructure",
+    "Office of Integrative Activities"
+  ],
+  "insights": [
+    "Grant management system modernization is major focus",
+    "Scientific computing and data infrastructure are priorities",
+    "IT infrastructure modernization across research programs",
+    "Cybersecurity important for protecting scientific research data",
+    "Strong emphasis on small business participation",
+    "Research data sharing platforms are growing priorities"
+  ]
+}
+

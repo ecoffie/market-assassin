@@ -1,0 +1,524 @@
+[
+ {
+  "case_id": "c24",
+  "company": null,
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "justified_abstention",
+  "acceptable": [
+   "551112",
+   "541611",
+   "523999"
+  ],
+  "unacceptable": [
+   "531110",
+   "531210",
+   "711310",
+   "721110"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c08",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541512",
+   "541690",
+   "541519"
+  ],
+  "unacceptable": [
+   "541611",
+   "561621",
+   "541380"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c02",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541512",
+   "541519",
+   "541690"
+  ],
+  "unacceptable": [
+   "561621",
+   "561612"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c05",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "423610",
+   "423690",
+   "423840",
+   "423860"
+  ],
+  "unacceptable": [
+   "335910",
+   "221114",
+   "334413",
+   "238210"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c23",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "921120",
+   "921110"
+  ],
+  "conf": 8.53,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "332710",
+   "333248",
+   "541330",
+   "339999"
+  ],
+  "unacceptable": [
+   "423840",
+   "541715",
+   "811310",
+   "541380"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "921120",
+    "Legislative Bodies",
+    8.53,
+    [
+     "federal state local"
+    ]
+   ],
+   [
+    "921110",
+    "Executive Offices",
+    7.96,
+    [
+     "federal state local"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c04",
+  "company": null,
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "justified_abstention",
+  "acceptable": [
+   "541512",
+   "541690",
+   "561320",
+   "541519"
+  ],
+  "unacceptable": [
+   "561612",
+   "561621",
+   "621111"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c09",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "unacceptable": [
+   "541612",
+   "561311",
+   "518210"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c12",
+  "company": null,
+  "label": "classifiable",
+  "selected": "811310",
+  "top3": [
+   "811310"
+  ],
+  "conf": 3.9,
+  "bucket": "miss",
+  "acceptable": [
+   "333914"
+  ],
+  "unacceptable": [
+   "333996",
+   "423830",
+   "333612",
+   "238220"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "811310",
+    "Commercial and Industrial Machinery an",
+    3.9,
+    [
+     "or electric motor"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c20",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541370",
+   "541360",
+   "541620"
+  ],
+  "unacceptable": [
+   "336411",
+   "541511",
+   "541330",
+   "561730"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c13",
+  "company": null,
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "justified_abstention",
+  "acceptable": [
+   "561499",
+   "459999",
+   "455219"
+  ],
+  "unacceptable": [
+   "541611",
+   "522320",
+   "561110"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c15",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "423430",
+   "423690"
+  ],
+  "unacceptable": [
+   "334111",
+   "541512",
+   "517121",
+   "562920"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c07",
+  "company": null,
+  "label": "ambiguous",
+  "selected": "611430",
+  "top3": [
+   "611430"
+  ],
+  "conf": 17.65,
+  "bucket": "unacceptable_confident",
+  "acceptable": [
+   "541511",
+   "541512",
+   "541611"
+  ],
+  "unacceptable": [
+   "561210",
+   "561720",
+   "611430",
+   "236220"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "611430",
+    "Professional and Management Developmen",
+    17.65,
+    [
+     "development professional management"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c16",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541611",
+   "541690",
+   "541512"
+  ],
+  "unacceptable": [
+   "621111",
+   "541219",
+   "561410"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c17",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "unacceptable": [
+   "541618",
+   "621999",
+   "518210"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "c03",
+  "company": null,
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [
+   "921120",
+   "921110"
+  ],
+  "conf": 8.53,
+  "bucket": "justified_abstention",
+  "acceptable": [
+   "541512",
+   "541611",
+   "541519"
+  ],
+  "unacceptable": [
+   "541715",
+   "561110"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "921120",
+    "Legislative Bodies",
+    8.53,
+    [
+     "federal state local"
+    ]
+   ],
+   [
+    "921110",
+    "Executive Offices",
+    7.96,
+    [
+     "federal state local"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c01",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541511",
+   "541512"
+  ],
+  "unacceptable": [
+   "541618",
+   "518210"
+  ],
+  "source": "internal_user_prose",
+  "cands": []
+ },
+ {
+  "case_id": "w01",
+  "company": "Loughmiller Machine, Tool & Design",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "332710"
+  ],
+  "unacceptable": [
+   "333517",
+   "333514",
+   "332721",
+   "541330"
+  ],
+  "source": "contractor_website",
+  "cands": []
+ },
+ {
+  "case_id": "w02",
+  "company": "Steward Machine Co., Inc.",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "333998",
+   "332312",
+   "332710"
+  ],
+  "unacceptable": [
+   "333517",
+   "333612",
+   "238120",
+   "237310"
+  ],
+  "source": "contractor_website",
+  "cands": []
+ },
+ {
+  "case_id": "w03",
+  "company": "AMTEC Corporation",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "332993"
+  ],
+  "unacceptable": [
+   "332992",
+   "332710",
+   "325920",
+   "332994"
+  ],
+  "source": "contractor_website",
+  "cands": []
+ },
+ {
+  "case_id": "w04",
+  "company": "Komori America Corporation",
+  "label": "classifiable",
+  "selected": "811310",
+  "top3": [
+   "811310",
+   "423820"
+  ],
+  "conf": 15.52,
+  "bucket": "miss",
+  "acceptable": [
+   "333248"
+  ],
+  "unacceptable": [
+   "323111",
+   "323120",
+   "333517",
+   "423830"
+  ],
+  "source": "contractor_website",
+  "cands": [
+   [
+    "811310",
+    "Commercial and Industrial Machinery an",
+    15.52,
+    [
+     "machinery equipment maintenance"
+    ]
+   ],
+   [
+    "423820",
+    "Farm and Garden Machinery and Equipmen",
+    1.56,
+    [
+     "machinery equipment maintenance"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "w05",
+  "company": "Die-Matic Corporation",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "conf": null,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "332119",
+   "333514"
+  ],
+  "unacceptable": [
+   "336370",
+   "333517",
+   "332710",
+   "332721"
+  ],
+  "source": "contractor_website",
+  "cands": []
+ }
+]

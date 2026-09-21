@@ -1,0 +1,444 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-04-05",
+  "description": "Maps federal agencies to their procurement portals and spending patterns beyond SAM.gov",
+  "agencies": {
+    "DEPARTMENT OF DEFENSE": {
+      "abbreviation": "DOD",
+      "cgac": "097",
+      "primarySources": ["sam.gov", "gsa_schedule", "idiq_vehicles"],
+      "secondarySources": [
+        {
+          "name": "Defense Logistics Agency Internet Bid Board System (DIBBS)",
+          "url": "https://www.dibbs.bsm.dla.mil/",
+          "type": "commodities",
+          "notes": "Product-specific, commodities and supplies"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 15,
+        "gsaSchedule": 35,
+        "idiqVehicles": 40,
+        "directAwards": 10
+      },
+      "topVehicles": [
+        {"name": "OASIS+", "manager": "GSA", "naics": ["541XXX"]},
+        {"name": "Alliant 3", "manager": "GSA", "naics": ["541512", "541513", "541519"]},
+        {"name": "SeaPort-NxG", "manager": "Navy", "naics": ["541330", "541715", "541714"]}
+      ],
+      "tips": "Most DoD IT and professional services go through GSA Schedule or SeaPort. Get on a vehicle first."
+    },
+    "DEPARTMENT OF THE ARMY": {
+      "abbreviation": "Army",
+      "cgac": "021",
+      "parent": "DEPARTMENT OF DEFENSE",
+      "primarySources": ["sam.gov", "gsa_schedule", "idiq_vehicles"],
+      "secondarySources": [
+        {
+          "name": "Army Contracting Command Portal",
+          "url": "https://www.acc.army.mil/",
+          "type": "information",
+          "notes": "Information only, not a bidding portal"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 12,
+        "gsaSchedule": 30,
+        "idiqVehicles": 45,
+        "directAwards": 13
+      },
+      "topVehicles": [
+        {"name": "RS3", "manager": "Army", "naics": ["541512", "541330"]},
+        {"name": "ITES-3S", "manager": "Army", "naics": ["541512", "541513"]}
+      ],
+      "tips": "USACE (Corps of Engineers) uses MATOC and regional SATOC vehicles extensively."
+    },
+    "DEPARTMENT OF THE NAVY": {
+      "abbreviation": "Navy",
+      "cgac": "017",
+      "parent": "DEPARTMENT OF DEFENSE",
+      "primarySources": ["sam.gov", "seaport", "gsa_schedule"],
+      "secondarySources": [
+        {
+          "name": "Navy Electronic Commerce Online (NECO)",
+          "url": "https://www.neco.navy.mil/",
+          "type": "solicitations",
+          "notes": "Requires CAGE code registration"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 10,
+        "gsaSchedule": 25,
+        "seaport": 45,
+        "directAwards": 20
+      },
+      "topVehicles": [
+        {"name": "SeaPort-NxG", "manager": "Navy", "naics": ["541330", "541715", "541714", "541512"]},
+        {"name": "NAVSEA IDIQ", "manager": "NAVSEA", "naics": ["336611", "541330"]}
+      ],
+      "tips": "SeaPort-NxG is essential for Navy professional services. 45% of Navy spending goes through this vehicle."
+    },
+    "DEPARTMENT OF THE AIR FORCE": {
+      "abbreviation": "USAF",
+      "cgac": "057",
+      "parent": "DEPARTMENT OF DEFENSE",
+      "primarySources": ["sam.gov", "gsa_schedule", "idiq_vehicles"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 18,
+        "gsaSchedule": 35,
+        "idiqVehicles": 35,
+        "directAwards": 12
+      },
+      "topVehicles": [
+        {"name": "NETCENTS-3", "manager": "Air Force", "naics": ["541512", "541513"]},
+        {"name": "SETA III", "manager": "Air Force", "naics": ["541715", "541714"]}
+      ],
+      "tips": "Air Force has more open competition than other services. Watch SAM.gov closely."
+    },
+    "GENERAL SERVICES ADMINISTRATION": {
+      "abbreviation": "GSA",
+      "cgac": "047",
+      "primarySources": ["sam.gov", "gsa_advantage", "ebuy"],
+      "secondarySources": [
+        {
+          "name": "GSA Advantage",
+          "url": "https://www.gsaadvantage.gov/",
+          "type": "catalog",
+          "notes": "Online shopping for GSA Schedule holders"
+        },
+        {
+          "name": "GSA eBuy",
+          "url": "https://www.ebuy.gsa.gov/",
+          "type": "rfq",
+          "notes": "RFQ portal for Schedule holders"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 25,
+        "gsaSchedule": 60,
+        "directAwards": 15
+      },
+      "topVehicles": [
+        {"name": "MAS (Multiple Award Schedule)", "manager": "GSA", "naics": ["all"]},
+        {"name": "OASIS+", "manager": "GSA", "naics": ["541XXX"]},
+        {"name": "Alliant 3", "manager": "GSA", "naics": ["541512", "541513"]}
+      ],
+      "tips": "GSA Schedule is the gateway. 60% of GSA's own spending and billions in assisted acquisitions go through Schedule."
+    },
+    "DEPARTMENT OF VETERANS AFFAIRS": {
+      "abbreviation": "VA",
+      "cgac": "036",
+      "primarySources": ["sam.gov", "gsa_schedule", "va_vehicles"],
+      "secondarySources": [
+        {
+          "name": "VA eCMS",
+          "url": "https://www.va.gov/opal/nac/ecms/",
+          "type": "solicitations",
+          "notes": "VA-specific procurement portal"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 20,
+        "gsaSchedule": 40,
+        "vaVehicles": 30,
+        "directAwards": 10
+      },
+      "topVehicles": [
+        {"name": "T4NG", "manager": "VA", "naics": ["541512", "541513", "541519"]},
+        {"name": "VA FSS", "manager": "VA", "naics": ["medical", "621XXX"]}
+      ],
+      "tips": "VA strongly prefers SDVOSB set-asides. Get CVE verified for massive advantage."
+    },
+    "DEPARTMENT OF HEALTH AND HUMAN SERVICES": {
+      "abbreviation": "HHS",
+      "cgac": "075",
+      "primarySources": ["sam.gov", "gsa_schedule", "nih_vehicles"],
+      "secondarySources": [
+        {
+          "name": "HHS Grants.gov",
+          "url": "https://www.grants.gov/",
+          "type": "grants",
+          "notes": "Primary portal for HHS grants"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 25,
+        "gsaSchedule": 30,
+        "nihVehicles": 25,
+        "grants": 15,
+        "directAwards": 5
+      },
+      "topVehicles": [
+        {"name": "CIO-SP3", "manager": "NIH", "naics": ["541512", "541513", "541519"]},
+        {"name": "CIO-SP4", "manager": "NIH", "naics": ["541512", "541513", "541519"]}
+      ],
+      "tips": "NIH CIO-SP vehicles dominate HHS IT spending. Also watch NIH SBIR/STTR for R&D."
+    },
+    "DEPARTMENT OF HOMELAND SECURITY": {
+      "abbreviation": "DHS",
+      "cgac": "070",
+      "primarySources": ["sam.gov", "gsa_schedule", "eagle_ii"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 22,
+        "gsaSchedule": 35,
+        "eagleVehicles": 30,
+        "directAwards": 13
+      },
+      "topVehicles": [
+        {"name": "EAGLE II", "manager": "DHS", "naics": ["541512", "541513", "541519"]},
+        {"name": "FirstSource III", "manager": "DHS", "naics": ["541611", "541612"]}
+      ],
+      "tips": "EAGLE II is the primary IT vehicle. Getting on is competitive but worthwhile."
+    },
+    "DEPARTMENT OF JUSTICE": {
+      "abbreviation": "DOJ",
+      "cgac": "015",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 30,
+        "gsaSchedule": 45,
+        "directAwards": 25
+      },
+      "topVehicles": [
+        {"name": "ITSSS-3", "manager": "DOJ", "naics": ["541512", "541513"]}
+      ],
+      "tips": "DOJ uses GSA Schedule heavily. More open competition than defense agencies."
+    },
+    "DEPARTMENT OF STATE": {
+      "abbreviation": "DOS",
+      "cgac": "019",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 25,
+        "gsaSchedule": 50,
+        "directAwards": 25
+      },
+      "topVehicles": [],
+      "tips": "State Department often requires security clearances. International work opportunities."
+    },
+    "DEPARTMENT OF TREASURY": {
+      "abbreviation": "Treasury",
+      "cgac": "020",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 35,
+        "gsaSchedule": 40,
+        "directAwards": 25
+      },
+      "topVehicles": [],
+      "tips": "IRS is the biggest buyer. Financial systems expertise valued."
+    },
+    "DEPARTMENT OF AGRICULTURE": {
+      "abbreviation": "USDA",
+      "cgac": "012",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [
+        {
+          "name": "USDA Grants Portal",
+          "url": "https://www.nifa.usda.gov/grants",
+          "type": "grants",
+          "notes": "Agricultural research grants"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 30,
+        "gsaSchedule": 35,
+        "grants": 20,
+        "directAwards": 15
+      },
+      "topVehicles": [],
+      "tips": "USDA Forest Service is a major buyer. Rural development focus."
+    },
+    "DEPARTMENT OF COMMERCE": {
+      "abbreviation": "DOC",
+      "cgac": "013",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 35,
+        "gsaSchedule": 40,
+        "directAwards": 25
+      },
+      "topVehicles": [],
+      "tips": "NOAA and Census Bureau are key buyers. Weather and data analytics focus."
+    },
+    "DEPARTMENT OF LABOR": {
+      "abbreviation": "DOL",
+      "cgac": "016",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 40,
+        "gsaSchedule": 35,
+        "directAwards": 25
+      },
+      "topVehicles": [],
+      "tips": "Workforce development and training opportunities. Good small business set-asides."
+    },
+    "DEPARTMENT OF TRANSPORTATION": {
+      "abbreviation": "DOT",
+      "cgac": "069",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 35,
+        "gsaSchedule": 35,
+        "directAwards": 30
+      },
+      "topVehicles": [],
+      "tips": "FAA and FHWA are major buyers. Infrastructure focus."
+    },
+    "DEPARTMENT OF ENERGY": {
+      "abbreviation": "DOE",
+      "cgac": "089",
+      "primarySources": ["sam.gov", "lab_portals", "gsa_schedule"],
+      "secondarySources": [
+        {
+          "name": "DOE National Labs",
+          "url": "https://www.energy.gov/national-laboratories",
+          "type": "information",
+          "notes": "Labs have independent procurement"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 20,
+        "gsaSchedule": 25,
+        "labContracts": 40,
+        "directAwards": 15
+      },
+      "topVehicles": [],
+      "tips": "National Labs (ORNL, LANL, Sandia) have their own procurement. Energy focus."
+    },
+    "DEPARTMENT OF EDUCATION": {
+      "abbreviation": "ED",
+      "cgac": "091",
+      "primarySources": ["sam.gov", "gsa_schedule", "grants"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 25,
+        "gsaSchedule": 30,
+        "grants": 35,
+        "directAwards": 10
+      },
+      "topVehicles": [],
+      "tips": "Heavy grants focus. Educational technology and assessment services."
+    },
+    "ENVIRONMENTAL PROTECTION AGENCY": {
+      "abbreviation": "EPA",
+      "cgac": "068",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 40,
+        "gsaSchedule": 35,
+        "directAwards": 25
+      },
+      "topVehicles": [],
+      "tips": "Environmental consulting and remediation. Good small business opportunities."
+    },
+    "NATIONAL AERONAUTICS AND SPACE ADMINISTRATION": {
+      "abbreviation": "NASA",
+      "cgac": "080",
+      "primarySources": ["sam.gov", "nspires", "sewp"],
+      "secondarySources": [
+        {
+          "name": "NSPIRES",
+          "url": "https://nspires.nasaprs.com/",
+          "type": "research",
+          "notes": "NASA research announcements and proposals"
+        },
+        {
+          "name": "NASA SEWP",
+          "url": "https://www.sewp.nasa.gov/",
+          "type": "it_products",
+          "notes": "IT hardware and solutions"
+        }
+      ],
+      "spendingPatterns": {
+        "samPosted": 25,
+        "sewp": 30,
+        "gsaSchedule": 20,
+        "research": 15,
+        "directAwards": 10
+      },
+      "topVehicles": [
+        {"name": "SEWP V", "manager": "NASA", "naics": ["541512", "334XXX"]},
+        {"name": "ACES", "manager": "NASA", "naics": ["541715", "541714"]}
+      ],
+      "tips": "SEWP V is huge for IT. SBIR/STTR program is excellent for R&D companies."
+    },
+    "SMALL BUSINESS ADMINISTRATION": {
+      "abbreviation": "SBA",
+      "cgac": "073",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 50,
+        "gsaSchedule": 30,
+        "directAwards": 20
+      },
+      "topVehicles": [],
+      "tips": "Small agency but sets small business policy. 8(a) and HUBZone programs."
+    },
+    "SOCIAL SECURITY ADMINISTRATION": {
+      "abbreviation": "SSA",
+      "cgac": "028",
+      "primarySources": ["sam.gov", "gsa_schedule"],
+      "secondarySources": [],
+      "spendingPatterns": {
+        "samPosted": 30,
+        "gsaSchedule": 45,
+        "directAwards": 25
+      },
+      "topVehicles": [],
+      "tips": "Large IT infrastructure needs. Disability determination services."
+    }
+  },
+  "vehicleTypes": {
+    "gsa_schedule": {
+      "name": "GSA Multiple Award Schedule (MAS)",
+      "description": "Base requirement for most federal contracting. Gateway to government sales.",
+      "howToGet": "Apply at GSA eOffer. 6-12 month process. Need 2 years commercial sales history.",
+      "benefits": ["Access to all agencies", "Pre-negotiated pricing", "Streamlined ordering"],
+      "url": "https://www.gsa.gov/buy-through-us/purchasing-programs/gsa-multiple-award-schedule"
+    },
+    "idiq_vehicles": {
+      "name": "Indefinite Delivery/Indefinite Quantity (IDIQ)",
+      "description": "Pre-competed contract vehicles for specific services/products.",
+      "howToGet": "Watch SAM.gov for solicitations. Highly competitive, requires past performance.",
+      "examples": ["OASIS+", "Alliant 3", "CIO-SP4", "SeaPort-NxG"],
+      "benefits": ["Sole access to task orders", "Multi-year revenue", "Reduced competition per order"]
+    },
+    "bpa": {
+      "name": "Blanket Purchase Agreement (BPA)",
+      "description": "Simplified acquisition for repeat purchases.",
+      "howToGet": "Usually awarded from GSA Schedule or open competition.",
+      "benefits": ["Streamlined ordering", "Established relationship", "Predictable revenue"]
+    }
+  },
+  "recommendations": {
+    "newContractors": [
+      "Get GSA Schedule first - it's the foundation",
+      "Start with small agencies that have more open competition",
+      "Build past performance before pursuing IDIQ vehicles",
+      "Consider subcontracting to gain prime experience"
+    ],
+    "establishedContractors": [
+      "Pursue IDIQ vehicles in your NAICS codes",
+      "Monitor recompetes 12-18 months ahead",
+      "Build teaming relationships with primes",
+      "Diversify across multiple vehicles"
+    ],
+    "smallBusiness": [
+      "Get 8(a), WOSB, SDVOSB, or HUBZone certification if eligible",
+      "Target agencies with strong small business programs (VA, SBA)",
+      "Use mentor-protege programs for experience",
+      "Joint ventures can access larger opportunities"
+    ]
+  }
+}

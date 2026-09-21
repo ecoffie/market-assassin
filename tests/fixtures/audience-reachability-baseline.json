@@ -1,0 +1,5 @@
+{
+  "note": "INT-011: audience read unbounded, then batched — the tail past the cap never reaches the cursor. Shrink this list; never grow it.",
+  "updated": "2026-08-23",
+  "violations": []
+}
