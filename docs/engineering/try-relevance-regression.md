@@ -154,3 +154,79 @@ resolved codes can still produce false matches" trap. Not shipped.
 puts "drones" ahead of "lidar" for "work with lidar for uas drones", which
 searches the category instead of the capability. Position order (after context
 words are stripped) is the safer tiebreak.
+
+
+---
+
+## Adversarial pass — 2026-09-21, after the first fix
+
+An independent verifier was asked to break the gate in two directions. It
+found real defects of the **same class as the original bug**, all fixed here
+and pinned into the frozen set.
+
+### False positives it found
+
+| input | searched | returned | fix |
+|---|---|---|---|
+| woman owned small business that does catering | `owned` | 9 Government-Owned / GOCO fuel-depot contracts, `catering` unused | ownership + certification self-description → `CONTEXT_TERMS` |
+| we drive trucks | `drive` | DISK DRIVE · QUAD TAPE DRIVE · AC DRIVE (26 cards, 0 trucking) | verbs that are also nouns → `ACTIVITY_VERBS` |
+| we rent cranes | `rent` | "Market Rent Study" (a real-estate study) | + service compound `crane rental` |
+| we tow vehicles | `vehicles` | Stryker Family of Vehicles · Low-Cost Kill Vehicles | + service compound `vehicle towing` |
+| we monitor alarms | `monitor` | MONITOR,FLAT PANEL · defibrillator monitors | + service compound `alarm monitoring` |
+| we survey land | `survey` | "Market Survey for Image Intensifier Assembly" | + service compound `land survey` |
+| medical staffing agency | `medical` | **40/40 wrong** — Medical Waste Disposal, VA Medical Center elevator inspection | two typed-generic words may anchor a phrase |
+| certified small disadvantaged veteran owned company | `disadvantaged` | — | now asks a clarifying question |
+
+**`CONTEXT_TERMS` is a blocklist and blocklists are unbounded** — the verifier
+is right, and the structural half of the answer is that rung 1 picks the first
+*distinctive* word by position, so any non-activity word ahead of the trade
+wins. What bounds it in practice: a word only reaches rung 1 if it is
+distinctive AND not a modifier AND not a verb, and the frozen set now pins the
+two whole families (ownership/certification, verb-nouns) rather than the two
+instances.
+
+### Lost results it found
+
+- **Plural was scored as derivation.** "we build fences" printed *"Mindy found
+  0 current opportunities"* above three live fence cards, with 14 open fence
+  notices in the cache. Same for roofs (54 live), windows (36). `singular()`
+  now resolves the plural mark in both directions, and the SQL keyword is
+  singularized because SAM's title search is an ILIKE substring — `%fences%`
+  cannot match "Fence". Measured after: fences 0 → 11 direct, roofs 3 → 24,
+  windows 2 → 24.
+- **Sector voting ran on undeduped rows.** A single notice duplicated in the
+  cache manufactured the 2-of-3 majority that demoted a real plumbing
+  contract. `classify` now dedupes first.
+- **The sector vote was unreachable** once `terms` carried both "door" and
+  "doors": every item was "held by another term". Terms are now deduplicated
+  by singular form, and only a MULTI-WORD term holds an item against the vote.
+
+### Two of my own regressions, caught by re-measuring
+
+- Compounding the repair family narrowed "we install windows" from 36 live
+  window notices to 1. `SERVICE_NOMINALS` is now only verbs where **the verb
+  is the service** (rent/tow/mow/monitor/survey/store/haul/drive/…), never
+  install/repair/replace/remove/collect/clean — for those the object already
+  names the work. The repair family gets the compound as *evidence* instead,
+  which is what demotes "windows 11 Laptops" and "WINDOW,DIAL" to adjacent.
+- `singularObject` over-stripped `-es`: "cranes" → "cran", "vehicles" →
+  "vehicl". Now only after s/x/z/ch/sh.
+
+### Accepted, not fixed
+
+- **Adjacent-sector demotion.** A tree company's two forestry notices (115310)
+  land under "Related" because landscaping (561730) dominates its own term.
+  Both are still shown; hardcoding sector adjacency would be a worse rule than
+  the one that keeps cattle guards and grill guards out of the direct group.
+- **"we mow lawns" returns nothing.** There are zero "lawn" titles open; the
+  11 relevant notices say "grounds maintenance". That is a vocabulary gap, not
+  a matcher bug, and we have no synonym source we trust (see the rejected
+  `naics_vocabulary` experiments above).
+- **Non-English input** ("yo tengo una compania de limpieza") is out of scope.
+
+### What the verifier could not break
+
+The reported bug is dead. Buyer-name stripping holds (Coast Guard, Marine
+Corps, Border Patrol, Merchant Marine Academy). It could not get a
+code-overlap-only item into the direct group, and it could not make the
+phrase-anchor rule demote a correct result.

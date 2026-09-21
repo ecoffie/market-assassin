@@ -76,6 +76,18 @@ export const CONTEXT_TERMS: ReadonlySet<string> = new Set([
   'contractor', 'contractors', 'subcontract', 'subcontracting', 'bid', 'bids',
   'bidding', 'procurement', 'award', 'awards', 'qualify', 'qualifies',
   'qualified', 'eligible', 'eligibility', 'register', 'registered',
+  // HOW A BEGINNER INTRODUCES THEMSELVES. Found by the adversarial pass
+  // 2026-09-21: "woman owned small business that does catering" searched
+  // `owned` and returned nine GOCO/Government-Owned fuel-depot contracts,
+  // with `catering` sitting unused in `terms`. "X-owned small business" is
+  // the single most common beginner self-description, and `owned` was a
+  // "distinctive noun" that won on word order — `person` again, new word.
+  // These describe WHO YOU ARE. Certification status is read from the
+  // NOTICE's own set-aside field, never from the user's sentence.
+  'own', 'owned', 'operated', 'minority', 'veteran', 'veterans',
+  'disadvantaged', 'disabled', 'certified', 'certification', 'sole',
+  'proprietor', 'proprietorship', 'hubzone', 'wosb', 'edwosb', 'sdvosb',
+  'vosb', 'native', 'tribally',
   // filler intent verbs / nouns
   'help', 'helps', 'helping', 'want', 'wants', 'need', 'needs', 'looking',
   'start', 'starting', 'started', 'stuff', 'things', 'thing', 'whatever',
@@ -120,6 +132,18 @@ export const ACTIVITY_VERBS: ReadonlySet<string> = new Set([
   'collect', 'collects', 'haul', 'hauls', 'pick', 'picks', 'remove',
   'removes', 'dispose', 'disposes', 'transport', 'transports', 'maintain',
   'maintains',
+  // ⚠️ VERBS THAT ARE ALSO NOUNS — the dangerous ones. Measured live
+  // 2026-09-21, each searched the HARDWARE sense and buried the trade:
+  //   "we drive trucks"   → `drive`   → DISK DRIVE, QUAD TAPE DRIVE, AC DRIVE (26 cards, 0 trucking)
+  //   "we rent cranes"    → `rent`    → "Market Rent Study" (a real-estate study)
+  //   "we monitor alarms" → `monitor` → MONITOR,FLAT PANEL · defibrillator monitors
+  //   "we survey land"    → `survey`  → "Market Survey for Image Intensifier Assembly"
+  // Demoted only while another activity word survives, so "I do surveying"
+  // and "storage company" still work.
+  'drive', 'drives', 'rent', 'rents', 'survey', 'surveys', 'monitor',
+  'monitors', 'train', 'trains', 'store', 'stores', 'stock', 'stocks',
+  'scan', 'scans', 'print', 'prints', 'wash', 'washes', 'move', 'moves',
+  'tow', 'tows', 'mow', 'mows',
 ]);
 
 /**
@@ -161,6 +185,111 @@ const SENTENCE_STOPWORDS: ReadonlySet<string> = new Set([
   // (information technology), and dropping it costs us "IT support"
   // entirely. The pronoun sense is handled in isAnchoredPhrase instead.
 ]);
+
+/**
+ * The noun the GOVERNMENT writes for a service verb.
+ *
+ * Demoting a verb (above) hands the head to its object, and for a SERVICE
+ * business that inverts the sentence: measured 2026-09-21, "we rent cranes"
+ * searched `cranes` and returned three crane PURCHASES while "W. Kerr Scott
+ * Crane Rental" sat in the adjacent group; "we tow vehicles" returned vehicle
+ * purchases while seven real towing notices were never fetched. The company
+ * sells the verb, not the object.
+ *
+ * So a verb+object pair also yields the compound the buyer actually writes.
+ * Same idea as `repairBuyingPhrases` ("fix doors" → "door repair"), which has
+ * been in this file since the beginner seam shipped — this generalises it past
+ * the repair verbs. Only verbs with an unambiguous nominal are listed; a guess
+ * here would be a fabricated search term.
+ */
+export const SERVICE_NOMINALS: Readonly<Record<string, string>> = {
+  rent: 'rental',
+  lease: 'lease',
+  tow: 'towing',
+  mow: 'mowing',
+  monitor: 'monitoring',
+  survey: 'survey',
+  wash: 'washing',
+  store: 'storage',
+  haul: 'hauling',
+  move: 'moving',
+  drive: 'driving',
+  transport: 'transportation',
+};
+// ⚠️ ONLY verbs where the VERB IS THE SERVICE. Deliberately absent:
+// install · repair · replace · remove · collect · dispose · maintain · clean.
+// For those trades the OBJECT already names the work the way the government
+// writes it — "Window Replacement", "Trash Removal", "Interior Cleaning" — and
+// forcing a compound narrows it to almost nothing: "we install windows" went
+// from 36 live window notices to one ("window installation"). Measured
+// 2026-09-21. `repairBuyingPhrases` already covers the repair family, and it
+// keeps the object too.
+
+/** "cranes" → "crane", "boxes" → "box". NOT "cran"/"vehicl". */
+function singularObject(word: string): string {
+  if (word.length > 4 && /(?:s|x|z|ch|sh)es$/.test(word)) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * "<object> <nominal>" for every service verb the user paired with an object,
+ * inside one segment. "we rent cranes" → "crane rental".
+ */
+/**
+ * The repair family does NOT get a compound HEAD (the object already names the
+ * work), but the compound is strong EVIDENCE. "we install windows" searching
+ * `window` legitimately returns "Windows 11 Laptops" and "WINDOW,DIAL" beside
+ * "Bldg 13 Window Replacement" — one word, three markets. Emitting
+ * "window replacement" / "window installation" as terms gives the phrase-anchor
+ * rule something to anchor on, and the product senses drop to adjacent.
+ */
+const WORK_NOMINALS = ['repair', 'replacement', 'installation', 'maintenance'] as const;
+const WORK_VERBS = new Set([
+  'fix', 'fixes', 'repair', 'repairs', 'replace', 'replaces', 'install',
+  'installs', 'restore', 'restores', 'rebuild', 'service', 'services',
+]);
+
+export function workCompounds(segments: readonly string[][]): string[] {
+  const out: string[] = [];
+  for (const seg of segments) {
+    if (!seg.some((w) => WORK_VERBS.has(w))) continue;
+    for (const word of seg) {
+      if (WORK_VERBS.has(word) || MODIFIER_TERMS.has(word) || word.length < 4) continue;
+      if (!isSingleActivityWord(word)) continue;
+      const obj = singularObject(word);
+      for (const nominal of WORK_NOMINALS) {
+        const phrase = `${obj} ${nominal}`;
+        if (!out.includes(phrase)) out.push(phrase);
+      }
+      break;
+    }
+  }
+  return out;
+}
+
+export function serviceCompounds(segments: readonly string[][]): string[] {
+  const out: string[] = [];
+  for (const seg of segments) {
+    for (let i = 0; i < seg.length; i += 1) {
+      // Only for a verb the ladder actually demotes. `clean` has a nominal but
+      // is NOT demoted (it is the cleaning trade's own word), and building a
+      // compound for it hijacked "I clean office buildings" into "building
+      // cleaning" — 21 real cleaning matches down to 5, plus GSA office leases.
+      if (!ACTIVITY_VERBS.has(seg[i])) continue;
+      const nominal = SERVICE_NOMINALS[seg[i]];
+      if (!nominal) continue;
+      for (let j = i + 1; j < seg.length; j += 1) {
+        const obj = seg[j];
+        if (MODIFIER_TERMS.has(obj) || ACTIVITY_VERBS.has(obj) || obj.length < 4) continue;
+        const phrase = `${singularObject(obj)} ${nominal}`;
+        if (!out.includes(phrase)) out.push(phrase);
+        break; // the nearest object, not every later word
+      }
+    }
+  }
+  return out;
+}
 
 export interface BusinessActivity {
   /** What we search — the single best activity term. */
@@ -246,7 +375,14 @@ function isAnchoredPhrase(tokens: readonly string[]): boolean {
   if (tokens.some(isSingleActivityWord)) return true;
   // A short domain token only anchors when it LEADS: "IT support" is a market,
   // "haul it" (out of "haul it away") is a pronoun.
-  return SHORT_DOMAIN_TOKENS.has(tokens[0]);
+  if (SHORT_DOMAIN_TOKENS.has(tokens[0])) return true;
+  // TWO broad words can name one precise market. "medical staffing" searched
+  // the wildcard `medical` alone and returned 40/40 wrong cards (Medical Waste
+  // Disposal, VA Medical Center elevator inspection) — the exact collapse
+  // keyword-sanitize already documents. Neither word anchors alone, both are
+  // real words the user typed, and the pair IS the market. A modifier or a
+  // venue still cannot participate, so "small construction" is unaffected.
+  return tokens.length === 2 && tokens.every(isTypedGenericActivity);
 }
 
 /**
@@ -298,14 +434,24 @@ function appearsContiguously(segments: readonly string[][], tokens: readonly str
   });
 }
 
+/** Same word, one entry. "door" and "doors" are not two pieces of evidence. */
+function termKey(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .map(singularObject)
+    .join(' ');
+}
+
 function pushUnique(into: string[], value: string, max: number): void {
   const v = value.trim();
   if (!v || into.length >= max) return;
-  if (into.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+  const key = termKey(v);
+  if (into.some((x) => termKey(x) === key)) return;
   into.push(v);
 }
 
-const MAX_TERMS = 4;
+const MAX_TERMS = 7;
 
 /**
  * @param text     the user's own words (description + follow-up)
@@ -333,6 +479,7 @@ export function extractBusinessActivity(
   singles.sort((a, b) => stream.indexOf(a) - stream.indexOf(b));
 
   // ── rung 2: anchored phrases (user's contiguous words, then derived) ────
+  const compounds = serviceCompounds(segments);
   const phrases: string[] = [];
   for (const p of contiguousPhrases(segments)) pushUnique(phrases, p, 8);
   for (const d of derived) {
@@ -358,7 +505,15 @@ export function extractBusinessActivity(
   let rung: BusinessActivity['rung'] = 'none';
   let confidence: BusinessActivity['confidence'] = 'none';
 
-  if (singles.length > 0) {
+  // A service compound outranks the bare object noun: the object alone buys
+  // the thing ("cranes" → crane procurements) where the compound hires the
+  // work ("crane rental"). `search_sam_opportunities` already falls back to
+  // the narrower token when a phrase returns nothing, so recall is preserved.
+  if (compounds.length > 0) {
+    head = compounds[0];
+    rung = 'phrase';
+    confidence = 'high';
+  } else if (singles.length > 0) {
     head = singles[0];
     rung = 'single';
     confidence = 'high';
@@ -383,11 +538,30 @@ export function extractBusinessActivity(
     }
   }
 
+  // ⚠️ SEARCH THE SINGULAR. `search_sam_opportunities` is an ILIKE substring
+  // on the title, so "%fences%" misses "Fence", "Fencing" and "Fence Repair" —
+  // 14 live fence notices reduced to 2. The singular is a substring of both,
+  // and `matchTerm` resolves plurals in either direction, so evidence is
+  // unaffected. Beginner prose is plural far more often than expert prose.
+  if (head && !head.includes(' ')) {
+    const sing = singularObject(head);
+    if (sing.length >= 4) head = sing;
+  }
+
   const terms: string[] = [];
   if (head) pushUnique(terms, head, MAX_TERMS);
+  for (const c of compounds) pushUnique(terms, c, MAX_TERMS);
+  for (const w of workCompounds(segments)) pushUnique(terms, w, MAX_TERMS);
   for (const p of phrases) pushUnique(terms, p, MAX_TERMS);
-  for (const s of singles) pushUnique(terms, s, MAX_TERMS);
-  for (const g of generics) pushUnique(terms, g, MAX_TERMS);
+  // ⚠️ When a compound decided the market, the bare OBJECT is not the market.
+  // Keeping "land" beside "land survey" let "Instrument Landing System" in
+  // (land + `+ing` is a different lemma, and no general rule separates it from
+  // roof/roofing). Dropping the object is the honest version of the decision
+  // we already made: they sell the surveying, not the land.
+  if (compounds.length === 0) {
+    for (const s of singles) pushUnique(terms, s, MAX_TERMS);
+    for (const g of generics) pushUnique(terms, g, MAX_TERMS);
+  }
 
   return { head, terms, context: [...new Set(context)], confidence, rung };
 }

@@ -85,7 +85,11 @@ function coverageOk(keyword: string): KeywordCoverageToolResult {
 
 describe('beginnerDirectKeyword', () => {
   it('searches the object for a repair-verb description so titles like Replace Doors match', () => {
-    expect(beginnerDirectKeyword('fix doors')).toBe('doors');
+    // CHANGED 2026-09-21 (adversarial pass): the SINGULAR is searched. SAM's
+    // title search is an ILIKE substring, so "%fences%" missed "Fence",
+    // "Fencing" and "Fence Repair" — 14 live fence notices reduced to 2, under
+    // a headline reading "Mindy found 0". The singular is a substring of both.
+    expect(beginnerDirectKeyword('fix doors')).toBe('door');
     // CHANGED 2026-09-21: the keyword is now the ACTIVITY, not the sentence.
     // "%clean office buildings%" matches no SAM title at all — it only ever
     // "worked" because search_sam_opportunities silently retries token-by-token
@@ -361,7 +365,7 @@ describe('searchBeginnerHiddenMarket', () => {
     );
     expect(result.resolution.state).toBe('structured');
     expect(result.resolution.primaryNaics).toBeNull();
-    expect(keywords).toContain('doors');
+    expect(keywords).toContain('door'); // singular — see beginnerDirectKeyword above
     expect(result.direct.items.map((i) => i.solicitation)).toEqual(['DOOR-1', 'DOOR-2']);
     const view = toHiddenMarketLandingView(result, { nowMs: NOW });
     expect(view.outcome).toBe('results');

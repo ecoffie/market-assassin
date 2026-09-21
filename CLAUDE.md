@@ -187,6 +187,18 @@ support, `install` for roofing, `physical` for security guard, `agency` for staf
   set) + `npm run verify:beginner-try` (live cache; 11 pinned + 800 sampled searches).
 - **SEO page generation stays blocked on this set passing** — every programmatic page
   inherits this matcher.
+- **Adversarial round (same day) found the same class twice more, both now pinned:**
+  ownership self-description (`woman owned small business that does catering` searched
+  **`owned`** → nine Government-Owned fuel-depot contracts) and verbs that are also nouns
+  (`we drive trucks` → **`drive`** → DISK DRIVE / AC DRIVE, 26 cards, zero trucking). A
+  verb that IS the service also emits the compound the buyer writes — `crane rental`,
+  `vehicle towing`, `alarm monitoring` — but **never for install/repair/replace/remove/
+  clean**, where the object already names the work ("we install windows" narrowed from 36
+  live notices to 1 before that was fixed).
+- ⚠️ **PLURAL IS NOT DERIVATION, and the SQL keyword must be SINGULAR.** "we build fences"
+  printed *"Mindy found 0 current opportunities"* above three live fence cards — 14 open
+  fence notices existed. SAM's title search is an ILIKE substring, so `%fences%` cannot
+  match "Fence". Measured after: fences 0→11, roofs 3→24, windows 2→24.
 
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 

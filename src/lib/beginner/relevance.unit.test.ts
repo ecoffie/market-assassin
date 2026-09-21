@@ -115,12 +115,26 @@ describe('isRelevantOpportunity', () => {
       naicsCodes: { status: 'known', items: ['236220', '238290'] },
       primaryNaics: '236220',
     });
-    // CHANGED 2026-09-21: "Door" is a SHORTENED form of the user's "doors",
-    // and shortening a word drops meaning (an object is not the service), so
-    // it is adjacent evidence — not a described match.
-    expect(tierOf(item({ title: 'Automobile Door Assemblies', naics: '336111' }), r)).toBe('broader');
-    expect(isRelevantOpportunity(item({ title: 'Replace Garage Doors', naics: '238290' }), r)).toBe(true);
-    expect(tierOf(item({ title: 'Replace Garage Doors', naics: '238290' }), r)).toBe('direct');
+    // CHANGED 2026-09-21 (adversarial pass): "Door" and "doors" are the SAME
+    // WORD — plural is inflection, not derivation. Treating them as different
+    // printed "Mindy found 0 current opportunities" above three live fence
+    // cards. So car doors vs building doors is a SENSE problem, not a stemming
+    // one, and it is resolved where the evidence is: across the result set, by
+    // sector disagreement. In isolation there is nothing to disagree with.
+    const doorSet = [
+      item({ title: 'Replace Garage Doors', naics: '238290', solicitation: 'D1' }),
+      item({ title: 'Repair Operating Room Doors', naics: '238290', solicitation: 'D2' }),
+      item({ title: 'Automobile Door Assemblies', naics: '336111', solicitation: 'D3' }),
+    ];
+    const byId = new Map(
+      classifyOpportunities(doorSet, {
+        activity: activityFor(r),
+        codes: r.naicsCodes.status === 'known' ? r.naicsCodes.items : [],
+      }).evidence.map((e) => [e.item.solicitation, e.evidence.tier]),
+    );
+    expect(byId.get('D1')).toBe('direct');
+    expect(byId.get('D2')).toBe('direct');
+    expect(byId.get('D3')).toBe('broader');
   });
 
   it('drops uncoded keyword hits when a structured NAICS market exists', () => {

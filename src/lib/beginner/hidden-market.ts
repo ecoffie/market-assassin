@@ -741,12 +741,6 @@ export async function searchBeginnerHiddenMarket(
     broaderTerms: expandedKeyword ? [expandedKeyword] : [],
   };
   const related: SamSearchItem[] = [];
-  const classify = (items: readonly SamSearchItem[]): SamSearchItem[] => {
-    const out = classifyOpportunities(items, relevance);
-    related.push(...out.broader);
-    return out.direct;
-  };
-
   /**
    * Count distinct NOTICES, not rows. Two things inflate a row count:
    *  - the same notice reached by two searches (opportunityKey handles it)
@@ -780,8 +774,18 @@ export async function searchBeginnerHiddenMarket(
     return out;
   };
 
-  const directItems =
-    direct.status === 'ok' ? dedupe(classify(direct.items)) : direct.items;
+  // ⚠️ DEDUPE BEFORE CLASSIFY. `demoteSectorOutliers` counts a sector majority,
+  // and the cache holds duplicate rows — measured on "we do plumbing repairs",
+  // the 2-of-3 "majority" that demoted a real plumbing contract was ONE notice
+  // counted twice. A duplicated row must not be able to manufacture the quorum.
+  const classify = (items: readonly SamSearchItem[]): SamSearchItem[] => {
+    const out = classifyOpportunities(dedupe(items), relevance);
+    related.push(...out.broader);
+    return out.direct;
+  };
+
+
+  const directItems = direct.status === 'ok' ? classify(direct.items) : direct.items;
   const expandedTitleFiltered =
     expandedOpen.status === 'ok' && expandedKeyword
       ? expandedOpen.items.filter((item) => titleMatchesExpanded(item, expandedKeyword))

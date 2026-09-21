@@ -114,8 +114,31 @@ function titleWords(title: string): string[] {
 }
 
 const SUFFIXES = ['s', 'es', 'ing', 'ed'] as const;
+/** Plural marks only. NOT derivation — see `singular()`. */
+const PLURAL_SUFFIXES = ['s', 'es'] as const;
 
-/** Does a title word mean the same thing as the term, possibly inflected? */
+/**
+ * Drop a plural mark. "fences" → "fence", "roofs" → "roof", "windows" →
+ * "window". Never touches -ing/-ed, which change the part of speech.
+ */
+function singular(word: string): string {
+  if (word.length > 4 && word.endsWith('es') && !word.endsWith('ses')) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * Does a title word mean the same thing as the term?
+ *
+ * ⚠️ PLURAL IS NOT DERIVATION. Both directions of a plural are the SAME word:
+ * "we build fences" vs a title that says "Fence". Treating that like
+ * trucking→Trucks scored it `broader` and printed **"Mindy found 0 current
+ * opportunities"** directly above three cards reading "CJAG Fence Install",
+ * "Z--CON Chain Link Fence" and "Grapevine Fire BAR - Fence Repair" — with 14
+ * open fence solicitations in the cache. Beginner prose is plural far more
+ * often than the expert phrasing this was tuned on: "we fix roofs" (54 live
+ * roof notices), "we install windows" (36), "we repair boilers".
+ */
 function wordMatchesExact(word: string, term: string): boolean {
   if (word === term) return true;
   // EXPANDING the user's word keeps its meaning: cater → catering/catered.
@@ -123,21 +146,33 @@ function wordMatchesExact(word: string, term: string): boolean {
     if (word === term + suffix) return true;
     // clean → cleaning is term+ing; roof → roofing likewise.
   }
-  // "cater" → "catering" is covered above; "cater" → "catered" too. Handle a
-  // terminal -e being dropped/kept ("remodele" never occurs, but "service" →
-  // "servicing" does).
+  // Terminal -e dropped before a suffix: "service" → "servicing".
   if (term.endsWith('e')) {
     const stem = term.slice(0, -1);
     for (const suffix of ['ing', 'ed'] as const) if (word === stem + suffix) return true;
   }
+  // Either side may carry the plural mark, and only the plural mark.
+  const ws = singular(word);
+  const ts = singular(term);
+  if (ws === ts) return true;
+  for (const suffix of SUFFIXES) if (ws === ts + suffix) return true;
   return false;
 }
 
-/** The title carries a SHORTENED form of the term: trucking → Trucks. */
+/**
+ * The title carries a SHORTENED form of the term: trucking → Trucks. Meaning
+ * is genuinely lost here (an object is not the service), so this is adjacent
+ * evidence. Plurals are excluded — `wordMatchesExact` already resolved those.
+ */
 function wordMatchesShortened(word: string, term: string): boolean {
-  if (word.length < 4 || word.length >= term.length) return false;
-  if (!term.startsWith(word)) return false;
-  const tail = term.slice(word.length);
+  const ws = singular(word);
+  const ts = singular(term);
+  if (ws === ts) return false;
+  if (ws.length < 4 || ws.length >= ts.length) return false;
+  if (!ts.startsWith(ws)) return false;
+  const tail = ts.slice(ws.length);
+  // A bare plural tail is inflection, not derivation.
+  if ((PLURAL_SUFFIXES as readonly string[]).includes(tail)) return false;
   return (SUFFIXES as readonly string[]).includes(tail);
 }
 
@@ -288,9 +323,13 @@ function demoteSectorOutliers(
     for (const s of withSector) {
       const sec = naicsSector(s.item.naics) as string;
       if (sec === top) continue;
-      // Another term may still hold it as a direct match — check the rest.
-      const heldByAnother = s.evidence.matchedTerms.some((t) => t !== term);
-      if (heldByAnother) continue;
+      // A MULTI-WORD term legitimately holds an item against the sector vote:
+      // "Repair Operating Room Doors" matched "door repair", which is specific
+      // evidence that this is the right sense. Another single word is not —
+      // every plain-word term matches the same titles, so "held by any other
+      // term" made the rule unreachable the moment `terms` carried two forms
+      // of one word.
+      if (s.evidence.matchedTerms.some((t) => t !== term && t.includes(' '))) continue;
       s.evidence.tier = 'broader';
       s.evidence.reasons.push(
         `NAICS sector ${sec} is an outlier among "${term}" matches (${topN}/${withSector.length} are sector ${top})`,

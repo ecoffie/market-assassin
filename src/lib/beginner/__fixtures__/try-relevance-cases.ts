@@ -499,6 +499,104 @@ export const TRY_RELEVANCE_CASES: RelevanceCase[] = [
     ],
   },
   {
+    id: 'woman-owned-catering',
+    input: 'woman owned small business that does catering',
+    rationale:
+      'ADVERSARIAL PASS 2026-09-21. "X-owned small business" is the most common beginner self-description, and `owned` was a distinctive noun that won on word order — `person` again, new word. Searched `owned` and returned nine Government-Owned/GOCO fuel-depot contracts while `catering` sat unused.',
+    expectHead: 'catering',
+    expectConfidence: 'high',
+    expectOutcome: 'results',
+    include: [
+      {
+        title: '19N15026Q0004 - SOLICITATION FOR CATERING SERVICES',
+        naics: '722320',
+        type: 'Solicitation',
+        setAside: null,
+        why: 'The actual market.',
+      },
+    ],
+    exclude: [
+      {
+        title: 'Government Owned Contractor Operated (GOCO) Aircraft/Ground Fuel Services, Cannon AFB',
+        naics: '493190',
+        type: 'Solicitation',
+        setAside: null,
+        why: 'Ownership words describe WHO YOU ARE, never the market.',
+        group: 'none',
+      },
+      {
+        title: 'Official Government Owned vehicles insurance CY2027',
+        naics: '524298',
+        type: 'Solicitation',
+        setAside: null,
+        why: 'Same.',
+        group: 'none',
+      },
+    ],
+  },
+  {
+    id: 'rent-cranes',
+    input: 'we rent cranes',
+    rationale:
+      'ADVERSARIAL PASS. Demoting the verb hands the head to the object, and for a SERVICE business that inverts the sentence: `cranes` returned crane PURCHASES while the real crane-rental job sat in the adjacent group. They sell the verb.',
+    expectHead: 'crane rental',
+    expectConfidence: 'high',
+    expectOutcome: 'results',
+    include: [
+      {
+        title: 'W. Kerr Scott Crane Rental',
+        naics: '238990',
+        type: 'Solicitation',
+        setAside: null,
+        why: 'The service they actually sell.',
+      },
+    ],
+    exclude: [
+      {
+        title: 'REQUEST FOR QUOTATION NO. N4008426Q1022 PROCUREMENT OF CRANES FOR NAVFAC FAR EAST',
+        naics: '333120',
+        type: 'Solicitation',
+        setAside: null,
+        why: 'Buying a crane is not hiring a crane.',
+        group: 'none',
+      },
+      {
+        title: 'Type 1 Family of All-Terrain Cranes',
+        naics: null,
+        type: 'Solicitation',
+        setAside: null,
+        why: 'A procurement of the object.',
+        group: 'none',
+      },
+    ],
+  },
+  {
+    id: 'plural-fences',
+    input: 'we build fences',
+    rationale:
+      'ADVERSARIAL PASS, the worst LOST-RESULTS case. Plural was scored as derivation, so every singular "Fence" title fell to `broader` and the page printed "Mindy found 0 current opportunities" directly above three fence cards. 14 open fence notices in the cache. Beginner prose is plural far more often than expert prose.',
+    expectHead: 'fence',
+    expectConfidence: 'high',
+    expectOutcome: 'results',
+    include: [
+      {
+        title: 'CJAG Fence Install',
+        naics: '238990',
+        type: 'Combined Synopsis/Solicitation',
+        setAside: null,
+        why: 'Singular title, plural input — the same word.',
+      },
+      {
+        title: 'Grapevine Fire BAR - Fence Repair & Tank Cleanout',
+        naics: '238990',
+        type: 'Solicitation',
+        setAside: null,
+        why: 'Singular title, plural input.',
+      },
+    ],
+    exclude: [],
+  },
+  {
     id: 'vague',
     input: 'I help businesses',
     rationale:
