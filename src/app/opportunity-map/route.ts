@@ -4357,17 +4357,21 @@ const VIEWPORT_JS = `<script>
           if(d&&d.success){
             try{ _track('tool_use','watch_created',{anonymous:true,mode:MODE,named:d.name}); }catch(e){}
             _ss.textContent='\u2713 Watching';
-            // Offer alerts; never imply we will send them until an email exists.
+            // ── ALERTS REQUIRE A VERIFIED ACCOUNT ────────────────────────────
+            // This used to prompt for any email and enable alerts on it, which
+            // let a visitor point Mindy's alert email at a victim's address.
+            // The upgrade now runs through the EXISTING sign-in flow, and the
+            // server derives the account from that session — the client never
+            // names the recipient.
+            //
+            // The save above already happened, so value still precedes sign-in;
+            // this is an offer, not a wall.
             setTimeout(function(){
-              var _em2=window.prompt('Watching this market. Add your email to get alerted when new opportunities match (optional):','');
-              if(_em2&&_em2.indexOf('@')>0){
-                fetch('/api/app/map-watch',{method:'POST',headers:{'Content-Type':'application/json'},
-                  body:JSON.stringify({action:'claim',anonId:_aid,email:_em2})})
-                  .then(function(r){return r.json();}).then(function(c){
-                    if(c&&c.success&&c.claimed>0){ try{ _track('tool_use','watch_claimed',{watches:c.claimed}); }catch(e){} _ssMsg('\u2713 Alerts on'); }
-                    else _ssReset();
-                  }).catch(_ssReset);
-              } else _ssReset();
+              if(!window.requireSignIn){ _ssReset(); return; }
+              if(!confirm('Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)')){ _ssReset(); return; }
+              var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
+              if(!_a){ _ssReset(); return; }
+              window.__claimAnonWatches&&window.__claimAnonWatches();
             },500);
           } else _ssMsg('Couldn\\'t save');
         }).catch(function(){ _ssMsg('Couldn\\'t save'); });
@@ -4607,6 +4611,23 @@ const SAVE_JS = `<script>
       window.__track('link_click','proposal_started',{notice_id:decodeURIComponent(_n),act:btn.getAttribute('data-act')||''}); } }catch(e){}
     window.open(url,'_blank','noopener');
   };
+  // Claim this browser's anonymous watches onto the signed-in account. The
+  // account email is NEVER sent — the server reads it from the verified session.
+  window.__claimAnonWatches=function(){
+    var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    var em=_uemail(); if(!t||!em)return;
+    var aid=_anonId(); if(!aid)return;
+    fetch('/api/app/map-watch',{method:'POST',
+      headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({action:'claim',anonId:aid})})
+      .then(function(r){return r.json();}).then(function(c){
+        // Only a VERIFIED claim counts.
+        if(c&&c.success&&c.claimed>0){ try{ _track('tool_use','watch_claimed',{watches:c.claimed}); }catch(e){}
+          if(_ss)_ssMsg('\u2713 Alerts on'); }
+        else if(_ss)_ssReset();
+      }).catch(function(){ if(_ss)_ssReset(); });
+  };
+
   window.savePursuit=function(btn){
     if(btn.dataset.saved==='1')return;
     var a=window.requireSignIn('save this to your pursuits', function(){ window.savePursuit(btn); }); if(!a)return;

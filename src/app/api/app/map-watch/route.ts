@@ -23,7 +23,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { isAnonId, watchOwner, saveMapWatch, claimAnonWatch } from '@/lib/map-watch/anon-watch';
+import {
+  isAnonId, watchOwner, saveMapWatch, claimAnonWatch,
+  checkWatchPayload, countAnonWatches, MAX_ANON_WATCHES,
+} from '@/lib/map-watch/anon-watch';
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,12 +67,23 @@ export async function POST(request: NextRequest) {
   const email = typeof body.email === 'string' ? body.email : null;
   const anonId = typeof body.anonId === 'string' ? body.anonId : null;
 
-  // Upgrade path: attach a real email to anonymous watches and turn alerts on.
+  // ── UPGRADE PATH — requires a VERIFIED session ───────────────────────────
+  // ⚠️ This used to accept an arbitrary `email` from the body and enable alerts
+  // on it. Any holder of an anon uuid could therefore point Mindy's alert email
+  // at a victim's address. The address is now DERIVED from the signed MI session
+  // and the body's email is ignored entirely — a caller cannot name the
+  // recipient, so there is no address to abuse.
   if (body.action === 'claim') {
-    if (!anonId || !email) {
-      return NextResponse.json({ success: false, error: 'anonId and email are required' }, { status: 400 });
+    if (!anonId || !isAnonId(anonId)) {
+      return NextResponse.json({ success: false, error: 'a well-formed anonId is required' }, { status: 400 });
     }
-    const r = await claimAnonWatch(db(), anonId, email);
+    const session = requireMIAuthSession(request);
+    if (!session.ok) return session.response;
+    const verifiedEmail = session.session.email;
+    if (!verifiedEmail) {
+      return NextResponse.json({ success: false, error: 'session carries no account' }, { status: 401 });
+    }
+    const r = await claimAnonWatch(db(), anonId, verifiedEmail);
     if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 400 });
     return NextResponse.json({ success: true, claimed: r.claimed, alertsEnabled: r.claimed > 0 });
   }
@@ -81,6 +96,36 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
+
+  // ── Abuse control on an UNAUTHENTICATED write ────────────────────────────
+  // Uses the repo's existing KV rate limiter rather than a new mechanism. Both
+  // the network origin and the claimed identity are bounded, because an anon id
+  // is client-minted and a single client can mint unlimited ones.
+  if (isAnonId(owner)) {
+    const ip = getClientIP(request);
+    const perIp = await checkRateLimit(`mapwatch:ip:${ip}`, 30, 3600);
+    if (!perIp.allowed) {
+      return NextResponse.json({ success: false, error: 'rate limit exceeded' }, { status: 429 });
+    }
+    const perAnon = await checkRateLimit(`mapwatch:anon:${owner}`, 10, 3600);
+    if (!perAnon.allowed) {
+      return NextResponse.json({ success: false, error: 'rate limit exceeded' }, { status: 429 });
+    }
+    const held = await countAnonWatches(db(), owner);
+    // A null count is UNKNOWN — refuse rather than allow an unbounded write.
+    if (held == null) {
+      return NextResponse.json({ success: false, error: 'could not verify watch count' }, { status: 503 });
+    }
+    if (held >= MAX_ANON_WATCHES) {
+      return NextResponse.json(
+        { success: false, error: `an anonymous visitor may hold at most ${MAX_ANON_WATCHES} watches` },
+        { status: 429 },
+      );
+    }
+  }
+
+  const shape = checkWatchPayload(body.filters, body.bbox, body.name);
+  if (!shape.ok) return NextResponse.json({ success: false, error: shape.error }, { status: 400 });
 
   const r = await saveMapWatch(db(), {
     owner,

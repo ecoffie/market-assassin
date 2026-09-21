@@ -48,12 +48,15 @@ describe('an anonymous click saves instead of hitting a wall', () => {
 });
 
 describe('it never implies alerts it will not send', () => {
-  it('the email ask is explicitly optional and comes AFTER the save', () => {
+  it('the alerts offer comes AFTER the save and routes through verified sign-in', () => {
     const h = SRC.slice(SRC.indexOf('_ss.onclick=function()'));
-    expect(h).toMatch(/Add your email to get alerted[^']*\(optional\)/);
     const saveIdx = h.indexOf("body:JSON.stringify({anonId:_aid");
-    const askIdx = h.indexOf('Add your email to get alerted');
+    const askIdx = h.indexOf("requireSignIn('get alerts for this market'");
+    expect(saveIdx).toBeGreaterThan(-1);
     expect(askIdx).toBeGreaterThan(saveIdx);
+    // The old flow collected an arbitrary address by prompt — that is the
+    // email-abuse path and must not come back.
+    expect(h).not.toMatch(/Add your email to get alerted/);
   });
 
   it('the success label says Watching, not Alerts on', () => {

@@ -119,20 +119,29 @@ export async function saveMapWatch(
 }
 
 /**
- * Attach a real email to an anonymous watch — the upgrade moment.
+ * Attach a VERIFIED account to an anonymous watch — the upgrade moment.
  *
- * This is the ONLY path that turns alerts on, so a watch cannot start emailing
- * anyone who did not ask for it. Scoped to the anon id that owns the row, so one
- * visitor cannot claim another's watch.
+ * ⚠️ SECURITY: `verifiedEmail` MUST come from a validated MI session, never from
+ * a request body. The first version of this function accepted an arbitrary email
+ * and enabled alerts on it, which let any holder of an anon uuid point alert
+ * email at a victim's address. That is an email-abuse path, and the fix is that
+ * the caller cannot supply the address at all — the server derives it from the
+ * signed session.
+ *
+ * This is still the ONLY path that turns alerts on, so a watch cannot start
+ * emailing anyone who did not verify that they own the mailbox. Scoped to the
+ * anon id that owns the row, so one visitor cannot claim another's watch.
  */
 export async function claimAnonWatch(
   db: SupabaseClient,
   anonId: string,
-  email: string,
+  verifiedEmail: string,
 ): Promise<{ ok: boolean; claimed: number; error?: string }> {
   if (!isAnonId(anonId)) return { ok: false, claimed: 0, error: 'invalid anon id' };
-  const e = email.trim().toLowerCase();
+  const e = verifiedEmail.trim().toLowerCase();
   if (!e.includes('@')) return { ok: false, claimed: 0, error: 'invalid email' };
+  // Defence in depth: an anon id must never become an "account".
+  if (isAnonId(e)) return { ok: false, claimed: 0, error: 'anon id is not an account' };
 
   // ⚠️ Never count a RETURNING payload as the write total. `UPDATE … .select()`
   // updates every matching row but RETURNS at most 1,000, so `data.length` would
@@ -150,4 +159,60 @@ export async function claimAnonWatch(
     return { ok: false, claimed: 0, error: 'claim count returned NULL — unknown, not zero' };
   }
   return { ok: true, claimed: count };
+}
+
+/** Most watches one anonymous identity may hold. Bounds unauthenticated writes. */
+export const MAX_ANON_WATCHES = 25;
+
+/** Largest accepted serialized filter payload, in bytes. */
+export const MAX_FILTER_BYTES = 4096;
+
+export interface PayloadCheck { ok: boolean; error?: string }
+
+/**
+ * Validate an anonymous watch payload before it reaches the database.
+ *
+ * An unauthenticated endpoint must not accept an unbounded blob: `filters` is
+ * stored as jsonb and read back by the alert cron, so an oversized or
+ * deeply-nested object is both a storage and a processing cost.
+ */
+export function checkWatchPayload(
+  filters: unknown,
+  bbox: unknown,
+  name: unknown,
+): PayloadCheck {
+  if (filters != null && (typeof filters !== 'object' || Array.isArray(filters))) {
+    return { ok: false, error: 'filters must be an object' };
+  }
+  if (bbox != null && (typeof bbox !== 'object' || Array.isArray(bbox))) {
+    return { ok: false, error: 'bbox must be an object' };
+  }
+  if (name != null && typeof name !== 'string') {
+    return { ok: false, error: 'name must be a string' };
+  }
+  if (typeof name === 'string' && name.length > 200) {
+    return { ok: false, error: 'name too long' };
+  }
+  try {
+    const size = JSON.stringify({ filters: filters ?? {}, bbox: bbox ?? null }).length;
+    if (size > MAX_FILTER_BYTES) return { ok: false, error: 'payload too large' };
+  } catch {
+    return { ok: false, error: 'payload not serializable' };
+  }
+  return { ok: true };
+}
+
+/** How many watches this anonymous identity already holds. */
+export async function countAnonWatches(
+  db: SupabaseClient,
+  anonId: string,
+): Promise<number | null> {
+  const { count, error } = await db
+    .from('saved_searches')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_email', anonId.trim().toLowerCase());
+  // A null/errored count is UNKNOWN. Callers must treat it as "cannot verify the
+  // cap" and refuse, never as zero.
+  if (error || count == null) return null;
+  return count;
 }
