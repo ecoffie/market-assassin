@@ -4567,6 +4567,47 @@ const SAVE_JS = `<script>
       window.__track('link_click','proposal_started',{notice_id:decodeURIComponent(_n),act:btn.getAttribute('data-act')||''}); } }catch(e){}
     window.open(url,'_blank','noopener');
   };
+  // ── RESTORE ──────────────────────────────────────────────────────────────
+  // Show what this visitor already kept, rather than making them click Save
+  // again to find out the server still has it.
+  window.__anonSaved=Object.create(null);
+  window.__loadAnonShortlist=function(){
+    var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    var aid=_anonId(); if(!aid)return;
+    // SIGNED IN with a shortlist kept earlier while signed out -> promote it now.
+    // This is the real upgrade moment: the account exists, the session is
+    // verified, and the user never had to do anything extra.
+    if(t&&_uemail()){ try{ window.__claimAnonShortlist&&window.__claimAnonShortlist(); }catch(e){} return; }
+    fetch('/api/app/shortlist?anonId='+encodeURIComponent(aid))
+      .then(function(r){return r.json();}).then(function(d){
+        if(!d||!d.success||!d.noticeIds)return;  // a failed read is UNKNOWN, not empty
+        for(var i=0;i<d.noticeIds.length;i++)window.__anonSaved[d.noticeIds[i]]=1;
+        try{
+          var bs=document.querySelectorAll('[data-sol]');
+          for(var j=0;j<bs.length;j++){
+            var b=bs[j]; if(window.__anonSaved[b.getAttribute('data-sol')]){
+              b.dataset.saved='1'; b.textContent='\u2713 Saved'; }
+          }
+        }catch(e){}
+      }).catch(function(){});
+  };
+  // Promote this browser's shortlist into the signed-in account. The account
+  // email is NEVER sent — the server reads it from the verified session.
+  window.__claimAnonShortlist=function(){
+    var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    var em=_uemail(); if(!t||!em)return;
+    var aid=_anonId(); if(!aid)return;
+    fetch('/api/app/shortlist',{method:'POST',
+      headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({action:'claim',anonId:aid})})
+      .then(function(r){return r.json();}).then(function(c){
+        if(c&&c.success&&c.promoted>0){ try{ _track('tool_use','shortlist_claimed',{promoted:c.promoted}); }catch(e){} }
+      }).catch(function(){});
+  };
+
+  // Run AFTER both helpers exist (the documented cross-block ordering trap).
+  try{ window.__loadAnonShortlist(); }catch(e){}
+
   window.savePursuit=function(btn){
     if(btn.dataset.saved==='1')return;
     // ── ANONYMOUS VISITORS CAN KEEP A LISTING ────────────────────────────────
@@ -4587,9 +4628,11 @@ const SAVE_JS = `<script>
         try{ _o2=(OPPS||[]).find(function(x){return x.sol===_sol2;}); }catch(e){}
         if(!_o2)return;
         btn.textContent='Saving\u2026'; btn.disabled=true;
+        // ONLY the notice id. The browser must not be able to manufacture
+        // opportunity metadata that could later become a real pursuit — the
+        // server resolves title/agency/NAICS/deadline from sam_opportunities.
         fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({anonId:_aid2,noticeId:_o2.sol,title:_o2.title,agency:_o2.agency,
-            naicsCode:_o2.naics,responseDeadline:_o2.close})})
+          body:JSON.stringify({anonId:_aid2,noticeId:_o2.sol})})
           .then(function(r){return r.json();}).then(function(d){
             btn.disabled=false;
             if(d&&d.success){
