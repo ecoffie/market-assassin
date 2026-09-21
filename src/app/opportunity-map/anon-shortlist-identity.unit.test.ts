@@ -148,7 +148,9 @@ describe('restore compares canonical to canonical', () => {
   });
 
   it('restore queries data-nid — never data-sol', () => {
-    const fn = MAP.slice(MAP.indexOf('window.__loadAnonShortlist=function'), MAP.indexOf('window.__claimAnonShortlist=function'));
+    // The marking loop is now the shared _markSaved helper, used by BOTH the
+    // anonymous read and the signed-in account read.
+    const fn = MAP.slice(MAP.indexOf('function _markSaved(ids)'), MAP.indexOf('window.__claimAnonShortlist=function'));
     expect(fn).toContain("querySelectorAll('[data-nid]')");
     expect(fn).toContain("getAttribute('data-nid')");
     expect(fn).not.toContain('data-sol');
