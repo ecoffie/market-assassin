@@ -140,6 +140,54 @@ renders then empties, diagnose from a **state timeline**, never the final URL.
 
 ---
 
+## 🔁 Return continuity — the Map remembers the MARKET, not just the viewport (2026-09-21)
+
+**Two localStorage keys, two different jobs. Do not merge them.**
+
+| key | holds | written by | read by |
+|---|---|---|---|
+| `mi_map_last_view` | lat/lng/zoom (30d, US-only, z≥4) | map `moveend` → `window.__saveMapView` | the map constructor in `template.html`, **synchronously** |
+| `mi_map_last_search` | `{mode, filters, t}` — **no bbox** | `fetchView()` → `window.__rememberMapState` (debounced 1.2s) | the boot restorer in `BOOT_VIEW_JS` → `window.__applySavedSearch` |
+
+⚠️ **`mi_map_last_search` must never carry a bbox.** The viewport already has an owner that is
+strictly fresher (moveend, not filter-change) and applies *before* boot. A second writer moving
+the map after boot is the `?naics=&state=` race that took the map **5,416 → 0**.
+
+⚠️ **Never remember a filter `__applySavedSearch` cannot give back.** `window.__mapStateMeaningful`
+is the allowlist and it is a SUBSET of that restorer's `FILT` reset (+`q`), guarded by
+`return-continuity.unit.test.ts`. `strategy` is deliberately absent — `_mapState` stores it
+comma-JOINED while the restorer copies only keys on its `FILT` literal, so it would be silently
+dropped and the "Picked up where you left off" pill would be lying. `fsc` likewise (it lives on
+`window.__fscFilter`). `companies`/`buyers`/`dla` modes are not stored at all: the first two would
+greet a returning anonymous visitor with the `__playersGate` modal, and dla's FSC filter is not in
+the shape. **A half-restore is worse than none.**
+
+⚠️ **An empty default map is not a session.** The meaningfulness check runs on BOTH the write and
+the read side. On the write side it is what stops the boot `fetchView` — which runs with the empty
+default *before* any restore lands — from overwriting a real memory with nothing.
+
+⚠️ **The memory never fights the URL.** Any record link (`?opp= ?company= ?buyer= ?recompete=
+?forecast=`) or market link (`?ss= ?agency= ?naics= ?state= ?strategy= ?q= ?mode= …`) or `?embed=`
+stands the restore down. The URL is the more recent instruction.
+
+Event: `returning_session_restored` (`tool_use`, `event_source='opportunity_map'`) with
+`age_hours` + `returning` (age > 30 min) — a reload seconds later is restored but is **not** a
+return, and counting it as one would inflate the one number this exists to move.
+
+**Also fixed here: the anonymous save was UNREACHABLE.** #1601 put it on `window.savePursuit`,
+which has **zero call sites** — measured on the serving production page, it appears exactly twice
+(its own definition and its own sign-in retry callback). Every live button calls
+`window.saveCurrentOpp` (13 occurrences), which had no anonymous branch; production confirmed it
+with **0 rows in `anonymous_shortlist` and 0 `shortlist_saved` events, ever**. The branch now lives
+in `saveCurrentOpp`, restricted to a SAM drawer with a canonical 32-hex `notice_id`
+(`!CUR.kind && !CUR.isDla && /^[a-f0-9]{32}$/`), and callers passing a `done` callback
+(`openProposalWorkspace`, `startCapture`) are excluded so their signed-in destinations still work.
+**A save is still not a pursuit** — the label says "Saved", never "Tracked"/"In pursuits".
+⚠️ `window.__claimAnonWatches` (W1/#1600) still calls a bare `_uemail()` from SAVE_JS and therefore
+throws — **separate, unfixed, out of scope here.**
+
+---
+
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 
 **`docs/engineering/a-number-is-a-product-feature.md`** is the frozen principle (Eric,
