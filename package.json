@@ -24,6 +24,7 @@
     "audit:api-auth": "node scripts/audit-api-auth.js",
     "launch:brief": "node scripts/generate-launch-manager-brief.js",
     "seo:warm-slugs": "tsx scripts/warm-contractor-slugs.ts",
+    "seo:build-forecast-summary": "tsx scripts/build-forecast-summary.ts",
     "seo:contractor-candidates": "node scripts/generate-seo-contractor-candidates.js",
     "predeploy": "npm run test:schema && npm run test:unit && npm run test:pre-deploy && npm run verify:data && npm run verify:m-scale && npm run verify:maps-account && npm run eval:cap-parse && npm run eval:evidence-match",
     "deploy": "npm run predeploy && vercel --prod",

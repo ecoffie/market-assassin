@@ -13,9 +13,11 @@
  *    per-NAICS detail already have their own canonical homes and are linked.
  *  - Server-rendered facts. A crawler with JavaScript disabled gets the real
  *    counts, the real agency names and the real NAICS codes in the HTML.
- *  - No BigQuery. Supabase only, ISR-cached for a day.
- *  - Nothing estimated. Every number is counted from rows actually read; on a
- *    read failure the page says so and noindexes rather than printing a zero.
+ *  - No BigQuery, and no table read either: ONE small KV read of a summary
+ *    materialized offline. ISR-cached for a day on top of that.
+ *  - Nothing estimated. `total` is an authoritative COUNT taken at build time,
+ *    not a tally of rows that happened to transfer; a summary that is stale,
+ *    truncated or the wrong shape renders the unavailable state and noindexes.
  *  - Visible provenance and freshness, because a forecast is a claim about the
  *    future and the reader deserves to know where it came from and how old it is.
  */
@@ -25,6 +27,18 @@ import { getForecastSummary, agencySlug } from '@/lib/seo/forecasts-summary';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 
 export const revalidate = 86400; // daily; the upstream forecast files move slowly
+
+/*
+ * Data comes from a MATERIALIZED summary in KV, built offline by
+ * `npm run seo:build-forecast-summary`. This page performs ONE small KV read,
+ * shared between generateMetadata and the body via React cache() — it does not
+ * read the agency_forecasts table, and it never touches BigQuery.
+ *
+ * If the summary is missing, stale, truncated or the wrong shape, the page
+ * renders the unavailable state below and noindexes. That is deliberate: a
+ * truncated summary undercounts, and publishing a total we cannot stand behind
+ * is worse than publishing nothing.
+ */
 
 const SITE_URL = 'https://getmindy.ai';
 const LINKABLE_AGENCIES = new Set(AGENCIES_SEO.map((a) => a.slug));

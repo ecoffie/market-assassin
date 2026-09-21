@@ -6,10 +6,10 @@
  * "Where exactly does a contractor request diverge between the MCP path and the
  * public SEO page?" For each fixture slug it reports, side by side:
  *
- *   MCP resolution      — what the canonical resolver returns with liveBq=true,
- *                         i.e. exactly what `uniqueBySlug()` in
+ *   MCP resolution      — what the canonical resolver returns on the MCP path,
+ *                         i.e. what `uniqueBySlug()` in
  *                         src/lib/contractor/name-resolution.ts does for the
- *                         MCP contractor tools.
+ *                         MCP contractor tools. CACHE-ONLY unless --live-bq.
  *   canonical UEI/parent— rollup_uei + rollup_name + child_count (parent identity)
  *   SEO resolution      — what the same resolver returns with the public page's
  *                         settings (cache-only, because seoLiveBqEnabled() is OFF)
@@ -31,7 +31,16 @@
  * failure, not a resolution failure — and the fix belongs at that boundary
  * (warm the cache), never in a second slug-resolution implementation.
  *
- * Run:  npx tsx scripts/seo-mcp-parity-report.ts [slug ...]
+ * ⚠️ CACHE-ONLY BY DEFAULT. An ordinary run makes ZERO BigQuery calls: both
+ * resolver calls run cache-only, so the "MCP resolve" column reports what the
+ * MCP path gets FROM CACHE. `--live-bq` allows the two cold reads that
+ * reproduce the authenticated MCP path exactly — that costs BigQuery and needs
+ * authorization, because CANONICAL_SLUG_SQL is CPU-bound and has been REFUSED
+ * by BigQuery for exceeding the on-demand CPU-to-bytes ratio (9,106 CPU
+ * seconds against 27 MB scanned, measured 2026-09-21).
+ *
+ * Run:  npx tsx scripts/seo-mcp-parity-report.ts [slug ...]            # 0 BQ
+ *       npx tsx scripts/seo-mcp-parity-report.ts --live-bq [slug ...]  # AUTHORIZED ONLY
  */
 import { config } from 'dotenv';
 config({ path: '.env.local' });
@@ -109,10 +118,11 @@ async function cachePresent(slug: string): Promise<string> {
   }
 }
 
-async function reconcile(slug: string): Promise<Row> {
-  // MCP path: liveBq = true (name-resolution.ts:152)
-  const mcpProfile = await getRollupOrSingleBySlug(slug, true).catch(() => null);
-  const canonical = await resolveCanonicalSlug(slug, true).catch(() => null);
+async function reconcile(slug: string, liveBq: boolean): Promise<Row> {
+  // MCP path. liveBq=true reproduces name-resolution.ts:152 exactly; the DEFAULT
+  // is false so a routine run of this diagnostic cannot touch the warehouse.
+  const mcpProfile = await getRollupOrSingleBySlug(slug, liveBq).catch(() => null);
+  const canonical = await resolveCanonicalSlug(slug, liveBq).catch(() => null);
 
   // SEO path: cache-only, exactly what contractors/[slug]/page.tsx does first
   const seoProfile = await getRollupBySlug(slug).catch(() => null);
@@ -132,7 +142,12 @@ async function reconcile(slug: string): Promise<Row> {
 
   let diverges = '—';
   if (mcpProfile && !seoProfile) diverges = 'CACHE boundary';
-  if (!mcpProfile && !canonical) diverges = 'source data (honest 404)';
+  if (!mcpProfile && !canonical) {
+    // Cache-only cannot distinguish "not in the warehouse" from "not warmed".
+    // Saying "source data" without a cold read would be asserting a fact we did
+    // not measure — the exact class of error this whole audit was about.
+    diverges = liveBq ? 'source data (honest 404)' : 'unknown (cache-only)';
+  }
   if (mcpProfile && seoProfile && live.startsWith('404')) diverges = 'ISR (stale 404 cached)';
 
   return {
@@ -155,13 +170,23 @@ function pad(s: string, n: number) {
 }
 
 async function main() {
-  const fixtures = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_FIXTURES;
+  const argv = process.argv.slice(2);
+  const liveBq = argv.includes('--live-bq');
+  const named = argv.filter((a) => !a.startsWith('--'));
+  const fixtures = named.length ? named : DEFAULT_FIXTURES;
+
   const rows: Row[] = [];
-  for (const f of fixtures) rows.push(await reconcile(f));
+  for (const f of fixtures) rows.push(await reconcile(f, liveBq));
 
   console.log('\nSEO ↔ MCP CONTRACTOR RECONCILIATION');
   console.log('Both paths call getRollupOrSingleBySlug() in src/lib/bigquery/recipients.ts.');
-  console.log('MCP passes liveBq=true; the SEO page passes seoLiveBqEnabled() (OFF).\n');
+  console.log('MCP passes liveBq=true; the SEO page passes seoLiveBqEnabled() (OFF).');
+  console.log(
+    liveBq
+      ? '⚠️  --live-bq: the MCP column made LIVE BigQuery calls.\n'
+      : 'Mode: CACHE-ONLY — zero BigQuery calls. The MCP column shows what the MCP\n' +
+        'path resolves FROM CACHE; pass --live-bq (authorized only) for cold reads.\n',
+  );
 
   const H = ['slug', 'MCP resolve', 'canonical UEI', 'SEO (cache-only)', 'cache', 'sitemap', 'live', 'diverges at'];
   const W = [40, 26, 14, 16, 14, 8, 22, 26];

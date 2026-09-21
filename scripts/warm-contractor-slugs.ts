@@ -15,11 +15,14 @@
  *
  * ONE SOURCE OF CONTRACTOR TRUTH
  * ------------------------------
- * It calls `getRollupsBySlugBatch()` and `resolveCanonicalSlugsBatch()` in
- * src/lib/bigquery/recipients.ts — the batch forms of the very functions the
- * public page and the MCP contractor tools already use, sharing the identical
- * SQL constants (`ROLLUP_BY_SLUG_SQL`, `CANONICAL_SLUG_SQL`). It does not carry
- * its own SQL.
+ * It calls `getRollupsBySlugBatch()` in src/lib/bigquery/recipients.ts — the
+ * batch form of the very function the public page and the MCP contractor tools
+ * already use, sharing the identical SQL constants (`ROLLUP_BY_SLUG_SQL`,
+ * `CANONICAL_SLUG_BATCH_SQL`). It does not carry its own SQL.
+ *
+ * ⛔ The ALIAS path (scan 2) is ESTIMATE-ONLY and cannot execute — see
+ * ALIAS_EXECUTION_DISABLED_REASON. Profile warming (scan 1) still executes
+ * under --go.
  *
  * That rule is written in blood. The first version of this script re-implemented
  * the resolution SQL in batched form and silently dropped the `norm_match` arm.
@@ -44,8 +47,8 @@
  * the edge until a deploy invalidates it. Warm, deploy, THEN verify.
  *
  * USAGE
- *   npx tsx scripts/warm-contractor-slugs.ts --file slugs.txt --dry-run   # estimate only, 0 bytes
- *   npx tsx scripts/warm-contractor-slugs.ts --file slugs.txt --go        # execute
+ *   npx tsx scripts/warm-contractor-slugs.ts --file slugs.txt             # dry run (default)
+ *   npx tsx scripts/warm-contractor-slugs.ts --file slugs.txt --go        # execute PROFILES only
  *   npx tsx scripts/warm-contractor-slugs.ts --queue --go                 # drain recorded misses
  *
  * `--dry-run` is the DEFAULT. Executing requires an explicit `--go`, because a
@@ -60,16 +63,43 @@ import { bqDryRun } from '../src/lib/bigquery/client';
 import { primeCache } from '../src/lib/bigquery/cache';
 import {
   getRollupsBySlugBatch,
-  resolveCanonicalSlugsBatch,
   normalizeCompanyName,
   ROLLUP_BY_SLUG_SQL,
-  CANONICAL_SLUG_SQL,
+  CANONICAL_SLUG_BATCH_SQL,
   type RollupProfile,
 } from '../src/lib/bigquery/recipients';
 import { CONTRACTOR_WARM_LIMITS as L, dailyBudgetKey } from '../src/lib/seo/warm-limits';
 import { WARM_QUEUE_KEY } from '../src/lib/seo/served-slugs';
 
 const gib = (b: number) => (b / 1024 ** 3).toFixed(3);
+
+/**
+ * Why the alias batch cannot be executed from here, even with --go.
+ *
+ * CANONICAL_SLUG_BATCH_SQL joins the full recipients table against the rollup
+ * table through UNNEST(child_ueis). Its cost is CPU, not bytes: measured
+ * 2026-09-21 the scalar form consumed 9,106 CPU seconds against 27 MB scanned
+ * and BigQuery REFUSED the job for exceeding the on-demand CPU-to-bytes ratio
+ * (ceiling 6,900 CPU seconds).
+ *
+ * A dry run reports BYTES. It cannot predict that refusal, so no dry run —
+ * however exact — is evidence that this batch is safe to execute. Every guard
+ * this script has (maxBytesPerScan, maxBytesPerRun, dailyScanBudgetBytes) is
+ * denominated in bytes and is therefore blind to the one failure mode that has
+ * actually occurred.
+ *
+ * Re-enabling requires a SEPARATELY AUTHORIZED bounded runtime probe: run the
+ * batch at a small size against production, measure actual CPU seconds from the
+ * job statistics, and derive a batch size with real headroom under the ratio.
+ * Until that exists, this path estimates and reports but does not run.
+ *
+ * Profile warming (scan 1) is unaffected — ROLLUP_BY_SLUG_SQL is a single-table
+ * filter with no UNNEST join, and it has executed successfully in production.
+ */
+const ALIAS_EXECUTION_DISABLED_REASON =
+  'CANONICAL_SLUG_BATCH_SQL is CPU-bound and has been refused by BigQuery ' +
+  '(9,106 CPU-sec vs 27 MB). A byte dry run cannot prove it safe. Needs an ' +
+  'authorized bounded runtime probe first.';
 
 /** `/contractors/foo/contracts`, a full URL, or a bare slug → `foo`. */
 export function toSlug(line: string): string | null {
@@ -222,40 +252,40 @@ async function main() {
   }
 
   // ── Scan 2: aliases for whatever scan 1 missed ────────────────────────────
+  //
+  // ⚠️ EXECUTION IS DISABLED. See ALIAS_EXECUTION_DISABLED_REASON. The dry run
+  // below still runs, because an estimate costs nothing and the byte figure is
+  // worth having — but it is explicitly NOT sufficient evidence to execute, and
+  // the code will not execute on the strength of it.
   const unmatched = slugs.filter((s) => !found.has(s));
-  let redirects = new Map<string, string>();
   if (unmatched.length && !stopped) {
     for (const [i, part] of chunk(unmatched, L.slugsPerScan).entries()) {
-      const est = await bqDryRun({
-        query: CANONICAL_SLUG_SQL,
-        params: { slugs: part, normSlugs: part.map(normalizeCompanyName) },
-      });
+      // Estimate the EXACT query and the EXACT parameters that execution would
+      // use. Previously this dry-ran CANONICAL_SLUG_SQL (the scalar form, bound
+      // on @slug/@normSlug) while execution ran CANONICAL_SLUG_BATCH_SQL — so
+      // the estimate described a different query, and with array params against
+      // scalar placeholders it could not even bind. An estimate of a query you
+      // are not going to run is worse than no estimate: it reads as safety.
+      const params = { slugs: part, normSlugs: part.map(normalizeCompanyName) };
+      const est = await bqDryRun({ query: CANONICAL_SLUG_BATCH_SQL, params });
       const reason = stopReason(budget, est.bytesProcessed);
       if (reason) {
         stopped = `scan 2 batch ${i + 1}: ${reason}`;
         break;
       }
-      console.log(`scan 2 · batch ${i + 1} · est ${gib(est.bytesProcessed)} GiB`);
-      if (!go) {
-        budget.runBytes += est.bytesProcessed;
-        continue;
-      }
-      const got = await resolveCanonicalSlugsBatch(part, String(L.maxBytesPerScan));
-      for (const [k, v] of got) redirects.set(k, v);
       budget.runBytes += est.bytesProcessed;
-      await addDailyBytes(est.bytesProcessed);
+      console.log(
+        `scan 2 · batch ${i + 1} · est ${gib(est.bytesProcessed)} GiB (bytes only — NOT a CPU guarantee)`,
+      );
     }
-    if (go && redirects.size) {
-      await mapLimit([...redirects.entries()], L.kvWriteConcurrency, async ([slug, canonical]) => {
-        await primeCache(`rollup:canonical-of:${slug}:v3-merged`, [{ canonical_slug: canonical }]);
-      });
-      console.log(`  primed ${redirects.size} redirect key(s)`);
-    }
+    console.log(`\n  ⛔ alias execution disabled — ${ALIAS_EXECUTION_DISABLED_REASON}`);
   }
 
-  // Successfully warmed slugs leave the miss queue.
+  // Successfully warmed slugs leave the miss queue. Alias-only slugs never do,
+  // because the alias path cannot execute — they stay queued for the day the
+  // bounded runtime probe authorizes it.
   if (go && useQueue) {
-    const done = [...found.keys(), ...redirects.keys()];
+    const done = [...found.keys()];
     if (done.length) {
       try {
         await kv.srem(WARM_QUEUE_KEY, ...done);
@@ -265,7 +295,10 @@ async function main() {
     }
   }
 
-  const gone = unmatched.filter((s) => !redirects.has(s));
+  // "unresolved" here means "not resolved BY THIS RUN". With alias execution
+  // disabled we cannot say whether these are genuinely gone or merely aliased,
+  // and naming them "gone" would assert something we did not measure.
+  const unresolved = unmatched;
 
   console.log('\n──────── RESULT ────────');
   console.log(`mode                        : ${go ? 'EXECUTED' : 'DRY RUN (nothing billed)'}`);
@@ -276,8 +309,9 @@ async function main() {
     ).length;
     console.log(`profile primed → serves 200 : ${found.size}`);
     console.log(`  …thin → 200 + noindex     : ${thin}`);
-    console.log(`redirect primed → 308       : ${redirects.size}`);
-    console.log(`genuinely gone → 404        : ${gone.length}`);
+    console.log(`redirect primed → 308       : 0 (alias execution disabled)`);
+    console.log(`unresolved by this run      : ${unresolved.length} — status UNKNOWN,`);
+    console.log(`                              not proven gone; alias path is disabled`);
   }
   console.log(`bytes scanned this run      : ${gib(budget.runBytes)} GiB`);
   console.log(`daily total after run       : ${gib(budget.dayBytes + budget.runBytes)} GiB`);
