@@ -24,8 +24,11 @@ import {
   describeCoverageTimestamp,
   isModificationAction,
   classifyModNumber,
+  classifyAgencyYearObligations,
   summarizeHistoricalSetAsides,
+  SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
 } from '@/lib/contractor/award-history-shape';
+import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 
 // Queries that scan the full `awards` table filtered by recipient_uei
 // can exceed the BQ client's 5 GiB default maximumBytesBilled for
@@ -630,6 +633,14 @@ export async function getYearlyTotalsForRecipient(
   });
 }
 
+export interface SetAsideSupportingActionRow {
+  uei: string | null;
+  award_id: string | null;
+  fiscal_year: number | null;
+  obligation_amount: number | null;
+  action_date: string | null;
+}
+
 export interface SetAsideHistoryRow {
   set_aside: string;
   award_count: number;
@@ -645,6 +656,10 @@ export interface SetAsideHistoryRow {
    */
   first_observed_positive_action_fy: number | null;
   total_obligated: number;
+  /** Distinct UEIs that contributed actions under this label (rollup may be many). */
+  contributing_ueis: string[] | null;
+  /** Sample supporting actions (ordered by |obligation|; not a full census). */
+  supporting_actions: SetAsideSupportingActionRow[] | null;
 }
 
 export async function getSetAsideHistoryForRecipient(
@@ -652,19 +667,31 @@ export async function getSetAsideHistoryForRecipient(
   rollupUei: string,
   liveBq = false,
 ): Promise<SetAsideHistoryRow[]> {
-  // v3: last_action_fy vs first_observed_positive_action_fy. Positive-obligation
-  // MIN is not award origin (mods can arrive years later). Award origin stays
-  // unknown unless a dedicated origin signal exists.
+  // v4: v3 FY semantics + contributing UEIs + supporting action sample.
+  // Positive-obligation MIN is not award origin. Award origin stays unknown
+  // unless a dedicated origin signal exists. Null first-positive ≠ all deobligations.
   return queryCached<SetAsideHistoryRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:set-aside-history:v3-m`,
+    cacheKey: `rollup:${rollupUei}:set-aside-history:v4-m`,
     query: `
       SELECT
         set_aside,
         COUNT(DISTINCT award_id) AS award_count,
         MAX(fiscal_year) AS last_action_fy,
         MIN(IF(obligation_amount > 0, fiscal_year, NULL)) AS first_observed_positive_action_fy,
-        SUM(obligation_amount) AS total_obligated
+        SUM(obligation_amount) AS total_obligated,
+        ARRAY_AGG(DISTINCT recipient_uei IGNORE NULLS LIMIT 20) AS contributing_ueis,
+        ARRAY_AGG(
+          STRUCT(
+            recipient_uei AS uei,
+            award_id,
+            fiscal_year,
+            obligation_amount,
+            CAST(action_date AS STRING) AS action_date
+          )
+          ORDER BY ABS(IFNULL(obligation_amount, 0)) DESC
+          LIMIT 5
+        ) AS supporting_actions
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei IN UNNEST(@ueis)
         AND set_aside IS NOT NULL
@@ -1532,20 +1559,22 @@ export async function getBqContractorHistory(opts: {
   const cacheKey = `single:${uei}`;
 
   const TOP_AGENCIES_LIMIT = 8;
-  const [yearly, agencies, naics, recent, yearlyByAgency, setAsideHist] = await Promise.all([
-    getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
-    getTopAgenciesForRecipient(ueiSet, cacheKey, TOP_AGENCIES_LIMIT, liveBq),
-    getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
-    getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
-    getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
-    getSetAsideHistoryForRecipient(ueiSet, cacheKey, liveBq),
-  ]);
+  const [yearly, agencies, naics, recent, yearlyByAgency, setAsideHist, warehouseCoverage] =
+    await Promise.all([
+      getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
+      getTopAgenciesForRecipient(ueiSet, cacheKey, TOP_AGENCIES_LIMIT, liveBq),
+      getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
+      getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
+      getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
+      getSetAsideHistoryForRecipient(ueiSet, cacheKey, liveBq),
+      loadAwardsWarehouseCoverage().catch(() => null),
+    ]);
 
   const awardCount = Number(profile.award_count || 0);
   // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
   // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
   // empty arrays mean "not retrieved", not "none exist".
-  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v3-m`;
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v4-m`;
   const setAsideUnavailable =
     awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
   const detailIncomplete =
@@ -1562,10 +1591,38 @@ export async function getBqContractorHistory(opts: {
 
   // Group the per-(year,agency) rows so each fiscal year carries its agency
   // breakdown — this is what the chart's click-to-drill-down renders.
-  const byYear = new Map<number, Array<{ agency: string; amount: number; count: number }>>();
+  // Zero-dollar cells keep vehicle_usage=not_established (never boolean false-as-caveat).
+  const byYear = new Map<
+    number,
+    Array<{
+      agency: string;
+      amount: number;
+      /** @deprecated Prefer distinct_award_count — same value, grain=distinct_awards. */
+      count: number;
+      distinct_award_count: number;
+      count_grain: 'distinct_awards';
+      classification: ReturnType<typeof classifyAgencyYearObligations>['classification'];
+      unused_vehicle: null;
+      vehicle_usage: 'not_established';
+      classification_note: string | null;
+    }>
+  >();
   for (const r of yearlyByAgency) {
+    const amount = Number(r.total_amount || 0);
+    const count = Number(r.award_count || 0);
+    const classified = classifyAgencyYearObligations({ amount, count });
     const arr = byYear.get(r.fiscal_year) || [];
-    arr.push({ agency: r.awarding_agency, amount: Number(r.total_amount || 0), count: Number(r.award_count || 0) });
+    arr.push({
+      agency: r.awarding_agency,
+      amount,
+      count: classified.distinct_award_count,
+      distinct_award_count: classified.distinct_award_count,
+      count_grain: classified.count_grain,
+      classification: classified.classification,
+      unused_vehicle: classified.unused_vehicle,
+      vehicle_usage: classified.vehicle_usage,
+      classification_note: classified.note,
+    });
     byYear.set(r.fiscal_year, arr);
   }
 
@@ -1593,6 +1650,16 @@ export async function getBqContractorHistory(opts: {
   });
   const coverageTs = describeCoverageTimestamp({
     lastRecipientActionDate: profile.last_action_date || null,
+    warehouseMaxActionDate: warehouseCoverage?.clocks?.sourceActionMax ?? null,
+    ingest: warehouseCoverage
+      ? {
+          last_built: warehouseCoverage.lastBuilt,
+          acquired_at: warehouseCoverage.clocks?.acquiredAt ?? null,
+          merged_at: warehouseCoverage.clocks?.mergedAt ?? null,
+          recipients_rebuilt_at: warehouseCoverage.clocks?.recipientsRebuiltAt ?? null,
+          freshness: warehouseCoverage.freshness,
+        }
+      : null,
   });
   const historicalSetAsides = summarizeHistoricalSetAsides(
     setAsideUnavailable
@@ -1604,9 +1671,21 @@ export async function getBqContractorHistory(opts: {
             r.first_observed_positive_action_fy == null
               ? null
               : Number(r.first_observed_positive_action_fy),
+          // Preserve null — never substitute the queried UEI.
+          contributingUeis: r.contributing_ueis,
+          supportingActions: (r.supporting_actions ?? []).map((a) => ({
+            uei: a?.uei ?? null,
+            award_id: a?.award_id ?? null,
+            fiscal_year: a?.fiscal_year == null ? null : Number(a.fiscal_year),
+            obligation_amount:
+              a?.obligation_amount == null ? null : Number(a.obligation_amount),
+            action_date: a?.action_date ?? null,
+          })),
         })),
     {
       coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+      scope: { kind: 'history_single_uei', uei_count: 1 },
+      contributingUeiSampleLimit: SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
       scopeNote:
         'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query.',
     },

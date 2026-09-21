@@ -31,6 +31,19 @@ vi.mock('@/lib/sam/recipient-certs', () => ({
   certBuckets: () => [],
 }));
 
+vi.mock('@/lib/awards-ingest/read-warehouse-coverage', () => ({
+  loadAwardsWarehouseCoverage: vi.fn(async () => ({
+    clocks: {
+      sourceActionMax: '2026-09-18',
+      acquiredAt: '2026-09-20T18:16:56.112Z',
+      mergedAt: '2026-09-20T18:18:56.743Z',
+      recipientsRebuiltAt: '2026-09-20T18:19:35.838Z',
+    },
+    lastBuilt: '2026-09-20',
+    freshness: { status: 'healthy', sourceAgeDays: 3, runAgeDays: 0 },
+  })),
+}));
+
 const { getBqContractorHistory } = await import('./recipients');
 
 const PROFILE = {
@@ -66,6 +79,14 @@ const SET_ASIDE = [{
   last_action_fy: 2022,
   first_observed_positive_action_fy: 2019,
   total_obligated: 1_000_000,
+  contributing_ueis: ['FCJCDUZV7RM3'],
+  supporting_actions: [{
+    uei: 'FCJCDUZV7RM3',
+    award_id: 'A1',
+    fiscal_year: 2022,
+    obligation_amount: -50_000,
+    action_date: '2022-03-01',
+  }],
 }];
 
 function seedCompleteDetails(uei: string) {
@@ -75,7 +96,7 @@ function seedCompleteDetails(uei: string) {
   detailByKey.set(`rollup:${k}:top-naics:8:v2-m`, NAICS);
   detailByKey.set(`rollup:${k}:recent-awards:25:v4-m`, RECENT);
   detailByKey.set(`rollup:${k}:yearly-by-agency:v2-m`, []);
-  detailByKey.set(`rollup:${k}:set-aside-history:v3-m`, SET_ASIDE);
+  detailByKey.set(`rollup:${k}:set-aside-history:v4-m`, SET_ASIDE);
 }
 
 beforeEach(() => {
@@ -104,10 +125,19 @@ describe('getBqContractorHistory — source + completeness', () => {
     expect(h.summary.activity_observation_period.series_coverage).toBe('adequate');
     expect(h.counting_bases.unique_awards).toBe(35);
     expect(h.coverage_timestamp.last_recipient_action_meaning).toMatch(/not the ingest/i);
+    expect(h.coverage_timestamp.warehouse_max_action_date).toBe('2026-09-18');
+    expect(h.coverage_timestamp.ingest.freshness_status).toBe('healthy');
+    expect(h.coverage_timestamp.freshness_evidence_available).toBe(true);
+    expect(h.coverage_timestamp.coverage_complete_established).toBe(false);
+    expect(h.coverage_timestamp.coverage_completeness).toBe('not_established');
     expect(h.historical_set_asides.labels).toContain('8(A) SOLE SOURCE');
     expect(h.historical_set_asides.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
     expect(h.historical_set_asides.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2019);
     expect(h.historical_set_asides.last_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
+    expect(h.historical_set_asides.deprecated.last_fy_by_label.status).toBe('deprecated');
+    expect(h.historical_set_asides.scope).toEqual({ kind: 'history_single_uei', uei_count: 1 });
+    expect(h.historical_set_asides.contributing_ueis_by_label['8(A) SOLE SOURCE']).toContain('FCJCDUZV7RM3');
+    expect(h.historical_set_asides.supporting_actions_by_label['8(A) SOLE SOURCE'][0].award_id).toBe('A1');
     expect(h.historical_set_asides.coverage).toBe('complete');
     expect(h.historical_set_asides.note).toMatch(/does not establish graduation|not.*certification/i);
     expect(h.historical_set_asides.note).toMatch(/last_observed_action_fy|deobligation|not award origin/i);
@@ -201,8 +231,8 @@ describe('getBqContractorHistory — source + completeness', () => {
     profileRows = [PROFILE];
     seedCompleteDetails('FCJCDUZV7RM3');
     const k = 'single:FCJCDUZV7RM3';
-    unavailableKeys.add(`rollup:${k}:set-aside-history:v3-m`);
-    detailByKey.delete(`rollup:${k}:set-aside-history:v3-m`);
+    unavailableKeys.add(`rollup:${k}:set-aside-history:v4-m`);
+    detailByKey.delete(`rollup:${k}:set-aside-history:v4-m`);
 
     const h = await getBqContractorHistory({ uei: 'FCJCDUZV7RM3', liveBq: false });
     expect(h.enrichment_status).toBe('budget_limited');
@@ -225,7 +255,7 @@ describe('getBqContractorHistory — source + completeness', () => {
     unavailableKeys.add(`rollup:${k}:top-naics:8:v2-m`);
     unavailableKeys.add(`rollup:${k}:recent-awards:25:v4-m`);
     unavailableKeys.add(`rollup:${k}:yearly-by-agency:v2-m`);
-    unavailableKeys.add(`rollup:${k}:set-aside-history:v3-m`);
+    unavailableKeys.add(`rollup:${k}:set-aside-history:v4-m`);
 
     const h = await getBqContractorHistory({ uei: 'FCJCDUZV7RM3', liveBq: false });
     expect(h.source).toBe('bigquery_normalized');
@@ -236,6 +266,28 @@ describe('getBqContractorHistory — source + completeness', () => {
     expect(h.topAgencies).toEqual([]);
     expect(h.historical_set_asides.coverage).toBe('unavailable');
     expect(h.message).toMatch(/not fetched|not retrieved/i);
+  });
+
+  it('never labels a zero-dollar agency-year as unused vehicle', async () => {
+    profileRows = [PROFILE];
+    seedCompleteDetails('FCJCDUZV7RM3');
+    const k = 'single:FCJCDUZV7RM3';
+    detailByKey.set(`rollup:${k}:yearly-by-agency:v2-m`, [
+      { fiscal_year: 2025, awarding_agency: 'General Services Administration', total_amount: 0, award_count: 2 },
+    ]);
+    const h = await getBqContractorHistory({ uei: 'FCJCDUZV7RM3', liveBq: false });
+    const cell = h.series.find((y: { fiscalYear: number }) => y.fiscalYear === 2025)?.agencyBreakdown?.[0];
+    expect(cell).toMatchObject({
+      agency: 'General Services Administration',
+      amount: 0,
+      count: 2,
+      distinct_award_count: 2,
+      count_grain: 'distinct_awards',
+      classification: 'zero_net_obligations',
+      unused_vehicle: null,
+      vehicle_usage: 'not_established',
+    });
+    expect(cell.classification_note).toMatch(/not_established|zero-dollar rows alone are insufficient/i);
   });
 
   it('genuine zero-award profile: empty details remain complete', async () => {

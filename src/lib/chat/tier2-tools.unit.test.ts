@@ -28,6 +28,19 @@ vi.mock('@/lib/bigquery/cache', () => ({
     rowCount === 0 && unavailableKeys.has(cacheKey),
 }));
 
+vi.mock('@/lib/awards-ingest/read-warehouse-coverage', () => ({
+  loadAwardsWarehouseCoverage: vi.fn(async () => ({
+    clocks: {
+      sourceActionMax: '2026-09-18',
+      acquiredAt: '2026-09-20T18:16:56.112Z',
+      mergedAt: '2026-09-20T18:18:56.743Z',
+      recipientsRebuiltAt: '2026-09-20T18:19:35.838Z',
+    },
+    lastBuilt: '2026-09-20',
+    freshness: { status: 'healthy', sourceAgeDays: 3, runAgeDays: 0 },
+  })),
+}));
+
 vi.mock('@/lib/bigquery/recipients', () => ({
   recipientSlug: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   resolveCanonicalSlug: vi.fn(async () => null),
@@ -77,7 +90,7 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   }),
   getSetAsideHistoryForRecipient: vi.fn(async (_ueis: string[], rollupUei: string, liveBq = false) => {
     bqCalls.push({ fn: 'getSetAsideHistory', liveBq });
-    const key = `rollup:${rollupUei}:set-aside-history:v3-m`;
+    const key = `rollup:${rollupUei}:set-aside-history:v4-m`;
     if (setAsideWarmEmpty) {
       // Confirmed empty warm hit — do NOT mark unavailable.
       unavailableKeys.delete(key);
@@ -94,6 +107,14 @@ vi.mock('@/lib/bigquery/recipients', () => ({
       last_action_fy: 2023,
       first_observed_positive_action_fy: 2019,
       total_obligated: 1_000_000,
+      contributing_ueis: ['LEIDOSUEI0001'],
+      supporting_actions: [{
+        uei: 'LEIDOSUEI0001',
+        award_id: 'CONT1',
+        fiscal_year: 2023,
+        obligation_amount: 500_000,
+        action_date: '2023-01-15',
+      }],
     }];
   }),
   findCapableSmallBusinesses: vi.fn(async ({ liveBq = false, limit }: { liveBq?: boolean; limit?: number }) => {
@@ -256,6 +277,20 @@ describe('get_contractor_profile — recent awards + set-aside honesty', () => {
         first_observed_positive_action_fy_by_label: Record<string, number | null>;
         note: string;
         coverage: string;
+        scope: { kind: string; uei_count: number } | null;
+        contributing_ueis_by_label: Record<string, string[] | null>;
+        contributing_ueis_sample_limit: number;
+        contributing_ueis_truncated_labels: string[];
+        contributing_ueis_unknown_labels: string[];
+        supporting_actions_by_label: Record<string, unknown[]>;
+        deprecated: { last_fy_by_label: { status: string } };
+      };
+      coverage: {
+        warehouse_max_action_date: string | null;
+        freshness_evidence_available: boolean;
+        coverage_completeness: string;
+        coverage_complete_established: boolean;
+        ingest: { freshness_status: string };
       };
     };
     expect(res.found).toBe(true);
@@ -268,7 +303,18 @@ describe('get_contractor_profile — recent awards + set-aside honesty', () => {
     expect(res.historical_set_asides.note).toMatch(/Award origin is not established/i);
     expect(res.historical_set_asides.note).toMatch(/UEI set/i);
     expect(res.historical_set_asides.coverage).toBe('complete');
+    expect(res.historical_set_asides.scope).toEqual({ kind: 'profile_rollup', uei_count: 1 });
+    expect(res.historical_set_asides.contributing_ueis_by_label['8(A) SOLE SOURCE']).toContain('LEIDOSUEI0001');
+    expect(res.historical_set_asides.contributing_ueis_sample_limit).toBe(20);
+    expect(Array.isArray(res.historical_set_asides.contributing_ueis_truncated_labels)).toBe(true);
+    expect(res.historical_set_asides.supporting_actions_by_label['8(A) SOLE SOURCE'].length).toBe(1);
+    expect(res.historical_set_asides.deprecated.last_fy_by_label.status).toBe('deprecated');
     expect(res.historical_set_asides).not.toHaveProperty('award_origin_fy_by_label');
+    expect(res.coverage.warehouse_max_action_date).toBe('2026-09-18');
+    expect(res.coverage.freshness_evidence_available).toBe(true);
+    expect(res.coverage.coverage_complete_established).toBe(false);
+    expect(res.coverage.coverage_completeness).toBe('not_established');
+    expect(res.coverage.ingest.freshness_status).toBe('healthy');
   });
 
   it('Cyrus path: warm agencies + cold awards still Pass-2 fills recent_awards', async () => {
