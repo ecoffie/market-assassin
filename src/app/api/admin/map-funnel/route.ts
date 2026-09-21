@@ -50,7 +50,7 @@ const MAP_SOURCES = ['opportunity_map', 'source_feed', 'pursuits', 'proposal', '
 // Token lists fold in the PRE-EXISTING app-panel tokens observed live in user_engagement
 // (save_to_pipeline, open_details, open_sam …) alongside the map's own tokens.
 type Loop = 'discovery' | 'execution';
-const JOURNEY_STEPS: { step: string; label: string; tokens: string[]; loop: Loop }[] = [
+export const JOURNEY_STEPS: { step: string; label: string; tokens: string[]; loop: Loop }[] = [
   // ── DISCOVERY loop — browsing is the point; measured by return, not conversion ──
   { step: 'map_open',         label: 'Map opened',       tokens: ['map_view'],                          loop: 'discovery' },
   { step: 'pin_clicked',      label: 'Pin clicked',      tokens: ['pin_clicked'],                       loop: 'discovery' },
@@ -58,7 +58,13 @@ const JOURNEY_STEPS: { step: string; label: string; tokens: string[]; loop: Loop
   // A listing opens via: map __track 'listing_open', __trackCard 'click' (card→drawer), or the app panel's 'open_details'.
   { step: 'listing_open',     label: 'Listing opened',   tokens: ['listing_open', 'click', 'open_details'], loop: 'discovery' },
   // "Saved" is the end of the discovery loop — a bookmark, not a commitment to bid.
-  { step: 'saved',            label: 'Saved',            tokens: ['save_to_pipeline', 'pursuit_started', 'start_pursuit_clicked'], loop: 'discovery' },
+  // ⚠️ `shortlist_saved` (W2/#1601) and `watch_created` (W1/#1600) are DISCOVERY-ONLY on purpose.
+  // They are absent from the EXECUTION `pursuit_started` step below because #1603 ruled that a save
+  // is a save: the anonymous claim path was explicitly stopped from auto-promoting saves into
+  // pursuits, so counting them as pursuits here would re-introduce that conflation in the reporting
+  // layer after it was removed from the product. Without these two tokens the funnel showed the
+  // anonymous save features as zero — indistinguishable from nobody using them.
+  { step: 'saved',            label: 'Saved',            tokens: ['save_to_pipeline', 'pursuit_started', 'start_pursuit_clicked', 'shortlist_saved', 'watch_created'], loop: 'discovery' },
   // ── EXECUTION loop — the rare minority path (Principle 01). A pursuit is far rarer than a save,
   //    and that is healthy. A drop callout is meaningful HERE (a started-but-never-submitted proposal
   //    is a real stall), and ONLY here. ──
@@ -78,6 +84,12 @@ const OUTCOME_TOKENS: Record<string, string> = { pursuit_won: 'won', pursuit_los
 const IMPRESSION_TOKENS = new Set(['impression', 'cards_shown']);
 const LISTING_OPEN_TOKENS = new Set(['listing_open', 'click', 'open_details']);
 const SHARE_TOKENS = new Set(['listing_share', 'share', 'share_listing']);
+
+// The discovery "Saved" step's tokens, derived from JOURNEY_STEPS so the step count and the
+// right-column engagement.saved counter can never disagree. Exported for the unit test.
+export const SAVED_TOKENS = new Set(
+  JOURNEY_STEPS.find((s) => s.step === 'saved')!.tokens,
+);
 
 // daily_alert opens land in user_engagement via the email tracking pixel:
 //   /api/track?t=<token> -> recordEmailOpen() -> logEmailOpen(user, 'daily_alert') -> user_engagement
@@ -241,7 +253,11 @@ export async function GET(request: NextRequest) {
     // Right-column engagement volume (measured as VOLUME, never as a conversion rate).
     if (LISTING_OPEN_TOKENS.has(token)) { listingOpenUsers.add(email); listingOpenEvents += 1; listingOpenForRatio += 1; }
     if (SHARE_TOKENS.has(token)) { listingShareUsers.add(email); listingShareEvents += 1; }
-    if (token === 'save_to_pipeline' || token === 'pursuit_started' || token === 'start_pursuit_clicked') { savedUsers.add(email); savedEvents += 1; }
+    // DERIVED from the 'saved' step's own token list, never a second hardcoded copy. This counter
+    // and the funnel step count the same action, so a token added to one and missed by the other
+    // puts two different numbers for "Saved" in the SAME payload — the failure this file already
+    // records above (the tokenToSteps overwrite: step said 0 while engagement.saved said 6).
+    if (SAVED_TOKENS.has(token)) { savedUsers.add(email); savedEvents += 1; }
     if (IMPRESSION_TOKENS.has(token)) impressionEvents += 1;
 
     // Strategy rollup — independent of the funnel steps.
