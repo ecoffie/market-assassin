@@ -178,19 +178,62 @@ describe('buildCountingBases', () => {
 describe('summarizeHistoricalSetAsides', () => {
   it('records historical set-aside labels without claiming graduation', () => {
     const s = summarizeHistoricalSetAsides([
-      { setAside: '8(A) SOLE SOURCE', fiscalYear: 2019 },
-      { setAside: '8(A) SOLE SOURCE', fiscalYear: 2022 },
-      { setAside: 'NO SET ASIDE USED.', fiscalYear: 2026 },
-      { setAside: '8A COMPETED', fiscalYear: 2023 },
+      { setAside: '8(A) SOLE SOURCE', lastActionFy: 2022, firstObservedPositiveActionFy: 2019 },
+      { setAside: 'NO SET ASIDE USED.', lastActionFy: 2026 },
+      { setAside: '8A COMPETED', lastActionFy: 2023, firstObservedPositiveActionFy: 2023 },
     ]);
     expect(s.labels).toContain('8(A) SOLE SOURCE');
+    expect(s.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
+    expect(s.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2019);
     expect(s.last_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
-    expect(s.note).toMatch(/does not establish graduation/i);
+    expect(s.note).toMatch(/does not establish graduation|not.*certification/i);
+    expect(s.note).toMatch(/not award origin/i);
+    expect(s).not.toHaveProperty('award_origin_fy_by_label');
+  });
+
+  it('does not treat a later deobligation FY as award origin or certification', () => {
+    const s = summarizeHistoricalSetAsides([
+      {
+        setAside: '8(A) SOLE SOURCE',
+        lastActionFy: 2023,
+        firstObservedPositiveActionFy: 2019,
+      },
+    ]);
+    expect(s.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2023);
+    expect(s.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2019);
+    expect(s.note).toMatch(/deobligation|last_observed_action_fy/i);
+    expect(s.note).not.toMatch(/graduated|certification status is/i);
+  });
+
+  it('older award + later positive modification is first_observed_positive_action_fy, not award origin', () => {
+    // Award created FY2016; first warehouse positive action observed is a FY2021
+    // modification — that MIN(positive) must not be labeled award origin.
+    const s = summarizeHistoricalSetAsides([
+      {
+        setAside: '8(A) SOLE SOURCE',
+        lastActionFy: 2021,
+        firstObservedPositiveActionFy: 2021,
+      },
+    ]);
+    expect(s.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2021);
+    expect(s.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2021);
+    expect(s.note).toMatch(/not award origin/i);
+    expect(s.note).toMatch(/Award origin is unknown/i);
+    expect(JSON.stringify(s)).not.toMatch(/award_origin_fy/);
+  });
+
+  it('keeps first_observed_positive_action_fy null when only action FY is present', () => {
+    const s = summarizeHistoricalSetAsides([
+      { setAside: '8(A) SOLE SOURCE', lastActionFy: 2023 },
+    ]);
+    expect(s.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2023);
+    expect(s.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBeNull();
   });
 
   it('uses null — not fiscal year 0 — when the year is unknown', () => {
     const s = summarizeHistoricalSetAsides([{ setAside: '8(A) SOLE SOURCE', fiscalYear: null }]);
-    expect(s.last_fy_by_label['8(A) SOLE SOURCE']).toBeNull();
+    expect(s.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBeNull();
+    expect(s.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBeNull();
     expect(Object.values(s.last_fy_by_label)).not.toContain(0);
   });
 
@@ -199,6 +242,14 @@ describe('summarizeHistoricalSetAsides', () => {
     expect(s.labels).toEqual([]);
     expect(s.coverage).toBe('unavailable');
     expect(s.note).toMatch(/not retrieved/i);
+  });
+
+  it('appends scopeNote so capped samples cannot claim complete history', () => {
+    const s = summarizeHistoricalSetAsides([], {
+      coverage: 'partial',
+      scopeNote: 'Sampled from recent_awards — not a full-history census.',
+    });
+    expect(s.note).toMatch(/not a full-history census/i);
   });
 });
 

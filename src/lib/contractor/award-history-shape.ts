@@ -320,49 +320,123 @@ export function buildCountingBases(input: {
   };
 }
 
+export type SetAsideCoverage = 'complete' | 'unavailable' | 'partial';
+
+export interface HistoricalSetAsideRow {
+  setAside?: string | null;
+  /** Latest observed ACTION fiscal year for this label (may be a deobligation). */
+  lastActionFy?: number | null;
+  /**
+   * Earliest positive-obligation ACTION fiscal year for this label.
+   * A positive modification years after award creation still lands here —
+   * this is NOT award origin. Absent/null when no positive action exists.
+   */
+  firstObservedPositiveActionFy?: number | null;
+  /**
+   * @deprecated Prefer lastActionFy. Treated as last observed action FY when
+   * lastActionFy is absent (legacy callers).
+   */
+  fiscalYear?: number | null;
+}
+
 /**
  * Historical set-aside evidence from award actions — NOT current SAM certification.
  * Never infer graduation / exit reason from this alone.
  * Unknown years are null — never fiscal year 0.
+ *
+ * last_observed_action_fy may be a deobligation. first_observed_positive_action_fy
+ * may be a later positive modification. Neither is award origin or certification.
+ * Award origin stays unknown unless a dedicated origin signal is supplied.
  */
 export function summarizeHistoricalSetAsides(
-  rows: Array<{ setAside?: string | null; fiscalYear?: number | null }>,
-  opts?: { coverage?: 'complete' | 'unavailable' | 'partial' },
+  rows: HistoricalSetAsideRow[],
+  opts?: {
+    coverage?: SetAsideCoverage;
+    /** Extra scope disclosure appended to the note (e.g. sample vs census). */
+    scopeNote?: string;
+  },
 ): {
   labels: string[];
+  /** Latest warehouse action FY per label (includes deobligations). */
+  last_observed_action_fy_by_label: Record<string, number | null>;
+  /**
+   * Earliest positive-obligation action FY per label when present; else null.
+   * Not award origin — a later positive mod does not create an award-origin claim.
+   */
+  first_observed_positive_action_fy_by_label: Record<string, number | null>;
+  /**
+   * @deprecated Alias of last_observed_action_fy_by_label — kept so older
+   * consumers do not silently lose the field. Do not treat as award origin.
+   */
   last_fy_by_label: Record<string, number | null>;
-  coverage: 'complete' | 'unavailable' | 'partial';
+  coverage: SetAsideCoverage;
   note: string;
 } {
   const coverage = opts?.coverage ?? 'complete';
-  const lastFy: Record<string, number | null> = {};
+  const lastAction: Record<string, number | null> = {};
+  const firstPositive: Record<string, number | null> = {};
+
   for (const row of rows) {
     const raw = String(row.setAside || '').trim();
     if (!raw || /^NO SET ASIDE/i.test(raw)) continue;
     const label = raw;
-    const fy = row.fiscalYear;
-    if (typeof fy === 'number' && Number.isFinite(fy) && fy > 0) {
-      const prev = lastFy[label];
-      lastFy[label] = prev == null ? fy : Math.max(prev, fy);
-    } else if (!(label in lastFy)) {
-      lastFy[label] = null;
+
+    const actionFy =
+      typeof row.lastActionFy === 'number' && Number.isFinite(row.lastActionFy) && row.lastActionFy > 0
+        ? row.lastActionFy
+        : typeof row.fiscalYear === 'number' && Number.isFinite(row.fiscalYear) && row.fiscalYear > 0
+          ? row.fiscalYear
+          : null;
+    if (actionFy != null) {
+      const prev = lastAction[label];
+      lastAction[label] = prev == null ? actionFy : Math.max(prev, actionFy);
+    } else if (!(label in lastAction)) {
+      lastAction[label] = null;
+    }
+
+    const positiveFy =
+      typeof row.firstObservedPositiveActionFy === 'number' &&
+      Number.isFinite(row.firstObservedPositiveActionFy) &&
+      row.firstObservedPositiveActionFy > 0
+        ? row.firstObservedPositiveActionFy
+        : null;
+    if (positiveFy != null) {
+      const prev = firstPositive[label];
+      firstPositive[label] = prev == null ? positiveFy : Math.min(prev, positiveFy);
+    } else if (!(label in firstPositive)) {
+      // Explicit unknown — do not copy lastActionFy into first-positive.
+      firstPositive[label] = null;
     }
   }
-  const labels = Object.keys(lastFy).sort();
+
+  const labels = Object.keys(lastAction).sort();
+  for (const label of labels) {
+    if (!(label in firstPositive)) firstPositive[label] = null;
+  }
+
   const coverageNote =
     coverage === 'unavailable'
       ? ' Historical set-aside retrieval was unavailable — empty labels mean not retrieved, not none exist.'
       : coverage === 'partial'
         ? ' Historical set-aside retrieval was partial.'
         : '';
+  const scopeNote = opts?.scopeNote ? ` ${opts.scopeNote}` : '';
+
   return {
     labels,
-    last_fy_by_label: lastFy,
+    last_observed_action_fy_by_label: lastAction,
+    first_observed_positive_action_fy_by_label: firstPositive,
+    last_fy_by_label: lastAction,
     coverage,
     note:
       'Historical set-aside codes observed on warehouse award actions. ' +
-      'This is not current SAM certification status and does not establish graduation or an exit reason.' +
-      coverageNote,
+      'last_observed_action_fy is the latest action FY for that code (may be a deobligation). ' +
+      'first_observed_positive_action_fy is the earliest positive-obligation action FY when present — ' +
+      'a later positive modification is still an action FY, not award origin. ' +
+      'Award origin is unknown unless a dedicated origin signal is present. ' +
+      'None of these fields is current SAM certification status or a graduation/exit reason.' +
+      coverageNote +
+      scopeNote,
   };
 }
 

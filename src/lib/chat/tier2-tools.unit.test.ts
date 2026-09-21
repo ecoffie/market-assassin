@@ -12,6 +12,21 @@ const bqCalls: Array<{ fn: string; liveBq: boolean; limit?: number }> = [];
 let rollupWarm = false;          // when true, cache-only (liveBq=false) returns a profile
 let capableWarm = false;
 let forceMiss = false;
+/** Cyrus repro: agencies warm, awards cold on Pass-1 — Pass-2 must still fill awards. */
+let awardsWarmPass1 = true;
+let agenciesWarmPass1 = true;
+let yearlyWarmPass1 = true;
+let setAsideWarmPass1 = true;
+/** Warm-cached confirmed empty set-aside (not a miss) — must not cold-fill. */
+let setAsideWarmEmpty = false;
+/** When true, even live awards return [] and bqUnavailable marks the key. */
+let awardsUnavailable = false;
+const unavailableKeys = new Set<string>();
+
+vi.mock('@/lib/bigquery/cache', () => ({
+  bqUnavailable: (cacheKey: string, rowCount: number) =>
+    rowCount === 0 && unavailableKeys.has(cacheKey),
+}));
 
 vi.mock('@/lib/bigquery/recipients', () => ({
   recipientSlug: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -23,11 +38,64 @@ vi.mock('@/lib/bigquery/recipients', () => ({
     return { rollup_uei: 'UEI1', rollup_name: 'Leidos', child_ueis: ['UEI1'], city: 'Reston', state: 'VA', total_obligated: 5e9, award_count: 1200, distinct_agency_count: 40, first_action_date: '2008-01-01', last_action_date: '2026-06-01' };
   }),
   getRecipientByUei: vi.fn(async () => null),
-  getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ award_id: 'A1', piid: 'X', mod_number: '0', obligation_amount: 1000, action_date: '2025-01-01' }]),
-  getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ awarding_agency: 'DoD', total_amount: 4e9, pct_of_total: 1 }]),
-  getYearlyTotalsForRecipient: vi.fn(async () => ([
-    { fiscal_year: 2025, total_obligated: 1e6, positive_obligations: 1e6, deobligations: 0, award_count: 10 },
-  ])),
+  getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], rollupUei: string, _limit = 5, liveBq = false) => {
+    bqCalls.push({ fn: 'getRecentAwards', liveBq });
+    const key = `rollup:${rollupUei}:recent-awards:5:v4-m`;
+    if (awardsUnavailable) {
+      unavailableKeys.add(key);
+      return [];
+    }
+    if (!liveBq && !awardsWarmPass1) {
+      // Mirror real cacheOnly miss → UNAVAILABLE mark.
+      unavailableKeys.add(key);
+      return [];
+    }
+    unavailableKeys.delete(key);
+    return [{ award_id: 'A1', piid: 'X', mod_number: '0', obligation_amount: 1000, action_date: '2025-01-01', set_aside: '8(A) SOLE SOURCE' }];
+  }),
+  getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], rollupUei: string, _limit = 5, liveBq = false) => {
+    bqCalls.push({ fn: 'getTopAgencies', liveBq });
+    const key = `rollup:${rollupUei}:top-agencies:5:v4-m`;
+    if (!liveBq && !agenciesWarmPass1) {
+      unavailableKeys.add(key);
+      return [];
+    }
+    unavailableKeys.delete(key);
+    return [{ awarding_agency: 'DoD', total_amount: 4e9, pct_of_total: 1 }];
+  }),
+  getYearlyTotalsForRecipient: vi.fn(async (_ueis: string[], rollupUei: string, liveBq = false) => {
+    bqCalls.push({ fn: 'getYearlyTotals', liveBq });
+    const key = `rollup:${rollupUei}:yearly-totals:v3-m`;
+    if (!liveBq && !yearlyWarmPass1) {
+      unavailableKeys.add(key);
+      return [];
+    }
+    unavailableKeys.delete(key);
+    return [
+      { fiscal_year: 2025, total_obligated: 1e6, positive_obligations: 1e6, deobligations: 0, award_count: 10 },
+    ];
+  }),
+  getSetAsideHistoryForRecipient: vi.fn(async (_ueis: string[], rollupUei: string, liveBq = false) => {
+    bqCalls.push({ fn: 'getSetAsideHistory', liveBq });
+    const key = `rollup:${rollupUei}:set-aside-history:v3-m`;
+    if (setAsideWarmEmpty) {
+      // Confirmed empty warm hit — do NOT mark unavailable.
+      unavailableKeys.delete(key);
+      return [];
+    }
+    if (!liveBq && !setAsideWarmPass1) {
+      unavailableKeys.add(key);
+      return [];
+    }
+    unavailableKeys.delete(key);
+    return [{
+      set_aside: '8(A) SOLE SOURCE',
+      award_count: 2,
+      last_action_fy: 2023,
+      first_observed_positive_action_fy: 2019,
+      total_obligated: 1_000_000,
+    }];
+  }),
   findCapableSmallBusinesses: vi.fn(async ({ liveBq = false, limit }: { liveBq?: boolean; limit?: number }) => {
     bqCalls.push({ fn: 'findCapableSmallBusinesses', liveBq, limit });
     if (!liveBq && !capableWarm) return { rows: [], total: 0 };
@@ -47,7 +115,23 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => { rlCalls++; return { allowed: rlAllowed, remaining: rlAllowed ? 5 : 0, limit: 12, resetAt: 0 }; }),
 }));
 
-beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; forceMiss = false; rlAllowed = true; rlCalls = 0; mockResolveName.mockReset(); mockResolveName.mockResolvedValue({ status: 'none', searched: '' }); });
+beforeEach(() => {
+  bqCalls.length = 0;
+  rollupWarm = false;
+  capableWarm = false;
+  forceMiss = false;
+  rlAllowed = true;
+  rlCalls = 0;
+  awardsWarmPass1 = true;
+  agenciesWarmPass1 = true;
+  yearlyWarmPass1 = true;
+  setAsideWarmPass1 = true;
+  setAsideWarmEmpty = false;
+  awardsUnavailable = false;
+  unavailableKeys.clear();
+  mockResolveName.mockReset();
+  mockResolveName.mockResolvedValue({ status: 'none', searched: '' });
+});
 
 describe('Tier-2 tool definitions', () => {
   it('registers the Tier-2 contractor-intel tools', () => {
@@ -154,6 +238,91 @@ describe('get_contractor_profile — award-corpus name resolution when the slug 
     expect(res.found).toBe(false);
     expect(res.resolution).toBe('lookup_failed');
     expect(res.error).toBe('lookup_failed');
+  });
+});
+
+describe('get_contractor_profile — recent awards + set-aside honesty', () => {
+  it('warm profile + warm enrichment: recent_awards present without live enrichment scans', async () => {
+    rollupWarm = true;
+    awardsWarmPass1 = true;
+    agenciesWarmPass1 = true;
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Leidos' }) as {
+      found: boolean;
+      enrichment_status: string;
+      recent_awards: unknown[];
+      historical_set_asides: {
+        last_observed_action_fy_by_label: Record<string, number | null>;
+        first_observed_positive_action_fy_by_label: Record<string, number | null>;
+        note: string;
+        coverage: string;
+      };
+    };
+    expect(res.found).toBe(true);
+    expect(res.enrichment_status).toBe('complete');
+    expect(res.recent_awards.length).toBeGreaterThan(0);
+    expect(bqCalls.some((c) => c.fn === 'getRecentAwards' && c.liveBq)).toBe(false);
+    expect(res.historical_set_asides.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2023);
+    expect(res.historical_set_asides.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2019);
+    expect(res.historical_set_asides.note).toMatch(/not derived from the capped recent_awards/i);
+    expect(res.historical_set_asides.note).toMatch(/Award origin is not established/i);
+    expect(res.historical_set_asides.note).toMatch(/UEI set/i);
+    expect(res.historical_set_asides.coverage).toBe('complete');
+    expect(res.historical_set_asides).not.toHaveProperty('award_origin_fy_by_label');
+  });
+
+  it('Cyrus path: warm agencies + cold awards still Pass-2 fills recent_awards', async () => {
+    rollupWarm = true;
+    awardsWarmPass1 = false;   // Pass-1 miss on awards key → unavailable
+    agenciesWarmPass1 = true;  // Pass-1 hit on agencies — old gate would skip Pass-2
+    yearlyWarmPass1 = true;
+    setAsideWarmPass1 = true;
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Leidos' }) as {
+      enrichment_status: string;
+      recent_awards: unknown[];
+      top_agencies: unknown[];
+    };
+    expect(res.top_agencies.length).toBeGreaterThan(0);
+    expect(bqCalls.some((c) => c.fn === 'getRecentAwards' && c.liveBq)).toBe(true);
+    expect(bqCalls.some((c) => c.fn === 'getTopAgencies' && c.liveBq)).toBe(false);
+    expect(res.recent_awards.length).toBeGreaterThan(0);
+    expect(res.enrichment_status).toBe('complete');
+  });
+
+  it('failed awards retrieval is budget_limited — not complete empty zero', async () => {
+    rollupWarm = true;
+    awardsUnavailable = true;
+    agenciesWarmPass1 = true;
+    yearlyWarmPass1 = true;
+    setAsideWarmPass1 = true;
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Leidos' }) as {
+      enrichment_status: string;
+      recent_awards: unknown[];
+      company: { award_count: number };
+    };
+    expect(res.company.award_count).toBeGreaterThan(0);
+    expect(res.recent_awards).toEqual([]);
+    expect(res.enrichment_status).toBe('budget_limited');
+  });
+
+  it('warm-empty set-aside with cold budget denied stays complete — does not cold-fill', async () => {
+    rollupWarm = true;
+    setAsideWarmEmpty = true; // confirmed empty warm hit
+    rlAllowed = false;        // deny any cold enrichment budget
+    const tools = makeTier2Tools('u@x.com');
+    const res = await tools.execute('get_contractor_profile', { company_name: 'Leidos' }) as {
+      enrichment_status: string;
+      recent_awards: unknown[];
+      historical_set_asides: { labels: string[]; coverage: string };
+    };
+    expect(res.recent_awards.length).toBeGreaterThan(0);
+    expect(res.historical_set_asides.labels).toEqual([]);
+    expect(res.historical_set_asides.coverage).toBe('complete');
+    expect(res.enrichment_status).toBe('complete');
+    expect(bqCalls.some((c) => c.fn === 'getSetAsideHistory' && c.liveBq)).toBe(false);
+    expect(rlCalls).toBe(0); // warm path never touches rate limiter for enrichment
   });
 });
 
