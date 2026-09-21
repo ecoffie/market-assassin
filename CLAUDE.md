@@ -187,7 +187,6 @@ in `saveCurrentOpp`, restricted to a SAM drawer with a canonical 32-hex `notice_
 throws — **separate, unfixed, out of scope here.**
 
 ---
----
 
 ## 🔤 A MATCH IS A CLAIM — READ before touching /try, the match engine, or SEO page generation
 
