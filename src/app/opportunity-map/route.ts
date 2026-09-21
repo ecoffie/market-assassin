@@ -4641,41 +4641,60 @@ const SAVE_JS = `<script>
   // its first statement.
   function _anonKey(){ try{ return (typeof window.__anonId==='function')?(window.__anonId()||''):''; }catch(e){ return ''; } }
   function _signedInEmail(){ var t=tok(); return t?email(t):''; }
+  // Mark every element whose CANONICAL notice id is in the saved set.
+  function _markSaved(ids){
+    if(!ids)return;  // a failed read is UNKNOWN, not empty
+    for(var i=0;i<ids.length;i++)window.__anonSaved[ids[i]]=1;
+    try{
+      var bs=document.querySelectorAll('[data-nid]');
+      for(var j=0;j<bs.length;j++){
+        var b=bs[j]; if(window.__anonSaved[b.getAttribute('data-nid')]){
+          b.dataset.saved='1'; if(b.tagName==='BUTTON')b.textContent='\u2713 Saved'; }
+      }
+    }catch(e){}
+  }
   window.__loadAnonShortlist=function(){
+    var t=tok(), em=_signedInEmail();
+    // SIGNED IN: transfer anything kept while signed out onto the account, then
+    // render the ACCOUNT's saves. A save stays a save — signing in does not turn
+    // it into a pursuit, and the "✓ Saved" state must survive creating an account.
+    if(t&&em){
+      var after=function(){
+        fetch('/api/app/shortlist',{headers:{'x-mi-auth-token':t,'x-user-email':em}})
+          .then(function(r){return r.json();}).then(function(d){
+            if(d&&d.success)_markSaved(d.noticeIds);
+          }).catch(function(){});
+      };
+      try{ window.__claimAnonShortlist?window.__claimAnonShortlist(after):after(); }catch(e){ after(); }
+      return;
+    }
     var aid=_anonKey(); if(!aid)return;
-    // SIGNED IN with a shortlist kept earlier while signed out -> promote it now.
-    // This is the real upgrade moment: the account exists, the session is
-    // verified, and the user never had to do anything extra.
-    if(tok()&&_signedInEmail()){ try{ window.__claimAnonShortlist&&window.__claimAnonShortlist(); }catch(e){} return; }
     fetch('/api/app/shortlist?anonId='+encodeURIComponent(aid))
       .then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.success||!d.noticeIds)return;  // a failed read is UNKNOWN, not empty
-        // ⚠️ The API returns CANONICAL sam_opportunities.notice_id values. The Map
-        // keeps TWO different identifiers — nid (= notice_id) and sol
-        // (= solicitation_number) — and 99.0% of open SAM rows have nid != sol.
+        if(!d||!d.success)return;  // a failed read is UNKNOWN, not empty
+        // The API returns CANONICAL sam_opportunities.notice_id values. The Map
+        // keeps TWO different identifiers - nid (= notice_id) and sol
+        // (= solicitation_number) - and 99.0% of open SAM rows have nid != sol.
         // So restore matches on data-nid. Comparing a canonical notice id to a
         // solicitation number marks nothing, forever.
-        for(var i=0;i<d.noticeIds.length;i++)window.__anonSaved[d.noticeIds[i]]=1;
-        try{
-          var bs=document.querySelectorAll('[data-nid]');
-          for(var j=0;j<bs.length;j++){
-            var b=bs[j]; if(window.__anonSaved[b.getAttribute('data-nid')]){
-              b.dataset.saved='1'; if(b.tagName==='BUTTON')b.textContent='\u2713 Saved'; }
-          }
-        }catch(e){}
+        _markSaved(d.noticeIds);
       }).catch(function(){});
   };
   // Promote this browser's shortlist into the signed-in account. The account
   // email is NEVER sent — the server reads it from the verified session.
-  window.__claimAnonShortlist=function(){
-    var t=tok(); var em=_signedInEmail(); if(!t||!em)return;
-    var aid=_anonKey(); if(!aid)return;
+  window.__claimAnonShortlist=function(done){
+    var fin=function(){ try{ if(typeof done==='function')done(); }catch(e){} };
+    var t=tok(); var em=_signedInEmail(); if(!t||!em){ fin(); return; }
+    var aid=_anonKey(); if(!aid){ fin(); return; }
     fetch('/api/app/shortlist',{method:'POST',
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({action:'claim',anonId:aid})})
       .then(function(r){return r.json();}).then(function(c){
-        if(c&&c.success&&c.promoted>0){ try{ _track('tool_use','shortlist_claimed',{promoted:c.promoted}); }catch(e){} }
-      }).catch(function(){});
+        // Saves TRANSFERRED to the account. They are still saves — this is not
+        // a pursuit and must never be counted as one.
+        if(c&&c.success&&c.attached>0){ try{ _track('tool_use','shortlist_attached',{attached:c.attached}); }catch(e){} }
+        fin();
+      }).catch(function(){ fin(); });
   };
 
   // Run AFTER both helpers exist (the documented cross-block ordering trap).

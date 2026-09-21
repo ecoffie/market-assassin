@@ -40,7 +40,6 @@ vi.mock('@/lib/pipeline/discovered-at', () => ({
 import { createCanonicalPursuit } from './create-pursuit';
 import { recordAppActivity } from '@/lib/app/workspace';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
-import { claimAnonShortlist, CLAIMED_SOURCE } from '@/lib/shortlist/anon-shortlist';
 
 const ANON = 'anon:57b9d751-9451-40c8-9f3e-2b1c4d5e6f70';
 const UUID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -142,6 +141,17 @@ const CTX = (db: never) => ({
   clientOwnerEmail: 'ws-client-1@clients.getmindy.ai',
 });
 
+/** What /api/pipeline POST hands the writer for this opportunity. */
+const pipelineDraft = {
+  notice_id: UUID,
+  title: OPP.title,
+  agency: OPP.department,
+  naics_code: OPP.naics_code,
+  set_aside: OPP.set_aside,
+  response_deadline: OPP.response_deadline,
+  source: 'opportunity_map',
+};
+
 beforeEach(() => vi.clearAllMocks());
 
 // ── 1. THE CONTRACT IS SHARED, NOT COPIED ──────────────────────────────────
@@ -151,9 +161,15 @@ describe('there is exactly one pursuit implementation', () => {
     expect(PIPELINE).toMatch(/createCanonicalPursuit\(/);
   });
 
-  it('the shortlist claim delegates to the SAME writer and never inserts a pursuit itself', () => {
-    expect(SHORTLIST_LIB).toMatch(/createCanonicalPursuit\(/);
-    expect(SHORTLIST_LIB).not.toMatch(/from\('user_pipeline'\)[\s\S]{0,80}\.insert\(/);
+  it('the shortlist NEVER creates a pursuit — a save is not a pursuit', () => {
+    // RETURNING IS THE CONVERSION. A saved listing is discovery; a pursuit is
+    // execution. Signing in is not a statement of intent to bid, so the claim
+    // transfers saves and touches user_pipeline not at all.
+    const code = SHORTLIST_LIB.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/createCanonicalPursuit/);
+    expect(code).not.toMatch(/user_pipeline/);
+    // …while the writer remains the ONE pursuit contract for /api/pipeline.
+    expect(PIPELINE).toMatch(/createCanonicalPursuit\(/);
   });
 
   it('no route inserts into user_pipeline outside the writer', () => {
@@ -180,208 +196,7 @@ describe('the writer never authenticates, and neither route was weakened', () =>
     expect(PIPELINE).toMatch(/requireMIAuthSession\(request, body\.user_email\)/);
   });
 
-  it('the shortlist claim derives the account from the session, never the body', () => {
-    expect(SHORTLIST_ROUTE).toMatch(/requireMIAuthSession\(request\)/);
-    expect(SHORTLIST_ROUTE).toMatch(/verifiedEmail = session\.session\.email/);
-    // No body-supplied email reaches the claim.
-    expect(SHORTLIST_ROUTE).not.toMatch(/body\.email/);
-  });
 
-  it('the writer refuses to treat an anon id as an account', async () => {
-    const { db } = recordingDb();
-    const r = await claimAnonShortlist(db, ANON, {
-      verifiedEmail: ANON, workspaceId: 'ws', asClient: false, clientOwnerEmail: 'x@y',
-    });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/verified account email/);
-  });
-});
-
-// ── 3. PERSISTED-FIELD PARITY ──────────────────────────────────────────────
-
-/** What /api/pipeline POST hands the writer for this opportunity. */
-const pipelineDraft = {
-  notice_id: UUID,
-  title: OPP.title,
-  agency: OPP.department,
-  naics_code: OPP.naics_code,
-  set_aside: OPP.set_aside,
-  response_deadline: OPP.response_deadline,
-  source: 'opportunity_map',
-};
-
-describe('a claimed shortlist produces the SAME pursuit as Start Pursuit', () => {
-  it('agrees on every persisted field except the truthful source', async () => {
-    const a = recordingDb();
-    await createCanonicalPursuit(CTX(a.db), { ...pipelineDraft }, { clientNoticeType: OPP.notice_type });
-
-    const b = recordingDb({ shortlistRows: [{ id: 'sl-1', notice_id: UUID }] });
-    await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com',
-      workspaceId: 'ws-client-1',
-      asClient: false,
-      clientOwnerEmail: 'ws-client-1@clients.getmindy.ai',
-    });
-
-    expect(a.inserts).toHaveLength(1);
-    expect(b.inserts).toHaveLength(1);
-    const [viaPipeline] = a.inserts;
-    const [viaClaim] = b.inserts;
-
-    for (const field of [
-      'notice_id', 'title', 'agency', 'naics_code', 'response_deadline',
-      'workspace_id', 'owner_email', 'created_by', 'updated_by',
-      'stage', 'priority', 'is_prime', 'next_action', 'user_email',
-    ]) {
-      expect(`${field}=${JSON.stringify(viaClaim[field])}`)
-        .toBe(`${field}=${JSON.stringify(viaPipeline[field])}`);
-    }
-    // The ONE intended difference: truthful provenance.
-    expect(viaPipeline.source).toBe('opportunity_map');
-    expect(viaClaim.source).toBe(CLAIMED_SOURCE);
-    expect(CLAIMED_SOURCE).toBe('opportunity_map_claimed');
-  });
-
-  it('a claimed pursuit carries the full contract, not a six-field stub', async () => {
-    const b = recordingDb({ shortlistRows: [{ id: 'sl-1', notice_id: UUID }] });
-    await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    const [row] = b.inserts;
-    // Each of these was ABSENT from the direct insert this PR replaced.
-    expect(row.workspace_id).toBe('ws-1');
-    expect(row.owner_email).toBe('buyer@example.com');
-    expect(row.created_by).toBe('buyer@example.com');
-    expect(row.updated_by).toBe('buyer@example.com');
-    expect(row.stage).toBe('tracking');
-    expect(row.priority).toBe('medium');
-    expect(row.is_prime).toBe(true);
-    expect(row.next_action).toBeTruthy();
-    expect(row.discovered_at).toBeTruthy();
-    expect(recordAppActivity).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ── 4. COACH MODE / WORKSPACE PARITY ───────────────────────────────────────
-
-describe('coach mode lands in the CLIENT workspace, both ways', () => {
-  const coachCtx = {
-    callerEmail: 'coach@agency.com',
-    workspaceId: 'ws-client-42',
-    asClient: true,
-    clientOwnerEmail: 'ws-client-42@clients.getmindy.ai',
-  };
-
-  it('owner is the client profile and workspace is the client workspace', async () => {
-    const a = recordingDb();
-    await createCanonicalPursuit({ db: a.db, ...coachCtx }, { ...pipelineDraft });
-
-    const b = recordingDb({ shortlistRows: [{ id: 'sl-1', notice_id: UUID }] });
-    await claimAnonShortlist(b.db, ANON, { verifiedEmail: coachCtx.callerEmail, ...coachCtx });
-
-    for (const row of [a.inserts[0], b.inserts[0]]) {
-      expect(row.workspace_id).toBe('ws-client-42');
-      // NOT the coach's personal workspace, and NOT the coach as owner.
-      expect(row.owner_email).toBe('ws-client-42@clients.getmindy.ai');
-      expect(row.user_email).toBe('coach@agency.com');
-      expect(row.created_by).toBe('coach@agency.com');
-    }
-  });
-
-  it('the claim route resolves the active workspace with the same resolver as /api/pipeline', () => {
-    expect(SHORTLIST_ROUTE).toMatch(/resolveActiveWorkspace\(verifiedEmail, request\)/);
-    expect(PIPELINE).toMatch(/resolveActiveWorkspace\(body\.user_email, request\)/);
-  });
-});
-
-// ── 5. ALREADY TRACKED → RESOLVED, NEVER OVERWRITTEN ───────────────────────
-
-describe('an opportunity the account already pursues', () => {
-  it('is left untouched but the shortlist row is resolved', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      alreadyTracked: [UUID],
-    });
-    const r = await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect(r.alreadyTracked).toBe(1);
-    expect(r.promoted).toBe(0);
-    // The existing pursuit is NOT modified…
-    expect(b.inserts).toHaveLength(0);
-    expect(b.pipelineUpdates).toHaveLength(0);
-    // …but the shortlist row IS resolved, so the Map stops reconsidering it.
-    expect(b.shortlistUpdates).toHaveLength(1);
-    expect(b.shortlistUpdates[0]).toMatchObject({ claimed_by: 'buyer@example.com' });
-    expect(b.shortlistUpdates[0].claimed_at).toBeTruthy();
-  });
-
-  it('a 23505 race is also already-tracked, not an error', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      insertErr: { code: '23505', message: 'duplicate key' },
-    });
-    const r = await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect(r.ok).toBe(true);
-    expect(r.alreadyTracked).toBe(1);
-    expect(r.failed).toBe(0);
-    expect(b.shortlistUpdates).toHaveLength(1);
-  });
-});
-
-// ── 6. FAILURE LEAVES THE ROW FOR RETRY ────────────────────────────────────
-
-describe('a failure is UNKNOWN, never a silent skip', () => {
-  it('a metadata read error leaves the row unclaimed and is counted', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      oppErr: { message: 'connection reset' },
-    });
-    const r = await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect(r.failed).toBe(1);
-    expect(r.promoted).toBe(0);
-    expect(r.alreadyTracked).toBe(0);
-    expect(b.inserts).toHaveLength(0);
-    expect(b.shortlistUpdates).toHaveLength(0);  // retryable
-  });
-
-  it('a pursuit write error leaves the row unclaimed and is counted', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      insertErr: { code: '42501', message: 'permission denied' },
-    });
-    const r = await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect(r.failed).toBe(1);
-    expect(r.promoted).toBe(0);
-    expect(b.shortlistUpdates).toHaveLength(0);
-  });
-
-  it('the pursuit exists BEFORE the shortlist row is marked', async () => {
-    // The ordering invariant that makes retry safe, asserted on the source.
-    const claimFn = SHORTLIST_LIB.slice(SHORTLIST_LIB.indexOf('export async function claimAnonShortlist'));
-    const writeAt = claimFn.indexOf('createCanonicalPursuit(');
-    const markAt = claimFn.indexOf('const marked = await markClaimed(row);', writeAt);
-    const promoteAt = claimFn.indexOf('promoted += 1;', markAt);
-    expect(writeAt).toBeGreaterThan(-1);
-    // pursuit write -> mark -> only then count it promoted
-    expect(markAt).toBeGreaterThan(writeAt);
-    expect(promoteAt).toBeGreaterThan(markAt);
-  });
-
-  it('the route reports `failed` rather than hiding a partial failure', () => {
-    expect(SHORTLIST_ROUTE).toMatch(/failed: r\.failed/);
-  });
 });
 
 // ── 7. DOCUMENT FETCH KEEPS ITS after() + maxDuration CONTRACT ──────────────
@@ -399,26 +214,22 @@ describe('background document fetch survives the extraction', () => {
     expect(fetchPursuitDocsAuto).toHaveBeenCalledTimes(1);
   });
 
-  it('both routes schedule it with after() and declare maxDuration = 300', () => {
+  it('/api/pipeline schedules it with after() and declares maxDuration = 300', () => {
     expect(PIPELINE).toMatch(/if \(result\.postWrite\) after\(result\.postWrite\)/);
     expect(PIPELINE).toMatch(/export const maxDuration = 300/);
-    expect(SHORTLIST_ROUTE).toMatch(/for \(const task of r\.postWrite\) after\(task\)/);
-    expect(SHORTLIST_ROUTE).toMatch(/export const maxDuration = 300/);
   });
 
-  it('a claim returns one task per pursuit created', async () => {
-    const b = recordingDb({ shortlistRows: [{ id: 'sl-1', notice_id: UUID }] });
-    const r = await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect(r.postWrite).toHaveLength(1);
+  it('the shortlist route schedules NO background work — it creates no pursuits', () => {
+    const code = SHORTLIST_ROUTE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/\bafter\(/);
+    expect(code).not.toMatch(/maxDuration/);
   });
+
 });
 
 // ── 8. FAMILY TRUTH ────────────────────────────────────────────────────────
 
-describe('a claimed pursuit is not second-class', () => {
+describe('family truth', () => {
   it('family attachment runs and family_id is persisted', async () => {
     const a = recordingDb();
     const r = await createCanonicalPursuit(CTX(a.db), { ...pipelineDraft });
@@ -428,14 +239,6 @@ describe('a claimed pursuit is not second-class', () => {
     expect(a.pipelineUpdates.some((u) => u.family_id === 'fam-1')).toBe(true);
   });
 
-  it('the same attachment happens on the claim path', async () => {
-    const b = recordingDb({ shortlistRows: [{ id: 'sl-1', notice_id: UUID }] });
-    await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect(b.pipelineUpdates.some((u) => u.family_id === 'fam-1')).toBe(true);
-  });
 });
 
 // ── 9. DISCOVERED_AT — RECOVERED, NEVER INVENTED ───────────────────────────
@@ -449,18 +252,11 @@ describe('discovered_at', () => {
     expect(new Date(iso).getTime()).toBeGreaterThan(Date.now() - 60_000);
   });
 
-  it('a claim recovers the ANONYMOUS first view, which is a real observation', async () => {
-    const b = recordingDb({ shortlistRows: [{ id: 'sl-1', notice_id: UUID }] });
-    await claimAnonShortlist(b.db, ANON, {
-      verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-      asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    // NOT claim time — the anon identity's earlier logged view of this notice.
-    expect(b.inserts[0].discovered_at).toBe('2026-09-01T00:00:00.000Z');
-  });
-
-  it('the claim passes BOTH identities and takes the earliest', () => {
-    expect(SHORTLIST_LIB).toMatch(/discoveryIdentities: \[owner, email\]/);
+  it('the multi-identity resolver takes the EARLIEST real observation', async () => {
+    const a = recordingDb();
+    await createCanonicalPursuit(CTX(a.db), { ...pipelineDraft }, { discoveryIdentities: [ANON, 'buyer@example.com'] });
+    // The anon identity carries an earlier logged view; neither is invented.
+    expect(a.inserts[0].discovered_at).toBe('2026-09-01T00:00:00.000Z');
     expect(WRITER).toMatch(/if \(new Date\(seen\)\.getTime\(\) < new Date\(earliest\)\.getTime\(\)\) earliest = seen/);
   });
 
@@ -516,104 +312,3 @@ describe('behaviour carried over from /api/pipeline', () => {
   });
 });
 
-// ── 11. THE CLAIM MARKER MUST BE FALSIFIABLE ───────────────────────────────
-
-const CLAIM_CTX = {
-  verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
-  asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-};
-
-describe('resolving a shortlist row is proven, never assumed', () => {
-  it('scopes the mutation defensively and counts it exactly', () => {
-    const fn = SHORTLIST_LIB.slice(SHORTLIST_LIB.indexOf('const markClaimed'));
-    expect(fn).toMatch(/\{ count: 'exact' \}/);
-    expect(fn).toMatch(/\.eq\('id', row\.id\)/);
-    expect(fn).toMatch(/\.eq\('owner_anon_id', owner\)/);
-    expect(fn).toMatch(/\.is\('claimed_at', null\)/);
-  });
-
-  it('a mark UPDATE database error counts as failed, never as resolved', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      markErr: { message: 'connection reset' },
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    expect(r.failed).toBe(1);
-    expect(r.promoted).toBe(0);
-    expect(r.alreadyTracked).toBe(0);
-    // The real pursuit was created and STAYS.
-    expect(b.inserts).toHaveLength(1);
-  });
-
-  it('a mark UPDATE affecting ZERO rows is not a clean resolution', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      markCount: 0,
-      markReadBack: { claimed_at: null },   // still unclaimed → genuinely unresolved
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    expect(r.failed).toBe(1);
-    expect(r.promoted).toBe(0);
-  });
-
-  it('a NULL count is UNKNOWN, never resolved', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      markCount: null,
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    expect(r.failed).toBe(1);
-    expect(r.promoted).toBe(0);
-  });
-
-  it('ZERO rows BUT provably claimed concurrently IS a resolution', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      markCount: 0,
-      markReadBack: { claimed_at: '2026-09-21T00:00:00Z' },  // someone else resolved it
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    expect(r.promoted).toBe(1);
-    expect(r.failed).toBe(0);
-  });
-
-  it('new pursuit created + mark fails → postWrite still returned, row retryable', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      markErr: { message: 'update rejected' },
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    // The pursuit exists, so its documents are still fetched…
-    expect(r.postWrite).toHaveLength(1);
-    // …and it is never rolled back.
-    expect(b.inserts).toHaveLength(1);
-    // The claim attempt is unresolved, so the next retry re-resolves it.
-    expect(r.failed).toBe(1);
-    expect(r.promoted).toBe(0);
-  });
-
-  it('existing pursuit + mark succeeds → untouched, resolved, alreadyTracked', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      alreadyTracked: [UUID],
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    expect(r.alreadyTracked).toBe(1);
-    expect(r.failed).toBe(0);
-    expect(b.inserts).toHaveLength(0);       // existing pursuit untouched
-    expect(b.pipelineUpdates).toHaveLength(0);
-    expect(b.shortlistUpdates).toHaveLength(1);
-  });
-
-  it('existing pursuit + mark FAILS → failed, not a false alreadyTracked', async () => {
-    const b = recordingDb({
-      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
-      alreadyTracked: [UUID],
-      markErr: { message: 'update rejected' },
-    });
-    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
-    expect(r.failed).toBe(1);
-    expect(r.alreadyTracked).toBe(0);
-    expect(b.inserts).toHaveLength(0);
-  });
-});

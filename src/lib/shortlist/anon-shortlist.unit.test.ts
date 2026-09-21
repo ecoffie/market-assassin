@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isAnonId, addToAnonShortlist, claimAnonShortlist, MAX_ANON_SHORTLIST } from './anon-shortlist';
+import { isAnonId, addToAnonShortlist, claimAnonShortlist, listAccountShortlist, MAX_ANON_SHORTLIST } from './anon-shortlist';
 
 const ANON = 'anon:57b9d751-9451-40c8-9f3e-2b1c4d5e6f70';
 const LIB = readFileSync(join(process.cwd(), 'src/lib/shortlist/anon-shortlist.ts'), 'utf8');
@@ -19,17 +19,52 @@ const MIG = readFileSync(join(process.cwd(), 'supabase/migrations/20260921_anony
 const MAP = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
 
 /** A chainable stub whose behaviour depends on the table asked for. */
-function mkDb(opts: { opp?: unknown; insertErr?: { code?: string; message: string } | null } = {}) {
+function mkDb(opts: {
+  opp?: unknown;
+  insertErr?: { code?: string; message: string } | null;
+  /** Unclaimed rows this anon identity holds. */
+  rows?: { id: string; notice_id: string }[];
+  /** Rows a verified account has saved (may repeat across browsers). */
+  accountRows?: { notice_id: string }[];
+  /** Error on the list read. */
+  readErr?: { message: string } | null;
+  /** Outcome of the attach UPDATE. */
+  updateErr?: { message: string } | null;
+  updateCount?: number | null;
+  /** What a read-back shows after a 0-row update. */
+  readBack?: { claimed_at: string | null } | null;
+} = {}) {
   const seen: string[] = [];
+  let listReads = 0;
   const make = (table: string) => {
     seen.push(table);
     const q: Record<string, unknown> = {};
-    q.select = () => q; q.eq = () => q; q.is = () => q; q.in = () => q;
-    q.order = () => q; q.limit = () => q; q.update = () => q;
-    q.maybeSingle = async () =>
-      table === 'sam_opportunities' ? { data: opts.opp ?? null, error: null } : { data: null, error: null };
+    const chain = () => q;
+    q.select = chain; q.eq = chain; q.is = chain; q.in = chain; q.not = chain;
+    q.order = chain; q.limit = chain;
+    q.update = () => {
+      const res = {
+        count: opts.updateErr ? null : (opts.updateCount === undefined ? 1 : opts.updateCount),
+        error: opts.updateErr ?? null,
+        data: null,
+      };
+      const upd: Record<string, unknown> = {};
+      upd.eq = () => upd; upd.is = () => upd;
+      upd.then = (r: (v: unknown) => unknown) => Promise.resolve(res).then(r);
+      return upd;
+    };
+    q.maybeSingle = async () => {
+      if (table === 'sam_opportunities') return { data: opts.opp ?? null, error: null };
+      // The attach read-back.
+      return { data: opts.readBack ?? null, error: null };
+    };
     q.insert = async () => ({ error: table === 'anonymous_shortlist' ? (opts.insertErr ?? null) : null });
-    q.then = (r: (v: unknown) => unknown) => Promise.resolve({ data: [], count: 0, error: null }).then(r);
+    q.then = (r: (v: unknown) => unknown) => {
+      if (opts.readErr) return Promise.resolve({ data: null, count: null, error: opts.readErr }).then(r);
+      // First list read = the anon rows to attach; the account read uses its own set.
+      const data = opts.accountRows ?? (listReads++ === 0 ? (opts.rows ?? []) : []);
+      return Promise.resolve({ data, count: data.length, error: null }).then(r);
+    };
     return q;
   };
   return { db: { from: (t: string) => make(t) } as never, seen };
@@ -72,21 +107,21 @@ describe('the browser cannot manufacture an opportunity', () => {
     }
   });
 
-  it('promotion reads metadata from sam_opportunities, not from the shortlist', () => {
-    expect(LIB).toMatch(/from\('sam_opportunities'\)[\s\S]{0,240}select\('notice_id,title,department,naics_code,set_aside,response_deadline,notice_type'\)/);
+  it('the save verifies the notice against the canonical corpus', () => {
+    // The claim no longer reads opportunity metadata at all — it creates no
+    // pursuit, so it needs none. What still matters is that a SAVE can only
+    // name a notice that genuinely exists, checked here and enforced by the FK.
+    expect(LIB).toMatch(/from\('sam_opportunities'\)[\s\S]{0,200}select\('notice_id'\)/);
+    expect(LIB).toMatch(/if \(!real\) return \{ ok: false[\s\S]{0,80}unknown noticeId/);
   });
 });
 
-describe('a caller cannot write into someone else\'s pursuits', () => {
+describe('a caller cannot write into someone else\'s space', () => {
   it('the claim branch requires a verified MI session', () => {
     const claim = ROUTE.slice(ROUTE.indexOf("body.action === 'claim'"), ROUTE.indexOf('Abuse control'));
     expect(claim).toMatch(/requireMIAuthSession\(request\)/);
-    expect(claim).toMatch(/const verifiedEmail = session\.session\.email/);
-    // The verified email now travels inside the write context, alongside the
-    // workspace resolved from the SAME request /api/pipeline resolves from.
-    expect(claim).toMatch(/claimAnonShortlist\(db\(\), anonId, \{/);
-    expect(claim).toMatch(/verifiedEmail,/);
-    expect(claim).toMatch(/resolveActiveWorkspace\(verifiedEmail, request\)/);
+    expect(claim).toMatch(/verifiedEmail = session\.session\.email/);
+    expect(claim).toMatch(/claimAnonShortlist\(db\(\), anonId, \{ verifiedEmail \}\)/);
   });
 
   it('the route never reads an email from the body', () => {
@@ -95,12 +130,9 @@ describe('a caller cannot write into someone else\'s pursuits', () => {
 
   it('claim refuses anything that is not a real account email', async () => {
     const { db } = mkDb();
-    const ctx = (verifiedEmail: string) => ({
-      verifiedEmail, workspaceId: 'ws-1', asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    });
-    expect((await claimAnonShortlist(db, ANON, ctx('nope'))).ok).toBe(false);
-    expect((await claimAnonShortlist(db, ANON, ctx(ANON))).ok).toBe(false);
-    expect((await claimAnonShortlist(db, 'bad-anon', ctx('a@b.com'))).ok).toBe(false);
+    expect((await claimAnonShortlist(db, ANON, { verifiedEmail: 'nope' })).ok).toBe(false);
+    expect((await claimAnonShortlist(db, ANON, { verifiedEmail: ANON })).ok).toBe(false);
+    expect((await claimAnonShortlist(db, 'bad-anon', { verifiedEmail: 'a@b.com' })).ok).toBe(false);
   });
 
   it('the Map never sends an email on claim', () => {
@@ -110,120 +142,120 @@ describe('a caller cannot write into someone else\'s pursuits', () => {
   });
 });
 
-describe('anonymous rows can never be mistaken for pursuits', () => {
-  it('they live in their own table, not user_pipeline', () => {
-    expect(LIB).toMatch(/from\('anonymous_shortlist'\)/);
-    // The ONLY user_pipeline touch left here is the already-tracked READ. The
-    // WRITE moved to the canonical pursuit writer, so this lib can no longer
-    // create a pursuit of its own shape.
-    const hits = LIB.match(/from\('user_pipeline'\)/g) ?? [];
-    expect(hits.length).toBe(1);
-    expect(LIB).not.toMatch(/from\('user_pipeline'\)[\s\S]{0,80}\.insert\(/);
+// ── THE PRODUCT THESIS: RETURNING IS THE CONVERSION ────────────────────────
+//
+// A saved listing belongs to the DISCOVERY loop; a pursuit belongs to the
+// EXECUTION loop. Signing in is not a statement of intent to bid, so a claim
+// transfers SAVES and must never manufacture execution intent.
+
+describe('a save is not a pursuit', () => {
+  it('the shortlist lib does not reference user_pipeline or the pursuit writer at all', () => {
+    const code = LIB.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/user_pipeline/);
+    expect(code).not.toMatch(/createCanonicalPursuit/);
   });
 
-  it('the table forbids a real account owning a row', () => {
-    expect(MIG).toMatch(/CHECK \(owner_anon_id ~ '\^anon:/);
+  it('claiming writes ONLY to anonymous_shortlist', async () => {
+    const { db, seen } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }] });
+    await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(new Set(seen)).toEqual(new Set(['anonymous_shortlist']));
   });
 
-  it('the migration records WHY reuse was rejected', () => {
-    expect(MIG).toMatch(/cron\/pursuit-changes/);
-    expect(MIG).toMatch(/SENDS EMAIL/);
+  it('the claim result counts ATTACHED saves — there is no promoted counter', async () => {
+    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }] });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r).toEqual({ ok: true, attached: 1, failed: 0 });
+    expect(r).not.toHaveProperty('promoted');
+    expect(r).not.toHaveProperty('alreadyTracked');
   });
 
-  it('a promoted row is tagged as claimed, distinct from a native pursuit', () => {
-    expect(LIB).toMatch(/CLAIMED_SOURCE = 'opportunity_map_claimed'/);
-    expect(LIB).toMatch(/source: CLAIMED_SOURCE/);
+  it('the Map reports saves attached, never a pursuit', () => {
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonShortlist=function'), MAP.indexOf('window.savePursuit=function'));
+    expect(helper).toMatch(/shortlist_attached/);
+    expect(helper).not.toMatch(/pursuit_started/);
+    expect(helper).not.toMatch(/promoted/);
+  });
+
+  it('an explicit Start Pursuit is still the ONLY path to a pursuit', () => {
+    const PIPE = readFileSync(join(process.cwd(), 'src/app/api/pipeline/route.ts'), 'utf8');
+    expect(PIPE).toMatch(/createCanonicalPursuit\(/);
+    expect(PIPE).toMatch(/requireMIAuthSession\(request, body\.user_email\)/);
   });
 });
 
-describe('promotion is safe and idempotent', () => {
-  it('marks claimed ONLY after the pursuit write succeeds', () => {
-    const body = LIB.slice(LIB.indexOf('export async function claimAnonShortlist'));
-    const writeIdx = body.indexOf('createCanonicalPursuit(');
-    const markIdx = body.indexOf('const marked = await markClaimed(row);', writeIdx);
-    const promoteIdx = body.indexOf('promoted += 1;', markIdx);
-    expect(writeIdx).toBeGreaterThan(-1);
-    expect(markIdx).toBeGreaterThan(writeIdx);
-    // promoted is counted only AFTER the row is proven resolved.
-    expect(promoteIdx).toBeGreaterThan(markIdx);
+describe('a claimed save is STILL a save', () => {
+  it('the account can read back what it saved', async () => {
+    const { db } = mkDb({ accountRows: [{ notice_id: 'n1' }, { notice_id: 'n2' }, { notice_id: 'n1' }] });
+    const ids = await listAccountShortlist(db, 'Buyer@Example.com');
+    // Deduped: one account can carry saves made in several browsers.
+    expect(ids).toEqual(['n1', 'n2']);
   });
 
-  it('never overwrites an existing pursuit, but DOES resolve the shortlist row', () => {
-    // Leaving it unclaimed was the loop: the row was reconsidered on every Map
-    // load forever. Its value HAS transferred — the pursuit exists.
-    const body = LIB.slice(LIB.indexOf('export async function claimAnonShortlist'));
-    expect(body).toMatch(/if \(tracked\.has\(row\.notice_id\)\) \{[\s\S]{0,120}await markClaimed\(row\)[\s\S]{0,400}alreadyTracked \+= 1;/);
-    // …and nothing in this lib updates an existing pursuit row.
-    expect(body).not.toMatch(/from\('user_pipeline'\)[\s\S]{0,80}\.update\(/);
+  it('a failed account read is UNKNOWN, never an empty shortlist', async () => {
+    const { db } = mkDb({ readErr: { message: 'connection reset' } });
+    expect(await listAccountShortlist(db, 'buyer@example.com')).toBeNull();
+  });
+
+  it('a signed-in GET returns the ACCOUNT saves, not an anon-id lookup', () => {
+    const get = ROUTE.slice(ROUTE.indexOf('export async function GET'));
+    expect(get).toMatch(/requireMIAuthSession\(request\)/);
+    expect(get).toMatch(/listAccountShortlist\(db\(\), session\.session\.email\)/);
+    // And an unreadable result is a 503, never a silent empty list.
+    expect(get).toMatch(/status: 503/);
+  });
+
+  it('after signing in the Map re-renders the account saves', () => {
+    const fn = MAP.slice(MAP.indexOf('window.__loadAnonShortlist=function'), MAP.indexOf('window.__claimAnonShortlist=function'));
+    // claim (transfer) THEN read back the account's saves, so "✓ Saved"
+    // survives creating an account instead of appearing to vanish.
+    expect(fn).toMatch(/__claimAnonShortlist\?window\.__claimAnonShortlist\(after\)/);
+    expect(fn).toMatch(/_markSaved\(d\.noticeIds\)/);
+  });
+});
+
+describe('attaching a save is proven, never assumed', () => {
+  it('scopes the mutation and counts it exactly', () => {
+    const fn = LIB.slice(LIB.indexOf('export async function claimAnonShortlist'));
+    expect(fn).toMatch(/\{ count: 'exact' \}/);
+    expect(fn).toMatch(/\.eq\('id', row\.id\)/);
+    expect(fn).toMatch(/\.eq\('owner_anon_id', owner\)/);
+    expect(fn).toMatch(/\.is\('claimed_at', null\)/);
+  });
+
+  it('a database error counts as failed, never attached', async () => {
+    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateErr: { message: 'connection reset' } });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r).toEqual({ ok: true, attached: 0, failed: 1 });
+  });
+
+  it('a NULL count is UNKNOWN, never attached', async () => {
+    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateCount: null });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r.failed).toBe(1);
+    expect(r.attached).toBe(0);
+  });
+
+  it('zero rows affected while still unclaimed is NOT a clean transfer', async () => {
+    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateCount: 0, readBack: { claimed_at: null } });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r.failed).toBe(1);
+    expect(r.attached).toBe(0);
+  });
+
+  it('zero rows BUT provably claimed concurrently IS a transfer', async () => {
+    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateCount: 0, readBack: { claimed_at: '2026-09-21T00:00:00Z' } });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r.attached).toBe(1);
+    expect(r.failed).toBe(0);
   });
 
   it('an empty shortlist is not an error', async () => {
     const { db } = mkDb();
-    expect(await claimAnonShortlist(db, ANON, {
-      verifiedEmail: 'a@b.com', workspaceId: 'ws-1', asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
-    })).toEqual({ ok: true, promoted: 0, alreadyTracked: 0, failed: 0, postWrite: [] });
+    expect(await claimAnonShortlist(db, ANON, { verifiedEmail: 'a@b.com' }))
+      .toEqual({ ok: true, attached: 0, failed: 0 });
   });
 
-  it('a FAILED metadata read is surfaced, not silently skipped', () => {
-    // Swallowing it would drop a promotion the user asked for and still report
-    // success. The row stays unclaimed so the next attempt retries.
-    expect(LIB).toMatch(/const \{ data: opp, error: oppErr \}/);
-    expect(LIB).toMatch(/if \(oppErr\) \{[\s\S]{0,220}failed \+= 1/);
-    expect(LIB).toMatch(/console\.error\(`\[anon-shortlist\] metadata read failed/);
-  });
-});
-
-describe('unauthenticated writes are bounded', () => {
-  it('uses the existing KV rate limiter', () => {
-    expect(ROUTE).toMatch(/from '@\/lib\/rate-limit'/);
-    expect(ROUTE).toMatch(/checkRateLimit\(`shortlist:ip:/);
-    expect(ROUTE).toMatch(/checkRateLimit\(`shortlist:anon:/);
-  });
-  it('caps rows per anon identity', () => {
-    expect(ROUTE).toMatch(/held >= MAX_ANON_SHORTLIST/);
-    expect(MAX_ANON_SHORTLIST).toBeGreaterThan(0);
-  });
-  it('an unverifiable count refuses the write', () => {
-    expect(ROUTE).toMatch(/held == null[\s\S]{0,180}could not verify shortlist size/);
-  });
-  it('rejects a malformed anon id and an oversized notice id', async () => {
-    const { db } = mkDb({ opp: { notice_id: 'n' } });
-    expect((await addToAnonShortlist(db, 'nope', 'n1')).ok).toBe(false);
-    expect((await addToAnonShortlist(db, ANON, 'x'.repeat(200))).ok).toBe(false);
-  });
-});
-
-describe('the visitor can see what they kept', () => {
-  it('the Map restores ✓ Saved on load', () => {
-    expect(MAP).toMatch(/window\.__loadAnonShortlist=function/);
-    expect(MAP).toMatch(/b\.textContent='\\u2713 Saved'/);
-  });
-  it('a failed read is UNKNOWN, never rendered as an empty shortlist', () => {
-    expect(ROUTE).toMatch(/ids == null[\s\S]{0,180}could not read shortlist/);
-    expect(MAP).toMatch(/if\(!d\|\|!d\.success\|\|!d\.noticeIds\)return;/);
-  });
-  it('the claim path is actually reachable, not dead code', () => {
-    expect(MAP).toMatch(/window\.__claimAnonShortlist&&window\.__claimAnonShortlist\(\)/);
-  });
-});
-
-describe('signed-in pursuits are untouched', () => {
-  // This assertion USED to be "the pipeline route is not modified". That is no
-  // longer the goal and would now be the wrong guard: the route IS refactored,
-  // deliberately, so both callers share one writer. What must not change is its
-  // BEHAVIOUR — so the guard moved to the observable contract.
-  it('the pipeline route keeps its auth, its status codes and its response shape', () => {
-    const PIPE = readFileSync(join(process.cwd(), 'src/app/api/pipeline/route.ts'), 'utf8');
-    // Auth: unchanged, and still bound to the body email.
-    expect(PIPE).toMatch(/requireMIAuthSession\(request, body\.user_email\)/);
-    // Required fields, duplicate 409, error 500, success payload.
-    expect(PIPE).toMatch(/user_email and title are required/);
-    expect(PIPE).toMatch(/Opportunity already in pipeline[\s\S]{0,120}status: 409/);
-    expect(PIPE).toMatch(/status: 500/);
-    expect(PIPE).toMatch(/success: true,[\s\S]{0,120}opportunity: result\.pursuit,[\s\S]{0,80}family: result\.family/);
-    expect(PIPE).toMatch(/message: 'Added to pipeline'/);
-    // The pursuit itself is created by the shared writer, not a local insert.
-    expect(PIPE).toMatch(/createCanonicalPursuit\(/);
-    expect(PIPE).not.toMatch(/from\('user_pipeline'\)\s*\.insert\(/);
+  it('the route reports `failed` rather than hiding a partial failure', () => {
+    expect(ROUTE).toMatch(/failed: r\.failed/);
   });
 });
