@@ -4628,8 +4628,113 @@ const SAVE_JS = `<script>
       }).catch(function(){ if(_ss)_ssReset(); });
   };
 
+  // ── RESTORE ──────────────────────────────────────────────────────────────
+  // Show what this visitor already kept, rather than making them click Save
+  // again to find out the server still has it.
+  window.__anonSaved=Object.create(null);
+  // WARNING - SCOPE. This block is its OWN <script> IIFE and CANNOT see _anonId
+  // or _uemail: those live inside the viewport block's IIFE (measured on the
+  // serving page - _uemail is defined at brace depth 10 inside a closed IIFE in
+  // script block 5, and this is block 7). _anonId is exported as
+  // window.__anonId; for the signed-in email use this block's own tok()/email().
+  // A bare _uemail() here is a ReferenceError that kills the whole handler on
+  // its first statement.
+  function _anonKey(){ try{ return (typeof window.__anonId==='function')?(window.__anonId()||''):''; }catch(e){ return ''; } }
+  function _signedInEmail(){ var t=tok(); return t?email(t):''; }
+  window.__loadAnonShortlist=function(){
+    var aid=_anonKey(); if(!aid)return;
+    // SIGNED IN with a shortlist kept earlier while signed out -> promote it now.
+    // This is the real upgrade moment: the account exists, the session is
+    // verified, and the user never had to do anything extra.
+    if(tok()&&_signedInEmail()){ try{ window.__claimAnonShortlist&&window.__claimAnonShortlist(); }catch(e){} return; }
+    fetch('/api/app/shortlist?anonId='+encodeURIComponent(aid))
+      .then(function(r){return r.json();}).then(function(d){
+        if(!d||!d.success||!d.noticeIds)return;  // a failed read is UNKNOWN, not empty
+        // ⚠️ The API returns CANONICAL sam_opportunities.notice_id values. The Map
+        // keeps TWO different identifiers — nid (= notice_id) and sol
+        // (= solicitation_number) — and 99.0% of open SAM rows have nid != sol.
+        // So restore matches on data-nid. Comparing a canonical notice id to a
+        // solicitation number marks nothing, forever.
+        for(var i=0;i<d.noticeIds.length;i++)window.__anonSaved[d.noticeIds[i]]=1;
+        try{
+          var bs=document.querySelectorAll('[data-nid]');
+          for(var j=0;j<bs.length;j++){
+            var b=bs[j]; if(window.__anonSaved[b.getAttribute('data-nid')]){
+              b.dataset.saved='1'; if(b.tagName==='BUTTON')b.textContent='\u2713 Saved'; }
+          }
+        }catch(e){}
+      }).catch(function(){});
+  };
+  // Promote this browser's shortlist into the signed-in account. The account
+  // email is NEVER sent — the server reads it from the verified session.
+  window.__claimAnonShortlist=function(){
+    var t=tok(); var em=_signedInEmail(); if(!t||!em)return;
+    var aid=_anonKey(); if(!aid)return;
+    fetch('/api/app/shortlist',{method:'POST',
+      headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({action:'claim',anonId:aid})})
+      .then(function(r){return r.json();}).then(function(c){
+        if(c&&c.success&&c.promoted>0){ try{ _track('tool_use','shortlist_claimed',{promoted:c.promoted}); }catch(e){} }
+      }).catch(function(){});
+  };
+
+  // Run AFTER both helpers exist (the documented cross-block ordering trap).
+  try{ window.__loadAnonShortlist(); }catch(e){}
+
   window.savePursuit=function(btn){
     if(btn.dataset.saved==='1')return;
+    // ── ANONYMOUS VISITORS CAN KEEP A LISTING ────────────────────────────────
+    // Map funnel, 30 days: 2,021 users opened a listing and 53 started a pursuit
+    // (2.6%). The listing already explains WHY (the Why-chips, Should-I-bid, the
+    // M-Estimate) — what stopped them was this requireSignIn call, because 96%
+    // of map users (8,254 of 8,583) are not signed in. A permission failure, not
+    // a comprehension one.
+    //
+    // Signed out -> save to an anonymous shortlist keyed on the SAME stable
+    // localStorage id the telemetry already uses. It becomes a real pursuit when
+    // an identity claims it; the signed-in path below is untouched.
+    var _tk=tok();
+    if(!_tk || !_signedInEmail()){
+      var _aid2=_anonKey();
+      var _sol2=btn.dataset.sol, _o2=null;
+      try{ _o2=(OPPS||[]).find(function(x){return x.sol===_sol2;}); }catch(e){}
+      // ⚠️ nid IS NOT sol. map-data sets id = sam_opportunities.notice_id and
+      // sol = solicitation_number, and the Map preserves nid=p.id, sol=p.sol||p.id.
+      // Measured on production: 10,824 of 10,932 open SAM rows (99.0%) have
+      // nid != sol, and solicitation_number is not even unique (8,549 distinct
+      // for 10,824 rows, worst collision 18). The shortlist API matches on
+      // notice_id and the table's FK references notice_id, so sending sol
+      // returned "unknown noticeId" for effectively the whole corpus.
+      //
+      // Only a SAM listing has a canonical notice id. DLA / forecast / grants /
+      // recompete / contact pins carry their own id in that field, so they are
+      // NOT eligible — and we never substitute a solicitation number for a
+      // notice id. Ineligible rows fall through to the normal sign-in path,
+      // exactly as they behaved before this feature existed.
+      var _nid2=(_o2&&_o2.src==='SAM')?String(_o2.nid||''):'';
+      var _canon2=/^[a-f0-9]{32}$/i.test(_nid2);
+      if(_aid2&&_o2&&_canon2){
+        btn.textContent='Saving\u2026'; btn.disabled=true;
+        // ONLY the notice id. The browser must not be able to manufacture
+        // opportunity metadata that could later become a real pursuit — the
+        // server resolves title/agency/NAICS/deadline from sam_opportunities.
+        fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({anonId:_aid2,noticeId:_nid2})})
+          .then(function(r){return r.json();}).then(function(d){
+            btn.disabled=false;
+            if(d&&d.success){
+              btn.dataset.saved='1';
+              btn.textContent=d.duplicate?'\u2713 Already saved':'\u2713 Saved';
+              try{ window.__anonSaved[_nid2]=1; }catch(e){}
+              // Only count a NEW save, so a repeat click cannot inflate the funnel.
+              // The CANONICAL notice id, so this joins back to sam_opportunities.
+              try{ if(window.__track && !d.duplicate) window.__track('tool_use','shortlist_saved',
+                {anonymous:true,notice_id:_nid2,agency:String(_o2.agency||'')}); }catch(e){}
+            } else btn.textContent='Couldn\\'t save';
+          }).catch(function(){ btn.disabled=false; btn.textContent='Couldn\\'t save'; });
+        return;
+      }
+    }
     var a=window.requireSignIn('save this to your pursuits', function(){ window.savePursuit(btn); }); if(!a)return;
     var t=a.t, em=a.em;
     var sol=btn.dataset.sol, o=null;

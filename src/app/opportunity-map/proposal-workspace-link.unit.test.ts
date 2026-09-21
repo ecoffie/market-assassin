@@ -17,6 +17,14 @@ import { join } from 'node:path';
 
 const map = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 const api = readFileSync(join(__dirname, '../api/pipeline/route.ts'), 'utf8');
+// The pursuit WRITE contract (duplicate handling, unknown-column retry) moved
+// into the shared canonical writer that /api/pipeline POST delegates to, so
+// both it and the anonymous-shortlist claim create the same pursuit. The
+// invariants below are unchanged — they are asserted where the code now is.
+const route = api;
+const writer = readFileSync(join(__dirname, '../../lib/pipeline/create-pursuit.ts'), 'utf8');
+const pursuitWrite = api + '\n' + writer;
+
 
 function fnBody(s: string, name: string): string {
   const start = s.indexOf(`function ${name}(`);
@@ -84,11 +92,13 @@ describe('the drawer opens the new workspace', () => {
 
 describe('the pursuit id survives an already-tracked opportunity', () => {
   it('returns the existing row alongside the 409', () => {
-    expect(api).toContain("if (error.code === '23505')");
-    expect(api).toContain(".eq('notice_id', body.notice_id)");
-    expect(api).toContain("{ error: 'Opportunity already in pipeline', opportunity: existing }");
+    expect(pursuitWrite).toContain("if (error.code === '23505')");
+    expect(pursuitWrite).toContain(".eq('notice_id', body.notice_id as string)");
+    expect(route).toContain("{ error: 'Opportunity already in pipeline', opportunity: result.existing }");
     // Best-effort: a failed lookup must still produce the same 409, not a 500.
-    expect(api).toContain('catch { /* best-effort');
+    expect(pursuitWrite).toContain('catch { /* best-effort');
+    // …and the route must actually reach the writer that holds this logic.
+    expect(route).toContain('createCanonicalPursuit(');
   });
 
   it('the client reads that row id and caches it on the button', () => {
