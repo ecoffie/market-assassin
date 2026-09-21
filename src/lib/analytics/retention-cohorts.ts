@@ -217,15 +217,27 @@ export const PRODUCT_REGIME_BOUNDARY = '2026-08-23';
 /**
  * The day anonymous saving / watches / continuity became genuinely REACHABLE in production.
  *
- * `null` means NOT YET STARTED — and that is the honest state as of 2026-09-21: #1608 is unmerged
- * and the anonymous `savePursuit` path is still dead on `main`, so no visitor has been able to
- * save. A band that has not begun must report NOT YET STARTED; it must never render as an empty
- * cohort with a 0, because "nobody saved" and "nobody COULD save" are different facts and only one
- * of them is about users.
+ * `null` would mean NOT YET STARTED. A band that has not begun must report NOT YET STARTED; it must
+ * never render as an empty cohort with a 0, because "nobody saved" and "nobody COULD save" are
+ * different facts and only one of them is about users.
  *
- * Set this to the ship date (YYYY-MM-DD) the day it goes live. It is deliberately ONE constant.
+ * ── STARTED 2026-09-21 ────────────────────────────────────────────────────────────────────────
+ * Set to the PRODUCTION VERIFICATION timestamp, not the merge time. #1608 merged as `47ddc285`
+ * and production was confirmed serving that SHA at 12:11:16Z; the signed-out browser acceptance
+ * then passed against getmindy.ai at **12:12:33Z**, which is the first moment a real visitor
+ * could save and SEE it. Deliberately NOT backdated: the anonymous save path was unreachable
+ * (`savePursuit` had zero call sites) for the whole preceding Map era, so any earlier date would
+ * put users in a band whose behaviour was impossible for them.
+ *
+ * It is deliberately ONE constant.
  */
-export const SAVE_LAUNCH_DATE: string | null = null;
+export const SAVE_LAUNCH_DATE: string | null = '2026-09-21';
+
+/**
+ * The exact production-verification instant, for the record. `SAVE_LAUNCH_DATE` stays a DATE
+ * because cohorts are assigned on completed calendar days; this is the provenance for that date.
+ */
+export const SAVE_LAUNCH_VERIFIED_AT = '2026-09-21T12:12:33Z';
 
 /** The three cohort bands. `current` is the default lens for current-product retention. */
 export type RegimeBand = 'pre_launch' | 'current' | 'post_save_launch';

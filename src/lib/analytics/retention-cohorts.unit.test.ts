@@ -19,6 +19,7 @@ import {
   MIN_REPORTABLE_COHORT,
   PRODUCT_REGIME_BOUNDARY,
   SAVE_LAUNCH_DATE,
+  SAVE_LAUNCH_VERIFIED_AT,
   REGIME_LABELS,
   regimeBand,
   saveBandStarted,
@@ -322,11 +323,24 @@ describe('PRODUCT REGIME — 2026-08-23 (Maps + MCP + new homepage)', () => {
     expect(REGIME_LABELS.current).toContain('current product');
   });
 
-  it('reports the save band as NOT YET STARTED while no save date is set', () => {
-    // Anonymous saving is unreachable on main today. "Nobody saved" and "nobody COULD save" are
-    // different facts; only one of them is about users, so the band must not render as 0.
-    expect(SAVE_LAUNCH_DATE).toBeNull();
-    expect(saveBandStarted()).toBe(false);
+  it('the save band is STARTED exactly when a save date is set, and never before', () => {
+    // "Nobody saved" and "nobody COULD save" are different facts; only one is about users, so an
+    // un-started band must never render as 0. This asserts the BEHAVIOUR in both directions
+    // rather than pinning the launch state — the original form asserted
+    // `SAVE_LAUNCH_DATE === null`, which stopped being true the moment saving shipped.
+    expect(saveBandStarted()).toBe(SAVE_LAUNCH_DATE !== null);
+  });
+
+  it('POST-SAVE-LAUNCH has started, dated from PRODUCTION VERIFICATION and not backdated', () => {
+    // #1608 merged 47ddc285; production confirmed serving it 12:11:16Z; the signed-out browser
+    // acceptance passed against getmindy.ai at 12:12:33Z — the first moment a visitor could save
+    // and see it. Backdating would place users in a band whose behaviour was impossible for them:
+    // `savePursuit` had ZERO call sites for the whole preceding Map era.
+    expect(SAVE_LAUNCH_DATE).toBe('2026-09-21');
+    expect(saveBandStarted()).toBe(true);
+    expect(SAVE_LAUNCH_VERIFIED_AT).toBe('2026-09-21T12:12:33Z');
+    // Never before the product-regime boundary, and never before saving was reachable.
+    expect(SAVE_LAUNCH_DATE >= PRODUCT_REGIME_BOUNDARY).toBe(true);
   });
 
   it('pins the boundary to the verified date', () => {
