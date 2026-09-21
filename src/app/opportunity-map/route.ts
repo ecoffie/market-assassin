@@ -4569,6 +4569,40 @@ const SAVE_JS = `<script>
   };
   window.savePursuit=function(btn){
     if(btn.dataset.saved==='1')return;
+    // ── ANONYMOUS VISITORS CAN KEEP A LISTING ────────────────────────────────
+    // Map funnel, 30 days: 2,021 users opened a listing and 53 started a pursuit
+    // (2.6%). The listing already explains WHY (the Why-chips, Should-I-bid, the
+    // M-Estimate) — what stopped them was this requireSignIn call, because 96%
+    // of map users (8,254 of 8,583) are not signed in. A permission failure, not
+    // a comprehension one.
+    //
+    // Signed out -> save to an anonymous shortlist keyed on the SAME stable
+    // localStorage id the telemetry already uses. It becomes a real pursuit when
+    // an identity claims it; the signed-in path below is untouched.
+    var _tk=null; try{ _tk=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    if(!_tk || !_uemail()){
+      var _aid2=_anonId();
+      if(_aid2){
+        var _sol2=btn.dataset.sol, _o2=null;
+        try{ _o2=(OPPS||[]).find(function(x){return x.sol===_sol2;}); }catch(e){}
+        if(!_o2)return;
+        btn.textContent='Saving\u2026'; btn.disabled=true;
+        fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({anonId:_aid2,noticeId:_o2.sol,title:_o2.title,agency:_o2.agency,
+            naicsCode:_o2.naics,responseDeadline:_o2.close})})
+          .then(function(r){return r.json();}).then(function(d){
+            btn.disabled=false;
+            if(d&&d.success){
+              btn.dataset.saved='1';
+              btn.textContent=d.duplicate?'\u2713 Already saved':'\u2713 Saved';
+              // Only count a NEW save, so a repeat click cannot inflate the funnel.
+              try{ if(window.__track && !d.duplicate) window.__track('tool_use','shortlist_saved',
+                {anonymous:true,notice_id:String(_o2.sol),agency:String(_o2.agency||'')}); }catch(e){}
+            } else btn.textContent='Couldn\\'t save';
+          }).catch(function(){ btn.disabled=false; btn.textContent='Couldn\\'t save'; });
+        return;
+      }
+    }
     var a=window.requireSignIn('save this to your pursuits', function(){ window.savePursuit(btn); }); if(!a)return;
     var t=a.t, em=a.em;
     var sol=btn.dataset.sol, o=null;
