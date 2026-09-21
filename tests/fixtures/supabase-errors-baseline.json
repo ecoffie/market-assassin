@@ -79,6 +79,7 @@
     "src/app/api/mi-dashboard/route.ts#count-null(sam_opportunities):5c0768b1fc",
     "src/app/api/sbir/route.ts#count-null(aggregated_opportunities):6dcf6ba9fd",
     "src/lib/admin/demand-heatmap.ts#swallowed-select(user_pipeline):3afb984ed4",
+    "src/lib/admin/member-grants.ts#count-null(mi_admin_grants):523a3d37c5",
     "src/lib/admin/member-grants.ts#swallowed-select(user_profiles):78e2bf8f2c",
     "src/lib/alerts/capability-vector.ts#swallowed-select(user_notification_settings):44dd00047e",
     "src/lib/alerts/capability-vector.ts#swallowed-select(user_notification_settings):875c541b25",

@@ -631,6 +631,35 @@ return (
 
 ---
 
+## ⚠️ The unit suite is CONCURRENCY-PINNED — `VITEST_MAX_FORKS=4`
+
+Set in **ONE** place: the `test:unit` script in `package.json`. That is the same command the
+pre-push gate's step 4 runs *and* the one `.github/workflows/decision-chain.yml` runs, so the
+gate and CI cannot drift. **Do not add a competing `--maxWorkers`/pool flag anywhere else, and
+do not use `VITEST_MAX_WORKERS`** — Vitest 3.2.6 reads `VITEST_MAX_FORKS` and applies it to
+`poolOptions.forks.maxForks`; `vitest.config.ts` sets no `pool`, so the default `forks` pool is
+what runs.
+
+**Why:** unbounded, the suite forks one worker per core, saturates all 16 and drives load to
+70–112. Vitest then reports **0 test failures** and still exits NON-ZERO with
+`[vitest-worker]: Timeout calling "onTaskUpdate"` — an RPC timeout, not a test result, that
+reads exactly like a real failure. Six agents hit it across two waves. **Waiting for a quiet
+machine does not help: the suite is what makes the machine busy.**
+
+Measured 2026-09-21 — the inventory is unchanged, only the concurrency:
+
+| | max concurrent forks | files | tests | exit |
+|---|---|---|---|---|
+| unbounded (`npx vitest run`) | **15** | 612 passed / 2 skipped (614) | 6,869 passed / 21 skipped (6,890) | 0 |
+| `VITEST_MAX_FORKS=4` | **4** | 612 passed / 2 skipped (614) | 6,869 passed / 21 skipped (6,890) | 0 |
+
+Nothing is skipped or filtered to buy the stability, and a deliberately failing test still
+fails under the bounded setting (verified inject → red → revert → green). **Never reach for
+`--no-verify` when step 4 fails: read the log first — "0 failed" with a worker RPC timeout is
+this, not your change.**
+
+---
+
 ## Pre-Deploy QA
 
 **ALWAYS run before deployment:**
@@ -989,7 +1018,7 @@ curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&p
 |---------|----------|------------|---------|
 | **Market Assassin** | This project | `getmindy.ai` | Dev/staging tools |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
-| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.com` | Marketing site |
+| **GovCon Funnels** | `/Users/ericcoffie/Projects/govcon-funnels` | `govcongiants.com` | Marketing site |
 | **LinkedIn Deal Magnet** | `/Users/ericcoffie/Linkedin App` | `linkedin-deal-magnet.vercel.app` | Profile optimizer (separate product) |
 
 ---
@@ -2166,6 +2195,23 @@ tighten instead of silently matching the survivors.
 - Migration was 1:1 where the code hadn't moved on: supabase-errors 109→109, api-truncation
   28→28, rank-then-filter 1→1. Two baselines were already **stale and nobody could tell**:
   mutation-receipts 14→11 and unranged-selects 62→60.
+- **All SEVEN baseline gates now share it**, including the two whose baselines are EMPTY
+  (`audit-client-auth`, `audit-persist-expansion`). Empty is their correct state — they were
+  migrated before a finding was ever accepted, because the wart only returns once one is.
+
+**⚠️ Rule B's suppression window is the FUNCTION, not a line budget (fixed 2026-09-21).**
+"Was the error handled?" has a semantic boundary; `LOOKBACK = 30` did not respect it, so a
+legitimate fix in one function silenced an unrelated unsafe count in the NEXT function. Real
+instance: `src/lib/admin/member-grants.ts` `getTierCounts` does `const { count } = await q;
+return count || 0;` with NO error bound, and it was invisible to the gate because
+`getGrantLog` — a *different* function 15 lines above — consults its own `error`. The window is
+now `max(enclosingScopeStart, i - LOOKBACK)`: **the intersection, never the union.** Taking the
+function alone WIDENS it inside a long function and starts hiding findings (measured: 4 real
+findings vanished), and a gate fix must only ever reveal. Two traps, both caught by testing:
+`if (deleteError) {` is regex-identical to a method signature, so treating it as a function
+boundary flags correctly-handled code (`CONTROL_KEYWORDS`); and the *provenance* window
+(`.from(` detection) deliberately keeps the full `LOOKBACK`, because being generous there can
+only flag more. Baseline 109 → **110**: exactly one previously-hidden real finding, 0 lost.
 
 **Standout debt in the baseline (not fixed):** `admin/data-health` does `count || 0` with no
 error bound — the endpoint whose job is reporting data health would report a fabricated 0.
@@ -2963,13 +3009,21 @@ npm run db:check -- <table> <column>                     # did the migration REA
 ```
 Never trust "Success. No rows returned" from the SQL editor — `db:check` is the proof.
 
-**Cron is registered** — it's a `cron_jobs` row, **NOT** `vercel.json`. The dispatcher ticks
-roughly HOURLY, so a `*/10` expression really fires ~once/hr. Columns are
+**Cron is registered** — it's a `cron_jobs` row, **NOT** `vercel.json`. The dispatcher
+**evaluates due jobs EVERY MINUTE** (`vercel.json` → `/api/cron/dispatch?tick=minute` on
+`* * * * *`), so a `*/10` expression really does fire every ~10 minutes. Columns are
 **`job_name` / `cron_expr` / `enabled`** (NOT `name`/`cron_expression`/`active`), and `enabled`
-is the *string* `'true'`:
+is a **boolean** — the predicate is `enabled = true`:
 ```bash
 npm run db -- cron_jobs --select job_name,cron_expr,enabled --eq enabled=true
 ```
+*Corrected 2026-09-21, both verified in this repo and previously wrong here: the doc said the
+dispatcher "ticks roughly HOURLY, so a `*/10` expression really fires ~once/hr" (contradicted by
+`vercel.json`'s minute tick — `run-proposal-jobs` at `* * * * *` logged 42,865 runs in 30 days,
+which an hourly dispatcher cannot produce), and it said `enabled` is the STRING `'true'`
+(contradicted by `supabase/migrations/20260604_cron_dispatcher.sql:17`
+`enabled boolean NOT NULL DEFAULT true` and by `dispatch/route.ts` `.eq('enabled', true)`).
+Three agents independently lost time to the boolean one.*
 
 **Env var is in prod:** `vercel env ls production | grep -i <VAR>`. Remember a var only binds on
 a build *after* `vercel env add` — trigger a fresh deploy.

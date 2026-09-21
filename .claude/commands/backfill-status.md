@@ -4,7 +4,7 @@ The question is never "did it run" — it's **drained vs progressing vs stalled*
 
 ## 1. Is it even scheduled?
 
-Crons are `cron_jobs` rows, **not** `vercel.json`. The dispatcher ticks roughly HOURLY, so a `*/10` expression really fires ~once an hour.
+Crons are `cron_jobs` rows, **not** `vercel.json`. The dispatcher **evaluates due jobs every MINUTE** (`vercel.json` → `/api/cron/dispatch?tick=minute` on `* * * * *`), so a `*/10` expression really does fire every ~10 minutes. (Corrected 2026-09-21 — this said "roughly HOURLY … ~once an hour", which would make you mis-diagnose a healthy drainer as stalled.)
 
 ```bash
 npm run db -- cron_jobs --select job_name,cron_expr,enabled,last_run --eq enabled=true

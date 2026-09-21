@@ -139,6 +139,67 @@ function selectColumnCount(block) {
   return parts.length;
 }
 
+/**
+ * Where does the FUNCTION containing line `i` begin?
+ *
+ * Rule B suppresses a finding when the error was handled — but "handled" has a semantic
+ * boundary, and the rule used to approximate it with a flat 30-line budget. That let a
+ * legitimate fix in one function silence an unrelated unsafe count in the NEXT function
+ * (measured in src/lib/seo/facets.ts). Handling never crosses a function boundary, so the
+ * suppression window must not either.
+ *
+ * Walks up from `i` tracking brace depth: going backwards a `}` means we are entering a
+ * nested block and a `{` means we are leaving one, so depth < 0 marks the line that OPENS
+ * the block we are in. If that opener looks like a function/method/arrow, that is our
+ * boundary. Otherwise it is an ordinary `if`/`try`/loop block, so we step out and keep
+ * climbing — the enclosing FUNCTION is what matters, not the innermost brace.
+ *
+ * Deliberately a brace walk, not a parser: same tool choice as the detectors themselves.
+ * Failure mode is to return a WIDER window (file top), which can only suppress as much as
+ * the old behaviour — never less. Braces inside strings/regexes can skew the count, which
+ * is why MAX_CLIMB bounds the walk instead of letting it run away.
+ */
+const MAX_CLIMB = 400;
+
+/**
+ * Control-flow keywords that LOOK exactly like a method signature to a regex:
+ * `if (deleteError) {` has the same shape as `handler(req) {`.
+ *
+ * Getting this wrong is not cosmetic — it was wrong in the first draft of this fix and the
+ * proof caught it. Treating `if (…) {` as a function boundary cut the window down to a single
+ * `else` branch and manufactured a FALSE POSITIVE on admin/send-all-now, code that consults
+ * `deleteError` and only then reads `count || 0` inside the else. A gate that flags correct
+ * error handling is precisely what trains people to re-baseline reflexively.
+ */
+const CONTROL_KEYWORDS = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'do', 'else', 'with',
+  'return', 'typeof', 'await', 'new', 'try', 'finally',
+]);
+const METHOD_SHAPE = /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:static\s+)?(?:get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*(?::\s*[^{]*)?\{\s*$/;
+
+function isFunctionOpener(line) {
+  if (/\bfunction\b|=>|\bconstructor\b/.test(line)) return true;
+  const m = line.match(METHOD_SHAPE);
+  return !!m && !CONTROL_KEYWORDS.has(m[1]);
+}
+
+function enclosingScopeStart(lines, i) {
+  let depth = 0;
+  const floor = Math.max(0, i - MAX_CLIMB);
+  for (let k = i - 1; k >= floor; k--) {
+    const l = lines[k].replace(/\/\/[^\n]*$/, '');
+    const opens = (l.match(/\{/g) || []).length;
+    const closes = (l.match(/\}/g) || []).length;
+    depth += closes - opens;
+    if (depth < 0) {
+      // `k` opens the block we sit in. A function boundary stops the walk.
+      if (isFunctionOpener(l)) return k;
+      depth = 0; // ordinary block — step out and keep climbing
+    }
+  }
+  return floor;
+}
+
 const findings = [];
 
 for (const root of SCAN_ROOTS) {
@@ -213,7 +274,30 @@ for (const root of SCAN_ROOTS) {
       // exactly this reason, and every one of them rendered "0 opportunities match your
       // profile" on a query failure.
       const back = lines.slice(Math.max(0, i - LOOKBACK), i + 1).join('\n');
-      const bindsError = /\{[^}]*\berror\b[^}]*\}\s*=\s*await/.test(back) || /\b\w+\.error\b/.test(back);
+
+      // ⚠️ TWO WINDOWS, ON PURPOSE — they answer two different questions.
+      //
+      // `back` (raw LOOKBACK lines, above) answers "is this even a Supabase count?" Being
+      // generous there can only make the gate flag MORE, so a line budget is fine.
+      //
+      // `scope` answers "was the error HANDLED for this operation?" — and a line budget is
+      // exactly wrong for that, because handling has a SEMANTIC boundary. A valid fix in one
+      // function was silencing an unrelated unsafe count in the NEXT function whenever the two
+      // sat within 30 lines. Measured live in src/lib/seo/facets.ts: binding + consulting the
+      // error in `getPscOpps` made the independent `count || 0` in `getSetAsideNaicsOpps`
+      // disappear from the gate — a false NEGATIVE inside the gate built to stop exactly this
+      // class of silent zero. Suppression must never cross a function boundary.
+      //
+      // The window is the INTERSECTION of the line budget and the function boundary, never
+      // the union. Taking the function alone would WIDEN it inside a long function and start
+      // hiding findings that are flagged today — measured while writing this: a bare function
+      // scope made 4 real findings (podcast-highlights ×2, forecasts ×2) vanish. A strict
+      // subset of the old window can only reveal findings, never conceal one, which is the
+      // property a gate fix has to have.
+      const scope = lines
+        .slice(Math.max(enclosingScopeStart(lines, i), i - LOOKBACK, 0), i + 1)
+        .join('\n');
+      const bindsError = /\{[^}]*\berror\b[^}]*\}\s*=\s*await/.test(scope) || /\b\w+\.error\b/.test(scope);
 
       // BINDING THE ERROR IS NOT THE SAME AS HANDLING IT.
       //
@@ -224,7 +308,7 @@ for (const root of SCAN_ROOTS) {
       //
       // So a binding only earns the skip if the error is actually CONSULTED nearby: tested,
       // thrown, logged, returned, or assigned to something. A bare mention does not count.
-      const errName = (back.match(/\{[^}]*\berror\s*:\s*(\w+)/) || [])[1];
+      const errName = (scope.match(/\{[^}]*\berror\s*:\s*(\w+)/) || [])[1];
       const consulted = new RegExp(
         `(if\\s*\\(\\s*!?\\s*(${errName || 'error'})\\b)`          // if (error) / if (!error)
         + `|((${errName || 'error'})\\s*(\\?\\.|&&|\\|\\||\\?))`  // error?. / error && / error ||
@@ -232,7 +316,7 @@ for (const root of SCAN_ROOTS) {
         + `|(console\\.(error|warn)\\([^\\n]*\\b(${errName || 'error'})\\b)`
         + `|(return[^\\n]*\\b(${errName || 'error'})\\b)`
         + `|(\\b\\w+\\s*=\\s*(${errName || 'error'})\\b)`,          // degraded = error
-      ).test(back);
+      ).test(scope);
       if (bindsError && consulted) continue;
       // Is this actually a Supabase count? `sb.` alone is too loose now that the audit covers
       // all of src/ -- it matches CSS class names in browser JS (`sb.inner` in the map's inline

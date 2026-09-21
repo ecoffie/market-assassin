@@ -171,7 +171,16 @@ fi
 
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
-echo -e "  ${BOLD}4/13${NC} unit tests (vitest run)…"
+# 4) HARD BLOCK: the unit suite.
+#    ⚠️ Concurrency is pinned in ONE place — the `test:unit` script in package.json
+#    (`VITEST_MAX_FORKS=4`), which is also what .github/workflows/decision-chain.yml runs,
+#    so the gate and CI cannot drift. Do NOT add a competing flag here.
+#    Why: unbounded, the suite forks one worker per core, saturates all 16 and drives load
+#    to 70-112. Vitest then reports 0 test failures but exits NON-ZERO with
+#    `[vitest-worker]: Timeout calling "onTaskUpdate"` — an RPC timeout, not a test result.
+#    Six agents hit this across two waves and it reads exactly like a real failure.
+#    Waiting for a quiet machine does not help: the suite is what makes the machine busy.
+echo -e "  ${BOLD}4/13${NC} unit tests (vitest run, VITEST_MAX_FORKS=4)…"
 if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
   echo -e "      ${GREEN}✓ unit tests pass${NC}"
 else

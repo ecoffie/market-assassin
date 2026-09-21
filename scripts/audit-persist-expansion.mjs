@@ -33,12 +33,13 @@
  *
  * Exit 0 = clean (or only known sites). Exit 1 = a NEW violation → push blocked.
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
+import { runBaselineGate } from './lib/finding-identity.mjs';
 
 const ROOT = process.cwd();
 const BASELINE_FILE = join(ROOT, 'scripts/.persist-expansion-baseline.json');
-const UPDATE = process.argv.includes('--update-baseline');
+// `--update-baseline` is handled by runBaselineGate (which owns every baseline flag now).
 const SELF_TEST = process.argv.includes('--self-test');
 
 /** Expanders that are correct for QUERY, wrong for PERSIST. */
@@ -178,38 +179,33 @@ for (const file of files) {
   violations.push(...scanSource(readFileSync(file, 'utf8'), rel));
 }
 
-const baseline = existsSync(BASELINE_FILE)
-  ? JSON.parse(readFileSync(BASELINE_FILE, 'utf8'))
-  : { known: [] };
-const known = new Set(baseline.known || []);
-
-if (UPDATE) {
-  writeFileSync(
-    BASELINE_FILE,
-    JSON.stringify({ known: violations.map((v) => v.key).sort() }, null, 2) + '\n',
-  );
-  console.log(`Baseline updated: ${violations.length} known site(s).`);
-  process.exit(0);
-}
-
-const fresh = violations.filter((v) => !known.has(v.key));
-if (fresh.length === 0) {
-  console.log(`persist-expansion: clean (${violations.length} known, 0 new).`);
-  process.exit(0);
-}
-
-console.error(`\npersist-expansion: ${fresh.length} NEW site(s) storing a QUERY-TIME expansion\n`);
-for (const v of fresh) {
-  console.error(`  ${v.file}:${v.line}`);
-  console.error(`    ${v.field} ← ${v.via}`);
-  console.error(`    ${v.snippet}`);
-}
-console.error(
-  `\n  Query-time expansion is correct for MATCHING, wrong for STORING.\n` +
-    `  Persisting it rewrites the user's own choices — one preset click became 51\n` +
-    `  NAICS codes on 1,144 profiles (2026-07). Use a persist helper instead:\n\n` +
-    `      normalizeNAICSForPersist(codes)   // 6-digit exact, prefixes → curated set, capped\n\n` +
-    `  Intentional? Accept it with:\n` +
-    `      node scripts/audit-persist-expansion.mjs --update-baseline\n`,
-);
-process.exit(1);
+// Content-addressed baseline keys — see scripts/lib/finding-identity.mjs for why `path:line`
+// was a bug. This gate's baseline is EMPTY/absent today, so nothing can drift yet; fixed now
+// rather than the first time a finding is accepted.
+//
+// The identity carries the PERSISTED FIELD as its tag and the assignment line as its evidence.
+// `via` (which expander tainted it, and on what line) is diagnostic detail, NOT identity: it
+// embeds a line number, so including it would smuggle the wart back in through the fingerprint.
+runBaselineGate({
+  name: 'persist-expansion',
+  script: 'audit-persist-expansion.mjs',
+  findings: violations.map((v) => ({
+    file: v.file,
+    line: v.line,
+    rule: 'persisted-query-expansion',
+    tag: v.field,
+    evidence: v.snippet,
+    detail: `${v.field} <- ${v.via}\n        ${v.snippet}`,
+  })),
+  baselineFile: BASELINE_FILE,
+  field: 'known',
+  note: 'Sites persisting a QUERY-TIME taxonomy expansion, accepted as pre-existing. Keys are CONTENT-ADDRESSED (see keyFormat). EMPTY is the correct state.',
+  okMessage: (n) => `persist-expansion: clean (${n} known, 0 new).`,
+  failHeader: (n) => `\npersist-expansion: ${n} NEW site(s) storing a QUERY-TIME expansion\n`,
+  failAdvice: [
+    `\n  Query-time expansion is correct for MATCHING, wrong for STORING.`,
+    `  Persisting it rewrites the user's own choices — one preset click became 51`,
+    `  NAICS codes on 1,144 profiles (2026-07). Use a persist helper instead:`,
+    `\n      normalizeNAICSForPersist(codes)   // 6-digit exact, prefixes -> curated set, capped`,
+  ],
+});

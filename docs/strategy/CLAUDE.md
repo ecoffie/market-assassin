@@ -4,7 +4,7 @@
 
 | Say This | Project | Location |
 |----------|---------|----------|
-| "**$82B page**", "govcon funnels", "marketing site" | GovCon Funnels | `/Users/ericcoffie/govcon-funnels` |
+| "**$82B page**", "govcon funnels", "marketing site" | GovCon Funnels | `/Users/ericcoffie/Projects/govcon-funnels` |
 | "**tools**", "market assassin", "dev" | Market Assassin | `./market-assassin` (this folder) |
 | "**live shop**", "production", "shop.govcongiants" | GovCon Shop | `/Users/ericcoffie/govcon-shop` |
 
@@ -13,7 +13,7 @@
 ## Project Details
 
 ### 1. GovCon Funnels (Marketing Site)
-**Location:** `/Users/ericcoffie/govcon-funnels`
+**Location:** `/Users/ericcoffie/Projects/govcon-funnels`
 **Live URL:** govcongiants.org
 **Identifier:** "$82 BILLION UNSPENT" hero page
 
@@ -26,7 +26,7 @@
 - `/resources` - Free resources
 
 ```bash
-cd /Users/ericcoffie/govcon-funnels && npm run dev
+cd /Users/ericcoffie/Projects/govcon-funnels && npm run dev
 ```
 
 ---
