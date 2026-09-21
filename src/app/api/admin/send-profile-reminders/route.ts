@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { reportCronOutcome, dispatchedJobName } from '@/lib/cron-self-report';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REMINDER_COOLDOWN_DAYS = 14;
@@ -80,8 +81,21 @@ function getCursorWindow<T>(items: T[], cursor: number, limit: number): T[] {
  * - limit: Max users to send in execute mode (default: 50)
  * - batchSize: Emails per batch with delay (default: 10)
  */
+/**
+ * The cron_jobs row that claimed this request, or null for a human/admin call.
+ *
+ * This is an ADMIN route that a cron_jobs row (`profile-completion-reminders`) also
+ * fires, so the job name cannot be a constant on the path — it comes from the
+ * dispatcher's `x-cron-job` header. A hand-run admin call reports nothing.
+ */
+function claimedJob(request: NextRequest): string | null {
+  if (request.headers.get('x-cron-dispatch') !== '1') return null;
+  return dispatchedJobName(request.headers);
+}
+
 export async function POST(request: NextRequest) {
   const { searchParams } = request.nextUrl;
+  const cronJob = claimedJob(request);
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
   const password = searchParams.get('password');
   const isCron = request.headers.get('x-cron-dispatch') === '1'
@@ -101,6 +115,7 @@ export async function POST(request: NextRequest) {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
+    if (cronJob) await reportCronOutcome(cronJob, 'error', 'Database not configured');
     return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
   }
 
@@ -126,6 +141,7 @@ export async function POST(request: NextRequest) {
       .range(from, from + pageSize - 1);
 
     if (fetchError) {
+      if (cronJob) await reportCronOutcome(cronJob, 'error', fetchError.message);
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
@@ -306,6 +322,27 @@ export async function POST(request: NextRequest) {
     ...response,
     completedAt: new Date().toISOString(),
   }, { ex: REMINDER_COOLDOWN_DAYS * 24 * 60 * 60 });
+
+  // TERMINAL SELF-REPORT. All 4 runs of `profile-completion-reminders` in the preceding
+  // 30 days were recorded `dispatched` with http_status NULL: the batch sends reminder
+  // emails serially and outlives the dispatcher's 12s ack, so nothing saw this body.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate: an empty eligible list is a genuine success
+  // (the cooldown + cursor are doing their job), but a batch that had recipients and sent
+  // NONE is not — that is a dead provider, and sendEmail returns false without throwing.
+  if (cronJob) {
+    await reportCronOutcome(
+      cronJob,
+      toProcess.length === 0
+        ? 'success'
+        : sent === 0
+          ? 'error'
+          : failed > 0
+            ? 'partial'
+            : 'success',
+      toProcess.length > 0 && failed > 0 ? `${failed}/${toProcess.length} sends failed` : undefined,
+    );
+  }
 
   return NextResponse.json(response);
 }

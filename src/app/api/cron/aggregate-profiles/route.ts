@@ -11,8 +11,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 const CRON_SECRET = process.env.CRON_SECRET;
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'aggregate-profiles';
 
 interface SearchHistoryRow {
   search_type: string;
@@ -60,6 +64,7 @@ export async function GET(request: NextRequest) {
         .order('user_email'));
     } catch (usersError) {
       console.error('[Cron] Error fetching users:', usersError);
+      await reportCronOutcome(CRON_JOB_NAME, 'error', `fetch users failed: ${String(usersError)}`);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
@@ -68,6 +73,7 @@ export async function GET(request: NextRequest) {
 
     if (uniqueEmails.length === 0) {
       console.log('[Cron] No search history found');
+      await reportCronOutcome(CRON_JOB_NAME, 'success');
       return NextResponse.json({
         success: true,
         message: 'No search history to aggregate',
@@ -179,6 +185,24 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Cron: aggregate-profiles] Complete: ${processed} processed (${created} created, ${updated} updated), ${errors} errors`);
 
+    // TERMINAL SELF-REPORT. All 30 runs in the 30 days before this was wired were
+    // recorded `dispatched` with http_status NULL — this job sweeps every user with
+    // search history serially, so it outlives the dispatcher's 12s ack and none of
+    // the returns below reached anything.
+    //
+    // EXECUTION vs ADVANCEMENT stay separate: a sweep that finished having written
+    // NO profile for a non-empty user list completed without advancing anything, so
+    // it is partial, not success.
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      processed === 0 ? 'partial' : errors > 0 ? 'partial' : 'success',
+      processed === 0
+        ? `0 of ${uniqueEmails.length} users aggregated (${errors} errors)`
+        : errors > 0
+          ? `${errors} of ${uniqueEmails.length} users errored`
+          : undefined,
+    );
+
     return NextResponse.json({
       success: true,
       processed,
@@ -190,6 +214,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('[Cron: aggregate-profiles] Fatal error:', error);
+    await reportCronOutcome(CRON_JOB_NAME, 'error', String(error));
     return NextResponse.json(
       { error: 'Aggregation job failed', details: String(error) },
       { status: 500 }

@@ -194,7 +194,17 @@ async function fireJob(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), waitMs);
     const res = await fetch(url, {
-      headers: { authorization: `Bearer ${process.env.CRON_SECRET || ''}`, 'x-cron-dispatch': '1' },
+      headers: {
+        authorization: `Bearer ${process.env.CRON_SECRET || ''}`,
+        'x-cron-dispatch': '1',
+        // WHICH job this fire belongs to. A route reached by TWO cron_jobs rows
+        // (daily-alerts + daily-alerts-10 share /api/cron/daily-alerts;
+        // weekly-alerts + weekly-alerts-mon share /api/cron/weekly-alerts)
+        // otherwise cannot self-report its terminal outcome without GUESSING
+        // which row claimed it — and a status written for the wrong job is
+        // worse than no status. Read it with `dispatchedJobName()`.
+        'x-cron-job': job.job_name,
+      },
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
     httpStatus = res.status;

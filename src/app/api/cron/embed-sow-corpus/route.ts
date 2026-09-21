@@ -18,6 +18,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { embedText } from '@/lib/market/embeddings';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'embed-sow-corpus';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -122,6 +126,30 @@ export async function GET(request: NextRequest) {
     .select('*', { count: 'exact', head: true })
     .is('sow_embedding', null)
     .or('sow_text.not.is.null,description.not.is.null');
+
+  // TERMINAL SELF-REPORT. 219 of 2,863 runs in the preceding 30 days were recorded
+  // `dispatched` with http_status NULL — the embedding loop outruns the dispatcher's 12s
+  // ack whenever the batch is large, so those runs had no completion evidence.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate, and they diverge sharply here: embedText
+  // failures are swallowed per row by design (a poison row must not block the queue), so
+  // a run where OpenAI was down would claim rows, embed NOTHING and still return 200.
+  // That is the DARPA/NSF shape — 200 while writing zero — so it reports partial.
+  // `skipped` rows ARE advancement (they get the empty-array sentinel and leave the queue).
+  const claimed = (rows || []).length;
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    claimed > 0 && embedded === 0 && skipped === 0
+      ? 'partial'
+      : failed > 0
+        ? 'partial'
+        : 'success',
+    claimed > 0 && embedded === 0 && skipped === 0
+      ? `0 embedded of ${claimed} claimed rows (${failed} failed)`
+      : failed > 0
+        ? `${failed} of ${claimed} rows failed to embed`
+        : undefined,
+  );
 
   return NextResponse.json({
     success: true,

@@ -22,6 +22,10 @@ import { generateWeeklyDeepDiveFromContracts } from '@/lib/briefings/delivery/we
 import { fetchContractsForProfile } from '@/lib/briefings/weekly-contracts';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { hashNaicsProfile, naicsProfileKey } from '@/lib/briefings/naics-profile-hash';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'precompute-weekly-briefings';
 
 const PROFILES_PER_RUN = 25; // Upper bound; soft time budget stops safely before platform timeout.
 const MAX_RUN_MS = 210_000;
@@ -89,6 +93,9 @@ export async function GET(request: NextRequest) {
 
   if (dayOfWeek !== 4 && !isTest) {
     console.log(`[PrecomputeWeekly] Skipped - not Thursday (day ${dayOfWeek})`);
+    // A deliberate day-guard skip IS the job working as designed → success. Without
+    // this a non-Thursday fire would sit at `dispatched` forever.
+    await reportCronOutcome(CRON_JOB_NAME, 'success');
     return NextResponse.json({
       success: true,
       message: `Weekly precompute only runs on Thursday. Today is day ${dayOfWeek}.`,
@@ -212,6 +219,8 @@ function getSupabase() {
     console.log(`[PrecomputeWeekly] Processing up to ${profilesToProcess.length} profiles (${existingHashes.size} already done)`);
 
     if (profilesToProcess.length === 0) {
+      // Every template for the target date already exists — genuine success.
+      if (!isTest) await reportCronOutcome(CRON_JOB_NAME, 'success');
       return NextResponse.json({
         success: true,
         message: 'All weekly templates already generated',
@@ -306,6 +315,32 @@ function getSupabase() {
 
     console.log(`[PrecomputeWeekly] Complete: ${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`);
 
+    // TERMINAL SELF-REPORT. All 4 runs in the preceding 30 days (weekly schedule) were
+    // recorded `dispatched` with http_status NULL — template generation is a Claude/LLM
+    // loop that always outlives the dispatcher's 12s ack. These templates are what
+    // `send-weekly-fast` mails on Friday, so a silently dead precompute means a Friday
+    // with no weekly deep dive for anyone.
+    //
+    // EXECUTION vs ADVANCEMENT stay separate: a run that attempted profiles and generated
+    // NO template completed while advancing nothing (that is the shape of an exhausted LLM
+    // quota) — error. Some failing, or stopping on the time budget with work left, is
+    // partial; the dispatcher window re-fires to finish, which is the design.
+    if (!isTest) {
+      await reportCronOutcome(
+        CRON_JOB_NAME,
+        profilesAttempted > 0 && templatesGenerated === 0
+          ? 'error'
+          : templatesFailed > 0 || remaining > 0
+            ? 'partial'
+            : 'success',
+        profilesAttempted > 0 && templatesGenerated === 0
+          ? `0 templates generated from ${profilesAttempted} profiles attempted`
+          : templatesFailed > 0 || remaining > 0
+            ? `${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`
+            : undefined,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       templatesGenerated,
@@ -323,6 +358,7 @@ function getSupabase() {
 
   } catch (error) {
     console.error('[PrecomputeWeekly] Fatal error:', error);
+    if (!isTest) await reportCronOutcome(CRON_JOB_NAME, 'error', String(error));
     return NextResponse.json({
       success: false,
       error: String(error),

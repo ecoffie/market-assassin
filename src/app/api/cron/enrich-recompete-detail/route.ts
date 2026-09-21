@@ -33,6 +33,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resolveRecompeteDetail, DetailFetchError } from '@/lib/recompete/detail-enrich';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'enrich-recompete-detail';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,6 +87,11 @@ export async function GET(request: NextRequest) {
     .is('quality_flag', null)
     .is('detail_checked_at', null);
   if (remainingRes.error) {
+    // Only the scheduled shape speaks for the job; a hand-run preview must not
+    // overwrite its status.
+    if (mode === 'execute') {
+      await reportCronOutcome(CRON_JOB_NAME, 'error', `count failed: ${remainingRes.error.message}`);
+    }
     return NextResponse.json({ error: `count failed: ${remainingRes.error.message}` }, { status: 500 });
   }
   const remaining = remainingRes.count ?? 0;
@@ -101,6 +110,7 @@ export async function GET(request: NextRequest) {
     .order('contract_id', { ascending: true })
     .limit(limit);
   if (error) {
+    await reportCronOutcome(CRON_JOB_NAME, 'error', `claim failed: ${error.message}`);
     return NextResponse.json({ error: `claim failed: ${error.message}` }, { status: 500 });
   }
   const batch = (rows || []) as { contract_id: string }[];
@@ -136,6 +146,25 @@ export async function GET(request: NextRequest) {
       }
     }
   }
+
+  // TERMINAL SELF-REPORT. All 709 runs in the 30 days before this was wired were
+  // recorded `dispatched` with http_status NULL — the serial drain runs to a 270s
+  // budget, ~22× past the dispatcher's 12s ack, so this 200 lands on a closed
+  // connection and the run history proved nothing either way.
+  //
+  // EXECUTION vs ADVANCEMENT are reported separately. A batch that claimed rows and
+  // stamped NONE of them executed to completion while advancing zero — USASpending's
+  // detail endpoint throttling produces exactly that, and by design those rows stay
+  // NULL for the next tick. That is `partial`; only a run that stamped what it
+  // claimed, with no failures, is a success. An empty queue (nothing claimed) is a
+  // genuine success.
+  const outcome =
+    batch.length === 0 ? 'success' : stamped === 0 ? 'partial' : failed > 0 ? 'partial' : 'success';
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    outcome,
+    outcome === 'partial' ? `stamped ${stamped}/${batch.length}, ${failed} failed` : undefined,
+  );
 
   return NextResponse.json({
     success: true,

@@ -30,6 +30,7 @@ import {
 import { sendEmail } from '@/lib/send-email';
 import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { createEmailTrackingToken } from '@/lib/engagement';
+import { reportCronOutcome, dispatchedJobName } from '@/lib/cron-self-report';
 
 // Process up to 200 users per cron run (~150ms each = 30 seconds total)
 // Increased from 100 to ensure all 958+ users are covered in 10 cron runs
@@ -61,9 +62,23 @@ async function queueForRetry(
   }
 }
 
+/**
+ * The cron_jobs row that claimed this request, or null when it is not a dispatcher fire.
+ *
+ * TWO rows share this route with IDENTICAL query strings — `send-briefings-fast` (the
+ * 07:00 UTC batch window) and `send-briefings-fast-8` (08:00) — so nothing in the URL
+ * distinguishes them and `reportCronOutcome` writes BY JOB NAME.
+ */
+function claimedJob(request: NextRequest): string | null {
+  if (request.headers.get('x-cron-dispatch') !== '1') return null;
+  return dispatchedJobName(request.headers);
+}
+
 export async function GET(request: NextRequest) {
   const testEmail = request.nextUrl.searchParams.get('email');
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
+  // A ?email=&test=true run is a single-user rehearsal — it must not speak for the job.
+  const cronJob = testEmail && isTest ? null : claimedJob(request);
 
   // Verify cron secret
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
@@ -140,6 +155,7 @@ export async function GET(request: NextRequest) {
     // dedup read must ABORT the run (the next cron tick retries), never silently send duplicates.
     if (processedErr) {
       console.error('[SendBriefingsFast] dedup query (briefing_log) failed — aborting to avoid duplicate sends:', processedErr.message);
+      if (cronJob) await reportCronOutcome(cronJob, 'error', `dedup query failed: ${processedErr.message}`);
       return NextResponse.json({
         success: false,
         error: 'Dedup query failed; aborted this run to avoid duplicate briefings. Will retry next tick.',
@@ -342,6 +358,27 @@ export async function GET(request: NextRequest) {
 
     console.log(`[SendBriefingsFast] Complete: ${briefingsSent} sent, ${briefingsSkipped} skipped, ${briefingsFailed} failed, ${noOpportunitiesCount} no opps`);
 
+    // TERMINAL SELF-REPORT. 58 of this job's 169 runs in the preceding 30 days were
+    // recorded `dispatched` with http_status NULL — the send loop outruns the dispatcher's
+    // 12s ack whenever the batch is large. These are CUSTOMER-FACING daily briefings.
+    //
+    // EXECUTION vs ADVANCEMENT stay separate. An exhausted batch (everyone already
+    // processed today → 0 users to process) is a genuine success. A run that had users and
+    // delivered NOTHING is not — and `noOpportunitiesCount` is deliberately NOT treated as
+    // a failure: "no matching opportunities today" is a real, honest outcome for a user.
+    if (cronJob) {
+      const attempted = briefingsSent + briefingsFailed;
+      await reportCronOutcome(
+        cronJob,
+        attempted > 0 && briefingsSent === 0
+          ? 'error'
+          : briefingsFailed > 0
+            ? 'partial'
+            : 'success',
+        briefingsFailed > 0 ? `${briefingsFailed} of ${attempted} sends failed` : undefined,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       briefingsSent,
@@ -357,6 +394,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('[SendBriefingsFast] Fatal error:', error);
+    if (cronJob) await reportCronOutcome(cronJob, 'error', String(error));
     return NextResponse.json({
       success: false,
       error: String(error),

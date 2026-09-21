@@ -54,6 +54,7 @@ import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vau
 import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-branding';
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
+import { reportCronOutcome, dispatchedJobName } from '@/lib/cron-self-report';
 
 export const maxDuration = 300;
 
@@ -368,11 +369,39 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
  * Free tier users are skipped (they get weekly alerts via weekly-alerts cron)
  * Paid tier = any product purchase (MA, Recompete, Content, Database, etc.)
  */
+/**
+ * The cron_jobs row that claimed this request, or null when it is not a dispatcher fire.
+ *
+ * TWO rows share this route with IDENTICAL query strings — `daily-alerts` (the 3-14 UTC
+ * batch window) and `daily-alerts-10` (15:00 UTC) — so nothing in the URL distinguishes
+ * them. `reportCronOutcome` writes BY JOB NAME and stamping the wrong row is worse than
+ * leaving a run unconfirmed, so the name comes from the dispatcher's `x-cron-job` header
+ * or nothing is reported.
+ */
+function claimedJob(request: NextRequest): string | null {
+  if (request.headers.get('x-cron-dispatch') !== '1') return null;
+  return dispatchedJobName(request.headers);
+}
+
 async function runDailyAlertJob(options?: {
   skipTimezoneCheck?: boolean;
   testEmail?: string;
   forceResend?: boolean;
+  /** Set ONLY for a real dispatcher fire — see claimedJob(). */
+  jobName?: string | null;
 }): Promise<NextResponse> {
+  // TERMINAL SELF-REPORT. `daily-alerts` recorded `dispatched` with http_status NULL on
+  // 815 of 2,042 runs in the preceding 30 days (and `daily-alerts-10` on 3 of 30): the
+  // batch sends up to BATCH_SIZE users' alert emails and routinely outlives the
+  // dispatcher's 12s ack, so ~40% of runs of the platform's highest-volume
+  // CUSTOMER-FACING job had no completion evidence at all.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate. An exhausted batch ("all users already
+  // processed today") and an empty audience are genuine successes. A batch that had
+  // users and delivered NOTHING is not — that is the shape of a dead email provider.
+  const report = async (outcome: 'success' | 'error' | 'partial', detail?: string) => {
+    if (options?.jobName) await reportCronOutcome(options.jobName, outcome, detail);
+  };
   // Initialize metrics and guardrails
   const metrics = new IntelligenceMetrics('daily_alerts');
   const guardrails = new GuardrailMonitor('daily-alerts');
@@ -391,6 +420,7 @@ async function runDailyAlertJob(options?: {
       errorMessage: breakerMessage,
       requestPath: '/api/cron/daily-alerts',
     }).catch(() => {});
+    await report('error', breakerMessage);
     return NextResponse.json({
       success: false,
       error: breakerMessage,
@@ -436,11 +466,13 @@ async function runDailyAlertJob(options?: {
       });
     } catch (usersError) {
       console.error('[Daily Alerts] Error fetching users:', usersError);
+      await report('error', `fetch users failed: ${String(usersError)}`);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
     if (!users || users.length === 0) {
       console.log('[Daily Alerts] No daily alert users found');
+      await report('success');
       return NextResponse.json({
         success: true,
         message: 'No users to process',
@@ -528,6 +560,7 @@ async function runDailyAlertJob(options?: {
 
     if (usersToProcess.length === 0) {
       console.log('[Daily Alerts] All users already processed today');
+      await report('success');
       return NextResponse.json({
         success: true,
         message: 'All users already processed today',
@@ -1178,6 +1211,15 @@ async function runDailyAlertJob(options?: {
       duration: metrics.getSnapshot().duration_ms,
     });
 
+    await report(
+      results.sent === 0 && results.failed > 0
+        ? 'error'
+        : results.failed > 0
+          ? 'partial'
+          : 'success',
+      results.failed > 0 ? `${results.failed} of ${usersToProcess.length} sends failed` : undefined,
+    );
+
     return NextResponse.json({
       success: true,
       results,
@@ -1215,6 +1257,7 @@ async function runDailyAlertJob(options?: {
     metrics.recordGuardrailWarning();
     await metrics.save();
 
+    await report('error', errorMessage);
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
@@ -1280,7 +1323,7 @@ export async function GET(request: NextRequest) {
 
   // Run the job if triggered by Vercel cron or has CRON_SECRET
   if (isVercelCron || hasCronSecret) {
-    return runDailyAlertJob();
+    return runDailyAlertJob({ jobName: claimedJob(request) });
   }
 
   // Otherwise return documentation

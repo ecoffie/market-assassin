@@ -9,6 +9,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { tagCtaBatch } from '@/lib/cta/tagger';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'tag-cta';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +39,20 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await tagCtaBatch(supabase, { limit, activeOnly });
+    // TERMINAL SELF-REPORT. 212 of 628 runs in the preceding 30 days were recorded
+    // `dispatched` with http_status NULL — the batch outruns the dispatcher's 12s ack on
+    // roughly a third of fires, so a third of runs had no completion evidence.
+    //
+    // EXECUTION vs ADVANCEMENT: a run that had rows left (`remaining`) but tagged NONE
+    // completed without moving the queue — partial. A drained queue (remaining 0,
+    // processed 0) is a real success.
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      result.processed === 0 && Boolean(result.remaining) ? 'partial' : 'success',
+      result.processed === 0 && Boolean(result.remaining)
+        ? `0 tagged with ${result.remaining} still queued`
+        : undefined,
+    );
     return NextResponse.json({
       success: true,
       ...result,
@@ -45,6 +63,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'CTA tagger failed';
     console.error('[tag-cta]', message);
+    await reportCronOutcome(CRON_JOB_NAME, 'error', message);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -33,6 +33,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAttachmentDrainKeys, getRotatedSAMKey } from '@/lib/sam/utils';
 import { fetchNoticeResources } from '@/lib/sam/fetch-notice-resources';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'backfill-sam-attachments';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -143,6 +147,7 @@ export async function GET(request: NextRequest) {
   const { data: rows, error } = await queryBuilder;
 
   if (error) {
+    await reportCronOutcome(CRON_JOB_NAME, 'error', `fetch failed: ${error.message}`);
     return NextResponse.json(
       { success: false, error: `fetch failed: ${error.message}` },
       { status: 500 }
@@ -150,6 +155,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!rows || rows.length === 0) {
+    await reportCronOutcome(CRON_JOB_NAME, 'success');
     return NextResponse.json({
       success: true,
       message: 'No rows left to fetch attachments for',
@@ -212,6 +218,24 @@ export async function GET(request: NextRequest) {
     .select('id', { count: 'exact', head: true }) as any)
     .or('attachments.is.null,attachments.eq.[]')
     .eq('active', true);
+
+  // TERMINAL SELF-REPORT. All 50 runs in the 30 days before this was wired were
+  // recorded `dispatched` with http_status NULL: the loop is 150 notices × 200ms
+  // plus fetch time, so it always outlives the dispatcher's 12s ack and this body
+  // reaches a closed connection.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate. Every row failing is the shape of a
+  // spent/dead SAM key pool and advances nothing — error. Some failing is partial.
+  // A run where SAM honestly reported no attachments is a success: the rows were
+  // stamped with the sentinel, which IS advancement.
+  const stamped = withAttachments + withoutAttachments;
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    failed === 0 ? 'success' : stamped === 0 ? 'error' : 'partial',
+    failed === 0
+      ? undefined
+      : `${failed}/${rows.length} notices failed (keys=${drainKeys.length})`,
+  );
 
   return NextResponse.json({
     success: failed === 0,

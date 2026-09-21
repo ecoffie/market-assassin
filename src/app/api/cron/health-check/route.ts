@@ -3,6 +3,11 @@ import { FEATURES } from '@/app/api/admin/feature-usage/route';
 import { checkRelations, checkClassifier } from '@/lib/integrity/runtime';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// The ONLY enabled cron_jobs row pointing here is `health-check-email`
+// (/api/cron/health-check?email=true).
+const CRON_JOB_NAME = 'health-check-email';
 
 const BASE_URL = 'https://getmindy.ai';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -814,6 +819,24 @@ export async function GET(request: NextRequest) {
     } catch (emailError) {
       console.error('[Health Check] Failed to send alert:', emailError);
     }
+  }
+
+  // TERMINAL SELF-REPORT. 29 of this job's 30 runs in the preceding 30 days were
+  // recorded `dispatched` with http_status NULL: the suite runs every probe serially and
+  // outlives the dispatcher's 12s ack. A health CHECK that cannot report its own
+  // completion is the worst case of this class — silence reads as "all clear" when it may
+  // simply never have run.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate, and they point opposite ways here: FAILING
+  // tests are the watch working (it found what it looks for) and are reported by the ops
+  // alert above, not by the job's status. What makes the JOB unhealthy is producing no
+  // verdict at all — zero tests executed.
+  if (sendEmail) {
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      results.length === 0 ? 'error' : 'success',
+      results.length === 0 ? 'no probes executed — no health verdict established' : undefined,
+    );
   }
 
   // Return response

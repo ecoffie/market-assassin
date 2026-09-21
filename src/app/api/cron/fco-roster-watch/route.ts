@@ -15,6 +15,10 @@ import { createClient } from '@supabase/supabase-js';
 import { runFcoWatch } from '@/lib/forecasts/fco-watch-run';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'fco-roster-watch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,9 +69,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // TERMINAL SELF-REPORT. Its one run in the preceding 30 days (weekly schedule) was
+    // recorded `dispatched` with http_status NULL — the roster crawl runs to a 240s budget,
+    // 20× the dispatcher's 12s ack. The catch below says "a watch that dies silently is
+    // exactly what this replaces", but its 500 was landing on a closed connection, so the
+    // watch could in fact die silently. It can't now.
+    //
+    // EXECUTION vs ADVANCEMENT: a census that saw NO upstream listings completed while
+    // establishing nothing about the roster — partial, never success. Finding zero
+    // actionable EVENTS is the healthy case and stays a success.
+    if (!dry) {
+      const sawNothing = !run.census.uniqueListingIds;
+      await reportCronOutcome(
+        CRON_JOB_NAME,
+        sawNothing ? 'partial' : 'success',
+        sawNothing ? 'upstream census returned 0 listing ids — roster not established' : undefined,
+      );
+    }
+
     return NextResponse.json({ success: true, alerted, reason, ...run });
   } catch (e) {
     // Surface it — a watch that dies silently is exactly what this replaces.
+    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'error', (e as Error).message);
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
 }

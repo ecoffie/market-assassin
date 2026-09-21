@@ -13,6 +13,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { certBackfillQueue, drainCertBackfill } from '@/lib/sam/recipient-certs';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// This route is fired by exactly ONE cron_jobs row, so the name is a constant.
+const CRON_JOB_NAME = 'backfill-recipient-certs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,11 +49,32 @@ export async function GET(request: NextRequest) {
     // A batch that touched SAM successfully is a 200; a run that couldn't reach SAM at all (every
     // attempt failed) is surfaced non-2xx so the dispatcher/watchdog notices a dead key.
     const deadKey = result.attempted > 0 && result.failed === result.attempted;
+    // TERMINAL SELF-REPORT. This drain runs ~250s under its own budget, so the
+    // dispatcher stopped listening at 12s and recorded `dispatched` — 709 of 709
+    // runs in the 30 days before this was wired. The non-2xx above only reaches a
+    // connection that is already closed.
+    //
+    // EXECUTION vs ADVANCEMENT are reported separately and neither substitutes for
+    // the other: a run that reached SAM for every queued firm and failed EVERY ONE
+    // executed fine but advanced nothing, so it is NOT a success. `failed` short of
+    // `attempted` is partial — some certs landed, some did not.
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      deadKey ? 'error' : result.failed > 0 ? 'partial' : 'success',
+      deadKey
+        ? `SAM unreachable: ${result.failed}/${result.attempted} lookups failed`
+        : result.failed > 0
+          ? `${result.failed}/${result.attempted} lookups failed`
+          : undefined,
+    );
     return NextResponse.json(
       { success: !deadKey, mode, ...result },
       { status: deadKey ? 502 : 200 },
     );
   } catch (e) {
+    // Only the scheduled shape (mode=execute) speaks for the job; a hand-run
+    // preview must never overwrite the job's status.
+    if (mode === 'execute') await reportCronOutcome(CRON_JOB_NAME, 'error', (e as Error).message);
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
 }

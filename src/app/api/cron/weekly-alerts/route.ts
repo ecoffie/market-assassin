@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
+import { reportCronOutcome, dispatchedJobName } from '@/lib/cron-self-report';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
 import { createClient } from '@supabase/supabase-js';
@@ -127,6 +128,23 @@ type WeeklyAlertSource = 'explicit_weekly' | 'free_weekly_fallback';
 interface WeeklyAlertJobOptions {
   force?: boolean;
   email?: string | null;
+  /**
+   * The cron_jobs row that claimed this run, for the terminal self-report.
+   *
+   * TWO rows share this route with IDENTICAL query strings —
+   * `weekly-alerts` (Sun 23:00 UTC) and `weekly-alerts-mon` (Mon 00:00 catch-up)
+   * — so nothing in the request URL can tell them apart. `reportCronOutcome`
+   * writes BY JOB NAME, and stamping the wrong row is worse than leaving the run
+   * unconfirmed, so this comes from the dispatcher's `x-cron-job` header or stays
+   * null and nothing is reported.
+   */
+  jobName?: string | null;
+}
+
+/** The claimed cron_jobs row, or null when this is not a dispatcher fire. */
+function claimedJob(request: NextRequest): string | null {
+  if (request.headers.get('x-cron-dispatch') !== '1') return null;
+  return dispatchedJobName(request.headers);
 }
 
 function getWeeklyCycleDate(referenceDate = new Date()): string {
@@ -205,6 +223,19 @@ async function persistProcessedWeeklyAlert({
  * 2. Free tier users with alert_frequency='daily' (skipped by daily-alerts cron)
  */
 async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<NextResponse> {
+  // TERMINAL SELF-REPORT (see jobName above). `weekly-alerts` recorded `dispatched`
+  // with http_status NULL on 30 of 30 runs and `weekly-alerts-mon` on 20 of 20 in the
+  // preceding 30 days: the batch sends up to BATCH_SIZE=75 alert emails, far past the
+  // dispatcher's 12s ack, so no run ever had completion evidence. These are
+  // CUSTOMER-FACING alert emails.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate. An exhausted batch ("all users already
+  // processed this week") and an empty audience are genuine successes — the cycle
+  // advanced earlier or has nobody in it. A batch that had users to send to and sent
+  // NOTHING is not.
+  const report = async (outcome: 'success' | 'error' | 'partial', detail?: string) => {
+    if (options.jobName) await reportCronOutcome(options.jobName, outcome, detail);
+  };
   try {
     console.log('[Weekly Alerts] Starting weekly alert job...');
     const alertDate = getWeeklyCycleDate();
@@ -226,11 +257,13 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         .order('user_email', { ascending: true }));
     } catch (usersError) {
       console.error('[Weekly Alerts] Error fetching users:', usersError);
+      await report('error', `fetch users failed: ${String(usersError)}`);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
     if (!allUsers || allUsers.length === 0) {
       console.log('[Weekly Alerts] No active alert users found');
+      await report('success');
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
@@ -278,6 +311,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
 
     if (users.length === 0) {
       console.log('[Weekly Alerts] No users to process after tier filtering');
+      await report('success');
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
@@ -303,6 +337,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     console.log(`[Weekly Alerts] Processing ${usersToProcess.length}/${users.length} users (${processedEmails.size} already processed this week)...`);
 
     if (usersToProcess.length === 0) {
+      await report('success');
       return NextResponse.json({
         success: true,
         message: 'All users already processed this week',
@@ -458,6 +493,11 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     const remainingUsers = users.length - processedEmails.size - usersToProcess.length;
     console.log(`[Weekly Alerts] Complete. Sent: ${results.sent}, Skipped: ${results.skipped}, Failed: ${results.failed}, Remaining: ${remainingUsers}`);
 
+    await report(
+      results.sent === 0 && results.failed > 0 ? 'error' : results.failed > 0 ? 'partial' : 'success',
+      results.failed > 0 ? `${results.failed}/${usersToProcess.length} sends failed` : undefined,
+    );
+
     return NextResponse.json({
       success: true,
       results,
@@ -472,6 +512,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     });
   } catch (error: unknown) {
     console.error('[Weekly Alerts] Error:', error);
+    await report('error', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -526,6 +567,10 @@ export async function GET(request: NextRequest) {
 
     if (dayOfWeek !== 0 && !force) {
       console.log(`[Weekly Alerts] Skipped - not Sunday (day ${dayOfWeek})`);
+      // A deliberate day-guard skip IS the job working as designed, so it is a success
+      // — not "no evidence". Without this a mid-week fire would stay `dispatched`.
+      const skipJob = claimedJob(request);
+      if (skipJob) await reportCronOutcome(skipJob, 'success');
       return NextResponse.json({
         success: true,
         message: `Weekly alerts only send on Sunday unless catchup=true or force=true. Today is day ${dayOfWeek}.`,
@@ -534,7 +579,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return runWeeklyAlertJob({ force, email: isTest ? email : null });
+    // A ?test=true&email= run is a single-user rehearsal — it must not speak for the job.
+    return runWeeklyAlertJob({
+      force,
+      email: isTest ? email : null,
+      jobName: isTest && email ? null : claimedJob(request),
+    });
   }
 
   // If checking specific user (not cron trigger)

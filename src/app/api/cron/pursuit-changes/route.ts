@@ -31,6 +31,10 @@ import {
   indexFamiliesByNoticeId,
   type FamilyNoticeRow,
 } from '@/lib/sam/solicitation-family';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'pursuit-changes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -189,6 +193,9 @@ export async function GET(request: NextRequest) {
   const totalMonitorable = allPursuits.length;
 
   if (!totalMonitorable) {
+    // Nothing to monitor is a genuine success — but only the scheduled (fleet)
+    // shape may speak for the job; ?email= is a single-user rehearsal.
+    if (!testEmail) await reportCronOutcome(CRON_JOB_NAME, 'success');
     return NextResponse.json({ success: true, monitored: 0, changes: 0, remaining: 0 });
   }
 
@@ -435,6 +442,27 @@ export async function GET(request: NextRequest) {
   // `remaining` = pursuits not yet touched this run (batch cap) PLUS any
   // skipped by the time budget. The dispatcher re-fires until remaining hits 0.
   const remainingThisRun = remaining + (pursuits.length - processed);
+
+  // TERMINAL SELF-REPORT. All 221 runs in the 30 days before this was wired were
+  // recorded `dispatched` with http_status NULL — the drain runs to a 45s budget,
+  // past the dispatcher's 12s ack, so nothing downstream ever saw this 200. These
+  // are CUSTOMER-FACING amendment/deadline alerts, so a silently dead run is a
+  // missed deadline for someone.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate: zero CHANGES is the normal healthy
+  // result (nothing moved upstream) and is a success. Zero PURSUITS PROCESSED out
+  // of a non-empty batch is not — the run completed without checking anything.
+  // Only the scheduled fleet shape reports; ?email= is a single-user rehearsal.
+  if (!testEmail) {
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      pursuits.length > 0 && processed === 0 ? 'partial' : 'success',
+      pursuits.length > 0 && processed === 0
+        ? `0 of ${pursuits.length} claimed pursuits checked`
+        : undefined,
+    );
+  }
+
   return NextResponse.json({
     success: true,
     totalMonitorable,

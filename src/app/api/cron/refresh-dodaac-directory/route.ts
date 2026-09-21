@@ -12,6 +12,10 @@ import {
   refreshSamOfficeNames,
   refreshOfficeEarlySignal,
 } from '@/lib/gov-contacts/refresh-dodaac-directory';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'refresh-dodaac-directory';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -72,10 +76,29 @@ export async function GET(request: NextRequest) {
       console.error('[refresh-dodaac-directory] early-signal pass failed:', earlySignalError);
     }
 
+    // TERMINAL SELF-REPORT. Its one run in the preceding 30 days (monthly schedule) was
+    // recorded `dispatched` with http_status NULL — three BigQuery/SAM passes outlive the
+    // dispatcher's 12s ack, so nothing downstream saw this body.
+    //
+    // EXECUTION vs ADVANCEMENT stay separate. Passes 2 and 3 are deliberately ISOLATED so
+    // a failure there cannot fail a pass-1 refresh that already wrote rows — that is the
+    // right HTTP behaviour and it is exactly why the job's own status must still say
+    // `partial`: a 200 carrying `samNamesError` is a run where part of the directory did
+    // not advance.
+    if (!dryRun) {
+      const broken = [samNamesError && 'sam_office_name', earlySignalError && 'early_signal'].filter(Boolean);
+      await reportCronOutcome(
+        CRON_JOB_NAME,
+        broken.length ? 'partial' : 'success',
+        broken.length ? `pass failed: ${broken.join(', ')}` : undefined,
+      );
+    }
+
     return NextResponse.json({
       success: true, dryRun, refresh, samNames, samNamesError, earlySignal, earlySignalError,
     });
   } catch (e) {
+    if (!dryRun) await reportCronOutcome(CRON_JOB_NAME, 'error', (e as Error).message);
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
 }

@@ -32,6 +32,7 @@ import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
+import { reportCronOutcome, dispatchedJobName } from '@/lib/cron-self-report';
 
 // The DoDAAC early-signal band map, loaded ONCE per sync run (an async precomputed lookup — same as
 // the map decorate). mapToDbRecord stays a pure sync fn by reading this run-scoped closure rather
@@ -60,6 +61,24 @@ let _dnaColumnsExist = false;
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
+
+/**
+ * THREE cron_jobs rows share this route — `sync-sam-opportunities-full` (no ?type),
+ * `-delta` (?type=delta) and `-resume` (?type=resume) — so there is no constant to
+ * pass to `reportCronOutcome`, which writes BY JOB NAME. The dispatcher declares
+ * which row it claimed in `x-cron-job`; that header is the ONLY safe source here.
+ *
+ * We deliberately do NOT infer the job from `?type=`: a hand-run `?type=delta&password=…`
+ * would then stamp a terminal status on a job that never fired. And we cannot infer it
+ * from the route's own `syncType` either — a resume run FALLS BACK to 'full' when the
+ * resume columns are missing, so by the end of the run that variable no longer names
+ * the job that started it. No header → report nothing (honest: no claimed job to
+ * speak for).
+ */
+function claimedJob(request: NextRequest): string | null {
+  if (request.headers.get('x-cron-dispatch') !== '1') return null;
+  return dispatchedJobName(request.headers);
+}
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
@@ -738,6 +757,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // TERMINAL SELF-REPORT. `-full` and `-resume` were recorded `dispatched` with
+    // http_status NULL on all 30 of their runs in the preceding 30 days, and `-delta`
+    // on 15 of 30 — this sync pages SAM for up to 300s, far past the dispatcher's 12s
+    // ack, so the body below reaches a closed connection.
+    //
+    // EXECUTION vs ADVANCEMENT stay separate: `isFullSuccess` is this route's own
+    // completeness verdict (no failed offsets), and a run that fetched NOTHING while SAM
+    // reported records available completed without advancing the corpus. Both are
+    // partial rather than success — the sync is resumable by design, so an incomplete
+    // pass is normal-but-worth-counting, not an error.
+    const jobFull = claimedJob(request);
+    if (jobFull && !dryRun) {
+      const noAdvance = totalAvailable > 0 && totalFetched === 0;
+      await reportCronOutcome(
+        jobFull,
+        !isFullSuccess || noAdvance ? 'partial' : 'success',
+        !isFullSuccess
+          ? `incomplete: ${newFailedOffsets.length} failed offsets, fetched ${totalFetched}/${totalAvailable}`
+          : noAdvance
+            ? `0 fetched of ${totalAvailable} available`
+            : undefined,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       syncType,
@@ -791,6 +834,12 @@ export async function GET(request: NextRequest) {
     const isUpstreamTransient = /SAM\.gov API error:\s*(502|503|504)\b|no healthy upstream/i.test(msg);
     if (isUpstreamTransient && totalFetched === 0) {
       console.warn('[sync-sam] soft-skip: transient SAM.gov upstream error —', msg);
+      // SAM.gov being down is not our failure, but it is NOT a success either: the run
+      // advanced nothing. `partial` keeps the watchdog quiet (it alerts on error/timeout)
+      // while leaving a truthful record, so a week of "transient" outages is visible
+      // instead of reading as a week of clean syncs.
+      const jobSoft = claimedJob(request);
+      if (jobSoft && !dryRun) await reportCronOutcome(jobSoft, 'partial', `SAM.gov upstream unavailable: ${msg}`);
       return NextResponse.json({
         success: true, // dispatcher/watchdog treat as OK; this is SAM.gov being down, not us
         skipped: true,
@@ -802,6 +851,8 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
+    const jobErr = claimedJob(request);
+    if (jobErr && !dryRun) await reportCronOutcome(jobErr, 'error', msg);
     return NextResponse.json({
       success: false,
       syncType,

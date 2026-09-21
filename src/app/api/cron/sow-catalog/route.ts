@@ -21,10 +21,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { attachmentUrls, scanAttachmentsForSow } from '@/lib/sam/sow-detect';
 import { getSowDrainKeys, hasDedicatedSowKeys } from '@/lib/sam/utils';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'sow-catalog';
+
+// ⚠️ This route has NO auth guard (pre-existing — it is publicly reachable), so the
+// terminal self-report is gated on the dispatcher's own `x-cron-dispatch` header.
+// Without that gate a passer-by could stamp a status on a scheduled job it never ran.
+// The missing auth itself is out of scope here and NOT fixed.
+function isDispatcherFire(request: NextRequest): boolean {
+  return request.headers.get('x-cron-dispatch') === '1';
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sb(): any {
@@ -86,7 +98,12 @@ export async function GET(request: NextRequest) {
     .eq('active', true)
     .order('id', { ascending: true })
     .limit(limit);
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (error) {
+    if (isDispatcherFire(request)) {
+      await reportCronOutcome(CRON_JOB_NAME, 'error', `queue read failed: ${error.message}`);
+    }
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
 
   let phase = 'active';
   // Active drained → recover inactive (recompete corpus). newest-expired first
@@ -154,6 +171,37 @@ export async function GET(request: NextRequest) {
   }
 
   const remaining = Math.max(0, (remainingTotal || 0) - processed);
+
+  // TERMINAL SELF-REPORT. This is the platform's most-dispatched blind job: 965 of its
+  // 2,633 runs in the preceding 30 days were recorded `dispatched` with http_status NULL,
+  // because the attachment scan routinely outlives the dispatcher's 12s ack — so the body
+  // below reached a closed connection on more than a third of runs.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate, and this route already distinguishes them in
+  // its own counters. `allKeysExhausted` means every SAM key 429'd and the run stopped
+  // early — it completed, but the queue did not move, which is an error, not a success.
+  // A run that claimed rows and stamped NONE is partial. `sowFound === 0` is NOT: plenty
+  // of notices genuinely have no SOW document, and calling that partial would cry wolf
+  // daily.
+  const claimed = (rows || []).length;
+  if (isDispatcherFire(request)) await reportCronOutcome(
+    CRON_JOB_NAME,
+    allKeysExhausted
+      ? 'error'
+      : claimed > 0 && processed === 0
+        ? 'partial'
+        : failed > 0 || skippedUnreached > 0
+          ? 'partial'
+          : 'success',
+    allKeysExhausted
+      ? `every SAM key exhausted (429) — ${processed}/${claimed} stamped`
+      : claimed > 0 && processed === 0
+        ? `0 of ${claimed} claimed rows stamped`
+        : failed > 0 || skippedUnreached > 0
+          ? `${failed} failed, ${skippedUnreached} unreachable of ${claimed} claimed`
+          : undefined,
+  );
+
   return NextResponse.json({
     success: true,
     mode: resweep ? 'resweep' : 'catalog',
