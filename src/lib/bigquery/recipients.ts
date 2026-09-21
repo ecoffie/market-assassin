@@ -26,6 +26,7 @@ import {
   classifyModNumber,
   classifyAgencyYearObligations,
   summarizeHistoricalSetAsides,
+  SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
 } from '@/lib/contractor/award-history-shape';
 import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 
@@ -1590,15 +1591,19 @@ export async function getBqContractorHistory(opts: {
 
   // Group the per-(year,agency) rows so each fiscal year carries its agency
   // breakdown — this is what the chart's click-to-drill-down renders.
-  // Zero-dollar cells are classified without inventing "unused vehicle".
+  // Zero-dollar cells keep vehicle_usage=not_established (never boolean false-as-caveat).
   const byYear = new Map<
     number,
     Array<{
       agency: string;
       amount: number;
+      /** @deprecated Prefer distinct_award_count — same value, grain=distinct_awards. */
       count: number;
+      distinct_award_count: number;
+      count_grain: 'distinct_awards';
       classification: ReturnType<typeof classifyAgencyYearObligations>['classification'];
-      unused_vehicle: false;
+      unused_vehicle: null;
+      vehicle_usage: 'not_established';
       classification_note: string | null;
     }>
   >();
@@ -1610,9 +1615,12 @@ export async function getBqContractorHistory(opts: {
     arr.push({
       agency: r.awarding_agency,
       amount,
-      count,
+      count: classified.distinct_award_count,
+      distinct_award_count: classified.distinct_award_count,
+      count_grain: classified.count_grain,
       classification: classified.classification,
-      unused_vehicle: false,
+      unused_vehicle: classified.unused_vehicle,
+      vehicle_usage: classified.vehicle_usage,
       classification_note: classified.note,
     });
     byYear.set(r.fiscal_year, arr);
@@ -1663,7 +1671,8 @@ export async function getBqContractorHistory(opts: {
             r.first_observed_positive_action_fy == null
               ? null
               : Number(r.first_observed_positive_action_fy),
-          contributingUeis: r.contributing_ueis ?? [uei],
+          // Preserve null — never substitute the queried UEI.
+          contributingUeis: r.contributing_ueis,
           supportingActions: (r.supporting_actions ?? []).map((a) => ({
             uei: a?.uei ?? null,
             award_id: a?.award_id ?? null,
@@ -1676,6 +1685,7 @@ export async function getBqContractorHistory(opts: {
     {
       coverage: setAsideUnavailable ? 'unavailable' : 'complete',
       scope: { kind: 'history_single_uei', uei_count: 1 },
+      contributingUeiSampleLimit: SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
       scopeNote:
         'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query.',
     },

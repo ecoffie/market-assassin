@@ -112,7 +112,13 @@ export function checkCyrusThreeToolAcceptance(input: {
       ? profile.topAgencies
       : [];
 
-  const zeroCells: Array<{ unused_vehicle?: boolean; classification?: string }> = [];
+  const zeroCells: Array<{
+    unused_vehicle?: unknown;
+    vehicle_usage?: unknown;
+    classification?: string;
+    count_grain?: unknown;
+    distinct_award_count?: unknown;
+  }> = [];
   const series = Array.isArray(history.series) ? history.series : [];
   for (const y of series) {
     const yr = asRecord(y);
@@ -120,10 +126,13 @@ export function checkCyrusThreeToolAcceptance(input: {
     for (const cell of breakdown) {
       const c = asRecord(cell);
       if (!c) continue;
-      if (Number(c.amount) === 0 && Number(c.count) > 0) {
+      if (Number(c.amount) === 0 && (Number(c.count) > 0 || Number(c.distinct_award_count) > 0)) {
         zeroCells.push({
-          unused_vehicle: c.unused_vehicle as boolean | undefined,
+          unused_vehicle: c.unused_vehicle,
+          vehicle_usage: c.vehicle_usage,
           classification: c.classification as string | undefined,
+          count_grain: c.count_grain,
+          distinct_award_count: c.distinct_award_count,
         });
       }
     }
@@ -133,16 +142,39 @@ export function checkCyrusThreeToolAcceptance(input: {
   const hasContributing = Object.values(contributing).some(
     (v) => Array.isArray(v) && v.length > 0,
   );
+  const hasUnknownContributor = Object.values(contributing).some((v) => v === null);
   const supporting = asRecord(profileSa.supporting_actions_by_label) ?? {};
   const hasSupporting = Object.values(supporting).some(
     (v) => Array.isArray(v) && v.length > 0,
   );
+  const contribLimit = Number(
+    profileSa.contributing_ueis_sample_limit ?? historySa.contributing_ueis_sample_limit,
+  );
+  const truncLabels = Array.isArray(profileSa.contributing_ueis_truncated_labels)
+    ? profileSa.contributing_ueis_truncated_labels
+    : Array.isArray(historySa.contributing_ueis_truncated_labels)
+      ? historySa.contributing_ueis_truncated_labels
+      : null;
+  const unknownLabels = Array.isArray(profileSa.contributing_ueis_unknown_labels)
+    ? profileSa.contributing_ueis_unknown_labels
+    : Array.isArray(historySa.contributing_ueis_unknown_labels)
+      ? historySa.contributing_ueis_unknown_labels
+      : null;
 
   const note = String(profileSa.note || '');
   const nullFirstNote = String(profileSa.null_first_positive_note || '');
   const freshnessNote = String(
     profileCoverage.freshness_note || historyCoverage.freshness_note || '',
   );
+
+  const profileFreshnessAvailable = profileCoverage.freshness_evidence_available === true;
+  const historyFreshnessAvailable = historyCoverage.freshness_evidence_available === true;
+  const profileCompleteness =
+    profileCoverage.coverage_completeness ??
+    (profileCoverage.coverage_complete_established === false ? 'not_established' : null);
+  const historyCompleteness =
+    historyCoverage.coverage_completeness ??
+    (historyCoverage.coverage_complete_established === false ? 'not_established' : null);
 
   const assertions: CyrusAssertion[] = [
     // —— Tool / payload presence ——
@@ -214,17 +246,36 @@ export function checkCyrusThreeToolAcceptance(input: {
       `unique_awards profile=${String(profileBases.unique_awards)} history=${String(historyBases.unique_awards)}`,
     ),
     assert(
+      'counting_distinct_award_grain',
+      profileBases.unique_awards_grain === 'distinct_awards' &&
+        historyBases.unique_awards_grain === 'distinct_awards' &&
+        /distinct.?award/i.test(String(profileBases.note || historyBases.note || '')),
+      `unique_awards_grain profile=${String(profileBases.unique_awards_grain)} history=${String(historyBases.unique_awards_grain)}`,
+    ),
+    assert(
       'counting_fy_sum_grain',
       typeof profileBases.fiscal_year_award_count_sum === 'number' &&
         typeof historyBases.fiscal_year_award_count_sum === 'number' &&
-        Number(profileBases.fiscal_year_award_count_sum) >= Number(profileBases.unique_awards),
-      `FY-sum profile=${String(profileBases.fiscal_year_award_count_sum)} (>= unique)`,
+        Number(profileBases.fiscal_year_award_count_sum) >= Number(profileBases.unique_awards) &&
+        (profileBases.fiscal_year_award_count_sum_grain === 'sum_of_per_fy_distinct_awards' ||
+          historyBases.fiscal_year_award_count_sum_grain === 'sum_of_per_fy_distinct_awards'),
+      `FY-sum profile=${String(profileBases.fiscal_year_award_count_sum)} grain=${String(profileBases.fiscal_year_award_count_sum_grain)}`,
     ),
     assert(
       'counting_recent_grain',
       profileBases.recent_grain === 'obligation_actions' &&
         historyBases.recent_grain === 'obligation_actions',
       `recent_grain profile=${String(profileBases.recent_grain)} history=${String(historyBases.recent_grain)}`,
+    ),
+    assert(
+      'agency_cell_distinct_award_grain',
+      zeroCells.length === 0 ||
+        zeroCells.every(
+          (c) =>
+            c.count_grain === 'distinct_awards' &&
+            typeof c.distinct_award_count === 'number',
+        ),
+      `zero cells=${zeroCells.length} all count_grain=distinct_awards`,
     ),
 
     // —— Scope ——
@@ -239,7 +290,7 @@ export function checkCyrusThreeToolAcceptance(input: {
       `history set-aside scope=${JSON.stringify(historyScope)}`,
     ),
 
-    // —— Freshness / uncertainty ——
+    // —— Freshness / uncertainty (clocks ≠ completeness) ——
     assert(
       'freshness_warehouse_max',
       Boolean(historyCoverage.warehouse_max_action_date) &&
@@ -255,21 +306,25 @@ export function checkCyrusThreeToolAcceptance(input: {
       `ingest history=${String(historyIngest.freshness_status)} profile=${String(profileIngest.freshness_status)}`,
     ),
     assert(
-      'freshness_note_three_clocks',
-      /Three clocks|warehouse|ingest/i.test(freshnessNote) &&
-        /does not establish complete|Missing evidence stays unknown|recent recipient action alone/i.test(
-          freshnessNote,
-        ),
-      'freshness_note distinguishes clocks and refuses recipient-action-as-complete-coverage',
+      'freshness_evidence_available',
+      profileFreshnessAvailable && historyFreshnessAvailable,
+      `freshness_evidence_available profile=${String(profileCoverage.freshness_evidence_available)} history=${String(historyCoverage.freshness_evidence_available)}`,
     ),
     assert(
-      'coverage_complete_established_not_overclaim',
-      // Flag may be true when clocks attached — note must still refuse over-read.
-      freshnessNote.length > 0 &&
-        !/this contractor.?s award history is exhaustive|corpus is complete for this recipient/i.test(
+      'coverage_completeness_not_established',
+      profileCoverage.coverage_complete_established === false &&
+        historyCoverage.coverage_complete_established === false &&
+        profileCompleteness === 'not_established' &&
+        historyCompleteness === 'not_established',
+      `coverage_complete_established must stay false; completeness=${String(profileCompleteness)}/${String(historyCompleteness)}`,
+    ),
+    assert(
+      'freshness_note_three_clocks',
+      /Three clocks|warehouse|ingest/i.test(freshnessNote) &&
+        /freshness_evidence_available|coverage_completeness=not_established|not_established/i.test(
           freshnessNote,
         ),
-      'coverage_complete_established must not claim recipient-exhaustive corpus',
+      'freshness_note separates clocks from completeness',
     ),
 
     // —— Set-aside uncertainty ——
@@ -297,6 +352,22 @@ export function checkCyrusThreeToolAcceptance(input: {
       `contributing=${hasContributing} supporting=${hasSupporting}`,
     ),
     assert(
+      'set_aside_contributor_truncation_disclosed',
+      Number.isFinite(contribLimit) &&
+        contribLimit > 0 &&
+        Array.isArray(truncLabels) &&
+        Array.isArray(unknownLabels),
+      `sample_limit=${String(contribLimit)} truncated=${JSON.stringify(truncLabels)} unknown=${JSON.stringify(unknownLabels)}`,
+    ),
+    assert(
+      'set_aside_unknown_contributors_preserved',
+      // Null entries mean unknown — never a substituted queried-UEI array disguised as evidence.
+      // When unknown_labels is non-empty, those labels must have null (not invented arrays).
+      (unknownLabels?.length ?? 0) === 0 ||
+        (unknownLabels as string[]).every((label) => contributing[label] === null || hasUnknownContributor),
+      `unknown_labels=${JSON.stringify(unknownLabels)}; null values preserved=${hasUnknownContributor}`,
+    ),
+    assert(
       'set_aside_last_fy_deprecated',
       dig(profileSa, 'deprecated.last_fy_by_label.status') === 'deprecated',
       `deprecated marker=${String(dig(profileSa, 'deprecated.last_fy_by_label.status'))}`,
@@ -313,9 +384,11 @@ export function checkCyrusThreeToolAcceptance(input: {
       `top_agencies=${topAgencies.length} all count null+unavailable`,
     ),
     assert(
-      'zero_dollar_not_unused_vehicle',
-      zeroCells.every((c) => c.unused_vehicle === false),
-      `zero cells=${zeroCells.length} all unused_vehicle=false`,
+      'zero_dollar_vehicle_usage_not_established',
+      zeroCells.every(
+        (c) => c.unused_vehicle === null && c.vehicle_usage === 'not_established',
+      ),
+      `zero cells=${zeroCells.length} unused_vehicle=null vehicle_usage=not_established (reject boolean false caveat)`,
     ),
 
     // —— SAM current vs historical (explained dual source) ——

@@ -51,6 +51,7 @@ import {
   isModificationAction,
   SHORT_TOTALS_NOTE,
   summarizeHistoricalSetAsides,
+  SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
 } from '@/lib/contractor/award-history-shape';
 import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 
@@ -398,7 +399,8 @@ export function makeTier2Tools(email: string) {
               r.first_observed_positive_action_fy == null
                 ? null
                 : Number(r.first_observed_positive_action_fy),
-            contributingUeis: r.contributing_ueis ?? childUeis,
+            // Preserve null — never substitute the queried UEI set (childUeis).
+            contributingUeis: r.contributing_ueis,
             supportingActions: (r.supporting_actions ?? []).map((a) => ({
               uei: a?.uei ?? null,
               award_id: a?.award_id ?? null,
@@ -411,6 +413,7 @@ export function makeTier2Tools(email: string) {
       {
         coverage: setAsideUnavailable ? 'unavailable' : 'complete',
         scope: { kind: 'profile_rollup', uei_count: childUeis.length },
+        contributingUeiSampleLimit: SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
         scopeNote:
           childUeis.length > 1
             ? `Aggregated across warehouse award actions for this profile's UEI set (${childUeis.length} UEIs on the rollup; not derived from the capped recent_awards sample). Award origin is not established by this query.`
@@ -469,7 +472,10 @@ export function makeTier2Tools(email: string) {
         as_of_meaning: coverageTs.last_recipient_action_meaning,
         warehouse_max_action_date: coverageTs.warehouse_max_action_date,
         ingest: coverageTs.ingest,
+        freshness_evidence_available: coverageTs.freshness_evidence_available,
+        coverage_completeness: coverageTs.coverage_completeness,
         coverage_complete_established: coverageTs.coverage_complete_established,
+        coverage_complete_established_meaning: coverageTs.coverage_complete_established_meaning,
         freshness_note: coverageTs.freshness_note,
         coverage_timestamp: coverageTs,
         not_equivalent_to: totalsScope === 'single_uei'

@@ -21,9 +21,11 @@
         "source_age_days": 3,
         "run_age_days": 0
       },
-      "coverage_complete_established": true,
-      "coverage_complete_established_meaning": "True only when warehouse max action_date and ingest clocks were attached and classified. Does NOT mean this recipient's award history is exhaustive or that coverage of the corpus is complete.",
-      "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage. coverage_complete_established=true means clocks were attached — not that this recipient's history is exhaustive."
+      "freshness_evidence_available": true,
+      "coverage_completeness": "not_established",
+      "coverage_complete_established": false,
+      "coverage_complete_established_meaning": "Always false until a dedicated completeness oracle exists. Attached freshness clocks (freshness_evidence_available) do NOT establish coverage completeness.",
+      "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. freshness_evidence_available=true. coverage_completeness=not_established — attached clocks do not prove this recipient's history is exhaustive or that warehouse coverage is complete. A contractor's quieter last_action_date does not mean the dataset is stale."
     },
     "contractor": {
       "company": "CYRUS MANAGEMENT SOLUTIONS LLC",
@@ -83,11 +85,13 @@
     },
     "counting_bases": {
       "unique_awards": 17,
+      "unique_awards_grain": "distinct_awards",
       "fiscal_year_award_count_sum": 51,
+      "fiscal_year_award_count_sum_grain": "sum_of_per_fy_distinct_awards",
       "recent_actions_returned": 20,
       "recent_unique_awards": 8,
       "recent_grain": "obligation_actions",
-      "note": "award_count / unique_awards = distinct awards in the warehouse profile. Summing per-FY award counts double-counts awards with actions in multiple years. recent_* rows are obligation actions (often modifications), not unique awards."
+      "note": "unique_awards (grain=distinct_awards) = COUNT(DISTINCT award_id) in warehouse scope — not obligation actions. fiscal_year_award_count_sum adds per-FY distinct-award counts and double-counts multi-year awards. recent_* rows are obligation actions (often modifications), not unique awards."
     },
     "series": [
       {
@@ -101,41 +105,56 @@
             "agency": "Department of the Treasury",
             "amount": 1950744.15,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Transportation",
             "amount": 1125486.79,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Defense",
             "amount": 456463.8,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "Department of State",
             "amount": -52029.87,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "negative_net",
-            "unused_vehicle": false,
-            "classification_note": "Negative net is deobligation evidence, not an unused vehicle."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Negative net is deobligation evidence. Vehicle usage remains not_established."
           }
         ]
       },
@@ -150,33 +169,45 @@
             "agency": "Department of the Treasury",
             "amount": 7193433.800000001,
             "count": 3,
+            "distinct_award_count": 3,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Defense",
             "amount": 1976495.48,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Transportation",
             "amount": 274779.36000000004,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 2 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       },
@@ -191,33 +222,45 @@
             "agency": "Department of Transportation",
             "amount": 1318359.6800000002,
             "count": 3,
+            "distinct_award_count": 3,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Defense",
             "amount": 870856.2,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of the Treasury",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       },
@@ -232,41 +275,56 @@
             "agency": "Department of Transportation",
             "amount": 938695.64,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Defense",
             "amount": 500,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 2 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "Department of the Treasury",
             "amount": -5000,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "negative_net",
-            "unused_vehicle": false,
-            "classification_note": "Negative net is deobligation evidence, not an unused vehicle."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Negative net is deobligation evidence. Vehicle usage remains not_established."
           },
           {
             "agency": "Department of Housing and Urban Development",
             "amount": -54479.14,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "negative_net",
-            "unused_vehicle": false,
-            "classification_note": "Negative net is deobligation evidence, not an unused vehicle."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Negative net is deobligation evidence. Vehicle usage remains not_established."
           }
         ]
       },
@@ -281,33 +339,45 @@
             "agency": "Department of Transportation",
             "amount": 288097.2,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "positive_net",
-            "unused_vehicle": false,
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
             "classification_note": null
           },
           {
             "agency": "Department of Defense",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 2 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "Department of the Treasury",
             "amount": -1015698.02,
             "count": 3,
+            "distinct_award_count": 3,
+            "count_grain": "distinct_awards",
             "classification": "negative_net",
-            "unused_vehicle": false,
-            "classification_note": "Negative net is deobligation evidence, not an unused vehicle."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Negative net is deobligation evidence. Vehicle usage remains not_established."
           }
         ]
       },
@@ -322,25 +392,34 @@
             "agency": "Department of the Treasury",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 2 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "Department of Defense",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       },
@@ -355,25 +434,34 @@
             "agency": "General Services Administration",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "Department of Defense",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "Department of Transportation",
             "amount": -310540.61,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "negative_net",
-            "unused_vehicle": false,
-            "classification_note": "Negative net is deobligation evidence, not an unused vehicle."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Negative net is deobligation evidence. Vehicle usage remains not_established."
           }
         ]
       },
@@ -388,17 +476,23 @@
             "agency": "Department of Defense",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 2,
+            "distinct_award_count": 2,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 2 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       },
@@ -413,17 +507,23 @@
             "agency": "Department of Defense",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       },
@@ -438,17 +538,23 @@
             "agency": "Department of Defense",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           },
           {
             "agency": "General Services Administration",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       },
@@ -463,9 +569,12 @@
             "agency": "General Services Administration",
             "amount": 0,
             "count": 1,
+            "distinct_award_count": 1,
+            "count_grain": "distinct_awards",
             "classification": "zero_net_obligations",
-            "unused_vehicle": false,
-            "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+            "unused_vehicle": null,
+            "vehicle_usage": "not_established",
+            "classification_note": "Zero net with 1 distinct award(s). Vehicle usage remains not_established — zero-dollar rows alone are insufficient."
           }
         ]
       }
@@ -1064,6 +1173,9 @@
           "N1N9JPDYHVC7"
         ]
       },
+      "contributing_ueis_unknown_labels": [],
+      "contributing_ueis_sample_limit": 20,
+      "contributing_ueis_truncated_labels": [],
       "supporting_actions_by_label": {
         "8(A) SOLE SOURCE": [
           {
@@ -1146,7 +1258,7 @@
         "uei_count": 1
       },
       "coverage": "complete",
-      "note": "Historical set-aside codes observed on warehouse award actions. last_observed_action_fy is the latest action FY for that code (may be a deobligation). first_observed_positive_action_fy is the earliest positive-obligation action FY when present — a later positive modification is still an action FY, not award origin. A null first_observed_positive_action_fy does not prove every action was a deobligation — it only means no positive-obligation action was observed for that label in this warehouse scope. Award origin is unknown unless a dedicated origin signal is present. None of these fields is current SAM certification status or a graduation/exit reason. last_fy_by_label is a deprecated alias of last_observed_action_fy_by_label. Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query."
+      "note": "Historical set-aside codes observed on warehouse award actions. last_observed_action_fy is the latest action FY for that code (may be a deobligation). first_observed_positive_action_fy is the earliest positive-obligation action FY when present — a later positive modification is still an action FY, not award origin. A null first_observed_positive_action_fy does not prove every action was a deobligation — it only means no positive-obligation action was observed for that label in this warehouse scope. Award origin is unknown unless a dedicated origin signal is present. None of these fields is current SAM certification status or a graduation/exit reason. last_fy_by_label is a deprecated alias of last_observed_action_fy_by_label. Contributor UEI lists are sampled at most 20 distinct UEIs per label. Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query."
     },
     "gated": {
       "fullHistory": false,
@@ -1171,11 +1283,13 @@
     "cache": "warm",
     "counting_bases": {
       "unique_awards": 17,
+      "unique_awards_grain": "distinct_awards",
       "fiscal_year_award_count_sum": 51,
+      "fiscal_year_award_count_sum_grain": "sum_of_per_fy_distinct_awards",
       "recent_actions_returned": 20,
       "recent_unique_awards": 8,
       "recent_grain": "obligation_actions",
-      "note": "award_count / unique_awards = distinct awards in the warehouse profile. Summing per-FY award counts double-counts awards with actions in multiple years. recent_* rows are obligation actions (often modifications), not unique awards."
+      "note": "unique_awards (grain=distinct_awards) = COUNT(DISTINCT award_id) in warehouse scope — not obligation actions. fiscal_year_award_count_sum adds per-FY distinct-award counts and double-counts multi-year awards. recent_* rows are obligation actions (often modifications), not unique awards."
     },
     "activity_status": "dormant",
     "last_positive_obligation_fy": 2020,

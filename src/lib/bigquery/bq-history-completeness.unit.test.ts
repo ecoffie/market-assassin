@@ -127,7 +127,9 @@ describe('getBqContractorHistory — source + completeness', () => {
     expect(h.coverage_timestamp.last_recipient_action_meaning).toMatch(/not the ingest/i);
     expect(h.coverage_timestamp.warehouse_max_action_date).toBe('2026-09-18');
     expect(h.coverage_timestamp.ingest.freshness_status).toBe('healthy');
-    expect(h.coverage_timestamp.coverage_complete_established).toBe(true);
+    expect(h.coverage_timestamp.freshness_evidence_available).toBe(true);
+    expect(h.coverage_timestamp.coverage_complete_established).toBe(false);
+    expect(h.coverage_timestamp.coverage_completeness).toBe('not_established');
     expect(h.historical_set_asides.labels).toContain('8(A) SOLE SOURCE');
     expect(h.historical_set_asides.last_observed_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2022);
     expect(h.historical_set_asides.first_observed_positive_action_fy_by_label['8(A) SOLE SOURCE']).toBe(2019);
@@ -279,10 +281,13 @@ describe('getBqContractorHistory — source + completeness', () => {
       agency: 'General Services Administration',
       amount: 0,
       count: 2,
+      distinct_award_count: 2,
+      count_grain: 'distinct_awards',
       classification: 'zero_net_obligations',
-      unused_vehicle: false,
+      unused_vehicle: null,
+      vehicle_usage: 'not_established',
     });
-    expect(cell.classification_note).toMatch(/not classified as an unused vehicle/i);
+    expect(cell.classification_note).toMatch(/not_established|zero-dollar rows alone are insufficient/i);
   });
 
   it('genuine zero-award profile: empty details remain complete', async () => {

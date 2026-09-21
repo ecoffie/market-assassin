@@ -49,9 +49,13 @@ export interface ActivityDerived {
 }
 
 export interface CountingBases {
+  /** Lifetime distinct award_id count in the warehouse profile/history scope. */
   unique_awards: number;
+  /** Machine grain for unique_awards — never obligation actions. */
+  unique_awards_grain: 'distinct_awards';
   /** Sum of per-FY distinct award counts — NOT unique lifetime awards. */
   fiscal_year_award_count_sum: number;
+  fiscal_year_award_count_sum_grain: 'sum_of_per_fy_distinct_awards';
   recent_actions_returned: number;
   recent_unique_awards: number;
   recent_grain: 'obligation_actions';
@@ -309,13 +313,15 @@ export function buildCountingBases(input: {
 
   return {
     unique_awards: input.uniqueAwards,
+    unique_awards_grain: 'distinct_awards',
     fiscal_year_award_count_sum,
+    fiscal_year_award_count_sum_grain: 'sum_of_per_fy_distinct_awards',
     recent_actions_returned,
     recent_unique_awards,
     recent_grain: 'obligation_actions',
     note:
-      'award_count / unique_awards = distinct awards in the warehouse profile. ' +
-      'Summing per-FY award counts double-counts awards with actions in multiple years. ' +
+      'unique_awards (grain=distinct_awards) = COUNT(DISTINCT award_id) in warehouse scope — not obligation actions. ' +
+      'fiscal_year_award_count_sum adds per-FY distinct-award counts and double-counts multi-year awards. ' +
       'recent_* rows are obligation actions (often modifications), not unique awards.',
   };
 }
@@ -364,6 +370,9 @@ export const LAST_FY_BY_LABEL_DEPRECATION = {
     'Alias of last_observed_action_fy_by_label kept for compatibility. Not award origin and not certification.',
 };
 
+/** BQ ARRAY_AGG DISTINCT recipient_uei LIMIT — disclose when a label hits this. */
+export const SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT = 20;
+
 /**
  * Historical set-aside evidence from award actions — NOT current SAM certification.
  * Never infer graduation / exit reason from this alone.
@@ -381,6 +390,8 @@ export function summarizeHistoricalSetAsides(
     scopeNote?: string;
     /** Machine-readable profile-rollup vs history-single-UEI scope. */
     scope?: { kind: SetAsideScopeKind; uei_count: number };
+    /** ARRAY_AGG LIMIT used upstream — disclose truncation against this. */
+    contributingUeiSampleLimit?: number;
   },
 ): {
   labels: string[];
@@ -398,7 +409,17 @@ export function summarizeHistoricalSetAsides(
   last_fy_by_label: Record<string, number | null>;
   /** Explicit deprecation marker for last_fy_by_label (compat preserved). */
   deprecated: { last_fy_by_label: typeof LAST_FY_BY_LABEL_DEPRECATION };
-  contributing_ueis_by_label: Record<string, string[]>;
+  /**
+   * Per-label contributor UEIs. `null` = contributor evidence not established
+   * (never substitute the queried UEI set). Array = warehouse-returned sample.
+   */
+  contributing_ueis_by_label: Record<string, string[] | null>;
+  /** Labels whose contributing_ueis evidence was null/absent upstream. */
+  contributing_ueis_unknown_labels: string[];
+  /** ARRAY_AGG DISTINCT limit applied upstream. */
+  contributing_ueis_sample_limit: number;
+  /** Labels whose returned contributor sample hit the LIMIT (may be incomplete). */
+  contributing_ueis_truncated_labels: string[];
   supporting_actions_by_label: Record<string, SetAsideSupportingAction[]>;
   null_first_positive_note: string;
   scope: { kind: SetAsideScopeKind; uei_count: number } | null;
@@ -406,9 +427,17 @@ export function summarizeHistoricalSetAsides(
   note: string;
 } {
   const coverage = opts?.coverage ?? 'complete';
+  const sampleLimit =
+    typeof opts?.contributingUeiSampleLimit === 'number' &&
+    Number.isFinite(opts.contributingUeiSampleLimit) &&
+    opts.contributingUeiSampleLimit > 0
+      ? Math.floor(opts.contributingUeiSampleLimit)
+      : SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT;
   const lastAction: Record<string, number | null> = {};
   const firstPositive: Record<string, number | null> = {};
-  const contributing: Record<string, string[]> = {};
+  const contributingKnown: Record<string, Set<string>> = {};
+  const contributingUnknown = new Set<string>();
+  const contributingTruncated = new Set<string>();
   const supporting: Record<string, SetAsideSupportingAction[]> = {};
 
   for (const row of rows) {
@@ -443,12 +472,23 @@ export function summarizeHistoricalSetAsides(
       firstPositive[label] = null;
     }
 
-    const ueiSet = new Set(contributing[label] ?? []);
-    for (const u of row.contributingUeis ?? []) {
-      const uei = String(u || '').trim().toUpperCase();
-      if (uei) ueiSet.add(uei);
+    // Preserve unknown contributor evidence — never invent the queried UEI set.
+    if (row.contributingUeis == null) {
+      if (!(label in contributingKnown)) contributingUnknown.add(label);
+    } else {
+      contributingUnknown.delete(label);
+      const ueiSet = contributingKnown[label] ?? new Set<string>();
+      let returnedCount = 0;
+      for (const u of row.contributingUeis) {
+        returnedCount += 1;
+        const uei = String(u || '').trim().toUpperCase();
+        if (uei) ueiSet.add(uei);
+      }
+      contributingKnown[label] = ueiSet;
+      if (returnedCount >= sampleLimit || ueiSet.size >= sampleLimit) {
+        contributingTruncated.add(label);
+      }
     }
-    contributing[label] = [...ueiSet].sort();
 
     const actions = supporting[label] ?? [];
     for (const a of row.supportingActions ?? []) {
@@ -480,10 +520,16 @@ export function summarizeHistoricalSetAsides(
   }
 
   const labels = Object.keys(lastAction).sort();
+  const contributing: Record<string, string[] | null> = {};
   for (const label of labels) {
     if (!(label in firstPositive)) firstPositive[label] = null;
-    if (!(label in contributing)) contributing[label] = [];
     if (!(label in supporting)) supporting[label] = [];
+    if (label in contributingKnown) {
+      contributing[label] = [...contributingKnown[label]].sort();
+    } else {
+      contributing[label] = null;
+      contributingUnknown.add(label);
+    }
   }
 
   const coverageNote =
@@ -492,6 +538,14 @@ export function summarizeHistoricalSetAsides(
       : coverage === 'partial'
         ? ' Historical set-aside retrieval was partial.'
         : '';
+  const truncNote =
+    contributingTruncated.size > 0
+      ? ` Contributor UEI lists are sampled (limit ${sampleLimit}); truncated for: ${[...contributingTruncated].sort().join(', ')}.`
+      : ` Contributor UEI lists are sampled at most ${sampleLimit} distinct UEIs per label.`;
+  const unknownNote =
+    contributingUnknown.size > 0
+      ? ' Some labels have contributing_ueis=null (evidence not established) — the queried UEI set was not substituted.'
+      : '';
   const scopeNote = opts?.scopeNote ? ` ${opts.scopeNote}` : '';
   const scope =
     opts?.scope &&
@@ -508,6 +562,9 @@ export function summarizeHistoricalSetAsides(
     last_fy_by_label: lastAction,
     deprecated: { last_fy_by_label: LAST_FY_BY_LABEL_DEPRECATION },
     contributing_ueis_by_label: contributing,
+    contributing_ueis_unknown_labels: [...contributingUnknown].sort(),
+    contributing_ueis_sample_limit: sampleLimit,
+    contributing_ueis_truncated_labels: [...contributingTruncated].sort(),
     supporting_actions_by_label: supporting,
     null_first_positive_note: NULL_FIRST_POSITIVE_NOTE,
     scope,
@@ -521,6 +578,8 @@ export function summarizeHistoricalSetAsides(
       'Award origin is unknown unless a dedicated origin signal is present. ' +
       'None of these fields is current SAM certification status or a graduation/exit reason. ' +
       'last_fy_by_label is a deprecated alias of last_observed_action_fy_by_label.' +
+      truncNote +
+      unknownNote +
       coverageNote +
       scopeNote,
   };
@@ -559,11 +618,20 @@ export function describeCoverageTimestamp(opts: {
     run_age_days: number | null;
   };
   /**
-   * True only when warehouse max + ingest clocks are attached.
-   * A recent recipient action alone never establishes complete coverage.
-   * Does NOT mean this recipient's award history is exhaustive.
+   * True when warehouse max + ingest clocks are attached and classified.
+   * Separate from coverage completeness — clocks ≠ exhaustive history.
    */
-  coverage_complete_established: boolean;
+  freshness_evidence_available: boolean;
+  /**
+   * Completeness of this recipient's warehouse coverage.
+   * Remains unproven even when freshness clocks are attached.
+   */
+  coverage_completeness: 'not_established';
+  /**
+   * Always false until a dedicated completeness oracle exists.
+   * Do NOT set true merely because freshness clocks are present.
+   */
+  coverage_complete_established: false;
   coverage_complete_established_meaning: string;
   freshness_note: string;
 } {
@@ -581,7 +649,7 @@ export function describeCoverageTimestamp(opts: {
         opts.ingest?.recipients_rebuilt_at ||
         (freshness && freshness.status !== 'unmeasured'),
     );
-  const coverageComplete =
+  const freshnessEvidenceAvailable =
     Boolean(warehouse) &&
     ingestAttached &&
     freshness != null &&
@@ -592,19 +660,20 @@ export function describeCoverageTimestamp(opts: {
     freshnessNote =
       `Three clocks: recipient last action ${last ?? 'unknown'}; warehouse awards reach ` +
       `action_date ${warehouse}; ingest freshness=${freshness.status}. ` +
-      `A contractor's quieter last_action_date does not mean the dataset is stale, and a ` +
-      `recent recipient action alone does not establish complete warehouse coverage. ` +
-      `coverage_complete_established=${coverageComplete} means clocks were attached — not that this recipient's history is exhaustive.`;
+      `freshness_evidence_available=${freshnessEvidenceAvailable}. ` +
+      `coverage_completeness=not_established — attached clocks do not prove this recipient's ` +
+      `history is exhaustive or that warehouse coverage is complete. ` +
+      `A contractor's quieter last_action_date does not mean the dataset is stale.`;
   } else if (warehouse) {
     freshnessNote =
       `Warehouse awards currently reach action_date ${warehouse}. Ingest clocks were not ` +
-      `attached — coverage completeness stays unknown. A contractor's quieter last_action_date ` +
-      `does not mean the dataset is stale.`;
+      `attached — freshness_evidence_available=false; coverage_completeness=not_established. ` +
+      `A contractor's quieter last_action_date does not mean the dataset is stale.`;
   } else {
     freshnessNote =
       'Warehouse max action_date and ingest freshness were not attached to this payload; ' +
-      'do not treat last_recipient_action_date as warehouse coverage or ingest lag. ' +
-      'Missing evidence stays unknown.';
+      'freshness_evidence_available=false; coverage_completeness=not_established. ' +
+      'Do not treat last_recipient_action_date as warehouse coverage or ingest lag.';
   }
 
   return {
@@ -624,78 +693,92 @@ export function describeCoverageTimestamp(opts: {
       source_age_days: freshness?.sourceAgeDays ?? null,
       run_age_days: freshness?.runAgeDays ?? null,
     },
-    coverage_complete_established: coverageComplete,
+    freshness_evidence_available: freshnessEvidenceAvailable,
+    coverage_completeness: 'not_established',
+    coverage_complete_established: false,
     coverage_complete_established_meaning:
-      'True only when warehouse max action_date and ingest clocks were attached and classified. ' +
-      'Does NOT mean this recipient\'s award history is exhaustive or that coverage of the corpus is complete.',
+      'Always false until a dedicated completeness oracle exists. Attached freshness clocks ' +
+      '(freshness_evidence_available) do NOT establish coverage completeness.',
     freshness_note: freshnessNote,
   };
 }
 
 /**
- * Classify an agency-year obligation cell. Zero net + actions present is
- * zero_net_obligations — NEVER "unused vehicle" without authoritative award-type evidence.
+ * Classify an agency-year obligation cell. Zero net + distinct awards present is
+ * zero_net_obligations — vehicle usage stays not_established without authoritative
+ * award-type / unused-vehicle evidence (never boolean false-as-caveat).
  */
 export function classifyAgencyYearObligations(input: {
   amount: number;
+  /** COUNT(DISTINCT award_id) for this agency-year — not obligation actions. */
   count: number;
   /** Authoritative award-type / IDV codes when available on this surface. */
   awardTypeCodes?: string[] | null;
 }): {
   net_amount: number;
-  award_actions: number;
+  /** Distinct award_id count for this agency-year cell. */
+  distinct_award_count: number;
+  count_grain: 'distinct_awards';
   classification: 'positive_net' | 'negative_net' | 'zero_net_obligations' | 'empty';
-  unused_vehicle: false;
+  /** Unsupported without dedicated evidence — always null. */
+  unused_vehicle: null;
+  vehicle_usage: 'not_established';
   note: string | null;
 } {
   const amount = Number(input.amount);
   const count = Number(input.count);
   const net = Number.isFinite(amount) ? amount : 0;
-  const actions = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  const distinctAwards = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
   const types = (input.awardTypeCodes ?? [])
     .map((t) => String(t || '').trim())
     .filter(Boolean);
 
-  if (actions === 0 && net === 0) {
+  const vehicleFields = {
+    unused_vehicle: null as null,
+    vehicle_usage: 'not_established' as const,
+    count_grain: 'distinct_awards' as const,
+  };
+
+  if (distinctAwards === 0 && net === 0) {
     return {
       net_amount: 0,
-      award_actions: 0,
+      distinct_award_count: 0,
       classification: 'empty',
-      unused_vehicle: false,
       note: null,
+      ...vehicleFields,
     };
   }
   if (net > 0) {
     return {
       net_amount: net,
-      award_actions: actions,
+      distinct_award_count: distinctAwards,
       classification: 'positive_net',
-      unused_vehicle: false,
       note: null,
+      ...vehicleFields,
     };
   }
   if (net < 0) {
     return {
       net_amount: net,
-      award_actions: actions,
+      distinct_award_count: distinctAwards,
       classification: 'negative_net',
-      unused_vehicle: false,
-      note: 'Negative net is deobligation evidence, not an unused vehicle.',
+      note: 'Negative net is deobligation evidence. Vehicle usage remains not_established.',
+      ...vehicleFields,
     };
   }
 
-  // net === 0 with actions
+  // net === 0 with distinct awards
   const hasAwardTypeEvidence = types.length > 0;
   return {
     net_amount: 0,
-    award_actions: actions,
+    distinct_award_count: distinctAwards,
     classification: 'zero_net_obligations',
-    unused_vehicle: false,
     note: hasAwardTypeEvidence
-      ? `Zero net with ${actions} award action(s) and award-type evidence [${types.join(', ')}]. ` +
-        'Zero-dollar rows alone do not establish an unused vehicle.'
-      : `Zero net with ${actions} award action(s). Without authoritative award-type evidence ` +
-        'this is not classified as an unused vehicle — zero-dollar rows alone are insufficient.',
+      ? `Zero net with ${distinctAwards} distinct award(s) and award-type evidence [${types.join(', ')}]. ` +
+        'Vehicle usage remains not_established — zero-dollar rows alone are insufficient.'
+      : `Zero net with ${distinctAwards} distinct award(s). Vehicle usage remains not_established — ` +
+        'zero-dollar rows alone are insufficient.',
+    ...vehicleFields,
   };
 }
 

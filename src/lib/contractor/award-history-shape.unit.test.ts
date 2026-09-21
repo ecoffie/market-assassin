@@ -170,10 +170,13 @@ describe('buildCountingBases', () => {
       ],
     });
     expect(bases.unique_awards).toBe(17);
+    expect(bases.unique_awards_grain).toBe('distinct_awards');
     expect(bases.fiscal_year_award_count_sum).toBe(16);
+    expect(bases.fiscal_year_award_count_sum_grain).toBe('sum_of_per_fy_distinct_awards');
     expect(bases.recent_actions_returned).toBe(4);
     expect(bases.recent_unique_awards).toBe(3);
     expect(bases.recent_grain).toBe('obligation_actions');
+    expect(bases.note).toMatch(/distinct_awards/i);
     expect(bases.note).toMatch(/modifications/i);
   });
 });
@@ -282,6 +285,9 @@ describe('summarizeHistoricalSetAsides', () => {
     );
     expect(s.scope).toEqual({ kind: 'profile_rollup', uei_count: 2 });
     expect(s.contributing_ueis_by_label['8A COMPETED']).toEqual(['UEI-A', 'UEI-B']);
+    expect(s.contributing_ueis_unknown_labels).toEqual([]);
+    expect(s.contributing_ueis_sample_limit).toBe(20);
+    expect(s.contributing_ueis_truncated_labels).toEqual([]);
     expect(s.supporting_actions_by_label['8A COMPETED'][0]).toMatchObject({
       uei: 'UEI-A',
       award_id: 'AW1',
@@ -289,6 +295,25 @@ describe('summarizeHistoricalSetAsides', () => {
       obligation_amount: -100,
     });
     expect(s.first_observed_positive_action_fy_by_label['8A COMPETED']).toBeNull();
+  });
+
+  it('preserves null contributing UEIs and discloses truncation at the sample limit', () => {
+    const unknown = summarizeHistoricalSetAsides([
+      {
+        setAside: '8A COMPETED',
+        lastActionFy: 2019,
+        contributingUeis: null,
+      },
+    ]);
+    expect(unknown.contributing_ueis_by_label['8A COMPETED']).toBeNull();
+    expect(unknown.contributing_ueis_unknown_labels).toContain('8A COMPETED');
+
+    const many = Array.from({ length: 20 }, (_, i) => `U${i}`);
+    const trunc = summarizeHistoricalSetAsides([
+      { setAside: '8(A) SOLE SOURCE', lastActionFy: 2020, contributingUeis: many },
+    ]);
+    expect(trunc.contributing_ueis_truncated_labels).toContain('8(A) SOLE SOURCE');
+    expect(trunc.note).toMatch(/truncated|sampled/i);
   });
 });
 
@@ -308,11 +333,13 @@ describe('describeCoverageTimestamp', () => {
     expect(d.last_recipient_action_date).toBe('2026-06-16');
     expect(d.warehouse_max_action_date).toBe('2026-09-18');
     expect(d.ingest.freshness_status).toBe('healthy');
-    expect(d.coverage_complete_established).toBe(true);
-    expect(d.coverage_complete_established_meaning).toMatch(/Does NOT mean/i);
+    expect(d.freshness_evidence_available).toBe(true);
+    expect(d.coverage_complete_established).toBe(false);
+    expect(d.coverage_completeness).toBe('not_established');
+    expect(d.coverage_complete_established_meaning).toMatch(/Always false|do NOT establish/i);
     expect(d.freshness_note).toMatch(/Three clocks/i);
-    expect(d.freshness_note).toMatch(/does not mean the dataset is stale/i);
-    expect(d.freshness_note).toMatch(/not that this recipient's history is exhaustive/i);
+    expect(d.freshness_note).toMatch(/freshness_evidence_available=true/i);
+    expect(d.freshness_note).toMatch(/coverage_completeness=not_established/i);
   });
 
   it('keeps coverage unknown when only recipient last action is present', () => {
@@ -321,27 +348,34 @@ describe('describeCoverageTimestamp', () => {
     });
     expect(d.warehouse_max_action_date).toBeNull();
     expect(d.ingest.freshness_status).toBe('unknown');
+    expect(d.freshness_evidence_available).toBe(false);
     expect(d.coverage_complete_established).toBe(false);
-    expect(d.freshness_note).toMatch(/Missing evidence stays unknown/i);
+    expect(d.coverage_completeness).toBe('not_established');
+    expect(d.freshness_note).toMatch(/freshness_evidence_available=false/i);
   });
 });
 
 describe('classifyAgencyYearObligations', () => {
-  it('never labels a zero-dollar row as unused vehicle', () => {
+  it('returns null/not_established for vehicle usage on zero-dollar rows', () => {
     const z = classifyAgencyYearObligations({ amount: 0, count: 2 });
     expect(z.classification).toBe('zero_net_obligations');
-    expect(z.unused_vehicle).toBe(false);
-    expect(z.note).toMatch(/not classified as an unused vehicle/i);
+    expect(z.unused_vehicle).toBeNull();
+    expect(z.vehicle_usage).toBe('not_established');
+    expect(z.distinct_award_count).toBe(2);
+    expect(z.count_grain).toBe('distinct_awards');
+    expect(z.note).toMatch(/distinct award/i);
+    expect(z.note).toMatch(/not_established/i);
   });
 
-  it('still refuses unused_vehicle even when award-type codes are present', () => {
+  it('still leaves vehicle usage not_established even when award-type codes are present', () => {
     const z = classifyAgencyYearObligations({
       amount: 0,
       count: 1,
       awardTypeCodes: ['IDV_B'],
     });
-    expect(z.unused_vehicle).toBe(false);
-    expect(z.note).toMatch(/Zero-dollar rows alone do not establish/i);
+    expect(z.unused_vehicle).toBeNull();
+    expect(z.vehicle_usage).toBe('not_established');
+    expect(z.note).toMatch(/not_established/i);
   });
 });
 

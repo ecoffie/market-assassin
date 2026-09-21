@@ -278,12 +278,17 @@ describe('get_contractor_profile — recent awards + set-aside honesty', () => {
         note: string;
         coverage: string;
         scope: { kind: string; uei_count: number } | null;
-        contributing_ueis_by_label: Record<string, string[]>;
+        contributing_ueis_by_label: Record<string, string[] | null>;
+        contributing_ueis_sample_limit: number;
+        contributing_ueis_truncated_labels: string[];
+        contributing_ueis_unknown_labels: string[];
         supporting_actions_by_label: Record<string, unknown[]>;
         deprecated: { last_fy_by_label: { status: string } };
       };
       coverage: {
         warehouse_max_action_date: string | null;
+        freshness_evidence_available: boolean;
+        coverage_completeness: string;
         coverage_complete_established: boolean;
         ingest: { freshness_status: string };
       };
@@ -300,11 +305,15 @@ describe('get_contractor_profile — recent awards + set-aside honesty', () => {
     expect(res.historical_set_asides.coverage).toBe('complete');
     expect(res.historical_set_asides.scope).toEqual({ kind: 'profile_rollup', uei_count: 1 });
     expect(res.historical_set_asides.contributing_ueis_by_label['8(A) SOLE SOURCE']).toContain('LEIDOSUEI0001');
+    expect(res.historical_set_asides.contributing_ueis_sample_limit).toBe(20);
+    expect(Array.isArray(res.historical_set_asides.contributing_ueis_truncated_labels)).toBe(true);
     expect(res.historical_set_asides.supporting_actions_by_label['8(A) SOLE SOURCE'].length).toBe(1);
     expect(res.historical_set_asides.deprecated.last_fy_by_label.status).toBe('deprecated');
     expect(res.historical_set_asides).not.toHaveProperty('award_origin_fy_by_label');
     expect(res.coverage.warehouse_max_action_date).toBe('2026-09-18');
-    expect(res.coverage.coverage_complete_established).toBe(true);
+    expect(res.coverage.freshness_evidence_available).toBe(true);
+    expect(res.coverage.coverage_complete_established).toBe(false);
+    expect(res.coverage.coverage_completeness).toBe('not_established');
     expect(res.coverage.ingest.freshness_status).toBe('healthy');
   });
 
