@@ -52,16 +52,18 @@ async function main() {
     company_name: COMPANY,
   });
   const sam = await lookupSamEntity({ uei: UEI });
-  const history = await contractorAwardHistory({
+  const historyRaw = await contractorAwardHistory({
     uei: UEI,
     award_limit: 20,
     actor: 'cyrus-audit-closure@getmindy.ai',
   });
-
-  const profileObj = profile as Record<string, unknown>;
+  const historyUnknown = historyRaw as unknown;
   const histPayload =
-    (history as { history?: Record<string, unknown> }).history ||
-    (history as Record<string, unknown>);
+    ((historyUnknown as { history?: Record<string, unknown> }).history as
+      | Record<string, unknown>
+      | undefined) ||
+    (historyUnknown as Record<string, unknown>);
+  const profileObj = profile as Record<string, unknown>;
 
   const cross = {
     identity: {
@@ -223,7 +225,7 @@ async function main() {
 
   writeFileSync(join(OUT, '01-profile.json'), JSON.stringify(profile, null, 2));
   writeFileSync(join(OUT, '02-sam.json'), JSON.stringify(sam, null, 2));
-  writeFileSync(join(OUT, '03-history.json'), JSON.stringify(history, null, 2));
+  writeFileSync(join(OUT, '03-history.json'), JSON.stringify(historyRaw, null, 2));
   writeFileSync(join(OUT, '04-baseline-summary.json'), JSON.stringify(packet, null, 2));
   console.log(JSON.stringify({ codeSha, startedAt, acceptance, cross_identity: cross.identity }, null, 2));
 }
