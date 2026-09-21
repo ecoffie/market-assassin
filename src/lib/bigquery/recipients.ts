@@ -1,0 +1,1917 @@
+/**
+ * Recipient (contractor) queries — one function per page-section.
+ *
+ * Lookup model: pages route by slug, slug derives from recipient_name.
+ * But the canonical key in BQ is recipient_uei. We need to handle:
+ *   - Slug → UEI resolution (slug isn't unique if two contractors
+ *     happen to share a normalized name)
+ *   - Falling back to name search when UEI unknown
+ *
+ * Each function caches independently — top NAICS for Lockheed
+ * doesn't have to recompute when only the awards list changed.
+ */
+import { BQ_TABLES } from './client';
+import { queryCached } from './cache';
+import { bqUnavailable } from './cache';
+import { readServedPage } from '../awards-serving';
+import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
+import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
+import {
+  buildCountingBases,
+  dateRangeValidFlag,
+  assessDateRange,
+  deriveActivityFromSeries,
+  describeCoverageTimestamp,
+  isModificationAction,
+  classifyModNumber,
+  classifyAgencyYearObligations,
+  summarizeHistoricalSetAsides,
+  SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
+} from '@/lib/contractor/award-history-shape';
+import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
+
+// Queries that scan the full `awards` table filtered by recipient_uei
+// can exceed the BQ client's 5 GiB default maximumBytesBilled for
+// mega-primes (Lockheed/RTX/McKesson scan >5 GiB), which BigQuery
+// rejects → the page 500s. GSC flagged ~94 such server errors. Raise
+// the per-query cap to 20 GiB (matching awards.ts) for every
+// recipient query that touches the awards table. Cache hits are free;
+// this only governs the cold-miss query that actually scans.
+const AWARDS_SCAN_MAX_BYTES = String(20 * 1024 * 1024 * 1024); // 20 GiB
+
+// Convert a display name into a URL-safe slug. Must exactly match
+// slugifyContractorName() in src/lib/contractor-sales-history.ts so
+// contractor URLs work identically whether the page was rendered
+// from contractors.json (legacy) or BigQuery (new).
+export function recipientSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
+export interface RecipientProfile {
+  recipient_uei: string;
+  recipient_name: string;
+  parent_uei: string | null;
+  parent_name: string | null;
+  cage_code: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+  total_obligated: number;
+  award_count: number;
+  transaction_count: number;
+  first_action_date: string;
+  last_action_date: string;
+  distinct_agency_count: number;
+  distinct_naics_count: number;
+}
+
+/**
+ * Minimum distinct rows a contractor needs before its /agencies or /naics
+ * sub-page is treated as substantive enough to index. Below this the table
+ * is near-empty (1-4 rows); Google crawls it, sees almost no unique content,
+ * and parks it as "Crawled - currently not indexed", wasting crawl budget.
+ *
+ * Single source of truth — imported by BOTH the sitemap (to decide which
+ * sub-page URLs to emit) and the sub-pages themselves (to decide their
+ * robots directive). These two MUST agree: the sitemap can omit a thin URL,
+ * but Google still discovers it through the always-rendered tab nav, so the
+ * page itself must also declare noindex or the gate leaks. /contracts is
+ * never gated — every recipient has award rows and it's the core
+ * brand-search SEO target.
+ */
+export const SUBPAGE_MIN_ROWS = 5;
+
+/**
+ * Parent-org rollup profile — the contractor pages' primary data shape.
+ *
+ * Backed by `recipients_rollup` (one row per COALESCE(parent_uei,
+ * recipient_uei)). Where RecipientProfile describes a single UEI,
+ * RollupProfile describes the whole parent organization, so a household-
+ * name prime shows its full footprint instead of one scattered subsidiary
+ * UEI. `child_ueis` is the parent's complete UEI set — detail queries
+ * filter awards by `recipient_uei IN UNNEST(child_ueis)` (which preserves
+ * the awards table's recipient_uei cluster pruning, unlike filtering on
+ * parent_uei). `canonical_slug` is the slug of `rollup_name`.
+ */
+export interface RollupProfile {
+  rollup_uei: string;
+  rollup_name: string;
+  canonical_slug: string;
+  child_ueis: string[];
+  child_count: number;
+  cage_code: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+  total_obligated: number;
+  award_count: number;
+  transaction_count: number;
+  first_action_date: string;
+  last_action_date: string;
+  distinct_agency_count: number;
+  distinct_naics_count: number;
+}
+
+// Shared SQL fragment: the computed-slug expression mirrors recipientSlug()
+// exactly (lowercase, & → " and ", non-alphanum → "-", trim, 120 cap). Used
+// by both the rollup slug lookup and the sibling-redirect resolver.
+const COMPUTED_SLUG_SQL = (col: string) => `
+  SUBSTR(
+    REGEXP_REPLACE(
+      REGEXP_REPLACE(
+        LOWER(REPLACE(${col}, '&', ' and ')),
+        r'[^a-z0-9]+', '-'
+      ),
+      r'^-+|-+$', ''
+    ),
+    1, 120
+  )`;
+
+// Legal-suffix words stripped when normalizing a company name for the
+// name-merge. MUST stay in sync with the regex in build-derived.sql's
+// recipients_rollup_merged block, and with normalizeCompanyName() below.
+const MERGE_SUFFIX_RE =
+  /\b(corporation|corp|incorporated|inc|llc|l\.?l\.?c|company|co|ltd|limited|lp|l\.?p|plc|holdings|holding|group|the)\b/g;
+
+// SQL form of the suffix-strip normalization (operates on a name column).
+const NORMALIZED_NAME_SQL = (col: string) => `
+  TRIM(REGEXP_REPLACE(
+    REGEXP_REPLACE(
+      LOWER(${col}),
+      r'\\b(corporation|corp|incorporated|inc|llc|l\\.?l\\.?c|company|co|ltd|limited|lp|l\\.?p|plc|holdings|holding|group|the)\\b', ''
+    ),
+    r'[^a-z0-9]+', ' '
+  ))`;
+
+// JS form of the same normalization, applied to a slug (dashes → spaces first
+// so word boundaries match). Used to normalize the REQUESTED slug before the
+// name-merge resolver arm. Mirrors recipients_rollup_merged + NORMALIZED_NAME_SQL.
+export function normalizeCompanyName(slugOrName: string): string {
+  return slugOrName
+    .toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(MERGE_SUFFIX_RE, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Resolve a slug to its parent-org rollup. This is the contractor pages'
+ * primary entry point (replaces getRecipientBySlug for the page render).
+ *
+ * Slugs aren't unique: same-name orphan UEIs (null/self parent) can produce
+ * the same slug as the true parent rollup. We resolve to the highest-spend
+ * match — the dominant rollup wins (e.g. the 167-child "Lockheed Martin
+ * Corp" beats two single-UEI orphans of the same name). Tiny orphans then
+ * canonical-tag back to this same URL, so Google dedupes them.
+ */
+// liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
+// callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
+export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
+  const rows = await queryCached<RollupProfile>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
+    query: `
+      WITH slugged AS (
+        SELECT
+          *,
+          ${COMPUTED_SLUG_SQL('rollup_name')} AS computed_slug
+        FROM ${BQ_TABLES.recipientsRollup}
+        WHERE rollup_name IS NOT NULL
+      )
+      SELECT
+        rollup_uei,
+        rollup_name,
+        computed_slug AS canonical_slug,
+        child_ueis,
+        child_count,
+        cage_code, address, city, state, zip, country,
+        total_obligated, award_count, transaction_count,
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date,
+        distinct_agency_count, distinct_naics_count
+      FROM slugged
+      WHERE computed_slug = @slug
+      ORDER BY total_obligated DESC
+      LIMIT 1
+    `,
+    params: { slug },
+  });
+  return rows[0] ?? null;
+}
+
+/**
+ * Rollup resolver with single-UEI fallback. Tries the rollup table first;
+ * if the slug isn't a rollup name (small contractor or orphan UEI that the
+ * recipients_rollup build excluded), falls back to the base `recipients`
+ * table and synthesizes a one-UEI rollup so the contractor page can still
+ * render. Pass liveBq=true to allow a cold BQ scan when the cache misses
+ * (the public page does this as its last fallback before 404).
+ *
+ * Cost: ≤2 BQ queries (rollup + recipients) per cold slug. ISR caches the
+ * resulting page for 7 days, so each unique slug pays this once per window.
+ */
+export async function getRollupOrSingleBySlug(
+  slug: string,
+  liveBq = false,
+): Promise<RollupProfile | null> {
+  const rollup = await getRollupBySlug(slug, liveBq);
+  if (rollup) return rollup;
+  const recipient = await getRecipientBySlug(slug, liveBq);
+  if (!recipient) return null;
+  return {
+    rollup_uei: recipient.recipient_uei,
+    rollup_name: recipient.recipient_name,
+    canonical_slug: recipientSlug(recipient.recipient_name),
+    child_ueis: [recipient.recipient_uei],
+    child_count: 1,
+    cage_code: recipient.cage_code,
+    address: recipient.address,
+    city: recipient.city,
+    state: recipient.state,
+    zip: recipient.zip,
+    country: recipient.country,
+    total_obligated: Number(recipient.total_obligated || 0),
+    award_count: Number(recipient.award_count || 0),
+    transaction_count: Number(recipient.transaction_count || 0),
+    first_action_date: recipient.first_action_date,
+    last_action_date: recipient.last_action_date,
+    distinct_agency_count: Number(recipient.distinct_agency_count || 0),
+    distinct_naics_count: Number(recipient.distinct_naics_count || 0),
+  };
+}
+
+/**
+ * Sibling-redirect resolver. Given the slug actually requested, return the
+ * canonical rollup slug it should 301/308 to — or null if the requested
+ * slug IS already canonical (so the page renders without redirecting).
+ *
+ * "Canonical" = the slug of the highest-spend rollup that owns this slug.
+ * A subsidiary whose own name slugifies differently from its parent's
+ * rollup_name would 404 today (only the top-spend name per slug resolves);
+ * this maps any child UEI's name-slug to the parent's canonical slug so old
+ * inbound links land on the live parent page instead of a 404.
+ */
+export async function resolveCanonicalSlug(slug: string): Promise<string | null> {
+  // Normalized (suffix-stripped) form of the requested slug, for the name-merge
+  // arm — catches pre-merge ROLLUP-name variants (e.g. the slug
+  // "general-dynamics-corporation" whose rollup got merged into
+  // "general-dynamics-corp"; that variant is no longer a rollup name nor an
+  // exact child recipient_name, so only the normalized form finds it).
+  const normSlug = normalizeCompanyName(slug);
+  const rows = await queryCached<{ canonical_slug: string }>({
+    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
+    query: `
+      WITH rollups AS (
+        SELECT
+          ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug,
+          ${NORMALIZED_NAME_SQL('rollup_name')} AS norm_name,
+          rollup_uei, total_obligated, child_ueis
+        FROM ${BQ_TABLES.recipientsRollup}
+        WHERE rollup_name IS NOT NULL
+      ),
+      -- Direct hit: the slug matches a rollup name. Canonical = highest-spend.
+      direct AS (
+        SELECT canonical_slug, total_obligated, 0 AS tiebreak
+        FROM rollups
+        WHERE canonical_slug = @slug
+      ),
+      -- Indirect hit: the slug matches a CHILD UEI's recipient name. Map to
+      -- the rollup that contains that child.
+      child_match AS (
+        SELECT r.canonical_slug, r.total_obligated, 1 AS tiebreak
+        FROM ${BQ_TABLES.recipients} c
+        JOIN rollups r ON c.recipient_uei IN UNNEST(r.child_ueis)
+        WHERE c.recipient_name IS NOT NULL
+          AND ${COMPUTED_SLUG_SQL('c.recipient_name')} = @slug
+      ),
+      -- Name-merge hit: the slug's normalized (suffix-stripped) form matches a
+      -- merged rollup's normalized name. Catches legal-suffix variants that the
+      -- merge collapsed (corp vs corporation). Lowest priority so an exact slug
+      -- always wins over a normalized match.
+      norm_match AS (
+        SELECT canonical_slug, total_obligated, 2 AS tiebreak
+        FROM rollups
+        WHERE norm_name = @normSlug AND norm_name != ''
+      )
+      SELECT canonical_slug
+      FROM (
+        SELECT * FROM direct
+        UNION ALL SELECT * FROM child_match
+        UNION ALL SELECT * FROM norm_match
+      )
+      ORDER BY tiebreak ASC, total_obligated DESC
+      LIMIT 1
+    `,
+    params: { slug, normSlug },
+  });
+  const canonical = rows[0]?.canonical_slug ?? null;
+  // null when unknown slug; null when already canonical (no redirect needed).
+  return canonical && canonical !== slug ? canonical : null;
+}
+
+/**
+ * Get the recipient summary by slug. Returns the highest-spending
+ * match if multiple UEIs share the same normalized name (rare but
+ * happens — e.g. parent/subsidiary with same brand name).
+ *
+ * SQL mirrors slugifyContractorName():
+ *   1. replace & with " and "
+ *   2. lowercase + replace non-alphanum runs with "-"
+ *   3. trim leading/trailing dashes
+ *   4. truncate at 120 chars
+ */
+export async function getRecipientBySlug(slug: string, liveBq = false): Promise<RecipientProfile | null> {
+  const rows = await queryCached<RecipientProfile>({
+    cacheOnly: !liveBq,
+    cacheKey: `recipient:by-slug:${slug}:v2`,
+    query: `
+      WITH slugged AS (
+        SELECT
+          *,
+          SUBSTR(
+            REGEXP_REPLACE(
+              REGEXP_REPLACE(
+                LOWER(REPLACE(recipient_name, '&', ' and ')),
+                r'[^a-z0-9]+',
+                '-'
+              ),
+              r'^-+|-+$',
+              ''
+            ),
+            1, 120
+          ) AS computed_slug
+        FROM ${BQ_TABLES.recipients}
+      )
+      SELECT
+        * EXCEPT(computed_slug, first_action_date, last_action_date),
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date
+      FROM slugged
+      WHERE computed_slug = @slug
+      ORDER BY total_obligated DESC
+      LIMIT 1
+    `,
+    params: { slug },
+  });
+  return rows[0] ?? null;
+}
+
+export async function getRecipientByUei(uei: string, liveBq = false): Promise<RecipientProfile | null> {
+  const rows = await queryCached<RecipientProfile>({
+    cacheOnly: !liveBq,
+    cacheKey: `recipient:by-uei:${uei}:v2`,
+    query: `
+      SELECT
+        * EXCEPT(first_action_date, last_action_date),
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date
+      FROM ${BQ_TABLES.recipients}
+      WHERE recipient_uei = @uei
+      LIMIT 1
+    `,
+    params: { uei },
+  });
+  if (rows[0]) return rows[0];
+  // `recipients` is a DERIVED table (build-derived.sql) rebuilt on its own cadence, while
+  // `awards` is refreshed by the WEEKLY ingest — so a firm whose first award landed after the
+  // last rebuild exists in awards with NO profile row, and every caller here saw a null that
+  // means "no such contractor" when the truth is "profile not built yet". Measured 2026-08-12:
+  // recipients MAX(last_action_date)=2026-04-23 vs awards MAX(action_date)=2026-07-31 → 1,962
+  // real firms (ACS RITZ JV $42.8M, FOLEY HOAG LLP $20.6M) 404'd the map's company drawer.
+  // Falling back to the awards table keeps the honest miss (a UEI with no awards is still null)
+  // while refusing to call a firm nonexistent just because a rollup is stale.
+  return liveBq ? getRecipientProfileFromAwards(uei) : null;
+}
+
+/**
+ * Synthesize a RecipientProfile for a UEI present in `awards` but absent from the derived
+ * `recipients` table (see getRecipientByUei). Returns null when the UEI has no awards at all —
+ * an honest miss, never a fabricated shell.
+ *
+ * Only the fields awards can GROUND are populated. `city`/`cage_code`/`address`/`zip`/parent
+ * linkage live exclusively on the profile row, so they stay null rather than being guessed —
+ * the drawer already renders a state-only location honestly. Name and state are taken from the
+ * firm's MOST RECENT award (not ANY_VALUE) so a renamed/relocated firm shows its current identity.
+ *
+ * Cheap despite the 63M-row table: `awards` is clustered on (recipient_uei, recipient_name), so a
+ * single-UEI equality lookup prunes to the firm's own blocks. Capped anyway.
+ */
+async function getRecipientProfileFromAwards(uei: string): Promise<RecipientProfile | null> {
+  const rows = await queryCached<{
+    recipient_uei: string; recipient_name: string | null; state: string | null;
+    total_obligated: number; award_count: number; transaction_count: number;
+    first_action_date: string | null; last_action_date: string | null;
+    distinct_agency_count: number; distinct_naics_count: number;
+  }>({
+    cacheOnly: false, // only reached on the authed liveBq path — see the caller's guard
+    cacheKey: `recipient:by-uei-awards-fallback:${uei}:v1`,
+    query: `
+      SELECT
+        recipient_uei,
+        ARRAY_AGG(recipient_name IGNORE NULLS ORDER BY action_date DESC LIMIT 1)[SAFE_OFFSET(0)] AS recipient_name,
+        ARRAY_AGG(recipient_state IGNORE NULLS ORDER BY action_date DESC LIMIT 1)[SAFE_OFFSET(0)] AS state,
+        SUM(obligation_amount) AS total_obligated,
+        COUNT(DISTINCT award_id) AS award_count,
+        COUNT(*) AS transaction_count,
+        CAST(MIN(action_date) AS STRING) AS first_action_date,
+        CAST(MAX(action_date) AS STRING) AS last_action_date,
+        COUNT(DISTINCT awarding_agency) AS distinct_agency_count,
+        COUNT(DISTINCT naics_code) AS distinct_naics_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei = @uei
+      GROUP BY recipient_uei
+      LIMIT 1
+    `,
+    params: { uei },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+  const r = rows[0];
+  // No awards → the UEI genuinely isn't a federal contractor we know. Keep the honest null.
+  if (!r || !r.recipient_name) return null;
+  return {
+    recipient_uei: r.recipient_uei,
+    recipient_name: r.recipient_name,
+    parent_uei: null,
+    parent_name: null,
+    cage_code: null,
+    address: null,
+    city: null,
+    state: r.state,
+    zip: null,
+    country: null,
+    total_obligated: Number(r.total_obligated || 0),
+    award_count: Number(r.award_count || 0),
+    transaction_count: Number(r.transaction_count || 0),
+    first_action_date: r.first_action_date || '',
+    last_action_date: r.last_action_date || '',
+    distinct_agency_count: Number(r.distinct_agency_count || 0),
+    distinct_naics_count: Number(r.distinct_naics_count || 0),
+  };
+}
+
+export interface TopAgencyRow {
+  awarding_agency: string;
+  total_amount: number;
+  pct_of_total: number;
+}
+
+export async function getTopAgenciesForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  limit = 10,
+  liveBq = false,
+): Promise<TopAgencyRow[]> {
+  return queryCached<TopAgencyRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:top-agencies:${limit}:v4-m`,
+    // Single-pass, and deliberately NO COUNT(DISTINCT award_id): that
+    // column is the widest read in the query and ~doubled the scan
+    // (5.9→3.0 GiB on mega-primes). The agency breakdown shows $ + %
+    // share; the contractor's total award count still comes from the
+    // recipients row (free). pct_of_total = share across this
+    // contractor's agencies, via window sum before the LIMIT.
+    query: `
+      WITH per_agency AS (
+        SELECT
+          awarding_agency,
+          SUM(obligation_amount) AS total_amount
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei IN UNNEST(@ueis) AND awarding_agency IS NOT NULL
+        GROUP BY awarding_agency
+      )
+      SELECT
+        awarding_agency,
+        total_amount,
+        SAFE_DIVIDE(total_amount, SUM(total_amount) OVER ()) AS pct_of_total
+      FROM per_agency
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { ueis, limit },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface TopNaicsRow {
+  naics_code: string;
+  naics_description: string;
+  total_amount: number;
+  award_count: number;
+}
+
+export async function getTopNaicsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  limit = 10,
+  liveBq = false,
+): Promise<TopNaicsRow[]> {
+  return queryCached<TopNaicsRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:top-naics:${limit}:v2-m`,
+    query: `
+      SELECT
+        naics_code,
+        ANY_VALUE(naics_description) AS naics_description,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis) AND naics_code IS NOT NULL
+      GROUP BY naics_code
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { ueis, limit },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface RecentAwardRow {
+  award_id: string;
+  piid: string | null;
+  /** Modification number from FPDS/USASpending — empty/0 = base action. */
+  mod_number: string | null;
+  awarding_agency: string | null;
+  awarding_office: string | null;
+  naics_code: string | null;
+  naics_description: string | null;
+  description: string | null;
+  obligation_amount: number;
+  action_date: string;
+  pop_start_date: string | null;
+  pop_end_date: string | null;
+  pop_state: string | null;
+  set_aside: string | null;
+}
+
+export async function getRecentAwardsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  limit = 25,
+  liveBq = false,
+): Promise<RecentAwardRow[]> {
+  // CAST DATE columns to STRING so we get 'YYYY-MM-DD' strings back
+  // instead of BigQuery's wrapper objects ({value: 'YYYY-MM-DD'}) which
+  // break our formatDate(). Also filter to dollar-bearing transactions —
+  // $0 modifications dominate the recent timeline but tell users nothing.
+  // Grain = obligation ACTIONS (often mods). Same award_id can appear more
+  // than once; do NOT treat this list as unique awards. mod_number is the
+  // modification signal — never PIID repetition alone.
+  return queryCached<RecentAwardRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v4-m`,
+    query: `
+      SELECT
+        award_id,
+        piid,
+        CAST(mod_number AS STRING) AS mod_number,
+        awarding_agency,
+        awarding_office,
+        naics_code,
+        naics_description,
+        description,
+        obligation_amount,
+        CAST(action_date AS STRING) AS action_date,
+        CAST(pop_start_date AS STRING) AS pop_start_date,
+        CAST(pop_end_date AS STRING) AS pop_end_date,
+        pop_state,
+        set_aside
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND obligation_amount > 0
+      ORDER BY action_date DESC
+      LIMIT @limit
+    `,
+    params: { ueis, limit },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface YearlyTotalRow {
+  fiscal_year: number;
+  /** Net obligations (positive + negative). Not revenue. */
+  total_obligated: number;
+  /** Sum of obligation_amount where amount > 0. */
+  positive_obligations: number;
+  /** Sum of obligation_amount where amount < 0 (negative number). */
+  deobligations: number;
+  /** Distinct award_id with any action in this FY — not additive across years. */
+  award_count: number;
+}
+
+export async function getYearlyTotalsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  liveBq = false,
+): Promise<YearlyTotalRow[]> {
+  return queryCached<YearlyTotalRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:yearly-totals:v3-m`,
+    query: `
+      SELECT
+        fiscal_year,
+        SUM(obligation_amount) AS total_obligated,
+        SUM(IF(obligation_amount > 0, obligation_amount, 0)) AS positive_obligations,
+        SUM(IF(obligation_amount < 0, obligation_amount, 0)) AS deobligations,
+        COUNT(DISTINCT award_id) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+      GROUP BY fiscal_year
+      ORDER BY fiscal_year ASC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface SetAsideSupportingActionRow {
+  uei: string | null;
+  award_id: string | null;
+  fiscal_year: number | null;
+  obligation_amount: number | null;
+  action_date: string | null;
+}
+
+export interface SetAsideHistoryRow {
+  set_aside: string;
+  award_count: number;
+  /**
+   * Latest fiscal_year on ANY warehouse action carrying this set-aside code
+   * (includes later deobligations). Not award origin and not certification.
+   */
+  last_action_fy: number | null;
+  /**
+   * Earliest fiscal_year with a positive obligation under this set-aside.
+   * A later positive modification can land years after award creation — this is
+   * NOT award origin. Null when no positive-obligation action exists.
+   */
+  first_observed_positive_action_fy: number | null;
+  total_obligated: number;
+  /** Distinct UEIs that contributed actions under this label (rollup may be many). */
+  contributing_ueis: string[] | null;
+  /** Sample supporting actions (ordered by |obligation|; not a full census). */
+  supporting_actions: SetAsideSupportingActionRow[] | null;
+}
+
+export async function getSetAsideHistoryForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  liveBq = false,
+): Promise<SetAsideHistoryRow[]> {
+  // v4: v3 FY semantics + contributing UEIs + supporting action sample.
+  // Positive-obligation MIN is not award origin. Award origin stays unknown
+  // unless a dedicated origin signal exists. Null first-positive ≠ all deobligations.
+  return queryCached<SetAsideHistoryRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:set-aside-history:v4-m`,
+    query: `
+      SELECT
+        set_aside,
+        COUNT(DISTINCT award_id) AS award_count,
+        MAX(fiscal_year) AS last_action_fy,
+        MIN(IF(obligation_amount > 0, fiscal_year, NULL)) AS first_observed_positive_action_fy,
+        SUM(obligation_amount) AS total_obligated,
+        ARRAY_AGG(DISTINCT recipient_uei IGNORE NULLS LIMIT 20) AS contributing_ueis,
+        ARRAY_AGG(
+          STRUCT(
+            recipient_uei AS uei,
+            award_id,
+            fiscal_year,
+            obligation_amount,
+            CAST(action_date AS STRING) AS action_date
+          )
+          ORDER BY ABS(IFNULL(obligation_amount, 0)) DESC
+          LIMIT 5
+        ) AS supporting_actions
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND set_aside IS NOT NULL
+        AND set_aside != ''
+        AND NOT STARTS_WITH(UPPER(set_aside), 'NO SET ASIDE')
+      GROUP BY set_aside
+      ORDER BY award_count DESC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+// ── Capable small-business sourcing (Navy OSBP) ────────────────────────
+// SCORE, DON'T FILTER (Eric: "if we do backwards we miss real matches").
+// A firm that does the WORK (won the PSC) but is registered under an adjacent
+// NAICS is a REAL match — a hard PSC∩NAICS filter would drop it (false
+// negative, the #1 accuracy sin). So we UNION all winners and RANK by relevance:
+//   PSC exact = strongest ("won the literal thing being bought")
+//   PSC family (first 2 chars, e.g. J0/19) = strong
+//   NAICS match = solid (right industry)
+//   + set-aside wins (small-biz signal), + proven winner (real awards)
+// PSC drives the SORT; NAICS widens the net. (Memory: naics_vs_psc_search.)
+export interface CapableSmbRow {
+  recipient_uei: string;
+  recipient_name: string;
+  total_obligated: number;
+  award_count: number;
+  agency_count: number;
+  set_asides: string;
+  recipient_state: string | null;
+  won_set_aside: boolean;
+  psc_exact: boolean;     // won the exact PSC
+  psc_family: boolean;    // won a PSC in the same 2-char family
+  naics_match: boolean;   // won under the target NAICS
+  match_score: number;    // composite relevance (higher = better)
+  match_reason: string;   // human label for why it ranked
+}
+
+export async function findCapableSmallBusinesses(opts: {
+  psc?: string;            // the specific product/service being bought (best signal)
+  naics?: string;          // the industry (widens the net)
+  maxObligated?: number;   // $ ceiling to bias toward smaller firms (default $25M)
+  setAsideOnly?: boolean;
+  state?: string;          // 2-letter recipient (firm HQ) state — "capable SBs in <state>"
+  limit?: number;
+  offset?: number;
+  liveBq?: boolean;
+}): Promise<{ rows: CapableSmbRow[]; total: number | null }> {
+  const psc = (opts.psc || '').trim().toUpperCase();
+  const naics = (opts.naics || '').trim();
+  if (!psc && !naics) return { rows: [], total: 0 };  // a real, measured zero
+  const state = (opts.state || '').trim().toUpperCase();
+  const limit = Math.min(opts.limit || 50, 200);
+  const offset = Math.max(opts.offset || 0, 0);
+  const maxObligated = opts.maxObligated ?? 25_000_000;
+  // Firm-HQ state filter (recipient_state on the awards row). Rule-of-Two market
+  // depth "in a state" = which capable businesses are located there.
+  const stateCond = state ? 'AND recipient_state = @state' : '';
+
+  // Match predicates. We UNION (OR) so nothing real is filtered out; the score
+  // (below) is what ranks PSC-exact above NAICS-only.
+  const naicsMatch = naics ? (naics.length >= 6 ? 'naics_code = @naics' : 'STARTS_WITH(naics_code, @naics)') : 'FALSE';
+  const pscExact = psc ? 'psc_code = @psc' : 'FALSE';
+  const pscFamily = psc ? 'STARTS_WITH(psc_code, @pscFam)' : 'FALSE';
+  const setAsideExpr =`LOGICAL_OR(set_aside IS NOT NULL AND set_aside != '' AND UPPER(set_aside) NOT LIKE '%NO SET%')`;
+
+  // Per-row flags computed in an inner aggregate, then scored in the outer.
+  const inner = `
+    SELECT
+      recipient_uei,
+      ANY_VALUE(recipient_name) AS recipient_name,
+      SUM(obligation_amount) AS total_obligated,
+      COUNT(DISTINCT award_id) AS award_count,
+      COUNT(DISTINCT awarding_agency) AS agency_count,
+      STRING_AGG(DISTINCT NULLIF(set_aside, ''), ', ') AS set_asides,
+      ANY_VALUE(recipient_state) AS recipient_state,
+      ${setAsideExpr} AS won_set_aside,
+      LOGICAL_OR(${pscExact}) AS psc_match_exact,
+      LOGICAL_OR(${pscFamily}) AS psc_match_family,
+      LOGICAL_OR(${naicsMatch}) AS naics_hit
+    FROM ${BQ_TABLES.awards}
+    WHERE obligation_amount > 0 AND (${pscExact} OR ${pscFamily} OR ${naicsMatch}) ${stateCond}
+    GROUP BY recipient_uei
+    HAVING SUM(obligation_amount) <= @maxObligated
+      ${opts.setAsideOnly ? `AND ${setAsideExpr}` : ''}
+  `;
+
+  // Composite score: PSC-exact 100, PSC-family 60, NAICS 40, +20 set-aside, +up
+  // to 20 for proven winning (award_count, capped). Sorts the union meaningfully.
+  const scored = `
+    SELECT
+      recipient_uei, recipient_name, total_obligated, award_count, agency_count,
+      set_asides, recipient_state, won_set_aside,
+      psc_match_exact AS psc_exact,
+      psc_match_family AS psc_family,
+      naics_hit AS naics_match,
+      (CASE WHEN psc_match_exact THEN 100 WHEN psc_match_family THEN 60 ELSE 0 END
+       + CASE WHEN naics_hit THEN 40 ELSE 0 END
+       + CASE WHEN won_set_aside THEN 20 ELSE 0 END
+       + LEAST(award_count, 20)) AS match_score,
+      (CASE WHEN psc_match_exact THEN 'Won this exact product/service'
+            WHEN psc_match_family THEN 'Won related product/service'
+            ELSE 'Active in this industry (NAICS)' END
+       || CASE WHEN won_set_aside THEN ' · set-aside winner' ELSE '' END) AS match_reason
+    FROM (${inner})
+  `;
+
+  const params: Record<string, unknown> = { maxObligated, limit, offset };
+  if (psc) { params.psc = psc; params.pscFam = psc.slice(0, 2); }
+  if (naics) params.naics = naics;
+  if (state) params.state = state;
+
+  const key = `smb-capable:${psc}:${naics}:${state}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:${limit}:${offset}:v2`;
+  const rows = await queryCached<CapableSmbRow>({
+    cacheOnly: !opts.liveBq,
+    cacheKey: key,
+    query: `${scored} ORDER BY match_score DESC, total_obligated DESC LIMIT @limit OFFSET @offset`,
+    params,
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+
+  const totalRows = await queryCached<{ n: number }>({
+    cacheOnly: !opts.liveBq,
+    cacheKey: `smb-capable-count:${psc}:${naics}:${state}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:v2`,
+    query: `SELECT COUNT(*) AS n FROM (${inner})`,
+    params: { maxObligated, ...(psc ? { psc, pscFam: psc.slice(0, 2) } : {}), ...(naics ? { naics } : {}), ...(state ? { state } : {}) },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+
+  // ⚠️ NOT `|| rows.length`. That fallback turned an unavailable COUNT into the length of the
+  // current PAGE — so a failed count query would have reported "50 capable suppliers" when the
+  // real answer was unknown. This figure can back a Rule-of-Two determination, so an unknown
+  // total must stay null and let the caller refuse to present it (INT-002).
+  const n = totalRows[0]?.n;
+  return { rows, total: typeof n === 'number' ? n : null };
+}
+
+// ── Procurement history (Army MRR §9) ──────────────────────────────────
+// Prior contracts for a PSC/NAICS, grouped to recipient — what the CO needs for
+// the "Procurement History" table: who won, how much, what method/set-aside,
+// over what period. Real award data (USASpending). (MICC-MRR-SPEC.md)
+export interface ProcurementHistoryRow {
+  recipient_name: string;
+  recipient_uei: string;
+  contract_type: string;     // most-common contract pricing type
+  set_aside: string;         // most-common set-aside / method
+  total_obligated: number;
+  award_count: number;
+  first_action: string;      // earliest award date (POP proxy start)
+  last_action: string;       // latest award date (POP proxy end)
+}
+
+export async function procurementHistoryByCode(opts: {
+  psc?: string;
+  naics?: string;
+  limit?: number;
+  liveBq?: boolean;
+}): Promise<ProcurementHistoryRow[]> {
+  const psc = (opts.psc || '').trim().toUpperCase();
+  const naics = (opts.naics || '').trim();
+  if (!psc && !naics) return [];
+  const limit = Math.min(opts.limit || 15, 50);
+  const conds: string[] = ['obligation_amount > 0'];
+  const params: Record<string, unknown> = { limit };
+  if (psc) { conds.push('psc_code = @psc'); params.psc = psc; }
+  if (naics) { conds.push(naics.length >= 6 ? 'naics_code = @naics' : 'STARTS_WITH(naics_code, @naics)'); params.naics = naics; }
+
+  return queryCached<ProcurementHistoryRow>({
+    cacheOnly: !opts.liveBq,
+    cacheKey: `mrr-proc-hist:${psc}:${naics}:${limit}:v1`,
+    query: `
+      SELECT
+        ANY_VALUE(recipient_name) AS recipient_name,
+        recipient_uei,
+        APPROX_TOP_COUNT(contract_pricing_type, 1)[OFFSET(0)].value AS contract_type,
+        APPROX_TOP_COUNT(NULLIF(set_aside, ''), 1)[OFFSET(0)].value AS set_aside,
+        SUM(obligation_amount) AS total_obligated,
+        COUNT(DISTINCT award_id) AS award_count,
+        CAST(MIN(action_date) AS STRING) AS first_action,
+        CAST(MAX(action_date) AS STRING) AS last_action
+      FROM ${BQ_TABLES.awards}
+      WHERE ${conds.join(' AND ')}
+      GROUP BY recipient_uei
+      ORDER BY total_obligated DESC
+      LIMIT @limit
+    `,
+    params,
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface YearlyByAgencyRow {
+  fiscal_year: number;
+  awarding_agency: string;
+  total_amount: number;
+  award_count: number;
+}
+
+/**
+ * Yearly obligations broken out by awarding agency, for stacked-bar
+ * drilldown. Returns rows for every (FY, agency) pair where the
+ * contractor had activity. Caller rolls up to "top N + Other".
+ */
+/**
+ * Paginated full awards list for a recipient — powers the
+ * /contractors/[slug]/contracts/[page] SEO subpages.
+ *
+ * Pagination uses fixed page size + offset. BQ can fetch ~50 rows from
+ * a clustered query in <500ms cold (KV-cached after that), and big
+ * primes (Lockheed) produce ~100 paginated URLs which Google can crawl
+ * over weeks.
+ *
+ * Skips $0 modifications — they're real records but the user-facing
+ * value is "what money moved", not "which admin paperwork was filed".
+ */
+export async function getPaginatedAwardsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  page: number,
+  pageSize: number = 50,
+): Promise<{ rows: RecentAwardRow[]; total: number; available: boolean }> {
+  const offset = (page - 1) * pageSize;
+  const [rows, totalRows] = await Promise.all([
+    queryCached<RecentAwardRow>({
+      cacheKey: `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`,
+      query: `
+        SELECT
+          award_id,
+          piid,
+          awarding_agency,
+          awarding_office,
+          naics_code,
+          naics_description,
+          description,
+          obligation_amount,
+          CAST(action_date AS STRING) AS action_date,
+          CAST(pop_start_date AS STRING) AS pop_start_date,
+          CAST(pop_end_date AS STRING) AS pop_end_date,
+          pop_state,
+          set_aside
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei IN UNNEST(@ueis)
+          AND obligation_amount > 0
+        ORDER BY action_date DESC
+        LIMIT @pageSize
+        OFFSET @offset
+      `,
+      params: { ueis, pageSize, offset },
+      maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+    }),
+    queryCached<{ total: number }>({
+      cacheKey: `rollup:${rollupUei}:awards-total:v2-m`,
+      query: `
+        SELECT COUNT(*) AS total
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei IN UNNEST(@ueis) AND obligation_amount > 0
+      `,
+      params: { ueis },
+      maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+    }),
+  ]);
+  // A cold cache returns [] for BOTH queries, which is indistinguishable from a
+  // contractor that genuinely has no awards — the ambiguity that let 11,772 pages
+  // publish "Showing contracts 1-0 of 0 total" beneath a "$399M / 29 awards" title.
+  // `available:false` means WE DO NOT KNOW; the page must noindex and say so rather
+  // than render a zero, and must not fall back to the cached headline count either.
+  const rowsKey = `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`;
+  const totalKey = `rollup:${rollupUei}:awards-total:v2-m`;
+  const cacheAvailable =
+    !bqUnavailable(rowsKey, rows.length) && !bqUnavailable(totalKey, totalRows.length);
+
+  if (cacheAvailable) {
+    return { rows, total: Number(totalRows[0]?.total ?? 0), available: true };
+  }
+
+  // ── TIER 2: the durable serving table ────────────────────────────────────────
+  // Redis missed. Before conceding "unavailable", ask the table that CANNOT lapse.
+  // This is the whole point of the durable layer: a 90-day TTL emptying itself must
+  // no longer take 11,772 public pages down with it.
+  //
+  // ⚠️ THERE IS NO TIER 3 THAT QUERIES BIGQUERY. A web request must never trigger a
+  // live scan — that is what turns crawler traffic into an uncontrolled bill. If the
+  // table cannot answer either, the page renders the honest unavailable state.
+  const served = await readServedPage(rollupUei, page, pageSize);
+  if (served) {
+    return {
+      rows: served.rows as unknown as RecentAwardRow[],
+      total: served.counts.displayedActions,
+      available: true,
+    };
+  }
+
+  return { rows, total: Number(totalRows[0]?.total ?? 0), available: false };
+}
+
+/**
+ * Full NAICS breakdown for a recipient — used on /contractors/[slug]/naics.
+ * Returns all NAICS the contractor has activity in, not just top N.
+ */
+export async function getAllNaicsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+): Promise<TopNaicsRow[]> {
+  return queryCached<TopNaicsRow>({
+    cacheKey: `rollup:${rollupUei}:all-naics:v2-m`,
+    query: `
+      SELECT
+        naics_code,
+        ANY_VALUE(naics_description) AS naics_description,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis) AND naics_code IS NOT NULL
+      GROUP BY naics_code
+      ORDER BY total_amount DESC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+/**
+ * Full agency breakdown for a recipient — used on /contractors/[slug]/agencies.
+ * Returns all agencies, not just top N. Caller can paginate display-side.
+ */
+export async function getAllAgenciesForRecipient(
+  ueis: string[],
+  rollupUei: string,
+): Promise<TopAgencyRow[]> {
+  return queryCached<TopAgencyRow>({
+    cacheKey: `rollup:${rollupUei}:all-agencies:v4-m`,
+    // Heaviest query on the site (82% of daily BQ scan per
+    // INFORMATION_SCHEMA). Two fixes vs. the original:
+    //  1) removed the correlated `WITH totals` subquery that scanned
+    //     the cluster a SECOND time for the grand total — now a window
+    //     SUM() over the grouped rows.
+    //  2) dropped COUNT(DISTINCT award_id) — that wide column ~doubled
+    //     the scan (5.9→3.0 GiB on mega-primes). The breakdown shows
+    //     $ + % share; the contractor's total award count comes from
+    //     the recipients row (free).
+    query: `
+      WITH per_agency AS (
+        SELECT
+          awarding_agency,
+          SUM(obligation_amount) AS total_amount
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei IN UNNEST(@ueis) AND awarding_agency IS NOT NULL
+        GROUP BY awarding_agency
+      )
+      SELECT
+        awarding_agency,
+        total_amount,
+        SAFE_DIVIDE(total_amount, SUM(total_amount) OVER ()) AS pct_of_total
+      FROM per_agency
+      ORDER BY total_amount DESC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export async function getYearlyByAgencyForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  liveBq = false,
+): Promise<YearlyByAgencyRow[]> {
+  return queryCached<YearlyByAgencyRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:yearly-by-agency:v2-m`,
+    query: `
+      SELECT
+        fiscal_year,
+        awarding_agency,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND awarding_agency IS NOT NULL
+      GROUP BY fiscal_year, awarding_agency
+      ORDER BY fiscal_year ASC, total_amount DESC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface ExecutiveRow {
+  exec_rank: number;
+  exec_name: string;
+  exec_amount: number;
+  reported_at: string;
+}
+
+export async function getExecutivesForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  liveBq = false,
+): Promise<ExecutiveRow[]> {
+  return queryCached<ExecutiveRow>({
+    cacheOnly: !liveBq, // SEO pages call cache-only (crawler-safe); authenticated paths opt into a live scan
+    cacheKey: `rollup:${rollupUei}:executives:v3-m`,
+    // Executives are reported per-UEI in FFATA. For a parent rollup we take
+    // the highest-ranked exec rows across the child set, then re-rank — the
+    // canonical parent's officers dominate by award value. DISTINCT on name
+    // collapses the same officer reported under multiple sibling UEIs.
+    query: `
+      SELECT
+        ROW_NUMBER() OVER (ORDER BY exec_amount DESC) AS exec_rank,
+        exec_name,
+        exec_amount,
+        reported_at
+      FROM (
+        SELECT
+          exec_name,
+          MAX(exec_amount) AS exec_amount,
+          CAST(MAX(reported_at) AS STRING) AS reported_at
+        FROM ${BQ_TABLES.recipientExecutives}
+        WHERE recipient_uei IN UNNEST(@ueis)
+        GROUP BY exec_name
+      )
+      ORDER BY exec_amount DESC
+      LIMIT 5
+    `,
+    params: { ueis },
+  });
+}
+
+/**
+ * Find similar contractors (same top NAICS + similar size band).
+ * Powers the "Related Contractors" section that HigherGov uses for
+ * internal linking density.
+ */
+export interface SimilarRecipientRow {
+  recipient_uei: string;
+  recipient_name: string;
+  total_obligated: number;
+}
+
+/**
+ * Top recipients for the sitemap — PARENT-ROLLUP name + spend, ordered by
+ * spend.
+ *
+ * Sources from `recipients_rollup` (one row per parent org), NOT the per-UEI
+ * `recipients` table. This is essential: the pages now resolve slugs to
+ * rollups, so the sitemap must emit one URL per parent — emitting per-UEI
+ * names would point at sibling-UEI slugs that 301 to the parent (wasted
+ * crawl) or fragment link equity across near-duplicate names.
+ *
+ * Capped: Google allows 50k URLs per sitemap file. We emit up to 3 URLs per
+ * contractor (overview + contracts, plus agencies/naics when substantive),
+ * so the cap keeps the contractor block well under 48k. Top-by-spend is the
+ * right SEO call — the biggest primes are what people brand-search for.
+ */
+export interface SitemapRecipientRow {
+  // Field name kept as `recipient_name` for call-site compatibility, but the
+  // value is the rollup (parent) name. recipientSlug() runs on it unchanged.
+  recipient_name: string;
+  total_obligated: number;
+  // Gate thin sub-pages out of the sitemap (see SUBPAGE_MIN_ROWS). These are
+  // now PARENT-level distinct counts, so primes like Lockheed (27 agencies)
+  // correctly clear the gate instead of being suppressed by per-UEI scatter.
+  distinct_agency_count: number;
+  distinct_naics_count: number;
+  // Thin-content gate on the contractor OVERVIEW url (mirrors the noindex
+  // predicate in contractors/[slug]/page.tsx): a rollup with < $25K obligated
+  // or a single award earns ~no search traffic, so we neither index it nor
+  // advertise it in the sitemap.
+  award_count: number;
+  // Needed so the sitemap can gate /contracts PER RECIPIENT against the durable
+  // serving table. Without it the only available gate is a global "table has
+  // data" boolean, which would emit ~2,361 URLs whose pages render noindex.
+  rollup_uei: string;
+}
+
+export async function getTopRecipientsForSitemap(
+  limit = 12000,
+): Promise<SitemapRecipientRow[]> {
+  return queryCached<SitemapRecipientRow>({
+    // :v4 — source switched to recipients_rollup_merged (one row per company).
+    // :v5 — added award_count for the overview thin-content sitemap gate.
+    // :v6 — added rollup_uei for the per-recipient /contracts sitemap gate.
+    cacheKey: `sitemap:top-recipients:${limit}:v6`,
+    query: `
+      SELECT
+        rollup_uei,
+        rollup_name AS recipient_name,
+        total_obligated,
+        award_count,
+        distinct_agency_count,
+        distinct_naics_count
+      FROM ${BQ_TABLES.recipientsRollup}
+      WHERE rollup_name IS NOT NULL AND rollup_name != ''
+      ORDER BY total_obligated DESC
+      LIMIT @limit
+    `,
+    params: { limit },
+    // Self-warm on a cold key. queryCached defaults cacheOnly:true (returns []
+    // on a miss to block cost spikes), but the sitemap has no other warmer — so
+    // a fresh cacheKey (e.g. the :v5 bump) would leave the contractor block
+    // permanently empty. This query is a single 0.016 GB scan gated to once/day
+    // by the route's `revalidate = 86400`, so a live cold-load is safe here.
+    cacheOnly: false,
+  });
+}
+
+export async function getSimilarRecipients(
+  ueis: string[],
+  rollupUei: string,
+  topNaicsCode: string,
+  limit = 8,
+): Promise<SimilarRecipientRow[]> {
+  // Scope to the last 3 fiscal years so we only scan ~20% of the
+  // awards partition. With clustering on recipient_uei + recipient_name
+  // and partition-pruning on fiscal_year, this scans ~500MB instead
+  // of 3GB. "Related" means actively competing — old contractors that
+  // exited the NAICS aren't useful related links anyway.
+  //
+  // Group results to the PARENT (COALESCE(parent_uei, recipient_uei)) so the
+  // "Related Contractors" links point at parent pages, and exclude THIS
+  // contractor's whole child set so a prime never lists its own subsidiaries
+  // as competitors.
+  const currentYear = new Date().getFullYear();
+  return queryCached<SimilarRecipientRow>({
+    cacheKey: `rollup:${rollupUei}:similar:${topNaicsCode}:${limit}:v2-m`,
+    query: `
+      SELECT
+        COALESCE(parent_uei, recipient_uei) AS recipient_uei,
+        ANY_VALUE(COALESCE(parent_name, recipient_name)) AS recipient_name,
+        SUM(obligation_amount) AS total_obligated
+      FROM ${BQ_TABLES.awards}
+      WHERE naics_code = @naics
+        AND recipient_uei IS NOT NULL
+        AND recipient_uei NOT IN UNNEST(@ueis)
+        AND fiscal_year BETWEEN @minYear AND @maxYear
+      GROUP BY COALESCE(parent_uei, recipient_uei)
+      ORDER BY total_obligated DESC
+      LIMIT @limit
+    `,
+    params: {
+      ueis,
+      naics: topNaicsCode,
+      limit,
+      minYear: currentYear - 3,
+      maxYear: currentYear,
+    },
+  });
+}
+
+export interface RecipientSearchRow {
+  recipient_uei: string;
+  recipient_name: string;
+  city: string | null;
+  state: string | null;
+  total_obligated: number;
+  award_count: number;
+  distinct_agency_count: number;
+  distinct_naics_count: number;
+}
+
+/**
+ * Search award-winning federal contractors for the in-app Contractors panel
+ * — replaces the static 2,768-row JSON with real BQ data (~317K recipients).
+ *
+ * QUOTA-AWARE (Eric 2026-06-04 — "keep the quota limit down"): BigQuery
+ * bills by bytes scanned. Two paths, both cheap + cached:
+ *   - No NAICS: query `recipients` (name/state search) — ~12-24 MB.
+ *   - With NAICS: query the pre-aggregated `top_contractors_by_dimension`
+ *     rollup (naics dimension) — ~6 MB. The naive alternative (EXISTS on the
+ *     63M-row awards table) scanned ~1.2 GB — 200× worse. NEVER do that here.
+ * Every query goes through queryCached, so repeats cost 0 bytes.
+ */
+export async function searchRecipients(opts: {
+  search?: string;
+  state?: string;
+  naics?: string;
+  // "firms with ≥1 award from this agency" — a pipe-joined multi-agency value is
+  // accepted (same convention as the map's Agency filter, multiAgency()); matched
+  // against BOTH awarding_agency (department) AND awarding_sub_agency (Army/Navy/
+  // Air Force/DLA/etc — where a service branch actually lives), both word orders.
+  // Eric 2026-08-03: "biggest VA contractors in Florida" — the agency word was
+  // being dropped/kept only as a keyword; this makes it a real scope filter.
+  agency?: string;
+  sortBy?: 'total_obligated' | 'award_count' | 'recipient_name';
+  limit?: number;
+  offset?: number;
+  // Opt into LIVE BigQuery. queryCached defaults to cacheOnly (returns [] on a
+  // cache miss to protect public/unauthed traffic from cold BQ scans). The
+  // authenticated in-app contractor search MUST set this true, else every search
+  // returns 0 on a cold cache (the bug: panel + lookup showed no results despite
+  // 317K rows in the table).
+  liveBq?: boolean;
+}): Promise<{ rows: RecipientSearchRow[]; total: number }> {
+  const liveBq = opts.liveBq ?? false;
+  const search = (opts.search || '').trim();
+  const state = (opts.state || '').trim().toUpperCase();
+  // Parse NAICS into a list of codes, PRESERVING separate codes (don't strip
+  // commas — that turned "236,237,238" into "236237238" → 0 results). Each code
+  // can be a 2-6 digit PREFIX (3-digit "236" should match all 236xxx in the
+  // rollup, which is keyed by full 6-digit codes). Eric 2026-06-05.
+  const naicsCodes = (opts.naics || '')
+    .split(/[, ]+/)
+    .map(c => c.replace(/[^0-9]/g, '').trim())
+    .filter(Boolean);
+  const agencyNeedles = multiAgency(opts.agency || '');
+  const sortBy = opts.sortBy || 'total_obligated';
+  // Cap raised 100→500 (2026-07-26, opportunity-map Companies coverage fix): LIMIT
+  // doesn't change bytes scanned (measured: state-filtered scan is ~27 MB at both
+  // limit=100 and limit=500 — it's the same filtered scan either way, LIMIT just
+  // trims the RETURNED rows), so a higher cap costs nothing and lets a
+  // state-scoped caller (the map) pull enough of a state's firms that small/local
+  // companies aren't crowded out by a couple of dominant in-state primes.
+  const limit = Math.min(opts.limit ?? 25, 500);
+  const offset = Math.max(opts.offset ?? 0, 0);
+
+  // ── Agency path: no agency column on the NAICS rollup, so an agency-scoped
+  // request scans the awards table directly (grouped by recipient, ranked by $ —
+  // the same shape as the NAICS-rollup path, just sourced live instead of from a
+  // pre-aggregate). Takes priority over the plain-NAICS rollup path below because
+  // that rollup CANNOT answer "which of these firms sold to the VA" at all.
+  //
+  // COST DISCIPLINE: `awards` is partitioned by fiscal_year (not clustered on
+  // agency), so this bounds the scan to a recent 3-FY window (mirrors
+  // getSimilarContractorsByNaics's `fiscal_year BETWEEN @minYear AND @maxYear`
+  // above) — a firm's RECENT agency relationships are what "sells to this agency"
+  // means anyway. Combined with the mandatory state and/or naics scope (this path
+  // is only reachable with at least one of those set — see the route caller),
+  // partition pruning + the state/naics predicate keep this well under the
+  // AWARDS_SCAN_MAX_BYTES cap (measured below in the verify script).
+  if (agencyNeedles.length > 0) {
+    const currentYear = new Date().getFullYear();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rp: Record<string, any> = {
+      limit, offset,
+      minYear: currentYear - 2,
+      maxYear: currentYear,
+    };
+    const conds: string[] = [
+      'obligation_amount > 0',
+      'recipient_uei IS NOT NULL',
+      'fiscal_year BETWEEN @minYear AND @maxYear',
+      agencyBqOrSql('awarding_agency', 'awarding_sub_agency', agencyNeedles),
+    ];
+    if (naicsCodes.length > 0) {
+      const naicsConds = naicsCodes.map((code, i) => {
+        rp[`n${i}`] = code;
+        return code.length >= 6 ? `naics_code = @n${i}` : `STARTS_WITH(naics_code, @n${i})`;
+      });
+      conds.push(`(${naicsConds.join(' OR ')})`);
+    }
+    if (state) { conds.push('recipient_state = @state'); rp.state = state; }
+    if (search) {
+      const isUei = /^[A-Za-z0-9]{12}$/.test(search);
+      if (isUei) { conds.push('(LOWER(recipient_name) LIKE @search OR recipient_uei = @uei)'); rp.uei = search.toUpperCase(); }
+      else conds.push('LOWER(recipient_name) LIKE @search');
+      rp.search = `%${search.toLowerCase()}%`;
+    }
+
+    const orderCol = sortBy === 'recipient_name' ? 'recipient_name' : sortBy === 'award_count' ? 'award_count' : 'total_obligated';
+    const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+    const agencyKey = agencyNeedles.join('|').toLowerCase();
+
+    const rows = await queryCached<{
+      recipient_uei: string; recipient_name: string; total_obligated: number; award_count: number;
+      distinct_agency_count: number; city: string | null; state: string | null; total_rows: number;
+    }>({
+      cacheOnly: !liveBq,
+      cacheKey: `recipient-search-agency:${agencyKey}:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
+      query: `
+        WITH matched AS (
+          SELECT
+            recipient_uei,
+            ANY_VALUE(recipient_name) AS recipient_name,
+            SUM(obligation_amount) AS total_obligated,
+            COUNT(DISTINCT award_id) AS award_count,
+            COUNT(DISTINCT awarding_agency) AS distinct_agency_count
+          FROM ${BQ_TABLES.awards}
+          WHERE ${conds.join(' AND ')}
+          GROUP BY recipient_uei
+        )
+        SELECT m.recipient_uei, m.recipient_name, m.total_obligated, m.award_count,
+          m.distinct_agency_count,
+          r.city AS city, r.state AS state,
+          COUNT(*) OVER() AS total_rows
+        FROM matched m
+        LEFT JOIN ${BQ_TABLES.recipients} r USING (recipient_uei)
+        ${state ? 'WHERE r.state = @stateJoin' : ''}
+        ORDER BY ${orderCol === 'recipient_name' ? 'm.recipient_name' : orderCol === 'award_count' ? 'm.award_count' : 'm.total_obligated'} ${orderDir}
+        LIMIT @limit OFFSET @offset
+      `,
+      // Two independent state checks, not one: `recipient_state = @state` in the inner scan bounds
+      // the awards-table SCAN (partition/predicate pruning — cheap), but a firm's individual award
+      // rows can carry a stale/inconsistent recipient_state (measured: GA firms leaked into an
+      // FL-scoped result when only the inner filter was applied). The OUTER `r.state = @stateJoin`
+      // re-asserts against the CANONICAL recipients-table state (same authority the NAICS/no-NAICS
+      // paths above use) before a row is ever returned — belt-and-suspenders, not redundant.
+      params: { ...rp, stateJoin: state || null },
+      maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+    });
+    const total = rows.length ? Number(rows[0].total_rows) : 0;
+    return {
+      total,
+      rows: rows.map(r => ({
+        recipient_uei: r.recipient_uei,
+        recipient_name: r.recipient_name,
+        city: r.city ?? null,
+        state: r.state ?? null,
+        total_obligated: Number(r.total_obligated || 0),
+        award_count: Number(r.award_count || 0),
+        distinct_agency_count: Number(r.distinct_agency_count || 0),
+        distinct_naics_count: 0,
+      })),
+    };
+  }
+
+  // ── NAICS path: cheap pre-aggregated rollup (top contractors per NAICS) ──
+  if (naicsCodes.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rp: Record<string, any> = { limit, offset };
+    // Match each code: exact when 6 digits, prefix (STARTS_WITH) when shorter.
+    const naicsConds = naicsCodes.map((code, i) => {
+      rp[`n${i}`] = code;
+      return code.length >= 6
+        ? `dimension_value = @n${i}`
+        : `STARTS_WITH(dimension_value, @n${i})`;
+    });
+    const conds = ['dimension = "naics"', `(${naicsConds.join(' OR ')})`];
+    if (search) { conds.push('LOWER(recipient_name) LIKE @search'); rp.search = `%${search.toLowerCase()}%`; }
+    // rollup has total_amount/award_count/rank; no state/agency/naics counts.
+    const orderCol = sortBy === 'recipient_name' ? 'recipient_name'
+      : sortBy === 'award_count' ? 'award_count' : 'total_amount';
+    const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+    // A recipient can appear under several NAICS in the list — aggregate to one
+    // row (sum $ + awards) so the same firm isn't listed multiple times.
+    // State filter: the NAICS rollup has NO location column, but the recipients
+    // table (joined for agency breadth) carries the firm's HQ state. Filtering on
+    // r.state turns the LEFT JOIN into an inner match for that state — so
+    // "top contractors for a NAICS, in FL" finally honors FL (was silently
+    // dropped — the rollup ignored state entirely). Eric 2026-07-16.
+    const stateWhere = state ? 'WHERE r.state = @state' : '';
+    if (state) rp.state = state;
+    const rolled = await queryCached<{
+      recipient_uei: string; recipient_name: string; total_amount: number; award_count: number;
+      distinct_agency_count: number; city: string | null; state: string | null; total_rows: number;
+    }>({
+      cacheOnly: !liveBq,
+      cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v4`,
+      query: `
+        WITH matched AS (
+          SELECT recipient_uei, ANY_VALUE(recipient_name) AS recipient_name,
+            SUM(total_amount) AS total_amount, SUM(award_count) AS award_count
+          FROM ${BQ_TABLES.topContractorsByDimension}
+          WHERE ${conds.join(' AND ')}
+          GROUP BY recipient_uei
+        )
+        -- Join the recipients table for agency breadth ("works with N agencies"),
+        -- a strong capture signal — does this firm sell to many buyers or one? —
+        -- and for the firm's HQ city/state (used by the optional state filter).
+        SELECT m.recipient_uei, m.recipient_name, m.total_amount, m.award_count,
+          COALESCE(r.distinct_agency_count, 0) AS distinct_agency_count,
+          r.city AS city, r.state AS state,
+          COUNT(*) OVER() AS total_rows
+        FROM matched m
+        LEFT JOIN ${BQ_TABLES.recipients} r USING (recipient_uei)
+        ${stateWhere}
+        ORDER BY ${orderCol === 'recipient_name' ? 'm.recipient_name' : orderCol === 'award_count' ? 'm.award_count' : 'm.total_amount'} ${orderDir}
+        LIMIT @limit OFFSET @offset
+      `,
+      params: rp,
+    });
+    const total = rolled.length ? Number(rolled[0].total_rows) : 0;
+    return {
+      total,
+      rows: rolled.map(r => ({
+        recipient_uei: r.recipient_uei,
+        recipient_name: r.recipient_name,
+        city: r.city ?? null,
+        state: r.state ?? null,
+        total_obligated: Number(r.total_amount || 0),
+        award_count: Number(r.award_count || 0),
+        distinct_agency_count: Number(r.distinct_agency_count || 0),
+        distinct_naics_count: 0,
+      })),
+    };
+  }
+
+  // ── No-NAICS path: name/UEI/state search over recipients (cheap) ──
+  const where: string[] = ['r.recipient_name IS NOT NULL'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params: Record<string, any> = { limit, offset };
+  if (search) {
+    // Match the name (substring) OR an exact UEI — so pasting a 12-char UEI
+    // resolves the company, not just a name search.
+    const isUei = /^[A-Za-z0-9]{12}$/.test(search);
+    if (isUei) {
+      where.push('(LOWER(r.recipient_name) LIKE @search OR r.recipient_uei = @uei)');
+      params.uei = search.toUpperCase();
+    } else {
+      where.push('LOWER(r.recipient_name) LIKE @search');
+    }
+    params.search = `%${search.toLowerCase()}%`;
+  }
+  if (state) { where.push('r.state = @state'); params.state = state; }
+
+  const orderCol = sortBy === 'recipient_name' ? 'r.recipient_name'
+    : sortBy === 'award_count' ? 'r.award_count'
+    : 'r.total_obligated';
+  const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+
+  const rows = await queryCached<RecipientSearchRow & { total_rows: number }>({
+    cacheOnly: !liveBq,
+    cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
+    query: `
+      SELECT
+        r.recipient_uei, r.recipient_name, r.city, r.state,
+        r.total_obligated, r.award_count,
+        r.distinct_agency_count, r.distinct_naics_count,
+        COUNT(*) OVER() AS total_rows
+      FROM ${BQ_TABLES.recipients} r
+      WHERE ${where.join(' AND ')}
+      ORDER BY ${orderCol} ${orderDir}
+      LIMIT @limit OFFSET @offset
+    `,
+    params,
+  });
+
+  const total = rows.length ? Number(rows[0].total_rows) : 0;
+  return { rows: rows.map(({ total_rows, ...r }) => r), total };
+}
+
+/**
+ * Build the in-app drawer's ContractorSalesHistory shape directly from BQ.
+ * Used as the fallback when a contractor isn't in the static contractor DB
+ * (i.e. most of the 317K BQ recipients). Resolves by UEI (exact) or slug.
+ *
+ * Shared BQ→ContractorSalesHistory mapper. Callers that authorize cold scans
+ * pass liveBq:true (Map drawer via getContractorHistoryByUei coldPolicy=always;
+ * warm-first MCP/chat pass false then true only when the cold budget allows).
+ * Public SEO never calls this.
+ */
+export async function getBqContractorHistory(opts: {
+  uei?: string;
+  slug?: string;
+  /** When false, only warm KV — never a cost-bearing BQ scan. Default true for legacy Map callers. */
+  liveBq?: boolean;
+  // Legacy return is the untyped ContractorSalesHistory-shaped object Map already consumes.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}): Promise<any | null> {
+  const liveBq = opts.liveBq ?? true;
+  const profile = opts.uei
+    ? await getRecipientByUei(opts.uei, liveBq)
+    : opts.slug
+    ? await getRecipientBySlug(opts.slug, liveBq)
+    : null;
+  if (!profile) return null;
+  const uei = profile.recipient_uei;
+  // In-app drawer fallback is a single-UEI view (resolved by exact UEI or
+  // slug). Pass the lone UEI as a one-element set; the detail fns key their
+  // cache on this UEI. (The public contractor pages use the parent rollup
+  // via getRollupBySlug; this surface intentionally stays per-UEI.)
+  const ueiSet = [uei];
+  // Distinct cache namespace from the parent-rollup pages: this is a single-
+  // UEI result, but for a parent UEI the same key string would otherwise
+  // collide with the page's full-child-set result. Prefix keeps them separate.
+  const cacheKey = `single:${uei}`;
+
+  const TOP_AGENCIES_LIMIT = 8;
+  const [yearly, agencies, naics, recent, yearlyByAgency, setAsideHist, warehouseCoverage] =
+    await Promise.all([
+      getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
+      getTopAgenciesForRecipient(ueiSet, cacheKey, TOP_AGENCIES_LIMIT, liveBq),
+      getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
+      getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
+      getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
+      getSetAsideHistoryForRecipient(ueiSet, cacheKey, liveBq),
+      loadAwardsWarehouseCoverage().catch(() => null),
+    ]);
+
+  const awardCount = Number(profile.award_count || 0);
+  // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
+  // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
+  // empty arrays mean "not retrieved", not "none exist".
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v4-m`;
+  const setAsideUnavailable =
+    awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
+  const detailIncomplete =
+    awardCount > 0 &&
+    (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v3-m`, yearly.length) ||
+      bqUnavailable(`rollup:${cacheKey}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`, agencies.length) ||
+      bqUnavailable(`rollup:${cacheKey}:top-naics:8:v2-m`, naics.length) ||
+      bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v4-m`, recent.length) ||
+      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length) ||
+      setAsideUnavailable);
+  const enrichmentStatus: 'complete' | 'budget_limited' = detailIncomplete
+    ? 'budget_limited'
+    : 'complete';
+
+  // Group the per-(year,agency) rows so each fiscal year carries its agency
+  // breakdown — this is what the chart's click-to-drill-down renders.
+  // Zero-dollar cells keep vehicle_usage=not_established (never boolean false-as-caveat).
+  const byYear = new Map<
+    number,
+    Array<{
+      agency: string;
+      amount: number;
+      /** @deprecated Prefer distinct_award_count — same value, grain=distinct_awards. */
+      count: number;
+      distinct_award_count: number;
+      count_grain: 'distinct_awards';
+      classification: ReturnType<typeof classifyAgencyYearObligations>['classification'];
+      unused_vehicle: null;
+      vehicle_usage: 'not_established';
+      classification_note: string | null;
+    }>
+  >();
+  for (const r of yearlyByAgency) {
+    const amount = Number(r.total_amount || 0);
+    const count = Number(r.award_count || 0);
+    const classified = classifyAgencyYearObligations({ amount, count });
+    const arr = byYear.get(r.fiscal_year) || [];
+    arr.push({
+      agency: r.awarding_agency,
+      amount,
+      count: classified.distinct_award_count,
+      distinct_award_count: classified.distinct_award_count,
+      count_grain: classified.count_grain,
+      classification: classified.classification,
+      unused_vehicle: classified.unused_vehicle,
+      vehicle_usage: classified.vehicle_usage,
+      classification_note: classified.note,
+    });
+    byYear.set(r.fiscal_year, arr);
+  }
+
+  const series = yearly
+  .sort((a, b) => a.fiscal_year - b.fiscal_year)
+  .map(y => ({
+    fiscalYear: y.fiscal_year,
+    totalObligations: Number(y.total_obligated || 0),
+    // Pass through only when the v3 query field is present — never invent from net.
+    positiveObligations:
+      y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+    deobligations:
+      y.deobligations == null ? undefined : Number(y.deobligations),
+    awardCount: Number(y.award_count || 0),
+    agencyBreakdown: byYear.get(y.fiscal_year) || [],
+  }));
+  const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
+  const topAgency = agencies[0]?.awarding_agency || null;
+  const totalObligations = Number(profile.total_obligated || 0);
+  const activity = deriveActivityFromSeries(series);
+  const counting = buildCountingBases({
+    uniqueAwards: awardCount,
+    series,
+    recentActions: recent.map((r) => ({ awardId: r.award_id })),
+  });
+  const coverageTs = describeCoverageTimestamp({
+    lastRecipientActionDate: profile.last_action_date || null,
+    warehouseMaxActionDate: warehouseCoverage?.clocks?.sourceActionMax ?? null,
+    ingest: warehouseCoverage
+      ? {
+          last_built: warehouseCoverage.lastBuilt,
+          acquired_at: warehouseCoverage.clocks?.acquiredAt ?? null,
+          merged_at: warehouseCoverage.clocks?.mergedAt ?? null,
+          recipients_rebuilt_at: warehouseCoverage.clocks?.recipientsRebuiltAt ?? null,
+          freshness: warehouseCoverage.freshness,
+        }
+      : null,
+  });
+  const historicalSetAsides = summarizeHistoricalSetAsides(
+    setAsideUnavailable
+      ? []
+      : setAsideHist.map((r) => ({
+          setAside: r.set_aside,
+          lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
+          firstObservedPositiveActionFy:
+            r.first_observed_positive_action_fy == null
+              ? null
+              : Number(r.first_observed_positive_action_fy),
+          // Preserve null — never substitute the queried UEI.
+          contributingUeis: r.contributing_ueis,
+          supportingActions: (r.supporting_actions ?? []).map((a) => ({
+            uei: a?.uei ?? null,
+            award_id: a?.award_id ?? null,
+            fiscal_year: a?.fiscal_year == null ? null : Number(a.fiscal_year),
+            obligation_amount:
+              a?.obligation_amount == null ? null : Number(a.obligation_amount),
+            action_date: a?.action_date ?? null,
+          })),
+        })),
+    {
+      coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+      scope: { kind: 'history_single_uei', uei_count: 1 },
+      contributingUeiSampleLimit: SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
+      scopeNote:
+        'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query.',
+    },
+  );
+  const agenciesServed = Number(profile.distinct_agency_count || agencies.length);
+  const topAgenciesCapped = agenciesServed > agencies.length;
+
+  return {
+    success: true,
+    source: 'bigquery_normalized',
+    coverage: enrichmentStatus === 'budget_limited' ? 'limited' : 'cached',
+    // lastUpdated remains for compatibility — it is the recipient's last action,
+    // NOT warehouse ingest freshness (see coverage_timestamp).
+    lastUpdated: profile.last_action_date || null,
+    coverage_timestamp: coverageTs,
+    contractor: {
+      company: profile.recipient_name,
+      slug: recipientSlug(profile.recipient_name),
+      naics: naics.map(n => n.naics_code),
+      agencies: agencies.map(a => a.awarding_agency),
+      totalContractValue: totalObligations,
+      contractCount: awardCount,
+      hasContact: false, hasEmail: false, hasPhone: false,
+    },
+    match: {
+      method: 'recipient_uei',
+      confidence: 'high',
+      name: profile.recipient_name,
+      // Shared vocabulary across MCP tools (profile resolution / SAM lookup_status / history).
+      match_status: 'unique',
+    },
+    summary: {
+      totalObligations, awardCount, latestFiscalYear, topAgency,
+      averageAwardSize: awardCount > 0 ? totalObligations / awardCount : 0,
+      last_positive_obligation_fy: activity.last_positive_obligation_fy,
+      activity_status: activity.activity_status,
+      activity_note: activity.activity_note,
+      activity_observation_period: activity.observation_period,
+      // Federal obligations ≠ company revenue.
+      obligations_are_not_revenue: true,
+    },
+    counting_bases: counting,
+    series,
+    // Per-agency award_count is intentionally not queried here (scan cost).
+    // count=null means unavailable — never fabricate 0. share can be ≤0 for
+    // deobligation-only agencies (still a real relationship).
+    topAgencies: agencies.map(a => ({
+      agency: a.awarding_agency,
+      amount: Number(a.total_amount || 0),
+      count: null as number | null,
+      count_unavailable: true,
+      share: Number(a.pct_of_total || 0),
+    })),
+    top_agencies_returned: agencies.length,
+    top_agencies_limit: TOP_AGENCIES_LIMIT,
+    agencies_served: agenciesServed,
+    top_agencies_capped: topAgenciesCapped,
+    top_agencies_note: topAgenciesCapped
+      ? `Showing top ${agencies.length} of ${agenciesServed} agencies by net obligations (includes $0 and negative nets). Cap is explicit — omitted agencies are not "no relationship".`
+      : 'Agency list includes $0 and negative net totals when present; negative net is deobligation evidence, not proof the agency was filtered out.',
+    topNaics: naics.map(n => ({ naics: n.naics_code, description: n.naics_description || null, amount: Number(n.total_amount || 0), count: Number(n.award_count || 0) })),
+    recentAwards: recent.map(r => {
+      const startDate = r.pop_start_date || null;
+      const endDate = r.pop_end_date || null;
+      const range = assessDateRange(startDate, endDate);
+      const modNumber = r.mod_number ?? null;
+      return {
+        id: r.award_id,
+        piid: r.piid || null,
+        modNumber,
+        modClassification: classifyModNumber(modNumber),
+        isModification: isModificationAction(modNumber),
+        title: (r.description || r.piid || r.award_id || '').slice(0, 160),
+        agency: r.awarding_agency || '—',
+        subAgency: r.awarding_office || null,
+        naics: r.naics_code || null,
+        naicsDescription: r.naics_description || null,
+        amount: Number(r.obligation_amount || 0),
+        actionDate: r.action_date || null,
+        startDate,
+        endDate,
+        dateRangeAssessment: range.assessment,
+        dateRangeValid: dateRangeValidFlag(startDate, endDate),
+        dateRangeIssue: range.issue,
+        state: r.pop_state || null,
+        setAside: r.set_aside || null,
+        url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
+        grain: 'obligation_action' as const,
+      };
+    }),
+    recent_awards_note:
+      'recentAwards are dollar-bearing obligation actions (often modifications of the same award_id). ' +
+      'Use counting_bases.recent_unique_awards for distinct awards in this sample.',
+    historical_set_asides: historicalSetAsides,
+    gated: { fullHistory: false, contacts: false, workflowActions: false, exports: false },
+    enrichment_status: enrichmentStatus,
+    ...(enrichmentStatus === 'budget_limited'
+      ? {
+          partial: true,
+          message:
+            `Award/agency/NAICS detail was not retrieved (detail cache cold or live lookup ` +
+            `unavailable). Empty series/topAgencies/topNaics/recentAwards mean "not fetched", ` +
+            `NOT "none exist" — profile shows ${awardCount} awards / $${totalObligations}.`,
+        }
+      : { partial: false }),
+  };
+}
+
+// ── Per-firm set-aside eligibility (derived from real awards) ─────────────
+// `recipients_rollup_merged` carries NO set-aside column, and the pre-agg
+// `top_contractors_by_dimension` rollup for dimension='set_aside' is capped to
+// the top ~50 firms PER set-aside NATIONWIDE (884 distinct UEIs total, verified
+// 2026-07-26) — small/local firms like a Cranston, RI construction sub never
+// appear there. So a firm's set-aside is derived from the `awards` table, but
+// SCOPED to the specific UEIs being displayed (never a state-wide/nationwide
+// scan) — an `IN UNNEST(@ueis)` lookup over a bounded pin list (~MB, cached),
+// not the 63M-row table unfiltered. Ground truth only: a firm with no
+// set-aside award returns no bucket (never fabricated "Open"/"None").
+export const SET_ASIDE_BUCKET_COLOR: Record<string, string> = {
+  SDVOSB: '#10b981', // green
+  SB: '#3b82f6',      // blue
+  '8A': '#a855f7',    // purple
+  WOSB: '#ef4444',    // red
+  HZ: '#f59e0b',      // amber
+};
+export const SET_ASIDE_BUCKET_LABEL: Record<string, string> = {
+  SDVOSB: 'SDVOSB',
+  SB: 'Small Biz',
+  '8A': '8(a)',
+  WOSB: 'WOSB',
+  HZ: 'HUBZone',
+};
+
+/**
+ * Classify a raw USASpending `set_aside` free-text string into one of the map's
+ * 5 legend buckets (SDVOSB / Small Biz / 8(a) / WOSB / HUBZone). Returns null
+ * for "NO SET ASIDE USED." and anything else that doesn't match a known
+ * bucket (Buy Indian, HBCU/MI, etc.) — those are real distinctions we don't
+ * have a pin color for yet, so we omit rather than mis-bucket them.
+ */
+export function classifySetAside(raw: string | null | undefined): string | null {
+  const s = (raw || '').toUpperCase().trim();
+  if (!s || s.startsWith('NO SET ASIDE')) return null;
+  if (s.includes('SDVOSB') || s.includes('SERVICE DISABLED VETERAN OWNED') || s.includes('SERVICE-DISABLED VETERAN')) return 'SDVOSB';
+  if (s.startsWith('8(A)') || s.startsWith('8A ') || s === '8A') return '8A';
+  if (s.includes('WOMEN OWNED') || s.includes('WOSB') || s.includes('EDWOSB') || s.includes('ECONOMICALLY DISADVANTAGED WOMEN')) return 'WOSB';
+  if (s.includes('HUBZONE')) return 'HZ';
+  if (s.includes('SMALL BUSINESS SET ASIDE') || s === 'RESERVED FOR SMALL BUSINESS' || s === 'TOTAL SMALL BUSINESS') return 'SB';
+  return null;
+}
+
+export interface RecipientSetAsides {
+  recipient_uei: string;
+  buckets: string[]; // e.g. ['8A', 'SB'] — every distinct bucket this firm has won under, ranked by award count
+}
+
+/**
+ * Look up which set-aside bucket(s) a specific, bounded list of recipients has
+ * actually WON awards under. Cost is proportional to the UEI list size, not the
+ * table (measured: 2 UEIs = 27 MB, 100 UEIs = ~480-735 MB with a 5-year floor —
+ * cache absorbs repeats). Callers MUST bound `ueis` to what's actually being
+ * displayed (a map page of pins), never a whole state/nationwide list.
+ */
+export async function getSetAsidesForRecipients(
+  ueis: string[],
+  liveBq = false,
+): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (!ueis.length) return out;
+
+  // AUTHORITATIVE FIRST (Eric 2026-07-28): a firm's real SBA certifications come from SAM.gov, cached
+  // in recipient_certifications. If SAM resolved a UEI, use its certs verbatim — a registered firm
+  // with no small-biz cert (SAIC) shows NO chip, un-foolable. Only UEIs SAM HASN'T resolved fall
+  // through to the award-share heuristic below (a reasonable stopgap until the cert backfill reaches
+  // them). getCachedCerts never calls SAM and never throws — a missing table just yields all-miss.
+  const certMap = await getCachedCerts(ueis);
+  const unresolved: string[] = [];
+  for (const uei of ueis) {
+    const c = certMap.get(uei);
+    if (c && c.found) out.set(uei, certBuckets(c)); // SAM truth (may be []) — no award-share needed
+    else unresolved.push(uei);                       // no SAM record yet → heuristic fallback
+  }
+  if (!unresolved.length) return out;
+  ueis = unresolved; // the award-share pass below now covers ONLY the unresolved UEIs
+
+  const currentYear = new Date().getFullYear();
+  const key = `setaside-lookup:${[...ueis].sort().join(',')}:v1`;
+  // Count set_aside INCLUDING "NO SET ASIDE" (do NOT filter it out) — a firm's set-aside chip must be
+  // measured against its WHOLE award mix, not just its set-aside awards. Otherwise a mega-prime like
+  // SAIC (97.5% full-and-open, ~3,099 awards) that also happens to hold 64 SDVOSB subcontract-type
+  // awards gets tagged "SDVOSB · SMALL BIZ" off 2% of its work (Eric 2026-07-28: "SAIC is a billion-
+  // dollar firm, it doesn't track"). We only surface a chip when the firm MEANINGFULLY competes in it.
+  const rows = await queryCached<{ recipient_uei: string; set_aside: string; n: number }>({
+    cacheOnly: !liveBq,
+    cacheKey: `${key.replace(':v1', ':v2')}`,
+    query: `
+      SELECT recipient_uei, IFNULL(set_aside, '') AS set_aside, COUNT(*) AS n
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND fiscal_year >= @minYear
+      GROUP BY recipient_uei, set_aside
+    `,
+    params: { ueis, minYear: currentYear - 5 },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+
+  // Per firm: total awards + per-bucket counts (bucket=null means open/full-and-open).
+  const perFirm = new Map<string, { total: number; buckets: Map<string, number> }>();
+  for (const r of rows) {
+    const rec = perFirm.get(r.recipient_uei) || { total: 0, buckets: new Map<string, number>() };
+    const n = Number(r.n || 0);
+    rec.total += n;
+    const bucket = classifySetAside(r.set_aside); // null for "NO SET ASIDE" / open competition
+    if (bucket) rec.buckets.set(bucket, (rec.buckets.get(bucket) || 0) + n);
+    perFirm.set(r.recipient_uei, rec);
+  }
+  // A chip only earns its place when the firm wins a MEANINGFUL share of its work through that
+  // set-aside — otherwise the badge misrepresents the firm (SAIC's 2% SDVOSB ≠ "an SDVOSB firm").
+  const MIN_SHARE = 0.2; // ≥20% of the firm's awards in this bucket to display the chip
+  for (const [uei, { total, buckets }] of perFirm) {
+    if (!total) continue;
+    const ranked = Array.from(buckets.entries())
+      .filter(([, n]) => n / total >= MIN_SHARE)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k]) => k);
+    out.set(uei, ranked); // empty array ⇒ no set-aside chip (an open-competition prime shows none)
+  }
+  return out;
+}

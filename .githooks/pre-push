@@ -1,0 +1,387 @@
+#!/usr/bin/env bash
+#
+# Pre-push safety gate. HARD-BLOCKS a push when the build would break or a new
+# unauthenticated gated fetch slips in — the two failure classes that reached
+# prod this week (a broken `getMIApiHeaders` deploy + the "Missing two-factor
+# session" auth-header class). Slower/flakier checks WARN but never block.
+#
+# Enabled via `core.hooksPath=.githooks` (set by `npm run hooks:install`, and
+# auto-run on `npm install` via the prepare script). Bypass in a real emergency
+# with `git push --no-verify` (use sparingly — it exists for genuine hotfixes).
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+BOLD='\033[1m'; RED='\033[0;31m'; GREEN='\033[0;32m'; YEL='\033[0;33m'; NC='\033[0m'
+fail=0
+
+echo -e "${BOLD}── pre-push gate ──${NC}"
+
+# 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
+echo -e "  ${BOLD}1/13${NC} typecheck (tsc --noEmit)…"
+if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
+  echo -e "      ${GREEN}✓ typecheck clean${NC}"
+else
+  echo -e "      ${RED}✗ typecheck FAILED — push blocked${NC}"
+  grep "error TS" /tmp/mindy-prepush-tsc.log | head -15 | sed 's/^/        /'
+  fail=1
+fi
+
+# 1b) HARD BLOCK: the opportunity-map serves client JS as TEMPLATE LITERALS; tsc treats those as
+# opaque strings, so a JS syntax error INSIDE the client script (unbalanced paren, etc.) compiles
+# clean, passes the gate, and ships DEAD — the inline <script> throws on load and every function
+# after the break (openOppDrawer, the drawers) never binds. #495 shipped exactly this (an extra ')').
+echo -e "  ${BOLD}1b/13${NC} client <script> syntax (opportunity-map)…"
+if node scripts/check-drawer-js.mjs > /tmp/mindy-prepush-drawerjs.log 2>&1; then
+  echo -e "      ${GREEN}✓ client scripts parse clean${NC}"
+else
+  echo -e "      ${RED}✗ a served client script has a JS syntax error — push blocked${NC}"
+  cat /tmp/mindy-prepush-drawerjs.log | head -8 | sed 's/^/        /'
+  fail=1
+fi
+
+echo -e "  ${BOLD}1c/13${NC} template-html.ts in sync with template.html…"
+if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1; then
+  echo -e "      ${GREEN}✓ served template matches source${NC}"
+else
+  echo -e "      ${RED}✗ template.html was edited but template-html.ts (the file the map SERVES) wasn't regenerated — push blocked${NC}"
+  echo -e "      ${YEL}  run: node scripts/gen-template-html.mjs${NC}"
+  fail=1
+fi
+
+# 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
+echo -e "  ${BOLD}2/13${NC} client auth-header audit…"
+if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
+else
+  echo -e "      ${RED}✗ new unauthenticated gated fetch — push blocked${NC}"
+  cat /tmp/mindy-prepush-auth.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3) HARD BLOCK: no NEW swallowed-error Supabase read (hardcoded multi-column
+#    .select() whose { error } is ignored → a bad column silently nulls the whole
+#    query → generic/empty result for the user). This is the loadBidderProfile /
+#    user_briefing_profile dead-table class. Baseline-gated: only NEW ones block.
+echo -e "  ${BOLD}3/13${NC} supabase swallowed-error audit…"
+if node scripts/audit-supabase-errors.mjs > /tmp/mindy-prepush-sberr.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new swallowed-error reads${NC}"
+else
+  echo -e "      ${RED}✗ new swallowed-error read — push blocked${NC}"
+  cat /tmp/mindy-prepush-sberr.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3b) HARD BLOCK: no NEW un-ranged list select in a script that WRITES.
+#     PostgREST caps an unranged .select() at 1,000 rows SILENTLY — no error, no
+#     warning, the query just returns 1,000 and looks complete. On 2026-08-19 that
+#     cap changed the verdict THREE times in one investigation: it faked a "3
+#     stranded" alert in a brand-new monitor, and a classification backfill
+#     computed 87 affected users against SQL's real 28 — it would have written 59
+#     duplicate rows into a live entitlement table. Only a human noticing two
+#     numbers disagree caught the last one. That is not a control; this is.
+#     Baseline-gated: the 46 pre-existing ones are recorded, only NEW ones block.
+echo -e "  ${BOLD}3b/13${NC} un-ranged selects in writing scripts…"
+if node scripts/audit-unranged-selects.mjs > /tmp/mindy-prepush-unranged.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new un-ranged list selects${NC}"
+else
+  echo -e "      ${RED}✗ new un-ranged select in a writing script — push blocked${NC}"
+  cat /tmp/mindy-prepush-unranged.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3c) HARD BLOCK: PostgREST 1,000-row truncation in API routes.
+#     FOUR occurrences in one day (2026-08-22) made this an architectural boundary, not a
+#     series of individual fixes: MCP adoption reported "24 accounts, 0 new" when the truth
+#     was 59 and 23; the description drainer would have drained 1,000 of 17,748 while
+#     printing success; and the admin dashboard derived the REIGNITE AUDIENCE from 1,000 of
+#     8,802 rows. Each produced a confident, plausible, WRONG number a human would act on.
+#     Targets the dangerous SHAPE only (unbounded list read -> population metric), so it
+#     flags 131 of 935 selects rather than becoming noise someone disables.
+echo -e "  ${BOLD}3c/13${NC} API 1,000-row truncation…"
+if node scripts/audit-api-truncation.mjs > /tmp/mindy-prepush-apitrunc.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new unpaginated population reads${NC}"
+else
+  echo -e "      ${RED}✗ new unpaginated population read in an API route — push blocked${NC}"
+  cat /tmp/mindy-prepush-apitrunc.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3e) HARD BLOCK: an oversized PostgREST .limit(n).
+#     Distinct from 3b/3c/3d, which target UNBOUNDED or unpaginated reads. This one is
+#     BOUNDED — someone wrote a number — which is exactly why it reads as deliberate and
+#     slipped past all three. PostgREST caps every response at 1,000 rows regardless, so
+#     .limit(50000) silently returns 1,000 and no error.
+#     Caught 2026-08-25 when validateGeneration() inspected 1,000 of 23,492 pages, reported
+#     "only 876 recipients", and refused a valid build -- the bug appearing inside the code
+#     written to guard against the bug. A repo scan then found 52 more, including
+#     observatory.ts requesting 200,000 rows from an 84,033-row table.
+echo -e "  ${BOLD}3e/13${NC} oversized PostgREST .limit(n)…"
+if node scripts/audit-oversized-limits.mjs > /tmp/mindy-prepush-limits.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new oversized limits${NC}"
+else
+  echo -e "      ${RED}✗ new .limit(n) above the 1,000-row cap — push blocked${NC}"
+  cat /tmp/mindy-prepush-limits.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3d) HARD BLOCK: INT-005 — a capped RETURNING receipt counted as a write total.
+#     Integrity OS Phase 2. The UPDATE affects every matching row; PostgREST returns at most
+#     1,000 of them, so counting the payload UNDER-REPORTS and nothing errors. Real incident:
+#     the recompete prune counted a payload against a 137,186-row candidate set. Proven by
+#     re-injecting that exact code from dde08aab and watching this gate block it.
+echo -e "  ${BOLD}3d/13${NC} INT-005 mutation receipts…"
+if node scripts/audit-mutation-receipts.mjs > /tmp/mindy-prepush-int005.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new mutation-receipt counts${NC}"
+else
+  echo -e "      ${RED}✗ INT-005: a mutation RETURNING payload is being counted — push blocked${NC}"
+  cat /tmp/mindy-prepush-int005.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3e) HARD BLOCK: INT-011 — an audience read truncated BEFORE batching.
+#     Unlike ordinary truncation this is NOT self-correcting: the rows past the cap never
+#     reach the batch cursor, so re-running never helps. Real incident: weekly-alerts left
+#     ~1,028 eligible users unqueued on EVERY cycle. Proven by re-injecting the pre-fix read.
+echo -e "  ${BOLD}3e/13${NC} INT-011 audience reachability…"
+if node scripts/audit-audience-reachability.mjs > /tmp/mindy-prepush-int011.log 2>&1; then
+  echo -e "      ${GREEN}✓ no unreachable-audience reads${NC}"
+else
+  echo -e "      ${RED}✗ INT-011: audience truncated before batching — push blocked${NC}"
+  cat /tmp/mindy-prepush-int011.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3f) HARD BLOCK: proposal telemetry must never carry proposal CONTENT.
+#     Eric's constraint on the Proposal instrumentation: "No proposal text in telemetry."
+#     These events live inside routes whose whole job is handling proposal text, so adding
+#     one content field to a metadata object is a one-word edit that reviews as a plausible
+#     analytics field. Nothing breaks when it leaks — which is why a human gate is the wrong
+#     tool. Proven by injection: a raw `sections: drafts` AND the deceptive
+#     `compliance_count: compliance.map(c => c.requirement).join(' ')` both block.
+echo -e "  ${BOLD}3f/13${NC} proposal telemetry content leak…"
+if node scripts/audit-proposal-telemetry.mjs > /tmp/mindy-prepush-proptel.log 2>&1; then
+  echo -e "      ${GREEN}✓ no proposal content in telemetry${NC}"
+else
+  echo -e "      ${RED}✗ proposal CONTENT is being written to analytics — push blocked${NC}"
+  cat /tmp/mindy-prepush-proptel.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
+#    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
+echo -e "  ${BOLD}4/13${NC} unit tests (vitest run)…"
+if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
+  echo -e "      ${GREEN}✓ unit tests pass${NC}"
+else
+  echo -e "      ${RED}✗ unit tests FAILED — push blocked${NC}"
+  grep -E "✗|FAIL|Error|expected|AssertionError" /tmp/mindy-prepush-unit.log | head -15 | sed 's/^/        /'
+  fail=1
+fi
+
+# 4b) HARD BLOCK: Maps account chrome (HMAC decode + never "?" + Players pill).
+#     2026-09-14: HMAC sessions were decoded as JWTs so / and /opportunity-map painted
+#     "?"; Markets → Players linked ?mode=buyers and blanked #fltDataset. A later
+#     main deploy can overwrite the HTML even when unit tests on a branch still pass.
+#     Source is offline and deterministic. Live HTML is CI (`--live` = currently
+#     serving host). After production Ready: `--live --expect-sha <release>`.
+#     Missing HMAC secrets = NOT TESTED; configured 401 = FAIL.
+echo -e "  ${BOLD}4b/13${NC} maps account chrome (source)…"
+if node scripts/verify-maps-account.mjs > /tmp/mindy-prepush-maps-account.log 2>&1; then
+  echo -e "      ${GREEN}✓ HMAC decoder, never \"?\", Players=companies${NC}"
+else
+  echo -e "      ${RED}✗ maps account chrome FAILED — push blocked${NC}"
+  cat /tmp/mindy-prepush-maps-account.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 5) HARD BLOCK: no email sent via the office365 transporter (it silently accepts
+#    then DROPS external mail — sendMail returns true but nothing arrives). Proven
+#    2026-07-18: 17 purchase/access senders were dropping; all rerouted to Resend
+#    via sendEmail(). Zero-tolerance — the only sanctioned nodemailer use is the
+#    fallback inside send-email.ts. See memory: mindy-email-sender-architecture.
+echo -e "  ${BOLD}5/13${NC} email-sender (no office365 direct sends)…"
+if node scripts/audit-email-sender.mjs > /tmp/mindy-prepush-email.log 2>&1; then
+  echo -e "      ${GREEN}✓ all email goes through sendEmail()/Resend${NC}"
+else
+  echo -e "      ${RED}✗ direct office365 send found — push blocked${NC}"
+  cat /tmp/mindy-prepush-email.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 6) BLOCKING: MCP tool-catalog drift. The catalog lives on FOUR surfaces and
+#    CLAUDE.md's "one fix = every surface" rule was read and violated anyway
+#    (2026-07-17: registry 49, artifact 46, changelog 41, whitepaper 40). A wrong
+#    tool count ships to customers, so it is a gate now rather than a paragraph.
+echo -e "  ${BOLD}6/13${NC} MCP tool-catalog drift…"
+if node scripts/audit-tool-catalog-drift.mjs > /tmp/mindy-prepush-catalog.log 2>&1; then
+  echo -e "      ${GREEN}✓ all catalog surfaces agree${NC}"
+else
+  echo -e "      ${RED}✗ tool-catalog DRIFT — push blocked${NC}"
+  sed 's/^/        /' /tmp/mindy-prepush-catalog.log
+  fail=1
+fi
+
+# 7) HARD BLOCK: no NEW "rank globally, then filter to scope" site. A ranked+limited
+#    award/recipient fetch (searchRecipients / findCapableSmallBusinesses /
+#    searchAwardsByLocation, sortBy:'total_obligated' + limit) with NO scope (state/
+#    naics/psc/agency/bbox) ranks over the WHOLE corpus, then the surrounding code
+#    narrows it to a viewport/state/segment — so the top-N is all national whales and the
+#    local firms never survive the limit. This is the Opportunity Map companiesPins class
+#    that hit the map THREE times (companies map / value-range / initial zoom); #457 fixed
+#    it by threading `state` INTO the call (filter BEFORE the limit). Baseline-gated: only
+#    NEW ones block. See memory: rank_then_filter_starves_local.
+# 6b) HARD BLOCK: no NEW customer-facing module may read the raw strategic corpus
+#     without routing it through the strategic-intel boundary. 2,500 priorities,
+#     0 with a source URL — imported raw they print as fact. That is how
+#     "$6.2B allocated for hypersonic weapons" reached a generated proposal under
+#     the heading "Stated strategic priorities".
+echo -e "  ${BOLD}6b/13${NC} strategic-claim provenance bypass…"
+if node scripts/audit-strategic-claim-bypass.mjs > /tmp/mindy-prepush-claimbypass.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new raw strategic-corpus reads${NC}"
+else
+  echo -e "      ${RED}✗ new strategic-claim provenance bypass — push blocked${NC}"
+  cat /tmp/mindy-prepush-claimbypass.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 6c) WARN ONLY — deliberately, and this is the interesting part.
+#     This check reads LIVE cron_jobs rows, not the code being pushed. A
+#     pre-push hook governs a diff; it cannot fix a row that already exists in
+#     production. Making it blocking means the very PR that repairs the data is
+#     the one it refuses to let through — which is exactly what happened when it
+#     was first written as a hard block.
+#     So: it reports here, and exits non-zero when run directly (or after a
+#     merge) where the finding IS actionable.
+echo -e "  ${BOLD}6c/13${NC} cron route credentials (warn only — reads live rows)…"
+if node scripts/audit-cron-route-credentials.mjs > /tmp/mindy-prepush-croncreds.log 2>&1; then
+  echo -e "      ${GREEN}✓ no credentials embedded in cron routes${NC}"
+else
+  echo -e "      ${YEL}⚠ credential stored in a live cron_jobs.route:${NC}"
+  cat /tmp/mindy-prepush-croncreds.log | sed 's/^/        /'
+  echo -e "${YEL}        (not blocking — fix the ROW via migration, then re-run this check)${NC}"
+fi
+
+echo -e "  ${BOLD}7/13${NC} rank-then-filter audit…"
+if node scripts/audit-rank-then-filter.mjs > /tmp/mindy-prepush-rankfilter.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new rank-globally-then-filter sites${NC}"
+else
+  echo -e "      ${RED}✗ new rank-then-filter site — push blocked${NC}"
+  cat /tmp/mindy-prepush-rankfilter.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 8) HARD BLOCK: no NEW persist path storing a QUERY-TIME NAICS expansion. Broadening
+#    codes for MATCHING is correct; STORING the broadened set rewrites the user's own
+#    choices. One "Professional Services" preset click (['541']) persisted all 51 codes
+#    of the 541 family onto 1,144 profiles and ran ~4 months (2026-07) — every unit test
+#    passed, because the expander was correct and just called in the wrong PLACE.
+#    Baseline-gated: only NEW ones block. Self-test: --self-test.
+echo -e "  ${BOLD}8/13${NC} persist-vs-query expansion audit…"
+if node scripts/audit-persist-expansion.mjs > /tmp/mindy-prepush-persist.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new persisted query-time expansions${NC}"
+else
+  echo -e "      ${RED}✗ new persisted query-time expansion — push blocked${NC}"
+  cat /tmp/mindy-prepush-persist.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 8b) HARD BLOCK: Market Assassin Phase 2 skill layer. Offline, no credentials.
+#     Frontmatter must parse, skills stay on-demand, and every registry path must exist.
+#     A broken skill pointer is the same class as catalog drift — confident instructions
+#     aimed at missing truth. Does not drive the Map or call live APIs.
+echo -e "  ${BOLD}8b/13${NC} ma-skills layer (verify:ma-skills)…"
+if npm run --silent verify:ma-skills > /tmp/mindy-prepush-ma-skills.log 2>&1; then
+  echo -e "      ${GREEN}✓ skill layer intact (paths + on-demand frontmatter)${NC}"
+else
+  echo -e "      ${RED}✗ ma-skills layer FAILED — push blocked${NC}"
+  cat /tmp/mindy-prepush-ma-skills.log | sed 's/^/        /'
+  fail=1
+fi
+
+echo -e "  ${BOLD}9/13${NC} schema-sync (warn only)…"
+if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
+  echo -e "      ${GREEN}✓ schema in sync${NC}"
+else
+  echo -e "      ${YEL}⚠ schema-sync reported drift (not blocking — review /tmp/mindy-prepush-schema.log)${NC}"
+fi
+
+# 5) WARN ONLY: design-token drift (new arbitrary [#hex] / raw slate-gray colors).
+#    Phase 1 of de-vibe-coding: freezes the baseline (135 hex + 10,563 raw-neutral)
+#    so the count can only trend DOWN as later phases migrate. Warn-only — never
+#    blocks a hotfix; a false positive shouldn't gate a genuine fix while the large
+#    baseline still exists. Accept an intentional change with --update-baseline.
+echo -e "  ${BOLD}10/13${NC} design-token drift (warn only)…"
+if node scripts/audit-design-tokens.mjs > /tmp/mindy-prepush-tokens.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new color drift${NC}"
+else
+  echo -e "      ${YEL}⚠ new raw color(s) added — prefer semantic tokens (bg-surface/border-hairline/text-muted/bg-navy/text-accent):${NC}"
+  grep -E ": \+" /tmp/mindy-prepush-tokens.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}  (not blocking — see /tmp/mindy-prepush-tokens.log; accept with: node scripts/audit-design-tokens.mjs --update-baseline)${NC}"
+fi
+
+# 11) Repair-ledger coverage. HARD half: every recorded fix's proof anchor must still resolve (a
+#     vanished anchor = a revert). WARN half: a substantive src/ feat|fix push that adds no ledger
+#     row is flagged (never blocks — refactors/reverts/merges legitimately add none).
+echo -e "  ${BOLD}11/13${NC} repair-ledger coverage…"
+if node scripts/audit-ledger-coverage.mjs > /tmp/mindy-prepush-ledger.log 2>&1; then
+  echo -e "      ${GREEN}✓ ledger anchors intact${NC}"
+  grep -E "^⚠" /tmp/mindy-prepush-ledger.log > /dev/null 2>&1 && { \
+    echo -e "      ${YEL}⚠ this push may be missing a REPAIR-LEDGER.md row:${NC}"; \
+    grep -E "^    •" /tmp/mindy-prepush-ledger.log | head -6 | sed 's/^/      /'; \
+    echo -e "      ${YEL}  (not blocking — add a row w/ a proof anchor, or ignore for a refactor/revert)${NC}"; }
+else
+  echo -e "      ${RED}✗ a recorded fix's proof anchor VANISHED (possible revert) — push blocked${NC}"
+  cat /tmp/mindy-prepush-ledger.log | tail -12 | sed 's/^/        /'
+  fail=1
+fi
+
+# 12) WARN ONLY: data-correctness ORACLES (verify:oracles). These 12 checks run a REAL surface
+#     against LIVE Supabase + BigQuery and assert the NUMBER is correct against an authoritative
+#     oracle — the class a green build + unit tests MISS (the search 1000-row-cap bug passed 11 unit
+#     tests + a green build; only a live check caught it). They cover scope / report / contacts /
+#     alert / pricing / mwin / filters / freshness / recompete-count / forecast-match — every
+#     high-stakes GROUNDED NUMBER a user bids on.
+#     WARN-ONLY BY DESIGN: they need `.env.local` (vercel env pull) + network, so a hard block would
+#     wedge every offline / no-creds / transient-DB-blip push — violating this gate's "flaky/live
+#     checks WARN, never block" contract. Auto-SKIPS cleanly when there's no .env.local. A real red
+#     here = a data regression to investigate (run `npm run verify:oracles` for the detail), not a
+#     push blocker.
+echo -e "  ${BOLD}12/13${NC} data-correctness oracles (warn only)…"
+if [ ! -f .env.local ]; then
+  echo -e "      ${YEL}— skipped: no .env.local (run \`vercel env pull .env.local\` to enable; live DB required)${NC}"
+elif npm run --silent verify:oracles > /tmp/mindy-prepush-oracles.log 2>&1; then
+  echo -e "      ${GREEN}✓ all oracle checks passed (numbers reconcile with source)${NC}"
+else
+  echo -e "      ${YEL}⚠ an oracle check FAILED — a data regression may be shipping (NOT blocking):${NC}"
+  grep -E "FAIL|threw" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}  (review with: npm run verify:oracles — a transient DB/network blip can also cause this)${NC}"
+fi
+
+# 13) WARN ONLY: .env.local usability (verify:env). Catches the STRUCTURAL breakage that
+#     dotenv hides — on 2026-09-05 .env.local became a SELF-REFERENCING SYMLINK, and because
+#     `dotenv.config()` does NOT throw on an unreadable path, ~15 local runners silently loaded
+#     ZERO variables and failed later with errors pointing nowhere near the cause.
+#     ⚠️ Step 12's `[ ! -f .env.local ]` test FOLLOWS the symlink, so that exact breakage makes
+#     it report "skipped cleanly" — the check designed to notice missing creds is blind to it.
+#     This step uses -L/-e and catches it. WARN-ONLY: .env.local is developer-local and
+#     gitignored, so a hard block would wedge any machine that has not set it up — same
+#     contract as steps 9-12.
+echo -e "  ${BOLD}13/13${NC} .env.local usability (warn only)…"
+if [ ! -e .env.local ] && [ ! -L .env.local ]; then
+  echo -e "      ${YEL}— skipped: no .env.local on this machine${NC}"
+elif npm run --silent verify:env > /tmp/mindy-prepush-env.log 2>&1; then
+  echo -e "      ${GREEN}✓ .env.local is readable, populated, and correctly linked${NC}"
+else
+  echo -e "      ${YEL}⚠ .env.local is NOT usable — local runners would load zero variables (NOT blocking):${NC}"
+  grep -E "^  \u2022" /tmp/mindy-prepush-env.log | head -4 | sed 's/^/        /'
+  echo -e "      ${YEL}  (detail: npm run verify:env)${NC}"
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo -e "${RED}${BOLD}✗ push blocked by pre-push gate.${NC} Fix the above, or \`git push --no-verify\` for a genuine emergency."
+  exit 1
+fi
+echo -e "${GREEN}${BOLD}✓ pre-push gate passed.${NC}"
+exit 0

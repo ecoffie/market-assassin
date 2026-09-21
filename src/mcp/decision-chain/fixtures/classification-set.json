@@ -1,0 +1,212 @@
+{
+  "_readme": "Frozen adversarial classification set for P0-1. Source: real FY2025 USASpending award descriptions for firms REGISTERED in each NAICS - real contractor language, not prose written to make the classifier win.\n\nLABELS ARE MULTI-VALUED ON PURPOSE. Firms register under several NAICS, and an award description is procurement text describing ONE job, not a capability statement. So the assertion is never `result.naics === X`. It is: an acceptable code ranks first (or top-3, per the test), and no expect_wrong code dominates.\n\nSPLIT: 8 dev + 4 holdout. Do NOT consult holdout while tuning scoring - with a set this small we would overfit almost immediately. Holdout is run once, to confirm.\n\nHARD NEGATIVES are load-bearing: dev-ammo-40mm, dev-printing-banknote, hold-ammo-artillery. A 'fix' that makes 332993/333244 unselectable is a REGRESSION, not a fix.",
+  "captured": "FY2025 (2024-10-01..2025-09-30), harvested 2026-08-23",
+  "cases": [
+    {
+      "id": "dev-regression-machine-shop",
+      "split": "dev",
+      "entity": "STEWARD MACHINE CO INC",
+      "registered_naics_primary": "332710",
+      "description": "MITER GATE FABRICATION FOR MELDAHL LOCKS AND DAM, FELICITY, OH",
+      "expect_acceptable": [
+        "332710",
+        "332312",
+        "332999"
+      ],
+      "expect_wrong": [
+        "332993",
+        "333244",
+        "311212"
+      ],
+      "note": "PRODUCTION REGRESSION FIXTURE. The original failing shape that opened the investigation. Short, real, and heavy on 'fabrication'/'mill'-adjacent language. Never delete or fold into the general set."
+    },
+    {
+      "id": "dev-machine-shop-gates",
+      "split": "dev",
+      "entity": "JOHNSON MACHINE WORKS, INC.",
+      "registered_naics_primary": "332710",
+      "description": "CHANGE IN PSC FROM J054 TO PSC 3419 FOR THE FABRICATION, ASSEMBLY AND DELIVERY OF ALL COMPONENTS AND ACCESSORIES FOR SIX (6) SERVICE GATES LOCATED AT BEACH CITY DAM, BEACH CITY, OH.",
+      "expect_acceptable": [
+        "332710",
+        "332312",
+        "332999"
+      ],
+      "expect_wrong": [
+        "332993",
+        "333244",
+        "311212"
+      ],
+      "note": "Machine shop; fabrication/assembly language. Must not land on ammunition or rice milling."
+    },
+    {
+      "id": "dev-machine-shop-ac",
+      "split": "dev",
+      "entity": "AC INC",
+      "registered_naics_primary": "332710",
+      "description": "VIRGINIA CLASS BLOCK V - CENTER CELL ACCESS PORTS (CCAPS) PRODUCTION UNITS",
+      "expect_acceptable": [
+        "332710",
+        "336611",
+        "332999"
+      ],
+      "expect_wrong": [
+        "332993",
+        "333244"
+      ],
+      "note": "Machine shop, submarine access ports. Naval context must not pull ordnance."
+    },
+    {
+      "id": "dev-ammo-40mm",
+      "split": "dev",
+      "entity": "AMTEC CORPORATION",
+      "registered_naics_primary": "332993",
+      "description": "FIXED PRICE W/ EPA CONTRACT. THIS CONTRACT IS FOR THE PRODUCTION OF 40MM GRENADE SYSTEMS FAMILY OF AMMUNITION: M430A1-METAL PALLET, M430A1-WOOD PALLET, M433, M583A1, M781, M918, MIXED BELT, M385A1, M992, M585, M661, M662, AND M433E1, AND M583A1.",
+      "expect_acceptable": [
+        "332993",
+        "332994",
+        "332992"
+      ],
+      "expect_wrong": [
+        "332710"
+      ],
+      "note": "HARD NEGATIVE. Genuine ammunition maker. 332993 MUST remain selectable."
+    },
+    {
+      "id": "dev-printing-banknote",
+      "split": "dev",
+      "entity": "KOENIG & BAUER BANKNOTE SOLUTIONS SA",
+      "registered_naics_primary": "333244",
+      "description": "DESIGN, FABRICATION, ASSEMBLY, INTEGRATION, DELIVERY, INSTALLATION, SET-UP, TESTING AND TRAINING OF THREE (3) NON-SEQUENTIAL LARGE EXAMINING AND PRINTING EQUIPMENT (NS-LEPE) MACHINES WITH OPTION FOR THREE ADDITIONAL NS-LEPE.",
+      "expect_acceptable": [
+        "333248",
+        "333244",
+        "333318",
+        "332710"
+      ],
+      "expect_wrong": [
+        "332993"
+      ],
+      "note": "HARD NEGATIVE. Genuine printing-machinery maker whose prose is FABRICATION/ASSEMBLY/MACHINES. 333244 must remain selectable; 332710 tolerated (it does build machines) but ammunition is wrong. LABEL CORRECTED 2026-08-23: 333244 was RETIRED in the 2022 NAICS revision and folded into 333248. USASpending still reports 333244 because award rows carry the vintage in force at award time. Both are acceptable; a 2022-taxonomy resolver can only ever emit 333248.",
+      "vintage_note": "registered_naics_primary 333244 is a pre-2022 code; 2022 equivalent is 333248"
+    },
+    {
+      "id": "dev-it-systems",
+      "split": "dev",
+      "entity": "SCIENCE APPLICATIONS INTERNATIONAL CORPORATION",
+      "registered_naics_primary": "541512",
+      "description": "TASK ORDER TO PROVIDE PROJECT MANAGEMENT SUPPORT, TRANSITION SUPPORT, ENGINEERING AND DESIGN SUPPORT, SECURING THE INFRASTRUCTURE SUPPORT AND O&M SUPPORT FOR THE DEPARTMENT'S IT CONSOLIDATION PROGRAM.",
+      "expect_acceptable": [
+        "541512",
+        "541519",
+        "541511"
+      ],
+      "expect_wrong": [
+        "332993",
+        "332710",
+        "238210"
+      ],
+      "note": "IT systems design. 'Infrastructure/engineering' wording must not pull construction or manufacturing."
+    },
+    {
+      "id": "dev-eng-services",
+      "split": "dev",
+      "entity": "BAE SYSTEMS TECHNOLOGY SOLUTIONS & SERVICES INC.",
+      "registered_naics_primary": "541330",
+      "description": "IGF::CL::IGF SYSTEMS ENGINEERING, INTEGRATION AND PROGRAM MANAGEMENT SUPPORT FOR THE ICBM SYSTEMS DIRECTORATE.",
+      "expect_acceptable": [
+        "541330",
+        "541715",
+        "541512"
+      ],
+      "expect_wrong": [
+        "332993",
+        "332710"
+      ],
+      "note": "Engineering services. 'Systems engineering/integration' must not pull manufacturing."
+    },
+    {
+      "id": "dev-electrical",
+      "split": "dev",
+      "entity": "M. C. DEAN, INC.",
+      "registered_naics_primary": "238210",
+      "description": "RECAPITALIZATION OF POWER GENERATION PLANT AND SUPERVISORY CONTROL AND DATA ACQUISITION (SCADA), LOCATED ON BUCKLEY AFB, CO",
+      "expect_acceptable": [
+        "238210",
+        "237130",
+        "238220"
+      ],
+      "expect_wrong": [
+        "332993",
+        "541512"
+      ],
+      "note": "Electrical contractor. SCADA/power-generation wording must not pull IT or ordnance."
+    },
+    {
+      "id": "hold-ammo-artillery",
+      "split": "holdout",
+      "entity": "GENERAL DYNAMICS OTS (WILKES BARRE), LLC",
+      "registered_naics_primary": "332993",
+      "description": "MANUFACTURE, ASSEMBLY, INSPECTION, PACKAGE, AND DELIVERY OF THE 155MM ARTILLERY M795 PROJECTILE BODY ASSEMBLY IN SUPPORT OF UKRAINE.",
+      "expect_acceptable": [
+        "332993",
+        "332992",
+        "332994"
+      ],
+      "expect_wrong": [
+        "332710"
+      ],
+      "note": "HOLDOUT hard negative: artillery projectile BODY ASSEMBLY - heavy machining vocabulary, genuinely ammunition."
+    },
+    {
+      "id": "hold-machine-shop-hydraulics",
+      "split": "holdout",
+      "entity": "PACIFIC IC SOURCE",
+      "registered_naics_primary": "332710",
+      "description": "PROCURE HARDWARE IN SUPPORT OF ELECTRONIC WARFARE (EW) AND ELECTRONIC ATTACK (EA) COMMUNICATION JAMMING AIRBORNE AND GROUND-BASED SYSTEMS.",
+      "expect_acceptable": [
+        "332710",
+        "334511",
+        "332999"
+      ],
+      "expect_wrong": [
+        "332993",
+        "311212"
+      ],
+      "note": "HOLDOUT: machine shop, electronic-warfare hardware. Mixed vocabulary."
+    },
+    {
+      "id": "hold-it",
+      "split": "holdout",
+      "entity": "L3HARRIS TECHNOLOGIES, INC.",
+      "registered_naics_primary": "541512",
+      "description": "THE PURPOSE OF THIS CONTRACT IS TO DEVELOP THE GROUND SYSTEM THAT WILL SUPPORT NOAA S NEXT GENERATION GEOSTATIONARY SATELLITE SERIES, GOES-R. THIS NEW SERIES OF SPACECRAFT, SET TO BEGIN LAUNCHING IN 2015, IS EXPECTED TO DOUBLE THE CLARITY OF TODAY S SATELLITE IMAGERY AND PROVIDE AT LEAST 20 TIMES MORE ATMOSPHERIC OBSERVATIONS FROM SPACE. THE CONTRACTOR IS TO DESIGN, DEVELOP, TEST AND IMPLEMENT THE GOES-R GROUND SYSTEM. THE GROUND SYSTEM WILL CAPTURE DATA FROM THE GOES-R SATELLITES, AND PROCESS AND DISTRIBUTE THE INFORMATION TO OPERATIONAL USERS.",
+      "expect_acceptable": [
+        "541512",
+        "541519",
+        "541715"
+      ],
+      "expect_wrong": [
+        "332993",
+        "238210"
+      ],
+      "note": "HOLDOUT: satellite ground system. 'Spacecraft/ground system' must not pull manufacturing."
+    },
+    {
+      "id": "hold-electrical",
+      "split": "holdout",
+      "entity": "SINTELA INC",
+      "registered_naics_primary": "238210",
+      "description": "LINEAR DETECTION GROUND SYSTEM (LGDS) CONTRACTOR MAINTENANCE LOGISTICS SUPPORT (CMLS)",
+      "expect_acceptable": [
+        "238210",
+        "238990",
+        "541512"
+      ],
+      "expect_wrong": [
+        "332993",
+        "332710"
+      ],
+      "note": "HOLDOUT: detection/logistics support under an electrical-contractor registration."
+    }
+  ]
+}

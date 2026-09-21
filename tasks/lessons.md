@@ -1,0 +1,1440 @@
+# Development Lessons Learned
+
+Rules and patterns to prevent repeated mistakes.
+
+---
+
+## PERSIST vs QUERY: never store the broad expansion (Jul 27, 2026)
+
+**Always widen taxonomy codes at QUERY time, never at PERSIST time, because storing the broadened set silently rewrites the user's own choices.**
+
+The industry picker offers broad short prefixes (`Professional Services` = `['541']`). The profile-save path called the *query-time* expander, so one click persisted all **51** codes of the 541 family.
+
+**Audit (`user_notification_settings`):** 1,089 profiles over 25 NAICS codes (max **241**); **710** held the byte-identical pure-541 array. Those bloated profiles — 12% of all profiles — drove **52,017 of 63,202 alerts sent (82% of volume)**. A cybersecurity firm was being matched against nursing homes, freight trucking, and grocery stores across 6 states.
+
+**The rule:**
+- Query/match → `expandNAICSCodes(codes, true)` / `naicsSubsectorPrefixes`. Broad is CORRECT (recall).
+- Persist → `normalizeNAICSForPersist()` (`src/lib/utils/naics-expansion.ts`). 6-digit exact; short prefix → curated coverage set; unmapped prefix passes through; capped at `MAX_PERSISTED_NAICS` (40).
+
+**Three traps this hid behind:**
+1. **A partial guard reads as a complete one.** `expandFullCodes=false` pinned 6-digit codes and looked like the fix shipped — short prefixes still fanned out. When adding a guard, test the OTHER input shapes (short prefix, empty, unmapped).
+2. **Don't narrow the shared expander to fix it.** `daily-alerts`, `send-notifications`, `find-agencies`, `spend-query` all rely on broad recall; narrowing it shrinks matching for every user. Add a separate persist-path function.
+3. **A preset whose prefix has no family entry leaks bare stubs.** `484`/`488`/`493` had no `NAICS_DATABASE` key, so they persisted as raw 3-digit codes. New preset → add its family too.
+
+**Generalizes beyond NAICS** — PSC codes, keywords, agencies. Any preset offering a broad bucket must persist a curated set.
+
+**Diagnostic that found it:** identical array lengths across many profiles = a shared seed, not user input (711 profiles at exactly 51 codes).
+
+---
+
+## Ship After Fix (Jun 2026)
+
+**Always commit, push, and `vercel --prod` after completing a fix or feature.** Eric should never need to ask — local-only changes that "look done" aren't done. Verify prod before claiming fixed.
+
+---
+
+## Vercel Cron Jobs
+
+**Lesson (Mar 17, 2026):** Vercel cron jobs call endpoints with GET requests, not POST.
+
+**Pattern:**
+```typescript
+// Extract job logic into standalone function
+async function runJob(): Promise<NextResponse> {
+  // actual job work here
+}
+
+// POST handler for manual triggers with auth
+export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return runJob();
+}
+
+// GET handler must detect Vercel cron header
+export async function GET(request: NextRequest) {
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const authHeader = request.headers.get('authorization');
+  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (isVercelCron || hasCronSecret) {
+    return runJob();
+  }
+
+  // Return status info for non-cron requests
+  return NextResponse.json({ message: 'Cron endpoint', schedule: '...' });
+}
+```
+
+**What went wrong:** Alert cron endpoints had job logic only in POST handler. Vercel sent GET requests at scheduled time, but GET just returned status info. Jobs never ran.
+
+**Fix applied to:** `/api/cron/daily-alerts`, `/api/cron/weekly-alerts`
+
+---
+
+## Testing Cron Jobs
+
+**Lesson:** Always manually test cron endpoints before marking as complete.
+
+**How to test:**
+```bash
+# Simulate Vercel cron call
+curl -H "x-vercel-cron: 1" "https://tools.govcongiants.org/api/cron/daily-alerts"
+
+# Or use CRON_SECRET
+curl -H "Authorization: Bearer $CRON_SECRET" "https://tools.govcongiants.org/api/cron/daily-alerts"
+```
+
+**Checklist for new cron endpoints:**
+1. [ ] Job logic in standalone function
+2. [ ] GET handler detects `x-vercel-cron: 1`
+3. [ ] GET handler also accepts CRON_SECRET for manual testing
+4. [ ] GET without auth returns status info (no job execution)
+5. [ ] Test with curl + `x-vercel-cron: 1` header
+6. [ ] Verify job actually runs (check logs, database, etc.)
+
+---
+
+## Supabase Foreign Key Constraints
+
+**Lesson:** Never `continue` after Supabase failure when KV access is the primary gate.
+
+**Pattern:** Always run KV operations unconditionally. Supabase FK constraints can fail for users without auth accounts, but KV is what gates actual tool access.
+
+```typescript
+// BAD - stops if Supabase fails
+const supabaseResult = await upsertUserProfile(email, data);
+if (!supabaseResult.success) {
+  return NextResponse.json({ error: 'Failed' });
+}
+await kv.set(`tool:${email}`, 'true');
+
+// GOOD - KV always runs
+const supabaseResult = await upsertUserProfile(email, data);
+// Log but don't block
+if (!supabaseResult.success) {
+  console.warn('Supabase upsert failed:', supabaseResult.error);
+}
+// KV is primary access control - must always execute
+await kv.set(`tool:${email}`, 'true');
+```
+
+---
+
+## Auth Gates Must Redirect, Not Show Forms (May 15, 2026)
+
+**Lesson:** When an unauthenticated user lands on a gated page, redirect them to signup instead of showing an email verification form.
+
+**What went wrong:** `/briefings` page showed a gate asking for email → users entered email → "No Access Found". Users had no clear path to signup and got confused.
+
+**Pattern:**
+```typescript
+// BAD - Shows confusing gate to new users
+useEffect(() => {
+  const saved = localStorage.getItem('auth_email');
+  if (!saved) {
+    return;  // Shows gate form, users get stuck
+  }
+  verifyUser(saved);
+}, []);
+
+// GOOD - Redirect to signup if not authenticated
+useEffect(() => {
+  const saved = localStorage.getItem('auth_email');
+  if (!saved) {
+    window.location.href = '/signup';  // Clear path forward
+    return;
+  }
+  verifyUser(saved);
+}, []);
+```
+
+**Rule:** Unauthenticated users should never see a "verify your email" form. Redirect them to a signup wizard that can create their account.
+
+**Auth Gate Design Checklist:**
+1. [ ] Check localStorage/session for existing auth
+2. [ ] If no auth → redirect to signup (not show form)
+3. [ ] Signup creates records → redirects back to gated page
+4. [ ] Gated page loads with auth, shows content
+
+---
+
+## Array Formatting
+
+**Lesson:** Arrays must be `.join(' ')` not interpolated.
+
+```typescript
+// BAD - produces "tag1,tag2"
+const text = `Hashtags: ${post.hashtags}`;
+
+// GOOD - produces "tag1 tag2"
+const text = `Hashtags: ${post.hashtags.join(' ')}`;
+```
+
+---
+
+## SAM.gov API Authentication
+
+**Lesson (Mar 25, 2026):** SAM.gov Contract Awards and Subaward APIs require **System Account**, not just public API key.
+
+**What works with public API key:**
+- Opportunities API ✅
+- Entity Management API ✅
+- Federal Hierarchy API ✅
+
+**What requires System Account:**
+- Contract Awards API ❌
+- Subaward Reporting API ❌
+
+**How to get System Account:**
+1. Entity must be **Active** in SAM.gov (renew if expired)
+2. Go to Workspace → System Accounts
+3. Request System Account access
+4. Wait 1-4 weeks for approval
+5. Add new API key to environment
+
+**Workaround:** USASpending.gov API provides similar contract data including bid counts (`number_of_offers_received`) without authentication. Use as fallback or primary source.
+
+---
+
+## USASpending API Field Mapping
+
+**Lesson (Mar 25, 2026):** USASpending search endpoint returns `generated_internal_id`, not `generated_unique_award_id`.
+
+**Pattern:**
+```typescript
+// Search endpoint returns generated_internal_id
+const awardId = result.generated_internal_id || result.generated_unique_award_id;
+
+// Use that ID for detail lookup
+const details = await fetch(`/api/v2/awards/${awardId}/`);
+```
+
+**Key field locations in award detail response:**
+```typescript
+// Competition data is nested
+const bidCount = details.latest_transaction_contract_data.number_of_offers_received;
+const competition = details.latest_transaction_contract_data.extent_competed;
+
+// Recipient is nested
+const recipientName = details.recipient.recipient_name;
+
+// Dates are nested
+const endDate = details.period_of_performance.end_date;
+
+// NAICS is nested
+const naicsCode = details.naics_hierarchy.base_code.code;
+```
+
+---
+
+## Daily Briefings Pipeline Migration
+
+**Lesson (Mar 26, 2026):** When replacing a data source (FPDS → USASpending), update ALL consumers, not just the wrapper.
+
+**Files that import from `fpds-recompete.ts`:**
+- `snapshot-recompetes/route.ts` - cron job
+- `diff-engine.ts` - snapshot comparison
+- `ai-briefing-generator.ts` - AI prompt generation
+- `generator.ts` - email generation
+- `pursuit-brief-generator.ts` - pursuit briefs
+- `weekly-briefing-generator.ts` - weekly digests
+- `perplexity-enrichment.ts` - web enrichment
+- `pipelines/index.ts` - unified exports
+
+**Pattern:**
+```typescript
+// OLD - imported from retired FPDS
+import { fetchFPDSByNaics, FPDSAward } from '@/lib/utils/fpds-api';
+
+// NEW - use SAM/USASpending wrapper
+import {
+  getExpiringContracts,
+  type ContractAward
+} from '@/lib/sam';
+```
+
+**Key changes to RecompeteContract interface:**
+```typescript
+// NEW fields added
+incumbentUei: string | null;      // DUNS deprecated
+numberOfBids?: number;            // From USASpending
+competitionLevel?: 'sole_source' | 'low' | 'medium' | 'high';
+competitionType?: string;         // e.g., "Full and Open Competition"
+```
+
+---
+
+## Market Intelligence System (3 Report Types)
+
+**Lesson (Mar 26, 2026):** The system is called "Market Intelligence" with 3 distinct report types.
+
+**The 3 Report Types:**
+1. **Daily Brief** - Daily Market Intel with Top 10 + 3 Ghosting/Teaming Plays
+2. **Weekly Deep Dive** - Full analysis of 10 Opportunities with competitive landscape, calendar
+3. **Pursuit Brief** - Single opportunity deep dive with score (68/100 CONDITIONAL)
+
+**Key Files:**
+- `/api/admin/send-all-briefings/route.ts` - Sends all 3 types
+- Uses `user_notification_settings` table for NAICS codes
+- Fetches real data from USASpending API
+
+**Pattern:**
+```typescript
+// Always pull NAICS from user's saved profile
+const { data: userSettings } = await supabase
+  .from('user_notification_settings')
+  .select('naics_codes, agencies, keywords')
+  .eq('user_email', email)
+  .single();
+
+const userNaics = userSettings?.naics_codes || [];
+```
+
+---
+
+## Daily Alerts vs Market Intelligence
+
+**Lesson (Mar 26, 2026):** These are TWO SEPARATE systems - do NOT conflate them.
+
+| System | Access | KV Key | Access Flag |
+|--------|--------|--------|-------------|
+| **Daily Alerts** | FREE for everyone (beta) | `alertpro:{email}` for Pro tier | N/A (free) |
+| **Market Intelligence** | Pro/Ultimate bundles only | `briefings:{email}` | `access_briefings` |
+
+**Daily Alerts:**
+- Simple SAM.gov opportunity notifications
+- User sets NAICS codes at `/alerts/preferences`
+- Cron: `/api/cron/daily-alerts`
+- FREE for everyone permanently — phased setup nudges first 30 days (`profile-setup.ts`)
+
+**Market Intelligence:**
+- Premium system with 3 report types
+- Deep analysis, bid counts, win probability
+- Only granted via Pro Bundle ($997) or Ultimate Bundle ($1,497)
+- Individual tool purchases do NOT include Market Intelligence
+
+**Why separate?**
+- Daily Alerts = demo/trial hook to show value
+- Market Intelligence = premium upsell for serious contractors
+
+---
+
+## Pre-Deploy QA Testing
+
+**Lesson (Mar 27, 2026):** Always run QA tests before deployment. The SAM.gov date format bug (YYYY-MM-DD vs MM/dd/yyyy) would have been caught.
+
+**Commands:**
+```bash
+# Run pre-deploy tests (required before deploy)
+npm run test:pre-deploy
+
+# Safe deploy (runs tests first, blocks if failures)
+npm run deploy
+
+# Run all test suites
+npm test
+```
+
+**What pre-deploy tests check:**
+1. TypeScript compilation (no type errors)
+2. SAM.gov date format validation
+3. Critical API endpoint health
+4. Daily alerts pipeline
+5. Market Intelligence pipeline
+6. Access control rules (Starter bundle exclusion)
+7. Environment variable references
+
+**Rule:** Never deploy without running `npm run test:pre-deploy` first.
+
+**Files:**
+- `tests/test-pre-deploy.sh` - Main QA script
+- `tests/run-all-tests.sh` - Full test suite runner
+
+---
+
+## Market Intelligence - Two Table Problem (RESOLVED)
+
+**Lesson (Mar 27, 2026):** ~~Daily Alerts and Daily Briefings use DIFFERENT user tables. Must query BOTH.~~
+
+**UPDATE (Mar 29, 2026):** This was resolved by dropping old tables and using UNIFIED `user_notification_settings` table for everything.
+
+**Old approach (don't use):**
+- Query `user_alert_settings` AND `user_notification_settings`, dedupe by email
+
+**New approach:**
+- Single source of truth: `user_notification_settings`
+- Fallback for NAICS: `smart_user_profiles` (search history aggregation)
+
+**Admin endpoints:**
+- `/api/admin/test-market-intel-pipeline` - Pipeline status/testing
+
+---
+
+## Fallback NAICS Codes
+
+**Lesson (Mar 27, 2026):** Users without NAICS codes should still receive alerts/briefs using popular defaults.
+
+**Problem:** 362/394 users had no NAICS codes set. They received nothing.
+
+**Solution:** If user has no NAICS AND no agencies, use fallback codes:
+```typescript
+if (naics.length === 0 && agencies.length === 0) {
+  naics = [
+    '541512', // Computer Systems Design
+    '541611', // Management Consulting
+    '541330', // Engineering Services
+    '541990', // Other Professional Services
+    '561210', // Facilities Support Services
+  ];
+}
+```
+
+**Why these codes:** Highest volume of federal opportunities, covers most small businesses.
+
+**Companion action:** Send NAICS reminder email to encourage personalization.
+- Endpoint: `/api/admin/send-naics-reminder?password=xxx&mode=execute`
+
+---
+
+## Auto-Enrollment for Purchasers
+
+**Lesson (Mar 27, 2026):** All purchasers should be auto-enrolled in free alerts during beta.
+
+**What changed (Stripe webhook):**
+```typescript
+// AUTO-ENROLL ALL PURCHASERS in alert settings
+if (supabase) {
+  const { data: existingSettings } = await supabase
+    .from('user_alert_settings')
+    .select('user_email')
+    .eq('user_email', email.toLowerCase())
+    .limit(1);
+
+  if (!existingSettings || existingSettings.length === 0) {
+    await supabase.from('user_alert_settings').insert({
+      user_email: email.toLowerCase(),
+      alerts_enabled: true,
+      briefings_enabled: true,
+      subscription_status: 'beta',
+      // ... other defaults
+    });
+  }
+}
+```
+
+**Added to purchase emails:**
+```html
+<div style="background: #f0fdf4; border: 2px solid #22c55e;">
+  🎁 BONUS: Free Daily Opportunity Alerts
+  As a GovCon Giants customer, you're automatically enrolled!
+  <a href="https://tools.govcongiants.org/alerts/preferences?email=...">
+    Set Up Your Daily Alerts
+  </a>
+</div>
+```
+
+---
+
+## Briefing Snapshot Pipeline
+
+**Lesson (Mar 27, 2026):** Daily Briefings require populated snapshot tables. No snapshots = 0 briefing items.
+
+**Data flow:**
+```
+Crons (3 AM ET)           →    briefing_snapshots table    →    generateBriefing()
+snapshot-opportunities    →    tool: opportunity_hunter    →    items for user
+snapshot-recompetes      →    tool: recompete             →    items for user
+snapshot-awards          →    tool: market_assassin       →    items for user
+snapshot-contractors     →    tool: contractor_db         →    items for user
+```
+
+**If briefing returns 0 items, check:**
+1. Are snapshots being created? Query `briefing_snapshots` for today
+2. Does user's NAICS match any snapshot data?
+3. Is the NAICS code included in snapshot crons?
+
+**Construction NAICS (236, 238) coverage:**
+- May have lower volume in snapshot data
+- Consider expanding snapshot cron queries to include construction codes
+
+---
+
+## Pipeline Testing Checklist
+
+**Lesson (Mar 27, 2026):** Always test the full Market Intelligence pipeline before declaring victory.
+
+**Pipeline Test Endpoint:**
+```bash
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=$ADMIN_PASSWORD"
+```
+
+**What it checks:**
+- Daily Alerts: Users eligible, users with NAICS, recent deliveries
+- Daily Briefs: Both tables, recent deliveries
+- Pursuit Brief: Eligibility
+- Weekly Deep Dive: Eligibility
+
+**Test specific user:**
+```bash
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=$ADMIN_PASSWORD&email=user@example.com"
+```
+
+**Send test component:**
+```bash
+curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=$ADMIN_PASSWORD&email=user@example.com&component=briefs"
+```
+
+---
+
+## Unified Notification Table Migration
+
+**Lesson (Mar 29, 2026):** The old `user_alert_settings` and `user_briefing_profile` tables were DROPPED and replaced with `user_notification_settings`.
+
+**What happened:**
+- Supabase schema was migrated to unified `user_notification_settings` table
+- BUT code still referenced old tables (`user_alert_settings`, `user_briefing_profile`)
+- Cron health check showed 15/16 passing (Alerts Signup failing)
+- Root cause: Table didn't exist
+
+**Files that needed updating:**
+| File | Old Table | New Table |
+|------|-----------|-----------|
+| `api/cron/daily-alerts/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/cron/send-briefings/route.ts` | `user_alert_settings` | `smart_user_profiles` (fallback) |
+| `api/admin/trigger-alerts/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/alerts/save-profile/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/alerts/unsubscribe/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/briefings/preferences/route.ts` | `user_briefing_profile` | `user_notification_settings` |
+
+**Column mapping:**
+| Old Column | New Column |
+|------------|------------|
+| `target_agencies` | `agencies` |
+| `email_frequency` | `briefing_frequency` |
+| `is_active` (for alerts) | `alerts_enabled` |
+| `is_active` (for briefings) | `briefings_enabled` |
+
+**Pattern:** Always check Supabase schema before assuming table names. Use health check endpoint to verify all systems working.
+
+---
+
+## GHL API Pagination
+
+**Lesson (Mar 29, 2026):** GoHighLevel API uses cursor-based pagination, not offset-based.
+
+**Wrong:**
+```bash
+# This fails with "property skip should not exist"
+curl ".../contacts/?skip=100&limit=100"
+```
+
+**Correct:**
+```bash
+# Get first page
+response=$(curl ".../contacts/?limit=100")
+
+# Extract next page URL from response
+next_url=$(echo "$response" | jq -r '.meta.nextPageUrl')
+
+# Use that URL for next page
+curl "$next_url"
+```
+
+**Pattern:** Check `.meta.nextPageUrl` in response for cursor. Total count in `.meta.total`.
+
+---
+
+## Bulk Enrollment Best Practice
+
+**Lesson (Mar 29, 2026):** Test with small sample before bulk operations.
+
+**Pattern:**
+1. Test with 5 users first
+2. Verify they appear in database
+3. Then batch enroll remaining
+4. Save email list to permanent file (not /tmp)
+
+**File saved:** `data/bootcamp-attendees-to-enroll.txt` (8,804 emails)
+
+---
+
+## Vercel.json Changes Must Be Committed
+
+**Lesson (Apr 2, 2026):** Vercel cron changes made to `vercel.json` must be **committed to git** to persist.
+
+**What happened:**
+1. Briefing crons were added in commit `b940a72`
+2. During a different commit (`332674a`), some crons were accidentally removed
+3. Each time we manually fixed `vercel.json` and deployed, it worked *once*
+4. But the next deploy from git reverted back to the committed (broken) version
+5. Result: Briefings sent once then stopped; Daily Alerts kept working (they were committed)
+
+**Why this happens:**
+- Vercel deploys from git HEAD
+- Local changes to `vercel.json` deploy when you run `vercel --prod`
+- But if you don't commit, next team deploy or CI deploy uses git version
+
+**Prevention:**
+```bash
+# After changing vercel.json, ALWAYS commit
+git add vercel.json
+git commit -m "fix: Update cron schedules"
+
+# Verify crons are in git
+git show HEAD:vercel.json | grep "your-cron-path"
+```
+
+**Checklist for cron changes:**
+1. [ ] Edit vercel.json locally
+2. [ ] Deploy and test: `vercel --prod`
+3. [ ] **COMMIT THE CHANGE**: `git add vercel.json && git commit -m "..."`
+4. [ ] Verify: `git show HEAD:vercel.json | grep cron`
+5. [ ] Push to remote if using CI
+
+**Rule:** "If it's not committed, it didn't happen."
+
+---
+
+## Check Existing Variable Names Before Writing Data Files
+
+**Lesson (Apr 3, 2026):** Always check what variable name an HTML file expects before writing/modifying data files.
+
+**What happened:**
+- `recompete.html` expected: `var expiringContractsData = [...]`
+- Merge script wrote: `var contractsData = [...]`
+- Result: Stats showed `--` (blank) because JavaScript couldn't find the variable
+
+**Prevention:**
+```bash
+# Before writing a data file, check what the HTML expects
+grep -n "expiringContractsData\|contractsData" public/recompete.html
+
+# Check current variable name in data file
+head -1 public/contracts-data.js
+```
+
+**Pattern for data scripts:**
+```javascript
+// At top of script, document the expected variable name
+const VARIABLE_NAME = 'expiringContractsData'; // MUST match recompete.html
+
+// Use it when writing
+const output = `var ${VARIABLE_NAME} = ${JSON.stringify(data, null, 2)};`;
+```
+
+**Rule:** Read the consumer (HTML) before writing the producer (data file).
+
+---
+
+## AI Response JSON Parsing Failures
+
+**Lesson (Apr 3, 2026):** Claude/AI responses often contain control characters that break `JSON.parse()`. Always sanitize.
+
+**Error:** `Bad control character in string literal in JSON at position 6422`
+
+**What happened:**
+- AI generates JSON response with newlines or control chars inside string values
+- `JSON.parse(responseText)` fails
+- Briefings logged as "attempted" but never sent
+- No one received briefings for 3 weeks
+
+**Solution:** Always use robust JSON extraction:
+```typescript
+function extractAndParseJSON<T>(responseText: string): T {
+  let jsonStr = responseText.trim();
+
+  // Extract from markdown code blocks
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+
+  // Find JSON boundaries
+  const firstBrace = jsonStr.indexOf('{');
+  const lastBrace = jsonStr.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+  }
+
+  // Remove control characters (except \n, \r, \t which are valid)
+  jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
+
+  return JSON.parse(jsonStr);
+}
+```
+
+**Rule:** Never use raw `JSON.parse()` on AI responses. Always sanitize first.
+
+---
+
+## Timezone Filters Can Block All Users
+
+**Lesson (Apr 3, 2026):** Timezone-based delivery filters can silently block most users if cron timing is wrong.
+
+**What happened:**
+- Code only sent briefings if user's local time was 6-10 AM
+- Cron ran at 6 AM ET
+- Most users outside delivery window = silently skipped
+- 90%+ users never received briefings
+
+**Why it's bad:**
+- No error logged (user just "skipped")
+- Looks like success in monitoring
+- Hard to diagnose
+
+**Fix:** Removed timezone filter. Send to ALL users at fixed time (3 AM ET).
+Users wake up to see briefings instead of system trying to "guess" their wake time.
+
+**Pattern:** For non-critical notifications, prefer fixed send times over smart delivery windows.
+Smart windows create silent failure modes.
+
+---
+
+## Cron Schedule Best Practices
+
+**Lesson (Apr 3, 2026):** Briefing/alert crons should run BEFORE users wake up, not during business hours.
+
+**Bad schedule:**
+```json
+{ "path": "/api/cron/send-briefings", "schedule": "0 10 * * *" }  // 6 AM ET
+```
+Users might already be awake and checking email before briefings arrive.
+
+**Good schedule:**
+```json
+{ "path": "/api/cron/send-briefings", "schedule": "0 7 * * *" }   // 3 AM ET
+```
+Briefings are in inbox when users wake up at 6-7 AM ET.
+
+**Current schedule (ET):**
+| Job | ET Time | Purpose |
+|-----|---------|---------|
+| send-briefings | 3 AM | Daily briefings (before wake) |
+| daily-alerts (1) | 7 AM | Morning alert (first check) |
+| daily-alerts (2) | 8 AM | Morning catch-up |
+| daily-alerts (3) | 10 AM | Mid-morning |
+| daily-alerts (4) | 12 PM | Lunch catch-up |
+
+---
+
+## AI Hallucination in Briefing Enrichment
+
+**Lesson (Apr 3, 2026):** AI models (Claude, Perplexity) will fabricate legal/regulatory issues when prompted to find "incumbent vulnerabilities."
+
+**What happened:**
+- Perplexity enrichment prompt asked for "Incumbent Issues: Performance problems, protests, negative CPARS, staffing issues?"
+- Prompt said "Always provide a displacementAngle even if speculative"
+- Result: AI fabricated ASBCA cases, OSHA violations, and GAO protests that don't exist
+- Web search verification found NO evidence of these claims
+- Users received briefings with false legal claims about contractors
+
+**Root cause:** The instruction "even if speculative" encouraged the AI to make things up when it couldn't find real data.
+
+**Prevention:**
+```typescript
+// BAD prompt - encourages hallucination
+"Incumbent Issues: Performance problems, protests, negative CPARS, staffing issues?"
+"Always provide a displacementAngle even if speculative"
+
+// GOOD prompt - demands verification
+"Incumbent Issues: ONLY report issues with verifiable sources - protests filed
+with GAO, ASBCA cases with case numbers, news articles with URLs. DO NOT speculate."
+"CRITICAL: If you cannot find a verifiable source (URL, case number), set field to false/null"
+"DO NOT fabricate ASBCA cases, GAO protests, CPARS issues, or OSHA violations"
+```
+
+**Rule:** Never instruct AI to be "speculative" about legal/regulatory issues. Require verifiable sources or return empty.
+
+**Files updated:**
+- `src/lib/briefings/enrichment/perplexity-enrichment.ts` - Removed speculation, added verification requirements
+- `src/lib/briefings/delivery/ai-briefing-generator.ts` - Added DO NOT FABRICATE instructions
+
+**Categories to NEVER hallucinate:**
+- ASBCA (Armed Services Board of Contract Appeals) cases
+- GAO (Government Accountability Office) protests
+- CPARS (Contractor Performance Assessment Reporting System) ratings
+- OSHA violations
+- Legal actions, lawsuits, settlements
+- Contract terminations
+
+**Better displacement angles (no hallucination needed):**
+- Bridge contract status (verifiable via contract data)
+- Multiple extensions (verifiable via contract history)
+- Set-aside changes (8(a) graduation → full competition)
+- M&A activity (publicly announced, news sources required)
+- Contract value and timeline (from contract data)
+
+---
+
+## USASpending API - Required Fields
+
+**Lesson (April 5, 2026):** USASpending `/search/spending_by_award/` endpoint requires `award_type_codes` in filters.
+
+**What went wrong:** MCP was returning 422 Unprocessable Entity because `award_type_codes` was missing from the request body.
+
+**Error message:** `Missing value: 'filters|award_type_codes' is a required field`
+
+**Fix:**
+```javascript
+const filters = {
+  award_type_codes: ["A", "B", "C", "D"],  // REQUIRED
+  time_period: [...],
+  naics_codes: [...]
+};
+```
+
+**Award Type Codes:**
+- `A` = BPA Call
+- `B` = Purchase Order
+- `C` = Delivery Order
+- `D` = Definitive Contract
+
+**Rule:** Always include `award_type_codes` when calling USASpending spending_by_award endpoint.
+
+**File fixed:** `/Users/ericcoffie/mcp-servers/usaspending-mcp/index.js`
+
+---
+
+## MCP Servers - Always Verify Supabase Project
+
+**Lesson (April 5, 2026):** When creating MCP servers that connect to Supabase, always verify the project URL matches the intended database.
+
+**What happened:**
+- Multisite MCP was configured with `tnfqhnnipljhatmtkdsw.supabase.co`
+- Market Assassin project uses `krpyelfrbicmvsmwovti.supabase.co`
+- Scraper ran successfully but data went to wrong (or no) database
+- `get_source_health` and `get_multisite_stats` returned errors/empty
+
+**Prevention:**
+```bash
+# Before configuring MCP, check the correct Supabase URL
+grep SUPABASE_URL ~/Market\ Assasin/market-assassin/.env.local
+
+# Verify MCP config matches
+cat ~/.mcp.json | jq '.mcpServers.multisite.env'
+```
+
+**Rule:** After editing `~/.mcp.json`, always restart Claude Code for changes to take effect.
+
+---
+
+## PostgreSQL Empty Array Casting
+
+**Lesson (April 5, 2026):** PostgreSQL requires explicit type casting for empty arrays.
+
+**Error:** `cannot determine type of empty array`
+
+**Bad:**
+```sql
+ADD COLUMN excluded_sources TEXT[] DEFAULT ARRAY[];
+```
+
+**Good:**
+```sql
+ADD COLUMN excluded_sources TEXT[] DEFAULT ARRAY[]::TEXT[];
+```
+
+**Rule:** Always cast empty arrays with `::TYPE[]` suffix.
+
+---
+
+*Last Updated: April 5, 2026*
+
+---
+
+## Database Schema Sync
+
+**Lesson (Apr 15, 2026):** Always run migrations before deploying code that references new columns.
+
+**Problem:** API code was updated to write to 4 new columns (`location_states`, `naics_profile_hash`, `profile_updated_at`, `primary_industry`) but the migration was never run. Users got "Failed to save preferences" errors.
+
+**Prevention:**
+1. Schema sync test added: `npm run test:schema`
+2. Runs automatically before deploy: `npm run deploy`
+3. Update `tests/test-schema-sync.js` when adding new columns
+
+**Pattern:**
+```typescript
+// When adding a new column to API code:
+// 1. Create migration in supabase/migrations/
+// 2. Add column to EXPECTED_SCHEMA in tests/test-schema-sync.js
+// 3. Run migration in Supabase Dashboard
+// 4. Deploy code
+```
+
+**Rule:** Never deploy code that writes to columns without verifying they exist first.
+
+---
+
+## Vercel Cron Disruption During Deployments
+
+**Lesson (Apr 16, 2026):** Vercel cron jobs can be disrupted when deployments happen during scheduled cron windows.
+
+**What happened:**
+- Daily alerts cron was scheduled at 11:00, 12:00, 14:00, 16:00 UTC
+- Multiple deployments happened during the morning
+- Cron jobs silently failed to execute
+- No error logs, no failures - jobs just didn't run
+- 947 users didn't receive daily alerts
+
+**Detection added:**
+- Health check now includes "Daily Alerts Cron" test
+- Checks `alert_log` table for today's alerts
+- If no alerts by 1 PM UTC (9 AM ET), flags as critical failure
+- Also checks "Briefing Templates" were generated
+
+**Recovery mechanism:**
+- Admin can manually trigger with timezone skip:
+```bash
+curl "https://tools.govcongiants.org/api/cron/daily-alerts?password=xxx&skipTimezone=true"
+```
+
+**Prevention:**
+1. **Don't deploy during cron windows** (7-12 PM ET for alerts)
+2. **Check health endpoint** after deploying: `/api/cron/health-check?password=xxx&email=true`
+3. **Monitor alert_log table** - should have entries for each day
+4. **Use admin override** if crons missed: `?password=xxx&skipTimezone=true`
+
+**Files:**
+- `api/cron/daily-alerts/route.ts` - Added admin override with `skipTimezone=true`
+- `api/cron/health-check/route.ts` - Added cron health tests
+
+**Rule:** After any production deployment, verify cron jobs ran by checking health check endpoint or database.
+
+---
+
+## Cron Day-of-Week Guards
+
+**Lesson (Apr 16, 2026):** Cron endpoints should have explicit day-of-week guards, not rely solely on Vercel schedule.
+
+**What happened:**
+- Weekly Deep Dive and Pursuit Brief emails arrived on Wednesday at 6:46 AM
+- Should only send on Sunday (Weekly) and Monday (Pursuit)
+- Endpoints had no day validation - relied 100% on Vercel's cron schedule
+- Something triggered them on wrong day (possibly admin endpoint or misconfigured cron)
+
+**Fix - Add defensive guards:**
+```typescript
+export async function GET(request: NextRequest) {
+  // ... auth checks ...
+
+  // DAY-OF-WEEK GUARD: Weekly only sends on Sunday (UTC)
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+  const isTestMode = testEmail && isTest;
+
+  if (dayOfWeek !== 0 && !isTestMode) {
+    console.log(`[SendWeeklyFast] Skipped - not Sunday (day ${dayOfWeek})`);
+    return NextResponse.json({
+      success: true,
+      message: `Weekly only sends on Sunday. Today is day ${dayOfWeek}.`,
+      skipped: true,
+      dayOfWeek,
+    });
+  }
+
+  // ... actual job logic ...
+}
+```
+
+**Schedule with guards:**
+| Endpoint | Day | UTC Day # |
+|----------|-----|-----------|
+| `precompute-weekly-briefings` | Saturday | 6 |
+| `send-weekly-fast` | Sunday | 0 |
+| `precompute-pursuit-briefs` | Sunday | 0 |
+| `send-pursuit-fast` | Monday | 1 |
+
+**Test mode bypass:** `?test=true&email=xxx` bypasses day guard for manual testing.
+
+**Monitor with:**
+```bash
+curl "https://tools.govcongiants.org/api/admin/briefing-status?password=$ADMIN_PASSWORD"
+```
+
+**Rule:** Day-specific crons need TWO protections:
+1. Vercel cron schedule (primary)
+2. In-code day guard (defensive - catches wrong-day triggers)
+
+---
+
+## Supabase LIKE Wildcard Character
+
+**Lesson (Apr 17, 2026):** Supabase PostgREST uses `%` for LIKE wildcards, NOT `*`.
+
+**What happened:**
+- Code used `naics_code.like.236*` to match all construction codes (236xxx)
+- This returned 0 results - Supabase doesn't recognize `*` as wildcard
+- Daily Alerts and Daily Briefings both failed silently (0 opportunities found)
+- 954 users received nothing for over a week
+
+**Wrong:**
+```typescript
+const naicsFilters = prefixes.map(p => `naics_code.like.${p}*`).join(',');
+// naics_code.like.236* → returns 0 results
+```
+
+**Correct:**
+```typescript
+const naicsFilters = prefixes.map(p => `naics_code.like.${p}%`).join(',');
+// naics_code.like.236% → returns all 236xxx codes
+```
+
+**File fixed:** `src/lib/briefings/pipelines/sam-gov.ts`
+
+**Rule:** Supabase LIKE uses SQL wildcards: `%` (any chars) and `_` (single char). Never use `*`.
+
+---
+
+## Daily Alerts Failsafe - Stale Data > No Data
+
+**Lesson (Apr 17, 2026):** Users paying $19/mo expect SOMETHING. 3-day-old data is better than 0 results.
+
+**What happened:**
+- Daily Alerts filtered for "new" opportunities (last 24 hours)
+- SAM.gov API rate limited, cache stale
+- No NEW opportunities → users received 0 results
+- Users complained: "I paid for alerts but got nothing"
+
+**Fix - Add failsafe:**
+```typescript
+// Fetch NEW opportunities (last 24h)
+const newOpps = await fetchOpportunities({ postedAfter: yesterday });
+
+// FAILSAFE: If no NEW, use ACTIVE from cache
+let opportunities = newOpps;
+let isUsingFallback = false;
+
+if (newOpps.length === 0 && activeOpps.length > 0) {
+  console.log(`No new opps, using ${activeOpps.length} ACTIVE as fallback`);
+  opportunities = activeOpps;
+  isUsingFallback = true;
+}
+
+// Limit fallback results to avoid overwhelming users
+if (isUsingFallback && opportunities.length > 15) {
+  opportunities = opportunities.slice(0, 15);
+}
+```
+
+**File fixed:** `src/app/api/cron/daily-alerts/route.ts`
+
+**Rule:** For paid email products, always have a fallback. Empty emails = complaints. Something relevant (even if stale) is better than nothing.
+
+---
+
+## Daily Alerts Now Sends to ALL Users (No Timezone Filtering)
+
+**Lesson (Apr 17, 2026):** Timezone-based filtering for Daily Alerts was removed. All 953 users now receive alerts in the same batch.
+
+**What happened:**
+- Daily Alerts previously filtered by timezone (deliver at 6 AM local time)
+- This meant only ~60-80 users processed per cron run
+- Result: Some users NEVER received alerts if their timezone wasn't covered by cron runs
+- Only 60 alerts sent per day instead of 953
+
+**Fix:**
+- Removed timezone filtering entirely from `daily-alerts/route.ts`
+- All users now receive alerts when cron runs (same as briefings)
+- 100% daily coverage for all paying subscribers
+
+**Old (60-80 users/day):**
+```typescript
+// Check timezone (skip if not delivery time for this user)
+if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
+  results.wrongTimezone++;
+  continue;
+}
+```
+
+**New (ALL users):**
+```typescript
+// DISABLED: Timezone filtering removed Apr 17, 2026
+// All users now receive alerts in same batch (100% daily coverage)
+```
+
+**Rule:** For paid email products, don't filter by timezone. Send to everyone at once. Users expect 100% daily delivery.
+
+---
+
+## Default NAICS Codes = Healthcare (Nudge Strategy)
+
+**Lesson (Apr 17, 2026):** Default NAICS codes are intentionally set to HEALTHCARE to encourage users to configure their actual preferences.
+
+**Strategy:**
+- Most GovCon users are NOT in healthcare
+- If they see healthcare opportunities, they'll think "this isn't relevant"
+- This prompts them to configure their actual NAICS codes
+- Result: Better engagement, more accurate preferences
+
+**Centralized config:** `src/lib/config/defaults.ts`
+
+**Current defaults (Healthcare):**
+```typescript
+export const DEFAULT_NAICS_CODES = [
+  '621111', // Offices of Physicians
+  '621210', // Offices of Dentists
+  '621511', // Medical Laboratories
+  '621610', // Home Health Care Services
+  '622110', // General Medical and Surgical Hospitals
+  '622310', // Specialty Hospitals
+  '623110', // Nursing Care Facilities
+  '623312', // Assisted Living Facilities
+  '624120', // Services for Elderly/Disabled
+];
+```
+
+**Rule:** Default values should nudge users toward proper configuration, not accidentally be useful.
+
+---
+
+*Last Updated: April 17, 2026*
+
+## April 19, 2026 - Daily Alerts Beta Mode Fix
+
+**Problem:** Only 103 users receiving daily alerts out of 613 eligible (17%)
+
+**Root Cause:** 
+- `getUserAlertTier()` checks `user_profiles` table for paid flags
+- Only 31 users exist in `user_profiles` (vs 960 in `user_notification_settings`)
+- 929 users were classified as "free" tier and skipped
+
+**Fix Applied:**
+- Added beta mode check in `daily-alerts/route.ts`
+- During beta (until Apr 28, 2026): ALL users with NAICS get daily alerts
+- After beta: Tier check re-enables (free tier → weekly alerts only)
+
+**Rule:** "Always verify user tables are in sync before implementing tiered features"
+
+---
+
+## April 20, 2026 - Briefing Log Unique Constraint Must Include briefing_type
+
+**Problem:** Daily, Weekly, and Pursuit briefings collide in `briefing_log` table because unique constraint was only on `(user_email, briefing_date)`.
+
+**Impact:**
+- When daily briefing runs, it overwrites weekly briefing from same day
+- Pursuit briefs overwrite both daily and weekly
+- 90%+ of users missing weekly/pursuit emails
+
+**Root Cause:**
+- Original schema: `UNIQUE (user_email, briefing_date)`
+- Doesn't account for multiple briefing types per day
+- All upserts collided, overwriting each other
+
+**Fix Applied:**
+```sql
+-- Drop old constraint
+ALTER TABLE briefing_log DROP CONSTRAINT IF EXISTS briefing_log_user_email_briefing_date_key;
+
+-- Add new constraint including briefing_type
+ALTER TABLE briefing_log ADD CONSTRAINT briefing_log_user_email_date_type_key
+  UNIQUE (user_email, briefing_date, briefing_type);
+
+-- Index for faster queries
+CREATE INDEX IF NOT EXISTS idx_briefing_log_email_date_type
+  ON briefing_log(user_email, briefing_date, briefing_type);
+```
+
+**Code Changes:**
+- All `briefing_log` queries must filter by `briefing_type`
+- All `onConflict` clauses must include `briefing_type`
+- Example: `{ onConflict: 'user_email,briefing_date,briefing_type' }`
+
+**Rule:** "Any table with multiple record types per user/date MUST include type in unique constraint"
+
+---
+
+## April 20, 2026 - Weekly-Alerts Needs Batching
+
+**Problem:** Weekly alerts cron processed all 950+ users sequentially in one run.
+
+**Impact:**
+- Vercel 60s timeout could kill job mid-execution
+- No checkpointing = job restarts from beginning if interrupted
+- Live SAM.gov API calls per user (~2-3s each) = 40+ minutes total
+
+**Fix Applied:**
+- Added `BATCH_SIZE = 15` constant
+- Added deduplication query against `alert_log` table
+- Added `alert_type: 'weekly'` to upsert for proper tracking
+- Response now includes batch progress stats
+
+**Code Pattern:**
+```typescript
+const BATCH_SIZE = 15;
+
+// Check for already processed this week
+const { data: processedThisWeek } = await getSupabase()
+  .from('alert_log')
+  .select('user_email')
+  .gte('sent_at', startOfWeek.toISOString())
+  .eq('alert_type', 'weekly');
+
+const processedEmails = new Set(processedThisWeek.map(r => r.user_email));
+
+const usersToProcess = users
+  .filter(u => !processedEmails.has(u.user_email))
+  .slice(0, BATCH_SIZE);
+```
+
+**Rule:** "Cron jobs with per-user API calls MUST batch to avoid Vercel timeout"
+
+---
+
+## April 20, 2026 - Pursuit Brief Log Table Doesn't Exist
+
+**Problem:** `send-pursuit-fast` tried to write to `pursuit_brief_log` table which doesn't exist.
+
+**Impact:**
+- All pursuit briefs silently failed
+- No deduplication = users could receive duplicates if job reran
+- Console errors but no data persisted
+
+**Root Cause:**
+- Code referenced `pursuit_brief_log` (never created)
+- Should use `briefing_log` with `briefing_type='pursuit'`
+
+**Fix Applied:**
+- Changed from `pursuit_brief_log` to `briefing_log`
+- Added `briefing_type: 'pursuit'` to all upserts
+- Fixed dedupe query to filter by `briefing_type='pursuit'`
+
+**Rule:** "Before referencing a table, verify it exists. Use unified logging tables with type columns."
+
+---
+
+*Last Updated: May 14, 2026*
+
+---
+
+## May 14, 2026 - Stripe API 4-Level Expansion Limit
+
+**Problem:** Admin dashboard showing "Purchase" instead of actual product names like "PRO Member Group - Monthly".
+
+**Root Cause 1 - Checkout charges have no invoice:**
+- Stripe Checkout session charges have `invoice: null`
+- All invoice-based product resolution methods failed silently
+- Code had 4 "tries" that all depended on invoice existing
+
+**Root Cause 2 - 5-level expansion fails silently:**
+```typescript
+// BAD - 5 levels deep, silently fails in catch block
+expand: ['data.items.data.price.product']
+// Error: "You cannot expand more than 4 levels of a property"
+```
+
+**Fix Applied:**
+```typescript
+// GOOD - 4 levels max
+const subscriptions = await stripe.subscriptions.list({
+  customer: customerId,
+  expand: ['data.items.data.price']  // 4 levels OK
+});
+
+// Then use resolvePriceSummary() to lookup product name separately
+const summary = await resolvePriceSummary(subItem.price);
+product = summary.product.replace(/^Copy of /, '');  // Clean prefix
+transactionType = 'subscription';  // Mark as subscription
+```
+
+**What changed:**
+1. Fixed Try 5 in `resolveChargePurchase()` to use 4-level expansion
+2. Added separate product lookup via `resolvePriceSummary()`
+3. Added "Copy of " prefix cleanup for product names
+4. Added `transactionType = 'subscription'` when subscription found
+
+**Result:** Dashboard now shows:
+- "PRO Member Group - Monthly" (not "Purchase")
+- "MI Pro Monthly" (not "Subscription update")
+- type: "subscription" (not "one-time")
+
+**Rule:** "Stripe API has a 4-level expansion limit. Count your levels. For deeper data, make a second API call."
+
+**Files:** `src/app/api/admin/dashboard/route.ts` (lines ~2335-2365)
+
+---
+
+## May 15, 2026 - Soft Keyword Filter with NAICS Fallback
+
+**Problem:** Users with specific keywords (e.g., "Leadership Training", "Executive Coaching") received 0 briefings because no SAM.gov opportunities contained those keywords.
+
+**Root Cause:**
+- Keyword filter was a "hard filter" - if keywords provided, only return opportunities matching at least one keyword
+- If keywords matched 0 opportunities → user was skipped with "no opportunities found"
+- User's NAICS codes matched plenty of opportunities, but they were filtered out by keywords
+
+**Impact:**
+- Kevin Wayne Johnson ($99/mo customer) received 0 briefings for weeks
+- His NAICS codes (611430, 611710, 541611) had 5+ matching opportunities
+- But his 10 leadership-related keywords matched nothing in SAM.gov
+
+**Fix Applied - Soft Keyword Filter:**
+```typescript
+// OLD - Hard filter (skips users if keywords match 0)
+if (keywords.length > 0) {
+  const keywordLower = keywords.map(k => k.toLowerCase());
+  const filtered = opportunities.filter(opp => {
+    const text = `${opp.title} ${opp.description}`.toLowerCase();
+    return keywordLower.some(k => text.includes(k));
+  });
+  return { opportunities: filtered, ...rest };  // Could be 0!
+}
+
+// NEW - Soft filter with NAICS fallback
+if (keywords.length > 0) {
+  const keywordLower = keywords.map(k => k.toLowerCase());
+  const keywordFiltered = opportunities.filter(opp => {
+    const text = `${opp.title} ${opp.description}`.toLowerCase();
+    return keywordLower.some(k => text.includes(k));
+  });
+
+  // Only apply keyword filter if it returns results
+  if (keywordFiltered.length > 0) {
+    filtered = keywordFiltered;
+    console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} opportunities`);
+  } else {
+    console.log(`[SAM Cache] Keyword filter returned 0 - falling back to NAICS-only`);
+    // Keep full NAICS results - don't filter by keywords
+  }
+}
+```
+
+**Result:**
+- Users with matching keywords: Get keyword-filtered results (more relevant)
+- Users with non-matching keywords: Get NAICS-only results (better than nothing)
+- 100% delivery rate for paying customers
+
+**Rule:** "Always use soft filters with fallback for user-configured preferences. Empty results = failed delivery."
+
+**File:** `src/lib/briefings/pipelines/sam-gov.ts` (lines 846-870)
+
+**Commit:** `bdc1e77` - "fix: Make keyword filter soft with NAICS fallback"
+
+---
+
+## May 15, 2026 - Free Signup Links Must Be Visible in Auth Gates
+
+**Problem:** New users landing on `/briefings` had no path to free signup. The page showed "View Access Options" which led to paid pricing only.
+
+**Root Cause:**
+- `/briefings` is the main MI dashboard entry point
+- User enters email → `verifyAndLoadUser` fails for new users → "denied" state
+- Denied state only offered paid upgrade paths
+- Gate state only said "View pricing" with no free option
+- The free signup wizard exists at `/alerts/signup` but was undiscoverable
+
+**Impact:**
+- New users like Dominic got stuck in dead-end loop
+- "Unauthorized sign-in" perception when really there was just no account
+- Word-of-mouth referrals couldn't sign up easily
+
+**Fix:**
+```tsx
+// Gate state - Before entering email
+<p>
+  New here?{' '}
+  <Link href="/alerts/signup" className="text-emerald-400 hover:underline font-medium">
+    Sign up free
+  </Link>
+  {' · '}
+  <Link href="/market-intelligence" className="text-purple-400 hover:underline">
+    View Pro pricing
+  </Link>
+</p>
+
+// Denied state - After verification fails
+<Link href="/alerts/signup" className="text-emerald-400 text-sm font-medium">
+  Sign up free for daily alerts →
+</Link>
+```
+
+**Visual Hierarchy:**
+- **Emerald green** = Free signup (action users should take first)
+- **Purple** = Paid upgrade (secondary option)
+
+**Rule:** "Every auth gate MUST have a visible free signup path. If there's a 'View Pro pricing' link, there should be a matching 'Sign up free' link."
+
+**Checklist for auth gates:**
+1. [ ] Gate state has "Sign up free" link (not just pricing)
+2. [ ] Denied state has free signup option
+3. [ ] Free path links to proper signup wizard (not preferences page)
+4. [ ] Visual hierarchy makes free path obvious (different color, first in order)
+
+**File:** `src/app/briefings/page.tsx` (gate state ~line 1256, denied state ~line 1292)
+
+---
+
+## Lesson (2026-06-03): "Alerts broke" = a hardcoded beta-end date, not a code crash
+
+**Symptom:** Daily alert send collapsed from ~922/day to ~1-2/day starting 2026-05-28. Dashboard showed `dailyAlerts: 2`, throughput monitor `daily baselineDays=[1,1,1,1,1,922,919]`.
+
+**Root cause:** `daily-alerts/route.ts` had `const BETA_END_DATE = new Date('2026-05-28')`. During beta, ALL daily-frequency users (~922) got free daily alerts. The moment `new Date() >= BETA_END_DATE`, the post-beta tier check kicked in and `continue`'d every free-tier user out of daily (→ weekly fallback). Only 24 users are paid-daily-eligible, so daily dropped to ~1. The ~900 audience didn't vanish — it moved to the weekly cron (weekly sent 485 same day).
+
+**Rule:** Always X, not Y because Z → **Always gate beta/rollout windows behind an env var with the date as a default, never a bare hardcoded `new Date('...')`, because Z: a hardcoded date silently flips behavior on a calendar day with no deploy, no log, and no alert — and it looks identical to a crash.** Now `DAILY_ALERT_BETA=on|off` + `DAILY_ALERT_BETA_END=<ISO>`.
+
+**Diagnostic lesson:** "Keeps breaking" with NO errors in tool-health, NO guardrail trips, and the parallel pipeline (briefings) healthy → suspect an **eligibility/tier/flag change**, not an exception. The tell here was zero new `alert_log` rows (not a flood of `skipped` rows) + a date-aligned cliff. Confirm audience math via `/api/admin/dashboard` (`postBetaPaidDailyEligible` vs `dailyFrequencyConfigured`) before touching send/cache code.
+
+**Also note:** `/api/admin/alert-status` reads the DROPPED `user_alert_settings` table (returns `total_users: 0`) — it's stale; use `/api/admin/dashboard` or `/api/admin/briefing-status` for real alert numbers.
+
+---
+
+## 2026-06-07 — "Generic, not from the docs" (Proposal Assist QC, caught 4×)
+
+**Pattern:** Across Proposal Assist, AI outputs repeatedly read as generic/template
+instead of using the actual solicitation. Eric caught it four times — in drafts
+("Agile sprints" for a construction job), Manual chat (template fluff for "how
+many past-perf refs?"), bid gates (a generic checklist), and the SOW export (a
+507-page mashup / wrong section). Same root cause each time.
+
+**Root cause:** the code was GENERATING from a weak/blank context or scanning a
+truncated/combined blob — instead of grounding in the documents we'd ALREADY
+extracted + classified + cached.
+
+**Rule:** Always X, not Y because Z → **Always ground AI output in the already-
+extracted, classified, cached documents (pass pipeline_id, pull the real doc by
+doc_kind, reuse the cached matrix), not in raw re-sent text or a blank prompt —
+because Z: a frontier model with no specific context produces plausible generic
+filler that looks fine in a demo but is wrong on the user's actual bid, and that
+destroys trust faster than any bug.** The product's whole moat is "it knows THIS
+bid" — every feature must actually use that.
+
+**Corollaries:**
+- Truncation hides this: `slice(0, 8000)` on a 350K doc → the answer is past the
+  cutoff → the model invents. Chunk + relevance-select the FULL doc, or pass the
+  cached structured requirements (the distilled matrix) first.
+- "Assist, not Writer" (Eric): when grounding genuinely can't produce the right
+  answer (no standalone SOW exists), FAIL HONESTLY ("here's where to look") — that
+  reads as trustworthy; a confident wrong answer does not.
+- Provider note: Groq's paid tier is CLOSED — never single-source an LLM. Use
+  `callLLM` per-job chains. Claude runs out fast → never use it for bulk.
+
+---
+
+## 2026-06-11 — SAM sync must not wipe attachment metadata
+
+**Pattern:** Opportunity attachments in Market Dashboard showed "Document 1", "Document 2"
+even after backfill stored real names.
+
+**Root cause:** Nightly `sync-sam-opportunities` overwrote `attachments: []` when SAM's
+list API omitted `resourceLinks`. UI fell back to generic labels; bare `/download` URLs
+carry no filename in the path.
+
+**Rule:** Always X, not Y because Z → **Always preserve existing attachment metadata when
+an upstream sync returns an empty attachments array, and resolve display names via HEAD
+Content-Disposition (or cached backfill), not path parsing — because Z: SAM list responses
+are incomplete and download URLs are opaque; overwriting with `[]` destroys good data and
+the UI has nothing real to show.**
+
+---
+
+## 2026-06-11 — Alert email conversion: time-box the nag, not the access
+
+**Pattern:** "FREE during beta" banner aged poorly; most alert users never log in.
+
+**Rule:** Always X, not Y because Z → **Always use a phased conversion window (30 days +
+incomplete profile) for setup CTAs on free alert emails, then switch to "Welcome • FREE
+forever" with dashboard access — because Z: permanent beta banners train users to ignore
+you, and permanent nagging after a month punishes loyal email-only subscribers who still
+get value from alerts.**

@@ -1,0 +1,32 @@
+Contracting Process for Acquisitions — Process Flow (teaching diagram)
+
+General Rule: The contracting process for acquisitions diagram is generalized for teaching purposes in the small business courses and is not specific to governing policies and regulatory requirements for any specific type of acquisition (DoDI 5000.2 (ACATs); DoDI 5000.74 (Services) and others). Small Business Professionals (SBPs) must understand the type of acquisition applicable to any new and/or recurring requirements and follow those governing policies and regulations accordingly.
+
+The contracting process has three major phases: Pre-Solicitation, Solicitation-Award, and Post-Award.
+
+Pre-Solicitation phase:
+- Phase begins with a valid acquisition need driving initial planning and team formation.
+- Initial Planning / Form the Team
+- Market Research
+- Define Requirements (PWS, SOW, SOO)
+- Acquisition Business Strategy
+- Phase ends with an Acquisition Strategy (AS) documented in an Acquisition Plan (AP).
+
+Solicitation-Award phase:
+- Phase begins with a clearly defined Acquisition Strategy and Acquisition Plan. These may or may not be approved, but guide development of Solicitations and Source Selection Plans (SSP).
+- DoD Peer Reviews occur prior to obtaining approval to issue a solicitation.
+- Decision Point: Approval To Issue Solicitation. Policy requires prior written approvals of AS, AP, SSPs, and DoD Peer Reviews, if any.
+- Solicitation (RFQ, IFB, RFP)
+- Evaluation
+- Negotiation
+- Award
+- Exchanges with Industry are tightly controlled from issuance of the Solicitation through Award of the contract(s).
+- Phase ends when a source selection decision is acted upon via award of the contract(s).
+
+Post-Award phase:
+- Phase begins after the competitively negotiated contract(s) is awarded.
+- Monitor Performance
+- Deliverables
+- Payments
+- Closeouts
+- Phase ends when all contract performance is complete and contract closeout actions are completed.

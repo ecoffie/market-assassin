@@ -1,0 +1,57 @@
+{
+  "at": "2026-09-20T23:58:37.470Z",
+  "environment": "local worktree fix/cyrus-profile-setaside-repair (correction batch)",
+  "profile": {
+    "uei": "N1N9JPDYHVC7",
+    "award_count": 17,
+    "enrichment_status": "complete",
+    "recent_len": 5,
+    "set_asides": {
+      "labels": [
+        "8(A) SOLE SOURCE",
+        "8A COMPETED"
+      ],
+      "last_observed_action_fy_by_label": {
+        "8(A) SOLE SOURCE": 2022,
+        "8A COMPETED": 2023
+      },
+      "first_observed_positive_action_fy_by_label": {
+        "8(A) SOLE SOURCE": 2016,
+        "8A COMPETED": null
+      },
+      "last_fy_by_label": {
+        "8(A) SOLE SOURCE": 2022,
+        "8A COMPETED": 2023
+      },
+      "coverage": "complete",
+      "note": "Historical set-aside codes observed on warehouse award actions. last_observed_action_fy is the latest action FY for that code (may be a deobligation). first_observed_positive_action_fy is the earliest positive-obligation action FY when present — a later positive modification is still an action FY, not award origin. Award origin is unknown unless a dedicated origin signal is present. None of these fields is current SAM certification status or a graduation/exit reason. Aggregated across warehouse award actions for this profile's UEI set (not derived from the capped recent_awards sample). Award origin is not established by this query."
+    },
+    "has_award_origin_field": false,
+    "note_has_uei_set": true,
+    "note_denies_award_origin": true
+  },
+  "history": {
+    "recent_len": 20,
+    "set_asides": {
+      "labels": [
+        "8(A) SOLE SOURCE",
+        "8A COMPETED"
+      ],
+      "last_observed_action_fy_by_label": {
+        "8(A) SOLE SOURCE": 2022,
+        "8A COMPETED": 2023
+      },
+      "first_observed_positive_action_fy_by_label": {
+        "8(A) SOLE SOURCE": 2016,
+        "8A COMPETED": null
+      },
+      "last_fy_by_label": {
+        "8(A) SOLE SOURCE": 2022,
+        "8A COMPETED": 2023
+      },
+      "coverage": "complete",
+      "note": "Historical set-aside codes observed on warehouse award actions. last_observed_action_fy is the latest action FY for that code (may be a deobligation). first_observed_positive_action_fy is the earliest positive-obligation action FY when present — a later positive modification is still an action FY, not award origin. Award origin is unknown unless a dedicated origin signal is present. None of these fields is current SAM certification status or a graduation/exit reason. Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query."
+    },
+    "has_award_origin_field": false
+  }
+}

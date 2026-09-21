@@ -1,3 +1,83 @@
-node_modules/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-.vercel/
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+.env*.local
+tasks/logs/
+
+# Service-account JSON keys (never commit credentials)
+market-asasin-*.json
+market-assasin-*.json
+*-service-account*.json
+*serviceaccount*.json
+*-sa-key*.json
+# GCP service-account keys have this exact shape — catch any stray one
+*[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].json
+
+# Exported call transcripts (proprietary, may contain PII — never commit)
+tasks/cache/calls/
+tasks/cache/fireflies-titles.txt
+backups/
+
+# Supabase CLI scratch — auto-rewritten on every `supabase` invocation
+supabase/.temp/
+.cta-backfill.log
+.env.local.bak*
+
+# Standalone design/email preview mockups (open in a browser to eyeball;
+# referenced nowhere in the app build — scratch, not source)
+preview-*.html
+.ghl-tag-sync-cursor.json
+
+# Local test/fetch caches (keyword-derivation harness, etc.)
+.cache/
+.recompete-sweep-state.json
+
+# Root-level scratch/debug scripts from ad-hoc sessions (referenced nowhere in src/)
+/*-tmp.ts
+/._*.cjs
+*.tmp
+.claude/worktrees/
+
+# scratch/throwaway scripts (leading underscore)
+scripts/_*
+
+# Internal strategy notes — moat reasoning, never in a public repo
+docs/internal/

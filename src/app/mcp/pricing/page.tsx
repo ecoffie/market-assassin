@@ -1,0 +1,516 @@
+'use client';
+
+/**
+ * getmindy.ai/mcp/pricing — the PUBLIC pricing page for the MCP CREDIT PRODUCT.
+ *
+ * Two-product model (GOS Decisions #008/#015/#016): the Mindy APP (Free / Pro $149 /
+ * Team $499) is a SEPARATE product sold elsewhere; this page sells only the metered MCP
+ * credit product. Ladder:
+ *   • Free trial — signup credits; every tool works, you just have fewer credits.
+ *   • Entry $99 / Mid $249 / Agency $999 — self-serve monthly credit subscriptions.
+ *   • One-time $119 top-up — the "ran out mid-month" valve.
+ *   • Enterprise / API — INQUIRY-ONLY (feed licensing, high-volume API, SSO/SLA); no price.
+ *
+ * App Pro/Team buyers get a small MCP credit "taste" (250 / 750) — surfaced as a note that
+ * links to app pricing, NOT sold here. Numbers come from the public /api/mcp/catalog (no
+ * auth); the static fallback below MUST stay in sync with SUBSCRIPTION_PLANS in packages.ts.
+ */
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Catalog, SubPlan, Pkg, McpNav, workupCostFrom, workups, toolCr, exampleCost } from '../catalog-ui';
+
+const APP_PRICING_URL = '/pricing'; // where the App Free/Pro/Team tiers live
+const ENTERPRISE_MAILTO = 'mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20%2F%20API%20inquiry';
+
+// App-tier MCP "taste" (GOS #015) — shown as a cross-sell note, not sold on this page.
+//
+// ⚠️ STATIC FALLBACKS ONLY. The live values come from /api/mcp/catalog `tierCredits`
+// (see the fetch below) — these are what renders before that resolves, or if it fails.
+// Keep them in sync with PRO_MONTHLY_CREDITS / TEAM_MONTHLY_CREDITS in
+// src/lib/mcp/packages.ts.
+//
+// TEAM was hardcoded 750 and went STALE the moment the constant moved to 1,000
+// (2026-08-02), so this page advertised 750 while the grant cron paid 1,000 and
+// /pricing said 1,000 — two public pages contradicting each other on the same
+// product. That is exactly why the rendered note now prefers the live value.
+const PRO_APP_USD = 149, PRO_APP_CREDITS = 250;
+const TEAM_APP_USD = 499, TEAM_APP_CREDITS = 1000;
+
+/** Per-plan "who it's for" blurb — the only thing that differs plan to plan (capabilities are identical). */
+const PACK_BLURB: Record<string, string> = {
+  entry: 'The on-ramp — a fixed monthly allowance for steady, project-based federal BD.',
+  mid: 'The daily-driver — enough credits to work opportunities every day, all month.',
+  agency: 'The agency plan — high volume for a shop running many pursuits at once.',
+};
+
+/** Per-tier visual theme for the 2×2 grid (full literal Tailwind strings so the JIT scanner sees them). */
+interface PlanTheme { tag: string; accent: string; card: string; badge: string; box: string; boxText: string; check: string; cta: string }
+const PLAN_THEME: Record<string, PlanTheme> = {
+  entry: {
+    tag: 'Popular', accent: 'text-emerald-300', card: 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]',
+    badge: 'bg-emerald-500 text-[#06120c]', box: 'border-emerald-400/15 bg-emerald-400/[0.04]', boxText: 'text-emerald-100',
+    check: 'text-emerald-400', cta: 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400',
+  },
+  mid: {
+    tag: 'Best for daily use', accent: 'text-indigo-300', card: 'border-indigo-400/40 bg-indigo-400/[0.06] shadow-[0_0_0_1px_rgba(99,102,241,0.15)]',
+    badge: 'bg-indigo-500 text-white', box: 'border-indigo-400/15 bg-indigo-400/[0.05]', boxText: 'text-indigo-100',
+    check: 'text-indigo-300', cta: 'bg-indigo-500 text-white hover:bg-indigo-400',
+  },
+  agency: {
+    tag: 'For agencies · high volume', accent: 'text-purple-300', card: 'border-purple-400/40 bg-purple-400/[0.06]',
+    badge: 'bg-purple-500 text-white', box: 'border-purple-400/15 bg-purple-400/[0.05]', boxText: 'text-purple-100',
+    check: 'text-purple-300', cta: 'bg-purple-500 text-white hover:bg-purple-400',
+  },
+};
+const FALLBACK_THEME: PlanTheme = PLAN_THEME.entry;
+
+/**
+ * Static fallback so the cards render even if the public /api/mcp/catalog fetch is
+ * unavailable (bot-gated, SSR). MUST stay in sync with SUBSCRIPTION_PLANS in
+ * src/lib/mcp/packages.ts — the live catalog wins when present. Monthly-only (annual
+ * deferred, GOS #015). Live Stripe price ids + payment links (created 2026-07-19).
+ */
+const PLANS_FALLBACK: SubPlan[] = [
+  { id: 'entry',  label: 'Entry',  creditsPerMonth: 500,   monthly: { priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG', usd: 99,  credits: 500,   checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD', usd: 990,  usdPerMonth: 83,  credits: 6000,   checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12' } },
+  { id: 'mid',    label: 'Mid',    creditsPerMonth: 2000,  monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 2000,  checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be', usd: 2490, usdPerMonth: 208, credits: 24000,  checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13' } },
+  { id: 'growth', label: 'Growth', creditsPerMonth: 3500,  monthly: { priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV', usd: 399, credits: 3500,  checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16' }, annual: { priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP', usd: 3990, usdPerMonth: 333, credits: 42000,  checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17' } },
+  { id: 'agency', label: 'Agency', creditsPerMonth: 10000, monthly: { priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH', usd: 999, credits: 10000, checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10' }, annual: { priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J', usd: 9990, usdPerMonth: 833, credits: 120000, checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14' } },
+];
+
+/** Allowance from packages.ts — never hardcode a credit figure in copy (it goes stale). */
+function planCredits(id: string): string {
+  const p = PLANS_FALLBACK.find((x) => x.id === id);
+  return p ? p.creditsPerMonth.toLocaleString() : '—';
+}
+
+const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits', checkoutUrl: 'https://buy.stripe.com/28EfZi5Ey97cgVL3OEfnO15' };
+
+/**
+ * Mindy's un-copyable layer — the curated + proprietary tools no public API has.
+ *
+ * Gating status (verified against prod 2026-08-06): `get_winning_playbook` is back on the
+ * MCP surface and is the ONE Pro-tier tool (TOOL_TIER in entitlements.ts). Enforcement is
+ * flag-gated by MCP_ENFORCE_TIERS — which is SET in Vercel, so /api/mcp/catalog returns
+ * `enforceTiers: true` and the gate is LIVE: a non-Pro caller gets a clean `requires_pro`
+ * and is not charged. (The code default is off; do not infer the deployed state from it —
+ * read the endpoint.) The live source of truth is /api/mcp/catalog (`tier` per tool +
+ * `enforceTiers`); the /mcp/tools reference reads it and labels the Pro chip accordingly.
+ * Do not restate a gating claim in copy — read the flag.
+ */
+const MOAT_LIST = 'The winning playbook (Pro) · Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The full proposal pipeline (matrix → draft → referee → .docx)';
+
+/** Plan-finder activities — each a real BD workflow, priced per opportunity from the live catalog. */
+const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[] = [
+  { id: 'find', label: 'Find & filter opportunities', note: 'live SAM search across your NAICS + keywords', tools: ['search_sam_opportunities'] },
+  { id: 'incumbent', label: 'Vet the incumbent', note: 'SEC financials + full contractor profile', tools: ['get_incumbent_financials', 'get_contractor_profile'] },
+  { id: 'price', label: 'Price the bid', note: 'GSA labor rates + regulatory demand signal', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
+  { id: 'playbook', label: 'Draft a win strategy', note: 'proprietary winning playbook — Mindy Pro', tools: ['get_winning_playbook'] },
+  { id: 'teaming', label: 'Build a teaming shortlist', note: 'who-can-win scan + deep-profile top partners', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile'] },
+];
+
+const FAQ: { q: string; a: string }[] = [
+  { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are debited only when a call succeeds; a failed or empty call costs nothing, and repeat/cached reads are free.' },
+  { q: 'Entry, Mid, Growth or Agency — which do I need?', a: `Entry ($99, ${planCredits('entry')} credits/mo) suits project or occasional use. Mid ($249, ${planCredits('mid')}/mo) is the daily driver for an agent working opportunities every day. Growth ($399, ${planCredits('growth')}/mo) is for working several markets at once. Agency ($999, ${planCredits('agency')}/mo) is for a shop running many pursuits. Every plan has the SAME tools — the tiers differ only in monthly credit allowance. Use the plan finder below to size it against your real workflow.` },
+  { q: 'What makes Mindy different from a public-data wrapper?', a: 'Beyond the public-data tools (SAM, USASpending, EDGAR, GSA, Grants, Federal Register), Mindy adds an un-copyable layer no public API has: curated SBLO + OSBP teaming/small-business contacts, agency intel and angles, podcast lessons, and a full proposal pipeline (compliance matrix → drafted sections → an independent compliance referee → a submittable .docx). You pay per successful call in credits — nothing is locked behind a tier; the plans just set how many credits you get each month.' },
+  { q: 'I already pay for the Mindy app (Pro or Team). Do I get MCP credits?', a: `Yes — Pro ($149/mo) includes ${PRO_APP_CREDITS} MCP credits every month and Team ($499/mo) includes ${TEAM_APP_CREDITS}, at no extra cost. Connect with the same account and they’re already there. It’s a taste — if your agent runs heavier, add one of the credit plans on this page.` },
+  { q: 'What is the one-time top-up for?', a: `The top-up (1,000 credits / $119) is the “ran out mid-month” valve — a one-time refill that doesn’t change your plan. It’s also the pack auto-recharge draws from if you switch that on. Top-up credits never expire and carry over when your plan renews.` },
+  { q: 'Do you have an Enterprise / API option?', a: 'Yes — for primes, agencies, funds, lenders, and partners who need a data/feed license, high-volume programmatic API access, SSO/SAML, a dedicated success manager, or an SLA. Pricing is bespoke (volume-based, annual invoicing). Email hello@getmindy.ai and we’ll scope it with you.' },
+  { q: 'Do I need a credit card to start?', a: 'No. You get signup credits free on your first connect — sign in through your browser, point your MCP client at Mindy, and start calling tools. Add a plan only when you want more.' },
+  { q: 'What happens when I run out of credits?', a: 'The next tool call is declined with a top-up message before it runs — you are never charged into a negative balance. Add a top-up, upgrade your plan, or wait for your renewal.' },
+];
+
+export default function McpPricing() {
+  const [cat, setCat] = useState<Catalog | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set(['find', 'incumbent', 'price']));
+  const [oppsPerMonth, setOppsPerMonth] = useState(5);
+  const [annual, setAnnual] = useState(true); // annual is the default view (best value + the bonus)
+
+  useEffect(() => {
+    fetch('/api/mcp/catalog')
+      .then((r) => r.json())
+      .then((j) => { if (j?.success) setCat({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? PRO_APP_CREDITS, tierCredits: j.tierCredits }); })
+      .catch(() => { /* falls back to static copy */ });
+  }, []);
+
+  const tools = cat?.tools ?? [];
+  const plans = cat?.subscriptionPlans?.length ? cat.subscriptionPlans : PLANS_FALLBACK;
+  const topup = cat?.packages?.find((p) => p.id === 'refill') ?? TOPUP_FALLBACK;
+  const trial = cat?.signupCredits ?? 100;
+  const workupCost = tools.length ? workupCostFrom(tools) : 30;
+  /**
+   * The number of tools we advertise = EVERY tool the catalog serves.
+   *
+   * This used to be `tools.filter(t => t.credits > 0).length`, which silently dropped the
+   * free ones (get_balance, get_proposal_job, verify_m_scale) and rendered "51 tools live
+   * today" while /mcp/tools, the changelog, the whitepaper and the catalog mirror all said
+   * 54. A visitor comparing the two public pages sees us disagree with ourselves about our
+   * own product. Free tools are still tools — verify_m_scale is arguably the most
+   * trust-building one on the surface, and excluding it from the headline count is
+   * backwards.
+   */
+  const toolCount = tools.length;
+  const searchCost = toolCr(tools, 'search_sam_opportunities', 5);
+  const draftCost = toolCr(tools, 'draft_proposal', 40);
+  // The flagship deliverable (a proposal draft / full market report) — the high-value unit
+  // that actually constrains a serious user. Live-priced from the catalog (100 cr today).
+  const flagshipCost = toolCr(tools, 'generate_market_report', 100);
+
+  /** Turn an abstract credit balance into concrete BD outcomes (the Higgsfield move, our way). */
+  const outcomes = (n: number) => [
+    `≈ ${workups(n, workupCost)} full opportunity work-ups`,
+    `${Math.max(1, Math.floor(n / flagshipCost)).toLocaleString()} proposals or market reports`,
+    `${Math.floor(n / draftCost).toLocaleString()} proposal drafts`,
+    `${Math.floor(n / searchCost).toLocaleString()} opportunity searches`,
+  ];
+
+  // Higgsfield pattern: credits/mo stay constant across the toggle; only the price flips.
+  // % off is computed from the real yearly price (annual vs 12× monthly) → the true "2 months
+  // free" = 17%, not the 16% you'd get from the rounded effective $/mo.
+  const planRows = plans.map((p) => {
+    const hasAnnual = !!p.annual;
+    const perMo = annual && p.annual ? p.annual.usdPerMonth : p.monthly.usd;
+    const pct = p.annual && p.monthly.usd > 0 ? Math.round((1 - p.annual.usd / (p.monthly.usd * 12)) * 100) : 0;
+    return {
+      id: p.id,
+      name: p.label,
+      creditsPerMonth: p.creditsPerMonth,
+      monthlyUsd: p.monthly.usd,
+      perMo,
+      perYear: p.annual?.usd ?? 0,
+      annualCredits: p.annual?.credits ?? 0,
+      // Annual bonus = the 2 free months expressed as credits (creditsPerMonth × 2).
+      annualBonus: p.annual ? p.creditsPerMonth * 2 : 0,
+      pct,
+      hasAnnual,
+      href: annual && p.annual ? p.annual.checkoutUrl : p.monthly.checkoutUrl,
+    };
+  });
+  // Whole-ladder discount for the toggle badge (all tiers share the 2-months-free rate).
+  const annualPct = plans[0]?.annual ? Math.round((1 - plans[0].annual.usd / (plans[0].monthly.usd * 12)) * 100) : 0;
+
+  // ---- Plan finder ----
+  const perOppCost = ACTIVITIES.filter((a) => picked.has(a.id)).reduce((s, a) => s + exampleCost(tools, a.tools), 0);
+  const monthlyNeed = perOppCost * oppsPerMonth;
+  const rec = ((): { tier: string; cap: number | null; cta: string; href: string; accent: 'slate' | 'emerald' | 'amber'; sub: string } | null => {
+    if (!picked.size || monthlyNeed <= 0) return null;
+    if (monthlyNeed <= trial) return { tier: 'Free trial', cap: trial, cta: 'Start free', href: '/app', accent: 'slate', sub: `Your ${trial} signup credits cover a first month at this pace.` };
+    const plan = plans.find((p) => p.creditsPerMonth >= monthlyNeed);
+    if (!plan) {
+      const biggest = plans[plans.length - 1];
+      return { tier: 'Enterprise / API', cap: null, cta: 'Contact sales', href: ENTERPRISE_MAILTO, accent: 'amber', sub: `At ~${monthlyNeed.toLocaleString()} credits/mo you’re past the ${biggest.label} plan (${biggest.creditsPerMonth.toLocaleString()}/mo) — a custom pool is the right fit.` };
+    }
+    // Honour the billing toggle: recommending a plan but linking to the MONTHLY checkout
+    // while the page shows annual prices sends the buyer somewhere other than what they
+    // were reading. Annual also grants its credits UPFRONT, which the copy must say.
+    const useAnnual = annual && !!plan.annual;
+    const href = useAnnual && plan.annual ? plan.annual.checkoutUrl : plan.monthly.checkoutUrl;
+    const cta = useAnnual && plan.annual
+      ? `Get ${plan.label} — $${plan.annual.usd.toLocaleString()}/yr`
+      : `Get ${plan.label} — $${plan.monthly.usd}/mo`;
+    const sub = useAnnual && plan.annual
+      ? `$${plan.annual.usd.toLocaleString()}/yr — ${plan.annual.credits.toLocaleString()} credits granted up front — every tool, charged on success.`
+      : `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month — every tool, charged on success.`;
+    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta, href, accent: 'emerald', sub };
+  })();
+  const usePct = rec && rec.cap ? Math.min(100, Math.round((monthlyNeed / rec.cap) * 100)) : 0;
+
+  const toggle = (id: string) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
+
+  return (
+    <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
+      <div className="mx-auto max-w-5xl px-5 py-8 sm:px-6">
+        <McpNav active="pricing" />
+
+        {/* Hero */}
+        <section className="mt-12 text-center">
+          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Start free. Pay as you grow.</h1>
+          <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
+            Metered federal-contracting credits for any AI agent. Start with a free trial, then pick a monthly or annual plan — every tool is charged per successful call, so you never pay for a miss. {tools.length ? `${toolCount} tools live today.` : 'Dozens of tools live today.'}
+          </p>
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <a href="/app" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-[15px] font-bold text-[#06120c] shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
+              Sign up free — {trial} credits, no card
+            </a>
+            <span className="text-[12px] text-slate-500">Granted the moment you connect · no credit card required</span>
+          </div>
+        </section>
+
+        {/* Refer-a-friend — prominent, right under the hero (paired with the free-signup offer) */}
+        <div className="mx-auto mt-5 flex max-w-2xl flex-col items-center justify-between gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/[0.06] px-5 py-4 text-center sm:flex-row sm:text-left">
+          <span className="text-[14px] text-slate-200">
+            <b className="font-bold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
+          </span>
+          <Link href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-[13px] font-semibold text-amber-100 hover:bg-amber-300/20">
+            Get your link →
+          </Link>
+        </div>
+
+        {/* Wayfinding to the plan finder */}
+        <div className="mt-8 flex justify-center">
+          <a href="#find-plan" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[13px] font-medium text-slate-300 hover:border-white/20 hover:text-slate-100">
+            <span className="text-slate-500">⤳</span> Not sure which plan? <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">Size it</span>
+          </a>
+        </div>
+
+        {/* Billing toggle — Monthly / Annual (annual = 2 months free, credits granted 12× upfront) */}
+        <div className="mt-3 flex justify-center">
+          <div className={`inline-flex items-center rounded-xl border p-1 text-[13px] transition ${annual ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
+            <button type="button" onClick={() => setAnnual(false)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${!annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>Monthly</button>
+            <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-lg px-4 py-1.5 font-semibold transition ${annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
+              Annual {annualPct > 0 && <span className="rounded-full bg-pink-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm shadow-pink-500/40">Save {annualPct}%</span>}
+            </button>
+          </div>
+        </div>
+
+        {/* The plans — the loved Higgsfield 2×2: Entry · Mid (top) / Agency · Enterprise (bottom).
+            No Free card here on purpose — free lives in the hero + Sign in. */}
+        <section className="mt-6 grid items-stretch gap-4 md:grid-cols-2">
+          {/* Entry · Mid · Agency — metered credit plans, each in its own color */}
+          {planRows.map((p) => {
+            const t = PLAN_THEME[p.id] ?? FALLBACK_THEME;
+            return (
+              <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${t.card}`}>
+                <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
+                {p.annualBonus > 0 && annual && (
+                  <span className="absolute -top-3.5 right-4 rotate-3 rounded-full border-2 border-[#0a0f1e] bg-gradient-to-r from-amber-300 to-yellow-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#3a2a00] shadow-lg shadow-amber-500/20">
+                    +{p.annualBonus.toLocaleString()} bonus credits
+                  </span>
+                )}
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className={`text-[12px] font-semibold uppercase tracking-wide ${t.accent}`}>{p.name}</span>
+                  <span className="text-[11px] text-slate-500">credits plan</span>
+                </div>
+                <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Every tool — charged on success.'}</div>
+                <div className={`mt-2 rounded-xl border p-3 ${t.box}`}>
+                  <div className={`flex items-baseline gap-1.5 ${t.boxText}`}>
+                    <span aria-hidden>✦</span>
+                    <b className="font-mono text-[15px] font-semibold tabular-nums">{p.creditsPerMonth.toLocaleString()}</b>
+                    <span className="text-[13px] font-semibold">credits/mo</span>
+                  </div>
+                  <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                    {outcomes(p.creditsPerMonth).map((o) => <li key={o} className="tabular-nums">· {o} <span className="text-slate-500">/mo</span></li>)}
+                  </ul>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  {annual && p.hasAnnual && p.pct > 0 && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${p.monthlyUsd}</span>}
+                  <span className="font-mono text-4xl font-bold tabular-nums">${p.perMo}</span>
+                  <span className="text-[13px] text-slate-400">{annual && p.hasAnnual ? 'per mo, billed annually' : 'billed monthly'}</span>
+                </div>
+                <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual && p.hasAnnual ? `$${p.perYear.toLocaleString()}/yr · ${p.annualCredits.toLocaleString()} credits upfront · 2 months free` : ''}</div>
+                <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} tools</b> — public data + the curated proprietary layer</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span>Charged on success only · {p.creditsPerMonth.toLocaleString()} credits every month</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span>Top up any time · optional auto-recharge</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span>Keyless connect — sign in through your browser</span></li>
+                </ul>
+                <a href={p.href} className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${t.cta}`}>Get {p.name}</a>
+              </div>
+            );
+          })}
+
+          {/* Enterprise / API — the 4th card in the 2×2 (inquiry-only, moat-doc feed buyers) */}
+          <div className="relative flex flex-col rounded-2xl border border-amber-300/30 bg-amber-300/[0.04] p-6">
+            <span className="absolute -top-2.5 left-6 rounded-full border border-amber-300/40 bg-[#0a0f1e] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">For primes · funds · partners</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-amber-200">Enterprise / API</span>
+              <span className="text-[11px] text-slate-500">custom</span>
+            </div>
+            <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">For primes, agencies, funds, lenders &amp; partners who need the <b className="font-semibold text-slate-200">data as a feed or high-volume API</b> — not a seat.</div>
+            <div className="mt-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] p-3">
+              <div className="flex items-baseline gap-1.5 text-amber-100">
+                <span aria-hidden>✦</span>
+                <b className="font-mono text-[15px] font-semibold">Custom</b>
+                <span className="text-[13px] font-semibold">credit pool</span>
+              </div>
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                <li>· Sized to your team &amp; volume</li>
+                <li>· Feed license / high-volume API</li>
+                <li>· Pooled across every seat</li>
+              </ul>
+            </div>
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-4xl font-bold">Let&apos;s talk</span>
+            </div>
+            <div className="mt-1 text-[12px] text-amber-200/80">Volume pricing · annual invoicing</div>
+            <ul className="mt-4 flex-1 space-y-2 border-t border-amber-300/15 pt-4 text-[12.5px]">
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>High-volume programmatic API access</span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>SSO / SAML · dedicated success manager · SLA</span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>Custom integrations · a data / feed license</span></li>
+            </ul>
+            <a href={ENTERPRISE_MAILTO} className="mt-5 inline-flex items-center justify-center rounded-lg border border-amber-300/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-300/10">Contact sales</a>
+          </div>
+        </section>
+
+        {/* One-time top-up — slim full-width strip below the 2×2 */}
+        <section className="mt-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-[#101728] px-6 py-4 sm:flex-row">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">One-time top-up</span>
+            <span className="font-mono text-2xl font-bold tabular-nums">${topup.usd}</span>
+            <span className="text-[13px] text-emerald-300">{topup.credits.toLocaleString()} credits</span>
+            <span className="text-[12px] text-slate-500">· ran out mid-month? a refill, no plan change · powers auto-recharge</span>
+          </div>
+          <a href={topup.checkoutUrl} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/5">Buy top-up</a>
+        </section>
+
+        {/* App cross-sell note (taste) */}
+        <div className="mt-4 flex justify-center">
+          <div className="max-w-2xl rounded-xl border border-indigo-400/25 bg-indigo-400/[0.05] px-5 py-3 text-center text-[13px] text-slate-300">
+            Already on the <b className="font-semibold text-indigo-200">Mindy app</b>? Pro (${PRO_APP_USD}/mo) includes <b className="font-semibold text-white">{cat?.tierCredits?.pro.credits ?? PRO_APP_CREDITS} MCP credits/mo</b> and Team (${TEAM_APP_USD}/mo) includes <b className="font-semibold text-white">{cat?.tierCredits?.teams.credits ?? TEAM_APP_CREDITS}</b> — connect the same account.{' '}
+            <Link href={APP_PRICING_URL} className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200">See app plans →</Link>
+          </div>
+        </div>
+
+        <p className="mx-auto mt-6 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
+          Mindy&apos;s <b className="font-medium text-slate-300">un-copyable layer</b> — {MOAT_LIST} — no public API has it. Every tool is open; you pay per successful call in credits, and plans differ only by monthly allowance.
+        </p>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
+          A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and draft the proposal (~{workupCost} credits). Lighter lookups cost far less.
+        </p>
+
+        {/* Plan finder */}
+        <section id="find-plan" className="mt-16 scroll-mt-8">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Find your plan</h2>
+          <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Tell us what your agent will do. We&apos;ll price it against the live catalog and point you at the right tier.</p>
+          <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101728]">
+            <div className="grid gap-0 sm:grid-cols-5">
+              {/* Inputs */}
+              <div className="border-b border-white/10 p-5 sm:col-span-3 sm:border-b-0 sm:border-r">
+                <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-400">For each opportunity, my agent will…</div>
+                <div className="mt-3 space-y-2">
+                  {ACTIVITIES.map((a) => {
+                    const on = picked.has(a.id);
+                    const cost = exampleCost(tools, a.tools);
+                    return (
+                      <button key={a.id} type="button" onClick={() => toggle(a.id)} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/[0.08] bg-[#0b1120] hover:border-white/20'}`}>
+                        <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] ${on ? 'border-emerald-400 bg-emerald-500 text-[#06120c]' : 'border-white/25 text-transparent'}`}>✓</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-semibold text-slate-100">{a.label}</span>
+                          <span className="block truncate text-[11.5px] text-slate-500">{a.note}</span>
+                        </span>
+                        <span className="shrink-0 font-mono text-[11.5px] tabular-nums text-slate-400">{cost} cr</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-5">
+                  <div className="flex items-center justify-between text-[12px] text-slate-400">
+                    <span>Opportunities worked per month</span>
+                    <span className="font-mono text-[15px] font-semibold tabular-nums text-slate-100">{oppsPerMonth}</span>
+                  </div>
+                  <input type="range" min={1} max={50} value={oppsPerMonth} onChange={(e) => setOppsPerMonth(Number(e.target.value))} className="mt-2 w-full accent-emerald-500" aria-label="Opportunities per month" />
+                  <div className="mt-1 flex justify-between text-[10px] text-slate-600"><span>1</span><span>50</span></div>
+                </div>
+              </div>
+              {/* Result */}
+              <div className="flex flex-col justify-center p-5 sm:col-span-2">
+                {rec ? (
+                  <>
+                    <div className="text-[12px] uppercase tracking-wide text-slate-500">We recommend</div>
+                    <div className={`mt-1 text-2xl font-bold ${rec.accent === 'amber' ? 'text-amber-200' : rec.accent === 'emerald' ? 'text-emerald-300' : 'text-slate-100'}`}>{rec.tier}</div>
+                    <div className="mt-3 text-[13px] text-slate-300">
+                      <span className="font-mono font-semibold tabular-nums text-slate-100">~{monthlyNeed.toLocaleString()}</span> credits/month
+                      <span className="text-slate-500"> — {perOppCost} cr × {oppsPerMonth} opps</span>
+                    </div>
+                    {rec.cap && (
+                      <div className="mt-3">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                          <div className="h-full rounded-full bg-emerald-400" style={{ width: `${usePct}%` }} />
+                        </div>
+                        <div className="mt-1 text-[11px] tabular-nums text-slate-500">{monthlyNeed.toLocaleString()} of {rec.cap.toLocaleString()} credits</div>
+                      </div>
+                    )}
+                    <p className="mt-3 text-[12px] leading-relaxed text-slate-400">{rec.sub}</p>
+                    <a href={rec.href} className={`mt-4 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-[13px] font-semibold ${rec.accent === 'amber' ? 'border border-amber-300/40 text-amber-100 hover:bg-amber-300/10' : 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400'}`}>{rec.cta}</a>
+                  </>
+                ) : (
+                  <div className="text-center text-[13px] text-slate-500">Pick at least one workflow to see your recommendation.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Compare */}
+        <section className="mt-16">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Compare every plan</h2>
+          <div className="mx-auto mt-6 max-w-3xl overflow-x-auto rounded-2xl border border-white/[0.07] bg-[#101728]">
+            <table className="w-full min-w-[680px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="p-4 font-medium text-slate-400">Feature</th>
+                  <th className="p-4 text-center font-semibold text-slate-300">Free</th>
+                  <th className="p-4 text-center font-semibold text-emerald-300">Entry</th>
+                  <th className="p-4 text-center font-semibold text-emerald-300">Mid</th>
+                  <th className="p-4 text-center font-semibold text-emerald-300">Agency</th>
+                  <th className="p-4 text-center font-semibold text-amber-200">Enterprise</th>
+                </tr>
+              </thead>
+              <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
+                <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry={`${planCredits('entry')}/mo`} mid={`${planCredits('mid')}/mo`} growth={`${planCredits('growth')}/mo`} agency={`${planCredits('agency')}/mo`} ent="custom" />
+                {/*
+                  Tool count is INTERPOLATED from the live catalog, never typed. This row once
+                  hardcoded "52", then drifted; the replacement counted only credit-charging
+                  tools and drifted the other way (51 vs the catalog's 54). It is now
+                  `tools.length` — the same number /mcp/tools shows, from the same endpoint.
+                  Never type a count into copy here.
+                */}
+                <CompareRow label={`All ${toolCount} tools (public data + curated contacts · angles · lessons · proposal pipeline)`} free="yes" entry="yes" mid="yes" growth="yes" agency="yes" ent="yes" />
+                <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" growth="yes" agency="yes" ent="yes" />
+                <CompareRow label="One-time top-ups · auto-recharge" free="no" entry="yes" mid="yes" growth="yes" agency="yes" ent="yes" />
+                <CompareRow label="Data feed / high-volume API" free="no" entry="no" mid="no" growth="no" agency="no" ent="yes" />
+                <CompareRow label="SSO / SAML · dedicated CSM · SLA" free="no" entry="no" mid="no" growth="no" agency="no" ent="yes" />
+                <CompareRow label="Best for" free="try it" entry="project / occasional" mid="daily BD" growth="several markets" agency="high volume" ent="primes · funds · partners" />
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className="mt-16">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Questions</h2>
+          <div className="mx-auto mt-6 max-w-2xl divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101728]">
+            {FAQ.map((f) => (
+              <details key={f.q} className="group px-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[14px] font-semibold text-slate-200 marker:hidden">
+                  {f.q}
+                  <span className="shrink-0 text-slate-500 transition group-open:rotate-45">＋</span>
+                </summary>
+                <p className="pb-4 text-[13px] leading-relaxed text-slate-400">{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        {/* Closing CTA */}
+        <section className="mt-16 rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-400/[0.08] to-indigo-500/[0.06] p-8 text-center">
+          <h2 className="text-balance text-xl font-bold sm:text-2xl">Point your agent at Mindy in five minutes.</h2>
+          <p className="mx-auto mt-2 max-w-md text-[13px] text-slate-400">Start with {trial} free credits — no card. Add a plan when you&apos;re ready.</p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Start free with {trial} credits</a>
+            <Link href="/mcp" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See it in action →</Link>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+/** One row of the compare matrix. Semantic cells: yes → colored check, no/— → muted, text → verbatim. */
+function CompareRow({ label, free, entry, mid, growth, agency, ent }: { label: string; free: string; entry: string; mid: string; growth: string; agency: string; ent: string }) {
+  const cell = (v: string, accent: 'slate' | 'emerald' | 'amber') => {
+    if (v === 'yes') return <span className={accent === 'amber' ? 'text-amber-300' : accent === 'slate' ? 'text-slate-300' : 'text-emerald-400'}>✓</span>;
+    if (v === 'no') return <span className="text-slate-600">–</span>;
+    return <span className="text-[12px] tabular-nums text-slate-300">{v}</span>;
+  };
+  return (
+    <tr>
+      <td className="text-slate-300">{label}</td>
+      <td>{cell(free, 'slate')}</td>
+      <td>{cell(entry, 'emerald')}</td>
+      <td>{cell(mid, 'emerald')}</td>
+      <td>{cell(growth, 'emerald')}</td>
+      <td>{cell(agency, 'emerald')}</td>
+      <td>{cell(ent, 'amber')}</td>
+    </tr>
+  );
+}

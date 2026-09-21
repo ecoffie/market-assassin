@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# Post-merge branch tidy. Runs after a `git pull`/`git merge` on main and REPORTS local
+# branches that are fully merged into origin/main — the residue GitHub's
+# `delete_branch_on_merge` can never clear, because it deletes its own copy of the branch and
+# never yours. (Verified 2026-08-17: that setting was already ON and working — zero merged
+# branches remained on origin — while the LOCAL list had reached 516.)
+#
+# REPORTS ONLY. It never deletes on its own: a hook that silently removes refs is exactly the
+# kind of surprise that makes people disable hooks. It prints the count and the one command to
+# run. Deleting stays an explicit act (`npm run tidy:branches -- --go`).
+#
+# Enabled via `core.hooksPath=.githooks` (same as pre-push; auto-set by npm's prepare script).
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT" || exit 0
+
+# Only on main — mid-feature merges into a topic branch are noise.
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+[ "$branch" = "main" ] || exit 0
+
+[ -f scripts/tidy-branches.mjs ] || exit 0
+
+out="$(node scripts/tidy-branches.mjs --quiet 2>/dev/null || true)"
+# Print only when there is something to prune (the script is silent otherwise under --quiet).
+if [ -n "$out" ] && printf '%s' "$out" | grep -q "prunable"; then
+  printf '%s\n' "$out" | head -6
+fi
+
+exit 0

@@ -1,0 +1,27 @@
+{
+  "_comment": "VERSIONED FIXTURE — NOT the full SBA table. Contains ONLY the NAICS codes required by the notices this prototype has been run against (WEEKEND.md: 'use a versioned local fixture containing only the NAICS codes required by the chosen public notice ... Do not pretend that fixture is the full production dataset'). Adding a code REQUIRES sourcing it from the cited authority and recording verification below.",
+  "table": {
+    "publisher": "U.S. Small Business Administration",
+    "title": "Small Business Size Regulations — Table of Small Business Size Standards",
+    "version": "13 CFR 121.201, as in force 2026-09-01",
+    "effectiveDate": "2026-09-01",
+    "authority": "13 CFR 121.201",
+    "sourceUrl": "https://www.ecfr.gov/current/title-13/section-121.201",
+    "retrievedAt": "2026-09-05",
+    "verification": {
+      "method": "primary",
+      "note": "Read programmatically from the authoritative eCFR versioner API (GET /api/versioner/v1/full/2026-09-01/title-13.xml?part=121&section=121.201, HTTP 200). The row is <TD>541512</TD><TD>Computer Systems Design Services</TD><TD>$34.0</TD> with an EMPTY employees column; the table's own column header reads 'Size standards in millions of dollars'. The SBA's own PDF host blocks automated retrieval, so eCFR — which publishes the codified regulation itself — is the primary source used.",
+      "primarySourceRetrieved": true
+    }
+  },
+  "standards": {
+    "541512": {
+      "naics": "541512",
+      "title": "Computer Systems Design Services",
+      "value": 34.0,
+      "unit": "million USD annual receipts",
+      "measure": "receipts",
+      "footnote": null
+    }
+  }
+}

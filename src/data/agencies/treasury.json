@@ -1,0 +1,184 @@
+{
+  "name": "Department of the Treasury",
+  "abbreviation": "Treasury",
+  "parentAgency": null,
+  "description": "The Department of the Treasury manages federal finances, collects taxes, pays bills, manages currency and public debt, and provides economic and financial policy guidance.",
+  "website": "https://home.treasury.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$16.3 billion (department operations)",
+    "procurementBudget": "$15.2 billion (IRS, Fiscal Service, FinCEN combined)"
+  },
+  "painPoints": [
+    {
+      "point": "IRS legacy IT systems requiring decommissioning - despite modernization progress, old systems still operational",
+      "source": "Federal News Network IT Modernization Report September 2025 & GAO-25-107611",
+      "priority": "critical"
+    },
+    {
+      "point": "Incomplete or ineffective security requirements creating vulnerabilities in new systems",
+      "source": "Treasury Inspector General Major Management Challenges Report",
+      "priority": "critical"
+    },
+    {
+      "point": "Cybersecurity threat monitoring gaps requiring Executive Order 14028 compliance",
+      "source": "Bureau of Fiscal Service FY2025 Budget - Cybersecurity Enhancement Initiative",
+      "priority": "high"
+    },
+    {
+      "point": "Paper records reduction and digital transformation challenges across IRS operations",
+      "source": "IRS IT Modernization Framework June 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Scaling IRS operations to handle Inflation Reduction Act clean energy tax credit administration",
+      "source": "IRS FY2025 Budget - IRA Funding Allocation",
+      "priority": "high"
+    },
+    {
+      "point": "Detection and audit log implementation challenges in new technology deployments",
+      "source": "TIGTA Major Management Challenges - Security Requirements",
+      "priority": "high"
+    },
+    {
+      "point": "Insufficient API standardization - need for unified application program interface across systems",
+      "source": "IRS IT Modernization Framework - Nine Strategic Initiatives",
+      "priority": "medium"
+    },
+    {
+      "point": "Taxpayer service capacity constraints requiring enhanced technology and staffing",
+      "source": "IRS FY2025 Budget - Taxpayer Services Allocation $1.323B",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting critical financial systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "IRS IT Modernization using Inflation Reduction Act funding - $1.929 billion for Business Systems Modernization",
+      "source": "IRS FY2025 Budget Summary",
+      "funding": "$1.929 billion FY2025",
+      "deadline": "Multi-year initiative through FY2031"
+    },
+    {
+      "priority": "Cybersecurity enhancement and cloud infrastructure implementation per Executive Order 14028",
+      "source": "Bureau of Fiscal Service FY2025 Congressional Budget",
+      "funding": "$6.0 million CEA funding for Fiscal Service",
+      "priority": "critical"
+    },
+    {
+      "priority": "Clean energy tax credit administration and compliance systems development",
+      "source": "IRS IRA Funding Usage FY2025",
+      "funding": "$180 million and 1,810 FTE",
+      "priority": "high"
+    },
+    {
+      "priority": "Tax enforcement technology for high-wealth individuals and corporations",
+      "source": "IRS FY2025 Budget - Enforcement Allocation",
+      "funding": "$2.317 billion and 7,239 FTE",
+      "priority": "high"
+    },
+    {
+      "priority": "Unified API development and interoperability improvements across IRS systems",
+      "source": "IRS IT Modernization Framework Nine Initiatives",
+      "deadline": "FY2026 implementation targets"
+    },
+    {
+      "priority": "Paper records elimination and digital service delivery enhancement",
+      "source": "IRS IT Modernization Framework",
+      "priority": "high"
+    },
+    {
+      "priority": "Taxpayer service technology improvements including $1.323 billion for Taxpayer Services",
+      "source": "IRS FY2025 IRA Funding Allocation",
+      "funding": "$1.323 billion and 12,562 FTE"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "Treasury FY2025 Budget in Brief - https://home.treasury.gov/about/budget-financial-reporting-planning-and-performance/budget-requestannual-performance-plan-and-reports/budget-in-brief/fy-2025-budget-in-brief",
+      "IRS FY2025 Budget Summary - https://home.treasury.gov/system/files/266/15.-IRS-FY-2025-BIB.pdf",
+      "GAO-25-107611 IRS IT Modernization Framework - https://files.gao.gov/reports/GAO-25-107611",
+      "Bureau of Fiscal Service FY2025 Congressional Budget - https://home.treasury.gov/system/files/266/14.-BFS-FY-2025-CJ.pdf",
+      "Treasury Inspector General Major Management Challenges - https://www.tigta.gov/management-challenges"
+    ],
+    "secondary": [
+      "Federal News Network IRS IT Modernization Report September 2025",
+      "Treasury Press Release IT Modernization Progress - https://home.treasury.gov/news/press-releases/sb0260",
+      "GAO Performance Budget FY2025 - https://www.gao.gov/assets/gao-24-900539.pdf"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "541611",
+    "541618",
+    "541690",
+    "541714",
+    "541715",
+    "518210",
+    "541330"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "BPA (Blanket Purchase Agreement)",
+    "GSA Schedule contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - active small business program",
+    "WOSB": "Active use for eligible contracts",
+    "8a": "Regular use for technology and professional services",
+    "HUBZone": "Moderate use",
+    "SDVOSB": "Active use - veteran preference",
+    "VOSB": "Regular use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M",
+    "medium": "$10M - $100M",
+    "large": "$100M+ (major IT modernization projects)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Financial systems and tax technology expertise",
+      "Cybersecurity certifications (FedRAMP, CMMC)",
+      "Cloud computing and API development experience",
+      "Legacy system modernization capabilities",
+      "Data analytics and fraud detection technology",
+      "Taxpayer service and contact center solutions"
+    ],
+    "contractingTimeline": "6-18 months average, expedited for critical security needs",
+    "competitionLevel": "Highly competitive for major IT contracts, moderate for specialized financial services",
+    "evaluationFactors": [
+      "Technical approach and financial systems expertise",
+      "Past performance with Treasury or financial agencies",
+      "Cybersecurity and compliance capabilities",
+      "Price/cost reasonableness",
+      "Small business participation",
+      "Innovation and modernization approach"
+    ]
+  },
+  "keyOffices": [
+    "Internal Revenue Service (IRS)",
+    "Bureau of the Fiscal Service",
+    "Financial Crimes Enforcement Network (FinCEN)",
+    "Office of the Comptroller of the Currency (OCC)",
+    "U.S. Mint",
+    "Bureau of Engraving and Printing"
+  ],
+  "insights": [
+    "IRS modernization represents multi-billion dollar opportunity through Inflation Reduction Act funding",
+    "Cybersecurity and legacy system replacement are urgent priorities",
+    "Clean energy tax credit administration is emerging procurement area",
+    "Strong focus on fraud detection and enforcement technology",
+    "API standardization and cloud migration are strategic initiatives",
+    "Taxpayer service improvements driving contact center and digital service contracts",
+    "Security requirements and audit capabilities are critical evaluation factors"
+  ]
+}

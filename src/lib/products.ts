@@ -1,0 +1,201 @@
+// Product Configuration with Stripe Checkout URLs
+
+export const PRODUCTS = {
+  // MI Pro ($149/mo) - The main product: All tools + AI Briefings + FHC Training
+  MI_PRO: {
+    id: 'mi-pro',
+    name: 'Mindy Pro',
+    tiers: {
+      monthly: {
+        price: 149,
+        billing: 'monthly',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_CHECKOUT_URL || 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C',
+      },
+      annual: {
+        price: 1490, // 2 months free
+        billing: 'annual',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_ANNUAL_CHECKOUT_URL || 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D',
+      },
+    },
+    features: ['agency-search-full', 'daily-alerts', 'ai-briefings', 'market-research', 'forecasts', 'pipeline', 'crm', 'content-reaper', 'fhc-training'],
+  },
+  // Coach Mode add-on ($99/mo) — for Pro users who want My Clients (manage other
+  // businesses' BD) without jumping to Teams. Caps at 3 client workspaces; upgrade to
+  // Teams (5) for more. Stripe product TBD — set NEXT_PUBLIC_COACH_ADDON_CHECKOUT_URL
+  // when the payment link exists. The placeholder intentionally fails safe (no charge).
+  COACH_ADDON: {
+    id: 'coach-addon',
+    name: 'Coach Mode Add-On',
+    price: 99,
+    billing: 'monthly',
+    requires: 'pro', // an add-on ON TOP of a Pro subscription, not a standalone tier
+    maxClients: 3,
+    stripeUrl: process.env.NEXT_PUBLIC_COACH_ADDON_CHECKOUT_URL || '',
+    features: ['my-clients', 'coach-mode'],
+  },
+  // Legacy: $49/mo briefings (for grandfathered users, NOT promoted)
+  LEGACY_BRIEFINGS: {
+    id: 'legacy-briefings',
+    name: 'Market Intelligence (Legacy)',
+    price: 49,
+    billing: 'monthly',
+    stripeUrl: 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z',
+    features: ['ai-briefings'],  // AI briefings only, not full tools
+  },
+  // Legacy: Keep for backwards compatibility
+  DAILY_BRIEFINGS: {
+    id: 'briefings',
+    name: 'Market Intelligence',
+    tiers: {
+      briefings: {
+        price: 149, // $149/mo - MI Pro
+        billing: 'monthly',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_CHECKOUT_URL || 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C',
+      },
+      briefings_annual: {
+        price: 1490, // $1,490/yr - MI Pro Annual (2 months free)
+        billing: 'annual',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_ANNUAL_CHECKOUT_URL || 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D',
+      },
+      // Note: $49/mo grandfathered users keep their price (price_1TJVGCK5zyiZ50PBQUPA4f4e)
+    },
+  },
+  AI_CONTENT_GENERATOR: {
+    id: 'ai-content-generator',
+    name: 'Content Reaper',
+    tiers: {
+      'content-engine': {
+        price: 197,
+        stripeUrl: '/pricing',
+      },
+      'full-fix': {
+        price: 397,
+        stripeUrl: '/pricing',
+      },
+    },
+  },
+  CONTENT_GENERATOR_FULL_FIX_UPGRADE: {
+    id: 'content-full-fix-upgrade',
+    name: 'Content Reaper Full Fix Upgrade',
+    price: 200,
+    stripeUrl: '/pricing',
+    upgradeFrom: 'content-engine',
+    upgradeTo: 'full-fix',
+  },
+  CONTRACTOR_DATABASE: {
+    id: 'contractor-database',
+    name: 'Federal Contractor Database',
+    price: 497,
+    stripeUrl: 'https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g',
+  },
+  // DISCONTINUED 2026-07-16 (Eric: "no that is gone") — recompete is a Pro feature
+  // now; the public pricing page sells Free/Pro/Teams only. Kept as a record so
+  // legacy buyers still resolve: the `recompete:{email}` KV grant and the webhook's
+  // `recompete` tier mapping (api/webhooks/stripe) are deliberately UNTOUCHED, and
+  // /recompete.html now redirects to the live in-app panel (next.config.ts, #303).
+  //
+  // `stripeUrl` removed so we never surface a checkout for a dead product. The
+  // payment link itself (buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k) was DEACTIVATED
+  // in the Stripe dashboard by Eric on 2026-07-17 — verified: the URL now returns
+  // Stripe's "deactivated" page, so it cannot take money. Removing the constant was
+  // never the kill; the dashboard was.
+  RECOMPETE_CONTRACTS: {
+    id: 'recompete-contracts',
+    name: 'Recompete Tracker',
+    price: 397,
+    discontinued: true,
+  },
+  MARKET_ASSASSIN_STANDARD: {
+    id: 'market-assassin-standard',
+    name: 'Market Assassin Standard',
+    price: 297,
+    stripeUrl: '/pricing',
+    reports: 4,
+  },
+  MARKET_ASSASSIN_PREMIUM: {
+    id: 'market-assassin-premium',
+    name: 'Market Assassin Premium',
+    price: 497,
+    stripeUrl: '/pricing',
+    reports: 8,
+  },
+  MARKET_ASSASSIN_PREMIUM_UPGRADE: {
+    id: 'market-assassin-premium-upgrade',
+    name: 'Market Assassin Premium Upgrade',
+    price: 200,
+    stripeUrl: '/pricing',
+    upgradeFrom: 'market-assassin-standard',
+    upgradeTo: 'market-assassin-premium',
+  },
+  OPPORTUNITY_HUNTER_PRO: {
+    id: 'opportunity-hunter-pro',
+    name: 'Opportunity Hunter Pro',
+    price: 49,
+    stripeUrl: '/pricing',
+  },
+  // Bundles
+  GOVCON_STARTER_BUNDLE: {
+    id: 'govcon-starter-bundle',
+    name: 'GovCon Starter Bundle',
+    price: 697,
+    stripeUrl: '/pricing',
+    individualTotal: 943,
+    includes: ['opportunity-hunter-pro', 'recompete-contracts', 'contractor-database'],
+    includesDisplay: [
+      { name: 'Opportunity Hunter Pro', price: 49 },
+      { name: 'Recompete Tracker', price: 397 },
+      { name: 'Federal Contractor Database', price: 497 },
+    ],
+  },
+  PRO_GIANT_BUNDLE: {
+    id: 'pro-giant-bundle',
+    name: 'Pro Giant Bundle',
+    price: 997,
+    stripeUrl: '/pricing',
+    includes: ['contractor-database', 'recompete-contracts', 'market-assassin-standard', 'ai-content-generator'],
+    includesDisplay: [
+      { name: 'Federal Contractor Database', price: 497 },
+      { name: 'Recompete Tracker', price: 397 },
+      { name: 'Market Assassin Standard', price: 297 },
+      { name: 'Content Reaper', price: 197 },
+    ],
+  },
+  ULTIMATE_GOVCON_BUNDLE: {
+    id: 'ultimate-govcon-bundle',
+    name: 'Ultimate GovCon Bundle',
+    price: 1497,
+    stripeUrl: 'https://buy.stripe.com/6oU3cwff897ceND84UfnO0t',
+    includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'market-assassin-premium'],
+    includesDisplay: [
+      { name: 'Content Reaper (Full Fix)', price: 397 },
+      { name: 'Federal Contractor Database', price: 497 },
+      { name: 'Recompete Tracker', price: 397 },
+      { name: 'Market Assassin Premium', price: 497 },
+    ],
+  },
+} as const;
+
+// Helper function to get product by ID
+export function getProductById(productId: string) {
+  for (const [, product] of Object.entries(PRODUCTS)) {
+    if (product.id === productId) {
+      return product;
+    }
+  }
+  return null;
+}
+
+// Helper function to check if a product is a bundle
+export function isBundle(productId: string): boolean {
+  const product = getProductById(productId);
+  return product !== null && 'includes' in product;
+}
+
+// Helper function to get all products included in a bundle
+export function getBundleIncludes(productId: string): string[] {
+  const product = getProductById(productId);
+  if (product && 'includes' in product) {
+    return [...product.includes];
+  }
+  return [];
+}

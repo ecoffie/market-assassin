@@ -1,0 +1,138 @@
+{
+  "name": "Department of Commerce",
+  "abbreviation": "DOC",
+  "parentAgency": null,
+  "description": "The Department of Commerce creates the conditions for economic growth and opportunity by promoting innovation, entrepreneurship, competitiveness, and stewardship.",
+  "website": "https://www.commerce.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$11.7 billion",
+    "procurementBudget": "$1B+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "IT infrastructure modernization across multiple bureaus including Census Bureau, NOAA, and NIST",
+      "source": "Department of Commerce IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Census Bureau data collection and processing system improvements for decennial census operations",
+      "source": "Census Bureau Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity enhancements for critical infrastructure and economic data protection",
+      "source": "DOC Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "NOAA weather data systems and climate monitoring infrastructure modernization",
+      "source": "NOAA Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Patent and trademark processing system improvements at USPTO",
+      "source": "USPTO Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting Census Bureau and NOAA IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "DOC IT Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Census Data Collection System Improvements",
+      "source": "Census Bureau Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity Enhancement",
+      "source": "DOC Cybersecurity Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "NOAA Weather and Climate Data Systems",
+      "source": "NOAA Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "Department of Commerce Budget Justification FY2025 - https://www.commerce.gov/about/budget",
+      "DOC Strategic Plan - https://www.commerce.gov/about/strategic-plan",
+      "DOC Procurement Forecasts - https://www.commerce.gov/oam/vendors/procurement-forecasts",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on DOC IT Systems"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $25M",
+    "large": "$25M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Data collection and processing system experience",
+      "Cybersecurity capabilities",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with data systems",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Acquisition Management (OAM)",
+    "U.S. Census Bureau",
+    "National Oceanic and Atmospheric Administration (NOAA)",
+    "National Institute of Standards and Technology (NIST)"
+  ],
+  "insights": [
+    "IT infrastructure modernization across multiple bureaus is major focus",
+    "Census Bureau data systems require ongoing improvements",
+    "Cybersecurity is important for economic data protection",
+    "NOAA weather and climate data systems modernization ongoing",
+    "Strong emphasis on small business participation"
+  ]
+}
+

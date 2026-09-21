@@ -1,0 +1,608 @@
+/**
+ * SAM.gov Entity Management API
+ *
+ * Provides live SAM.gov registration data for contractors:
+ * - SAM registration status (Active/Inactive/Expired)
+ * - Certifications (8(a), SDVOSB, WOSB, HUBZone)
+ * - UEI, CAGE code
+ * - NAICS codes registered
+ * - Points of contact
+ */
+
+import {
+  getSAMAPIConfig,
+  makeSAMRequest, getAllDistinctSAMKeys} from './utils';
+import { fromEntityApiNaicsList, type NaicsSbMap } from './naics-small-business';
+import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
+
+// Types
+export interface SAMEntity {
+  ueiSAM: string;
+  cageCode: string;
+  legalBusinessName: string;
+  dbaName?: string;
+  registrationStatus: 'Active' | 'Inactive' | 'Expired' | 'Unknown';
+  registrationExpirationDate?: string;
+  purposeOfRegistration?: string;
+  entityStructure?: string;
+  physicalAddress?: {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    stateOrProvince?: string;
+    zipCode?: string;
+    countryCode?: string;
+  };
+  mailingAddress?: {
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    stateOrProvince?: string;
+    zipCode?: string;
+    countryCode?: string;
+  };
+  naicsList?: Array<{
+    naicsCode: string;
+    naicsDescription?: string;
+    isPrimary?: boolean;
+  }>;
+  pscList?: Array<{
+    pscCode: string;
+    pscDescription?: string;
+  }>;
+  certifications?: {
+    sbaBusinessTypes?: string[];
+    /** P0-3: per-NAICS small-business representation, {"561720":"Y"}. Absent key = SAM did not say. */
+    naicsSmallBusiness?: NaicsSbMap;
+    certificationExpirations?: Array<{
+      type: string;
+      expirationDate: string;
+    }>;
+  };
+  pointsOfContact?: Array<{
+    name?: string;
+    title?: string;
+    phone?: string;
+    email?: string;
+    type?: string; // 'Government', 'Electronic', 'Alternate'
+  }>;
+  // Computed fields
+  isActive: boolean;
+  daysUntilExpiration?: number;
+  has8a?: boolean;
+  hasSDVOSB?: boolean;
+  hasWOSB?: boolean;
+  hasHUBZone?: boolean;
+  /** Normalized SAM self-id labels from businessTypeList (VOSB / SDVOSB / WOSB). */
+  businessTypes?: string[];
+  /** Primary NAICS from assertions.goodsAndServices.primaryNaics, when present. */
+  primaryNaics?: string;
+}
+
+export interface EntitySearchParams {
+  legalBusinessName?: string;
+  dbaName?: string;
+  uei?: string;
+  cageCode?: string;
+  naicsCode?: string;
+  stateCode?: string;
+  registrationStatus?: 'Active' | 'Inactive' | 'Expired';
+  sbaBusinessTypes?: string; // 8a, SDVOSB, WOSB, HUBZone
+  page?: number;
+  size?: number;
+}
+
+export interface EntitySearchResult {
+  entities: SAMEntity[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  fromCache: boolean;
+}
+
+// SBA Business Type Codes → normalized set-aside labels.
+// CORRECTED 2026-06-04 against live SAM v3 data — the old map used
+// guessed codes (2X/XY/23/A2) that DON'T appear in real responses, so
+// certifications never normalized. Verified live codes:
+//   A6 = "SBA Certified 8(a) Program Participant"   (n≈5,009)
+//   JT = "SBA Certified 8(a) Joint Venture"          (n≈781)
+//   XX = "SBA Certified HUBZone Firm"                (n≈4,603)
+// (WOSB/EDWOSB/SDVOSB are self-certified and live on businessTypeList —
+//  mapped by selfCertLabel below. Do NOT run those codes through this map:
+//  2X is For-Profit, not 8(a).)
+const SBA_TYPE_MAP: Record<string, string> = {
+  'A6': '8(a)',
+  'JT': '8(a)',      // 8(a) joint venture — still 8(a)-eligible
+  'XX': 'HUBZone',
+  // Legacy guessed codes kept as harmless fallbacks:
+  '2X': '8(a)',
+  'XY': 'SDVOSB',
+  '23': 'WOSB',
+  'A2': 'EDWOSB',
+};
+
+// Normalize an SBA business-type label from the DESCRIPTION text, which
+// is self-describing and more stable than the cryptic codes. Used as the
+// primary signal; the code map is the fallback.
+function sbaLabelFromDesc(desc: string): string | null {
+  const d = desc.toLowerCase();
+  if (d.includes('8(a)') || d.includes('8a')) return '8(a)';
+  if (d.includes('hubzone')) return 'HUBZone';
+  if (d.includes('service-disabled') || d.includes('sdvosb')) return 'SDVOSB';
+  if (d.includes('women')) return d.includes('economically') ? 'EDWOSB' : 'WOSB';
+  if (d.includes('small disadvantaged') || d.includes('sdb')) return 'Small Disadvantaged Business';
+  return null;
+}
+
+// Same verified self-id codes as scripts/import-sam-entity-extract.mjs selfCertLabel.
+// QF/JV = SDVOSB, A5 = VOSB, 8W/A2 = WOSB. 2X and F stay unmapped.
+function selfCertLabel(entry: unknown): string | null {
+  const code = typeof entry === 'string'
+    ? entry
+    : entry && typeof entry === 'object'
+      ? String((entry as Record<string, unknown>).businessTypeCode || '')
+      : '';
+  const c = code.toUpperCase().trim();
+  if (c === '8W' || c === 'A2') return 'WOSB';
+  if (c === 'QF' || c === 'JV') return 'SDVOSB';
+  if (c === 'A5') return 'VOSB';
+  return null;
+}
+
+/**
+ * Transform raw API response to our SAMEntity type
+ */
+export function transformEntity(raw: Record<string, unknown>): SAMEntity {
+  // SAM v3 Entity API response shape is nested:
+  //   entityRegistration: { ueiSAM, legalBusinessName, registrationStatus, ... }
+  //   coreData: { entityInformation: {...}, physicalAddress, mailingAddress }
+  //   assertions: { goodsAndServices: { naicsList, pscList } }
+  //   pointsOfContact: { governmentBusinessPOC, electronicBusinessPOC, ... }
+  //
+  // Bug fixed 2026-05-26: transformer was reading top-level fields
+  // that don't exist, so even valid entity rows returned empty fields.
+  const er = (raw.entityRegistration as Record<string, unknown>) || {};
+  const core = (raw.coreData as Record<string, unknown>) || {};
+  const assertions = (raw.assertions as Record<string, unknown>) || {};
+  const pocSection = (raw.pointsOfContact as Record<string, unknown>) || {};
+
+  const expirationDate = (er.registrationExpirationDate as string) || (raw.registrationExpirationDate as string);
+  const daysUntilExpiration = expirationDate
+    ? Math.ceil((new Date(expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : undefined;
+
+  const status = (er.registrationStatus as string) || (raw.registrationStatus as string) || 'Unknown';
+
+  // SBA business types live under coreData.businessTypes.sbaBusinessTypeList
+  // in the live v3 response (verified 2026-06-04). The old code read
+  // assertions.goodsAndServices.sbaBusinessTypeList — which is undefined —
+  // so 8(a)/WOSB/SDVOSB/HUBZone flags NEVER populated. Keep the old paths
+  // as fallbacks in case the shape varies by entity.
+  const goodsServices = (assertions.goodsAndServices as Record<string, unknown>) || {};
+  const businessTypes = (core.businessTypes as Record<string, unknown>) || {};
+  const sbaTypesArr =
+    (businessTypes.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
+    (goodsServices.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
+    (raw.sbaBusinessTypes as unknown as Array<Record<string, unknown>>) ||
+    [];
+  // Normalize each SBA entry to a clean label: prefer the description
+  // text (self-describing), fall back to the code map, then the raw code.
+  // De-dupe (8(a) + 8(a) JV both normalize to '8(a)').
+  const sbaTypes: string[] = Array.isArray(sbaTypesArr)
+    ? Array.from(new Set(
+        sbaTypesArr
+          .map(t => {
+            if (typeof t === 'string') return SBA_TYPE_MAP[t] || t;
+            const desc = (t.sbaBusinessTypeDesc as string) || '';
+            const code = (t.sbaBusinessTypeCode as string) || '';
+            if (!desc && !code) return '';
+            return sbaLabelFromDesc(desc) || SBA_TYPE_MAP[code] || code;
+          })
+          .filter(Boolean),
+      ))
+    : [];
+
+  // Self-identified types live on businessTypeList (not sbaBusinessTypeList).
+  // Map ONLY the verified set-aside codes — never SBA_TYPE_MAP (2X ≠ 8(a)).
+  const businessTypeList =
+    (businessTypes.businessTypeList as unknown[]) || [];
+  const selfIdTypes: string[] = Array.isArray(businessTypeList)
+    ? Array.from(new Set(businessTypeList.map(selfCertLabel).filter((t): t is string => Boolean(t))))
+    : [];
+
+  // NAICS list lives under assertions.goodsAndServices.naicsList
+  const primaryNaicsRaw = goodsServices.primaryNaics ?? raw.primaryNaics;
+  const primaryNaics = primaryNaicsRaw != null && String(primaryNaicsRaw).trim()
+    ? String(primaryNaicsRaw).trim()
+    : undefined;
+  const naicsRaw = (goodsServices.naicsList as Array<Record<string, unknown>>) || (raw.naicsList as Array<Record<string, unknown>>) || [];
+  const naicsList = naicsRaw.map(n => ({
+    naicsCode: String(n.naicsCode || ''),
+    naicsDescription: String(n.naicsDescription || ''),
+    isPrimary: Boolean(
+      n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y'
+      || (primaryNaics != null && String(n.naicsCode || '') === primaryNaics),
+    ),
+    // P0-3: SAM ships per-NAICS small-business status here and this parser used to drop it,
+    // leaving market-research.ts with no size signal — so it substituted socioeconomic
+    // certification matching and returned ZERO capable firms for NAICS 561720 against 21,933
+    // active registrants. Carried through verbatim; normalisation is shared with the bulk
+    // extract path via lib/sam/naics-small-business.ts so the two cannot diverge.
+    sbaSmallBusiness: n.sbaSmallBusiness == null ? undefined : String(n.sbaSmallBusiness),
+  }));
+  // Tri-state map: 'Y' | 'N' | ABSENT. Absent means SAM did not say — never "not small".
+  const naicsSmallBusiness = fromEntityApiNaicsList(naicsList);
+
+  // PSC list — drop blank-only rows so clients do not render empty PSC lines.
+  const pscRaw = (goodsServices.pscList as Array<Record<string, unknown>>) || (raw.pscList as Array<Record<string, unknown>>) || [];
+  const pscList = filterBlankPscList(
+    pscRaw.map(p => ({
+      pscCode: String(p.pscCode || ''),
+      pscDescription: String(p.pscDescription || ''),
+    })),
+  );
+
+  // Addresses
+  const physAddr = (core.physicalAddress as Record<string, unknown>) || (raw.physicalAddress as Record<string, unknown>) || {};
+  const mailAddr = (core.mailingAddress as Record<string, unknown>) || (raw.mailingAddress as Record<string, unknown>) || {};
+
+  // POCs — v3 nests them: governmentBusinessPOC, electronicBusinessPOC,
+  // pastPerformancePOC. Flatten to an array.
+  const pointsOfContact: SAMEntity['pointsOfContact'] = [];
+  for (const [type, poc] of Object.entries(pocSection)) {
+    if (poc && typeof poc === 'object') {
+      const p = poc as Record<string, unknown>;
+      pointsOfContact.push({
+        name: String([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || ''),
+        title: String(p.title || ''),
+        phone: String(p.usPhone || p.phone || ''),
+        email: String(p.email || ''),
+        type,
+      });
+    }
+  }
+
+  return {
+    ueiSAM: String(er.ueiSAM || raw.ueiSAM || ''),
+    cageCode: String(er.cageCode || raw.cageCode || ''),
+    legalBusinessName: String(er.legalBusinessName || raw.legalBusinessName || ''),
+    dbaName: er.dbaName ? String(er.dbaName) : raw.dbaName ? String(raw.dbaName) : undefined,
+    registrationStatus: status as SAMEntity['registrationStatus'],
+    registrationExpirationDate: expirationDate,
+    purposeOfRegistration: er.purposeOfRegistrationDesc ? String(er.purposeOfRegistrationDesc) : undefined,
+    entityStructure: (core.entityStructure as Record<string, unknown>)?.entityStructureDesc as string | undefined,
+    physicalAddress: {
+      addressLine1: physAddr.addressLine1 ? String(physAddr.addressLine1) : undefined,
+      addressLine2: physAddr.addressLine2 ? String(physAddr.addressLine2) : undefined,
+      city: physAddr.city ? String(physAddr.city) : undefined,
+      stateOrProvince: physAddr.stateOrProvinceCode ? String(physAddr.stateOrProvinceCode) : physAddr.stateOrProvince ? String(physAddr.stateOrProvince) : undefined,
+      zipCode: physAddr.zipCode ? String(physAddr.zipCode) : undefined,
+      countryCode: physAddr.countryCode ? String(physAddr.countryCode) : undefined,
+    },
+    mailingAddress: {
+      addressLine1: mailAddr.addressLine1 ? String(mailAddr.addressLine1) : undefined,
+      addressLine2: mailAddr.addressLine2 ? String(mailAddr.addressLine2) : undefined,
+      city: mailAddr.city ? String(mailAddr.city) : undefined,
+      stateOrProvince: mailAddr.stateOrProvinceCode ? String(mailAddr.stateOrProvinceCode) : mailAddr.stateOrProvince ? String(mailAddr.stateOrProvince) : undefined,
+      zipCode: mailAddr.zipCode ? String(mailAddr.zipCode) : undefined,
+      countryCode: mailAddr.countryCode ? String(mailAddr.countryCode) : undefined,
+    },
+    naicsList,
+    ...(primaryNaics ? { primaryNaics } : {}),
+    ...(selfIdTypes.length ? { businessTypes: selfIdTypes } : {}),
+    pscList,
+    certifications: {
+      // sbaTypes already holds normalized labels (8(a)/HUBZone/...).
+      sbaBusinessTypes: sbaTypes,
+      naicsSmallBusiness,
+      certificationExpirations: [],
+    },
+    pointsOfContact,
+    isActive: status === 'Active',
+    daysUntilExpiration,
+    has8a: sbaTypes.some(t => /8\(a\)/i.test(t)),
+    hasSDVOSB: selfIdTypes.includes('SDVOSB'),
+    hasWOSB: sbaTypes.some(t => /WOSB|Women/i.test(t)) || selfIdTypes.includes('WOSB'),
+    hasHUBZone: sbaTypes.some(t => /HUBZone/i.test(t)),
+  };
+}
+
+/**
+ * Search for entities in SAM.gov
+ */
+export async function searchEntities(
+  params: EntitySearchParams
+): Promise<EntitySearchResult> {
+  // Use the dynamic config getter so we get a populated apiKey
+  // (the static SAM_API_CONFIGS map sets apiKey='' as a stale default;
+  // bug fixed 2026-05-26 — was making getEntityByUEI() return 404 even
+  // for valid UEIs because the empty Bearer token rejected the call.)
+  const config = getSAMAPIConfig('entity');
+
+  // Build query parameters
+  // SAM v3 Entity API quirk: when ueiSAM is provided, do NOT include
+  // page/size — the API auto-narrows to 1 record and pagination params
+  // cause it to return totalRecords=1 but entityData=[]. Bug fixed
+  // 2026-05-26 — was making UEI lookups silently return null.
+  const queryParams: Record<string, string | number> = {};
+
+  if (!params.uei && !params.cageCode) {
+    // Only add pagination for list searches, not single-record lookups
+    queryParams.page = params.page || 1;
+    queryParams.size = params.size || 25;
+  }
+
+  if (params.legalBusinessName) {
+    queryParams.legalBusinessName = params.legalBusinessName;
+  }
+
+  if (params.dbaName) {
+    queryParams.dbaName = params.dbaName;
+  }
+
+  if (params.uei) {
+    queryParams.ueiSAM = params.uei;
+  }
+
+  if (params.cageCode) {
+    queryParams.cageCode = params.cageCode;
+  }
+
+  if (params.naicsCode) {
+    queryParams.naicsCode = params.naicsCode;
+  }
+
+  if (params.stateCode) {
+    // SAM v3 rejects `stateCode` (HTTP 400 "do not exist"). The real param is
+    // physicalAddressProvinceOrStateCode (verified vs. the SAM Functional Data
+    // Dictionary 2026-06-14).
+    queryParams.physicalAddressProvinceOrStateCode = params.stateCode;
+  }
+
+  if (params.registrationStatus) {
+    // SAM v3 entity API expects single-letter status CODES, not the
+    // friendly word. Passing 'Active' silently returns totalRecords=0
+    // (verified 2026-06-04 — this was making every NAICS entity search
+    // come back empty). Translate to the code SAM actually filters on.
+    const REG_STATUS_CODE: Record<string, string> = {
+      Active: 'A', Inactive: 'I', Expired: 'E',
+    };
+    queryParams.registrationStatus =
+      REG_STATUS_CODE[params.registrationStatus] || params.registrationStatus;
+  }
+
+  if (params.sbaBusinessTypes) {
+    // SAM v3 rejects `sbaBusinessTypes` (HTTP 400). Correct param is the
+    // SINGULAR `sbaBusinessTypeCode` (SAM Functional Data Dictionary 2026-06-14).
+    queryParams.sbaBusinessTypeCode = params.sbaBusinessTypes;
+  }
+
+  // 429 FAIL-OVER. getSAMAPIConfig('entity') resolves ONE key via getRotatedSAMKey(), which
+  // picks by day-of-year — the exact strategy getAllDistinctSAMKeys()'s own comment calls out
+  // as inferior because it "still dies when the day's single key hits its 1,000/day quota".
+  //
+  // MEASURED 2026-08-21 against the four PRODUCTION keys: two returned 200, two returned 429
+  // (daily quota exhausted). On a day the rotation lands on an exhausted key EVERY SAM entity
+  // lookup fails — which is why the UEI lookup broke twice in one week rather than constantly.
+  //
+  // Try each distinct key until one is not throttled. Ordinary errors (a 400 on a bad param)
+  // are NOT retried — only 429, where a different key genuinely has quota left.
+  let result = await makeSAMRequest<{
+    entityData: Record<string, unknown>[];
+    totalRecords: number;
+  }>(config, '/entities', queryParams);
+
+  // A key is UNUSABLE if it is throttled (429) OR rejected (401/403 — SAM returns
+  // API_KEY_INVALID as a 401). Measured 2026-08-24 across the four production keys:
+  // SAM_API_KEY = 401 API_KEY_INVALID (dead), _1 and _2 = 429 (quota exhausted).
+  //
+  // ⚠️ THE BUG THIS REPLACES: the loop below used to break on `status !== 429`, so the moment
+  // fail-over landed on the DEAD key it treated a 401 as a real answer and stopped. The dead
+  // key then fell through to the silent-empty return further down, and the caller was told the
+  // company is not registered in SAM. That is how a total credential outage was reported to a
+  // paying user as a fact about the world.
+  const keyUnusable = (st?: number) => st === 429 || st === 401 || st === 403;
+
+  if (keyUnusable(result.error?.status)) {
+    const pool = getAllDistinctSAMKeys().filter((k) => k !== config.apiKey);
+    for (const key of pool) {
+      console.warn(`[SAM Entity] key unusable (${result.error?.status}) — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
+      result = await makeSAMRequest<{
+        entityData: Record<string, unknown>[];
+        totalRecords: number;
+      }>({ ...config, apiKey: key }, '/entities', queryParams);
+      if (!keyUnusable(result.error?.status)) break;
+    }
+  }
+
+  if (result.error) {
+    // FAIL LOUDLY on an exhausted quota. This used to return an empty list identical to a
+    // genuine no-match, so a caller could not tell "this company is not in SAM" from "every
+    // one of our keys is out of quota" — and that is precisely how a total outage sat unnoticed.
+    if (keyUnusable(result.error.status)) {
+      const st = result.error.status;
+      const why = st === 429
+        ? 'all API keys are rate-limited (429)'
+        : `all API keys were rejected by SAM (${st} — check SAM_API_KEY* validity)`;
+      console.error('[Entity Search] EVERY SAM KEY UNUSABLE — this is NOT an empty result', result.error);
+      throw new Error(`SAM entity lookup unavailable: ${why}.`);
+    }
+    // ⚠️ ANY upstream error must THROW, never return an empty list. An empty list is
+    // indistinguishable from "this company is not registered in SAM" — the caller cannot tell
+    // an outage from a fact, so it reports our failure as the world's state. Callers that want
+    // to degrade gracefully catch this and fall back to the local registry.
+    console.error('[Entity Search Error]', result.error);
+    throw new Error(`SAM entity lookup failed (${result.error.status}): ${result.error.message}`);
+  }
+
+  const data = result.data;
+  const entities = (data?.entityData || []).map(transformEntity);
+
+  return {
+    entities,
+    totalCount: data?.totalRecords || entities.length,
+    page: params.page || 1,
+    pageSize: params.size || 25,
+    hasMore: entities.length === (params.size || 25),
+    fromCache: result.fromCache
+  };
+}
+
+/**
+ * Get entity details by UEI
+ */
+export async function getEntityByUEI(uei: string): Promise<SAMEntity | null> {
+  const result = await searchEntities({ uei, size: 1 });
+
+  if (result.entities.length === 0) {
+    return null;
+  }
+
+  return result.entities[0];
+}
+
+/**
+ * Get entity details by CAGE code
+ */
+export async function getEntityByCAGE(cageCode: string): Promise<SAMEntity | null> {
+  const result = await searchEntities({ cageCode, size: 1 });
+
+  if (result.entities.length === 0) {
+    return null;
+  }
+
+  return result.entities[0];
+}
+
+/**
+ * Verify SAM.gov registration status
+ */
+export async function verifySAMStatus(uei: string): Promise<{
+  isRegistered: boolean;
+  isActive: boolean;
+  status: string;
+  expirationDate?: string;
+  daysUntilExpiration?: number;
+}> {
+  const entity = await getEntityByUEI(uei);
+
+  if (!entity) {
+    return {
+      isRegistered: false,
+      isActive: false,
+      status: 'Not Found'
+    };
+  }
+
+  return {
+    isRegistered: true,
+    isActive: entity.isActive,
+    status: entity.registrationStatus,
+    expirationDate: entity.registrationExpirationDate,
+    daysUntilExpiration: entity.daysUntilExpiration
+  };
+}
+
+/**
+ * Get all certifications for an entity
+ */
+export async function getCertifications(uei: string): Promise<{
+  has8a: boolean;
+  hasSDVOSB: boolean;
+  hasWOSB: boolean;
+  hasHUBZone: boolean;
+  allCertifications: string[];
+  expirations: Array<{ type: string; expirationDate: string }>;
+} | null> {
+  const entity = await getEntityByUEI(uei);
+
+  if (!entity) {
+    return null;
+  }
+
+  return {
+    has8a: entity.has8a || false,
+    hasSDVOSB: entity.hasSDVOSB || false,
+    hasWOSB: entity.hasWOSB || false,
+    hasHUBZone: entity.hasHUBZone || false,
+    allCertifications: entity.certifications?.sbaBusinessTypes || [],
+    expirations: entity.certifications?.certificationExpirations || []
+  };
+}
+
+/**
+ * Search for entities by certification type
+ */
+export async function searchByCertification(
+  certType: '8a' | 'SDVOSB' | 'WOSB' | 'HUBZone',
+  options: { naicsCode?: string; stateCode?: string; limit?: number } = {}
+): Promise<SAMEntity[]> {
+  const certMap: Record<string, string> = {
+    '8a': 'A6',
+    'SDVOSB': 'QF',
+    'WOSB': '8W',
+    'HUBZone': 'XX'
+  };
+
+  const result = await searchEntities({
+    sbaBusinessTypes: certMap[certType],
+    naicsCode: options.naicsCode,
+    stateCode: options.stateCode,
+    registrationStatus: 'Active',
+    size: Math.min(options.limit || 10, 10)
+  });
+
+  return result.entities;
+}
+
+/**
+ * Get NAICS codes registered by an entity
+ */
+export async function getEntityNAICS(uei: string): Promise<Array<{
+  naicsCode: string;
+  naicsDescription: string;
+  isPrimary: boolean;
+}>> {
+  const entity = await getEntityByUEI(uei);
+
+  if (!entity || !entity.naicsList) {
+    return [];
+  }
+
+  return entity.naicsList.map(n => ({
+    naicsCode: n.naicsCode,
+    naicsDescription: n.naicsDescription || '',
+    isPrimary: n.isPrimary || false
+  }));
+}
+
+/**
+ * Find potential teaming partners by NAICS and certification
+ */
+export async function findTeamingPartners(
+  naicsCode: string,
+  certType?: '8a' | 'SDVOSB' | 'WOSB' | 'HUBZone',
+  stateCode?: string,
+  limit: number = 10
+): Promise<SAMEntity[]> {
+  const params: EntitySearchParams = {
+    naicsCode,
+    stateCode,
+    registrationStatus: 'Active',
+    size: Math.min(limit, 10)
+  };
+
+  if (certType) {
+    const certMap: Record<string, string> = {
+      '8a': 'A6',
+      'SDVOSB': 'QF',
+      'WOSB': '8W',
+      'HUBZone': 'XX'
+    };
+    params.sbaBusinessTypes = certMap[certType];
+  }
+
+  const result = await searchEntities(params);
+  return result.entities;
+}

@@ -1,0 +1,201 @@
+{
+  "name": "Department of Transportation",
+  "abbreviation": "DOT",
+  "parentAgency": null,
+  "description": "The U.S. Department of Transportation ensures that America has the safest, most efficient and modern transportation system in the world, improving the quality of life for all American people and communities.",
+  "website": "https://www.transportation.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$5.4 billion (Office of the Secretary)",
+    "procurementBudget": "$20.5 billion in FTA funding, $12.5 billion for FAA ATC modernization"
+  },
+  "painPoints": [
+    {
+      "point": "Critical air traffic control crisis - 105 of 138 systems (76%) are unsustainable or potentially unsustainable, with 40 systems over 30 years old",
+      "source": "GAO-25-108162 Air Traffic Control Urgent Modernization Report March 2025",
+      "priority": "critical"
+    },
+    {
+      "point": "2023 national airspace shutdown due to aging ATC system outage exposed infrastructure vulnerability",
+      "source": "GAO Air Traffic Control Reports & FAA Operational Risk Assessment",
+      "priority": "critical"
+    },
+    {
+      "point": "NextGen modernization severely delayed - originally planned for 2025 completion, now anticipated at least 2030",
+      "source": "GAO-24-105254 NextGen Delays & DOT OIG NextGen Status Report April 2024",
+      "priority": "critical"
+    },
+    {
+      "point": "Cybersecurity vulnerabilities in FAA IT systems - unsupported software, configuration management gaps, missing software updates",
+      "source": "USDOT Cybersecurity Program GAO Reports",
+      "priority": "high"
+    },
+    {
+      "point": "Legacy analog radios over 30 years old causing frequent outages, high maintenance costs, incompatibility with modern VoIP standards",
+      "source": "Brand New Air Traffic Control System Plan May 2025",
+      "priority": "high"
+    },
+    {
+      "point": "STARS and ERAM disparate systems creating inefficiencies, high costs, and integration challenges requiring common automation platform",
+      "source": "FAA Terminal Flight Data Manager Report July 2024",
+      "priority": "high"
+    },
+    {
+      "point": "Bipartisan Infrastructure Law deployment pressure - $108 billion in transit funding requiring rapid implementation capacity",
+      "source": "Infrastructure Investment and Jobs Act Implementation Reports",
+      "priority": "high"
+    },
+    {
+      "point": "5G spectrum interference risks, drone integration challenges, commercial spacecraft accommodation needs",
+      "source": "FAA Reauthorization Act of 2024 Requirements",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting transportation infrastructure and safety IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Air traffic control modernization - $12.5 billion budget with Peraton as systems integrator",
+      "source": "Brand New Air Traffic Control System Plan & FAA Modernization Announcement December 2025",
+      "funding": "$12.5 billion (half committed by end of 2025)",
+      "deadline": "Multi-year through at least 2030"
+    },
+    {
+      "priority": "NextGen implementation completion and Office of NextGen sunset per FAA Reauthorization Act",
+      "source": "FAA Reauthorization Act of 2024",
+      "deadline": "End of 2025 for Office of NextGen sunset",
+      "priority": "critical"
+    },
+    {
+      "priority": "Transit infrastructure deployment - $108 billion historic investment through Bipartisan Infrastructure Law",
+      "source": "Infrastructure Investment and Jobs Act & FTA FY2025 Budget",
+      "funding": "$108 billion through 2026, $20.5B allocated FY2025",
+      "priority": "critical"
+    },
+    {
+      "priority": "Capital Investment Grants (CIG) Program - heavy rail, light rail, streetcar, and BRT projects",
+      "source": "FTA Capital Investment Grants Annual Report FY2025",
+      "funding": "$4.3 billion advance appropriations FY2025, $1.6B for CIG",
+      "priority": "high"
+    },
+    {
+      "priority": "Highway safety - Safe Streets and Roads for All (SS4A) preventing roadway deaths and serious injuries",
+      "source": "DOT SS4A NOFO FY2025",
+      "funding": "$5 billion over 5 years",
+      "deadline": "FY2025 NOFO closed June 26, 2025"
+    },
+    {
+      "priority": "Zero-emission transit - Low or No Emission Bus Grants for new-technology buses and fueling equipment",
+      "source": "Bipartisan Infrastructure Law Transit Programs",
+      "funding": "$5.6 billion for Low/No-Emission Bus Grants, $1.1B FY2025 formula allocation",
+      "priority": "high"
+    },
+    {
+      "priority": "Cybersecurity program enhancement - addressing unsupported software, configuration management, and software updates",
+      "source": "USDOT Cybersecurity Program Assessments",
+      "priority": "high"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO-25-108162 Air Traffic Control Urgent Modernization - https://files.gao.gov/reports/GAO-25-108162/index.html",
+      "DOT FY2025 Budget Highlights - https://www.transportation.gov/sites/dot.gov/files/2024-03/DOT_Budget_Highlights_FY_2025_508.pdf",
+      "FTA FY2025 Budget Estimates - https://www.transportation.gov/sites/dot.gov/files/2024-03/FTA_FY2025-Budget-Estimates.pdf",
+      "Brand New Air Traffic Control System Plan May 2025 - https://www.transportation.gov/sites/dot.gov/files/2025-05/Brand New Air Traffic Control System Plan.pdf",
+      "FAA FY2025 Budget Request - https://www.transportation.gov/sites/dot.gov/files/2024-03/FAA_FY_2025_Budget_Budget_Request.pdf"
+    ],
+    "secondary": [
+      "GAO-24-105254 NextGen Delays Report - https://www.gao.gov/products/gao-24-105254",
+      "DOT OIG FAA NextGen Status Report April 2024 - https://www.oig.dot.gov/sites/default/files/library-items/FAA%20NextGen%20Status%20Report_4.30.24.pdf",
+      "FTA Capital Investment Grants Annual Report FY2025 - https://www.transit.dot.gov/funding/grants/grant-programs/capital-investments/annual-report-funding-recommendations-fiscal-0",
+      "Bipartisan Infrastructure Law Resources - https://www.transportation.gov/bipartisan-infrastructure-law"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541330",
+    "541511",
+    "541512",
+    "541519",
+    "541690",
+    "541715",
+    "237310",
+    "237990",
+    "336411",
+    "488190"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "BPA (Blanket Purchase Agreement)",
+    "Systems Integration Contracts",
+    "GSA Schedule contracts",
+    "FTA Formula Grants",
+    "FTA Capital Investment Grants (CIG)"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - significant small business participation goals",
+    "WOSB": "Active use for eligible contracts",
+    "8a": "Regular use for IT modernization and engineering services",
+    "HUBZone": "Moderate use",
+    "SDVOSB": "Strong preference - veteran-owned businesses prioritized",
+    "VOSB": "Active use",
+    "TribalPreference": "Active use - $3.2B historic tribal roads and transit investment"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M (consulting, IT services, engineering support)",
+    "medium": "$10M - $100M (transit vehicle procurement, system components)",
+    "large": "$100M - $12.5B (ATC modernization, major transit infrastructure, systems integration)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Air traffic control and aviation systems expertise",
+      "Systems integration and IT modernization capabilities",
+      "Cybersecurity and FAA IT security experience",
+      "Transit vehicle manufacturing and rail systems",
+      "Transportation infrastructure construction and engineering",
+      "Highway safety technology and intelligent transportation systems",
+      "Zero-emission vehicle and fueling infrastructure expertise",
+      "Advanced automation platform development",
+      "Legacy system migration and modernization"
+    ],
+    "contractingTimeline": "6-24 months average, expedited for critical ATC systems",
+    "competitionLevel": "Highly competitive for major contracts, specialized expertise required for ATC modernization",
+    "evaluationFactors": [
+      "Technical approach and aviation/transportation expertise",
+      "Past performance with DOT, FAA, or FTA",
+      "Systems integration and modernization capabilities",
+      "Cybersecurity and IT security qualifications",
+      "Price/cost reasonableness",
+      "Small business participation",
+      "Safety and reliability track record"
+    ]
+  },
+  "keyOffices": [
+    "Federal Aviation Administration (FAA)",
+    "Federal Transit Administration (FTA)",
+    "Federal Highway Administration (FHWA)",
+    "Federal Railroad Administration (FRA)",
+    "National Highway Traffic Safety Administration (NHTSA)",
+    "Federal Motor Carrier Safety Administration (FMCSA)",
+    "Maritime Administration (MARAD)",
+    "Pipeline and Hazardous Materials Safety Administration (PHMSA)",
+    "Office of the Secretary (OST)"
+  ],
+  "insights": [
+    "Air traffic control modernization represents $12.5B multi-year opportunity - Peraton awarded systems integrator role December 2025",
+    "76% of ATC systems unsustainable or potentially unsustainable - massive replacement and modernization contracts imminent",
+    "NextGen 5-year delay (2025 to 2030+) creates extended contract opportunities for aviation IT and automation",
+    "$108 billion Bipartisan Infrastructure Law transit funding through 2026 - largest federal transit investment in history",
+    "GAO identified 9 open recommendations requiring urgent FAA action - compliance and risk mitigation contracts likely",
+    "FAA Reauthorization Act 2024 mandates Office of NextGen sunset end of 2025 - organizational transformation support needed",
+    "Legacy analog radio systems over 30 years old - immediate replacement opportunity with modern digital/VoIP solutions",
+    "$5.6B Low/No-Emission Bus Grants driving zero-emission vehicle procurement and charging infrastructure",
+    "Cybersecurity gaps in USDOT IT systems - unsupported software, configuration management contracts needed",
+    "DOT Procurement Forecast available at transportation.gov/osdbu - updated annually for small business opportunities"
+  ]
+}

@@ -1,0 +1,490 @@
+{
+  "metadata": {
+    "description": "Comprehensive component agency extraction rules to prevent parent agency pain point mismatches",
+    "lastUpdated": "2025-12-21",
+    "purpose": "Automatically detect and extract component agencies from office names to ensure correct pain points are displayed"
+  },
+  "departmentRules": {
+    "Department of Homeland Security": {
+      "components": [
+        {
+          "name": "U.S. Coast Guard",
+          "aliases": ["USCG", "Coast Guard"],
+          "patterns": ["U\\.S\\. Coast Guard", "Coast Guard", "USCG"],
+          "officeCodes": ["70Z023", "00042"],
+          "keywords": ["Maritime", "Shore", "Vessel", "Cutter", "Training Center Cape May"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "U.S. Customs and Border Protection",
+          "aliases": ["CBP", "Customs and Border Protection"],
+          "patterns": ["U\\.S\\. Customs and Border Protection", "Customs and Border Protection", "\\bCBP\\b"],
+          "officeCodes": ["TFMSCD"],
+          "keywords": ["Border", "Port of Entry", "Customs", "CBP OAQ"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Cybersecurity and Infrastructure Security Agency",
+          "aliases": ["CISA"],
+          "patterns": ["Cybersecurity and Infrastructure Security Agency", "\\bCISA\\b"],
+          "officeCodes": ["70RCSJ", "70RCSA"],
+          "keywords": ["Cybersecurity", "Critical Infrastructure", "CISA"],
+          "hasPainPoints": false,
+          "fallbackTo": "Department of Homeland Security"
+        },
+        {
+          "name": "Federal Emergency Management Agency",
+          "aliases": ["FEMA"],
+          "patterns": ["Federal Emergency Management Agency", "\\bFEMA\\b"],
+          "officeCodes": [],
+          "keywords": ["Emergency Management", "Disaster", "FEMA"],
+          "hasPainPoints": false,
+          "fallbackTo": "Department of Homeland Security"
+        },
+        {
+          "name": "Immigration and Customs Enforcement",
+          "aliases": ["ICE"],
+          "patterns": ["Immigration and Customs Enforcement", "\\bICE\\b"],
+          "officeCodes": ["70CMSD"],
+          "keywords": ["Immigration", "ICE"],
+          "hasPainPoints": false,
+          "fallbackTo": "Department of Homeland Security"
+        },
+        {
+          "name": "Transportation Security Administration",
+          "aliases": ["TSA"],
+          "patterns": ["Transportation Security Administration", "\\bTSA\\b"],
+          "officeCodes": [],
+          "keywords": ["Transportation Security", "Airport", "TSA"],
+          "hasPainPoints": false,
+          "fallbackTo": "Department of Homeland Security"
+        },
+        {
+          "name": "U.S. Secret Service",
+          "aliases": ["USSS", "Secret Service"],
+          "patterns": ["U\\.S\\. Secret Service", "Secret Service", "USSS"],
+          "officeCodes": ["SS001"],
+          "keywords": ["Secret Service", "Protection"],
+          "hasPainPoints": false,
+          "fallbackTo": "Department of Homeland Security"
+        }
+      ]
+    },
+    "Department of Defense": {
+      "components": [
+        {
+          "name": "Defense Logistics Agency",
+          "fullName": "Defense Logistics Agency",
+          "aliases": ["DLA"],
+          "patterns": ["Defense Logistics Agency", "\\bDLA\\b"],
+          "officeCodes": [],
+          "keywords": ["DLA", "Defense Logistics", "Supply Chain"],
+          "locations": ["Fort Belvoir, VA"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Missile Defense Agency",
+          "fullName": "Missile Defense Agency",
+          "aliases": ["MDA"],
+          "patterns": ["Missile Defense Agency", "\\bMDA\\b"],
+          "officeCodes": [],
+          "keywords": ["MDA", "Missile Defense", "Ballistic Missile Defense"],
+          "locations": ["Huntsville, AL"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Defense Information Systems Agency",
+          "fullName": "Defense Information Systems Agency",
+          "aliases": ["DISA"],
+          "patterns": ["Defense Information Systems Agency", "\\bDISA\\b"],
+          "officeCodes": [],
+          "keywords": ["DISA", "Defense Information Systems", "milCloud"],
+          "locations": ["Fort Meade, MD"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Defense Contract Management Agency",
+          "fullName": "Defense Contract Management Agency",
+          "aliases": ["DCMA"],
+          "patterns": ["Defense Contract Management Agency", "\\bDCMA\\b"],
+          "officeCodes": [],
+          "keywords": ["DCMA", "Defense Contract Management", "Contract Administration"],
+          "locations": ["Fort Gregg-Adams, VA"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Defense Contract Audit Agency",
+          "fullName": "Defense Contract Audit Agency",
+          "aliases": ["DCAA"],
+          "patterns": ["Defense Contract Audit Agency", "\\bDCAA\\b"],
+          "officeCodes": [],
+          "keywords": ["DCAA", "Defense Contract Audit", "Contract Audit"],
+          "locations": ["Fort Belvoir, VA"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "DARPA",
+          "fullName": "Defense Advanced Research Projects Agency",
+          "aliases": ["DARPA"],
+          "patterns": ["Defense Advanced Research Projects Agency", "\\bDARPA\\b"],
+          "officeCodes": [],
+          "keywords": ["DARPA", "Advanced Research", "Research Projects"],
+          "locations": ["Arlington, VA"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Department of the Navy",
+          "subComponents": [
+            {
+              "name": "NAVFAC",
+              "fullName": "Naval Facilities Engineering Systems Command",
+              "patterns": ["Naval Facilities Engineering", "\\bNAVFAC\\b"],
+              "officeCodes": ["N69450", "N62473", "N40085"],
+              "keywords": ["Naval Facilities", "NAVFAC Atlantic", "NAVFAC Pacific", "NAVFAC Southwest"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "NAVSEA",
+              "fullName": "Naval Sea Systems Command",
+              "patterns": ["Naval Sea Systems", "\\bNAVSEA\\b"],
+              "officeCodes": [],
+              "keywords": ["Naval Sea", "Ship", "Submarine"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "NAVAIR",
+              "fullName": "Naval Air Systems Command",
+              "patterns": ["Naval Air Systems", "\\bNAVAIR\\b", "Naval Air Warfare Center"],
+              "officeCodes": ["N00421"],
+              "keywords": ["Naval Air", "Aircraft", "Aviation"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "NAVWAR",
+              "fullName": "Naval Information Warfare Systems Command",
+              "patterns": ["Naval Information Warfare", "\\bNAVWAR\\b"],
+              "officeCodes": [],
+              "keywords": ["Naval Information", "Warfare", "C4ISR"],
+              "hasPainPoints": true
+            }
+          ]
+        },
+        {
+          "name": "Department of the Army",
+          "subComponents": [
+            {
+              "name": "Army Materiel Command",
+              "fullName": "U.S. Army Materiel Command",
+              "patterns": ["Army Materiel Command", "\\bAMC\\b"],
+              "officeCodes": [],
+              "keywords": ["Materiel Command", "AMC", "Redstone Arsenal"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "Army Contracting Command",
+              "fullName": "U.S. Army Contracting Command",
+              "patterns": ["Army Contracting Command", "\\bACC\\b", "ACC-Aberdeen", "ACC-Redstone", "ACC-Rock Island", "ACC-New Jersey", "ACC-Natick"],
+              "officeCodes": ["W50S8P"],
+              "keywords": ["Army Contracting", "ACC-", "Mission and Installation Contracting", "MICC"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "USACE",
+              "fullName": "U.S. Army Corps of Engineers",
+              "patterns": ["U\\.S\\. Army Corps of Engineers", "Army Corps of Engineers", "\\bUSACE\\b"],
+              "officeCodes": ["W9126G", "W91278", "W912DR", "W912PL", "W912DY"],
+              "keywords": ["Corps of Engineers", "District", "USACE"],
+              "hasPainPoints": true,
+              "specialHandling": "missionArea",
+              "note": "See usace-office-specific-pain-points.json for mission-area-specific mappings"
+            }
+          ]
+        },
+        {
+          "name": "Department of the Air Force",
+          "subComponents": [
+            {
+              "name": "Air Force Materiel Command",
+              "patterns": ["Air Force Materiel Command", "\\bAFMC\\b"],
+              "officeCodes": ["FA0021"],
+              "keywords": ["AFMC", "Materiel Command", "Wright-Patterson"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "Air Force Sustainment Center",
+              "patterns": ["Air Force Sustainment Center", "\\bAFSC\\b"],
+              "officeCodes": [],
+              "keywords": ["Sustainment Center", "AFSC", "Air Logistics Complex", "Tinker AFB", "Hill AFB", "Robins AFB"],
+              "hasPainPoints": true
+            },
+            {
+              "name": "Space Systems Command",
+              "fullName": "U.S. Space Force Space Systems Command",
+              "patterns": ["Space Systems Command", "\\bSSC\\b"],
+              "officeCodes": [],
+              "keywords": ["Space Systems", "SSC", "Los Angeles AFB", "Space Force"],
+              "hasPainPoints": true
+            }
+          ]
+        },
+        {
+          "name": "Department of the Navy",
+          "note": "Also includes Marine Corps components",
+          "subComponents": [
+            {
+              "name": "Marine Corps Systems Command",
+              "fullName": "U.S. Marine Corps Systems Command",
+              "patterns": ["Marine Corps Systems Command", "\\bMCSC\\b", "MARCORSYSCOM"],
+              "officeCodes": ["M95494"],
+              "keywords": ["Marine Corps Systems", "MCSC", "MARCORSYSCOM", "Quantico"],
+              "hasPainPoints": true
+            }
+          ]
+        },
+        {
+          "name": "Defense Health Agency",
+          "patterns": ["Defense Health Agency", "\\bDHA\\b"],
+          "officeCodes": ["HT0011"],
+          "keywords": ["Defense Health", "Military Health"],
+          "hasPainPoints": true
+        }
+      ]
+    },
+    "General Services Administration": {
+      "components": [
+        {
+          "name": "Public Buildings Service",
+          "aliases": ["PBS"],
+          "patterns": ["Public Buildings Service", "\\bPBS\\b"],
+          "officeCodes": [],
+          "keywords": ["Public Buildings", "Federal Building"],
+          "hasPainPoints": false,
+          "fallbackTo": "General Services Administration"
+        },
+        {
+          "name": "Federal Acquisition Service",
+          "aliases": ["FAS"],
+          "patterns": ["Federal Acquisition Service", "\\bFAS\\b"],
+          "officeCodes": [],
+          "keywords": ["Federal Acquisition", "FAS"],
+          "hasPainPoints": false,
+          "fallbackTo": "General Services Administration"
+        }
+      ]
+    },
+    "Department of Veterans Affairs": {
+      "components": [
+        {
+          "name": "Veterans Health Administration",
+          "aliases": ["VHA"],
+          "patterns": ["Veterans Health Administration", "\\bVHA\\b"],
+          "officeCodes": [],
+          "keywords": ["Veterans Health", "VA Medical Center", "VAMC"],
+          "hasPainPoints": false,
+          "fallbackTo": "Department of Veterans Affairs"
+        }
+      ]
+    },
+    "Department of Energy": {
+      "components": [
+        {
+          "name": "NNSA",
+          "fullName": "National Nuclear Security Administration",
+          "aliases": ["NNSA"],
+          "patterns": ["National Nuclear Security Administration", "\\bNNSA\\b", "Los Alamos", "Livermore", "Sandia"],
+          "officeCodes": [],
+          "keywords": ["Nuclear Security", "NNSA", "Los Alamos National Laboratory", "Lawrence Livermore", "Sandia National Laboratories"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "DOE Office of Science",
+          "aliases": ["Office of Science", "SC"],
+          "patterns": ["Office of Science", "\\bSC\\b", "Argonne", "Oak Ridge", "Brookhaven", "Fermilab", "Berkeley Lab"],
+          "officeCodes": [],
+          "keywords": ["Office of Science", "Argonne National Laboratory", "Oak Ridge National Laboratory", "Brookhaven", "Fermilab", "Lawrence Berkeley", "PNNL", "Princeton Plasma", "SLAC", "Ames Laboratory", "Jefferson Lab"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "DOE Nuclear Energy",
+          "aliases": ["Nuclear Energy", "NE", "INL"],
+          "patterns": ["Idaho National Laboratory", "\\bINL\\b", "Nuclear Energy"],
+          "officeCodes": [],
+          "keywords": ["Idaho National Laboratory", "INL", "Nuclear Energy", "Advanced Reactors"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "DOE Fossil Energy",
+          "aliases": ["Fossil Energy", "FECM", "NETL"],
+          "patterns": ["National Energy Technology Laboratory", "\\bNETL\\b", "Fossil Energy"],
+          "officeCodes": [],
+          "keywords": ["National Energy Technology Laboratory", "NETL", "Fossil Energy", "Carbon Management"],
+          "hasPainPoints": true
+        }
+      ]
+    },
+    "Department of Health and Human Services": {
+      "components": [
+        {
+          "name": "NIH",
+          "fullName": "National Institutes of Health",
+          "aliases": ["NIH"],
+          "patterns": ["National Institutes of Health", "\\bNIH\\b"],
+          "officeCodes": [],
+          "keywords": ["NIH", "Bethesda", "National Institute"],
+          "locations": ["Bethesda, MD"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "CDC",
+          "fullName": "Centers for Disease Control and Prevention",
+          "aliases": ["CDC"],
+          "patterns": ["Centers for Disease Control", "\\bCDC\\b"],
+          "officeCodes": [],
+          "keywords": ["CDC", "Disease Control", "Prevention"],
+          "locations": ["Atlanta, GA"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "FDA",
+          "fullName": "Food and Drug Administration",
+          "aliases": ["FDA"],
+          "patterns": ["Food and Drug Administration", "\\bFDA\\b"],
+          "officeCodes": [],
+          "keywords": ["FDA", "Food and Drug"],
+          "locations": ["Silver Spring, MD"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "CMS",
+          "fullName": "Centers for Medicare & Medicaid Services",
+          "aliases": ["CMS"],
+          "patterns": ["Centers for Medicare", "Medicaid Services", "\\bCMS\\b"],
+          "officeCodes": [],
+          "keywords": ["CMS", "Medicare", "Medicaid"],
+          "locations": ["Baltimore, MD"],
+          "hasPainPoints": true
+        }
+      ]
+    },
+    "Department of Transportation": {
+      "components": [
+        {
+          "name": "FAA",
+          "fullName": "Federal Aviation Administration",
+          "aliases": ["FAA"],
+          "patterns": ["Federal Aviation Administration", "\\bFAA\\b"],
+          "officeCodes": [],
+          "keywords": ["FAA", "Aviation", "NextGen", "Air Traffic"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "FHWA",
+          "fullName": "Federal Highway Administration",
+          "aliases": ["FHWA"],
+          "patterns": ["Federal Highway Administration", "\\bFHWA\\b"],
+          "officeCodes": [],
+          "keywords": ["FHWA", "Highway", "Federal Highway"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "FTA",
+          "fullName": "Federal Transit Administration",
+          "aliases": ["FTA"],
+          "patterns": ["Federal Transit Administration", "\\bFTA\\b"],
+          "officeCodes": [],
+          "keywords": ["FTA", "Transit", "Federal Transit"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "FRA",
+          "fullName": "Federal Railroad Administration",
+          "aliases": ["FRA"],
+          "patterns": ["Federal Railroad Administration", "\\bFRA\\b"],
+          "officeCodes": [],
+          "keywords": ["FRA", "Railroad", "Federal Railroad", "Rail"],
+          "hasPainPoints": true
+        }
+      ]
+    },
+    "Department of Commerce": {
+      "components": [
+        {
+          "name": "NOAA",
+          "fullName": "National Oceanic and Atmospheric Administration",
+          "aliases": ["NOAA"],
+          "patterns": ["National Oceanic", "Atmospheric Administration", "\\bNOAA\\b"],
+          "officeCodes": ["1305M2", "1305M3"],
+          "keywords": ["NOAA", "National Oceanic", "Weather", "Atmospheric"],
+          "locations": ["Silver Spring, MD"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "NIST",
+          "fullName": "National Institute of Standards and Technology",
+          "aliases": ["NIST"],
+          "patterns": ["National Institute of Standards", "\\bNIST\\b"],
+          "officeCodes": [],
+          "keywords": ["NIST", "Standards", "Technology"],
+          "locations": ["Gaithersburg, MD"],
+          "hasPainPoints": true
+        },
+        {
+          "name": "Census Bureau",
+          "fullName": "U.S. Census Bureau",
+          "aliases": ["Census"],
+          "patterns": ["Census Bureau", "\\bCensus\\b", "U\\.S\\. Census"],
+          "officeCodes": ["1333LB"],
+          "keywords": ["Census", "Census Bureau"],
+          "locations": ["Suitland, MD"],
+          "hasPainPoints": true
+        }
+      ]
+    }
+  },
+  "extractionInstructions": {
+    "priority": [
+      "1. Check office code against officeCodes array",
+      "2. Match office name against patterns (regex)",
+      "3. Check for keywords in office name",
+      "4. If component has hasPainPoints=true, use component name",
+      "5. If component has hasPainPoints=false, use fallbackTo agency",
+      "6. If no component match, use parent agency"
+    ],
+    "specialCases": {
+      "USACE": "Must determine mission area (Civil Works, MILCON, Environmental, Emergency) - see usace-office-specific-pain-points.json",
+      "Navy": "Always prefer sub-component (NAVFAC, NAVSEA, NAVAIR, NAVWAR) over 'Department of the Navy'",
+      "Air Force": "Prefer specific commands (AFMC, AFSC) over generic Air Force"
+    }
+  },
+  "validationRules": {
+    "flags": [
+      {
+        "condition": "Office name contains component keywords but parent agency shown",
+        "severity": "high",
+        "message": "Component agency detected but parent agency pain points may be shown",
+        "example": "Office='U.S. Coast Guard Training Center' but showing DHS pain points"
+      },
+      {
+        "condition": "Office code maps to component but component not in pain points file",
+        "severity": "medium",
+        "message": "Component identified but no pain points available - using fallback",
+        "example": "CISA office detected but CISA not in agency-pain-points.json"
+      },
+      {
+        "condition": "Generic parent agency name shown for specific office",
+        "severity": "medium",
+        "message": "Generic parent agency shown - may not be specific enough",
+        "example": "Department of Homeland Security shown instead of specific component"
+      }
+    ]
+  },
+  "howToUse": {
+    "step1": "Load this file in content-engine-test.html",
+    "step2": "For each office, run extraction against departmentRules",
+    "step3": "Check if extracted component has hasPainPoints=true",
+    "step4": "If yes, use component name for pain points lookup",
+    "step5": "If no, use fallbackTo agency",
+    "step6": "Log validation flags for monitoring",
+    "step7": "Display component name prominently, parent in context"
+  }
+}

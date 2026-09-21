@@ -1,0 +1,111 @@
+{
+  "label": "REPRESENTATIVE_REGRESSION_COMPARABLE_SIZE_NOT_ORIGINAL",
+  "original_exact_input_retest": "unavailable",
+  "note": "Original 17-requirement / ~15k-draft payload was not found. This is a labeled comparable-size representative regression only.",
+  "requirements": [
+    {
+      "id": "REP15K-001",
+      "requirement": "The Contractor shall provide capability item 1 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.1"
+    },
+    {
+      "id": "REP15K-002",
+      "requirement": "The Contractor shall provide capability item 2 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.2"
+    },
+    {
+      "id": "REP15K-003",
+      "requirement": "The Contractor shall provide capability item 3 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.3"
+    },
+    {
+      "id": "REP15K-004",
+      "requirement": "The Contractor shall provide capability item 4 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.4"
+    },
+    {
+      "id": "REP15K-005",
+      "requirement": "The Contractor shall provide capability item 5 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.5"
+    },
+    {
+      "id": "REP15K-006",
+      "requirement": "The Contractor shall provide capability item 6 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.6"
+    },
+    {
+      "id": "REP15K-007",
+      "requirement": "The Contractor shall provide capability item 7 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.7"
+    },
+    {
+      "id": "REP15K-008",
+      "requirement": "The Contractor shall provide capability item 8 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.8"
+    },
+    {
+      "id": "REP15K-009",
+      "requirement": "The Contractor shall provide capability item 9 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.9"
+    },
+    {
+      "id": "REP15K-010",
+      "requirement": "The Contractor shall provide capability item 10 with documented evidence of training, QA, and delivery milestones.",
+      "category": "technical",
+      "section": "L.10"
+    },
+    {
+      "id": "REP15K-011",
+      "requirement": "The Contractor shall comply with clause set 11 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.11"
+    },
+    {
+      "id": "REP15K-012",
+      "requirement": "The Contractor shall comply with clause set 12 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.12"
+    },
+    {
+      "id": "REP15K-013",
+      "requirement": "The Contractor shall comply with clause set 13 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.13"
+    },
+    {
+      "id": "REP15K-014",
+      "requirement": "The Contractor shall comply with clause set 14 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.14"
+    },
+    {
+      "id": "REP15K-015",
+      "requirement": "The Contractor shall comply with clause set 15 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.15"
+    },
+    {
+      "id": "REP15K-016",
+      "requirement": "The Contractor shall comply with clause set 16 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.16"
+    },
+    {
+      "id": "REP15K-017",
+      "requirement": "The Contractor shall comply with clause set 17 including monthly reporting, risk register updates, and corrective action logs.",
+      "category": "management",
+      "section": "L.17"
+    }
+  ],
+  "draft": "REPRESENTATIVE REGRESSION DRAFT — COMPARABLE SIZE (~15k), NOT THE ORIGINAL AUDIT PAYLOAD\n\noriginal_exact_input_retest: unavailable\n\nExecutive summary: This draft is sized to exercise the referee draft cap / batching path.\n\nRegarding REP15K-001 (The Contractor shall provide capability item 1 with documented evidence of training, QA, and delivery milestones.): We address this in L.1 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-002 (The Contractor shall provide capability item 2 with documented evidence of training, QA, and delivery milestones.): We address this in L.2 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-003 (The Contractor shall provide capability item 3 with documented evidence of training, QA, and delivery milestones.): We address this in L.3 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-004 (The Contractor shall provide capability item 4 with documented evidence of training, QA, and delivery milestones.): We address this in L.4 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-005 (The Contractor shall provide capability item 5 with documented evidence of training, QA, and delivery milestones.): We address this in L.5 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-006 (The Contractor shall provide capability item 6 with documented evidence of training, QA, and delivery milestones.): We address this in L.6 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-007 (The Contractor shall provide capability item 7 with documented evidence of training, QA, and delivery milestones.): We address this in L.7 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nRegarding REP15K-008 (The Contractor shall provide capability item 8 with documented evidence of training, QA, and delivery milestones.): We address this in L.8 via trained staff, documented QA gates, and delivery evidence retained in the project file.\n\nSection Technical.\n Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Technical approach continues with procedural detail, staffing, tooling, and insp\n\nSection Management.\n Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues with procedural detail, staffing, tooling, and inspection checkpoints. Management approach continues \n\nItems REP15K-011 through REP15K-017 are intentionally lightly addressed or omitted.\n",
+  "draft_chars": 14343
+}

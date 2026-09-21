@@ -1,0 +1,352 @@
+/**
+ * Mindy MCP credit packages + Pro monthly allowance — the SERVER-TRUSTED source of
+ * truth for how many credits a purchase grants.
+ *
+ * Phase 1 Slice 4. Stripe payment links carry only a `package` id in metadata; the
+ * webhook maps that id → credits HERE. We deliberately do NOT trust a `credits` number
+ * from client-settable metadata (tamper-safe). Amounts are low-entry on purpose — the
+ * broad-audience on-ramp (à la Higgsfield's $15 start / $5 packs) that sits BELOW the
+ * $149/mo app sub. Final dollar prices are set when the Stripe products are created;
+ * these credit amounts are what the webhook grants.
+ */
+
+export interface CreditPackage {
+  /** Stripe product-metadata `package` id — the webhook maps this → credits. */
+  id: string;
+  /** Credits granted on purchase. */
+  credits: number;
+  /** Display price (informational; the real charge is the Stripe product's price). */
+  usd: number;
+  label: string;
+  /** Stripe payment-link URL — the dashboard Buy button appends ?client_reference_id=<email>. */
+  checkoutUrl: string;
+  /**
+   * Stripe PRICE id. Required for server-created Checkout Sessions, which are the only
+   * way a purchase can carry attempt attribution (payment LINKS do not forward query
+   * params, so `?attempt=` never reaches the webhook). Its absence is why /api/mcp/checkout
+   * returned 400 for `refill` while working for subscription plans.
+   */
+  priceId?: string;
+}
+
+/**
+ * Live one-time top-up pack (SINGLE, GOS Decision #015). The backing product carries
+ * metadata `type=mcp_credit_topup` + `package=refill`; the webhook grants credits
+ * SERVER-SIDE from the package id (never a raw credits number).
+ *
+ * Locked model (2026-07-19): ONE premium "ran out mid-month" valve — 500 cr / $119
+ * (~$0.238/cr, the priciest per-credit in the whole ladder ON PURPOSE, so it never
+ * undercuts subscribing). Also the SKU auto-recharge draws from. Product/link/price
+ * created live 2026-07-19; the 4 legacy top-ups ($79/300, $149/700, $99/5,000, $49/2,000)
+ * were ARCHIVED in Stripe the same pass (prices + payment links deactivated).
+ */
+/**
+ * ⚠️ PHASE 3 DECISION (Eric, 2026-09-15) — NOT YET IMPLEMENTED. Do not apply early.
+ *
+ * The $119 pack becomes **1,000 credits** (from 500), **non-expiring**, and **preserved
+ * through renewal** — a balance must survive a subscription renewal rather than being
+ * reset or replaced by the monthly allowance.
+ *
+ * Until that release the current 500-credit pack stays EXACTLY as is. Prices unchanged.
+ *
+ * Context that makes the current shape worth fixing, measured 2026-09-15 against live
+ * Stripe: the paywall's PRIMARY offer to a blocked user is Entry at $99/mo — a RECURRING
+ * subscription — while the "one-time" $119 pack is the only true one-off and costs MORE
+ * for the same 500 credits. Phase 3 resolves that product structure; changing credit
+ * quantities before then would make the comparison worse, not better.
+ */
+export const CREDIT_PACKAGES: readonly CreditPackage[] = [
+  // PHASE 3 (Eric, 2026-09-15): $119 buys 1,000 credits. Price UNCHANGED; the pack
+  // doubled. Credits are non-expiring and preserved through renewal — enforced by the
+  // purchased/allowance pool split, not by copy.
+  { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits',
+    priceId: 'price_1UFvuQK5zyiZ50PBga7mejqu',
+    checkoutUrl: 'https://buy.stripe.com/28EfZi5Ey97cgVL3OEfnO15' },
+] as const;
+
+const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
+
+/**
+ * Credits for a package id, or null if unknown. Returning null (not a default) is the
+ * tamper guard: an unrecognized/forged `package` grants NOTHING.
+ */
+/**
+ * Credits for a HISTORICAL price id. Fulfilment resolves by the price the customer
+ * actually bought, so a session created against the old 500-credit price still grants
+ * 500 after the pack becomes 1,000. Resolving by the current package config instead
+ * would retroactively re-price completed purchases.
+ */
+const CREDITS_BY_PRICE_ID: Readonly<Record<string, number>> = {
+  price_1TuxArK5zyiZ50PB6WvZ7ZT2: 500,   // retired 2026-09-15; old sessions still fulfil
+  price_1UFvuQK5zyiZ50PBga7mejqu: 1000,  // Phase 3 — $119 / 1,000 credits
+};
+
+export function creditsForPriceId(priceId: string | null | undefined): number | null {
+  return priceId && priceId in CREDITS_BY_PRICE_ID ? CREDITS_BY_PRICE_ID[priceId] : null;
+}
+
+export function creditsForPackage(packageId: string | null | undefined): number | null {
+  const p = packageId ? BY_ID.get(packageId) : undefined;
+  return p ? p.credits : null;
+}
+
+/**
+ * Credits included with an active Pro ($149/mo) subscription, granted monthly.
+ * **1,500 (Eric, 2026-09-08).** Was 250.
+ *
+ * ── THE GOVERNING STRATEGY CHANGED. This is not a tuning tweak. ──────────────
+ * OLD (GOS #015, 2026-07-19): MCP inside Mindy is a TASTE — ≈2–3 flagship runs, then
+ * a wall, so the user buys the separate $99/500 MCP product. 250 was set deliberately
+ * BELOW the standalone entry so it could not substitute for it.
+ *
+ * NEW (2026-09-08): normal interactive MCP use is an INCLUDED way to use Mindy —
+ * "Mindy everywhere". A subscriber should not feel they bought two products to use
+ * Mindy through the web app and a supported AI assistant. Standalone MCP is being
+ * re-aimed at high-volume / developer / machine / external-agent use and is NOT
+ * redesigned here; its packages and prices are untouched.
+ *
+ * ⚠️ CONSEQUENCE, stated plainly: at $149/1,500 the bundled rate is ~$0.099/credit vs
+ * the standalone Entry $99/500 = $0.198. Bundled is now the CHEAPER per-credit path,
+ * which INVERTS the old two-product split. `tier-credits.unit.test.ts` asserted that
+ * invariant; it is rewritten to pin the new strategy rather than silently edited, so
+ * the reversal is a recorded decision instead of a test someone made go green.
+ *
+ * Sizing evidence (measured 2026-09-08, non-staff paying MCP users, n=18 across 30
+ * user-months): interactive consumption P50 135 · P90 795 · P95 925. Reconstructing
+ * SUPPRESSED demand from `rejected_no_credits` attempts priced at their historical
+ * rates lifts the observed max to 1,100. 1,500 sits above every observed and every
+ * reconstructed user-month. It is a fair-use boundary, not a headline number.
+ * ⚠️ That evidence is CENSORED — nobody was permitted past the old wall, so it bounds
+ * observed intent and does not prove sufficiency.
+ *
+ * CUSTOMER-FACING: do NOT headline "1,500 credits". Credits stay the internal
+ * fair-use/resource accounting mechanism; the customer concept is "MCP included".
+ *
+ * ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel it WINS over this
+ * default. Verified 2026-09-08 that it is NOT set in any environment (both by
+ * `vercel env ls` and by live read-back of /api/mcp/catalog). If it is ever set,
+ * update it too or Pro silently keeps the old amount.
+ */
+export const PRO_MONTHLY_CREDITS = Math.max(
+  0,
+  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '1500') || 0,
+);
+
+/**
+ * Credits included with an active Team ($499/mo) subscription, granted monthly.
+ *
+ * 750 -> 1,000 (Eric, 2026-08-02) so the allowance can be stated on /pricing. The
+ * per-SEAT math drove it: Team includes 5 users, so 750 was 150/user — LESS than a
+ * solo Pro subscriber's 250. A buyer who does that division on a public pricing page
+ * reads it as a downgrade. 1,000 gives 200/user, which still sits below Pro per head
+ * (seats buy collaboration, not credits) without looking punitive.
+ *
+ * This does NOT abandon the two-product split from GOS #015/#016 (commit e9b8cd70):
+ * bundled credits stay a gateway TASTE, not a substitute for the standalone MCP
+ * ladder (Entry $99/500 · Mid $249/1500 · Agency $999/8000). At $499 for 1,000 the
+ * bundled rate is $0.50/credit vs Entry's $0.198 — a real agency still buys the MCP
+ * product. 1,000 is ~10 flagship runs across a 5-person team.
+ *
+ * Safe to change now, and only now: ZERO active $499 subscriptions (Stripe, 30-day
+ * window, verified 2026-08-02), so nobody is affected retroactively. Post-launch this
+ * becomes a customer-facing promise — raising it is a good announcement, cutting it
+ * is not. Every value in this ladder is still an UNTESTED pre-launch hypothesis: only
+ * 19 accounts have ever made a tool call and there has been one Stripe top-up ever.
+ *
+ * ⚠️ Env-overridable: MCP_TEAM_MONTHLY_CREDITS wins over this default if set in
+ * Vercel. Not set in production as of 2026-08-02 (verified), so this default applies.
+ */
+export const TEAM_MONTHLY_CREDITS = Math.max(
+  0,
+  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '1000') || 0,
+);
+
+/**
+ * Internal team (Eric, Branden, the dev team) monthly comp allowance — deliberately HIGH so
+ * internal never runs out while building/testing (Eric, 2026-07-19). Cost to us is ~$0 (the
+ * $15/user/mo LLM cap governs real spend regardless of balance). Env-overridable.
+ */
+export const INTERNAL_MONTHLY_CREDITS = Math.max(
+  0,
+  Number(process.env.MCP_INTERNAL_MONTHLY_CREDITS ?? '25000') || 0,
+);
+
+/**
+ * Credit subscriptions — the acquisition-surface plans on /mcp/pricing.
+ *
+ * Each plan has a MONTHLY and an ANNUAL Stripe price. Following the Higgsfield
+ * pattern, the credit allowance is expressed per-month and stays CONSTANT across
+ * the billing toggle — only the price changes (annual discounts the effective
+ * monthly rate). The annual invoice grants a full year of credits up front
+ * (creditsPerMonth × 12); each monthly invoice grants creditsPerMonth.
+ *
+ * The webhook maps a paid invoice's line-item Stripe price id → its credit grant
+ * HERE (never trusting a client-set credit count). creditsPerMonth is
+ * env-overridable so the grant can be tuned without a Stripe change. Distinct
+ * from CREDIT_PACKAGES (one-time dashboard top-ups) and PRO_MONTHLY_CREDITS
+ * (the $149/mo app sub allowance). Prices/links created 2026-07-14; each price
+ * carries metadata type=mcp_subscription + plan=<id> + interval=month|year.
+ */
+export interface PlanPrice {
+  /** Stripe recurring price id. */
+  priceId: string;
+  /** Charge in USD for this interval (monthly = per month, annual = per year). */
+  usd: number;
+  /** Credits granted per paid invoice at this interval. */
+  credits: number;
+  /** Stripe payment-link URL — append ?client_reference_id=<email> at checkout. */
+  checkoutUrl: string;
+}
+
+export interface SubscriptionPlan {
+  /** Config key + Stripe product-metadata `plan` id. */
+  id: string;
+  label: string;
+  /** Credit allowance shown on the card — constant across the toggle. */
+  creditsPerMonth: number;
+  monthly: PlanPrice;
+  /**
+   * Annual price + the effective monthly rate to display. OPTIONAL — annual MCP variants
+   * are DEFERRED (GOS Decision #015: monthly-only first, add annual once the model proves).
+   */
+  annual?: PlanPrice & { usdPerMonth: number };
+}
+
+// The MCP metered ladder (GOS Decision #015, 2026-07-19): a SEPARATE product from the App
+// ($149 Pro / $499 Team are app tiers — their MCP allowance is PRO/TEAM_MONTHLY_CREDITS, not
+// sold here). Three self-serve tiers, each MONTHLY + ANNUAL (annual = 2 months free, and grants
+// credits 12× UPFRONT on the annual invoice — Eric 2026-07-19, "let them see it all at once").
+// ⚠️ MCP per-credit COST is its own economics (LLM tokens + BigQuery bytes + external APIs) — the
+// app's $15/user callLLM cap does NOT apply here. Real unit cost + BQ daily-quota isolation are
+// tracked in tasks/mcp-economics-2026-07-19.md; the credit prices must clear that cost.
+// The Enterprise/API tier (#016) is INQUIRY-ONLY — no Stripe product, deliberately absent here.
+// Products/prices/payment-links created live 2026-07-19; each price carries metadata
+// type=mcp_subscription + plan=<id> + interval. The webhook grants by priceId
+// (subscriptionGrantForPriceId), so these IDs are the source of truth.
+export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
+  {
+    id: 'entry',
+    label: 'Entry',
+    creditsPerMonth: 500,
+    monthly: {
+      priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG',
+      usd: 99,
+      credits: 500,
+      checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y',
+    },
+    annual: {
+      priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD',
+      usd: 990, // 2 months free vs $99/mo
+      usdPerMonth: 83,
+      credits: 6000, // 12× upfront on the annual invoice
+      checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12',
+    },
+  },
+  {
+    id: 'mid',
+    label: 'Mid',
+    // 1,500 -> 2,000 (Eric, 2026-09-15). At 1,500 Mid had no defensible buyer: app Pro
+    // gives the same 1,500 for $149 WITH the whole application, so a $249 credit-only
+    // plan at equal capacity was dominated. 2,000 is the smallest quantity that clears it.
+    creditsPerMonth: 2000,
+    monthly: {
+      priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG',
+      usd: 249,
+      credits: 2000,
+      checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z',
+    },
+    annual: {
+      priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be',
+      usd: 2490, // 2 months free vs $249/mo
+      usdPerMonth: 208,
+      credits: 24000, // 12× upfront (2,000/mo)
+      checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13',
+    },
+  },
+  {
+    // NEW 2026-09-15 (Eric). The missing middle: nothing existed between Mid ($208/mo
+    // annual equivalent) and Agency ($833). A buyer needing ~3,500/mo had to overbuy
+    // Agency at 2.5x the price. Sized so the step UP matches the step IN: +1,500 credits
+    // for +$150 at both rungs, so upgrading never buys a worse deal.
+    id: 'growth',
+    label: 'Growth',
+    creditsPerMonth: 3500,
+    monthly: {
+      priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV',
+      usd: 399,
+      credits: 3500,
+      checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16',
+    },
+    annual: {
+      priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP',
+      usd: 3990, // 2 months free vs $399/mo
+      usdPerMonth: 333,
+      credits: 42000, // 12× upfront (3,500/mo)
+      checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17',
+    },
+  },
+  {
+    id: 'agency',
+    label: 'Agency',
+    // 8,000 -> 10,000 (Eric, 2026-09-15). At 8,000 Agency sat at 12.49c/credit — a WORSE
+    // rate than the tier below it, so the top of the ladder had the second-worst price per
+    // credit. 10,000 puts it at 9.99c so the highest-volume tier earns the best rate.
+    creditsPerMonth: 10000,
+    monthly: {
+      priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH',
+      usd: 999,
+      credits: 10000,
+      checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10',
+    },
+    annual: {
+      priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J',
+      usd: 9990, // 2 months free vs $999/mo
+      usdPerMonth: 833,
+      credits: 120000, // 12× upfront (10,000/mo)
+      checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14',
+    },
+  },
+] as const;
+
+const SUB_BY_ID = new Map(SUBSCRIPTION_PLANS.map((p) => [p.id, p]));
+
+/** The credit grant + interval for a paid subscription invoice. */
+export interface SubscriptionGrant {
+  planId: string;
+  credits: number;
+  interval: 'month' | 'year';
+}
+
+/** Plan by config/metadata id, or null if unknown. */
+export function subscriptionPlan(planId: string | null | undefined): SubscriptionPlan | null {
+  return planId ? SUB_BY_ID.get(planId) ?? null : null;
+}
+
+/**
+ * Resolve the credit grant for a Stripe price id (the webhook's primary path).
+ * Returns null for any unrecognized price — the tamper guard: an unknown/forged
+ * price grants NOTHING.
+ */
+export function subscriptionGrantForPriceId(priceId: string | null | undefined): SubscriptionGrant | null {
+  if (!priceId) return null;
+  for (const p of SUBSCRIPTION_PLANS) {
+    if (p.monthly.priceId === priceId) return { planId: p.id, credits: p.monthly.credits, interval: 'month' };
+    if (p.annual && p.annual.priceId === priceId) return { planId: p.id, credits: p.annual.credits, interval: 'year' };
+  }
+  return null;
+}
+
+/**
+ * Resolve the credit grant from metadata `plan` + `interval` (the webhook's
+ * fallback when a line item lacks a recognized price id). Null if plan unknown.
+ */
+export function subscriptionGrantForMeta(
+  planId: string | null | undefined,
+  interval: string | null | undefined,
+): SubscriptionGrant | null {
+  const p = subscriptionPlan(planId);
+  if (!p) return null;
+  return interval === 'year' && p.annual
+    ? { planId: p.id, credits: p.annual.credits, interval: 'year' }
+    : { planId: p.id, credits: p.monthly.credits, interval: 'month' };
+}

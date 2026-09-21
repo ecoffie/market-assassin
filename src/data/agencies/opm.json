@@ -1,0 +1,138 @@
+{
+  "name": "Office of Personnel Management",
+  "abbreviation": "OPM",
+  "parentAgency": null,
+  "description": "The Office of Personnel Management provides human resources leadership and support to federal agencies and administers benefits, retirement, and healthcare programs for federal employees.",
+  "website": "https://www.opm.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$4.2 billion",
+    "procurementBudget": "$300M+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Retirement services system modernization to improve processing times and customer service for federal retirees",
+      "source": "OPM Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Federal employee healthcare enrollment and benefits administration system improvements",
+      "source": "OPM Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and data protection following previous data breaches, critical for sensitive employee information",
+      "source": "OPM Cybersecurity Strategy & GAO Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Human resources data systems integration and modernization across federal agencies",
+      "source": "OPM IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Federal job application and hiring system (USAJOBS) improvements and scalability",
+      "source": "OPM Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting retirement services and benefits IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Retirement Services System Modernization",
+      "source": "OPM Strategic Plan",
+      "deadline": "Ongoing multi-year initiative"
+    },
+    {
+      "priority": "Cybersecurity and Data Protection Enhancement",
+      "source": "OPM Cybersecurity Strategy",
+      "deadline": "Ongoing critical priority"
+    },
+    {
+      "priority": "Federal Employee Benefits System Improvements",
+      "source": "OPM Budget Justification FY2025",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "OPM IT Modernization Strategy",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "OPM Budget Justification FY2025 - https://www.opm.gov/about-us/budget-performance/budget-information",
+      "OPM Strategic Plan - https://www.opm.gov/about-us/our-mission-role/strategic-plan",
+      "OPM Contracting Opportunities - https://www.opm.gov/about-us/doing-business-with-opm/contracting-opportunities",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on OPM IT Security and Modernization"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $25M",
+    "large": "$25M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Cybersecurity capabilities",
+      "Retirement services system experience",
+      "Benefits administration system knowledge",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with HR or benefits systems",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Procurement Operations",
+    "Retirement Services",
+    "Healthcare and Insurance"
+  ],
+  "insights": [
+    "Cybersecurity is critical priority following previous data breaches",
+    "Retirement services system modernization is a major focus",
+    "Federal employee benefits administration requires ongoing improvements",
+    "IT infrastructure modernization priorities across all programs",
+    "Strong emphasis on protecting sensitive employee data"
+  ]
+}
+

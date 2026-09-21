@@ -1,0 +1,15 @@
+{
+  "runId": "generic-va-janitorial",
+  "generatedAt": "2026-09-05T18:00:00.000Z",
+  "requirement": {
+    "title": "Janitorial Services for VA Medical Center",
+    "agency": "Department of Veterans Affairs",
+    "sub_agency": "Veterans Health Administration",
+    "office": "Network Contracting Office 8",
+    "naics": "561720",
+    "psc": "S201",
+    "keyword": "janitorial",
+    "description": "The Department of Veterans Affairs is conducting market research on janitorial services.",
+    "solicitation_number": "VA-NCO8-JANITORIAL-2026"
+  }
+}

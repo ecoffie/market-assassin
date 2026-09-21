@@ -1,0 +1,134 @@
+{
+  "name": "Small Business Administration",
+  "abbreviation": "SBA",
+  "parentAgency": null,
+  "description": "The Small Business Administration helps Americans start, build and grow businesses by providing counseling, capital, and contracting expertise.",
+  "website": "https://www.sba.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$1.1 billion",
+    "procurementBudget": "$200M+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Loan processing system modernization to improve speed and efficiency of small business loan applications",
+      "source": "SBA Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "IT infrastructure modernization for disaster loan processing and small business certification systems",
+      "source": "SBA IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Small business contracting data collection and reporting system improvements",
+      "source": "SBA Budget Justification FY2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Cybersecurity enhancements for loan processing and business information systems",
+      "source": "SBA Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Disaster assistance program system scalability and performance improvements",
+      "source": "SBA Disaster Assistance Program",
+      "priority": "high"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting loan processing and small business IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Loan Processing System Modernization",
+      "source": "SBA Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "SBA IT Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Disaster Loan System Improvements",
+      "source": "SBA Disaster Assistance Program",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Small Business Certification System Enhancement",
+      "source": "SBA Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "SBA Strategic Plan - https://www.sba.gov/about-sba/sba-initiatives/sba-strategic-plan",
+      "SBA Budget Justification FY2025 - https://www.sba.gov/document/report-congressional-budget-justification",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "SBA Annual Performance Report"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "541611",
+    "518210",
+    "541330"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "100% - All contracts to small businesses",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$100K - $3M",
+    "medium": "$3M - $15M",
+    "large": "$15M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Small business contractors",
+      "IT modernization expertise",
+      "Loan processing system experience",
+      "Financial system knowledge",
+      "Data analytics and reporting",
+      "Cybersecurity capabilities"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach",
+      "Past performance",
+      "Price/cost",
+      "Small business status"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Government Contracting and Business Development",
+    "Office of Disaster Assistance",
+    "Office of Capital Access"
+  ],
+  "insights": [
+    "SBA itself is required to contract 100% with small businesses",
+    "Loan processing system modernization is a major focus",
+    "Disaster loan systems require scalability improvements",
+    "Strong emphasis on supporting other agencies' small business goals",
+    "IT infrastructure modernization priorities across programs"
+  ]
+}
+

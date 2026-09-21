@@ -1,0 +1,2317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recompete Tracker | GovCon Giants</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #dc2626 0%, #f59e0b 50%, #dc2626 100%);
+            padding: 50px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            color: #ffffff;
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 5px;
+        }
+
+        .stat-number.highlight {
+            color: #fbbf24;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Search Section */
+        .search-section {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 35px;
+            margin-bottom: 30px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .search-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .search-header-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .search-header h2 {
+            color: #1e293b;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: #f8fafc;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #f59e0b;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1);
+        }
+
+        .button-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%);
+            color: white;
+            box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+        }
+
+        /* Results Table */
+        .results-section {
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .results-header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .results-header h3 {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .results-count {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8fafc;
+            position: sticky;
+            top: 0;
+        }
+
+        th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        th:hover {
+            background: #f1f5f9;
+        }
+
+        th.sorted-asc::after {
+            content: ' ▲';
+            color: #f59e0b;
+        }
+
+        th.sorted-desc::after {
+            content: ' ▼';
+            color: #f59e0b;
+        }
+
+        td {
+            padding: 16px 20px;
+            font-size: 14px;
+            color: #334155;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+        }
+
+        tr:hover {
+            background: #fffbeb;
+        }
+
+        .prime-name {
+            font-weight: 600;
+            color: #1e293b;
+            max-width: 250px;
+        }
+
+        tbody tr {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        tbody tr:hover {
+            background: #eff6ff !important;
+        }
+
+        .prime-name {
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%);
+            padding: 25px 30px;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .modal-header h3 {
+            color: white;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .modal-header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .modal-body {
+            padding: 25px 30px;
+        }
+
+        .detail-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .detail-value.highlight {
+            color: #059669;
+            font-weight: 700;
+        }
+
+        .agency-name {
+            color: #64748b;
+            font-size: 13px;
+            max-width: 200px;
+        }
+
+        .contract-value {
+            font-weight: 700;
+            color: #059669;
+            white-space: nowrap;
+        }
+
+        .contract-value.high {
+            color: #dc2626;
+        }
+
+        .naics-badge {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #4338ca;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .date-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Bids/Competition badges */
+        .bids-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: help;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .bids-badge.sole-source {
+            background: #10b981;
+            color: white;
+        }
+
+        .bids-badge.low {
+            background: #22c55e;
+            color: white;
+        }
+
+        .bids-badge.medium {
+            background: #fbbf24;
+            color: #1e293b;
+        }
+
+        .bids-badge.high {
+            background: #ef4444;
+            color: white;
+        }
+
+        .bids-badge.unknown {
+            background: #e2e8f0;
+            color: #94a3b8;
+        }
+
+        .award-id {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #64748b;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 25px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            flex-wrap: wrap;
+        }
+
+        .pagination button {
+            padding: 10px 16px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: inherit;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .pagination button.current {
+            background: #f59e0b;
+            color: white;
+            border-color: #f59e0b;
+        }
+
+        .pagination-info {
+            color: #64748b;
+            font-size: 13px;
+            padding: 0 10px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 40px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #f59e0b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 40px;
+        }
+
+        .no-results-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #fbbf24;
+            text-decoration: none;
+        }
+
+        /* Results Controls */
+        .results-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .per-page-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .per-page-control label {
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .per-page-control select {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #ffffff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .per-page-control select option {
+            background: #1e293b;
+            color: #ffffff;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .btn-export:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
+        .state-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 6px;
+            vertical-align: middle;
+            letter-spacing: 0.5px;
+        }
+
+        /* Location Filter */
+        .location-filter {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        .location-filter-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .location-filter-header label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #475569;
+        }
+        .location-selected-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            flex: 1;
+            margin-left: 8px;
+        }
+        .location-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .location-tag .remove-tag {
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+            opacity: 0.6;
+        }
+        .location-tag .remove-tag:hover { opacity: 1; }
+        .region-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .region-btn {
+            padding: 5px 12px;
+            border-radius: 16px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .region-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        .region-btn.active {
+            background: #1e40af;
+            color: white;
+            border-color: #1e40af;
+        }
+        .nearme-btn {
+            padding: 5px 12px;
+            border-radius: 16px;
+            border: 1px solid #059669;
+            background: #ecfdf5;
+            color: #059669;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .nearme-btn:hover {
+            background: #059669;
+            color: white;
+        }
+        .nearme-btn.active {
+            background: #059669;
+            color: white;
+        }
+        .nearme-btn.loading {
+            opacity: 0.6;
+            cursor: wait;
+        }
+        .state-checkboxes-dropdown {
+            position: relative;
+        }
+        .state-dropdown-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #475569;
+            user-select: none;
+        }
+        .state-dropdown-trigger:hover {
+            border-color: #94a3b8;
+        }
+        .state-dropdown-panel {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 280px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+        .state-dropdown-panel.open {
+            display: block;
+        }
+        .state-dropdown-panel label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #334155;
+            cursor: pointer;
+            font-weight: 400;
+        }
+        .state-dropdown-panel label:hover {
+            background: #f1f5f9;
+        }
+        .state-dropdown-panel input[type="checkbox"] {
+            accent-color: #1e40af;
+            width: 14px;
+            height: 14px;
+        }
+        .include-no-location {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .include-no-location input {
+            accent-color: #1e40af;
+        }
+
+        /* Responsive — Tablets */
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Responsive — Mobile */
+        @media (max-width: 768px) {
+            .header {
+                padding: 30px 15px;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+
+            .header p {
+                font-size: 15px;
+            }
+
+            .container {
+                padding: 20px 12px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                margin-bottom: 25px;
+            }
+
+            .stat-card {
+                padding: 18px 12px;
+                border-radius: 14px;
+            }
+
+            .stat-icon {
+                font-size: 24px;
+                margin-bottom: 6px;
+            }
+
+            .stat-number {
+                font-size: 22px;
+            }
+
+            .stat-label {
+                font-size: 11px;
+            }
+
+            .search-section {
+                padding: 20px 16px;
+                border-radius: 16px;
+                margin-bottom: 20px;
+            }
+
+            .search-header {
+                margin-bottom: 18px;
+            }
+
+            .search-header-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+                border-radius: 10px;
+            }
+
+            .search-header h2 {
+                font-size: 18px;
+            }
+
+            .search-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .input-group input,
+            .input-group select {
+                padding: 12px 14px;
+                font-size: 14px;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+
+            .btn {
+                justify-content: center;
+                padding: 14px 20px;
+            }
+
+            .results-section {
+                border-radius: 16px;
+            }
+
+            .results-header {
+                padding: 16px 18px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .results-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            td, th {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+
+            .prime-name {
+                max-width: 160px;
+                font-size: 13px;
+            }
+
+            .agency-name {
+                max-width: 140px;
+                font-size: 12px;
+            }
+
+            .award-id {
+                max-width: 100px;
+                font-size: 11px;
+            }
+
+            .pagination {
+                padding: 18px 12px;
+                gap: 6px;
+            }
+
+            .pagination button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .modal-card {
+                max-width: 100%;
+                margin: 10px;
+                border-radius: 16px;
+            }
+
+            .modal-header {
+                padding: 20px;
+                border-radius: 16px 16px 0 0;
+            }
+
+            .modal-header h3 {
+                font-size: 17px;
+                padding-right: 30px;
+            }
+
+            .modal-body {
+                padding: 18px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .detail-label {
+                width: auto;
+            }
+
+            .footer {
+                padding: 25px 15px;
+                font-size: 13px;
+            }
+        }
+
+        /* Responsive — Small phones */
+        @media (max-width: 400px) {
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .stat-number {
+                font-size: 18px;
+            }
+
+            .stat-card {
+                padding: 14px 10px;
+            }
+
+            .results-controls {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .btn-sm {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Email + Logout Banner -->
+    <div id="user-banner" style="display:none; background:#1a1a2e; color:#94a3b8; font-size:13px; padding:8px 20px; font-family:'Inter',sans-serif; position:sticky; top:0; z-index:1000;">
+        <div style="max-width:1400px; margin:0 auto; display:flex; justify-content:space-between; align-items:center;">
+            <span id="user-email-display"></span>
+            <span id="logout-btn" onclick="handleLogout()" style="color:#ef4444; cursor:pointer; font-weight:600;">Logout</span>
+        </div>
+    </div>
+    <script>
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var email = params.get('email');
+            if (email) {
+                document.getElementById('user-banner').style.display = 'block';
+                document.getElementById('user-email-display').textContent = 'Logged in as: ' + email;
+            }
+        })();
+        function handleLogout() {
+            window.parent.postMessage({ type: 'recompete-logout' }, '*');
+        }
+    </script>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">GOVCON GIANTS</div>
+            <h1>Recompete Tracker</h1>
+            <p>Recompete Opportunities</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-number" id="totalContracts">--</div>
+                <div class="stat-label">Total Contracts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-number highlight" id="totalValue">--</div>
+                <div class="stat-label">Contract Ceiling</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🏛️</div>
+                <div class="stat-number" id="totalAgencies">--</div>
+                <div class="stat-label">Agencies</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🏢</div>
+                <div class="stat-number" id="totalPrimes">--</div>
+                <div class="stat-label">Prime Contractors</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-number" id="totalNaics">--</div>
+                <div class="stat-label">NAICS Codes</div>
+            </div>
+            <div class="stat-card" id="lastUpdatedCard" style="display:none;">
+                <div class="stat-icon">🕐</div>
+                <div class="stat-number" id="lastUpdatedDate" style="font-size:16px;">--</div>
+                <div class="stat-label">Data Through</div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-header">
+                <div class="search-header-icon">🔍</div>
+                <h2>Filter Contracts</h2>
+            </div>
+
+            <div class="search-grid">
+                <div class="input-group">
+                    <label>Prime Contractor</label>
+                    <input type="text" id="searchPrime" placeholder="Search by company name...">
+                </div>
+                <div class="input-group">
+                    <label>NAICS Code</label>
+                    <input type="text" id="searchNaics" placeholder="e.g., 541511">
+                </div>
+                <div class="input-group">
+                    <label>Agency</label>
+                    <select id="searchAgency">
+                        <option value="">All Agencies</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Contract Value</label>
+                    <select id="searchValue">
+                        <option value="">Any Value</option>
+                        <option value="micro">Under $250K</option>
+                        <option value="small">$250K - $1M</option>
+                        <option value="medium">$1M - $10M</option>
+                        <option value="large">$10M - $100M</option>
+                        <option value="major">Over $100M</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Award ID</label>
+                    <input type="text" id="searchAward" placeholder="Search award ID...">
+                </div>
+                <div class="input-group">
+                    <label>Expiration Timeline</label>
+                    <select id="searchExpiration">
+                        <option value="">All Dates</option>
+                        <option value="3">Next 3 Months</option>
+                        <option value="3-6">3-6 Months</option>
+                        <option value="6-12">6-12 Months</option>
+                        <option value="12+">12+ Months</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Contracting Office</label>
+                    <input type="text" id="searchOffice" placeholder="Search office name...">
+                </div>
+            </div>
+
+            <!-- Location Filter -->
+            <div class="location-filter">
+                <div class="location-filter-header">
+                    <label>Location</label>
+                    <div class="location-selected-tags" id="selectedStateTags"></div>
+                </div>
+                <div class="region-buttons">
+                    <button class="nearme-btn" id="nearMeBtn" onclick="handleNearMe()">📍 Near Me</button>
+                    <button class="region-btn" onclick="toggleRegion('dc_metro', this)">DC Metro</button>
+                    <button class="region-btn" onclick="toggleRegion('northeast', this)">Northeast</button>
+                    <button class="region-btn" onclick="toggleRegion('southeast', this)">Southeast</button>
+                    <button class="region-btn" onclick="toggleRegion('mid_atlantic', this)">Mid-Atlantic</button>
+                    <button class="region-btn" onclick="toggleRegion('midwest', this)">Midwest</button>
+                    <button class="region-btn" onclick="toggleRegion('southwest', this)">Southwest</button>
+                    <button class="region-btn" onclick="toggleRegion('west_coast', this)">West Coast</button>
+                </div>
+                <div class="state-checkboxes-dropdown">
+                    <div class="state-dropdown-trigger" id="stateDropdownTrigger" onclick="toggleStateDropdown()">
+                        <span>Select states...</span>
+                        <span>▾</span>
+                    </div>
+                    <div class="state-dropdown-panel" id="stateDropdownPanel"></div>
+                </div>
+                <label class="include-no-location">
+                    <input type="checkbox" id="includeNoLocation" checked onchange="performSearch()">
+                    Include contracts without location data
+                </label>
+            </div>
+
+            <div class="button-row">
+                <button class="btn btn-primary" onclick="performSearch()">
+                    <span>🔍</span> Search
+                </button>
+                <button class="btn btn-secondary" onclick="clearFilters()">
+                    <span>↺</span> Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <!-- Error Banner -->
+        <div id="errorBanner" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#991b1b; font-size:14px;">
+            <strong>⚠ Error:</strong> <span id="errorMessage"></span>
+            <button onclick="document.getElementById('errorBanner').style.display='none'" style="float:right; background:none; border:none; color:#991b1b; cursor:pointer; font-size:16px;">&times;</button>
+        </div>
+
+        <div class="results-section">
+            <div class="results-header">
+                <div>
+                    <h3>Contract Results</h3>
+                    <span class="results-count" id="resultsCount">Loading...</span>
+                </div>
+                <div class="results-controls">
+                    <div class="per-page-control">
+                        <label for="perPageSelect">Show</label>
+                        <select id="perPageSelect">
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-export btn-sm" onclick="exportFilteredCSV()">CSV</button>
+                    <button class="btn btn-export btn-sm" onclick="exportFilteredExcel()">Excel</button>
+                    <button class="btn btn-export btn-sm" onclick="exportFilteredPDF()">PDF</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="contractsTable">
+                    <thead>
+                        <tr>
+                            <th data-sort="Recipient">Prime Contractor</th>
+                            <th data-sort="Agency">Agency</th>
+                            <th data-sort="value">Value</th>
+                            <th data-sort="bids">Bids</th>
+                            <th data-sort="NAICS">NAICS</th>
+                            <th data-sort="Expiration">Expires</th>
+                            <th data-sort="Award ID">Award ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                        <tr>
+                            <td colspan="7">
+                                <div class="loading">
+                                    <div class="loading-spinner"></div>
+                                    <p>Loading contracts...</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Source Attribution -->
+    <div style="margin: 16px auto; max-width: 1200px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; border-top: 1px solid #334155;">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Source: <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">SAM.gov</a> &amp; <a href="https://www.usaspending.gov" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">USASpending.gov</a> &mdash; Competition data from SAM.gov Contract Awards API. Budget trends from OMB FY2026 Request.</span>
+    </div>
+
+    <div class="footer">
+        <p>Data from USASpending.gov | Built by <a href="https://govcongiants.org">GovCon Giants AI</a></p>
+    </div>
+
+    <!-- Contract Details Modal -->
+    <div class="modal-overlay" id="contractModal" onclick="closeModal(event)">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <div class="modal-header" style="position:relative;">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <h3 id="modalTitle">Contract Details</h3>
+                <p id="modalSubtitle"></p>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the shared data file -->
+    <script src="contracts-data.js?v=3"></script>
+
+    <script>
+        let allContracts = [];
+        let filteredResults = [];
+        let currentPage = 1;
+        let currentSort = { field: 'value', direction: 'desc' };
+        let perPage = 25;
+        let budgetMap = {};
+        const userEmail = new URLSearchParams(window.location.search).get('email') || '';
+
+        function showError(msg) {
+            document.getElementById('errorMessage').textContent = msg;
+            document.getElementById('errorBanner').style.display = 'block';
+        }
+
+        function getBudgetBadge(agencyName) {
+            if (!agencyName || !budgetMap) return '';
+            const normalized = agencyName.toLowerCase().replace(/\s+/g, ' ').trim();
+            let match = null;
+            for (const [key, data] of Object.entries(budgetMap)) {
+                const normKey = key.toLowerCase().replace(/\s+/g, ' ').trim();
+                if (normKey === normalized || normalized.includes(normKey) || normKey.includes(normalized)) {
+                    match = data;
+                    break;
+                }
+            }
+            if (!match) return '';
+            const pct = ((match.change.percent - 1) * 100).toFixed(1);
+            const isGrowth = match.change.percent >= 1;
+            const color = match.change.trend === 'surging' || match.change.trend === 'growing' ? '#10b981' :
+                          match.change.trend === 'stable' ? '#f59e0b' : '#ef4444';
+            const arrow = isGrowth ? '▲' : '▼';
+            return `<span style="display:inline-block;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;background:${color}15;color:${color};font-weight:600" title="FY2026 budget ${isGrowth ? 'increase' : 'decrease'} vs FY2025 (Source: OMB FY2026 Discretionary Budget Request, May 2025)">${arrow} ${isGrowth ? '+' : ''}${pct}%</span>`;
+        }
+
+        function loadData() {
+            try {
+                if (typeof expiringContractsData === 'undefined' || !expiringContractsData) {
+                    showError('Failed to load contract data. Please refresh the page or contact support.');
+                    return;
+                }
+                allContracts = expiringContractsData;
+            } catch (e) {
+                showError('Failed to load contract data. Please refresh the page.');
+                return;
+            }
+
+            // Show "Data Through" based on latest expiration date in dataset
+            try {
+                // Parse M/D/YYYY format dates
+                const parseDate = (str) => {
+                    if (!str) return null;
+                    const parts = str.split('/');
+                    if (parts.length !== 3) return null;
+                    return new Date(parts[2], parts[0] - 1, parts[1]);
+                };
+                const dates = allContracts
+                    .map(c => parseDate(c['Expiration']))
+                    .filter(d => d && !isNaN(d.getTime()))
+                    .sort((a, b) => b - a); // Sort descending (latest expiration first)
+                const latestExpiration = dates[0] || null;
+                if (latestExpiration) {
+                    // Show the latest expiration date in the dataset
+                    const dateStr = latestExpiration.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    document.getElementById('lastUpdatedDate').innerHTML = dateStr + '<span style="color:#22c55e;font-size:10px;display:block;margin-top:2px">Fresh</span>';
+                    document.getElementById('lastUpdatedCard').style.display = '';
+                }
+            } catch (e) { /* non-critical */ }
+
+            // Fetch budget data for agency badges
+            fetch('/api/budget-authority?limit=200')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        data.data.forEach(a => { budgetMap[a.agency] = a; });
+                        renderResults(); // re-render with badges
+                    }
+                })
+                .catch(() => { /* budget badges are non-critical */ });
+
+            // Populate agency dropdown
+            const agencies = [...new Set(allContracts.map(c => c.Agency))].filter(a => a).sort();
+            const agencySelect = document.getElementById('searchAgency');
+            agencies.forEach(agency => {
+                const option = document.createElement('option');
+                option.value = agency;
+                option.textContent = agency;
+                agencySelect.appendChild(option);
+            });
+
+            // Populate state checkbox dropdown
+            populateStateCheckboxes();
+
+            updateStats();
+            filteredResults = [...allContracts];
+            sortResults();
+            renderResults();
+
+            // Add sort listeners
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => handleSort(th.dataset.sort));
+            });
+        }
+
+        function updateStats() {
+            let totalValue = 0;
+            allContracts.forEach(c => {
+                totalValue += parseValue(c['Total Value']);
+            });
+
+            const agencies = new Set(allContracts.map(c => c.Agency)).size;
+            const primes = new Set(allContracts.map(c => c.Recipient)).size;
+            const naics = new Set(allContracts.map(c => c.NAICS?.split(' ')[0])).size;
+
+            document.getElementById('totalContracts').textContent = allContracts.length.toLocaleString();
+            document.getElementById('totalValue').textContent = formatCurrency(totalValue);
+            document.getElementById('totalAgencies').textContent = agencies.toLocaleString();
+            document.getElementById('totalPrimes').textContent = primes.toLocaleString();
+            document.getElementById('totalNaics').textContent = naics.toLocaleString();
+        }
+
+        function parseValue(valueStr) {
+            if (!valueStr) return 0;
+            const cleaned = valueStr.replace(/[$,\s]/g, '');
+            return parseFloat(cleaned) || 0;
+        }
+
+        function formatCurrency(value) {
+            if (value >= 1e12) return '$' + (value / 1e12).toFixed(1) + 'T';
+            if (value >= 1e9) return '$' + (value / 1e9).toFixed(1) + 'B';
+            if (value >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
+            if (value >= 1e3) return '$' + (value / 1e3).toFixed(0) + 'K';
+            return '$' + value.toFixed(0);
+        }
+
+        function formatValueDisplay(valueStr) {
+            const value = parseValue(valueStr);
+            if (value >= 999.5e9) return '$' + (value / 1e12).toFixed(2) + 'T';
+            if (value >= 1e9) return '$' + (value / 1e9).toFixed(2) + 'B';
+            if (value >= 1e6) return '$' + (value / 1e6).toFixed(2) + 'M';
+            return '$' + value.toLocaleString();
+        }
+
+        // Get bid count badge with color coding
+        // Green = low competition (good opportunity), Red = high competition
+        function getBidsBadge(numBids, competitionLevel) {
+            if (numBids === undefined && !competitionLevel) {
+                return '<span class="bids-badge unknown" title="Competition data not available">—</span>';
+            }
+
+            // Determine color based on competition level or bid count
+            let colorClass = 'medium';
+            let tooltip = '';
+
+            if (competitionLevel === 'sole_source') {
+                colorClass = 'sole-source';
+                tooltip = 'Sole Source - No competition!';
+            } else if (competitionLevel === 'low' || numBids <= 2) {
+                colorClass = 'low';
+                tooltip = 'Low competition - Prime target';
+            } else if (competitionLevel === 'medium' || numBids <= 5) {
+                colorClass = 'medium';
+                tooltip = 'Medium competition';
+            } else {
+                colorClass = 'high';
+                tooltip = 'High competition';
+            }
+
+            const displayText = numBids !== undefined ? numBids : (competitionLevel === 'sole_source' ? 'SS' : '?');
+
+            return `<span class="bids-badge ${colorClass}" title="${tooltip}">${displayText}</span>`;
+        }
+
+        function handleSort(field) {
+            if (currentSort.field === field) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.field = field;
+                currentSort.direction = field === 'value' ? 'desc' : 'asc';
+            }
+
+            // Update header styles
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                if (th.dataset.sort === field) {
+                    th.classList.add(currentSort.direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                }
+            });
+
+            sortResults();
+            currentPage = 1;
+            renderResults();
+        }
+
+        function sortResults() {
+            const { field, direction } = currentSort;
+            const mult = direction === 'asc' ? 1 : -1;
+
+            filteredResults.sort((a, b) => {
+                let aVal, bVal;
+
+                if (field === 'value') {
+                    aVal = parseValue(a['Total Value']);
+                    bVal = parseValue(b['Total Value']);
+                } else if (field === 'bids') {
+                    // Sort by number of bids - put unknown at end
+                    aVal = a.numberOfBids !== undefined ? a.numberOfBids : 999;
+                    bVal = b.numberOfBids !== undefined ? b.numberOfBids : 999;
+                } else {
+                    aVal = (a[field] || '').toLowerCase();
+                    bVal = (b[field] || '').toLowerCase();
+                }
+
+                if (aVal < bVal) return -1 * mult;
+                if (aVal > bVal) return 1 * mult;
+                return 0;
+            });
+        }
+
+        // ===== Location Filter Logic =====
+        const STATE_NAMES = {
+            AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',
+            CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',
+            FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',
+            IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',
+            ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',
+            MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',
+            NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',
+            NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',
+            PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',
+            TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
+            WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+            PR:'Puerto Rico',GU:'Guam',VI:'Virgin Islands',AS:'American Samoa',
+            MP:'Northern Mariana Islands'
+        };
+
+        const REGIONS = {
+            dc_metro: ['DC', 'MD', 'VA'],
+            northeast: ['CT', 'ME', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'],
+            southeast: ['AL', 'FL', 'GA', 'KY', 'MS', 'NC', 'SC', 'TN'],
+            mid_atlantic: ['DC', 'DE', 'MD', 'NJ', 'NY', 'PA', 'VA', 'WV'],
+            midwest: ['IA', 'IL', 'IN', 'KS', 'MI', 'MN', 'MO', 'NE', 'ND', 'OH', 'SD', 'WI'],
+            southwest: ['AZ', 'NM', 'OK', 'TX'],
+            west_coast: ['CA', 'OR', 'WA']
+        };
+
+        const NEIGHBOR_STATES = {
+            AL:['FL','GA','MS','TN'], AK:[], AZ:['CA','NM','NV','UT'],
+            AR:['LA','MO','MS','OK','TN','TX'], CA:['AZ','NV','OR'],
+            CO:['KS','NE','NM','OK','UT','WY'], CT:['MA','NY','RI'],
+            DE:['MD','NJ','PA'], DC:['MD','VA'],
+            FL:['AL','GA'], GA:['AL','FL','NC','SC','TN'],
+            HI:[], ID:['MT','NV','OR','UT','WA','WY'],
+            IL:['IA','IN','KY','MO','WI'], IN:['IL','KY','MI','OH'],
+            IA:['IL','MN','MO','NE','SD','WI'], KS:['CO','MO','NE','OK'],
+            KY:['IL','IN','MO','OH','TN','VA','WV'], LA:['AR','MS','TX'],
+            ME:['NH'], MD:['DC','DE','PA','VA','WV'],
+            MA:['CT','NH','NY','RI','VT'], MI:['IN','OH','WI'],
+            MN:['IA','ND','SD','WI'], MS:['AL','AR','LA','TN'],
+            MO:['AR','IA','IL','KS','KY','NE','OK','TN'],
+            MT:['ID','ND','SD','WY'], NE:['CO','IA','KS','MO','SD','WY'],
+            NV:['AZ','CA','ID','OR','UT'], NH:['MA','ME','VT'],
+            NJ:['DE','NY','PA'], NM:['AZ','CO','OK','TX','UT'],
+            NY:['CT','MA','NJ','PA','VT'], NC:['GA','SC','TN','VA'],
+            ND:['MN','MT','SD'], OH:['IN','KY','MI','PA','WV'],
+            OK:['AR','CO','KS','MO','NM','TX'], OR:['CA','ID','NV','WA'],
+            PA:['DE','MD','NJ','NY','OH','WV'], RI:['CT','MA'],
+            SC:['GA','NC'], SD:['IA','MN','MT','ND','NE','WY'],
+            TN:['AL','AR','GA','KY','MO','MS','NC','VA'],
+            TX:['AR','LA','NM','OK'], UT:['AZ','CO','ID','NM','NV','WY'],
+            VT:['MA','NH','NY'], VA:['DC','KY','MD','NC','TN','WV'],
+            WA:['ID','OR'], WV:['KY','MD','OH','PA','VA'],
+            WI:['IA','IL','MI','MN'], WY:['CO','ID','MT','NE','SD','UT']
+        };
+
+        // State bounding boxes for reverse geocoding [minLat, maxLat, minLng, maxLng]
+        const STATE_BOUNDS = {
+            AL:[30.2,35.0,-88.5,-84.9], AK:[51.2,71.4,-179.1,-129.9],
+            AZ:[31.3,37.0,-114.8,-109.0], AR:[33.0,36.5,-94.6,-89.6],
+            CA:[32.5,42.0,-124.4,-114.1], CO:[37.0,41.0,-109.1,-102.0],
+            CT:[41.0,42.1,-73.7,-71.8], DE:[38.5,39.8,-75.8,-75.0],
+            DC:[38.8,39.0,-77.1,-76.9], FL:[24.5,31.0,-87.6,-80.0],
+            GA:[30.4,35.0,-85.6,-80.8], HI:[18.9,22.2,-160.2,-154.8],
+            ID:[42.0,49.0,-117.2,-111.0], IL:[37.0,42.5,-91.5,-87.0],
+            IN:[37.8,41.8,-88.1,-84.8], IA:[40.4,43.5,-96.6,-90.1],
+            KS:[37.0,40.0,-102.1,-94.6], KY:[36.5,39.1,-89.6,-81.9],
+            LA:[29.0,33.0,-94.0,-89.0], ME:[43.1,47.5,-71.1,-67.0],
+            MD:[37.9,39.7,-79.5,-75.0], MA:[41.2,42.9,-73.5,-69.9],
+            MI:[41.7,48.3,-90.4,-82.4], MN:[43.5,49.4,-97.2,-89.5],
+            MS:[30.2,35.0,-91.7,-88.1], MO:[36.0,40.6,-95.8,-89.1],
+            MT:[44.4,49.0,-116.0,-104.0], NE:[40.0,43.0,-104.1,-95.3],
+            NV:[35.0,42.0,-120.0,-114.0], NH:[42.7,45.3,-72.6,-70.7],
+            NJ:[38.9,41.4,-75.6,-73.9], NM:[31.3,37.0,-109.1,-103.0],
+            NY:[40.5,45.0,-79.8,-71.9], NC:[33.8,36.6,-84.3,-75.5],
+            ND:[45.9,49.0,-104.0,-96.6], OH:[38.4,42.0,-84.8,-80.5],
+            OK:[33.6,37.0,-103.0,-94.4], OR:[42.0,46.3,-124.6,-116.5],
+            PA:[39.7,42.3,-80.5,-74.7], RI:[41.1,42.0,-71.9,-71.1],
+            SC:[32.0,35.2,-83.4,-78.5], SD:[42.5,46.0,-104.1,-96.4],
+            TN:[35.0,36.7,-90.3,-81.6], TX:[25.8,36.5,-106.6,-93.5],
+            UT:[37.0,42.0,-114.1,-109.0], VT:[42.7,45.0,-73.4,-71.5],
+            VA:[36.5,39.5,-83.7,-75.2], WA:[45.5,49.0,-124.8,-116.9],
+            WV:[37.2,40.6,-82.6,-77.7], WI:[42.5,47.1,-92.9,-86.8],
+            WY:[41.0,45.0,-111.1,-104.1]
+        };
+
+        function populateStateCheckboxes() {
+            const panel = document.getElementById('stateDropdownPanel');
+            const dataStates = [...new Set(allContracts.map(c => c.State).filter(s => s && s.trim()))].sort();
+            // Show all 50 states + DC, mark which have data
+            const allStates = Object.keys(STATE_NAMES).sort();
+            panel.innerHTML = '';
+            allStates.forEach(st => {
+                const hasData = dataStates.includes(st);
+                const count = hasData ? allContracts.filter(c => c.State === st).length : 0;
+                const lbl = document.createElement('label');
+                lbl.innerHTML = `<input type="checkbox" value="${st}" onchange="onStateCheckChange()"> ${STATE_NAMES[st]} (${st})${count ? ` — ${count}` : ''}`;
+                if (!hasData) lbl.style.opacity = '0.5';
+                panel.appendChild(lbl);
+            });
+        }
+
+        function toggleStateDropdown() {
+            document.getElementById('stateDropdownPanel').classList.toggle('open');
+        }
+
+        function getSelectedStates() {
+            return [...document.querySelectorAll('#stateDropdownPanel input[type="checkbox"]:checked')].map(cb => cb.value);
+        }
+
+        function setSelectedStates(states) {
+            document.querySelectorAll('#stateDropdownPanel input[type="checkbox"]').forEach(cb => {
+                cb.checked = states.includes(cb.value);
+            });
+            updateSelectedStateTags();
+            performSearch();
+        }
+
+        function onStateCheckChange() {
+            updateSelectedStateTags();
+            updateRegionButtonStates();
+            performSearch();
+        }
+
+        function updateSelectedStateTags() {
+            const container = document.getElementById('selectedStateTags');
+            const selected = getSelectedStates();
+            if (selected.length === 0) {
+                container.innerHTML = '<span style="color:#94a3b8;font-size:12px;">All locations</span>';
+                document.getElementById('stateDropdownTrigger').querySelector('span').textContent = 'Select states...';
+                return;
+            }
+            container.innerHTML = selected.map(st =>
+                `<span class="location-tag">${st} <span class="remove-tag" onclick="removeState('${st}')">&times;</span></span>`
+            ).join('');
+            document.getElementById('stateDropdownTrigger').querySelector('span').textContent = `${selected.length} state${selected.length > 1 ? 's' : ''} selected`;
+        }
+
+        function removeState(st) {
+            const cb = document.querySelector(`#stateDropdownPanel input[value="${st}"]`);
+            if (cb) cb.checked = false;
+            onStateCheckChange();
+        }
+
+        function toggleRegion(regionKey, btn) {
+            const regionStates = REGIONS[regionKey];
+            const currentSelected = getSelectedStates();
+            const allInRegionSelected = regionStates.every(s => currentSelected.includes(s));
+
+            if (allInRegionSelected) {
+                // Deselect this region's states
+                regionStates.forEach(s => {
+                    const cb = document.querySelector(`#stateDropdownPanel input[value="${s}"]`);
+                    if (cb) cb.checked = false;
+                });
+                btn.classList.remove('active');
+            } else {
+                // Select this region's states (additive)
+                regionStates.forEach(s => {
+                    const cb = document.querySelector(`#stateDropdownPanel input[value="${s}"]`);
+                    if (cb) cb.checked = true;
+                });
+                btn.classList.add('active');
+            }
+            updateSelectedStateTags();
+            updateRegionButtonStates();
+            performSearch();
+        }
+
+        function updateRegionButtonStates() {
+            const selected = getSelectedStates();
+            document.querySelectorAll('.region-btn').forEach(btn => {
+                const regionName = btn.textContent.trim().toLowerCase().replace(/[ -]/g, '_');
+                const regionKey = Object.keys(REGIONS).find(k => k === regionName);
+                if (regionKey) {
+                    const allIn = REGIONS[regionKey].every(s => selected.includes(s));
+                    btn.classList.toggle('active', allIn);
+                }
+            });
+        }
+
+        function handleNearMe() {
+            const btn = document.getElementById('nearMeBtn');
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser. Select states manually.');
+                return;
+            }
+            btn.classList.add('loading');
+            btn.textContent = '📍 Locating...';
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const userState = resolveStateFromCoords(latitude, longitude);
+                    btn.classList.remove('loading');
+                    btn.textContent = '📍 Near Me';
+                    if (userState) {
+                        const neighbors = NEIGHBOR_STATES[userState] || [];
+                        const nearStates = [userState, ...neighbors];
+                        setSelectedStates(nearStates);
+                        btn.classList.add('active');
+                    } else {
+                        alert('Could not determine your state. Select states manually.');
+                    }
+                },
+                (error) => {
+                    btn.classList.remove('loading');
+                    btn.textContent = '📍 Near Me';
+                    alert('Location access denied. Select states manually.');
+                },
+                { timeout: 8000 }
+            );
+        }
+
+        function resolveStateFromCoords(lat, lng) {
+            let bestMatch = null;
+            let bestArea = Infinity;
+            for (const [st, bounds] of Object.entries(STATE_BOUNDS)) {
+                const [minLat, maxLat, minLng, maxLng] = bounds;
+                if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+                    const area = (maxLat - minLat) * (maxLng - minLng);
+                    if (area < bestArea) {
+                        bestArea = area;
+                        bestMatch = st;
+                    }
+                }
+            }
+            return bestMatch;
+        }
+
+        function parseExpirationDate(dateStr) {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function performSearch() {
+            const primeSearch = document.getElementById('searchPrime').value.toLowerCase();
+            const naicsSearch = document.getElementById('searchNaics').value;
+            const agencySearch = document.getElementById('searchAgency').value;
+            const valueSearch = document.getElementById('searchValue').value;
+            const awardSearch = document.getElementById('searchAward').value.toLowerCase();
+            const expirationSearch = document.getElementById('searchExpiration').value;
+            const officeSearch = document.getElementById('searchOffice').value.toLowerCase();
+            const selectedStates = getSelectedStates();
+            const includeNoLocation = document.getElementById('includeNoLocation').checked;
+
+            const now = new Date();
+
+            filteredResults = allContracts.filter(contract => {
+                if (primeSearch && !contract.Recipient?.toLowerCase().includes(primeSearch)) return false;
+                if (naicsSearch && !contract.NAICS?.includes(naicsSearch)) return false;
+                if (agencySearch && contract.Agency !== agencySearch) return false;
+                if (awardSearch && !contract['Award ID']?.toLowerCase().includes(awardSearch)) return false;
+                if (officeSearch && !contract.Office?.toLowerCase().includes(officeSearch)) return false;
+
+                // Multi-state filter
+                if (selectedStates.length > 0) {
+                    const contractState = contract.State?.trim();
+                    if (!contractState) {
+                        if (!includeNoLocation) return false;
+                    } else {
+                        if (!selectedStates.includes(contractState)) return false;
+                    }
+                }
+
+                if (valueSearch) {
+                    const value = parseValue(contract['Total Value']);
+                    if (valueSearch === 'micro' && value >= 250000) return false;
+                    if (valueSearch === 'small' && (value < 250000 || value >= 1e6)) return false;
+                    if (valueSearch === 'medium' && (value < 1e6 || value >= 1e7)) return false;
+                    if (valueSearch === 'large' && (value < 1e7 || value >= 1e8)) return false;
+                    if (valueSearch === 'major' && value < 1e8) return false;
+                }
+
+                if (expirationSearch) {
+                    const expDate = parseExpirationDate(contract.Expiration);
+                    if (!expDate) return false;
+                    const monthsAway = (expDate - now) / (1000 * 60 * 60 * 24 * 30.44);
+                    if (expirationSearch === '3' && monthsAway > 3) return false;
+                    if (expirationSearch === '3-6' && (monthsAway <= 3 || monthsAway > 6)) return false;
+                    if (expirationSearch === '6-12' && (monthsAway <= 6 || monthsAway > 12)) return false;
+                    if (expirationSearch === '12+' && monthsAway <= 12) return false;
+                }
+
+                return true;
+            });
+
+            sortResults();
+            currentPage = 1;
+            renderResults();
+        }
+
+        function clearFilters() {
+            document.getElementById('searchPrime').value = '';
+            document.getElementById('searchNaics').value = '';
+            document.getElementById('searchAgency').value = '';
+            document.getElementById('searchValue').value = '';
+            document.getElementById('searchAward').value = '';
+            document.getElementById('searchExpiration').value = '';
+            document.getElementById('searchOffice').value = '';
+            // Clear all state checkboxes
+            document.querySelectorAll('#stateDropdownPanel input[type="checkbox"]').forEach(cb => cb.checked = false);
+            document.getElementById('includeNoLocation').checked = true;
+            // Clear region button highlights
+            document.querySelectorAll('.region-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('nearMeBtn').classList.remove('active');
+            updateSelectedStateTags();
+            filteredResults = [...allContracts];
+            sortResults();
+            currentPage = 1;
+            renderResults();
+        }
+
+        function renderResults() {
+            const tbody = document.getElementById('resultsBody');
+            const perPageSelect = document.getElementById('perPageSelect');
+            const effectivePerPage = perPageSelect && perPageSelect.value === 'all' ? filteredResults.length : perPage;
+            const start = (currentPage - 1) * effectivePerPage;
+            const end = start + effectivePerPage;
+            const pageResults = filteredResults.slice(start, end);
+
+            document.getElementById('resultsCount').textContent =
+                `Showing ${start + 1}-${Math.min(end, filteredResults.length)} of ${filteredResults.length.toLocaleString()} contracts`;
+
+            if (pageResults.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="no-results">
+                                <div class="no-results-icon">🔍</div>
+                                <h3>No contracts found</h3>
+                                <p>Try adjusting your filters</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            tbody.innerHTML = pageResults.map((contract, idx) => {
+                const value = parseValue(contract['Total Value']);
+                const valueClass = value >= 100000000 ? 'high' : '';
+                const naicsCode = contract.NAICS?.split(' ')[0] || '';
+                const globalIdx = (currentPage - 1) * effectivePerPage + idx;
+                const bidsBadge = getBidsBadge(contract.numberOfBids, contract.competitionLevel);
+
+                return `
+                    <tr onclick="showContractDetails(${globalIdx})">
+                        <td class="prime-name">${contract.Recipient || 'Unknown'}</td>
+                        <td class="agency-name">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}${contract.State ? `<span class="state-badge">${contract.State}</span>` : ''}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
+                        <td class="contract-value ${valueClass}">${formatValueDisplay(contract['Total Value'])}</td>
+                        <td>${bidsBadge}</td>
+                        <td><span class="naics-badge">${naicsCode}</span></td>
+                        <td><span class="date-badge">${contract.Expiration || 'N/A'}</span></td>
+                        <td class="award-id">${contract['Award ID'] || 'N/A'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const perPageSelect = document.getElementById('perPageSelect');
+            const effectivePerPage = perPageSelect && perPageSelect.value === 'all' ? filteredResults.length : perPage;
+            const totalPages = Math.ceil(filteredResults.length / effectivePerPage);
+            const pagination = document.getElementById('pagination');
+
+            if (totalPages <= 1) {
+                pagination.style.display = 'none';
+                return;
+            }
+
+            pagination.style.display = 'flex';
+            let html = '';
+
+            html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">← Prev</button>`;
+
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+
+            if (endPage - startPage < maxPages - 1) {
+                startPage = Math.max(1, endPage - maxPages + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button onclick="goToPage(1)">1</button>`;
+                if (startPage > 2) html += `<span class="pagination-info">...</span>`;
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="${i === currentPage ? 'current' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span class="pagination-info">...</span>`;
+                html += `<button onclick="goToPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">Next →</button>`;
+
+            pagination.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderResults();
+            window.scrollTo({ top: document.querySelector('.results-section').offsetTop - 20, behavior: 'smooth' });
+        }
+
+        function showContractDetails(idx) {
+            const contract = filteredResults[idx];
+            if (!contract) return;
+
+            document.getElementById('modalTitle').textContent = contract.Recipient || 'Unknown';
+            document.getElementById('modalSubtitle').textContent = contract.Agency || '';
+
+            // Build contracts table
+            let contractsTable = '';
+            if (contract.Contracts && contract.Contracts.length > 0) {
+                contractsTable = `
+                    <div style="margin-top:20px;">
+                        <h4 style="font-size:14px;color:#64748b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">All Contracts (${contract.Contracts.length})</h4>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                                <thead>
+                                    <tr style="background:#f8fafc;">
+                                        <th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Award ID</th>
+                                        <th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Start Date</th>
+                                        <th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Expires</th>
+                                        <th style="padding:10px;text-align:right;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${contract.Contracts.map(c => `
+                                        <tr style="border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px;font-family:monospace;">
+                                                ${c['Award ID'] ? `<a href="https://www.usaspending.gov/keyword_search/${encodeURIComponent(c['Award ID'])}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:none;font-weight:500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${c['Award ID']} ↗</a>` : 'N/A'}
+                                            </td>
+                                            <td style="padding:10px;color:#0369a1;">${c['Start Date'] || 'N/A'}</td>
+                                            <td style="padding:10px;color:#dc2626;font-weight:600;">${c['Expiration'] || 'N/A'}</td>
+                                            <td style="padding:10px;text-align:right;color:#059669;font-weight:600;">${formatValueDisplay(c['Value'])}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Build budget row if data available
+            let budgetRow = '';
+            const agencyBudget = contract.Agency ? (() => {
+                const norm = contract.Agency.toLowerCase().replace(/\s+/g, ' ').trim();
+                for (const [key, data] of Object.entries(budgetMap)) {
+                    const nk = key.toLowerCase().replace(/\s+/g, ' ').trim();
+                    if (nk === norm || norm.includes(nk) || nk.includes(norm)) return data;
+                }
+                return null;
+            })() : null;
+            if (agencyBudget) {
+                const pct = ((agencyBudget.change.percent - 1) * 100).toFixed(1);
+                const isUp = agencyBudget.change.percent >= 1;
+                const color = isUp ? '#059669' : '#dc2626';
+                budgetRow = `
+                <div class="detail-row">
+                    <div class="detail-label">FY2026 Budget</div>
+                    <div class="detail-value" style="color:${color};font-weight:600">
+                        $${(agencyBudget.fy2025.budgetAuthority / 1e9).toFixed(1)}B → $${(agencyBudget.fy2026.budgetAuthority / 1e9).toFixed(1)}B
+                        (${isUp ? '+' : ''}${pct}%, ${agencyBudget.change.trend})
+                        <div style="font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px">Source: OMB FY2026 Discretionary Budget Request (May 2025)</div>
+                    </div>
+                </div>`;
+            }
+
+            document.getElementById('modalBody').innerHTML = `
+                <div class="detail-row">
+                    <div class="detail-label">Agency</div>
+                    <div class="detail-value">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}</div>
+                </div>
+                ${budgetRow}
+                <div class="detail-row">
+                    <div class="detail-label">Office</div>
+                    <div class="detail-value">${contract.Office || 'N/A'}</div>
+                </div>
+                ${contract.State ? `<div class="detail-row">
+                    <div class="detail-label">State</div>
+                    <div class="detail-value"><span class="state-badge" style="font-size:13px;padding:4px 10px;">${contract.State}</span></div>
+                </div>` : ''}
+                <div class="detail-row">
+                    <div class="detail-label">Total Value</div>
+                    <div class="detail-value highlight">${formatValueDisplay(contract['Total Value'])}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">NAICS</div>
+                    <div class="detail-value">${contract.NAICS || 'N/A'}</div>
+                </div>
+                ${contractsTable}
+                <div style="margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:center;">
+                    <a href="https://www.usaspending.gov/keyword_search/${encodeURIComponent(contract.Recipient || '')}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;transition:transform 0.2s,box-shadow 0.2s;"
+                       onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(37,99,235,0.4)'"
+                       onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                        <span>View on USASpending</span>
+                        <span style="font-size:16px;">↗</span>
+                    </a>
+                </div>
+            `;
+
+            document.getElementById('contractModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('contractModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Debounced auto-search
+        let searchTimeout = null;
+        function debouncedSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 300);
+        }
+
+        // Per-page selector
+        function handlePerPageChange() {
+            const val = document.getElementById('perPageSelect').value;
+            perPage = val === 'all' ? filteredResults.length || allContracts.length : parseInt(val);
+            currentPage = 1;
+            renderResults();
+        }
+
+        // CSV Export
+        function exportFilteredCSV() {
+            if (filteredResults.length === 0) return;
+
+            const headers = ['Recipient', 'Agency', 'Office', 'State', 'NAICS Code', 'NAICS Description', 'Total Value', 'Expiration', 'Start Date', 'Award ID', 'Contract Count'];
+
+            function csvEscape(val) {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            }
+
+            const rows = filteredResults.map(c => {
+                const naicsParts = (c.NAICS || '').split(' ');
+                const naicsCode = naicsParts[0] || '';
+                const naicsDesc = naicsParts.slice(1).join(' ').replace(/^-\s*/, '') || '';
+                const contractCount = c.Contracts ? c.Contracts.length : 1;
+                const startDate = c.Contracts && c.Contracts.length > 0 ? c.Contracts[0]['Start Date'] || '' : '';
+                return [
+                    c.Recipient || '',
+                    c.Agency || '',
+                    c.Office || '',
+                    c.State || '',
+                    naicsCode,
+                    naicsDesc,
+                    c['Total Value'] || '',
+                    c.Expiration || '',
+                    startDate,
+                    c['Award ID'] || '',
+                    contractCount
+                ].map(csvEscape).join(',');
+            });
+
+            // Add watermark header with user email
+            const meta = userEmail ? [`Licensed to: ${userEmail} | Generated: ${new Date().toISOString().split('T')[0]} | GovCon Giants AI`] : [];
+            const csv = [...meta, headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const date = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `recompete-contracts-${date}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Excel Export
+        function exportFilteredExcel() {
+            if (filteredResults.length === 0 || typeof XLSX === 'undefined') return;
+
+            const data = filteredResults.map(c => {
+                const naicsParts = (c.NAICS || '').split(' ');
+                const naicsCode = naicsParts[0] || '';
+                const naicsDesc = naicsParts.slice(1).join(' ').replace(/^-\s*/, '') || '';
+                const contractCount = c.Contracts ? c.Contracts.length : 1;
+                const startDate = c.Contracts && c.Contracts.length > 0 ? c.Contracts[0]['Start Date'] || '' : '';
+                return {
+                    'Recipient': c.Recipient || '',
+                    'Agency': c.Agency || '',
+                    'Office': c.Office || '',
+                    'State': c.State || '',
+                    'NAICS Code': naicsCode,
+                    'NAICS Description': naicsDesc,
+                    'Total Value': c['Total Value'] || '',
+                    'Expiration': c.Expiration || '',
+                    'Start Date': startDate,
+                    'Award ID': c['Award ID'] || '',
+                    'Contract Count': contractCount
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+
+            // Auto-width columns
+            const colWidths = Object.keys(data[0]).map(key => {
+                const maxLen = Math.max(key.length, ...data.map(row => String(row[key] || '').length));
+                return { wch: Math.min(maxLen + 2, 40) };
+            });
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Recompete Contracts');
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `recompete-contracts-${date}.xlsx`);
+        }
+
+        // PDF Export
+        function exportFilteredPDF() {
+            if (filteredResults.length === 0 || typeof jspdf === 'undefined') return;
+
+            const { jsPDF } = jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const date = new Date().toISOString().split('T')[0];
+
+            // --- Header branding ---
+            // Red/orange gradient bar
+            doc.setFillColor(220, 38, 38);
+            doc.rect(0, 0, pageWidth * 0.6, 28, 'F');
+            doc.setFillColor(245, 158, 11);
+            doc.rect(pageWidth * 0.6, 0, pageWidth * 0.4, 28, 'F');
+
+            // Brand name
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('GOVCON GIANTS', 14, 10);
+
+            // Title
+            doc.setFontSize(16);
+            doc.text('Recompete Contracts Report', 14, 20);
+
+            // Date on right side
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Generated: ${date}`, pageWidth - 14, 10, { align: 'right' });
+            doc.text(`${filteredResults.length.toLocaleString()} contracts`, pageWidth - 14, 17, { align: 'right' });
+
+            // Filter summary
+            const activeFilters = [];
+            const primeVal = document.getElementById('searchPrime').value;
+            const naicsVal = document.getElementById('searchNaics').value;
+            const agencyVal = document.getElementById('searchAgency').value;
+            const valueVal = document.getElementById('searchValue').value;
+            const statesSelected = getSelectedStates();
+            const expVal = document.getElementById('searchExpiration').value;
+            const officeVal = document.getElementById('searchOffice').value;
+            if (primeVal) activeFilters.push(`Contractor: ${primeVal}`);
+            if (naicsVal) activeFilters.push(`NAICS: ${naicsVal}`);
+            if (agencyVal) activeFilters.push(`Agency: ${agencyVal}`);
+            if (valueVal) activeFilters.push(`Value: ${valueVal}`);
+            if (statesSelected.length > 0) activeFilters.push(`States: ${statesSelected.join(', ')}`);
+            if (expVal) activeFilters.push(`Expires: ${expVal} mo`);
+            if (officeVal) activeFilters.push(`Office: ${officeVal}`);
+
+            let tableStartY = 34;
+            if (activeFilters.length > 0) {
+                doc.setTextColor(100, 116, 139);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'italic');
+                doc.text(`Filters: ${activeFilters.join(' | ')}`, 14, 32);
+                tableStartY = 37;
+            }
+
+            // --- Table data ---
+            const tableData = filteredResults.map(c => {
+                const recipient = (c.Recipient || 'Unknown');
+                const truncRecipient = recipient.length > 28 ? recipient.substring(0, 26) + '...' : recipient;
+                const naicsParts = (c.NAICS || '').split(' - ');
+                const naicsCode = (c.NAICS || '').split(' ')[0] || '';
+                const naicsDesc = naicsParts[1] ? naicsParts[1].substring(0, 25) : '';
+                const naicsDisplay = naicsDesc ? naicsCode + '\n' + naicsDesc : naicsCode;
+                const awardId = (c['Award ID'] || 'N/A').split(' (')[0].split(' +')[0];
+                const office = (c.Office || '').substring(0, 30);
+                const contractCount = c.Contracts ? c.Contracts.length : 1;
+                const startDate = c.Contracts && c.Contracts.length > 0 ? c.Contracts[0]['Start Date'] || '' : '';
+                return [
+                    truncRecipient,
+                    (c.Agency || 'N/A').substring(0, 30) + (office ? '\n' + office : ''),
+                    c.State || '',
+                    naicsDisplay,
+                    formatValueDisplay(c['Total Value']),
+                    startDate + '\n' + (c.Expiration || 'N/A'),
+                    awardId,
+                    contractCount
+                ];
+            });
+
+            doc.autoTable({
+                startY: tableStartY,
+                head: [['Recipient', 'Agency / Office', 'State', 'NAICS', 'Value', 'Start / Expires', 'Award ID', '#']],
+                body: tableData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 6.5,
+                    cellPadding: 2,
+                    lineColor: [226, 232, 240],
+                    lineWidth: 0.2,
+                    overflow: 'ellipsize',
+                    font: 'helvetica'
+                },
+                headStyles: {
+                    fillColor: [30, 41, 59],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 7
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 250, 252]
+                },
+                columnStyles: {
+                    0: { cellWidth: 52 },
+                    1: { cellWidth: 55 },
+                    2: { cellWidth: 14, halign: 'center' },
+                    3: { cellWidth: 40 },
+                    4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+                    5: { cellWidth: 32, halign: 'center' },
+                    6: { cellWidth: 38, fontSize: 5.5 },
+                    7: { cellWidth: 10, halign: 'center' }
+                },
+                margin: { left: 14, right: 14 },
+                didDrawPage: function(data) {
+                    // Diagonal watermark with user email
+                    if (userEmail) {
+                        doc.saveGraphicsState();
+                        doc.setFontSize(36);
+                        doc.setTextColor(200, 200, 200);
+                        doc.setFont('helvetica', 'bold');
+                        const gState = new doc.GState({ opacity: 0.08 });
+                        doc.setGState(gState);
+                        const centerX = pageWidth / 2;
+                        const centerY = pageHeight / 2;
+                        doc.text(userEmail, centerX, centerY, {
+                            align: 'center',
+                            angle: 35,
+                        });
+                        doc.restoreGraphicsState();
+                    }
+
+                    // Footer on every page
+                    const pageNum = doc.internal.getCurrentPageInfo().pageNumber;
+                    const totalPages = doc.internal.getNumberOfPages();
+                    doc.setFontSize(7);
+                    doc.setTextColor(148, 163, 184);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(
+                        'Data from USASpending.gov | GovCon Giants AI',
+                        14,
+                        pageHeight - 8
+                    );
+                    doc.text(
+                        userEmail ? `Licensed to: ${userEmail} | Page ${pageNum} of ${totalPages}` : `Page ${pageNum} of ${totalPages}`,
+                        pageWidth - 14,
+                        pageHeight - 8,
+                        { align: 'right' }
+                    );
+                }
+            });
+
+            doc.save(`recompete-contracts-${date}.pdf`);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+
+            // Attach debounced search to text inputs
+            ['searchPrime', 'searchNaics', 'searchAward', 'searchOffice'].forEach(id => {
+                document.getElementById(id).addEventListener('input', debouncedSearch);
+            });
+
+            // Attach instant search to dropdowns
+            ['searchAgency', 'searchValue', 'searchExpiration'].forEach(id => {
+                document.getElementById(id).addEventListener('change', performSearch);
+            });
+
+            // Close state dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                const dropdown = document.querySelector('.state-checkboxes-dropdown');
+                if (dropdown && !dropdown.contains(e.target)) {
+                    document.getElementById('stateDropdownPanel').classList.remove('open');
+                }
+            });
+
+            // Per-page selector
+            document.getElementById('perPageSelect').addEventListener('change', handlePerPageChange);
+        });
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+    </script>
+</body>
+</html>

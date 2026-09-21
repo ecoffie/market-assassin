@@ -1,0 +1,136 @@
+{
+  "name": "Department of Labor",
+  "abbreviation": "DOL",
+  "parentAgency": null,
+  "description": "The Department of Labor fosters and promotes the welfare of job seekers, wage earners, and retirees by improving working conditions, advancing opportunities for profitable employment, and assuring work-related benefits and rights.",
+  "website": "https://www.dol.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$13.9 billion",
+    "procurementBudget": "$500M+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Legacy IT systems modernization needed for unemployment insurance, workforce development, and occupational safety data management",
+      "source": "Department of Labor IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Unemployment insurance system capacity and processing improvements required to handle peak demand periods",
+      "source": "DOL Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Workforce development program data integration and reporting capabilities need enhancement",
+      "source": "DOL Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Cybersecurity and data protection for sensitive worker and employer information",
+      "source": "DOL Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Occupational Safety and Health Administration (OSHA) data collection and analysis system improvements",
+      "source": "OSHA Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting unemployment insurance and workforce IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Unemployment Insurance System Modernization",
+      "source": "DOL Budget Justification FY2025",
+      "deadline": "Ongoing multi-year initiative"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "DOL IT Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Workforce Development Data Systems",
+      "source": "DOL Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity Enhancement",
+      "source": "DOL Cybersecurity Strategy",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "Department of Labor Budget Justification FY2025 - https://www.dol.gov/agencies/oasam/centers-offices/business-operations-center/osdbu/procurement-forecast",
+      "DOL Strategic Plan - https://www.dol.gov/aboutdol/strategic-plan",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on Department of Labor IT Systems"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $25M",
+    "large": "$25M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Unemployment insurance system experience",
+      "Workforce development system knowledge",
+      "Data analytics and reporting",
+      "Cybersecurity capabilities",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with labor or workforce systems",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Small and Disadvantaged Business Utilization (OSDBU)",
+    "Employment and Training Administration (ETA)",
+    "Occupational Safety and Health Administration (OSHA)"
+  ],
+  "insights": [
+    "Unemployment insurance system modernization is a major focus area",
+    "Workforce development data systems require ongoing improvements",
+    "Strong emphasis on small business participation",
+    "IT infrastructure modernization priorities across multiple programs",
+    "Data analytics and reporting capabilities are growing needs"
+  ]
+}
+

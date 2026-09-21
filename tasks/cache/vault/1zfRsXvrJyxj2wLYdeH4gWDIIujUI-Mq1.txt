@@ -1,0 +1,14 @@
+CALLING 8(a) FIRMS — PHONE SCRIPT (cold-call script for a consultant offering to bring federal opportunities to an 8(a) company)
+
+"Hi, good afternoon Javier. My name is Maria and I actually got your information from your SBA profile. I do see that you are 8(a) and that you've had it for the last few years, but I didn't see any contracts.
+
+So I was just calling you because I actually found this opportunity, and I think it suits you and your company. I just wanted to go over it for a little bit — if you have a few minutes, we could talk about it. There is a scheduled site visit coming up next week. I could go over it with you, or send you the scope of work and see if you're interested, then schedule a time to talk."
+
+If they ask what you do:
+"I'm a consultant — I do government contracts. I help companies like yours and other small businesses find opportunities from federal agencies, and I bring you those opportunities. We could go over everything; I can help you put it all together. You and your team would help me with the technicals, estimates, and so on. Together we put these opportunities together to go after the contracts.
+
+Right now this one is off beta.SAM, but going forward I'll help you do market research and see which agencies need and buy your products and services — so we don't always have to bid: being 8(a), you can get them sole-source. I'll help you build those relationships and find those opportunities."
+
+Close: "If you give me a few minutes, we could schedule a time to do a Zoom call. It's totally up to you — I just think this would be a great match for us."
+
+Teaching point: a consultant's outreach call to an 8(a) firm leads with a real, specific opportunity (from their SBA profile), positions the consultant as the rainmaker who brings opportunities while the firm supplies technical/estimating, and pivots to long-term sole-source relationship-building via market research.

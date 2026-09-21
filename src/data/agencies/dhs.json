@@ -1,0 +1,175 @@
+{
+  "name": "Department of Homeland Security",
+  "abbreviation": "DHS",
+  "parentAgency": null,
+  "description": "DHS is responsible for public security, including border security, immigration enforcement, cybersecurity, disaster prevention and management, and counter-terrorism.",
+  "website": "https://www.dhs.gov",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$103.2 billion",
+    "procurementBudget": "$8.9 billion"
+  },
+  "painPoints": [
+    {
+      "point": "Border surveillance technology modernization and detection system upgrades",
+      "source": "DHS Acquisition Forecast FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity for critical infrastructure protection gaps",
+      "source": "GAO High-Risk List 2025 - Critical Infrastructure",
+      "priority": "high"
+    },
+    {
+      "point": "Immigration system IT modernization delays affecting processing capacity",
+      "source": "DHS OIG Reports 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Biometric identification system integration and interoperability challenges",
+      "source": "DHS Biometric Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Emergency response coordination and preparedness system improvements",
+      "source": "FEMA Strategic Plan 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Supply chain security and port of entry modernization",
+      "source": "CBP Technology Modernization Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Workforce capacity in cybersecurity and IT modernization",
+      "source": "DHS Workforce Planning 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Federal disaster assistance delivery challenges due to increasing frequency and intensity of natural disasters, with 27 disasters in 2024 causing at least $1 billion in damages each, straining federal resources and requiring more efficient relief efforts",
+      "source": "GAO High-Risk List 2025 - Improving the Delivery of Federal Disaster Assistance",
+      "priority": "high"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting government-wide IT investments",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Border Security Technology Modernization",
+      "source": "DHS Budget Justification FY2025",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Cybersecurity and Critical Infrastructure Protection",
+      "source": "CISA Strategic Plan 2025",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Biometric Identification and Screening Enhancement",
+      "source": "DHS Biometric Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "priority": "Emergency Response and Preparedness Modernization",
+      "source": "FEMA Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "priority": "Immigration System IT Modernization",
+      "source": "DHS Acquisition Forecast",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Transportation Security Enhancement",
+      "source": "TSA Technology Roadmap",
+      "priority": "medium"
+    },
+    {
+      "priority": "Federal Disaster Assistance Delivery Improvements",
+      "source": "GAO High-Risk List 2025 - Improving the Delivery of Federal Disaster Assistance",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "DHS Acquisition Forecast - https://www.dhs.gov/acquisition-forecast",
+      "GAO High-Risk List 2025 - https://www.gao.gov/highrisk",
+      "DHS OIG Reports - https://www.oig.dhs.gov",
+      "DHS Budget Justification FY2025 - https://www.dhs.gov/budget"
+    ],
+    "secondary": [
+      "CISA Strategic Plan",
+      "FEMA Strategic Plan",
+      "GSA Acquisition Gateway Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "334111",
+    "541330",
+    "334511",
+    "541715",
+    "518210",
+    "541712",
+    "541611"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts",
+    "BPA"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $50M",
+    "large": "$50M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "DHS EAGLE II and FirstSource holders",
+      "Cybersecurity expertise",
+      "Border security technology experience",
+      "Emergency response capabilities",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-18 months average",
+    "competitionLevel": "Highly competitive",
+    "evaluationFactors": [
+      "Technical approach",
+      "Past performance with DHS/homeland security",
+      "Price/cost",
+      "Small business participation",
+      "Security clearances"
+    ]
+  },
+  "keyComponents": [
+    "U.S. Customs and Border Protection (CBP)",
+    "Transportation Security Administration (TSA)",
+    "Federal Emergency Management Agency (FEMA)",
+    "Cybersecurity and Infrastructure Security Agency (CISA)",
+    "Immigration and Customs Enforcement (ICE)"
+  ],
+  "insights": [
+    "DHS uses EAGLE II and FirstSource contract vehicles extensively",
+    "Border security technology modernization is ongoing multi-billion dollar priority",
+    "Cybersecurity for critical infrastructure is growing focus area",
+    "Emergency response contracts are frequently issued on short notice",
+    "Biometric identification systems are high-priority technology area",
+    "Strong preference for small businesses in IT and professional services"
+  ]
+}
+

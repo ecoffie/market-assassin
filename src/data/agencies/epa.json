@@ -1,0 +1,186 @@
+{
+  "name": "Environmental Protection Agency",
+  "abbreviation": "EPA",
+  "parentAgency": null,
+  "description": "The EPA protects human health and the environment through regulation and enforcement. The agency conducts environmental assessment, research, and education on pollution control and environmental stewardship.",
+  "website": "https://www.epa.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$21.14 billion (including Infrastructure Investment and Jobs Act funding)",
+    "procurementBudget": "$3.04 billion for water infrastructure programs"
+  },
+  "painPoints": [
+    {
+      "point": "Massive water infrastructure funding gap - $630.1 billion needed for wastewater/stormwater over 20 years and $625 billion for drinking water systems",
+      "source": "EPA 2024 Infrastructure Needs Survey & 2023 Drinking Water Assessment",
+      "priority": "critical"
+    },
+    {
+      "point": "PFAS contamination at federal facility Superfund sites requiring complex enforcement and remediation",
+      "source": "EPA FY2025 Budget - Superfund Enforcement Federal Facilities",
+      "priority": "critical"
+    },
+    {
+      "point": "Public water systems must implement PFAS treatment by 2029 - technical assistance and compliance monitoring challenges",
+      "source": "Bipartisan Infrastructure Law PFAS Implementation Requirements",
+      "priority": "high"
+    },
+    {
+      "point": "Unclear guidance on Drinking Water SRF Emerging Contaminants funds for non-PFAS contaminants",
+      "source": "EPA OIG Report February 2025 - SRF Emerging Contaminants Guidance",
+      "priority": "high"
+    },
+    {
+      "point": "Climate change resilience gaps in workforce protection, facilities, critical infrastructure, and supply chains",
+      "source": "National Water Program Guidance FY2025-2026 - Climate Adaptation",
+      "priority": "high"
+    },
+    {
+      "point": "Limited capacity to process $10 billion in Bipartisan Infrastructure Law relief for PFAS-affected communities",
+      "source": "Bipartisan Infrastructure Law - PFAS and Emerging Contaminants Relief Program",
+      "priority": "high"
+    },
+    {
+      "point": "Water quality monitoring and data management system modernization needs",
+      "source": "National Water Program Guidance FY2025-2026",
+      "priority": "medium"
+    },
+    {
+      "point": "Procurement process vulnerabilities to climate-related supply chain disruptions",
+      "source": "EPA Climate Change Adaptation Strategy",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting environmental monitoring and regulatory IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "PFAS contamination remediation and compliance - $10 billion relief program implementation",
+      "source": "Bipartisan Infrastructure Law P.L. 117-58",
+      "funding": "$10 billion for PFAS and emerging contaminants",
+      "deadline": "2029 treatment implementation deadline"
+    },
+    {
+      "priority": "Water infrastructure modernization - drinking water and wastewater systems upgrades",
+      "source": "P.L. 119-4 FY2025 Appropriations",
+      "funding": "$3.04 billion for water infrastructure programs",
+      "priority": "critical"
+    },
+    {
+      "priority": "Superfund enforcement at federal facilities including PFAS contamination sites",
+      "source": "EPA FY2025 Congressional Justification",
+      "priority": "high"
+    },
+    {
+      "priority": "Climate change adaptation and resilience for EPA operations and water infrastructure",
+      "source": "National Water Program Guidance FY2025-2026",
+      "priority": "high"
+    },
+    {
+      "priority": "Emerging contaminants monitoring, detection, and treatment technology development",
+      "source": "EPA Drinking Water SRF Emerging Contaminants Program",
+      "funding": "Part of $3.04B water infrastructure allocation"
+    },
+    {
+      "priority": "Environmental data management and water quality monitoring system upgrades",
+      "source": "National Water Program Guidance FY2025-2026",
+      "priority": "medium"
+    },
+    {
+      "priority": "Supply chain and procurement climate resilience improvements",
+      "source": "EPA Climate Change Adaptation Strategy",
+      "priority": "medium"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "EPA FY2025 Budget in Brief - https://www.epa.gov/system/files/documents/2024-03/fy-2025-epa-bib.pdf",
+      "EPA FY2025 Congressional Justification - https://www.epa.gov/system/files/documents/2024-04/fy25-cj-00-overview.pdf",
+      "National Water Program Guidance FY2025-2026 - https://www.epa.gov/system/files/documents/2024-07/fy-2025-2026-ow-npg.pdf",
+      "EPA Water Infrastructure Programs FY2025 Appropriations CRS IF12950 - https://www.congress.gov/crs-product/IF12950",
+      "GAO-25-108135 Oversight of EPA and DOE Spending - https://files.gao.gov/reports/GAO-25-108135"
+    ],
+    "secondary": [
+      "EPA FY2024 Annual Performance Report - https://www.epa.gov/system/files/documents/2025-01/fy24-annual-performance-report.pdf",
+      "EPA OIG Report February 2025 - SRF Emerging Contaminants Guidance",
+      "GAO Water Quality and Protection Reports - https://www.gao.gov/water-quality-and-protection"
+    ]
+  },
+  "commonNAICSCodes": [
+    "562910",
+    "562112",
+    "562119",
+    "541330",
+    "541620",
+    "541690",
+    "237110",
+    "221310",
+    "541380",
+    "541715"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "BPA (Blanket Purchase Agreement)",
+    "Cooperative Agreements",
+    "State Revolving Fund (SRF) Grants"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - environmental services ideal for small business",
+    "WOSB": "Active use for environmental consulting and engineering",
+    "8a": "Regular use for remediation and assessment services",
+    "HUBZone": "Moderate use - local environmental services",
+    "SDVOSB": "Active use for veteran-owned environmental firms",
+    "VOSB": "Regular use"
+  },
+  "typicalContractSizes": {
+    "small": "$100K - $5M (site assessments, monitoring)",
+    "medium": "$5M - $50M (remediation projects, infrastructure design)",
+    "large": "$50M - $500M+ (major infrastructure upgrades, Superfund sites)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Environmental engineering and remediation expertise",
+      "PFAS treatment and emerging contaminants experience",
+      "Water infrastructure design and construction",
+      "Environmental data management and monitoring systems",
+      "Climate adaptation and resilience planning",
+      "Superfund site experience and environmental compliance",
+      "State/local government partnership experience"
+    ],
+    "contractingTimeline": "6-24 months average (longer for major infrastructure)",
+    "competitionLevel": "Moderate to high - specialized expertise required",
+    "evaluationFactors": [
+      "Technical approach and environmental expertise",
+      "Past performance with EPA or environmental agencies",
+      "Compliance with environmental regulations",
+      "Price/cost reasonableness",
+      "Small business participation",
+      "Local presence and community engagement"
+    ]
+  },
+  "keyOffices": [
+    "Office of Water",
+    "Office of Land and Emergency Management (Superfund)",
+    "Office of Air and Radiation",
+    "Office of Chemical Safety and Pollution Prevention",
+    "Office of Research and Development",
+    "Office of Environmental Information",
+    "Regional Offices (10 regions nationwide)"
+  ],
+  "insights": [
+    "Water infrastructure represents trillion-dollar 20-year opportunity across drinking water, wastewater, and stormwater",
+    "PFAS remediation is urgent priority with $10B dedicated funding through 2029",
+    "Climate adaptation and resilience are cross-cutting priorities affecting all programs",
+    "Strong preference for small businesses and local firms for regional environmental services",
+    "Emerging contaminants detection and treatment is growing market segment",
+    "Superfund sites at federal facilities represent complex, multi-year contract opportunities",
+    "State Revolving Fund programs create opportunities for engineering and construction firms",
+    "Environmental data systems and monitoring technology are modernization priorities"
+  ]
+}

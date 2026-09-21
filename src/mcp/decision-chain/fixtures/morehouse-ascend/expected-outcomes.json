@@ -1,0 +1,255 @@
+{
+  "version": 2,
+  "label_source": "Eric 32-company Morehouse Ascend bug report (2026-08-30). room-profile.md not used; no invented NAICS labels.",
+  "baseline_measured": {
+    "date": "2026-08-30",
+    "production_prefix": "0f3708c3",
+    "wrong": 23,
+    "no_market": 2,
+    "correct": 7
+  },
+  "shared_forbidden": {
+    "generic_mission_led_substrings": [
+      "mission-first",
+      "mission-driven",
+      "helps mission",
+      "innovative",
+      "award-winning",
+      "expert solutions",
+      "trusted it",
+      "scalable technology",
+      "mission success",
+      "operational excellence",
+      "workforce innovation"
+    ],
+    "unrelated_rd_fallback_substrings": [
+      "research and development",
+      "r&d services",
+      "laboratory research"
+    ]
+  },
+  "cases": [
+    {
+      "participant_id": "brave-one-contract-agency",
+      "expectation_level": "exact_expected",
+      "expected_capability": "elevator maintenance",
+      "required_capability_signals": ["elevator", "maintenance", "facilities"],
+      "notes": "Preserve elevator maintenance / facilities management capability"
+    },
+    {
+      "participant_id": "deluxe-delivery-systems",
+      "expectation_level": "exact_expected",
+      "expected_capability": "courier services",
+      "required_capability_signals": ["courier", "delivery", "logistics"],
+      "notes": "Preserve courier / logistics capability"
+    },
+    {
+      "participant_id": "enspyre-llc",
+      "expectation_level": "exact_expected",
+      "expected_capability": "engineering services",
+      "required_capability_signals": ["energy", "engineering", "it"],
+      "notes": "IT and energy provider — engineering services anchor preserved"
+    },
+    {
+      "participant_id": "building-consultants-inc",
+      "expectation_level": "exact_expected",
+      "expected_capability": "construction specialists",
+      "required_capability_signals": ["construction", "engineer", "architect", "environmental", "preconstruction"],
+      "notes": "Construction specialists / A-E consulting"
+    },
+    {
+      "participant_id": "fredrick-oak-consulting",
+      "expectation_level": "exact_expected",
+      "expected_capability": "administrative capability",
+      "required_capability_signals": ["administrative", "human resources", "investigative", "program"],
+      "notes": "Administrative / HR / investigative support retained"
+    },
+    {
+      "participant_id": "information-management-resources-inc",
+      "expectation_level": "exact_expected",
+      "expected_capability": "cybersecurity",
+      "forbidden_anchors": ["imri"],
+      "required_capability_signals": ["cybersecurity", "security"],
+      "notes": "Strip IMRI brand; retain cybersecurity"
+    },
+    {
+      "participant_id": "undergrid",
+      "expectation_level": "exact_expected",
+      "expected_capability": "networks",
+      "required_capability_signals": ["network", "telecommunication", "infrastructure"],
+      "notes": "Networks / critical infrastructure"
+    },
+    {
+      "participant_id": "greenup-industries-llc",
+      "expectation_level": "exact_expected",
+      "expected_capability": "civil/general construction",
+      "required_behavior": "must_not_miss",
+      "required_capability_signals": ["construction", "civil", "engineering"],
+      "notes": "General civil construction + award-history evidence path"
+    },
+    {
+      "participant_id": "capitolhill-consortium-for-counseling-consultation-llc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["and"],
+      "notes": "Bare conjunction must never anchor"
+    },
+    {
+      "participant_id": "muse-technologies-inc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["helps mission-driven"],
+      "forbidden_substrings": ["helps mission", "mission-driven"],
+      "notes": "Verb-led mission filler"
+    },
+    {
+      "participant_id": "w2-consulting-corporation",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["firm focused"],
+      "forbidden_substrings": ["firm focused"],
+      "notes": "Meta phrase, not capability"
+    },
+    {
+      "participant_id": "gcubed-enterprises-llc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["certifications"],
+      "forbidden_substrings": ["certifications"],
+      "notes": "Certification language, not capability"
+    },
+    {
+      "participant_id": "morris-builders-llc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["asphalt", "roofing", "shingle"],
+      "reject_naics_prefixes_when_anchor_signals_construction": ["324"],
+      "notes": "Concrete reinforcement must not map to asphalt/roofing markets"
+    },
+    {
+      "participant_id": "anadria-consulting-llc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["outcomes"],
+      "forbidden_substrings": ["outcomes"],
+      "notes": "Generic abstraction"
+    },
+    {
+      "participant_id": "tpj-solutions-inc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["customized"],
+      "forbidden_substrings": ["customized"],
+      "notes": "Marketing abstraction"
+    },
+    {
+      "participant_id": "business-management-associates-inc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["bma", "mission-focused", "mission-focused consulting"],
+      "forbidden_substrings": ["bma", "mission-focused", "mission-driven", "people-always"],
+      "must_not_claim_high_confidence_without_evidence": true,
+      "notes": "Company acronym and mission adjectives cannot be the capability. The algorithm may correct the BMA regression scenario (mission-focused must not ground a TAM; human-capital language may, only with a uniquely resolved well-formed UEI) under deterministic SYNTHETIC evidence (SYNTH0BMA001, fixture NAICS 541611/541612). This is not a claim that the live Business Management Associates, Inc. identity or NAICS were verified from SAM/USASpending."
+    },
+    {
+      "participant_id": "roda-business-solutions",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["helps organizations", "roda"],
+      "notes": "Verb-led org filler; company token"
+    },
+    {
+      "participant_id": "comcentia",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["helps organizations"],
+      "notes": "Duplicate bad map class with RoDa"
+    },
+    {
+      "participant_id": "vision-centric-inc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["service-disabled veteran-owned", "service-disabled", "veteran-owned"],
+      "notes": "Socioeconomic cert language must not anchor"
+    },
+    {
+      "participant_id": "premier-regulatory-consulting",
+      "expectation_level": "behavioral_expected",
+      "forbidden_anchors": ["affairs"],
+      "forbidden_substrings": [" regulatory affairs", "affairs"],
+      "notes": "Generic affairs fragment"
+    },
+    {
+      "participant_id": "oban-corporation",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["provides practical"],
+      "notes": "Verb-led filler"
+    },
+    {
+      "participant_id": "smile-therapy-services",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["consulting company"],
+      "notes": "Meta company descriptor"
+    },
+    {
+      "participant_id": "icgm-group",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["provides commercial"],
+      "notes": "Verb-led filler"
+    },
+    {
+      "participant_id": "ovp-management-consulting-group-inc",
+      "expectation_level": "behavioral_expected",
+      "forbidden_substrings": ["air transport", "scheduled air", "481"],
+      "reject_naics_prefixes": ["481"],
+      "notes": "Organizational-development language must not collapse to air transport"
+    },
+    {
+      "participant_id": "latronic-solutions-llc",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "reject_unrelated_rd_fallback": true,
+      "notes": "Reject generic/mission-led IT marketing anchors"
+    },
+    {
+      "participant_id": "tury-research-institute",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "reject_unrelated_rd_fallback": true,
+      "forbidden_substrings": ["expert solutions"],
+      "notes": "Reject generic expert-solutions / unrelated R&D fallback"
+    },
+    {
+      "participant_id": "giggagov-inc",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "reject_unrelated_rd_fallback": true,
+      "notes": "Reject generic mission/AI-lab filler and unrelated R&D fallback"
+    },
+    {
+      "participant_id": "space-continuum",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "reject_unrelated_rd_fallback": true,
+      "notes": "Reject unrelated R&D/robotics fallback vs interiors/procurement core"
+    },
+    {
+      "participant_id": "courageous-leadership-alliance-inc",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "notes": "Reject generic mission-led workforce filler"
+    },
+    {
+      "participant_id": "digital-culture-group-llc",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "forbidden_substrings": ["award-winning"],
+      "notes": "Reject award-winning marketing anchor"
+    },
+    {
+      "participant_id": "wellsourced-inc",
+      "expectation_level": "behavioral_expected",
+      "reject_generic_mission_led": true,
+      "reject_unrelated_rd_fallback": true,
+      "notes": "Reject generic/mission-led anchors; security capability may emerge without asserting NAICS"
+    },
+    {
+      "participant_id": "south-river-federal-solutions-llc",
+      "expectation_level": "behavioral_expected",
+      "allow_no_anchor": true,
+      "forbidden_anchors": ["srfed"],
+      "forbidden_substrings": ["srfed"],
+      "must_not_claim_high_confidence_without_evidence": true,
+      "notes": "No market OK if no defensible capability; never anchor on company acronym or grounded certainty without evidence"
+    }
+  ]
+}

@@ -1,0 +1,1985 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
+import { createClient } from '@supabase/supabase-js';
+import {
+  fetchSamOpportunities,
+  fetchSamOpportunitiesFromCache,
+  fetchSamOpportunityNoticeSummaryFromCache,
+  scoreOpportunity,
+  SAMOpportunity,
+  SAMNoticeSummary,
+} from '@/lib/briefings/pipelines/sam-gov';
+import { searchGrantsByNAICS, scoreGrant, GrantOpportunity, GRANT_RELEVANCE_THRESHOLD } from '@/lib/briefings/pipelines/grants-gov';
+import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
+import { getVocabularyForCodes } from '@/lib/market/vocabulary';
+import Anthropic from '@anthropic-ai/sdk';
+import { getCapabilityVector } from '@/lib/alerts/capability-vector';
+import { fetchHiddenMatchPool, findHiddenMatches, type HiddenMatch } from '@/lib/alerts/hidden-match';
+import {
+  IntelligenceMetrics,
+  logIntelligenceDelivery,
+  GuardrailMonitor,
+  CircuitBreaker,
+  postSendValidation,
+} from '@/lib/intelligence';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
+import { sendEmail } from '@/lib/send-email';
+import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
+import { runwayRank } from '@/lib/opportunities/runway';
+import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
+import {
+  COMING_BACK_PANEL_PATH,
+  loadComingBackSection,
+  renderComingBackSection,
+  type ComingBackDecision,
+} from '@/lib/alerts/coming-back-to-market';
+import { prioritiesFromAggregated } from '@/lib/alerts/naics-priorities';
+import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
+import { userInRollout } from '@/lib/intelligence/feature-flag';
+import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
+import { generateEmailToken } from '@/lib/api-auth';
+// DEFAULT_PROFILE_NAICS import removed 2026-07-27 — the daily-alert path no longer
+// substitutes a generic profile for users with no targeting; it skips them instead
+// (see the "NO TARGETING → SKIP" block below). The constant still exists for the
+// onboarding/seed paths that legitimately use it.
+import {
+  getAlertEmailCta,
+  renderKeywordSetupNudgeHtml,
+} from '@/lib/alerts/email-promo';
+import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
+import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-branding';
+import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
+import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
+
+export const maxDuration = 300;
+
+// BATCH_SIZE: Process this many users per cron run
+// Apr 23, 2026: Reduced from 100 to 35 to prevent Vercel 60s timeout
+// With 29 runs/day (11:00-15:40 UTC, every 10 min), 35 users × 29 = 1015 users/day
+// Each user requires ~2-3 Supabase queries, so 35 users ≈ 105 queries in 60s
+// May 12, 2026: Raised after fixing skipped/failed users being reprocessed every batch
+// and moving per-user AI tips behind a feature flag.
+// Aug 3, 2026: BATCH_SIZE=150 was ASPIRATIONAL and never reached. MEASURED throughput
+// is a steady ~12.5 users/minute across every day sampled, so a run hits
+// maxDuration=300s at ~65 users and dies mid-batch. 70 is the honest ceiling
+// (70 / 12.5 = 336s — still slightly over, but a run that ENDS cleanly beats one that
+// is killed with a user in flight).
+// The real capacity lever is the NUMBER OF RUNS, not batch size: 1,594 daily users at
+// ~12.5/min needs ~128 active minutes, and the best day only had 104. See cron_jobs.
+const BATCH_SIZE = parseInt(process.env.DAILY_ALERT_BATCH_SIZE || '70', 10);
+
+// Lazy initialization to avoid build-time errors
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+// Supabase/PostgREST hard-caps a single response at 1000 rows. Our eligible alert
+// audience is larger (1,541 as of Jul 2026), so a plain .select() silently returned
+// only the first 1000 — leaving ~541 subscribers NEVER processed and pinning the daily
+// send at ~1000 regardless of signups. This pages through the WHOLE set via .range().
+// The query factory MUST include a stable .order() so pages partition cleanly (no
+// overlap / no gaps). Returns all rows; throws on a page error so callers keep their
+// existing error handling.
+const SUPABASE_PAGE_SIZE = 1000;
+async function fetchAllPaged<T = any>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  makeQuery: () => any,
+  pageSize = SUPABASE_PAGE_SIZE
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await makeQuery().range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < pageSize) break; // last page
+  }
+  return all;
+}
+
+// Map business type to SAM.gov set-aside code
+
+// Timezone hour offsets (UTC offset for delivery at ~6 AM local)
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  'America/New_York': -5,      // 11 UTC = 6 AM ET
+  'America/Chicago': -6,       // 12 UTC = 6 AM CT
+  'America/Denver': -7,        // 13 UTC = 6 AM MT
+  'America/Los_Angeles': -8,   // 14 UTC = 6 AM PT
+  'America/Phoenix': -7,       // No DST
+  'Pacific/Honolulu': -10,     // 16 UTC = 6 AM HT
+  'America/Anchorage': -9,     // 15 UTC = 6 AM AK
+};
+
+interface AlertUser {
+  user_email: string;
+  // Coach Mode: when set (e.g. on a {workspaceId}@clients.getmindy.ai client row),
+  // alerts are delivered HERE — the client's real inbox — instead of user_email.
+  alert_recipient_email?: string | null;
+  naics_codes: string[];
+  naics_source?: 'user_confirmed' | 'derived_suggestion' | 'system_default' | null;
+  aggregated_profile?: Record<string, unknown> | null;
+  psc_codes?: string[] | null;
+  keywords: string[] | null;
+  business_type: string | null;
+  business_description?: string | null;
+  set_aside_preferences?: string[] | null;
+  agencies: string[];  // renamed from target_agencies
+  location_state: string | null;
+  location_states: string[] | null; // Multi-state support
+  alert_frequency: string;
+  alerts_enabled: boolean;
+  is_active: boolean;
+  timezone?: string;
+  last_alert_sent?: string;
+  created_at?: string | null;
+  total_alerts_sent?: number | null;
+}
+
+// Alert tier types
+type AlertTier = 'free' | 'paid';
+
+// Products that grant paid tier (daily alerts)
+const PAID_TIER_ACCESS_FLAGS = [
+  'access_hunter_pro',       // Alert Pro subscription
+  'access_assassin_standard',
+  'access_assassin_premium',
+  'access_recompete',
+  'access_contractor_db',
+  'access_content_standard',
+  'access_content_full_fix',
+  'access_briefings',
+];
+
+/**
+ * Check if user has paid tier access (any product purchase)
+ * Free tier users should use weekly-alerts cron instead
+ */
+async function getUserAlertTier(email: string): Promise<AlertTier> {
+  try {
+    // Check user_profiles for any access flag
+    const { data: profile } = await getSupabase()
+      .from('user_profiles')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (!profile) {
+      return 'free';
+    }
+
+    // Check if user has ANY paid access flag
+    for (const flag of PAID_TIER_ACCESS_FLAGS) {
+      if ((profile as any)[flag] === true) {
+        return 'paid';
+      }
+    }
+
+    return 'free';
+  } catch (error) {
+    console.error(`[Daily Alerts] Error checking tier for ${email}:`, error);
+    return 'free'; // Default to free on error
+  }
+}
+
+interface SentOpportunity {
+  noticeId: string;
+  title: string;
+}
+
+/**
+ * Get opportunities already sent to user in the last 7 days (for deduplication)
+ */
+async function getRecentlySentOpportunityIds(email: string): Promise<Set<string>> {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const { data } = await getSupabase()
+    .from('alert_log')
+    .select('opportunities_data')
+    .eq('user_email', email)
+    .gte('alert_date', sevenDaysAgo.toISOString().split('T')[0]);
+
+  const sentIds = new Set<string>();
+  if (data) {
+    for (const log of data) {
+      if (log.opportunities_data && Array.isArray(log.opportunities_data)) {
+        for (const opp of log.opportunities_data) {
+          if (opp.noticeId) sentIds.add(opp.noticeId);
+        }
+      }
+    }
+  }
+
+  return sentIds;
+}
+
+/**
+ * Check if it's the right time to send to this user based on their timezone
+ * We want to deliver around 6 AM local time
+ */
+function isDeliveryTimeForTimezone(timezone: string | undefined): boolean {
+  const currentHourUTC = new Date().getUTCHours();
+
+  // Default to Eastern Time
+  const tz = timezone || 'America/New_York';
+  const offset = TIMEZONE_OFFSETS[tz] || -5;
+
+  // We run at 11 UTC. Calculate what hour that is in user's timezone
+  // For ET (offset -5): 11 + (-5) = 6 AM ✓
+  // For PT (offset -8): 11 + (-8) = 3 AM (too early, skip)
+  // For CT (offset -6): 11 + (-6) = 5 AM (close enough)
+
+  const localHour = (currentHourUTC + offset + 24) % 24;
+
+  // Allow delivery if local time is between 5 AM and 8 AM
+  return localHour >= 5 && localHour <= 8;
+}
+
+/**
+ * Save failed email for retry
+ */
+async function saveFailedAlert(
+  email: string,
+  opportunities: (SAMOpportunity & { score: number })[],
+  error: string
+) {
+  await upsertAlertLog(getSupabase(), {
+    user_email: email,
+    alert_date: new Date().toISOString().split('T')[0],
+    alert_type: 'daily',
+    opportunities_count: opportunities.length,
+    opportunities_data: opportunities.slice(0, 20).map(o => ({
+      noticeId: o.noticeId,
+      title: o.title,
+      agency: o.department,
+      naics: o.naicsCode,
+      deadline: o.responseDeadline,
+    })),
+    delivery_status: 'failed',
+    error_message: error,
+    retry_count: 0,
+  });
+}
+
+async function saveSkippedAlert(
+  email: string,
+  reason: string,
+  context?: Record<string, unknown>
+) {
+  await upsertAlertLog(getSupabase(), {
+    user_email: email,
+    alert_date: new Date().toISOString().split('T')[0],
+    alert_type: 'daily',
+    opportunities_count: 0,
+    opportunities_data: context ? [context] : [],
+    delivery_status: 'skipped',
+    error_message: reason,
+    retry_count: 0,
+  });
+}
+
+/**
+ * Retry failed alerts from previous runs
+ */
+async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number }> {
+  const results = { retried: 0, succeeded: 0 };
+
+  // Get failed alerts from last 3 days with retry_count < 3
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data: failedAlerts } = await getSupabase()
+    .from('alert_log')
+    .select('*')
+    .eq('alert_type', 'daily')
+    .eq('delivery_status', 'failed')
+    .lt('retry_count', 3)
+    .gte('alert_date', threeDaysAgo.toISOString().split('T')[0])
+    .lt('alert_date', today);
+
+  if (!failedAlerts || failedAlerts.length === 0) return results;
+
+  console.log(`[Daily Alerts] Retrying ${failedAlerts.length} failed alerts...`);
+
+  for (const alert of failedAlerts) {
+    results.retried++;
+
+    try {
+      // Get user settings (unified table)
+      const { data: user } = await getSupabase()
+        .from('user_notification_settings')
+        .select('*')
+        .eq('user_email', alert.user_email)
+        .single();
+
+      if (!user || !alert.opportunities_data) continue;
+
+      // Resend email
+      await sendDailyAlertEmail(
+        alert.user_email,
+        alert.opportunities_data.map((o: any) => ({
+          ...o,
+          score: 50, // Default score for retry
+          uiLink: `https://sam.gov/opp/${o.noticeId}/view`,
+        })),
+        user as AlertUser
+      );
+
+      // Mark as sent
+      await getSupabase()
+        .from('alert_log')
+        .update({
+          delivery_status: 'sent',
+          sent_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .eq('id', alert.id);
+
+      results.succeeded++;
+      console.log(`[Daily Alerts] Retry succeeded for ${alert.user_email}`);
+
+    } catch (err: any) {
+      // Increment retry count
+      await getSupabase()
+        .from('alert_log')
+        .update({
+          retry_count: (alert.retry_count || 0) + 1,
+          error_message: err.message,
+        })
+        .eq('id', alert.id);
+
+      console.error(`[Daily Alerts] Retry failed for ${alert.user_email}:`, err.message);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Core job logic - PAID TIER ONLY
+ * Free tier users are skipped (they get weekly alerts via weekly-alerts cron)
+ * Paid tier = any product purchase (MA, Recompete, Content, Database, etc.)
+ */
+async function runDailyAlertJob(options?: {
+  skipTimezoneCheck?: boolean;
+  testEmail?: string;
+  forceResend?: boolean;
+}): Promise<NextResponse> {
+  // Initialize metrics and guardrails
+  const metrics = new IntelligenceMetrics('daily_alerts');
+  const guardrails = new GuardrailMonitor('daily-alerts');
+  const circuitBreaker = new CircuitBreaker('daily-alerts');
+
+  // Check if circuit breaker is open (too many recent failures)
+  if (await circuitBreaker.isOpen()) {
+    const breakerMessage = 'Circuit breaker is open due to recent failures. Will retry in 30 minutes.';
+    console.error('[Daily Alerts] Circuit breaker is OPEN - skipping this run');
+    metrics.recordCircuitBreakerTripped();
+    metrics.recordGuardrailWarning();
+    await metrics.save();
+    await logToolError({
+      tool: ToolNames.ALERTS,
+      errorType: ErrorTypes.INTERNAL,
+      errorMessage: breakerMessage,
+      requestPath: '/api/cron/daily-alerts',
+    }).catch(() => {});
+    return NextResponse.json({
+      success: false,
+      error: breakerMessage,
+      circuitBreakerOpen: true,
+    }, { status: 503 });
+  }
+
+  try {
+    console.log('[Daily Alerts] Starting daily alert job (PAID TIER ONLY)...');
+
+    // First, retry any failed alerts from previous runs
+    const retryResults = await retryFailedAlerts();
+    if (retryResults.retried > 0) {
+      console.log(`[Daily Alerts] Retried ${retryResults.retried} failed alerts, ${retryResults.succeeded} succeeded`);
+    }
+
+    // Build query for daily alert users (unified table).
+    //   daily    = every day
+    //   weekdays = Mon-Fri
+    //   weekends = Sat-Sun
+    //   mwf      = Mon/Wed/Fri (every other day, BD-friendly)
+    //   tth      = Tue/Thu (twice a week)
+    // Per-user day check happens inside the loop below.
+    // Page through the ENTIRE eligible audience (was capped at 1000 → ~541 users
+    // silently never processed). Stable .order('user_email') so .range() pages
+    // partition cleanly and the daily batch drains deterministically (alphabetically)
+    // across the dispatcher window instead of an arbitrary, drifting 1000-row window.
+    let users: AlertUser[];
+    try {
+      users = await fetchAllPaged<AlertUser>(() => {
+        let q = getSupabase()
+          .from('user_notification_settings')
+          .select('*') // truncation-ok: fetchAllPaged applies .range() until drained
+          .eq('is_active', true)
+          .eq('alerts_enabled', true)
+          .in('alert_frequency', ['daily', 'weekdays', 'weekends', 'mwf', 'tth'])
+          .order('user_email', { ascending: true });
+        // If test email specified, only process that user
+        if (options?.testEmail) {
+          q = q.eq('user_email', options.testEmail);
+        }
+        return q;
+      });
+    } catch (usersError) {
+      console.error('[Daily Alerts] Error fetching users:', usersError);
+      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    }
+
+    if (!users || users.length === 0) {
+      console.log('[Daily Alerts] No daily alert users found');
+      return NextResponse.json({
+        success: true,
+        message: 'No users to process',
+        sent: 0,
+        retryResults
+      });
+    }
+
+    // Vault certifications for everyone in this run — ONE batched query, not a
+    // per-user lookup inside the loop. Fails soft to an empty map (= today's
+    // business_type-only behaviour), so a Vault read problem can never narrow a
+    // user's alerts or take the cron down.
+    const vaultEligibility: VaultEligibilityMap = await loadVaultEligibility(
+      getSupabase(),
+      users.map((u) => u.user_email),
+    );
+    if (vaultEligibility.size) {
+      console.log(`[Daily Alerts] Vault certifications loaded for ${vaultEligibility.size} user(s) — eligibility unioned with business_type`);
+    }
+
+    const totalEligible = users.length;
+    console.log(`[Daily Alerts] Found ${totalEligible} total eligible users`);
+    metrics.recordUserEligible(); // Track total eligible before filtering
+
+    // =====================================================
+    // BATCHING: Only process users who have not been handled today.
+    // Multiple cron runs (11, 12, 14, 16 UTC) will process all users
+    // =====================================================
+    const today = new Date().toISOString().split('T')[0];
+    // Page this too: once daily volume exceeds 1000, a capped read here would return
+    // an INCOMPLETE already-processed set → users past row 1000 look un-processed and
+    // get re-sent (duplicate alerts). Order for clean .range() paging.
+    let alreadyProcessedToday: { user_email: string; delivery_status: string }[] = [];
+    try {
+      alreadyProcessedToday = await fetchAllPaged<{ user_email: string; delivery_status: string }>(() =>
+        getSupabase()
+          .from('alert_log')
+          .select('user_email, delivery_status') // truncation-ok: fetchAllPaged applies .range() until drained
+          .eq('alert_date', today)
+          .eq('alert_type', 'daily')
+          .in('delivery_status', ['sent', 'skipped', 'failed'])
+          .order('user_email', { ascending: true })
+      );
+    } catch (e) {
+      // Non-fatal: an empty set just means we may re-consider some users this run.
+      console.error('[Daily Alerts] Error fetching already-processed set:', e);
+    }
+
+    const alreadyProcessedEmails = new Set((alreadyProcessedToday || []).map((s: { user_email: string }) => s.user_email));
+    if (options?.forceResend && options.testEmail) {
+      alreadyProcessedEmails.delete(options.testEmail);
+    }
+    const alreadyProcessedCount = alreadyProcessedEmails.size;
+
+    // Filter out already-processed users and apply BATCH_SIZE limit.
+    //
+    // ROTATE THE STARTING POINT EACH DAY. The audience is ordered by user_email, and
+    // every run drains from the top — so when the day runs short of capacity, the
+    // SAME people lose out, every time. Measured 2026-08-01: processing stopped at the
+    // letter M, and N-Z (435 users) received NOTHING. Not random loss — a systematic
+    // penalty on the back half of the alphabet, every under-capacity day.
+    //
+    // A day-of-year offset makes the cut-off point walk the list instead. Anyone
+    // missed today starts near the front tomorrow. This does NOT fix a capacity
+    // shortfall (see BATCH_SIZE + the cron schedule for that) — it stops the shortfall
+    // always landing on the same inboxes, which is the part that reads as "Mindy
+    // stopped sending me alerts" to one specific user while looking fine in aggregate.
+    const pending = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email));
+    const dayOfYear = Math.floor(
+      (Date.parse(today) - Date.parse(`${new Date(today).getUTCFullYear()}-01-01`)) / 86_400_000
+    );
+    // Offset is a fraction of the FULL audience so the start point sweeps the whole
+    // alphabet over a cycle, then wraps. Slice from the offset and wrap around so a
+    // short batch still takes a contiguous, deterministic window (no gaps, no repeats).
+    const rotateBy = pending.length > 0 ? (dayOfYear * BATCH_SIZE) % pending.length : 0;
+    const rotated = rotateBy === 0
+      ? pending
+      : [...pending.slice(rotateBy), ...pending.slice(0, rotateBy)];
+    const usersToProcess = rotated.slice(0, BATCH_SIZE);
+
+    const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email)).length;
+    const remainingAfterBatch = remainingAfterFilter - usersToProcess.length;
+
+    console.log(`[Daily Alerts] Batching: ${alreadyProcessedCount} already processed today, processing ${usersToProcess.length} of ${remainingAfterFilter} remaining (${remainingAfterBatch} for next run)`);
+
+    if (usersToProcess.length === 0) {
+      console.log('[Daily Alerts] All users already processed today');
+      return NextResponse.json({
+        success: true,
+        message: 'All users already processed today',
+        sent: 0,
+        alreadyProcessed: alreadyProcessedCount,
+        totalEligible,
+        retryResults
+      });
+    }
+
+    const samApiKey = process.env.SAM_API_KEY;
+    if (!samApiKey) {
+      console.warn('[Daily Alerts] SAM_API_KEY not configured - cache fallback to live SAM API is disabled');
+    }
+
+    const results = {
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+      noNaics: 0,
+      noTargeting: 0, // no NAICS AND no keywords → skipped, not given a default profile
+      noOpps: 0,
+      wrongTimezone: 0,
+      deduplicated: 0,
+      freeTierSkipped: 0, // Free tier users (they get weekly alerts instead)
+      errors: [] as string[],
+    };
+
+    for (const user of usersToProcess) {
+      // Check guardrails before processing each user
+      const guardrailCheck = guardrails.check();
+      if (!guardrailCheck.continue) {
+        console.error(`[Daily Alerts] Guardrail triggered: ${guardrailCheck.reason}`);
+        await guardrails.logEvent('trip', guardrailCheck.reason!);
+        metrics.recordCircuitBreakerTripped();
+        // Surface to tool_errors so the throughput-regression detector
+        // and the operations dashboard both see this — previously
+        // guardrail trips only landed in console.error which nobody
+        // reads until they go investigating after a 4-day outage.
+        await logToolError({
+          tool: ToolNames.ALERTS,
+          errorType: ErrorTypes.INTERNAL,
+          errorMessage: `Guardrail tripped: ${guardrailCheck.reason}. Loop stopped after ${results.sent + results.failed + results.skipped} users processed.`,
+          requestPath: '/api/cron/daily-alerts',
+        }).catch(() => {});
+        break; // Stop processing more users
+      }
+
+      try {
+        // DISABLED: Timezone filtering removed Apr 17, 2026
+        // All daily-frequency users receive alerts in same batch (not staggered by timezone)
+        // Note: Only processes users with alert_frequency='daily' per query filter (line 327)
+        // if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
+        //   continue;
+        // }
+
+        // Day-of-week skip for partial-week frequencies.
+        // 0 = Sun, 1 = Mon, 2 = Tue, ... 6 = Sat.
+        if (!options?.testEmail) {
+          const dayOfWeek = new Date().getUTCDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const isMWF = dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5;
+          const isTTh = dayOfWeek === 2 || dayOfWeek === 4;
+          if (user.alert_frequency === 'weekdays' && isWeekend) continue;
+          if (user.alert_frequency === 'weekends' && !isWeekend) continue;
+          if (user.alert_frequency === 'mwf' && !isMWF) continue;
+          if (user.alert_frequency === 'tth' && !isTTh) continue;
+        }
+
+        // Note: This route ONLY processes users where alert_frequency='daily' (line 327 query filter)
+        // Users with alert_frequency='weekly' go through weekly-alerts route instead.
+        //
+        // PERMANENT MODEL (decided 2026-06-03): free users always get DAILY alerts.
+        // The daily tier check is OFF by default. A hardcoded BETA_END_DATE of
+        // 2026-05-28 previously flipped this on a calendar day with no deploy and
+        // collapsed the daily send from ~922 to ~1 (free users fell through to the
+        // weekly fallback) — never reintroduce a bare date gate here.
+        //
+        // To enforce paid-only daily in the future, flip the env WITHOUT a redeploy:
+        //   DAILY_ALERT_BETA=off → enforce paid-tier check (free users → weekly)
+        //   DAILY_ALERT_BETA=on (or unset) → everyone with daily frequency gets daily
+        const betaFlag = (process.env.DAILY_ALERT_BETA || '').trim().toLowerCase();
+        const isBetaPeriod = betaFlag !== 'off';
+
+        if (!isBetaPeriod) {
+          // Post-beta: Check tier - free tier users should use weekly alerts
+          const tier = await getUserAlertTier(user.user_email);
+          if (tier === 'free') {
+            console.log(`[Daily Alerts] ${user.user_email} is free tier - will receive weekly alerts instead`);
+            results.freeTierSkipped++;
+            metrics.recordUserSkipped();
+            continue;
+          }
+        }
+        // During beta: All daily-frequency users get alerts (tier check skipped)
+
+        // NO TARGETING → SKIP, don't substitute a default profile.
+        //
+        // This used to fall back to DEFAULT_PROFILE_NAICS (541512/541611/541330/
+        // 541990/561210 — generic IT + admin consulting) whenever the user had no
+        // codes. The result: 279 users with NO NAICS and NO keywords received daily
+        // alerts for work that had nothing to do with their business — averaging 82
+        // alerts each, every one of them mailed in the last 7 days. A janitorial firm
+        // and a cybersecurity firm got the same five codes. It LOOKED like the product
+        // was working (send counts climbed) while relevance was zero.
+        //
+        // Keywords count as targeting for the skip gate only: a keyword-only
+        // profile is matchable. They do not unrestricted-OR into a NAICS/PSC
+        // market (Contract D). Market Discovery still sends that market when
+        // distinctive hits are zero. Focused omits Open instead.
+        //
+        // These users are reached by the existing "Complete Your Profile" flow
+        // (/api/admin/send-profile-reminders) instead of a generic daily alert, and
+        // resume automatically the moment they set real targeting.
+        const userNaics = knownNaicsForMatch(user.naics_codes || []);
+        const hasKeywords = (user.keywords || []).length > 0;
+
+        if (userNaics.length === 0 && !hasKeywords) {
+          results.noTargeting++;
+          console.log(`[Daily Alerts] SKIP ${user.user_email}: no NAICS and no keywords — nothing to match on (was: generic default profile)`);
+          continue;
+        }
+
+        // Normalize codes — expand short prefixes ("541" → 541xxx) but KEEP
+        // 6-digit codes EXACT (expandFullCodes=false). Recall comes from the
+        // matcher widening each code to its 4-digit industry group at query time;
+        // blowing 6-digit codes out to the full 3-digit family here would re-add
+        // the cross-industry noise (561710 pest control → 561xxx office-admin /
+        // security guards) that the matcher fix removes.
+        const expandedNaics = expandNAICSCodes(userNaics, false);
+
+        // Get related PSC codes for broader search
+        const relatedPSCs: string[] = [];
+        for (const naics of userNaics.slice(0, 3)) { // Top 3 NAICS
+          const pscMatches = getPSCsForNAICS(naics, 3); // Top 3 PSCs per NAICS
+          relatedPSCs.push(...pscMatches.map(p => p.pscCode));
+        }
+        const uniquePSCs = [...new Set(relatedPSCs)];
+
+        // Get user keywords
+        const userKeywords = user.keywords || [];
+
+        // VOCABULARY EXPANSION (flag: VOCAB_ALERT_EXPANSION) — widen the match with
+        // the REAL buyer work-words for the user's NAICS (naics_vocabulary, mined
+        // from award text). An opp whose title/description uses a buyer-word the
+        // user never typed as a keyword now matches. Top 5 highest-weight terms
+        // only (keeps the OR query small + avoids generic noise), and NOT for
+        // default-only profiles (would inject generic 5415xx terms for everyone).
+        // Flows through the EXISTING keyword OR-match in sam-gov.ts — no matcher
+        // change. Fails soft: any error → the user's own keywords, unchanged.
+        let vocabTerms: string[] = [];
+        const usingDefaults = (user.naics_codes || []).length === 0;
+        if (process.env.VOCAB_ALERT_EXPANSION === 'on' && !usingDefaults) {
+          try {
+            const vocab = await getVocabularyForCodes(userNaics, { limit: 5 });
+            const have = new Set(userKeywords.map((k: string) => k.toLowerCase()));
+            vocabTerms = vocab.map((t) => t.term).filter((t) => !have.has(t.toLowerCase())).slice(0, 5);
+          } catch { /* vocab unavailable — degrade to the user's own keywords */ }
+        }
+        const matchKeywords = [...userKeywords, ...vocabTerms];
+
+        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords${vocabTerms.length ? ` +${vocabTerms.length} vocab [${vocabTerms.join(', ')}]` : ''}`);
+
+        // Get recently sent opportunity IDs for deduplication
+        const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
+
+        // Build search params
+        // An unrecognized business_type falls back to itself (a raw code the user
+        // may have entered) rather than to nothing — but unrestricted work is OR'd
+        // in by the query regardless, so a bad value can no longer zero a user out.
+        // Canonical eligibility (src/lib/market/set-aside-eligibility.ts). A cert
+        // EXPANDS what you can bid; unrestricted work is OR'd in by the query.
+        // business_type is ONE string; the Vault is an ARRAY the user actually
+        // maintains, so it is routinely richer ("Small Business" + vault
+        // [WOSB, EDWOSB]). Union both or those firms never see the pools
+        // reserved for them. Empty vault map => identical to the old behaviour.
+        const setAsides = eligibleSetAsidesCombined(
+          user.business_type,
+          vaultEligibility.get((user.user_email || '').toLowerCase()),
+        );
+
+        // Get states to search (multi-state or single state with expansion)
+        const userStates = user.location_states?.length
+          ? user.location_states
+          : user.location_state
+            ? [user.location_state]
+            : undefined;
+
+        // Fetch opportunities from Supabase cache (much faster, no rate limits)
+        metrics.recordApiCall();
+        let newOpportunities: SAMOpportunity[] = [];
+        let allActiveOpportunities: SAMOpportunity[] = [];
+        let noticeSummary: SAMNoticeSummary | undefined;
+        let openKeywordOutcome: OpenKeywordOutcome | undefined;
+        let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
+        try {
+          noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
+            naicsCodes: expandedNaics,
+            keywords: matchKeywords.length > 0 ? matchKeywords : undefined,
+            setAsides,
+            states: userStates,
+          });
+
+          // PSC = what was actually BOUGHT — the most precise opportunity signal.
+          // OR'd with NAICS in the cache fetcher (psc_code.like.X%). Keywords
+          // prefer inside that market (Contract D); they do not expand it.
+          // Prefer the user's MANUAL psc_codes, but fall back to the PSCs we
+          // already auto-derived from their NAICS (uniquePSCs, via the crosswalk
+          // above) when they haven't entered any. This was computed-then-discarded
+          // — so the PSC recall net only fired for users who hand-entered codes.
+          // Keyword-first means PSC should be invisible/auto: derive it, don't nag.
+          const userPsc = (user.psc_codes || []).filter(Boolean);
+          const effectivePsc = userPsc.length > 0 ? userPsc : uniquePSCs;
+
+          const cacheResult = await fetchSamOpportunitiesFromCache({
+            naicsCodes: expandedNaics,
+            pscCodes: effectivePsc.length > 0 ? effectivePsc : undefined,
+            keywords: matchKeywords.length > 0 ? matchKeywords : undefined,
+            setAsides,
+            states: userStates,
+            limit: 200, // Get more from cache, filter locally
+            savedNaics: userNaics,
+          });
+
+          const appliedOpen = applyOpenAlertMode(
+            {
+              rows: cacheResult.opportunities,
+              distinctiveMatchCount: cacheResult.distinctiveMatchCount ?? cacheResult.keywordMatchCount ?? 0,
+              outcome: cacheResult.openKeywordOutcome ?? 'no_keywords_configured',
+            },
+            alertModeFromAggregated(user.aggregated_profile),
+            userKeywords,
+          );
+          allActiveOpportunities = appliedOpen.rows;
+          openKeywordOutcome = appliedOpen.outcome;
+
+          const industry = filterMarketToSavedIndustry(
+            allActiveOpportunities,
+            userNaics,
+            (opp) => opp.naicsCode,
+          );
+          if (industry.droppedOffIndustry > 0) {
+            console.log(`[Daily Alerts] ${user.user_email}: dropped ${industry.droppedOffIndustry} off-industry PSC/NAICS rows`);
+            allActiveOpportunities = industry.rows;
+          }
+
+          // Filter for "new" opportunities (posted in last 24 hours)
+          const oneDayAgo = new Date();
+          oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+          newOpportunities = allActiveOpportunities.filter(opp => {
+            const postedDate = new Date(opp.postedDate);
+            return postedDate >= oneDayAgo;
+          });
+
+          console.log(`[Daily Alerts] ${user.user_email}: Found ${allActiveOpportunities.length} from cache, ${newOpportunities.length} new (last 24h)`);
+        } catch (cacheError: any) {
+          metrics.recordApiError();
+          guardrails.recordApiError('SAM Cache');
+          console.error(`[Daily Alerts] SAM cache error for ${user.user_email}:`, cacheError.message);
+
+          // Fallback to live API if cache fails
+          if (samApiKey) {
+            try {
+              const newResult = await fetchSamOpportunities({
+                naicsCodes: expandedNaics,
+                keywords: matchKeywords.length > 0 ? matchKeywords : undefined,
+                setAsides,
+                states: userStates,
+                noticeTypes: ['p', 'r', 'k', 'o'],
+                postedFrom: getDateDaysAgo(1),
+                limit: 50,
+              }, samApiKey);
+              const liveIndustry = filterMarketToSavedIndustry(
+                newResult.opportunities,
+                userNaics,
+                (opp) => opp.naicsCode,
+              );
+              const livePreferred = preferDistinctiveInOpenMarket(
+                liveIndustry.rows,
+                userKeywords,
+                (opp) => `${opp.title} ${opp.description}`,
+              );
+              const liveApplied = applyOpenAlertMode(
+                livePreferred,
+                alertModeFromAggregated(user.aggregated_profile),
+                userKeywords,
+              );
+              newOpportunities = liveApplied.rows;
+              openKeywordOutcome = liveApplied.outcome;
+              console.log(`[Daily Alerts] ${user.user_email}: Fallback to API, found ${newOpportunities.length} new`);
+            } catch (apiError: any) {
+              console.error(`[Daily Alerts] API fallback also failed for ${user.user_email}:`, apiError.message);
+            }
+          } else {
+            console.warn(`[Daily Alerts] ${user.user_email}: Skipping live SAM fallback because SAM_API_KEY is not configured`);
+          }
+        }
+
+        // FAILSAFE: If no NEW opportunities, fall back to ALL active opportunities
+        // Users paying $19/mo expect something - 3-day-old data is better than 0 results
+        let opportunities = newOpportunities;
+        let isUsingFallback = false;
+
+        if (newOpportunities.length === 0 && allActiveOpportunities.length > 0) {
+          console.log(`[Daily Alerts] ${user.user_email}: No new opps, using ${allActiveOpportunities.length} ACTIVE opportunities as fallback`);
+          opportunities = allActiveOpportunities;
+          isUsingFallback = true;
+        }
+
+        metrics.recordOpportunitiesTotal(opportunities.length);
+
+        // DEDUPLICATE: Filter out opportunities already sent in last 7 days
+        const beforeDedup = opportunities.length;
+        opportunities = opportunities.filter(opp => !recentlySentIds.has(opp.noticeId));
+        const dedupCount = beforeDedup - opportunities.length;
+        if (dedupCount > 0) {
+          console.log(`[Daily Alerts] ${user.user_email}: Deduplicated ${dedupCount} already-sent opportunities`);
+          results.deduplicated += dedupCount;
+        }
+
+        // Score and rank - use ORIGINAL codes for scoring (exact matches rank higher).
+        // Tiebreaker: actionable RUNWAY (higher = more days to respond) so a
+        // strong-fit opp with real runway leads the email, not a 1-day scramble.
+        // The email's own urgency badge still flags the tight ones lower down.
+        let scoredOpps = opportunities.map(opp => ({
+          ...opp,
+          score: scoreOpportunity(opp, {
+            naics_codes: userNaics, // Original codes, not expanded
+            agencies: user.agencies || [],
+            keywords: userKeywords,
+            business_description: user.business_description || null,
+            business_type: user.business_type || null,
+            setAsides: user.set_aside_preferences || undefined,
+          }),
+        })).sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
+        });
+
+        // Limit fallback results to top 15 to avoid overwhelming users
+        if (isUsingFallback && scoredOpps.length > 15) {
+          scoredOpps = scoredOpps.slice(0, 15);
+        }
+
+        // Fetch Grants.gov opportunities (parallel to contracts)
+        let scoredGrants: (GrantOpportunity & { score: number })[] = [];
+        try {
+          const grantsResult = await searchGrantsByNAICS(userNaics, {
+            limit: 15,
+            postedFrom: getDateDaysAgo(7), // Last 7 days for grants (less frequent posting)
+          });
+
+          // Score and filter grants
+          scoredGrants = grantsResult.grants
+            .filter(g => !recentlySentIds.has(g.oppNumber)) // Dedupe
+            .map(g => ({
+              ...g,
+              score: scoreGrant(g, {
+                naics_codes: userNaics,
+                keywords: userKeywords,
+                agencies: user.agencies || [],
+                business_description: user.business_description || null,
+              }),
+            }))
+            .filter(g => g.score >= GRANT_RELEVANCE_THRESHOLD) // genuinely relevant only
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5); // Top 5 grants
+
+          if (scoredGrants.length > 0) {
+            console.log(`[Daily Alerts] ${user.user_email}: Found ${scoredGrants.length} matching grants`);
+          }
+        } catch (grantsError) {
+          console.error(`[Daily Alerts] Grants.gov error for ${user.user_email}:`, grantsError);
+          // Continue without grants - don't fail the whole alert
+        }
+
+        if (userNaics.length > 0 || (user.psc_codes || []).some(Boolean)) {
+          comingBack = await loadComingBackSection({
+            storedNaics: userNaics,
+            storedPsc: (user.psc_codes || []).filter(Boolean),
+            naicsSource: user.naics_source ?? null,
+            keywords: userKeywords,
+            businessType: user.business_type,
+            businessDescription: user.business_description ?? null,
+            naicsPriorities: prioritiesFromAggregated(user.aggregated_profile),
+          });
+        }
+
+        // If dedupe eliminated everything, resurface a small set of active opportunities
+        // instead of sending nothing. This keeps daily alerts behaving like a daily pulse
+        // product rather than an exact-match-only trigger.
+        let usedRepeatFallback = false;
+        if (scoredOpps.length === 0 && allActiveOpportunities.length > 0) {
+          const resurfacedOpps = allActiveOpportunities
+            .map(opp => ({
+              ...opp,
+              score: scoreOpportunity(opp, {
+                naics_codes: userNaics,
+                agencies: user.agencies || [],
+                keywords: userKeywords,
+                business_description: user.business_description || null,
+                business_type: user.business_type || null,
+                setAsides: user.set_aside_preferences || undefined,
+              }),
+            }))
+            .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
+            .sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score;
+              // Real runway first (pursuable over tight), soonest-deadline only
+              // as the final tiebreaker within the same runway tier.
+              const rank = runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
+              if (rank !== 0) return rank;
+              return getDaysUntil(a.responseDeadline) - getDaysUntil(b.responseDeadline);
+            })
+            .slice(0, 10);
+
+          if (resurfacedOpps.length > 0) {
+            scoredOpps = resurfacedOpps;
+            usedRepeatFallback = true;
+            console.log(`[Daily Alerts] ${user.user_email}: Resurfacing ${scoredOpps.length} active opportunities after dedupe`);
+          }
+        }
+
+        // Even if no NEW opportunities, we still want to send if there are deadlines or active opportunities
+        const hasNewOpps = scoredOpps.length > 0 || scoredGrants.length > 0;
+        const hasActiveDeadlines = allActiveOpportunities.length > 0;
+        const hasComingBack = comingBack.kind === 'show';
+
+        if (!hasNewOpps && !hasActiveDeadlines && !hasComingBack) {
+          console.log(`[Daily Alerts] No new or active opportunities for ${user.user_email}`);
+          await saveSkippedAlert(user.user_email, 'no_new_or_active_opportunities', {
+            naicsCodes: userNaics.slice(0, 5),
+            keywordCount: userKeywords.length,
+            deduplicatedCount: dedupCount,
+          });
+          results.noOpps++;
+          results.skipped++;
+          metrics.recordUserSkipped();
+          continue;
+        }
+
+        // Track matched opportunities
+        if (hasNewOpps) {
+          metrics.recordOpportunityMatched(scoredOpps.length + scoredGrants.length, scoredOpps[0]?.score);
+        }
+
+        // Generate AI action tips based on all active opportunities
+        const actionTips = await generateActionTips(
+          allActiveOpportunities.length > 0 ? allActiveOpportunities : scoredOpps,
+          user.business_type || undefined
+        );
+
+        // 💡 HIDDEN MATCH (Phase 3 semantic alerts) — opps whose SOW matches the
+        // user's CAPABILITIES but that NAICS/keyword search missed. Gated + off by
+        // default; skips cleanly if not eligible / no cached vector / nothing clears
+        // the conservative threshold. Never throws into the send path.
+        let hiddenMatches: HiddenMatch[] = [];
+        try {
+          // .trim() the env — Vercel UI paste can leave a trailing newline that would
+          // silently make `=== 'true'` false and disable the whole feature.
+          // HIDDEN_MATCH_WHITELIST (comma-separated emails) bypasses the rollout %
+          // so specific accounts (e.g. demo/staff) get the feature without enabling
+          // it for the % bucket — lets us demo the beta without a broad rollout.
+          const hmWhitelist = (process.env.HIDDEN_MATCH_WHITELIST || '')
+            .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+          const hmEnabled = (process.env.ENABLE_HIDDEN_MATCH || '').trim() === 'true';
+          const hmEligible = hmEnabled && (
+            hmWhitelist.includes(user.user_email.toLowerCase()) ||
+            userInRollout(user.user_email, Number((process.env.HIDDEN_MATCH_ROLLOUT_PERCENT || '0').trim()) || 0, 'hidden-match-v1')
+          );
+          if (hmEligible) {
+            const userVec = await getCapabilityVector(user.user_email);
+            if (userVec) {
+              const pool = await fetchHiddenMatchPool();
+              // Exclude everything they already got: recent sends + this email's results.
+              const excluded = new Set<string>(recentlySentIds);
+              for (const o of scoredOpps) if (o.noticeId) excluded.add(o.noticeId);
+              for (const o of allActiveOpportunities) if (o.noticeId) excluded.add(o.noticeId);
+              hiddenMatches = findHiddenMatches(userVec, excluded, pool);
+              if (hiddenMatches.length) {
+                console.log(`[hidden-match] ${user.user_email}: ${hiddenMatches.length} shown, top=${hiddenMatches[0].score}`);
+              }
+            }
+          }
+        } catch (hmErr) {
+          console.warn('[hidden-match] non-fatal', user.user_email, hmErr instanceof Error ? hmErr.message : hmErr);
+        }
+
+        // Today's Lens — the grounded map hook (same lens the app hero shows), rendered into the
+        // email so contractors get the "why open the map today" strand counts + a pre-filtered map
+        // CTA in their inbox. ADDITIVE: the opportunity list is the primary payload; a lens failure
+        // must NEVER block the alert, so we .catch(() => null) and simply omit the block on null.
+        const todaysLens = await computeTodaysLens(user.user_email).catch((lensErr) => {
+          console.warn(`[Daily Alerts] Today's Lens failed for ${user.user_email} (omitting block):`, lensErr instanceof Error ? lensErr.message : lensErr);
+          return null;
+        });
+
+        // Send email - now includes all active opportunities for deadline tracking and action tips
+        try {
+          metrics.recordEmailAttempted();
+          const emailDelivered = await sendDailyAlertEmail(
+            user.user_email,
+            scoredOpps,
+            user,
+            scoredGrants,
+            allActiveOpportunities,
+            actionTips,
+            noticeSummary,
+            hiddenMatches,
+            {
+              openKeywordNote: openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined,
+              comingBack,
+            },
+            todaysLens,
+            isUsingFallback,
+          );
+
+          // sendEmail() returns false (not throw) when the send GUARD blocks the
+          // recipient — suppression-list hit or the per-recipient daily email cap
+          // (EMAIL_DAILY_CAP). Ignoring that boolean recorded a phantom "sent"
+          // (last_alert_sent stamped, total_alerts_sent++, alert_log=sent) while
+          // NO email actually left — making a real non-delivery invisible to every
+          // "who didn't get an alert" query. Record it as a visible skip instead.
+          if (emailDelivered === false) {
+            await saveSkippedAlert(user.user_email, 'send_guard_blocked', {
+              opportunitiesCount: scoredOpps.length + scoredGrants.length,
+            });
+            console.warn(`[Daily Alerts] ⚠️ Send guard blocked ${user.user_email} (suppression or daily cap) — recorded as skipped, NOT sent`);
+            results.skipped++;
+            continue;
+          }
+
+          // Track successful send
+          metrics.recordEmailSent();
+          guardrails.recordSuccess();
+          circuitBreaker.record(true);
+
+          // Log to intelligence_log for tracking
+          await logIntelligenceDelivery({
+            userEmail: user.user_email,
+            intelligenceType: 'daily_alert',
+            deliveryStatus: 'sent',
+            itemsCount: scoredOpps.length + scoredGrants.length,
+            itemIds: scoredOpps.slice(0, 20).map(o => o.noticeId),
+          });
+
+          await persistSentAlert({
+            supabase: getSupabase(),
+            email: user.user_email,
+            alertType: 'daily',
+            opportunitiesCount: scoredOpps.length,
+            opportunitiesData: [
+              ...scoredOpps.slice(0, 20).map(o => ({
+                noticeId: o.noticeId,
+                title: o.title,
+                agency: o.department,
+                naics: o.naicsCode,
+                deadline: o.responseDeadline,
+                score: o.score,
+                repeatFallback: usedRepeatFallback || undefined,
+              })),
+              // 💡 Hidden matches appended with a flag so the Source Feed can badge them.
+              ...hiddenMatches.map(m => ({
+                noticeId: m.noticeId,
+                title: m.title,
+                agency: m.agency,
+                naics: m.naics,
+                deadline: m.deadline,
+                score: m.score,
+                hiddenMatch: true,
+              })),
+            ],
+            currentTotalAlertsSent: (user as any).total_alerts_sent,
+          });
+
+          console.log(`[Daily Alerts] ✅ Sent ${scoredOpps.length} opps to ${user.user_email}`);
+          results.sent++;
+
+        } catch (emailError: any) {
+          console.error(`[Daily Alerts] Email send failed for ${user.user_email}:`, emailError.message);
+
+          // Track failure
+          metrics.recordEmailFailed();
+          guardrails.recordFailure(emailError.message);
+          circuitBreaker.record(false);
+
+          // Log to intelligence_log
+          await logIntelligenceDelivery({
+            userEmail: user.user_email,
+            intelligenceType: 'daily_alert',
+            deliveryStatus: 'failed',
+            itemsCount: scoredOpps.length,
+            errorMessage: emailError.message,
+          });
+
+          // Save for retry
+          await saveFailedAlert(user.user_email, scoredOpps, emailError.message);
+
+          results.failed++;
+          results.errors.push(`${user.user_email}: ${emailError.message}`);
+        }
+
+      } catch (userError: any) {
+        const errorMsg = userError instanceof Error
+          ? userError.message
+          : (typeof userError === 'object' && userError !== null && 'message' in userError)
+            ? String((userError as { message: unknown }).message)
+            : JSON.stringify(userError);
+        console.error(`[Daily Alerts] Error processing ${user.user_email}:`, userError);
+        metrics.recordEmailFailed();
+        guardrails.recordFailure(errorMsg);
+        circuitBreaker.record(false);
+        results.failed++;
+        results.errors.push(`${user.user_email}: ${errorMsg}`);
+
+        // Persist a 'failed' alert_log row so this user is VISIBLE (dashboard +
+        // zero-alert-diagnosis) and gets picked up by the retry queue — mirroring the
+        // inner email-send catch (saveFailedAlert). Without this, a pre-send pipeline
+        // error (opp fetch / dedup / grants / action-tips / hidden-match) left NO
+        // alert_log row, so the user was invisible and merely reprocessed every run —
+        // a deterministic per-profile error would silently recur forever. scoredOpps
+        // isn't reliably in scope this early, so log with no opportunities.
+        await saveFailedAlert(user.user_email, [], errorMsg).catch(() => {});
+
+        // Log to tool_errors for dashboard visibility
+        await logToolError({
+          tool: ToolNames.ALERTS,
+          errorType: ErrorTypes.EMAIL_FAILURE,
+          errorMessage: errorMsg,
+          userEmail: user.user_email,
+          errorStack: userError instanceof Error ? userError.stack : undefined,
+          requestPath: '/api/cron/daily-alerts',
+        }).catch(() => {}); // Don't let logging failure break the flow
+      }
+    }
+
+    console.log(`[Daily Alerts] Complete. Batch: ${usersToProcess.length}/${totalEligible}, Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Remaining: ${remainingAfterBatch}`);
+
+    // Save metrics to database
+    await metrics.save();
+
+    // Run post-send validation
+    await postSendValidation('daily-alerts', {
+      attempted: results.sent + results.failed,
+      sent: results.sent,
+      failed: results.failed,
+      failedRecipients: results.errors.map(e => e.split(':')[0]),
+      duration: metrics.getSnapshot().duration_ms,
+    });
+
+    return NextResponse.json({
+      success: true,
+      results,
+      batching: {
+        batchSize: BATCH_SIZE,
+        totalEligible,
+        alreadyProcessedToday: alreadyProcessedCount,
+        processedThisRun: usersToProcess.length,
+        remainingForNextRun: remainingAfterBatch,
+      },
+      retryResults,
+      metrics: metrics.getSnapshot(),
+      guardrailStats: guardrails.getStats(),
+    });
+  } catch (error: any) {
+    console.error('[Daily Alerts] Error:', error);
+
+    // Properly serialize errors
+    const errorMessage = error instanceof Error
+      ? error.message
+      : (typeof error === 'object' && error !== null && 'message' in error)
+        ? String((error as { message: unknown }).message)
+        : JSON.stringify(error);
+
+    // Log to tool_errors for dashboard visibility
+    await logToolError({
+      tool: ToolNames.ALERTS,
+      errorType: ErrorTypes.INTERNAL,
+      errorMessage,
+      errorStack: error instanceof Error ? error.stack : undefined,
+      requestPath: '/api/cron/daily-alerts',
+    }).catch(() => {});
+
+    // Still try to save metrics on error
+    metrics.recordGuardrailWarning();
+    await metrics.save();
+
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/cron/daily-alerts
+ * Manual trigger with CRON_SECRET
+ */
+export async function POST(request: NextRequest) {
+  // Verify cron secret
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  const body = await request.json().catch(() => ({}));
+  return runDailyAlertJob({
+    skipTimezoneCheck: body.skipTimezoneCheck,
+    testEmail: body.testEmail,
+    forceResend: body.forceResend,
+  });
+}
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+/**
+ * GET endpoint - runs the cron job when called by Vercel cron
+ */
+export async function GET(request: NextRequest) {
+  const email = request.nextUrl.searchParams.get('email');
+  const test = request.nextUrl.searchParams.get('test') === 'true';
+  const password = request.nextUrl.searchParams.get('password');
+  const skipTimezone = request.nextUrl.searchParams.get('skipTimezone') === 'true';
+  const forceResend = request.nextUrl.searchParams.get('forceResend') === 'true';
+  const limit = parseInt(request.nextUrl.searchParams.get('limit') || '0');
+
+  // Admin override - allows manual triggering with timezone skip
+  if (password === ADMIN_PASSWORD) {
+    if (request.nextUrl.searchParams.get('fixture') === 'true' && email) {
+      console.log('[Daily Alerts] Admin fixture template test →', email);
+      return sendFixtureDailyAlertTest(email);
+    }
+
+    console.log('[Daily Alerts] Admin override triggered', { skipTimezone, limit: limit || 'all' });
+    return runDailyAlertJob({
+      skipTimezoneCheck: skipTimezone,
+      testEmail: email || undefined,
+      forceResend: forceResend && Boolean(email),
+    });
+  }
+
+  // If checking/testing for a specific email
+  if (email && test) {
+    return runDailyAlertJob({ testEmail: email, skipTimezoneCheck: true });
+  }
+
+  // Check if this is a Vercel cron request
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const authHeader = request.headers.get('authorization');
+  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  // Run the job if triggered by Vercel cron or has CRON_SECRET
+  if (isVercelCron || hasCronSecret) {
+    return runDailyAlertJob();
+  }
+
+  // Otherwise return documentation
+  return NextResponse.json({
+    message: 'Daily Alerts Cron Job (PAID TIER ONLY)',
+    usage: {
+      test: 'GET ?email=xxx&test=true to send test alert',
+      manual: 'POST with Authorization: Bearer {CRON_SECRET}',
+      admin: 'GET ?password=xxx&skipTimezone=true to send all (bypass timezone)',
+    },
+    schedule: 'Every day at 6 AM local time (based on user timezone)',
+    tiers: {
+      free: 'Free tier users get WEEKLY alerts (5 opps max via weekly-alerts cron)',
+      paid: 'Paid tier users get DAILY alerts (unlimited opps via this cron)',
+    },
+    features: [
+      'Paid tier users only (any product purchase)',
+      'Free tier users redirected to weekly-alerts cron',
+      'Deduplication (won\'t send same opp twice in 7 days)',
+      'Retry failed emails (up to 3 attempts)',
+      'Timezone-aware delivery (~6 AM local)',
+      'Includes grants from Grants.gov',
+    ],
+  });
+}
+
+// Helper functions
+function getDateDaysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split('T')[0];
+}
+
+function formatDate(dateString: string): string {
+  if (!dateString) return 'N/A';
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+function getDaysUntil(dateString: string): number {
+  if (!dateString) return 999;
+  const target = new Date(dateString);
+  const diff = target.getTime() - Date.now();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+// Count notice types for summary
+function countNoticeTypes(opps: SAMOpportunity[]): SAMNoticeSummary {
+  const counts: SAMNoticeSummary = {
+    totalMatched: opps.length,
+    rfp: 0,
+    rfq: 0,
+    sourcesSought: 0,
+    preSol: 0,
+    combined: 0,
+    other: 0,
+  };
+  for (const opp of opps) {
+    const type = (opp.noticeType || '').toLowerCase();
+    if (type.includes('solicitation') || type.includes('rfp')) counts.rfp++;
+    else if (type.includes('rfq') || type.includes('quote')) counts.rfq++;
+    else if (type.includes('sources sought') || type.includes('rfi')) counts.sourcesSought++;
+    else if (type.includes('presol') || type.includes('pre-sol')) counts.preSol++;
+    else if (type.includes('combined')) counts.combined++;
+    else counts.other++;
+  }
+  return counts;
+}
+
+// Get urgency color based on days remaining
+function getUrgencyColor(days: number): string {
+  if (days <= 3) return '#dc2626';
+  if (days <= 7) return '#f97316';
+  if (days <= 14) return '#eab308';
+  return '#22c55e';
+}
+
+// Get urgency label
+function getUrgencyLabel(days: number): string {
+  if (days <= 0) return 'TODAY!';
+  if (days === 1) return 'TOMORROW';
+  if (days <= 3) return `🔥 ${days} DAYS`;
+  if (days <= 7) return `⚡ ${days} days`;
+  return `${days} days`;
+}
+
+// Generate AI action tips based on opportunities
+async function generateActionTips(
+  opportunities: SAMOpportunity[],
+  userBusinessType?: string
+): Promise<string[]> {
+  const defaultTips = [
+    'Review solicitation documents within 48 hours of receiving this brief',
+    'Identify teaming partners for larger opportunities',
+    'Check SAM.gov for amendments and Q&A updates',
+  ];
+
+  if (opportunities.length === 0) {
+    return defaultTips;
+  }
+
+  // Keep the production sender on the same fast path as briefings.
+  // Per-user AI calls are useful for experiments, but they slow batches enough
+  // that the daily alert cron may not cover the full audience.
+  if (process.env.ENABLE_DAILY_ALERT_AI_TIPS !== 'true') {
+    return defaultTips;
+  }
+
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const oppSummary = opportunities.slice(0, 5).map(o => ({
+      title: o.title?.slice(0, 80),
+      agency: o.department,
+      deadline: o.responseDeadline,
+      setAside: o.setAside,
+      noticeType: o.noticeType,
+    }));
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{
+        role: 'user',
+        content: `Based on these federal opportunities, provide 2-3 brief, actionable tips for a ${userBusinessType || 'small business'} contractor:
+
+${JSON.stringify(oppSummary, null, 2)}
+
+Return ONLY a JSON array of strings, each tip under 100 characters:
+["tip 1", "tip 2", "tip 3"]`,
+      }],
+    });
+
+    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const tips = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(tips) && tips.length > 0) {
+        return tips.slice(0, 3);
+      }
+    }
+  } catch (err) {
+    console.error('[Daily Alerts] Action tips generation error:', err);
+  }
+
+  return defaultTips;
+}
+
+/** Admin fixture send — renders the live template with sample opps (no cron batching). */
+async function sendFixtureDailyAlertTest(toEmail: string) {
+  // A REALISTIC profile, not an empty one. An all-empty fixture trips
+  // userNeedsMindySetup() (no naics AND no keywords), so every template test rendered the
+  // red "Fix My Alert Filters" setup nudge in place of the content a real subscriber sees —
+  // which is exactly what a fixture is supposed to preview. Caught 2026-08-17 from an inbox
+  // screenshot. These values are illustrative fixture data only; nothing is persisted.
+  const fixtureUser: AlertUser = {
+    user_email: toEmail,
+    naics_codes: ['541512', '541519'],
+    keywords: ['cybersecurity', 'help desk', 'network support'],
+    business_type: 'Small Business',
+    business_description: 'Federal contractor: cybersecurity, help desk, network support.',
+    set_aside_preferences: null,
+    agencies: [],
+    location_state: null,
+    location_states: null,
+    alert_frequency: 'daily',
+    alerts_enabled: true,
+    is_active: true,
+  };
+
+  const cached = await fetchSamOpportunitiesFromCache({ limit: 10 });
+  const opportunities = (cached.opportunities || []).slice(0, 3).map((opp, i) => ({
+    ...opp,
+    score: 72 - i * 8,
+  }));
+
+  if (opportunities.length === 0) {
+    return NextResponse.json(
+      { success: false, error: 'No cached SAM opportunities available for fixture email' },
+      { status: 503 },
+    );
+  }
+
+  // Compute the REAL Today's Lens for this address, exactly as the live send path does
+  // (see the runDailyAlertJob call site). Without it the fixture passed no lens, so
+  // todaysLensHtml rendered EMPTY and the map hero — the whole point of the email — was
+  // silently missing from every template test. Caught 2026-08-17: a fixture send arrived
+  // with the keyword-setup nudge where the map should have been.
+  const fixtureLens = await computeTodaysLens(toEmail).catch((lensErr) => {
+    console.error('[daily-alerts] fixture computeTodaysLens threw:', lensErr);
+    return null;
+  });
+
+  const sent = await sendDailyAlertEmail(toEmail, opportunities, fixtureUser, [], [], [], undefined, [], {
+    transactional: true,
+  }, fixtureLens);
+  if (!sent) {
+    return NextResponse.json(
+      {
+        success: false,
+        fixture: true,
+        to: toEmail,
+        error: 'Email blocked by send guard (suppression or daily cap). Check /api/admin/email-guard.',
+      },
+      { status: 429 },
+    );
+  }
+  return NextResponse.json({
+    success: true,
+    fixture: true,
+    sent: true,
+    to: toEmail,
+    opportunities: opportunities.length,
+    keywordSetupCta: true,
+  });
+}
+
+// Send daily alert email - alert product format (distinct from Market Intelligence briefings)
+async function sendDailyAlertEmail(
+  email: string,
+  opportunities: (SAMOpportunity & { score: number })[],
+  user: AlertUser,
+  grants: (GrantOpportunity & { score: number })[] = [],
+  allActiveOpportunities: SAMOpportunity[] = [],
+  actionTips: string[] = [],
+  noticeSummary?: SAMNoticeSummary,
+  hiddenMatches: HiddenMatch[] = [],
+  sendOptions?: {
+    transactional?: boolean;
+    openKeywordNote?: string;
+    comingBack?: ComingBackDecision;
+  },
+  todaysLens?: TodaysLens | null,
+  /**
+   * True when NO opportunity was actually new and we substituted existing active ones so the
+   * email is not empty. The substitution is fine; calling the result "new" is not. Computed
+   * at the call site since 2026, never passed here — so the subject and headline said
+   * "N new opportunities" about rows whose newness was never established.
+   *
+   * Unknown is not new.
+   */
+  isUsingFallback = false,
+): Promise<boolean> {
+  const emailDate = new Date().toISOString().split('T')[0];
+  const tokenResult = await createEmailTrackingToken(email, 'daily_alert', emailDate);
+  const trackingToken = tokenResult?.token;
+  const trackedUrl = (url: string, label: string, content = label) => {
+    const urlWithUtm = appendEmailUtm(url, {
+      campaign: 'daily_alert',
+      content,
+    });
+    return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
+  };
+
+  const encodedEmail = encodeURIComponent(email.toLowerCase().trim());
+  const preferencesAuth = generateEmailToken(email);
+  // One-click "Track in Mindy" (the alert→action fix): a signed token so the
+  // add-to-pipeline GET link authenticates straight from the email. Reuses the
+  // same email-token scheme as the preferences link.
+  const actionAuth = generateEmailToken(email);
+  const trackUrl = (opp: { noticeId?: string; title: string; agency?: string; naicsCode?: string }) => {
+    const p = new URLSearchParams({
+      email: email.toLowerCase().trim(),
+      title: opp.title || '',
+      token: actionAuth.token,
+      ts: String(actionAuth.ts),
+      source: 'daily_alert',
+    });
+    if (opp.noticeId) p.set('notice_id', opp.noticeId);
+    if (opp.agency) p.set('agency', opp.agency);
+    if (opp.naicsCode) p.set('naics', opp.naicsCode);
+    return `${MINDY_SITE_URL}/api/actions/add-to-pipeline?${p.toString()}`;
+  };
+
+  // "View opportunity" must open THAT opportunity — so it uses the map's typed
+  // exact-opportunity address, ?opp=<notice_id>, the SAME contract Share, the
+  // Favorites page and /today already use (opportunity-map/route.ts ~8049 →
+  // openOppDrawer; guarded by opp-deeplink.unit.test.ts). One code path, so the
+  // email cannot drift from the three surfaces that already work.
+  //
+  // ⚠️ DO NOT re-add market filters (naics/subAgency/agency/state) to a
+  // PER-OPPORTUNITY link. They do not scope the destination, they can DELETE it:
+  //   · The map's scope-params deep-link IIFE (route.ts ~8141) parses those params
+  //     and applies them through __applySavedSearch inside a 40x150ms retry loop.
+  //     So boot painted broad results first and ~1-2s later the filters landed and
+  //     the target vanished into "No opportunities match" — results, then nothing.
+  //     With opp= alone that IIFE early-returns ("nothing asked for"), so there is
+  //     no delayed writer to race and the drawer stays open.
+  //   · state came from the RECIPIENT's profile — a fact about the reader, not the
+  //     opportunity. It filters on pop_state, populated on only 4,047 of 10,993
+  //     open rows (36.8%; the documented SAM sparsity), while the opportunity was
+  //     selected for this email by NAICS/agency and need never carry one. Measured
+  //     on prod: 571 of 2,078 live NAICS x sub-agency scopes (27.5%) go to EXACTLY
+  //     0 the moment any state filter is applied.
+  // A notice with no id is the only case that still needs a fallback: keep the
+  // opportunity's OWN agency/NAICS (never the reader's state) so it lands on that
+  // work rather than the unfiltered 136K-pin national map.
+  const mapUrl = (opp: { noticeId?: string; agency?: string; naicsCode?: string; subTier?: string }) => {
+    if (opp.noticeId) {
+      return `${MINDY_SITE_URL}/opportunity-map?opp=${encodeURIComponent(opp.noticeId)}`;
+    }
+    const p = new URLSearchParams();
+    if (opp.naicsCode) p.set('naics', opp.naicsCode);
+    if (opp.subTier) p.set('subAgency', opp.subTier);
+    else if (opp.agency) p.set('agency', opp.agency);
+    const q = p.toString();
+    return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
+  };
+
+  // Grants land on the map's grants dataset (DATASET={buyers,companies,grants}
+  // in opportunity-map/route.ts), scoped to the user's state when we have one.
+  // Was: a straight exit to grants.gov — off Mindy, no return path.
+  const grantsMapUrl = () => {
+    const p = new URLSearchParams({ mode: 'grants' });
+    if (user.location_state) p.set('state', user.location_state);
+    return `${MINDY_SITE_URL}/opportunity-map?${p.toString()}`;
+  };
+  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
+  const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
+  const mindyDashboardUrl = mindyDashboardUrlFor(email);
+  const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);
+  const totalCount = opportunities.length + grants.length;
+
+  // ── EDITORIAL ROWS (2026-08-19 visual reset) ──────────────────────────────────────
+  // Eric: the email read as "three different products stitched together" — a dark
+  // dashboard, alert-heavy SaaS cards, a purple grants module, then a fourth footer
+  // style. One system now: warm white, dark ink, thin rules, restrained accents.
+  //
+  // SHOW THE BEST 5, NOT ALL OF THEM. The email answers "what changed that I need to
+  // know?", not "here is the database" — the rest live behind an honest "View all N".
+  const EMAIL_ROW_LIMIT = 5;
+  const shownOpps = opportunities.slice(0, EMAIL_ROW_LIMIT);
+
+  // WHY THIS MATCHED — a plain reason, replacing the old "100%" badge.
+  // That badge was an internal RELEVANCE score (NAICS 40 + agency 30 + keywords x10,
+  // clamped to 100), so any opp matching NAICS + agency + a few keywords rendered
+  // "100%" — it saturated and stopped discriminating while implying a fit precision it
+  // never had. The score still does its real job (ORDERING these rows); it is just no
+  // longer shown as a percentage. The reason below is derived from the SAME profile
+  // facts the scorer uses, so it is grounded — never narrated.
+
+// ── MINDY DAY BANNER (day-of only) ─────────────────────────────────────────────────
+// ~1,500 people get this alert every morning; 760 are registered for the session. The
+// gap is the point — this reaches the ones who are not.
+//
+// SELF-EXPIRING BY CONSTRUCTION: it renders ONLY on MINDY_DAY.iso and only until the
+// session ends. No flag to remember to turn off, and no chance of a stale "today!"
+// banner going out tomorrow to 1,500 people. Every value reads MINDY_DAY — the same
+// config the reminder emails use, so this cannot drift from the real room or time.
+function mindyDayBannerHtml(): string {
+  try {
+    const nowIso = new Date().toISOString().slice(0, 10);
+    if (nowIso !== MINDY_DAY.iso) return '';
+    // 20:00 UTC = 4pm ET, comfortably after a 10am-1pm ET session. Past that, drop it.
+    if (new Date().getUTCHours() >= 20) return '';
+    return `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 0 22px 0;">
+    <tr>
+      <td style="border:1px solid #ddd6fe;background:#faf5ff;border-radius:10px;padding:14px 16px;">
+        <p style="margin:0;color:#6d28d9;font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;">Live today &middot; free</p>
+        <p style="margin:6px 0 0;color:#0f172a;font-size:15px;font-weight:700;line-height:1.4;">
+          Mindy Day &mdash; ${MINDY_DAY.timeLabel}
+        </p>
+        <p style="margin:5px 0 0;color:#475569;font-size:13px;line-height:1.55;">
+          A live working session: build your own federal market map on real government data.
+        </p>
+        <p style="margin:10px 0 0;">
+          <a href="${MINDY_DAY.joinUrl}" style="color:#6d28d9;font-size:13.5px;font-weight:700;text-decoration:none;">Join on Zoom &rarr;</a>
+          <span style="color:#94a3b8;font-size:12px;"> &nbsp;&middot;&nbsp; ${MINDY_DAY.zoomCapacity.toLocaleString('en-US')} seats${MINDY_DAY.livestreamUrl ? `, or <a href="${MINDY_DAY.livestreamUrl}" style="color:#6d28d9;text-decoration:none;font-weight:600;">watch the livestream</a>` : ''}</span>
+        </p>
+      </td>
+    </tr>
+  </table>`;
+  } catch {
+    return ''; // a banner must never break the alert it rides on
+  }
+}
+  const profileNaics: string[] = Array.isArray(user.naics_codes) ? user.naics_codes : [];
+  const matchReason = (opp: SAMOpportunity & { score: number }): string => {
+    const bits: string[] = [];
+    const code = opp.naicsCode || '';
+    if (code && profileNaics.includes(code)) bits.push(`NAICS ${code}`);
+    else if (code && profileNaics.some((n) => code.startsWith(n) || n.startsWith(code))) bits.push(`NAICS ${code} (related)`);
+    if (opp.setAside && user.business_type && opp.setAside.toLowerCase().includes(String(user.business_type).toLowerCase().slice(0, 4))) {
+      bits.push(`${opp.setAside} eligible`);
+    } else if (opp.setAside) bits.push(opp.setAside);
+    return bits.slice(0, 2).join(' · ');
+  };
+
+  const opportunitiesHtml = shownOpps.map((opp, i) => {
+    const daysUntil = getDaysUntil(opp.responseDeadline);
+    // Urgency is EDITORIAL, not alarmist: a small rust-red word, no fire emoji, no pink
+    // row background. Red means urgency; it must not dominate the email.
+    const urgent = daysUntil <= 7;
+    const dayLabel = daysUntil <= 0 ? 'DUE TODAY' : `${daysUntil} DAY${daysUntil === 1 ? '' : 'S'} LEFT`;
+    const reason = matchReason(opp);
+    const meta = [opp.noticeType || 'Solicitation', opp.setAside, opp.naicsCode ? `NAICS ${opp.naicsCode}` : '']
+      .filter(Boolean).join(' &middot; ');
+    return `
+      <tr>
+        <td style="padding:18px 0;border-bottom:1px solid #eceff3;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="color:#64748b;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+                ${(opp.department || 'Federal').slice(0, 42)}
+              </td>
+              <td align="right" style="color:${urgent ? '#b91c1c' : '#94a3b8'};font-size:11px;font-weight:700;letter-spacing:0.6px;white-space:nowrap;">
+                ${dayLabel}
+              </td>
+            </tr>
+          </table>
+          <p style="margin:7px 0 0 0;">
+            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_${opp.noticeId || i + 1}`)}" style="color:#0f172a;font-size:16px;font-weight:700;line-height:1.35;text-decoration:none;">${opp.title.slice(0, 90)}${opp.title.length > 90 ? '…' : ''}</a>
+          </p>
+          <p style="color:#64748b;font-size:12px;line-height:1.5;margin:6px 0 0 0;">${meta}</p>
+          <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:3px 0 0 0;">
+            Posted ${formatDate(opp.postedDate)} &middot; Due ${formatDate(opp.responseDeadline)}${reason ? ` &middot; Matched on ${reason}` : ''}
+          </p>
+          <p style="margin:11px 0 0 0;">
+            <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">View opportunity &rarr;</a>
+            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="color:#94a3b8;font-size:13px;font-weight:600;text-decoration:none;margin-left:18px;">Track</a>
+          </p>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Everything not shown above. The old copy ("+ N more…") was a dead sentence; this is
+  // now a real link to all of today's NEW matches — distinct from "explore the whole
+  // market", which is a different action and is labelled separately at the foot.
+  const moreCount = Math.max(0, opportunities.length - EMAIL_ROW_LIMIT);
+
+  // THE CTA MUST NAME THE POPULATION IT LANDS ON. Two things were wrong here:
+  //
+  //  1. It printed totalCount (contracts + grants) while moreCount is contracts-only, and
+  //     /app?panel=alerts renders NO grants at all. "View all 10" with 6 contracts + 4 grants
+  //     sent the user to a panel holding 6.
+  //
+  //  2. It said "new matches", but the panel filters on response_deadline (still open) and
+  //     never on posted_date — so the destination is every open opportunity regardless of age.
+  //     The count was a 24-hour population; the landing is not time-bounded at all.
+  //
+  // Both fixed by describing the destination honestly rather than restating the headline:
+  // contracts only, and "matches" without the time claim the landing cannot honour. When the
+  // rows are fallback rows, "new" would be false anyway.
+  const ctaLabel = isUsingFallback
+    ? `View all ${opportunities.length} matches`
+    : `View all ${opportunities.length} matching contracts`;
+
+  // REMOVED (Eric 2026-08-06): the green market-breadth banner + its upsell CTA. It pushed
+  // the /market-intelligence subscription page — buyer framing. We seek CASUAL BROWSERS:
+  // the map hero at the top IS the market-browse path (browse, not buy).
+
+  // Mindy Insight — pick the dominant notice-type bucket from this
+  // user's batch, fetch one teaching quote for that bucket. The helper
+  // is process-cached, so 500 users across 5 buckets in one cron run
+  // = 5 RAG queries, not 500. Defensive: null insight just renders ''.
+  const bucketCounts = new Map<string, number>();
+  for (const opp of opportunities.slice(0, 20)) {
+    const b = bucketNoticeType(opp.noticeType);
+    bucketCounts.set(b, (bucketCounts.get(b) || 0) + 1);
+  }
+  let dominantNoticeType: string | undefined;
+  let maxCount = 0;
+  for (const opp of opportunities.slice(0, 20)) {
+    const b = bucketNoticeType(opp.noticeType);
+    const c = bucketCounts.get(b) || 0;
+    if (c > maxCount) {
+      maxCount = c;
+      dominantNoticeType = opp.noticeType;
+    }
+  }
+  // Mindy Insights (#91) — process-cached RAG quote per bucket.
+  // Gated by ENABLE_MINDY_INSIGHTS=true AND a per-user rollout percent
+  // (MINDY_INSIGHTS_ROLLOUT_PERCENT, default 0). When the May 28-31
+  // outage hit, *all* users saw the new feature → 100% of cron runs
+  // tripped the guardrail. With per-user bucketing, a future
+  // regression only affects MINDY_INSIGHTS_ROLLOUT_PERCENT% of users
+  // and the throughput-regression detector catches it the next morning.
+  const insightsRollout = parseInt(process.env.MINDY_INSIGHTS_ROLLOUT_PERCENT || '0', 10);
+  const insightsEnvOn = process.env.ENABLE_MINDY_INSIGHTS === 'true';
+  const mindyInsightEnabled = insightsEnvOn
+    && opportunities.length > 0
+    && userInRollout(email, insightsRollout, 'mindy-insights-v1');
+  const mindyInsight = mindyInsightEnabled
+    ? await getInsightForNoticeType(dominantNoticeType).catch(err => {
+        console.error('[daily-alerts] mindy-insights threw:', err);
+        return null;
+      })
+    : null;
+  const mindyInsightHtml = renderInsightHtml(mindyInsight);
+
+  // REMOVED (Eric 2026-08-06): the "Hidden match — your kind of work" email section. The
+  // hiddenMatches DATA still feeds the Source Feed badge (above); we just don't render a
+  // capability-match block in the email — browse-first, less to scroll. Map hero leads.
+
+  // Today's Lens map hook — the SAME grounded lens the app hero renders, in the inbox. Additive;
+  // omitted entirely when the caller couldn't compute it (todaysLens == null).
+  // Pass trackedUrl so the "Open Today's Map" click is LOGGED + UTM-tagged (campaign=daily_alert) —
+  // the same click-tracker every other link here uses. Makes email→map reach measurable (Mission Control).
+  // The lead's supporting line — counted from THE ACTUAL matches in this email, never
+  // estimated. Each clause is omitted when its count is 0, so the sentence can never
+  // read "0 close this week". (ground_in_real_data: these are facts about the payload.)
+  const _closingSoon = opportunities.filter((o) => getDaysUntil(o.responseDeadline) <= 7).length;
+  const _setAside = opportunities.filter((o) => !!o.setAside && o.setAside !== 'None').length;
+  const _leadBits = [
+    _closingSoon > 0 ? `${_closingSoon} close this week` : '',
+    _setAside > 0 ? `${_setAside} ${_setAside === 1 ? 'is' : 'are'} set-aside` : '',
+  ].filter(Boolean);
+  const leadBreakdown = _leadBits.length
+    ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${_leadBits.join(' &middot; ')}</p>`
+    : '';
+
+  const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL, trackedUrl) : '';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#faf9f7;">
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#0f172a;max-width:600px;margin:0 auto;padding:28px 24px 36px;background:#ffffff;">
+
+  <!-- ── HEADER: a masthead line + a thin rule. No dark slab. ──────────────────────
+       The 2026-08-19 reset (Eric): "the email needs a full visual reset, not just a
+       better top section… it feels like three different products stitched together."
+       One system now — warm white, dark ink, thin rules, restrained accents. -->
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+    <tr>
+      <td style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;">Mindy &middot; Saved Search Alert</td>
+      <td align="right" style="color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</td>
+    </tr>
+  </table>
+  <div style="height:1px;background:#e5e7eb;margin:12px 0 22px 0;"></div>
+  ${mindyDayBannerHtml()}
+
+  <!-- ── LEAD: the news, then the standing context. This is the fix for the confusing
+       "17 new" vs "1,089 total" — they are different facts, so they get different
+       weights instead of competing as two big numbers. ── -->
+  <p style="color:#0f172a;font-size:23px;font-weight:700;line-height:1.3;margin:0;">
+    ${totalCount} new ${totalCount === 1 ? 'opportunity matches' : 'opportunities match'} your market.
+  </p>
+  ${leadBreakdown}
+  ${sendOptions?.openKeywordNote ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${sendOptions.openKeywordNote}</p>` : ''}
+  ${todaysLensHtml}
+
+  ${mindyInsightHtml}
+
+  ${opportunities.length > 0 ? `
+  <!-- ── OPEN NOW: respondable SAM. Never mixed with Coming Back recompetes. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
+  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${isUsingFallback ? 'These solicitations are still open in your market.' : OPEN_NOW_EXPLAIN}</p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+    ${opportunitiesHtml}
+  </table>
+  ${moreCount > 0 ? `
+  <p style="margin:18px 0 0 0;">
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/app?panel=alerts`, 'view_all_new', 'view_all_new')}" style="color:#4f46e5;font-size:14px;font-weight:700;text-decoration:none;">${ctaLabel} &rarr;</a>
+  </p>` : ''}
+  ` : `
+  <!-- Quiet day — honest, no fabricated rows, no emoji. -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 16px 0;"></div>
+  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">Nothing new matched your filters today. Coming Back below is work returning to market later — not an open solicitation.</p>
+  `}
+
+  ${renderComingBackSection(sendOptions?.comingBack ?? { kind: 'omit', reason: 'none_qualify' }, {
+    panelUrl: `${MINDY_SITE_URL}${COMING_BACK_PANEL_PATH}`,
+    trackedUrl,
+  })}
+
+  ${grants.length > 0 ? `
+  <!-- ── GRANTS: the SAME editorial treatment as opportunities. Grants are another form
+       of intelligence, not another product embedded in the email — so no gradient panel. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:34px 0 0 0;">Grants</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
+  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${grants.length} new ${grants.length === 1 ? 'grant matches' : 'grants match'} your profile</p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+    ${grants.slice(0, 3).map((grant, i) => {
+      const gDays = getDaysUntil(grant.closeDate);
+      const gUrgent = gDays <= 14;
+      const funding = grant.awardCeiling ? `Up to $${(grant.awardCeiling / 1000).toFixed(0)}K` : '';
+      return `
+      <tr>
+        <td style="padding:16px 0;border-bottom:1px solid #eceff3;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="color:#64748b;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">${(grant.agency || 'Federal').slice(0, 42)}</td>
+              <td align="right" style="color:${gUrgent ? '#b91c1c' : '#94a3b8'};font-size:11px;font-weight:700;letter-spacing:0.6px;white-space:nowrap;">CLOSES ${formatDate(grant.closeDate).toUpperCase()}</td>
+            </tr>
+          </table>
+          <p style="margin:7px 0 0 0;">
+            <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_map_${grant.oppNumber || i + 1}`)}" style="color:#0f172a;font-size:16px;font-weight:700;line-height:1.35;text-decoration:none;">${grant.title.slice(0, 90)}${grant.title.length > 90 ? '…' : ''}</a>
+          </p>
+          ${funding ? `<p style="color:#64748b;font-size:12px;line-height:1.5;margin:6px 0 0 0;">${funding}</p>` : ''}
+          <p style="margin:11px 0 0 0;">
+            <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_btn_${grant.oppNumber || i + 1}`)}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">View grant &rarr;</a>
+          </p>
+        </td>
+      </tr>`;
+    }).join('')}
+  </table>
+  ` : ''}
+
+  <!-- ── YOUR MARKET: the filters, moved OFF the top and made quiet. They were a heavy
+       navy bar competing with the opportunities themselves. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:34px 0 0 0;">Your market</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 14px 0;"></div>
+  <p style="color:#475569;font-size:13px;line-height:1.7;margin:0;">
+    NAICS ${user.naics_codes?.slice(0, 3).join(' &middot; ') || 'Any'}${user.naics_codes?.length > 3 ? ` &middot; +${user.naics_codes.length - 3}` : ''}<br>
+    ${[user.business_type, user.location_state].filter(Boolean).join(' &middot; ') || 'All set-asides &middot; All states'}
+  </p>
+  <p style="margin:14px 0 0 0;">
+    <a href="${trackedUrl(preferencesUrl, 'manage_preferences', 'your_market')}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">Adjust preferences &rarr;</a>
+  </p>
+
+  <!-- ── FEEDBACK: a quiet question, not a consumer survey. ── -->
+  <div style="height:1px;background:#e5e7eb;margin:32px 0 0 0;"></div>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:16px 0 0 0;">
+    Was today's alert useful?
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="color:#4f46e5;font-weight:700;text-decoration:none;margin-left:8px;">Yes</a>
+    <span style="color:#cbd5e1;"> &middot; </span>
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="color:#4f46e5;font-weight:700;text-decoration:none;">No</a>
+  </p>
+
+  <!-- ── FOOTER ── -->
+  <div style="height:1px;background:#e5e7eb;margin:26px 0 0 0;"></div>
+  <p style="color:#0f172a;font-size:13px;font-weight:700;margin:18px 0 0 0;">Mindy</p>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:3px 0 0 0;">Federal market intelligence, updated daily.</p>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:12px 0 0 0;">
+    <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color:#64748b;text-decoration:none;">Preferences</a>
+    <span style="color:#cbd5e1;"> &middot; </span>
+    <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color:#64748b;text-decoration:none;">Unsubscribe</a>
+  </p>
+  <p style="color:#cbd5e1;font-size:11px;line-height:1.6;margin:14px 0 0 0;">Data sourced from federal procurement and agency records.</p>
+</div>
+  ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
+</body>
+</html>
+`;
+
+  return sendEmail({
+    // NO `from` — sendEmail defaults to `Mindy <${EMAIL_FROM || alerts@mail.getmindy.ai}>`,
+    // the domain Resend is actually verified for. This used to pass
+    // `SMTP_USER || alerts@govcongiants.com`, and the caller's `from` WINS
+    // (`const fromAddress = from || …`), so Resend rejected the unverified
+    // govcongiants.com sender on EVERY send and silently fell back to Office365:
+    // 1000/1000 recent daily_alert rows in email_provider_sends were office365 with
+    // msgid=null, while weekly_alert / magic_link / nudges (which don't override
+    // `from`) all went via resend. ~900 alerts/day were leaving from the wrong
+    // domain's SPF/DKIM — a spam-folder pattern, and the reason users reported
+    // "sent" alerts they never received.
+    // Deliberately omitting it rather than copying weekly-alerts' `EMAIL_FROM ||
+    // 'alerts@mail.getmindy.ai'` default: one source of truth, one less place to drift.
+    // (CLAUDE.md rule #13 + the mindy-email-sender-architecture memory.)
+    // Coach-managed client rows deliver to the client's real inbox (alert_recipient_email);
+    // everyone else falls back to their own address.
+    to: user.alert_recipient_email || email,
+    // Mindy is already the SENDER, so "Mindy Alert:" was spending the most valuable
+    // subject-line real estate re-stating it. The inside of the email is now more
+    // sophisticated than the subject was (Eric 2026-08-19); this matches its voice and
+    // leads with the number that matters.
+    // UNKNOWN IS NOT NEW. On the fallback path nothing was new -- we substituted existing
+    // active opportunities so the email is not empty, which is fine -- but the subject said
+    // "N new opportunities" about rows whose newness was never established. isUsingFallback
+    // was computed and never consulted.
+    subject: isUsingFallback
+      ? `${totalCount} ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`
+      : `${totalCount} new ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`,
+    html: htmlContent,
+    emailType: 'daily_alert',
+    eventSource: 'daily_alert',
+    transactional: sendOptions?.transactional,
+    tags: {
+      email_type: 'daily_alert',
+      alert_type: 'daily',
+      match_count: totalCount,
+      sam_match_count: opportunities.length,
+      grant_match_count: grants.length,
+      naics_primary: user.naics_codes?.[0] || 'none',
+      user_segment: user.business_type || 'uncertified',
+      state: user.location_state || 'none',
+    },
+    metadata: {
+      tracking_token: trackingToken || null,
+      naics_codes: user.naics_codes || [],
+      business_type: user.business_type || null,
+      location_state: user.location_state || null,
+      opportunity_ids: opportunities.slice(0, 20).map(opp => opp.noticeId).filter(Boolean),
+    },
+  });
+}

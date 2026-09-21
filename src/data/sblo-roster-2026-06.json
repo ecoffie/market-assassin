@@ -1,0 +1,1814 @@
+{
+  "metadata": {
+    "description": "Prime contractor SBLO (Small Business Liaison Officer) contacts, refreshed June 2026 against live web sources. Canonical replacement for the legacy TIER-2-FINAL-CONTACT-LIST (regex-scraped garbage names/emails).",
+    "verified": "2026-06",
+    "companyCount": 200,
+    "withSbloName": 41,
+    "withEmail": 57,
+    "withPortal": 104,
+    "mergedIntoPrimeDb": 68,
+    "methodology": "225-row SBA prime roster cleaned to 200 official legal names (dropped non-company rows, merged duplicates/fragments); every contact field re-researched Jun 2026 via parallel research agents. Blank = no public SBLO found (no fabrication). 68 matched companies also written into prime-contractors-database.json (sbloVerified=2026-06)."
+  },
+  "contacts": [
+    {
+      "company": "AAI CORPORATION",
+      "sbloName": null,
+      "title": "Small Business Liaison Officer (mailbox)",
+      "email": "sblo@textronsystems.com",
+      "phone": null,
+      "supplierPortal": "https://www.textronsystems.com/contact/suppliers",
+      "source": "AAI is now Textron Systems; SBLO mailbox sblo@textronsystems.com per Textron Systems supplier classification forms, Jun 2026"
+    },
+    {
+      "company": "AArete",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "AArete (management/tech consulting); no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "ABACUS TECHNOLOGY",
+      "sbloName": "Jane Cross",
+      "title": "Contract Administrator",
+      "email": "crossj@abacustech.com",
+      "phone": "(301) 215-7593",
+      "supplierPortal": "https://www.abacustech.com/doing-business/",
+      "source": "abacustech.com contract-vehicles / doing-business page (Jane Cross, Contract Administrator); also verified in DOT FY2026 directory, Jun 2026"
+    },
+    {
+      "company": "ABHE & SVOBODA INC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Abhe & Svoboda (bridge coating/heavy-civil contractor); no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "ABS Group Consulting",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "Accenture",
+      "sbloName": "Carla Jamison",
+      "title": "Senior Manager / Small Business Liaison Officer, Accenture Federal Services",
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.accenture.com/us-en/support/us-federal-government/small-business-services-overview",
+      "source": "AFS Small Business Services page lists Carla Jamison as SBLO (Sherry Penson deputy); no public personal email; supplier portal supplierhub.accenture.com, Jun 2026"
+    },
+    {
+      "company": "ACE ENGINEERING, INC.S",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "Acuity International",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Acuity International; no public small-business supplier-registration page or named contact found, Jun 2026"
+    },
+    {
+      "company": "ADVERTISING COUNCIL, INC., THE",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "The Ad Council (nonprofit); no public supplier/small-business contact found, Jun 2026"
+    },
+    {
+      "company": "AECOM",
+      "sbloName": "Shawn Ralston",
+      "title": "Small Business Program Manager & SBLO, National Governments",
+      "email": "shawn.ralston@aecom.com",
+      "phone": "703-559-1338",
+      "supplierPortal": "https://aecom.com/our-supply-chain/small-business-supplier-diversity/",
+      "source": "AECOM Supplier Diversity Points-of-Contact list + aecom.com/blog; general supplier mailbox supplier@aecom.com, Jun 2026"
+    },
+    {
+      "company": "AECOM TECHNICAL SERVICES",
+      "sbloName": "Shawn Ralston",
+      "title": "SB Program Manager & SBLO",
+      "email": "shawn.ralston@aecom.com",
+      "phone": "(703) 559-1338",
+      "supplierPortal": "https://aecom.com/our-supply-chain/small-businesssupplier-diversity/",
+      "source": "aecom.com supplier diversity page + AECOM Small Business handout naming SBLO Shawn Ralston (subcontractor prequal at prequal.aecom.com/SUBPORT), Jun 2026"
+    },
+    {
+      "company": "Akima Global Services",
+      "sbloName": null,
+      "title": null,
+      "email": "info@akima.com",
+      "phone": "(844) 675-7686",
+      "supplierPortal": "https://www.akima.com/doing-business-with-us/",
+      "source": "No named SBLO on akima.com; Doing Business With Us page + general mailbox only (AGS GSA listing uses GSA.MAS@akimaglobal.com), Jun 2026"
+    },
+    {
+      "company": "ALION SCIENCE AND TECHNOLOGY CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.hii.com/suppliers/become-a-mission-technologies-supplier",
+      "source": "Alion acquired by HII; register via HII Mission Technologies graphiteConnect supplier portal, Jun 2026"
+    },
+    {
+      "company": "AMEC ENVIRONMENT AND INFRASTRUCTURE CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "AMEC merged into Wood; no public US small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "Amentum",
+      "sbloName": null,
+      "title": null,
+      "email": "SBLO@Amentum.com",
+      "phone": null,
+      "supplierPortal": "https://supplier.amentum.com/SupplierRegistration",
+      "source": "Amentum 'Tips for Potential Suppliers' PDF lists SBLO@Amentum.com mailbox; no current named SBLO publicly verifiable, Jun 2026"
+    },
+    {
+      "company": "AMERICAN ASSOCIATION OF STATE HIGHWAY AND TRANSPORTATION OFFICIALS",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "AASHTO (membership association); no public supplier/small-business contact found, Jun 2026"
+    },
+    {
+      "company": "AMERICAN CIVIL CONSTRUCTORS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "AMERICAN TRANSPORTATION RESEARCH INSTITUTE, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "ATRI (research nonprofit); no public supplier/small-business contact found, Jun 2026"
+    },
+    {
+      "company": "APPLIED RESEARCH ASSOCIATES, INC.",
+      "sbloName": null,
+      "title": "Corporate Small Business Liaison Officer (mailbox)",
+      "email": "sblo@ara.com",
+      "phone": "(505) 881-8074",
+      "supplierPortal": "https://www.ara.com/vendor-information/",
+      "source": "ara.com vendor-information / small business program page; SBLO mailbox sblo@ara.com, supplier.compliance@ara.com, Jun 2026"
+    },
+    {
+      "company": "APTIM",
+      "sbloName": "Holly Hutson",
+      "title": "Small Business Liaison Officer",
+      "email": "Small.Business@APTIM.com",
+      "phone": null,
+      "supplierPortal": "https://smallbusinessregistrationportal.aptim.com",
+      "source": "aptim.com/supplier-diversity-program + ASDP/LinkedIn confirm Hutson as SBLO; office mailbox only (no personal email), Jun 2026"
+    },
+    {
+      "company": "ARINC INCORPORATED",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.rtx.com/suppliers/small-business",
+      "source": "ARINC now Collins Aerospace (RTX); register via RTX potential supplier portal, Collins SBLO contact listed on rtx.com/suppliers/small-business, Jun 2026"
+    },
+    {
+      "company": "ATKINS NORTH AMERICA",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.atkinsrealis.com/en/about/working-with-suppliers",
+      "source": "Atkins North America = AtkinsRealis; supplier registration via SAP Ariba on atkinsrealis.com 'Working with suppliers', Jun 2026"
+    },
+    {
+      "company": "AUI, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "AUI Inc (NM heavy-civil contractor, auiinc.net); no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "AYRES ASSOCIATES, INC.",
+      "sbloName": "Anthony Alvarado",
+      "title": "Subcontracting Liaison",
+      "email": null,
+      "phone": "(970) 797-3501",
+      "supplierPortal": "https://www.ayresassociates.com/bidding/",
+      "source": "Verified current in DOT FY2026 Subcontracting Directory (Anthony Alvarado); ayresassociates.com has a bidding page, Jun 2026"
+    },
+    {
+      "company": "BAE Systems Intelligence & Security",
+      "sbloName": "Katelyn Russell",
+      "title": "Small Business Liaison Officer, Intelligence & Security",
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.baesystems.com/en-us/partnership/suppliers/small-business-programs",
+      "source": "LinkedIn + DoD MARC roster name Russell as I&S sector SBLO; Dawn Dunlop (old hint) moved to Leidos; no public email/phone for Russell, Jun 2026"
+    },
+    {
+      "company": "BAE SYSTEMS SAN FRANCISCO SHIP REPAIR, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.baesystems.com/en/suppliers",
+      "source": "BAE Systems corporate supplier/supplier-diversity registration (baesystems.com/supplierdiversity); no SF Ship Repair-specific small-business contact found, Jun 2026"
+    },
+    {
+      "company": "BATTELLE MEMORIAL INSTITUTE",
+      "sbloName": null,
+      "title": null,
+      "email": "Connect@Battelle.org",
+      "phone": "1-800-201-2011",
+      "supplierPortal": "https://www.battelle.org/doing-business-with-us/suppliers/small-business-programs-office",
+      "source": "battelle.org Small Business Programs Office page; no named SBLO (Warren Weaver not found); office mailbox + Potential Supplier Registration portal, Jun 2026"
+    },
+    {
+      "company": "Battelle National Biodefense Institute, LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.battelle.org/doing-business-with-us/suppliers",
+      "source": "Register via Battelle corporate Supplier Portal (battelle.org/doing-business-with-us/suppliers, SupplierGateway); no named small-business contact published, Jun 2026"
+    },
+    {
+      "company": "BI Incorporated",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "BI Incorporated (GEO Group subsidiary); no public small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "BMT DESIGNERS & PLANNERS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "BMT Designers & Planners Inc. filed Chapter 7 bankruptcy Feb 2022; no active supplier contact found, Jun 2026"
+    },
+    {
+      "company": "THE BOEING COMPANY",
+      "sbloName": null,
+      "title": null,
+      "email": "boeingassessment@boeing.com",
+      "phone": null,
+      "supplierPortal": "https://www.boeingsuppliers.com",
+      "source": "boeingsuppliers.com supplier portal; Boeing uses multiple BU-specific SBLOs (no single corporate-wide named SBLO on official pages); SBIR via BoeingSBIR@boeing.com, Jun 2026"
+    },
+    {
+      "company": "Bollinger Shipyards",
+      "sbloName": null,
+      "title": null,
+      "email": "sales@bollingershipyards.com",
+      "phone": "(985) 532-2554",
+      "supplierPortal": "https://www.bollingershipyards.com/clients/",
+      "source": "No named SBLO on bollingershipyards.com; Vendors/Clients page + general sales mailbox only, Jun 2026"
+    },
+    {
+      "company": "BOOZ ALLEN HAMILTON INCORPORATED",
+      "sbloName": null,
+      "title": null,
+      "email": "SmallBusinessStrategyGroup@bah.com",
+      "phone": null,
+      "supplierPortal": "https://www.boozallen.com/menu/suppliers-and-small-businesses.html",
+      "source": "boozallen.com Suppliers & Small Businesses / Small Business Office page; no SBLO named on official pages (Dan Ryan listed as Deputy SBLO on LinkedIn only), Jun 2026"
+    },
+    {
+      "company": "BURNS ENGINEERING INC",
+      "sbloName": "Tamara Nicholson",
+      "title": "Subcontracting Liaison",
+      "email": null,
+      "phone": "(215) 979-7700",
+      "supplierPortal": null,
+      "source": "Verified current in DOT FY2026 Subcontracting Directory (Tamara Nicholson); no supplier page found, Jun 2026"
+    },
+    {
+      "company": "CACI Federal, Inc.",
+      "sbloName": "Yadira Beltre",
+      "title": "Small Business Liaison Officer",
+      "email": "yadira.beltre@caci.com",
+      "phone": null,
+      "supplierPortal": "https://supplier.caci.com",
+      "source": "CACI Small Business brochure (caci.com, Jan 2024) lists Beltre as SBLO; Wayne Pizer (old hint) is Small Business Advocacy Officer/Exec Director, not SBLO; supplier.caci.com portal, Jun 2026"
+    },
+    {
+      "company": "CAMBRIDGE SYSTEMATICS, INC.",
+      "sbloName": "Allison Karoly",
+      "title": "Subcontracting Liaison",
+      "email": null,
+      "phone": "(617) 354-0167",
+      "supplierPortal": null,
+      "source": "Verified current in DOT FY2026 Subcontracting Directory (Allison Karoly); no supplier page found, Jun 2026"
+    },
+    {
+      "company": "CARDNO TEC INC",
+      "sbloName": null,
+      "title": null,
+      "email": "supplierdiversity@stantec.com",
+      "phone": null,
+      "supplierPortal": "https://www.stantec.com/en/about/vendor-supplier-diversity",
+      "source": "Cardno acquired by Stantec; register via stantec.com Vendor/Supplier Diversity page, supplierdiversity@stantec.com, Jun 2026"
+    },
+    {
+      "company": "CARNEGIE MELON UNIVERSITY",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.cmu.edu/finance/procurementservices/doing-business/index.html",
+      "source": "cmu.edu Procurement Services 'Doing Business with CMU' + Supplier Diversity pages (supplier pre-registration / PaymentWorks); no named contact, Jun 2026"
+    },
+    {
+      "company": "CB&i FEDERAL SERVICES LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "CB&I/McDermott (cbi.com); legacy entity, no supplier/small-business contact found, Jun 2026"
+    },
+    {
+      "company": "CDM FEDERAL PROGRAMS CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "303-383-2300",
+      "supplierPortal": "https://www.cdmsmith.com/en/subcontracting",
+      "source": "cdmsmith.com Subcontracting page (vendor registration) + GSA eLibrary contact; no named SBLO publicly listed (Jeffrey Montera unverified), Jun 2026"
+    },
+    {
+      "company": "CDM SMITH",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.cdmsmith.com/en/subcontracting",
+      "source": "cdmsmith.com Subcontracting page; vendor-database registration only, no named SBLO or mailbox (Antoinette Vigil unverified), Jun 2026"
+    },
+    {
+      "company": "CENTURY COMPANIES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "centuryci.com contact page; general office only, no procurement/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "CGI Federal",
+      "sbloName": "Tyler Brooks-Craft",
+      "title": "Small Business Program Contact / SBLO",
+      "email": "tyler.brooks-craft@cgifederal.com",
+      "phone": "703-227-6000",
+      "supplierPortal": "https://www.cgi.com/us/en-us/federal/small-business-programs",
+      "source": "CGI Federal Small Business Programs page (still lists Brooks-Craft, c2026) + State/NASA SBLO rosters; NOTE LinkedIn/RocketReach indicate he left CGI for Peraton ~Mar 2025 - verify, Jun 2026"
+    },
+    {
+      "company": "CH2M HILL, INC.",
+      "sbloName": "Lauren Terry",
+      "title": "Federal Small Business Liaison Officer (SBLO) & Program Manager",
+      "email": "Lauren.Terry@jacobs.com",
+      "phone": "(720) 286-5318",
+      "supplierPortal": "https://www.jacobs.com/suppliers/us-federal-small-business-program",
+      "source": "CH2M acquired by Jacobs; Jacobs US Federal Small Business Program page + jacobs.com/people/lauren-terry, Jun 2026"
+    },
+    {
+      "company": "CHARLES BLALOCK & SONS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "blalockcompanies.com; no supplier/procurement page or contact found, Jun 2026"
+    },
+    {
+      "company": "CHERRY HILL CONSTRUCTION, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no supplier/subcontractor registration or procurement contact found (Jessup MD entity), Jun 2026"
+    },
+    {
+      "company": "Clark Construction",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.clarkconstruction.com/business-with-us/trade-contractors",
+      "source": "clarkconstruction.com Business With Us / Trade Contractors interest form; no named SBLO (EVP Jay Grauberger oversees small business but no contact listed), Jun 2026"
+    },
+    {
+      "company": "CleanHarbors",
+      "sbloName": "Maryellen C. Boyd",
+      "title": "Corporate Small Business Liaison Officer (SBLO)",
+      "email": "SupplierDiversity@cleanharbors.com",
+      "phone": "781-792-5468",
+      "supplierPortal": "https://www.cleanharbors.com/about-us/vendor-resources/small-business-supplier-program",
+      "source": "cleanharbors.com Small Business Supplier Program page (named SBLO, current); same contact on safety-kleen.com vendor-resources, Jun 2026"
+    },
+    {
+      "company": "Composite Analysis Group",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Composite Analysis Group dba Lipsey Mountain Spring Water (lipseywater.com); no supplier contact found, Neal Chibba unverified, Jun 2026"
+    },
+    {
+      "company": "COMPUTER SCIENCES CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": "supplier_diversity@dxc.com",
+      "phone": "1-703-972-7000",
+      "supplierPortal": "https://dxc.com/contact-dxc/vendors-and-suppliers",
+      "source": "CSC merged into DXC Technology; dxc.com Vendors and Suppliers page lists supplier_diversity mailbox; no named SBLO, Jun 2026"
+    },
+    {
+      "company": "CoreCivic",
+      "sbloName": null,
+      "title": null,
+      "email": "DBI@CoreCivic.com",
+      "phone": "615-263-3000",
+      "supplierPortal": "https://www.corecivic.com/purchasing",
+      "source": "corecivic.com/purchasing Local and Diverse Suppliers (Diversity Business Inclusion mailbox); no named SBLO, Jun 2026"
+    },
+    {
+      "company": "CORMAN-WAGMAN, A JOINT VENTURE",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Corman Kokosing/Wagman JV; kokosing.biz general contact only, no supplier portal found, Jun 2026"
+    },
+    {
+      "company": "Covenant Aviation Security, LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "covenantsecurity.com; general contact only, no supplier page, Christine Mueller unverified, Jun 2026"
+    },
+    {
+      "company": "CUBRC, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "cubrc.org/contact; departmental phones only, no supplier/procurement contact found, Jun 2026"
+    },
+    {
+      "company": "DANIEL J EDELMAN INC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "edelman.com; no supplier/procurement/vendor page found, Jun 2026"
+    },
+    {
+      "company": "DAVID EVANS AND ASSOCIATES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(800) 721-1916",
+      "supplierPortal": "https://www.deainc.com/suppliers/subconsultants-and-vendors/",
+      "source": "deainc.com Subconsultants & Vendors prequalification page (no named procurement contact), Jun 2026"
+    },
+    {
+      "company": "DELOITTE (FEDERAL)",
+      "sbloName": "Brittany Claud",
+      "title": "Leader, GPS Office of Small Business Programs / designated SBLO, Deloitte Consulting LLP",
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.deloitte.com/us/en/industries/government-public/about/gps-small-business.html",
+      "source": "Deloitte GPS Small Business & SLHE Supplier Programs page (GPS Vendor Connect registration); SBLO name per Brittany Claud LinkedIn, no email/phone on Deloitte page, Jun 2026"
+    },
+    {
+      "company": "DELON HAMPTON & ASSOCIATES, CHARTERED INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "delonhampton.com; BD contact only (dhadc@delonhampton.com), no supplier/procurement page, Jun 2026"
+    },
+    {
+      "company": "Deployed Resources",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(315) 281-0039",
+      "supplierPortal": "https://www.deployedresources.com/doing-business-with-dr/",
+      "source": "deployedresources.com 'Doing Business With DR / Subcontracting' page (no named contact; Lori Riley unverified), Jun 2026"
+    },
+    {
+      "company": "Dewberry",
+      "sbloName": null,
+      "title": null,
+      "email": "supplierinfo@dewberry.com",
+      "phone": "703-849-0100",
+      "supplierPortal": "https://www.dewberry.com/contact",
+      "source": "dewberry.com/contact Small Business section + Small Business Inquiry form (supplierinfo mailbox, (c)2026); no named SBLO, Jun 2026"
+    },
+    {
+      "company": "EA ENGINEERING, SCIENCE, AND TECHNOLOGY, INC.",
+      "sbloName": "Sarah Shaw",
+      "title": "Director, Procurement",
+      "email": "Vendor@eaest.com",
+      "phone": null,
+      "supplierPortal": "https://eaest.com/teaming-partners/",
+      "source": "eaest.com Subcontractors/Suppliers page lists Sarah Shaw, Director Procurement; Vendor@eaest.com per published invoice requirements, Jun 2026"
+    },
+    {
+      "company": "EDAG, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.edag.com/en/supplier-application",
+      "source": "edag.com global supplier application form (EDAG Group; no US/Auburn Hills-specific procurement contact), Jun 2026"
+    },
+    {
+      "company": "EIC ASSOCIATES",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "eicassociates.com; no supplier/subcontractor/procurement page found, Jun 2026"
+    },
+    {
+      "company": "ENGILITY CORP.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(844) 788-2121",
+      "supplierPortal": "https://suppliers.saic.com",
+      "source": "Engility acquired by SAIC; SAIC supplier portal suppliers.saic.com + Suppliers/Small Business page, Partner Line (844) 788-2121, Jun 2026"
+    },
+    {
+      "company": "ENSCO, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "ensco.com; general contact only, no supplier/procurement page found, Jun 2026"
+    },
+    {
+      "company": "Environmental Chemical Corporation (ECC)",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "ecc.net; general corporate contact only, no supplier page, Terry Huber unverified, Jun 2026"
+    },
+    {
+      "company": "Ernst & Young LLP",
+      "sbloName": null,
+      "title": null,
+      "email": "EYInclusiveProcurement@eyg.ey.com",
+      "phone": null,
+      "supplierPortal": "https://ey.suppliergateway.com",
+      "source": "EY SupplierGateway registration portal + ey.com inclusive-procurement mailbox; no named US supplier-diversity lead, Jun 2026"
+    },
+    {
+      "company": "FANN CONTRACTING, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "fanncontracting.com; general inquiry contact only, no supplier/procurement page found, Jun 2026"
+    },
+    {
+      "company": "FJC Security Services, Inc.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "fjcsecurity.com (now Allied Universal); no supplier/procurement page, Stephanie Stevens unverified, Jun 2026"
+    },
+    {
+      "company": "FLIGHTSAFETY INTERNATIONAL INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "flightsafety.com; customer-facing contacts only, no supplier/procurement page found, Jun 2026"
+    },
+    {
+      "company": "Fluor Government Group",
+      "sbloName": "Debra Sampson",
+      "title": "Small Business Liaison Officer, Fluor Government Group / Fluor Federal Services Inc.",
+      "email": "debra.sampson@fluor.com",
+      "phone": "864-281-6034",
+      "supplierPortal": "https://www.fluor.com/services-and-expertise/procurement/supplier-and-contractor-portal/",
+      "source": "Fluor Small Business Master Subcontracting Plan (DOE/NNSA contract, Fluor-authored) names SBLO; fluor.com supplier portal for registration, Jun 2026"
+    },
+    {
+      "company": "FUGRO CONSULTANTS, LP",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "fugro.com; no supplier registration/vendor portal found, Jun 2026"
+    },
+    {
+      "company": "G4S Secure Solutions (USA) Inc.",
+      "sbloName": "Teja Kappagantula",
+      "title": "Vice President of Corporate Spend (Head of Procurement & Real Estate) — supplier diversity contact",
+      "email": "teja.kappagantula@aus.com",
+      "phone": "714-619-9787",
+      "supplierPortal": "https://www.aus.com/sites/default/files/2025-04/pol-1513_north_america_supplier_diversity_policy_04152025.pdf",
+      "source": "G4S now part of Allied Universal; aus.com North America Supplier Diversity Policy POL-1513 (Apr 2025) names this contact; not titled SBLO but is the supplier-diversity POC, Jun 2026"
+    },
+    {
+      "company": "GANNETT FLEMING INC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "gannettfleming.com; no supplier/subcontractor/procurement page found, Jun 2026"
+    },
+    {
+      "company": "GE Power",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.gevernova.com/suppliers",
+      "source": "GE Power now GE Vernova; gevernova.com/suppliers supplier registration page (no public procurement email/phone), Jun 2026"
+    },
+    {
+      "company": "General Atomics Aeronautical Systems, Inc.",
+      "sbloName": "Tony Vigo",
+      "title": "Senior Manager, Small Business Program / Small Business Liaison Officer",
+      "email": "anthony.vigo@ga-asi.com",
+      "phone": "858-524-8904",
+      "supplierPortal": "https://www.ga-asi.com/suppliers/small-business-program",
+      "source": "ga-asi.com Suppliers / Small Business Program page + GA-ASI small business flyer (named SBLO, direct email/phone); office mailbox GA-ASI-Small-Business@ga-asi.com, Jun 2026"
+    },
+    {
+      "company": "General Dynamics Information Technology",
+      "sbloName": null,
+      "title": null,
+      "email": "smallbusiness@gdit.com",
+      "phone": "703-995-5148",
+      "supplierPortal": "https://www.gdit.com/about-gdit/doing-business-with-gdit/small-business-partners-suppliers/",
+      "source": "gdit.com Small Business Partners and Suppliers Center + Small Business Teaming doc (mailbox/phone); no named SBLO, Jun 2026"
+    },
+    {
+      "company": "GENERAL ELECTRIC COMPANY",
+      "sbloName": null,
+      "title": null,
+      "email": "aviation.suppliercommunications@geaerospace.com",
+      "phone": null,
+      "supplierPortal": "https://www.geaerospace.com/company/doing-business/supplier-diversity-program",
+      "source": "GE Aerospace Supplier Diversity / Small Business Program page (supplier-communications mailbox, handles gov subcontracting/SF294); no named SBLO, Jun 2026"
+    },
+    {
+      "company": "GEOCONCEPTS ENGINEERING",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "geoconceptseng.com (a Terracon company); no supplier/procurement page found, Jun 2026"
+    },
+    {
+      "company": "GEORGE MASON UNIVERSITY",
+      "sbloName": null,
+      "title": null,
+      "email": "purch1@gmu.edu",
+      "phone": null,
+      "supplierPortal": "https://fiscal.gmu.edu/purchasing/do-business-with-mason/",
+      "source": "GMU Purchasing 'Do Business with Mason' page (vendor registration + eVA + Bonfire); purch1@gmu.edu purchasing inbox, Jun 2026"
+    },
+    {
+      "company": "Gilbane Building Company",
+      "sbloName": null,
+      "title": null,
+      "email": "supplychain@gilbaneco.com",
+      "phone": "401-456-5588",
+      "supplierPortal": "https://www.gilbaneco.com/partner-with-us/building/become-a-subcontractor/",
+      "source": "gilbaneco.com Become a Subcontractor + Suppliers page (Supply Chain dept mailbox/phone); no named SBLO/supplier-diversity officer, Jun 2026"
+    },
+    {
+      "company": "GRANITE CONSTRUCTION COMPANY",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.graniteconstruction.com/company/contact-us",
+      "source": "graniteconstruction.com Partner With Us / Subcontractor Registration database, Jun 2026; no named SB contact published"
+    },
+    {
+      "company": "Grant Thornton, LLP",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.grantthornton.com/about-us/our-suppliers",
+      "source": "grantthornton.com Our Suppliers page (links Supplier Code of Conduct); no named SBLO, no supplier-diversity mailbox or phone published, Jun 2026"
+    },
+    {
+      "company": "Grunley Construction Company, Inc.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://grunley.com/subcontractors/small-business-engagement/",
+      "source": "grunley.com subcontractor/small-business engagement page (online qualification + size self-cert form), Jun 2026; stale hint email was garbled, dropped"
+    },
+    {
+      "company": "HALCROW, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Halcrow acquired by CH2M (now Jacobs) ~2011; no standalone supplier page, Jun 2026"
+    },
+    {
+      "company": "HDR ENGINEERING, INC.",
+      "sbloName": "Nancy Perusich",
+      "title": "National Supplier Diversity & Small Business Program Specialist",
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.hdrinc.com/supplier-diversity-and-small-business-statement",
+      "source": "hdrinc.com supplier-diversity page + SignalHire (named role, Jan 2026); exact email not publicly verifiable"
+    },
+    {
+      "company": "HILL INTERNATIONAL",
+      "sbloName": "Michael Griffin",
+      "title": "Subcontracting Liaison Representative",
+      "email": "SubContractor-Supplier@hillintl.com",
+      "phone": "(215) 309-7750",
+      "supplierPortal": null,
+      "source": "DOT Subcontracting Directory Dec 2025 (Griffin) + hillintl.com supplier mailbox SubContractor-Supplier@hillintl.com"
+    },
+    {
+      "company": "HK CONTRACTORS",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "HNTB",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.hntb.com/",
+      "source": "no single national SBLO; A&E firm assigns SBLOs per contract/region (e.g. CA HSR program), Jun 2026"
+    },
+    {
+      "company": "HOHL INDUSTRIAL SERVICES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "HONEYWELL INTERNATIONAL INC",
+      "sbloName": "Geraldine Zabala Cordero",
+      "title": "Small Business Liaison Officer, Honeywell Aerospace Technologies",
+      "email": "geraldine.zabalacordero@honeywell.com",
+      "phone": "727-294-1005",
+      "supplierPortal": "https://www.honeywell.com/us/en/contact/small-business-liaison",
+      "source": "DoW/DoD CSP Prime Contractor Directory May 2026 + honeywell.com small-business-liaison page (Jan 2026)"
+    },
+    {
+      "company": "HUGHES ASSOCIATES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Hughes Associates merged into Jensen Hughes (2014); no supplier/SB registration page, Jun 2026"
+    },
+    {
+      "company": "Huntington Ingalls Industries",
+      "sbloName": "Joan Branson",
+      "title": "Small Business Liaison Officer, Ingalls Shipbuilding (SEBP)",
+      "email": "joan.branson@hii-ingalls.com",
+      "phone": null,
+      "supplierPortal": "https://www.hii.com/suppliers",
+      "source": "hii.com Ingalls Small Business Office (SEBP) page Oct 2025; Branson named in SBLO directory (2024) - verify recency"
+    },
+    {
+      "company": "IBM US Federal",
+      "sbloName": "Lisa King",
+      "title": "Federal Small Business Liaison Officer",
+      "email": "lisa.king@ibm.com",
+      "phone": "(301) 803-2083",
+      "supplierPortal": "https://www.ibm.com/solutions/procurement/supplier-diversity",
+      "source": "Large Prime SBLO directory (LinkedIn) + ibm.com Federal/Public Sector supplier diversity page; office mailbox federal@us.ibm.com"
+    },
+    {
+      "company": "ICF INTERNATIONAL, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": "icfsupplierhub@icf.com",
+      "phone": null,
+      "supplierPortal": "https://www.icf.com/company/about/partners/suppliers",
+      "source": "icf.com Supplier Hub (icfsupplierhub@icf.com); PA supplier-search lists procurementcompliance@icf.com as SB main; no named public SBLO"
+    },
+    {
+      "company": "Insitu",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.boeingsuppliers.com/supplier-principles/supplier-sourcing",
+      "source": "Insitu is a Boeing subsidiary; small-business subcontracting handled via Boeing Strategic Sourcing & Partnerships; no Insitu-specific SBLO verified"
+    },
+    {
+      "company": "INSTITUTE OF TRANSPORTATION ENGINEERS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "trade association, no small-business/supplier procurement contact, Jun 2026"
+    },
+    {
+      "company": "INTELLIGENT TRANSPORTATION SOCIETY OF AMERICA",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "trade association, no small-business/supplier procurement contact, Jun 2026"
+    },
+    {
+      "company": "INTERMOUNTAIN SLURRY SEAL, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.graniteconstruction.com/company/contact-us",
+      "source": "Granite Construction subsidiary; subcontracting via Granite's subcontractor registration, Jun 2026; no standalone SB contact"
+    },
+    {
+      "company": "IOWA STATE UNIVERSITY OF SCIENCE AND TECHNOLOGY",
+      "sbloName": null,
+      "title": "Supplier Service Desk",
+      "email": null,
+      "phone": "(515) 294-8201",
+      "supplierPortal": "https://supplier.procurement.iastate.edu/supplier-registration",
+      "source": "ISU Procurement Services supplier registration + small business program, Jun 2026; supplier desk line verified"
+    },
+    {
+      "company": "ITERIS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public supplier/SB registration page found, Jun 2026"
+    },
+    {
+      "company": "JACOBS ENGINEERING GROUP, INC.",
+      "sbloName": "Lauren Terry",
+      "title": "Federal Small Business Liaison Officer (SBLO) & Program Manager",
+      "email": "Lauren.Terry@jacobs.com",
+      "phone": "(720) 286-5318",
+      "supplierPortal": "https://www.jacobs.com/suppliers/supplier-diversity-and-small-business-program",
+      "source": "jacobs.com supplier-diversity PDF + FAA Subcontracting Directory (current)"
+    },
+    {
+      "company": "JOHNSON, MIRMIRAN & THOMPSON, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "jmt.com teams with certified small/DBE/MBE/WBE firms but no online supplier registration portal, Jun 2026"
+    },
+    {
+      "company": "KCI TECHNOLOGIES INCORPORATED",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no general supplier/SB registration portal found (kci.com), Jun 2026"
+    },
+    {
+      "company": "KIEWIT INFRASTRUCTURE WEST CO",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.kiewit.com/business-with-us/",
+      "source": "kiewit.com Business With Us / supplier registration (GEP SMART; vendor participation at kiewit.mwdbe.com), Jun 2026"
+    },
+    {
+      "company": "KIMLEY-HORN AND ASSOCIATES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public subconsultant/supplier registration portal found, Jun 2026"
+    },
+    {
+      "company": "KITTELSON & ASSOCIATES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier registration page found, Jun 2026"
+    },
+    {
+      "company": "KNIFE RIVER CORPORATION - NORTHWEST",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public supplier/subcontractor registration portal found (kniferiver.com), Jun 2026"
+    },
+    {
+      "company": "KPMG",
+      "sbloName": "Eric Causey",
+      "title": "Small Business Liaison Officer",
+      "email": "ecausey@kpmg.com",
+      "phone": "(202) 533-6732",
+      "supplierPortal": null,
+      "source": "Large Prime SBLO directory (LinkedIn); alts Tina Ho tinaho@kpmg.com, Kyle Petroske kpetroske@kpmg.com - verify recency"
+    },
+    {
+      "company": "L.P.C. & D. INC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "L3Harris",
+      "sbloName": "Thosie Varga",
+      "title": "Small Business Liaison Officer (Corporate HQ, Melbourne FL)",
+      "email": "Thosie.Varga@L3Harris.com",
+      "phone": "(903) 274-7336",
+      "supplierPortal": "https://arsuppliernet.l3harris.com/suppliernet/doing-business-ar/small-business-and-small-business-liaison-officers-sblo",
+      "source": "DoD CSP Prime Contractor Directory Aug 2024 (corporate SBLO); L3Harris is segmented - portal shown is Aerojet/SupplierNet segment"
+    },
+    {
+      "company": "LACY CONSTRUCTION COMPANY",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "LAS VEGAS PAVING CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": "bids@lasvegaspaving.com",
+      "phone": "(702) 251-5800",
+      "supplierPortal": "https://lasvegaspaving.com/jobs-bidding/",
+      "source": "lasvegaspaving.com Jobs/Bidding page solicits sub bids from MBE/DBE/WBE/SBE; bids email + main line verified, Jun 2026"
+    },
+    {
+      "company": "LE GRAND JOHNSON CONSTRUCTION CO",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "Leidos",
+      "sbloName": "Chireda Gaither",
+      "title": "Small Business Liaison Officer",
+      "email": "Chireda.b.Gaither@leidos.com",
+      "phone": "(571) 526-6026",
+      "supplierPortal": "https://www.leidos.com/suppliers",
+      "source": "SSA OSDBU subcontracting directory + leidos.com/suppliers; office mailbox sbcomp@leidos.com"
+    },
+    {
+      "company": "Leo A Daly",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "leoadaly.com has diverse-supplier/diversity statement but no online vendor registration portal; stale hint emails were garbled, dropped, Jun 2026"
+    },
+    {
+      "company": "LOCKHEED MARTIN CORPORATION",
+      "sbloName": "Sefnee Manzanares",
+      "title": "Regulatory Compliance & Supplier Diversity Senior Manager / SBLO",
+      "email": "sefnee.a.manzanares@lmco.com",
+      "phone": "(817) 777-0997",
+      "supplierPortal": "https://www.lockheedmartin.com/en-us/suppliers/small-business-programs.html",
+      "source": "DoD CSP Prime Contractor Directory Aug 2024 + lockheedmartin.com small-business-programs (Feb 2026)"
+    },
+    {
+      "company": "Loyal Source",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public subcontractor/supplier registration portal found (loyalsource.com); stale hint emails garbled, dropped, Jun 2026"
+    },
+    {
+      "company": "M V M, Inc.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no public subcontractor/supplier registration portal found (mvminc.com); stale hint emails garbled, dropped, Jun 2026"
+    },
+    {
+      "company": "MACROSYS, LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "SIKORSKY AIRCRAFT (LOCKHEED MARTIN)",
+      "sbloName": "Martha L. Crawford",
+      "title": "Supplier Diversity Manager / SBLO, Sikorsky (LM Rotary & Mission Systems)",
+      "email": "martha.crawford@lmco.com",
+      "phone": "(203) 386-3241",
+      "supplierPortal": "https://www.lockheedmartin.com/en-us/suppliers/small-business-programs.html",
+      "source": "DoD CSP Prime Contractor Directory + ct.supplierone.co Sikorsky page; office mailbox supplier_diversity.gr-sik@lmco.com"
+    },
+    {
+      "company": "Mantech",
+      "sbloName": "Amy Dawson",
+      "title": "Small Business Liaison Officer",
+      "email": "Amy.Dawson@mantech.com",
+      "phone": "(571) 446-9496",
+      "supplierPortal": "https://www.mantech.com/small-business-program/",
+      "source": "mantech.com ASTRO contract page lists Amy Dawson as SBLO w/ email+phone; corporate Small Business Office mailbox SBLO@mantech.com on mantech.com/contact (2026)"
+    },
+    {
+      "company": "Maximus Federal",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://maximus.com/federal-government/small-business-and-strategic-partnership-office",
+      "source": "maximus.com Small Business & Strategic Partnership Office page (2026); no named SBLO or direct email/phone published, web intake only"
+    },
+    {
+      "company": "MCCARTHY BUILDING COMPANIES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://prequalification.mccarthy.com/",
+      "source": "mccarthy.com Trade Partners subcontractor prequalification system, Jun 2026; no named SB contact published"
+    },
+    {
+      "company": "McDean",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://vendors.mcdean.com/",
+      "source": "M.C. Dean vendor/subcontractor portal + mcdean.com/business-opportunities-form, Jun 2026; stale hint emails garbled, dropped"
+    },
+    {
+      "company": "McKissack-Liro Joint Venture",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Joint venture (McKissack & McKissack + LiRo Group); no standalone small-business contact found, Jun 2026"
+    },
+    {
+      "company": "MICHAEL BAKER INTERNATIONAL, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "No verifiable small-business/SBLO contact or supplier page found on mbakerintl.com (2026); only a contracts/procurement VP on GSA Schedule page, not labeled SBLO"
+    },
+    {
+      "company": "MIDMOUNTAIN CONTRACTORS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(425)202-3600",
+      "supplierPortal": null,
+      "source": "Regional WA contractor; no supplier/small-business page found, Jun 2026"
+    },
+    {
+      "company": "Mitre",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.mitre.org/contact-us/vendor-registration",
+      "source": "mitre.org Vendor Registration page (subcontract vendor profile form, 2026); MITRE Small Business Office exists but no named person/email/phone published"
+    },
+    {
+      "company": "Monster Government Solutions LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "No small-business/supplier contact found; prior hint data corrupted, Jun 2026"
+    },
+    {
+      "company": "MONTANA STATE UNIVERSITY",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(406)994-3211",
+      "supplierPortal": "https://www.montana.edu/ubs/procurementservices/",
+      "source": "MSU Procurement Services; vendor registration via Montana eMACS (vendorportal.mt.gov), Jun 2026"
+    },
+    {
+      "company": "Mortenson",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.mortenson.com/contact/trade-partner-registration-small-business",
+      "source": "mortenson.com small-business trade-partner registration (prequal via TradeTapp), Jun 2026"
+    },
+    {
+      "company": "Motorola Solutions, Inc.",
+      "sbloName": null,
+      "title": null,
+      "email": "supplier.diversity@motorolasolutions.com",
+      "phone": null,
+      "supplierPortal": "https://www.motorolasolutions.com/en_us/about/suppliers.html",
+      "source": "Motorola Solutions Supplier Diversity (SupplierOne) page lists supplier.diversity@motorolasolutions.com (2026); office team, no named SBLO"
+    },
+    {
+      "company": "NATIONAL ACADEMY OF SCIENCES",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(202)334-1347",
+      "supplierPortal": null,
+      "source": "No dedicated small-business/supplier portal found, Jun 2026"
+    },
+    {
+      "company": "NAVTEQ CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Defunct name; acquired by Nokia, now HERE Technologies. No SB contact, Jun 2026"
+    },
+    {
+      "company": "NEEL-SCHAFFER, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(601)948-3071",
+      "supplierPortal": "https://www.neel-schaffer.com/who-we-are/partner-with-us/",
+      "source": "neel-schaffer.com 'Partner With Us' page seeks DBE/MBE/WBE teaming partners; no named SB officer, Jun 2026"
+    },
+    {
+      "company": "Neopost Inc.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Neopost rebranded to Quadient; no SB/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "NOBLIS, INC.",
+      "sbloName": null,
+      "title": "Small Business Liaison Officer",
+      "email": "sblo@noblis.org",
+      "phone": "703-610-2000",
+      "supplierPortal": "https://noblis.org/work-with-us/small-business/",
+      "source": "noblis.org Small Business Collaboration + Contact pages list SBLO mailbox sblo@noblis.org (2026); name not published, phone is HQ general"
+    },
+    {
+      "company": "Noresco LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Energy services firm (Carrier subsidiary); no supplier/small-business page found, Jun 2026"
+    },
+    {
+      "company": "NORTHROP GRUMMAN CORPORATION",
+      "sbloName": "Carla Undurraga",
+      "title": "Sector Manager / SBLO, Defense Systems, Office of Small Business Programs",
+      "email": "carla.undurraga@ngc.com",
+      "phone": "703-713-4574",
+      "supplierPortal": "https://www.northropgrumman.com/suppliers/osbp",
+      "source": "northropgrumman.com OSBP page + SBLOlist.pdf (2026) name Carla Undurraga as Defense Systems Sector Mgr/SBLO; corporate mailbox NGCSmallBusiness@ngc.com"
+    },
+    {
+      "company": "NTTData Federal",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://supplier.nttdatafed.com",
+      "source": "No SBLO/small-business contact published for NTT DATA Federal (2026); supplier.nttdatafed.com is a vendor payment-setup portal only, not small-business labeled"
+    },
+    {
+      "company": "OFFICE DEPOT, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "National retailer; no verifiable federal small-business liaison contact found, Jun 2026"
+    },
+    {
+      "company": "OFTEDAL CONSTRUCTION, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(406)232-5911",
+      "supplierPortal": null,
+      "source": "oftedalconstruction.com; employee-owned MT earthmoving contractor, no supplier portal found, Jun 2026"
+    },
+    {
+      "company": "Paragon Systems",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(703) 750-1098",
+      "supplierPortal": "https://parasys.com/contact-us/",
+      "source": "parasys.com Contact page (HQ phone, 2026); no named SBLO or supplier-diversity contact found. GSA Advantage page lists EVP Sean O'Brien for procurement inquiries (not titled SBLO)"
+    },
+    {
+      "company": "PARSONS BRINCKERHOFF INC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Defunct name; absorbed into WSP USA. No standalone SB contact, Jun 2026"
+    },
+    {
+      "company": "PB AMERICAS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Former Parsons Brinckerhoff entity; now WSP USA. No standalone SB contact, Jun 2026"
+    },
+    {
+      "company": "PENNONI ASSOCIATES INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(215)222-3000",
+      "supplierPortal": null,
+      "source": "pennoni.com contact page only; no dedicated supplier/SB registration portal found, Jun 2026"
+    },
+    {
+      "company": "PENNSYLVANIA STATE UNIVERSITY, THE",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://procurement.psu.edu/become-supplier",
+      "source": "Penn State Procurement 'Become a Supplier' + supplier-diversity program (PaymentWorks registration), Jun 2026"
+    },
+    {
+      "company": "Peraton",
+      "sbloName": "Yuri Cruz",
+      "title": "Small Business Liaison Officer / Small Business Office Manager",
+      "email": "peratonsmallbusiness@peraton.com",
+      "phone": null,
+      "supplierPortal": "https://www.peraton.com/suppliers/supplier-partnerships/",
+      "source": "peraton.com Supplier Partnerships + Small Business Program Office PDF list peratonsmallbusiness@peraton.com (2026); Yuri Cruz named as Peraton SBLO (LinkedIn, Mar 2026-present), direct email not published"
+    },
+    {
+      "company": "PERFORMTECH INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(703)548-0320",
+      "supplierPortal": null,
+      "source": "Training/learning firm; no supplier/small-business page found, Jun 2026"
+    },
+    {
+      "company": "PGH WONG ENGINEERING",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(415)566-0800",
+      "supplierPortal": null,
+      "source": "pghwong.com transit engineering firm; appears on agency DBE lists but no own supplier portal, Jun 2026"
+    },
+    {
+      "company": "PHILLIPS AND JORDAN, INCORPORATED",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(865)688-8342",
+      "supplierPortal": null,
+      "source": "pandj.com invites subcontractor pre-registration via Disaster Vendor Database; no exact URL/named contact verified, Jun 2026"
+    },
+    {
+      "company": "PMA Consultants LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(415)813-5000",
+      "supplierPortal": null,
+      "source": "Program/construction management firm; no supplier/SB portal found, Jun 2026"
+    },
+    {
+      "company": "POST BUCKLEY SCHUH & JERNIGAN INC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Legacy PBS&J name; absorbed into Atkins (AtkinsRealis). No standalone SB contact, Jun 2026"
+    },
+    {
+      "company": "PRATT & WHITNEY (RTX)",
+      "sbloName": "Francisco Vasquez",
+      "title": "Associate Director of Procurement / SBLO",
+      "email": "Francisco.Vasquez@prattwhitney.com",
+      "phone": "475-301-3063",
+      "supplierPortal": "https://www.rtx.com/suppliers/small-business",
+      "source": "DoW/DoD CSP Prime Contractor Directory (Dec 2025) lists Francisco Vasquez as P&W SBLO w/ email+phone; RTX small-business page lists SmallBusinessOffice@prattwhitney.com"
+    },
+    {
+      "company": "PROFESSIONAL SERVICE INDUSTRIES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "PSI acquired by Intertek (2015), now Intertek-PSI; no standalone SB/supplier portal found, Jun 2026"
+    },
+    {
+      "company": "QINETIQ NORTH AMERICA, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "+1 781-684-4000",
+      "supplierPortal": "https://www.qinetiq.com/en/who-we-are/suppliers-and-smes",
+      "source": "qinetiq.com Suppliers & SMEs page + US Small Business policy PDF (2026); no named SBLO or small-business email published. Phone is general corporate"
+    },
+    {
+      "company": "Rapiscan",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "+1 310-978-1457",
+      "supplierPortal": "https://www.rapiscansystems.com/en/contact",
+      "source": "No SBLO/supplier-diversity contact or page found on rapiscansystems.com or parent osi-systems.com (2026); only general Americas corporate contact"
+    },
+    {
+      "company": "RAYTHEON COMPANY (RTX)",
+      "sbloName": "Crystal L. King",
+      "title": "Supplier Diversity Lead & Small Business Liaison Officer",
+      "email": "crystal.l.king@rtx.com",
+      "phone": "(571) 274-8407",
+      "supplierPortal": "https://www.rtx.com/suppliers/small-business",
+      "source": "FAA & NASA MSFC subcontracting directories + DoD SBLO listing name Crystal L. King as Raytheon SBLO/Supplier Diversity Lead (corrects stale 'Valerie King'); RTX page lists raytheon_smallbusiness@rtx.com"
+    },
+    {
+      "company": "ReadyAmerica",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Emergency-prep products firm; no SB/supplier contact found; prior hint data corrupted, Jun 2026"
+    },
+    {
+      "company": "REGENTS OF THE UNIVERSITY OF MICHIGAN",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(734)615-2000",
+      "supplierPortal": "https://procurement.umich.edu/um-suppliers/supplier-basics/",
+      "source": "U-M Procurement Services; supplier registration via MConnect, supplier-diversity program, Jun 2026"
+    },
+    {
+      "company": "RESEARCH FOUNDATION OF THE CITY UNIVERSITY OF NEW YORK",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(212)417-8587",
+      "supplierPortal": null,
+      "source": "RF CUNY purchasing exists but no dedicated small-business/supplier registration portal found, Jun 2026"
+    },
+    {
+      "company": "RIVERSIDE CONTRACTING, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "(406)721-9267",
+      "supplierPortal": null,
+      "source": "Small MT paving/construction contractor; no supplier portal found, Jun 2026"
+    },
+    {
+      "company": "ROAD & HIGHWAY BUILDERS, LLC.",
+      "sbloName": "Sherry Cuellar",
+      "title": "DBE/Subcontractor Outreach Contact",
+      "email": null,
+      "phone": "(775)852-7283",
+      "supplierPortal": null,
+      "source": "RHB DBE outreach (Sparks, NV) lists Sherry Cuellar for sub/DBE inquiries; phone verified, email not published, Jun 2026"
+    },
+    {
+      "company": "ROBERT PECCIA AND ASSOCIATES INCORPORATED",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "rpa-eng.com active (Helena MT civil engineering firm); no small-business/supplier registration page found, Jun 2026"
+    },
+    {
+      "company": "SAE INTERNATIONAL",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "sae.org (standards org); purchasing-resources page is for buying SAE content, no supplier/small-business registration found, Jun 2026"
+    },
+    {
+      "company": "SAFETY RESEARCH CORP OF AMERICA LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "no small-business/supplier contact found, Jun 2026"
+    },
+    {
+      "company": "SAIC",
+      "sbloName": "Rita (Marguerite) Brooks",
+      "title": "Director, Small Business Programs (Corporate)",
+      "email": "marguerite.brooks@saic.com",
+      "phone": "(571) 203-6832",
+      "supplierPortal": "https://www.saic.com/who-we-are/suppliers-and-small-business",
+      "source": "SAIC 'Doing Business with SAIC' webinars (she gives marguerite.brooks/rita.brooks@saic.com) + FAA Subcontracting Directory listing for SAIC (phone, title). Verified 2026."
+    },
+    {
+      "company": "Salient",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Salient CRGT acquired by GDIT (General Dynamics IT) in 2018; no standalone supplier contact, Jun 2026"
+    },
+    {
+      "company": "SCIENCE APPLICATIONS INTERNATIONAL CORPORATION",
+      "sbloName": "Rita (Marguerite) Brooks",
+      "title": "Director, Small Business Programs (Corporate)",
+      "email": "marguerite.brooks@saic.com",
+      "phone": "(571) 203-6832",
+      "supplierPortal": "https://www.saic.com/who-we-are/suppliers-and-small-business",
+      "source": "Same entity as SAIC. Stale 'Rochelle Lowe / 858-826-7406' not corroborated; current SBLO is Rita Brooks per SAIC webinars + FAA Subcontracting Directory. Verified 2026."
+    },
+    {
+      "company": "Serco, Inc.",
+      "sbloName": null,
+      "title": null,
+      "email": "Agencies@serco-na.com",
+      "phone": "(703) 263-6000",
+      "supplierPortal": null,
+      "source": "No named SBLO/supplier-diversity contact publicly listed on Serco-NA pages. Agencies@serco-na.com is Serco-NA's approved-vendor inquiry mailbox; (703) 263-6000 is corporate HQ. Verified 2026."
+    },
+    {
+      "company": "SGT, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "SGT (Stinger Ghaffarian Technologies) acquired by KBR in 2018; no standalone supplier contact, Jun 2026"
+    },
+    {
+      "company": "SHAW ENVIRONMENTAL & INFRASTRUCTURE, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Shaw E&I folded into CB&I, now APTIM; entity defunct, no standalone supplier contact, Jun 2026"
+    },
+    {
+      "company": "SHIRLEY CONTRACTING COMPANY, LLC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.clarkconstruction.com/business-with-us/trade-contractors",
+      "source": "Subsidiary of Clark Construction Group; subcontractor prequalification via Clark Trade Contractors page (TradeTapp), Jun 2026"
+    },
+    {
+      "company": "SKANSKA USA CIVIL",
+      "sbloName": "Bridget Davis-Tobias",
+      "title": "Supplier Diversity Coordinator, Skanska USA",
+      "email": null,
+      "phone": "+1 917 438 4500",
+      "supplierPortal": "https://www.skanska.com/us/en/construction/approach/subcontractors--suppliers",
+      "source": "Skanska USA vendor-diversity contact page (usa.skanska.com/.../vendor-diversity/bridget-davistobias). Page shows 'Email Bridget' link but no exposed address. Joycelyn Yue is National Director of Supplier Diversity (Skanska USA Building). Verified 2026."
+    },
+    {
+      "company": "SLONE ASSOCIATES, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "small GA firm; no supplier/small-business contact found, Jun 2026"
+    },
+    {
+      "company": "STANTEC CONSULTING INC.",
+      "sbloName": null,
+      "title": null,
+      "email": "FedSmallBiz@stantec.com",
+      "phone": null,
+      "supplierPortal": "https://www.stantec.com/en/about/federal-small-disadvantaged-business-program",
+      "source": "No individual SBLO named on Stantec pages. FedSmallBiz@stantec.com is the federal small-business teaming mailbox (Federal Small & Disadvantaged Business Program page); supplierdiversity@stantec.com is the corporate supplier-diversity inbox. Verified 2026."
+    },
+    {
+      "company": "STV INCORPORATED",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "stvinc.com active (AEC firm); no dedicated supplier-diversity/vendor registration page found, Jun 2026"
+    },
+    {
+      "company": "SYSTEMS RESEARCH AND APPLICATIONS CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "SRA International now part of General Dynamics IT (GDIT) via CSRA; entity defunct, no standalone supplier contact, Jun 2026"
+    },
+    {
+      "company": "BAE SYSTEMS, INC.",
+      "sbloName": "Marianne Tenore",
+      "title": "Small Business Liaison Officer, Electronic Systems",
+      "email": "Marianne.Tenore@BaeSystems.com",
+      "phone": "(603) 885-8470",
+      "supplierPortal": "https://www.baesystems.com/en-us/partnership/suppliers/small-business-programs",
+      "source": "DoD Comprehensive Subcontracting Test Program participant listing (business.defense.gov) confirms Tenore as ES SBLO with phone/email (matches stale hint). Corporate small-business mailbox: smallbusiness.ushq@baesystems.us; supplier reg via baesystems.hicx.net. Verified 2026."
+    },
+    {
+      "company": "TAPANI UNDERGROUND, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://tapani.pipelinesuite.com/",
+      "source": "tapani.com (heavy civil, Battle Ground WA); bid invitations / sub registration via PipelineSuite plan room, Jun 2026"
+    },
+    {
+      "company": "TEXAS A&M TRANSPORTATION INSTITUTE",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "tti.tamu.edu; procurement runs through Texas A&M University System purchasing (HUB program); no TTI-specific small-business contact found, Jun 2026"
+    },
+    {
+      "company": "THE GEO GROUP",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "561-893-0101",
+      "supplierPortal": "https://www.geogroup.com/vendors/",
+      "source": "No named SBLO/supplier-diversity contact on GEO pages ('Ray Castro' not verifiable). Vendors landing page + Vendor Application; corporate phone 561-893-0101. Verified 2026."
+    },
+    {
+      "company": "The Haskell Company",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.haskell.com/who-we-are/subcontractors-vendors/",
+      "source": "haskell.com Subcontractors/Vendors page; prequalification via TradeTapp, Jun 2026"
+    },
+    {
+      "company": "THE LOUIS BERGER GROUP, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Louis Berger acquired by WSP in 2018; entity defunct, no standalone supplier contact, Jun 2026"
+    },
+    {
+      "company": "THE TINKER COMPANY",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "small CO firm; no supplier/small-business contact found, Jun 2026"
+    },
+    {
+      "company": "TOTE SERVICES, INC.",
+      "sbloName": null,
+      "title": "Marine Purchasing Department",
+      "email": "deptpurc@toteservices.com",
+      "phone": null,
+      "supplierPortal": "https://www.toteservices.com/about/vendor-resources/",
+      "source": "toteservices.com Vendor Resources page; purchasing dept deptpurc@toteservices.com, profiles to TSVendorProfiles@toteservices.com, Jun 2026"
+    },
+    {
+      "company": "TRANSYSTEMS CORPORATION",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "transystems.com active (engineering firm); only DEI page, no supplier/subconsultant registration page found, Jun 2026"
+    },
+    {
+      "company": "Triple Canopy",
+      "sbloName": null,
+      "title": null,
+      "email": "info@constellis.com",
+      "phone": "+1 703-673-5000",
+      "supplierPortal": "https://constellis.com/contact-us/",
+      "source": "Triple Canopy is a Constellis company; no SBLO/supplier-diversity contact published ('Christopher Philippsen' not verifiable). Constellis general/business-development contact info@constellis.com + HQ phones. GSA contractor contact for Triple Canopy: Stephen Sloss, stephen.sloss@constellis.com, 703-932-3570. Verified 2026."
+    },
+    {
+      "company": "TUCCI & SONS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "Tacoma WA paving/civil contractor; bids via public agency portals (City of Tacoma Ariba), no own supplier registration page, Jun 2026"
+    },
+    {
+      "company": "URBAN ENGINEERS, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "urbanengineers.com active (Philadelphia AEC firm); no subconsultant/supplier registration page found, Jun 2026"
+    },
+    {
+      "company": "URS GROUP",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "URS acquired by AECOM in 2014; entity defunct, no standalone supplier contact, Jun 2026"
+    },
+    {
+      "company": "VANASSE HANGEN BRUSTLIN, INC.",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.vhb.com/supplier-diversity/",
+      "source": "vhb.com Supplier Engagement / supplier-diversity page (sub/subconsultant partnering), Jun 2026"
+    },
+    {
+      "company": "Verizon",
+      "sbloName": "Delores Johnson-Cooper",
+      "title": "Director, Supplier Diversity and Supplier Quality",
+      "email": "delores.johnson-cooper@verizon.com",
+      "phone": null,
+      "supplierPortal": "https://www.verizon.com/about/our-company/supplier-diversity",
+      "source": "Verizon Supplier Diversity program lead per Verizon-filed Maryland PSC supplier-diversity report (email) + Verizon supplier-diversity video. Stale 'Emily Bien/Brandilynn Collins' not corroborated. Supplier registration: verizon.com/suppliers; help desk ariba.supplier.helpdesk@verizon.com. Verified 2026."
+    },
+    {
+      "company": "VIGOR MARINE LLC",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.vigormarine.com/supplier-resources",
+      "source": "vigormarine.com Supplier Resources page (terms, size/classification cert, cyber requirements), Jun 2026"
+    },
+    {
+      "company": "WAGMAN INDUSTRIAL SERVICES",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": "https://www.wagman.com/subcontractor-trade-partnering/",
+      "source": "Wagman (wagman.com) Subcontractor & Trade Partnering page; SmartBid plan room registration, Jun 2026"
+    },
+    {
+      "company": "WASHINGTON CENTER FOR INTERNSHIPS AND ACADEMIC SEMINARS",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": null,
+      "supplierPortal": null,
+      "source": "twc.edu (education nonprofit); no supplier/small-business registration page found, Jun 2026"
+    },
+    {
+      "company": "WASHINGTON STATE UNIVERSITY",
+      "sbloName": null,
+      "title": "Purchasing Services",
+      "email": null,
+      "phone": "(509) 335-3541",
+      "supplierPortal": "https://purchasing.wsu.edu/supplier-diversity/",
+      "source": "purchasing.wsu.edu Supplier Diversity page; bids posted on WA WEBS; Purchasing Services (509) 335-3541, Jun 2026"
+    },
+    {
+      "company": "Whiting-Turner",
+      "sbloName": null,
+      "title": null,
+      "email": null,
+      "phone": "410-821-1100",
+      "supplierPortal": "https://www.whiting-turner.com/subcontractor-prequalification/",
+      "source": "No single named SBLO ('Joanna Harmon' not found on W-T pages). Subcontractor/supplier prequalification portal; diversity page (whiting-turner.com/diversity-inclusion/trade-partners-and-suppliers/) lists 7 regional diversity reps via 'Send a Message' links (no direct emails shown). HQ phone 410-821-1100. Verified 2026."
+    },
+    {
+      "company": "WSP",
+      "sbloName": "Laura Unger",
+      "title": "Small Business Liaison Officer, WSP USA",
+      "email": "SBLO@wsp.com",
+      "phone": "(212) 465-5000",
+      "supplierPortal": "https://ussuppliers.wspis.com",
+      "source": "WSP USA Supplier Registration 'Contact Us' page (ussuppliers.wspis.com/contact_us.aspx) names Laura Unger as designated SBLO, SBLO@wsp.com. Stale 'Bernard Fanfan' not on WSP pages. Phone is WSP EEO/compliance line (212-465-5000); registration support prequalus@wsp.com. Verified 2026."
+    }
+  ]
+}

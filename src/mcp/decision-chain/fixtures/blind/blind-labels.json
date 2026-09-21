@@ -1,0 +1,392 @@
+{
+  "labeller": "independent-agent",
+  "labelled_on": "2026-08-23",
+  "taxonomy_vintage": "2022",
+  "cases": [
+    {
+      "case_id": "c01",
+      "acceptable_naics": [
+        "541511",
+        "541512"
+      ],
+      "unacceptable_naics": [
+        "541618",
+        "518210"
+      ],
+      "confidence": "medium",
+      "reason": "'Web and Mobile App Development', 'Extreme Programming', 'DevSecOps' put custom software development first; 541512 defensible because cloud migration and systems work are bundled. Not 541618 \u2014 'Program Management' here is agile delivery of software, not management consulting; not 518210 since they build and migrate rather than operate hosting infrastructure as their product.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c02",
+      "acceptable_naics": [
+        "541512",
+        "541519",
+        "541690"
+      ],
+      "unacceptable_naics": [
+        "561621",
+        "561612"
+      ],
+      "confidence": "medium",
+      "reason": "'Penetration Testing', 'Security Architecture & Design', 'Network Security', 'IT Infrastructure Management', 'Help Desk' is IT security services \u2014 541512 for architecture/design, 541519 for the ops/help-desk side, 541690 matches the Census index entry 'Security consulting services'. The trap is the word 'Security': 561621 is physical alarm-system installation and 561612 is guards, neither of which is described.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c03",
+      "acceptable_naics": [
+        "541512",
+        "541611",
+        "541519"
+      ],
+      "unacceptable_naics": [
+        "541715",
+        "561110"
+      ],
+      "confidence": "low",
+      "reason": "Split personality: the headline sells 'Quantum Technologies, Zero Trust Security, Hybrid Cloud, Managed Services' (541512/541519) but every listed COMPETENCY is administrative \u2014 'Program and Project Management Support, Change Management, Grants Management, Contract Management, Human Resource Support' \u2014 which reads 541611. 'Next-Gen Quantum Technologies' is marketing language, not R&D, so 541715 would be a trap.",
+      "label": "ambiguous"
+    },
+    {
+      "case_id": "c04",
+      "acceptable_naics": [
+        "541512",
+        "541690",
+        "561320",
+        "541519"
+      ],
+      "unacceptable_naics": [
+        "561612",
+        "561621",
+        "621111"
+      ],
+      "confidence": "low",
+      "reason": "Genuinely two businesses: 'cybersecurity consulting' (RMF/GRC, NIST 800-53, FedRAMP, SSPs/POA&Ms) and 'IT Staffing & Augmentation \u2014 recruiting and direct-hire placement', with no revenue split given. 'Facility Security Operations' and 'personnel clearance management' are clearance administration, not guard services (561612) or alarm installation (561621); 'healthcare clients' is a customer, not 621111.",
+      "label": "ambiguous"
+    },
+    {
+      "case_id": "c05",
+      "acceptable_naics": [
+        "423610",
+        "423690",
+        "423840",
+        "423860"
+      ],
+      "unacceptable_naics": [
+        "335910",
+        "221114",
+        "334413",
+        "238210"
+      ],
+      "confidence": "medium",
+      "reason": "'procurement, rapid deployment, and distribution' of 'commercial-off-the-shelf (COTS)' equipment with 'drop-ship deployment' and 'vendor network coordination' is a distributor, not a maker or installer. The traps are all the product nouns: battery banks is not 335910 (battery mfg), solar modules/inverters is not 221114 (power generation) or 334413 (solar cell mfg), and they never install panels (238210).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c06",
+      "acceptable_naics": [
+        "488510",
+        "484210",
+        "541614"
+      ],
+      "unacceptable_naics": [
+        "484121",
+        "493110",
+        "561210"
+      ],
+      "confidence": "medium",
+      "reason": "They 'manage projects through a nationwide network of qualified transportation and logistics vendors' doing 'vendor sourcing and coordination, scheduling, transportation planning\u2026 contract administration' \u2014 that is freight transportation arrangement (488510), i.e. a broker, not an asset carrier. Their self-reported 484210 (used household and office goods moving) fits only the 'household goods and office moving' line and assumes they own trucks, which the prose contradicts; 484121 and 493110 are the same asset-ownership trap for 'general trucking' and 'warehousing'.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c07",
+      "acceptable_naics": [
+        "541511",
+        "541512",
+        "541611"
+      ],
+      "unacceptable_naics": [
+        "561210",
+        "561720",
+        "611430",
+        "236220"
+      ],
+      "confidence": "low",
+      "reason": "Self-reports 541511 and 'custom application development, systems design' supports it, but the capability list sprawls across unrelated verticals \u2014 'Facilities, Maintenance & Construction Support\u2026 groundskeeping', 'Training & Curriculum Development', 'Emergency & Relief Support' \u2014 with nothing indicating which earns the revenue. The facilities/training/construction lines (561210, 561720, 611430, 236220) are keyword bait from a capability statement casting a wide net.",
+      "label": "ambiguous"
+    },
+    {
+      "case_id": "c08",
+      "acceptable_naics": [
+        "541512",
+        "541690",
+        "541519"
+      ],
+      "unacceptable_naics": [
+        "541611",
+        "561621",
+        "541380"
+      ],
+      "confidence": "medium",
+      "reason": "Pure information-security services: 'RMF Support\u2026 categorization to Authority to Operate', 'Continuous Monitoring & Vulnerability Management', 'eMASS Administration', 'System Security Plans, FISMA, CMMC'. 'Risk management' and 'Compliance' could bait 541611 management consulting, but the risk here is technical system accreditation; 561621 is physical security systems and 541380 is a testing lab, neither described.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c09",
+      "acceptable_naics": [
+        "541512",
+        "541511"
+      ],
+      "unacceptable_naics": [
+        "541612",
+        "561311",
+        "518210"
+      ],
+      "confidence": "high",
+      "reason": "'PeopleSoft migration to AWS GovCloud', 'lift-and-shift and application modernization, secure cloud architecture, DevSecOps' is systems design and integration; their self-reported 541512 matches. The traps are 'DoD Personnel System' and 'decades of combined experience in HR, recruiting' \u2014 that is domain experience in the systems they build, not an HR consulting (541612) or staffing (561311) business, and they migrate to AWS rather than operate hosting (518210).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c10",
+      "acceptable_naics": [
+        "561720"
+      ],
+      "unacceptable_naics": [
+        "561210",
+        "236220",
+        "561790",
+        "238320"
+      ],
+      "confidence": "high",
+      "reason": "'commercial janitorial\u2026 recurring cleaning, day-porter, specialty floor care' is textbook 561720 (Census index: 'Building cleaning services, janitorial'). 'Post-Construction Cleaning' and 'Pressure Washing' are cleaning services, not construction (236220) or painting (238320); 561210 facilities support requires operating a facility broadly, which they do not claim.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c11",
+      "acceptable_naics": [
+        "541511",
+        "541512"
+      ],
+      "unacceptable_naics": [
+        "541690",
+        "518210",
+        "928110"
+      ],
+      "confidence": "medium",
+      "reason": "'Secure Software Engineering \u2014 full-stack and cloud-native development, microservices and API engineering, Agile delivery, secure coding' leads with custom programming; 541512 is defensible for the 'systems integration\u2026 technical architecture' half. 'Intelligence Community and Department of War' names customers, not the industry (928110 would be the government buyer itself).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c12",
+      "acceptable_naics": [
+        "333914"
+      ],
+      "unacceptable_naics": [
+        "333996",
+        "423830",
+        "333612",
+        "238220"
+      ],
+      "confidence": "high",
+      "reason": "'designs and manufactures high-volume centrifugal pumping equipment' matches the Census index 'Pumps, industrial and commercial-type, general purpose, manufacturing' at 333914. 333996 is fluid-power (hydraulic/pneumatic) pumps, a different animal; 'vertical gearbox' does not make them 333612, and they build rather than distribute (423830) or install (238220).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c13",
+      "acceptable_naics": [
+        "561499",
+        "459999",
+        "455219"
+      ],
+      "unacceptable_naics": [
+        "541611",
+        "522320",
+        "561110"
+      ],
+      "confidence": "low",
+      "reason": "The prose describes a transaction mechanism, not an industry \u2014 'generalized micro-purchasing', 'Government Purchase Card transactions', 'rapid-turnaround delivery' \u2014 and never says what goods or services are actually delivered. 'Credit Cards' is the sharpest trap (522320 card processing) and 'Core Competencies: speed, flexibility, compliance' baits management consulting; neither is the business.",
+      "label": "ambiguous"
+    },
+    {
+      "case_id": "c14",
+      "acceptable_naics": [
+        "541690",
+        "541611",
+        "541512"
+      ],
+      "unacceptable_naics": [
+        "541618",
+        "561621",
+        "541219"
+      ],
+      "confidence": "medium",
+      "reason": "'independent technology advisory, cybersecurity strategy, compliance, AI governance' with 'Executive Technology Readiness Reviews, Technology Roadmaps, Virtual CISO, Vendor Evaluation' is advisory only \u2014 no build, no operate \u2014 so 541690 (index: 'Security consulting services') leads with 541611 for the executive-governance half. 'SOC 2' and 'audit' bait accounting (541219); they prepare for audits, they do not perform them.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c15",
+      "acceptable_naics": [
+        "423430",
+        "423690"
+      ],
+      "unacceptable_naics": [
+        "334111",
+        "541512",
+        "517121",
+        "562920"
+      ],
+      "confidence": "high",
+      "reason": "'IT Hardware & End-User Devices\u2026 Laptops / Desktops / Monitors / Printers', 'Procurement Support Services', '24/7 rapid quote and fulfillment', past performance with 'DLA Troop Support' \u2014 a value-added reseller, so 423430. They do not build computers (334111); 'Systems Integration' and 'Network / SD-WAN / Telecom' are installation attached to the resale, not 541512 or 517121, and 'IT Asset Disposition' is not a recycling business (562920).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c16",
+      "acceptable_naics": [
+        "541611",
+        "541690",
+        "541512"
+      ],
+      "unacceptable_naics": [
+        "621111",
+        "541219",
+        "561410"
+      ],
+      "confidence": "medium",
+      "reason": "'GRC consulting firm', 'assess an organization's governance', 'governance and risk-management program design', 'audit-readiness preparation' is consulting; 541690 is defensible given the HIPAA/NIST 800-53 privacy-control technical work. 'healthcare privacy' and 'patient privacy' name the client vertical, not a medical practice (621111), and 'audit support' is not accounting (541219).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c17",
+      "acceptable_naics": [
+        "541512",
+        "541511"
+      ],
+      "unacceptable_naics": [
+        "541618",
+        "621999",
+        "518210"
+      ],
+      "confidence": "high",
+      "reason": "'IT consulting and managed services firm' doing 'custom application development and systems integration (React, .NET, Node.js)', 'cloud migration and modernization', 'enterprise platforms (ServiceNow, SharePoint)' \u2014 541512 with 541511 a close near-neighbour given the named stacks. 'federal health agencies\u2026 NIH, CMS, FDA, CDC' and 'biomedical data catalogs' are customers and data subjects, not a healthcare industry code.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c18",
+      "acceptable_naics": [
+        "333612",
+        "332710"
+      ],
+      "unacceptable_naics": [
+        "333517",
+        "423840",
+        "336350",
+        "541330"
+      ],
+      "confidence": "high",
+      "reason": "'precision gear and drivetrain component manufacturer\u2026 spur and helical gears, splines, worm gears, gear sets, gearboxes' maps to the Census index 'Gears, power transmission (except aircraft, motor vehicle), manufacturing' at 333612; 332710 is a fair near-neighbour for the CNC machining and build-to-print work. 333517 makes gear-cutting machines (they use them), 423840 wholesales gears, and 336350 is automotive gears only.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c19",
+      "acceptable_naics": [
+        "541512",
+        "423690",
+        "423430"
+      ],
+      "unacceptable_naics": [
+        "561621",
+        "541330",
+        "517121",
+        "238210"
+      ],
+      "confidence": "low",
+      "reason": "Deliberately straddles integration and resale: 'full-service system integration\u2026 complete decision support and full turnkey network installation and integration' points to 541512, but 'equipment procurement' plus 'more than product sourcing alone' concedes hardware resale is part of the model with no split stated. 'surveillance integration' baits 561621 (alarm installation) and 'Engineering Lab and Design Center' baits 541330; neither is the described business.",
+      "label": "ambiguous"
+    },
+    {
+      "case_id": "c20",
+      "acceptable_naics": [
+        "541370",
+        "541360",
+        "541620"
+      ],
+      "unacceptable_naics": [
+        "336411",
+        "541511",
+        "541330",
+        "561730"
+      ],
+      "confidence": "medium",
+      "reason": "'aerial, terrestrial, and hydrographic data collection', 'UAV LiDAR, photogrammetry\u2026 GIS mapping, 3D modeling', 'orthomosaics, point clouds, DEMs' matches the index entries 'Aerial surveying (except geophysical) services' and 'Photogrammetric mapping services' at 541370; 541360 covers the bathymetric side and 541620 the environmental consulting line. 'unmanned systems' does not make them a drone manufacturer (336411), and 'vegetation mapping' is not landscaping (561730).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c21",
+      "acceptable_naics": [
+        "236220"
+      ],
+      "unacceptable_naics": [
+        "236118",
+        "238990",
+        "484121",
+        "488510"
+      ],
+      "confidence": "high",
+      "reason": "'commercial and institutional building construction, interior renovation and build-out\u2026 facility repair and maintenance' for government owners matches their self-reported 236220. The 'trucking and logistics brokerage arm' is explicitly secondary ('also operate'), so 484121/488510 would be the trap; 'multi-unit residential rehabilitation' alone does not shift them to 236118.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c22",
+      "acceptable_naics": [
+        "621420",
+        "621330",
+        "621498",
+        "621112"
+      ],
+      "unacceptable_naics": [
+        "622210",
+        "713940",
+        "812199",
+        "621399"
+      ],
+      "confidence": "medium",
+      "reason": "'outpatient services like mental health therapy, Intensive outpatient programs (IOP), psychiatry, and medication management' plus 'licensed by DDAP for Drug & Alcohol outpatient' is squarely 621420 (index: 'Outpatient mental health centers and clinics (except hospitals)'). The hormone/peptide and reiki/yoga/hypnotherapy lines are ancillary offerings that bait 812199, 713940 and 621399; nothing here is inpatient, so 622210 is wrong.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c23",
+      "acceptable_naics": [
+        "332710",
+        "333248",
+        "541330",
+        "339999"
+      ],
+      "unacceptable_naics": [
+        "423840",
+        "541715",
+        "811310",
+        "541380"
+      ],
+      "confidence": "medium",
+      "reason": "'CNC-machined replacement parts for obsolete and hard-to-source components' is a machine shop (332710) that also does 'reverse engineering, technical data package (TDP) development' \u2014 engineering services (541330) is a defensible primary given DMSMS/Source Approval Request work is largely documentation. 'additive manufacturing' as a process does not make them 333248 (which is the makers of 3D printers), and supplying DLA parts is not wholesale (423840) or repair (811310).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "c24",
+      "acceptable_naics": [
+        "551112",
+        "541611",
+        "523999"
+      ],
+      "unacceptable_naics": [
+        "531110",
+        "531210",
+        "711310",
+        "721110"
+      ],
+      "confidence": "low",
+      "reason": "Self-declared 'holding company operating across four verticals: real estate, private equity, advisory and business development, and media, entertainment, and hospitality' \u2014 four unrelated verticals with no stated dominant one, which is the definition of ambiguous. 551112 fits the holding structure only if it is passive; the 'advisory practice\u2026 strategic consulting' suggests real operations. Each vertical noun (real estate, media, hospitality) is bait for an operating code they never claim to run.",
+      "label": "ambiguous"
+    }
+  ]
+}

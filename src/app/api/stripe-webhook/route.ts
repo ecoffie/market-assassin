@@ -1,0 +1,926 @@
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+import { kv } from '@vercel/kv';
+import { handleMcpCreditTopup } from '@/lib/mcp/stripe-topup';
+import { handleAutoRechargeSetup, MCP_AUTORECHARGE_PI_TYPE } from '@/lib/mcp/autorecharge';
+import { sendCreditReceiptEmail } from '@/lib/mcp/credit-emails';
+import { applyCreditOnce } from '@/lib/mcp/credits';
+import { creditsForPackage } from '@/lib/mcp/packages';
+import {
+  sendLicenseKeyEmail,
+  sendOpportunityHunterProEmail,
+  sendDatabaseAccessEmail,
+  sendAccessCodeEmail,
+  sendContentReaperEmail,
+  sendRecompeteEmail,
+  sendBundleEmail,
+  sendFHCWelcomeEmail,
+  sendMindyFHCBonusEmail,
+  sendAlertProWelcomeEmail,
+  sendMarketIntelligenceWelcomeEmail,
+} from '@/lib/send-email';
+import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
+import { recordAccessGrant } from '@/lib/access/grant-audit';
+import { grantBriefingsAccess } from '@/lib/briefings/access';
+import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
+import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
+
+// Webhook secrets
+const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+const testWebhookSecret = process.env.STRIPE_TEST_WEBHOOK_SECRET || '';
+
+// Supabase admin client
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+// Lazy-load Stripe
+function getStripe(testMode = false) {
+  const liveKey = process.env.STRIPE_SECRET_KEY || '';
+  const testKey = process.env.STRIPE_TEST_SECRET_KEY || '';
+  return new Stripe(testMode ? testKey : liveKey);
+}
+
+// Idempotency check
+const processedEvents = new Set<string>();
+
+export async function POST(request: NextRequest) {
+  const rawBody = await request.text();
+  const signature = request.headers.get('stripe-signature');
+
+  console.log('Webhook received, signature present:', !!signature);
+  console.log('Live secret configured:', !!liveWebhookSecret, liveWebhookSecret ? `(starts with ${liveWebhookSecret.substring(0, 10)}...)` : '(empty)');
+  console.log('Test secret configured:', !!testWebhookSecret, testWebhookSecret ? `(starts with ${testWebhookSecret.substring(0, 10)}...)` : '(empty)');
+
+  let event: Stripe.Event;
+  let isTestMode = false;
+
+  // Verify signature
+  try {
+    if (!signature) throw new Error('No Stripe signature header');
+    const stripe = getStripe(false);
+    event = stripe.webhooks.constructEvent(rawBody, signature, liveWebhookSecret);
+    console.log('Live signature verified successfully');
+  } catch (liveError) {
+    console.log('Live signature failed:', liveError instanceof Error ? liveError.message : 'unknown error');
+    try {
+      if (!signature) throw new Error('No Stripe signature header');
+      const stripeTest = getStripe(true);
+      event = stripeTest.webhooks.constructEvent(rawBody, signature, testWebhookSecret);
+      isTestMode = true;
+      console.log('Test signature verified successfully');
+    } catch (testError) {
+      console.log('Test signature also failed:', testError instanceof Error ? testError.message : 'unknown error');
+      try {
+        const parsed = JSON.parse(rawBody) as { id?: string; livemode?: boolean };
+        if (!parsed.id?.startsWith('evt_')) {
+          return NextResponse.json({ error: 'Invalid Stripe event' }, { status: 400 });
+        }
+
+        // Stripe uses a different signing secret per webhook endpoint. This
+        // legacy endpoint may receive valid events signed with an old endpoint
+        // secret, so verify authenticity by retrieving the event from Stripe.
+        isTestMode = parsed.livemode === false;
+        event = await getStripe(isTestMode).events.retrieve(parsed.id);
+        console.log(`Recovered Stripe event ${event.id} via Events API`);
+      } catch (retrieveError) {
+        console.log('Unable to recover Stripe event:', retrieveError instanceof Error ? retrieveError.message : 'unknown error');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      }
+    }
+  }
+
+  // Idempotency
+  if (processedEvents.has(event.id)) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+  processedEvents.add(event.id);
+  if (processedEvents.size > 1000) {
+    const first = processedEvents.values().next().value;
+    if (first) processedEvents.delete(first);
+  }
+
+  const stripe = getStripe(isTestMode);
+  const supabase = getSupabase();
+
+  console.log(`Stripe webhook: ${event.type} (test: ${isTestMode})`);
+
+  // ── ASYNC PAYMENT SETTLED. A delayed payment method (ACH, bank debit, some wallets)
+  // completes the checkout session with payment_status 'unpaid' and settles LATER.
+  // handleMcpCreditTopup correctly refuses to grant on that unpaid event — which would
+  // STRAND a customer who genuinely pays if this follow-up were not wired. Stripe sends
+  // async_payment_succeeded when the money actually arrives; routing it through the SAME
+  // handler grants exactly once, because applyCreditOnce is keyed on session.id.
+  // Removing this handler without also removing the unpaid refusal loses real payments.
+  if (event.type === 'checkout.session.async_payment_succeeded') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const mcpTopup = await handleMcpCreditTopup(session);
+    if (mcpTopup.handled) {
+      console.log(`[stripe-webhook] async payment settled for ${session.id}:`, mcpTopup);
+      return NextResponse.json({ received: true, mcp_topup: mcpTopup, via: 'async_payment_succeeded' });
+    }
+  }
+
+  // An async payment that FAILED grants nothing — logged so a customer who believes they
+  // paid can be told what actually happened rather than being met with silence.
+  if (event.type === 'checkout.session.async_payment_failed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    console.error(`[stripe-webhook] async payment FAILED for session ${session.id} — no credits granted.`);
+    return NextResponse.json({ received: true, async_payment_failed: session.id });
+  }
+
+  // Handle checkout.session.completed
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    // MCP credit top-up? Handle + return early — it's a credit purchase, not a
+    // tier/bundle. Idempotent by session id, so safe if a second webhook also fires.
+    const mcpTopup = await handleMcpCreditTopup(session);
+    if (mcpTopup.handled) {
+      return NextResponse.json({ received: true, mcp_topup: mcpTopup });
+    }
+
+    // MCP auto-recharge CARD SAVE (setup-mode Checkout)? Persist the customer +
+    // payment method so future off-session refills can charge it. Return early.
+    if (session.mode === 'setup' || session.metadata?.type === 'mcp_autorecharge_setup') {
+      const handled = await handleAutoRechargeSetup(session);
+      if (handled) return NextResponse.json({ received: true, mcp_autorecharge_setup: true });
+    }
+
+    let tier = session.metadata?.tier;
+    const bundle = session.metadata?.bundle;
+    const email = session.customer_details?.email || session.customer_email;
+
+    if (!email) {
+      return NextResponse.json({ error: 'No email' }, { status: 400 });
+    }
+
+    console.log(`Checkout completed: ${email}, tier: ${tier}, bundle: ${bundle}`);
+
+    // Get line items for product_id
+    const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+    const productId = lineItems.data[0]?.price?.id || 'unknown';
+    const lineItemDescription = lineItems.data[0]?.description || '';
+    const normalizedDescription = lineItemDescription.toLowerCase();
+
+    // Payment links for standalone Mindy AI may not inject session metadata.
+    // Fall back to the product description so the purchase still grants
+    // the right access. Order matters: Team first, then lifetime (before
+    // generic briefings/mindy match), then recurring briefings.
+    if (!tier && !bundle) {
+      // Team price IDs are the MOST reliable signal — they survive link edits and
+      // don't depend on payment-link metadata (the annual link ships with none) or
+      // an exact description. price.id here is lineItems.data[0].price.id (productId).
+      if (productId === 'price_1TZxaaK5zyiZ50PBzhQJ1Pk8') {
+        tier = 'team_monthly';
+      } else if (productId === 'price_1TZxcAK5zyiZ50PBcBg0ZvoV') {
+        tier = 'team_annual';
+      } else if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
+        tier = normalizedDescription.includes('annual') ? 'team_annual' : 'team_monthly';
+      } else if (
+        normalizedDescription.includes('lifetime') &&
+        (normalizedDescription.includes('mindy') ||
+          normalizedDescription.includes('briefings') ||
+          normalizedDescription.includes('market intelligence') ||
+          normalizedDescription.includes('founders'))
+      ) {
+        tier = 'briefings_lifetime';
+      } else if (
+        normalizedDescription.includes('market intelligence') ||
+        normalizedDescription.includes('daily briefings') ||
+        normalizedDescription.includes('mindy ai')
+      ) {
+        tier = 'briefings';
+      }
+      // Legacy Ultimate ($1,497) + bootcamp Mindy Lifetime ($2,997) + Founders ($4,997)
+      if (!tier && session.amount_total === 149700) {
+        tier = 'briefings_lifetime';
+      }
+      if (!tier && session.amount_total === 299700) {
+        tier = 'briefings_lifetime';
+      }
+      if (!tier && session.amount_total === 499700) {
+        tier = 'briefings_lifetime';
+      }
+      // Team amount fallback — last-resort if a future link uses a new price ID at
+      // the same price point ($499/mo, $4,990/yr). Distinct from the lifetime
+      // amounts above, so no collision.
+      if (!tier && session.amount_total === 49900) {
+        tier = 'team_monthly';
+      }
+      if (!tier && session.amount_total === 499000) {
+        tier = 'team_annual';
+      }
+
+      // Standalone tools bought via payment link. These ship WITHOUT session metadata, so
+      // tier stayed undefined, updateAccessFlags returned {}, and (before the profile-gap
+      // fix) no profile was created — 28 stranded buyers measured 2026-07-30:
+      // Opportunity Hunter Pro (20), Opportunity Scout Pro (5), Federal Contractor
+      // Database (3), Recompete Contracts Tracker (3), Market Assassin Standard (1).
+      //
+      // Matched on DESCRIPTION, not amount: these products have repriced over time
+      // ($49 → $497 → $397 across the ledger) and amounts collide between products,
+      // whereas the Stripe product description is stable. Ordered most-specific first —
+      // "opportunity hunter"/"scout" before any looser match.
+      if (!tier) {
+        if (
+          normalizedDescription.includes('opportunity hunter') ||
+          normalizedDescription.includes('opportunity scout')
+        ) {
+          tier = 'hunter_pro';
+        } else if (normalizedDescription.includes('contractor database')) {
+          tier = 'contractor_db';
+        } else if (normalizedDescription.includes('recompete')) {
+          tier = 'recompete';
+        } else if (normalizedDescription.includes('market assassin')) {
+          tier = normalizedDescription.includes('premium') ? 'assassin_premium' : 'assassin_standard';
+        }
+      }
+    }
+
+    // Coach Mode ADD-ON ($99/mo) — NOT a tier. It's a capability flag on top of Pro,
+    // so we detect it separately and set access_coach_addon below WITHOUT touching tier.
+    // Matched by description or the $99/mo ($9,900 cents) amount. If a user somehow buys
+    // this without Pro, coach-access still gates correctly (they only get the add-on
+    // path; the modal explains they need Pro first).
+    const isCoachAddon =
+      normalizedDescription.includes('coach mode') ||
+      normalizedDescription.includes('coach add') ||
+      (session.mode === 'subscription' && session.amount_total === 9900);
+
+    // Check if already processed.
+    //
+    // ⚠️ The `error` here is NOT optional to check. Until 2026-07-30 `purchases` had no
+    // `stripe_session_id` column at all, so this lookup errored on every call — and because
+    // only `data` was destructured, the error was discarded, `existing` came back undefined,
+    // and this early-return NEVER fired. Idempotency was silently absent for months: any
+    // Stripe webhook retry re-ran the entire access-grant path below.
+    //
+    // A lookup failure now fails the webhook (500) so Stripe RETRIES rather than us
+    // half-processing a sale we can't dedupe. Silent-continue is what hid the original bug.
+    if (supabase) {
+      const { data: existing, error: existingError } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('stripe_session_id', session.id)
+        .limit(1);
+
+      if (existingError) {
+        console.error(
+          `[stripe-webhook] FATAL: cannot check for duplicate session ${session.id} — ${existingError.message}. `
+          + `Refusing to process so Stripe retries instead of double-granting.`,
+        );
+        return NextResponse.json(
+          { error: 'purchase dedup check failed', detail: existingError.message },
+          { status: 500 },
+        );
+      }
+
+      if (existing && existing.length > 0) {
+        // The PURCHASE is already recorded — do not grant twice. But enrollment is a
+        // separate concern and used to be skipped entirely by this return: auto-enroll
+        // lives ~180 lines below, so any session that reached here (a Stripe retry, a
+        // redelivery, a purchase row written by another path) never got its settings
+        // row and the customer was invisible to every send path. Idempotent, so a
+        // re-run on an already-enrolled customer just refreshes paid state.
+        const email = (session.customer_details?.email || session.customer_email || '').toLowerCase().trim();
+        if (email) {
+          const stripeCustomerId = typeof session.customer === 'string'
+            ? session.customer
+            : session.customer?.id || null;
+          const enroll = await ensureNotificationSettings(supabase, email, stripeCustomerId);
+          if (enroll.outcome === 'failed') {
+            console.error(`[stripe-webhook] duplicate-path AUTO-ENROLL FAILED for ${email}: ${enroll.error}`);
+          } else if (enroll.outcome === 'created') {
+            console.log(`[stripe-webhook] duplicate session, but settings row was MISSING — created for ${email}`);
+          }
+          const classified = await grantPaidBriefingClassification(supabase, {
+            email,
+            productName: lineItemDescription,
+            amountCents: session.amount_total ?? 0,
+            stripeCustomerId,
+            hasActiveSubscription: session.mode === 'subscription',
+          });
+          if (classified.outcome === 'failed') {
+            console.error(`[stripe-webhook] duplicate-path classification FAILED for ${email}: ${classified.reason}`);
+          }
+        }
+        console.log('Session already processed, skipping');
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      // Save purchase
+      const purchaseRow = {
+        user_email: email.toLowerCase(),
+        stripe_session_id: session.id,
+        stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+        product_id: productId,
+        product_name: lineItemDescription,
+        tier: tier || 'unknown',
+        bundle: bundle || null,
+        amount_paid: session.amount_total ? session.amount_total / 100 : null,
+        status: 'completed',
+        metadata: session.metadata,
+      };
+      const { error: insertError } = await supabase.from('purchases').insert(purchaseRow);
+
+      // A duplicate-key rejection is the unique index doing its job on a Stripe retry —
+      // expected, not an error. Anything else means the ledger write is broken and every
+      // sale is going unrecorded, which is exactly how the missing-column bug stayed hidden
+      // from 2026-05 to 2026-07-30 (28 paying subscribers, ZERO purchases rows, and Stripe
+      // showing 21/21 "delivered" because this handler logged and returned 200).
+      //
+      // Deliberately NOT fatal: the access grant runs below, and a customer getting what
+      // they paid for outranks the bookkeeping row. So make it SCREAM instead — a silent
+      // console.error is what cost us three months of ledger data.
+      if (insertError) {
+        const isDuplicate = /duplicate key|already exists|uniq_purchases/i.test(insertError.message || '');
+        if (isDuplicate) {
+          console.log(`[stripe-webhook] purchase row already exists for ${session.id} (retry) — continuing`);
+        } else {
+          console.error(
+            `[stripe-webhook] 🚨 PURCHASE LEDGER WRITE FAILED for ${email} / ${session.id}: `
+            + `${insertError.message}. Access provisioning CONTINUES below, but this sale is NOT `
+            + `recorded in purchases — check for schema drift (missing column) before trusting any `
+            + `revenue report. Payload keys: ${Object.keys(purchaseRow).join(', ')}`,
+          );
+        }
+      }
+    }
+
+    // Cross-site purchase attribution (non-fatal): join the pre-checkout
+    // attribution captured by the /checkout hop (client_reference_id) and
+    // record this sale in the shared Upstash store so it shows on the unified
+    // govcongiants.com /admin/purchases dashboard tagged site="mindy". Wrapped
+    // so a tracking hiccup can NEVER block access provisioning below.
+    try {
+      const { getCheckoutStart, savePurchase } = await import('@/lib/purchase-attribution');
+      const attributionId =
+        session.client_reference_id || session.metadata?.attribution_id || null;
+      const checkoutStart = await getCheckoutStart(attributionId);
+      await savePurchase({
+        id: session.id,
+        event_id: event.id,
+        event_type: event.type,
+        status: 'paid',
+        product_id: checkoutStart?.product_id || productId,
+        product_name: checkoutStart?.product_name || lineItemDescription || 'Mindy Purchase',
+        product_price: checkoutStart?.product_price,
+        amount_cents: session.amount_total ?? checkoutStart?.amount_cents ?? undefined,
+        currency: session.currency ?? undefined,
+        customer_email: email,
+        customer_name: session.customer_details?.name || undefined,
+        stripe_checkout_session_id: session.id,
+        stripe_customer_id:
+          typeof session.customer === 'string' ? session.customer : session.customer?.id,
+        attribution_id: attributionId ?? undefined,
+        attribution: checkoutStart?.attribution,
+        created_at: new Date().toISOString(),
+        raw_created: event.created,
+      });
+    } catch (attrErr) {
+      console.error('[stripe-webhook] purchase attribution write failed (non-fatal):', attrErr);
+    }
+
+    // Affiliate commission (30% recurring) — non-fatal
+    try {
+      const { recordAffiliateFromStripePayment } = await import('@/lib/mindy/affiliate-commissions');
+      const { getCheckoutStart } = await import('@/lib/purchase-attribution');
+      const attributionId =
+        session.client_reference_id || session.metadata?.attribution_id || null;
+      const checkoutStart = await getCheckoutStart(attributionId);
+      const grossCents = session.amount_total ?? checkoutStart?.amount_cents ?? 0;
+      if (grossCents > 0 && email) {
+        const commission = await recordAffiliateFromStripePayment({
+          supabase,
+          customerEmail: email,
+          grossCents,
+          stripeEventId: event.id,
+          eventType: 'checkout',
+          currency: session.currency ?? undefined,
+          productLabel: checkoutStart?.product_name || lineItemDescription,
+          partnerCode: checkoutStart?.attribution?.partner_code,
+        });
+        if (commission) {
+          console.log(
+            `[stripe-webhook] Affiliate ${commission.commissionPercent}% recorded: `
+            + `${commission.partnerCode} +$${(commission.commissionCents / 100).toFixed(2)} `
+            + `from ${email}`,
+          );
+        }
+      }
+    } catch (affiliateErr) {
+      console.error('[stripe-webhook] affiliate commission failed (non-fatal):', affiliateErr);
+    }
+
+    // Auto-update access flags (always update, user_id is optional)
+    const accessUpdates = await updateAccessFlags(email, tier, bundle);
+
+    // Keep KV in sync with paid briefings entitlement so /briefings access works immediately.
+    // Record the grant AFTER the KV write so wrote_kv reflects what actually landed
+    // (Adam's 2026-09-08 row stored wrote_kv=false while KV was true).
+    let wroteKv = false;
+    if (accessUpdates.access_briefings) {
+      wroteKv = await grantBriefingsAccess(email);
+    }
+
+    // Audit the AUTOMATIC grant. This is the baseline that makes admin_manual rows
+    // interpretable: a paid session with a stripe_webhook row here and an admin_manual row
+    // minutes later is a provisioning failure caught by hand. A session with NO row here at
+    // all means the webhook never reached this point. Either way it is now measurable —
+    // which it was not before 2026-07-30.
+    await recordAccessGrant({
+      email,
+      capability: 'briefings',
+      source: 'stripe_webhook',
+      tier: tier || 'unknown',
+      actor: 'stripe',
+      reason: `checkout.session.completed — ${lineItemDescription || 'unknown product'}`,
+      // Boolean({}) === true, so `Boolean(accessUpdates)` recorded a profile
+      // write on EVERY path — including the three where updateAccessFlags
+      // returns {} precisely because nothing was written: no Supabase client,
+      // an unmapped tier, and a FAILED update. That put rows in access_grants
+      // claiming wrote_profile=true for a customer whose access_briefings was
+      // false. Success is now an actual verified flag change, never object
+      // truthiness. (TASK-STRIPE-DUP-004 scope item 7.)
+      wroteProfile: Object.keys(accessUpdates).length > 0,
+      wroteKv,
+      stripeSessionId: session.id,
+      metadata: { event_id: event.id, amount_total: session.amount_total, bundle: bundle || null },
+    });
+
+    // Coach Mode add-on ($99/mo): flip the standalone access_coach_addon flag. It's
+    // independent of tier (the user stays Pro), so we write it directly rather than
+    // through updateAccessFlags' tier→flag map. Non-fatal — a flag-write hiccup must
+    // not fail the webhook (Stripe would retry the whole event).
+    if (isCoachAddon && supabase) {
+      try {
+        await supabase
+          .from('user_profiles')
+          .update({ access_coach_addon: true })
+          .eq('email', email);
+        console.log(`[stripe-webhook] granted Coach Mode add-on to ${email}`);
+      } catch (e) {
+        console.error('[stripe-webhook] coach-addon flag write failed (non-fatal):', e);
+      }
+    }
+
+    // Team purchase: provision the team workspace + migrate the buyer's
+    // personal pipeline/contacts/targets into it. updateAccessFlags already
+    // set access_team; this creates the actual shared workspace so they land
+    // in a team (not their personal one) on next load. Idempotent + non-fatal
+    // so a provisioning hiccup never fails the webhook (the /app self-heal and
+    // POST /api/app/team/upgrade also call it).
+    if (accessUpdates.access_team || tier === 'team_monthly' || tier === 'team_annual') {
+      try {
+        const { provisionTeamWorkspace } = await import('@/lib/app/workspace');
+        await provisionTeamWorkspace(email);
+      } catch (provisionErr) {
+        console.error('[stripe-webhook] team workspace provisioning failed (non-fatal):', provisionErr);
+      }
+    }
+
+    // Get/create profile
+    const profile = await getOrCreateProfile(email);
+    const customerName = session.customer_details?.name || undefined;
+    const productName = lineItems.data[0]?.description || 'GovCon Product';
+
+    // AUTO-ENROLL: create the row that makes this customer reachable.
+    // Delegated to ensureNotificationSettings() — it surfaces the DB error instead of
+    // discarding it. This block previously did `await ...insert(...)` without reading
+    // { error } and then logged "✅ Auto-enrolled" unconditionally, so a failed insert
+    // printed a SUCCESS line; 15 paying customers had a checkout session recorded and
+    // no settings row. See lib/onboarding/ensure-notification-settings.ts.
+    if (supabase) {
+      const stripeCustomerId = typeof session.customer === 'string'
+        ? session.customer
+        : session.customer?.id || null;
+      const enroll = await ensureNotificationSettings(supabase, email, stripeCustomerId);
+      if (enroll.outcome === 'failed') {
+        // LOUD. A stranded payer is invisible to every send path and only surfaces as a
+        // refund request, so this must never pass silently again.
+        console.error(`[stripe-webhook] AUTO-ENROLL FAILED for ${email}: ${enroll.error}`);
+      } else {
+        console.log(`✅ Auto-enrolled purchaser in alerts: ${email} (${enroll.outcome}${enroll.needsTargeting ? ', NEEDS TARGETING' : ''})`);
+      }
+      const classified = await grantPaidBriefingClassification(supabase, {
+        email,
+        productName: lineItemDescription || productName,
+        amountCents: session.amount_total ?? 0,
+        stripeCustomerId,
+        hasActiveSubscription: session.mode === 'subscription',
+      });
+      if (classified.outcome === 'failed') {
+        console.error(`[stripe-webhook] briefing classification FAILED for ${email}: ${classified.reason}`);
+      } else if (classified.outcome === 'upserted') {
+        console.log(`[stripe-webhook] briefing classification ${classified.access} for ${email}`);
+      }
+    }
+
+    // Check if this is an Alert Pro subscription
+    const isAlertPro = tier === 'alert_pro' ||
+      productName?.toLowerCase().includes('alert pro') ||
+      lineItems.data.some(item => (item.price?.product as string) === 'prod_U9rOClXY6MFcRu');
+
+    // Check if this is a Federal Help Center membership
+    const isFHCMembership = tier === 'fhc_membership' ||
+      productName?.toLowerCase().includes('federal help center') ||
+      productName?.toLowerCase().includes('fhc');
+
+    if (isAlertPro) {
+      // Alert Pro subscription - set user to daily frequency
+      if (supabase) {
+        await supabase
+          .from('user_notification_settings')
+          .update({
+            alert_frequency: 'daily',
+            subscription_status: 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_email', email.toLowerCase());
+      }
+
+      // Set KV access for Alert Pro + Opportunity Hunter Pro (Alert Pro includes OH Pro)
+      try {
+        await kv.set(`alertpro:${email.toLowerCase()}`, 'true');
+        await kv.set(`ospro:${email.toLowerCase()}`, 'true');
+        console.log(`✅ Alert Pro + OH Pro activated for: ${email}`);
+      } catch (kvError) {
+        console.error('KV error (non-fatal):', kvError);
+      }
+
+      // Also update Supabase access flags for OH Pro
+      await updateAccessFlags(email, 'hunter_pro');
+
+      // Send welcome email
+      await sendAlertProWelcomeEmail({ to: email, customerName });
+    } else if (isFHCMembership) {
+      // Grant MA Standard + Alert Pro for FHC members ($99/mo includes Alert Pro as a benefit)
+      await updateAccessFlags(email, 'assassin_standard');
+      await updateAccessFlags(email, 'hunter_pro'); // Alert Pro includes OH Pro
+
+      // Set KV access for MA + Alert Pro (FHC members get daily alerts as a premium benefit)
+      try {
+        await kv.set(`ma:${email.toLowerCase()}`, 'true');
+        await kv.set(`alertpro:${email.toLowerCase()}`, 'true');
+        await kv.set(`ospro:${email.toLowerCase()}`, 'true'); // Alert Pro includes OH Pro
+        console.log(`✅ KV access set for FHC member (MA + Alert Pro): ${email}`);
+      } catch (kvError) {
+        console.error('KV error (non-fatal):', kvError);
+      }
+
+      // Set alert frequency to daily for FHC members
+      if (supabase) {
+        await supabase
+          .from('user_notification_settings')
+          .upsert({
+            user_email: email.toLowerCase(),
+            alert_frequency: 'daily',
+            subscription_status: 'active',
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_email',
+          });
+      }
+
+      // Send FHC welcome email
+      await sendFHCWelcomeEmail({ to: email, customerName });
+    } else if (bundle) {
+      // Bundle purchase - send bundle email with all tool links
+      await sendBundleEmail({ to: email, customerName, bundle });
+    } else if (tier === 'hunter_pro') {
+      // Opportunity Hunter Pro
+      await sendOpportunityHunterProEmail({ to: email, customerName });
+    } else if (tier === 'contractor_db') {
+      // Federal Contractor Database
+      const accessLink = `https://getmindy.ai/contractor-database?email=${encodeURIComponent(email)}`;
+      await sendDatabaseAccessEmail({ to: email, customerName, accessLink });
+    } else if (tier === 'assassin_standard' || tier === 'assassin_premium' || tier === 'assassin_premium_upgrade') {
+      // Market Assassin - use access code email with tutorial
+      const accessLink = `https://getmindy.ai/market-assassin?email=${encodeURIComponent(email)}`;
+      await sendAccessCodeEmail({
+        to: email,
+        companyName: customerName,
+        accessCode: profile?.license_key || 'See email for access',
+        accessLink,
+      });
+    } else if (tier === 'content_standard' || tier === 'content_full_fix' || tier === 'content_full_fix_upgrade') {
+      // Content Reaper
+      const contentTier = (tier === 'content_full_fix' || tier === 'content_full_fix_upgrade') ? 'full_fix' : 'standard';
+      await sendContentReaperEmail({ to: email, customerName, tier: contentTier });
+    } else if (tier === 'recompete') {
+      // Recompete Tracker
+      await sendRecompeteEmail({ to: email, customerName });
+    } else if (
+      tier === 'briefings' ||
+      tier === 'briefings_monthly' ||
+      tier === 'briefings_annual' ||
+      tier === 'briefings_lifetime' ||
+      tier === 'team_monthly' ||
+      tier === 'team_annual'
+    ) {
+      // Team uses the same welcome email as Pro for now — both
+      // unlock the same /app surface. A team-specific welcome
+      // (with "5 seats included" + "Invite teammates →" link)
+      // is a Phase 2 polish; not blocking for v1 launch.
+      await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
+
+      // Mindy buyers ALSO get Federal Help Center (coaching + training) included.
+      // Record the FHC grant in KV (our source of who has FHC access — they access
+      // it directly at federalhelpcenter.com) and send a SEPARATE, Mindy-framed FHC
+      // welcome. KV write is unconditional/non-fatal; the email never blocks the flow.
+      try {
+        await kv.set(`fhc:${email.toLowerCase()}`, 'true');
+        console.log(`✅ FHC access flag set for Mindy buyer: ${email}`);
+      } catch (kvError) {
+        console.error('KV error setting fhc flag (non-fatal):', kvError);
+      }
+      await sendMindyFHCBonusEmail({ to: email, customerName });
+    } else if (profile?.license_key) {
+      // Fallback to generic license key email
+      await sendLicenseKeyEmail({
+        to: email,
+        customerName,
+        licenseKey: profile.license_key,
+        productName,
+      });
+    }
+
+    console.log(`✅ Purchase processed: ${email}, tier: ${tier}, bundle: ${bundle}`);
+
+    return NextResponse.json({
+      received: true,
+      email,
+      tier,
+      bundle,
+      isFHCMembership,
+    });
+  }
+
+  // MCP auto-recharge off-session charge — BACKSTOP grant. The engine
+  // (maybeAutoRecharge) already grants synchronously via applyCreditOnce(pi.id) after
+  // it confirms the PaymentIntent; this webhook grants the SAME key, so it's a no-op
+  // duplicate in the normal path but rescues the rare case where the engine's process
+  // died after the charge but before the grant. Idempotent by PaymentIntent id.
+  if (event.type === 'payment_intent.succeeded') {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    const meta = (pi.metadata || {}) as Record<string, string>;
+    if (meta.type === MCP_AUTORECHARGE_PI_TYPE && meta.user_email) {
+      const credits = creditsForPackage(meta.package) ?? (Number(meta.credits) || 0);
+      if (credits > 0) {
+        const { applied, newBalance } = await applyCreditOnce(pi.id, meta.user_email, credits, 'auto_recharge');
+        console.log(`[mcp:autorecharge] webhook backstop ${meta.user_email} pi=${pi.id} applied=${applied} balance=${newBalance}`);
+        // Only fires here in the rare case the engine died after charge before grant —
+        // then the engine's receipt never sent, so the backstop covers it. Normal path:
+        // engine already applied → applied=false here → no duplicate.
+        if (applied) {
+          await sendCreditReceiptEmail({
+            email: meta.user_email,
+            kind: 'auto_recharge',
+            credits,
+            newBalance,
+            amountUsd: typeof pi.amount === 'number' ? pi.amount / 100 : null,
+            reference: pi.id,
+          });
+        }
+      }
+      return NextResponse.json({ received: true, mcp_autorecharge: true });
+    }
+    // Not an auto-recharge PI → fall through (nothing else handles this event today).
+    return NextResponse.json({ received: true });
+  }
+
+  // Recurring affiliate commission on subscription renewals (not first checkout —
+  // checkout.session.completed already records the initial payment).
+  if (event.type === 'invoice.paid') {
+    const invoice = event.data.object as Stripe.Invoice;
+
+    // MCP annual subscription credit grant — runs on BOTH the initial charge
+    // (subscription_create) and each renewal (subscription_cycle), so it must be
+    // BEFORE the subscription_create early-return below. Idempotent by invoice id;
+    // handled=false for any non-MCP invoice so nothing else is affected.
+    try {
+      const { handleMcpSubscriptionInvoice } = await import('@/lib/mcp/stripe-subscription');
+      const sub = await handleMcpSubscriptionInvoice(invoice);
+      if (sub.handled) console.log('[stripe-webhook] MCP subscription invoice:', sub);
+    } catch (mcpSubErr) {
+      console.error('[stripe-webhook] MCP subscription grant failed (non-fatal):', mcpSubErr);
+    }
+
+    // App-tier (Pro/Team) MCP allowance. Same placement + same reasoning as the
+    // MCP-plan grant above: BEFORE the subscription_create early-return, so the
+    // FIRST invoice grants too. Until this existed the only grant path was the
+    // monthly cron (0 9 1 * *), so a subscriber who paid on the 2nd waited ~30
+    // days for credits they were already paying for — 9 of 26 paying Pro subs
+    // were sitting at zero on 2026-07-30 for exactly this reason.
+    // Idempotent on the cron's own key (pro:<email>:<YYYY-MM>), so the two paths
+    // can never double-grant in the same month.
+    try {
+      const { handleAppTierSubscriptionInvoice } = await import('@/lib/mcp/app-tier-subscription');
+      const tierGrant = await handleAppTierSubscriptionInvoice(invoice);
+      if (tierGrant.handled) console.log('[stripe-webhook] app-tier subscription invoice:', tierGrant);
+    } catch (tierErr) {
+      console.error('[stripe-webhook] app-tier credit grant failed (non-fatal):', tierErr);
+    }
+
+    if (invoice.billing_reason === 'subscription_create') {
+      return NextResponse.json({ received: true, action: 'invoice_skipped_initial' });
+    }
+
+    const grossCents = invoice.amount_paid ?? 0;
+    let email = invoice.customer_email || null;
+    if (!email && invoice.customer) {
+      const customerId = typeof invoice.customer === 'string'
+        ? invoice.customer
+        : invoice.customer.id;
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer.deleted) email = customer.email;
+    }
+
+    if (grossCents > 0 && email) {
+      try {
+        const { recordAffiliateFromStripePayment } = await import('@/lib/mindy/affiliate-commissions');
+        const line = invoice.lines?.data?.[0];
+        await recordAffiliateFromStripePayment({
+          supabase,
+          customerEmail: email,
+          grossCents,
+          stripeEventId: event.id,
+          eventType: 'invoice',
+          currency: invoice.currency ?? undefined,
+          productLabel: line?.description || undefined,
+        });
+      } catch (affiliateErr) {
+        console.error('[stripe-webhook] invoice affiliate commission failed (non-fatal):', affiliateErr);
+      }
+    }
+
+    return NextResponse.json({ received: true, action: 'invoice_paid' });
+  }
+
+  // Handle subscription cancellation - revoke FHC access
+  if (event.type === 'customer.subscription.deleted' ||
+      event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    // Only process if subscription is canceled/ended
+    if (event.type === 'customer.subscription.updated' &&
+        subscription.status !== 'canceled' &&
+        subscription.status !== 'unpaid' &&
+        subscription.status !== 'past_due') {
+      // Not a cancellation, just a regular update
+      return NextResponse.json({ received: true, action: 'ignored' });
+    }
+
+    // Check if this is an FHC subscription by looking at product metadata
+    const items = subscription.items.data;
+    let isFHCSubscription = false;
+
+    for (const item of items) {
+      const price = item.price;
+      const productId = typeof price.product === 'string' ? price.product : price.product?.id;
+
+      // FHC product IDs
+      if (productId === 'prod_TaiXlKb350EIQs' || productId === 'prod_TMUmxKTtooTx6C') {
+        isFHCSubscription = true;
+        break;
+      }
+
+      // Also check metadata
+      if (price.metadata?.tier === 'fhc_membership') {
+        isFHCSubscription = true;
+        break;
+      }
+    }
+
+    // Check if this is an Alert Pro subscription
+    let isAlertProSubscription = false;
+    for (const item of items) {
+      const price = item.price;
+      const productId = typeof price.product === 'string' ? price.product : price.product?.id;
+      if (productId === 'prod_U9rOClXY6MFcRu') {
+        isAlertProSubscription = true;
+        break;
+      }
+      if (price.metadata?.tier === 'alert_pro') {
+        isAlertProSubscription = true;
+        break;
+      }
+    }
+
+    if (!isFHCSubscription && !isAlertProSubscription) {
+      console.log('Non-FHC/AlertPro subscription event, ignoring');
+      return NextResponse.json({ received: true, action: 'ignored' });
+    }
+
+    // Handle Alert Pro cancellation
+    if (isAlertProSubscription) {
+      const customerId = typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer?.id;
+
+      if (customerId) {
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!customer.deleted && customer.email) {
+          const email = customer.email.toLowerCase();
+          console.log(`🚫 Alert Pro subscription canceled for: ${email}`);
+
+          // Revert to weekly/free tier
+          if (supabase) {
+            await supabase
+              .from('user_notification_settings')
+              .update({
+                alert_frequency: 'weekly',
+                subscription_status: 'canceled',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_email', email);
+          }
+
+          // Remove KV access
+          try {
+            await kv.del(`alertpro:${email}`);
+            console.log(`✅ Revoked Alert Pro for: ${email}`);
+          } catch (kvError) {
+            console.error('KV error:', kvError);
+          }
+        }
+      }
+
+      return NextResponse.json({
+        received: true,
+        action: 'alert_pro_revoked',
+        reason: subscription.status,
+      });
+    }
+
+    // Get customer email
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+
+    if (!customerId) {
+      return NextResponse.json({ error: 'No customer ID' }, { status: 400 });
+    }
+
+    const customer = await stripe.customers.retrieve(customerId);
+    if (customer.deleted || !customer.email) {
+      return NextResponse.json({ error: 'Customer not found or no email' }, { status: 400 });
+    }
+
+    const email = customer.email.toLowerCase();
+    console.log(`🚫 FHC subscription canceled for: ${email}`);
+
+    // Revoke MA Standard + Alert Pro access (FHC members get Alert Pro, not briefings)
+    if (supabase) {
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({
+          access_assassin_standard: false,
+          access_hunter_pro: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('email', email);
+
+      if (updateError) {
+        console.error('Error revoking access:', updateError);
+      } else {
+        console.log(`✅ Revoked Supabase access for: ${email}`);
+      }
+
+      // Revert alert frequency to weekly
+      await supabase
+        .from('user_notification_settings')
+        .update({
+          alert_frequency: 'weekly',
+          subscription_status: 'canceled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_email', email);
+    }
+
+    // Remove KV access (MA + Alert Pro + OH Pro)
+    try {
+      await kv.del(`ma:${email}`);
+      await kv.del(`alertpro:${email}`);
+      await kv.del(`ospro:${email}`);
+      console.log(`✅ Revoked KV access for FHC member: ${email}`);
+    } catch (kvError) {
+      console.error('KV error revoking access:', kvError);
+    }
+
+    return NextResponse.json({
+      received: true,
+      action: 'revoked',
+      email,
+      reason: subscription.status,
+    });
+  }
+
+  return NextResponse.json({ received: true });
+}

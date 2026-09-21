@@ -1,0 +1,1239 @@
+/**
+ * SAM.gov GREEN Email Template - Active Solicitations
+ *
+ * WORKING template extracted from send-all-briefings/route.ts
+ * Uses Anthropic Claude for Quick Win Assessments
+ *
+ * Color scheme: Green (#059669 → #10b981) - "bid now" opportunities
+ */
+
+import Anthropic from '@anthropic-ai/sdk';
+import { SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import agencySatData from '@/data/agency-sat-friendliness.json';
+import { generateTrackingPixel, generateTrackedLink } from '@/lib/engagement';
+import { MindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
+import { MINDY_APP_URL, MINDY_SITE_URL, MINDY_PREFERENCES_URL } from '@/lib/mindy/email-branding';
+import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
+
+// ============ INTERFACES ============
+
+export interface SamDailyOpportunity {
+  rank: number;
+  title: string;
+  agency: string;
+  parentAgency?: string;
+  buyerOffice?: string;
+  naicsCode: string;
+  setAside: string | null;
+  popCity?: string;
+  popState?: string;
+  popZip?: string;
+  popCountry?: string;
+  responseDeadline: string;
+  daysRemaining: number;
+  noticeType: string;
+  solicitationNumber: string;
+  samLink: string;
+  quickWinAssessment: string;
+  postedDate: string;
+}
+
+export interface SamDailyBriefing {
+  date: string;
+  opportunities: SamDailyOpportunity[];
+  deadlinesThisWeek: {
+    title: string;
+    fullTitle: string;
+    deadline: string;
+    responseDeadline?: string;
+    daysRemaining: number;
+    samLink: string;
+    noticeType: string;
+    noticeId: string;
+    solicitationNumber?: string;
+    agency: string;
+    parentAgency?: string;
+    buyerOffice?: string;
+    naicsCode: string;
+    setAside: string;
+    popCity?: string;
+    popState?: string;
+    popZip?: string;
+    popCountry?: string;
+  }[];
+  actionTips: string[];
+  noticeSummary: {
+    totalMatched: number;
+    rfp: number;
+    rfq: number;
+    sourcesSought: number;
+    preSol: number;
+    combined: number;
+    other: number;
+  };
+}
+
+export interface SamStrategicRankingContext {
+  naicsCodes?: string[];
+  agencies?: string[];
+  keywords?: string[];
+  businessType?: string;
+  businessDescription?: string;
+  feedbackSignals?: MindyFeedbackSignals;
+}
+
+export interface NoticeSummary {
+  totalMatched: number;
+  rfp: number;
+  rfq: number;
+  sourcesSought: number;
+  preSol: number;
+  combined: number;
+  other: number;
+}
+
+// Legacy exports for backwards compatibility
+export type SamGreenBriefing = SamDailyBriefing;
+export type SamGreenOpportunity = SamDailyOpportunity;
+
+// ============ HELPERS ============
+
+/**
+ * Shape of the frozen editorial file. `satPercent`/`microPercent` are the
+ * hand-authored THRESHOLD INPUTS that chose each label in 2026-04; they are
+ * NOT measurements and are deliberately NOT surfaced by the accessor below,
+ * so they cannot reach a customer or a product decision.
+ */
+interface SatAgencyInfo {
+  /** @deprecated editorial threshold input — never render, never treat as measured. */
+  satPercent: number;
+  /** @deprecated editorial threshold input — never render, never treat as measured. */
+  microPercent: number;
+  level: string;
+  badge: string | null;
+}
+
+/** What callers get: a label and whether we have any editorial opinion at all. */
+export interface SatEditorialSignal {
+  /** The label to render, or null when we have no opinion (render NOTHING). */
+  badge: string | null;
+  level: string;
+  /** 'covered' = we hold an editorial opinion; 'uncovered' = no opinion, NOT negative. */
+  coverage: 'covered' | 'uncovered';
+}
+
+/**
+ * SAT-friendliness EDITORIAL SIGNAL (P0 decision, 2026-09-12 — Option B).
+ *
+ * This is an EDITORIAL / HEURISTIC label, NOT a measured score. The underlying
+ * src/data/agency-sat-friendliness.json is a frozen hand-authored set covering
+ * 19 agencies of ~250-307; it has no producer and cannot be reproduced. Customer
+ * output is therefore LABEL-ONLY ("Easy Entry" / "SAT-Friendly") and no
+ * percentage is ever rendered.
+ *
+ * RULES (docs/data-core-p0-decisions-approved.md):
+ *   - never render a percentage to a customer
+ *   - never imply the label is statistically derived
+ *   - ABSENCE OF A LABEL IS NOT NEGATIVE EVIDENCE: the other ~230+ agencies are
+ *     simply uncovered, not "unfriendly". Callers render nothing when badge is null.
+ *   - a reproducible derivation exists at reports/generate-all/route.ts:871
+ *     (satPercent = satCount/totalCount from live award data); replacing this
+ *     frozen set with it is the approved LONG-TERM target, not done here.
+ */
+export function getSatBadgeForAgency(agencyName: string): SatEditorialSignal {
+  // `coverage: 'uncovered'` — NOT "low", NOT 0. An agency we have no editorial
+  // opinion about must never be reported as unfriendly (Bug Prevention Rule #11:
+  // unknown is not zero).
+  if (!agencyName) return { badge: null, level: 'unknown', coverage: 'uncovered' };
+
+  const agencies = agencySatData.agencies as Record<string, SatAgencyInfo>;
+  const normalizedAgency = agencyName.toUpperCase().trim();
+
+  // Try exact match first
+  if (agencies[normalizedAgency]) {
+    const data = agencies[normalizedAgency];
+    return { badge: data.badge, level: data.level, coverage: 'covered' };
+  }
+
+  // Try partial matching for common variations
+  for (const [key, data] of Object.entries(agencies)) {
+    const keyWords = key.split(/[\s,]+/).filter(w => w.length > 3);
+    const agencyWords = normalizedAgency.split(/[\s,]+/).filter(w => w.length > 3);
+
+    if (normalizedAgency.includes(key) || key.includes(normalizedAgency)) {
+      return { badge: data.badge, level: data.level, coverage: 'covered' };
+    }
+
+    // BUG FIXED (P0 repair, 2026-09-12): this previously matched on >= 1 shared
+    // word, so ANY agency name containing "DEPARTMENT" inherited the first
+    // DEPARTMENT entry's badge — e.g. an uncovered Department of Commerce would
+    // render Veterans Affairs' "Easy Entry". That is the inverse of the approved
+    // rule: absence of an editorial opinion was rendering as a POSITIVE claim
+    // about a different agency. Generic org words are now stopworded and a match
+    // requires a DISTINCTIVE shared word.
+    const GENERIC = new Set(['DEPARTMENT', 'DEPT', 'OFFICE', 'AGENCY', 'ADMINISTRATION',
+      'BUREAU', 'FEDERAL', 'NATIONAL', 'UNITED', 'STATES', 'SERVICE', 'SERVICES',
+      'COMMISSION', 'AUTHORITY', 'CENTER', 'CENTRE', 'GENERAL']);
+    const distinctiveKeyWords = keyWords.filter(w => !GENERIC.has(w));
+    const distinctiveAgencyWords = agencyWords.filter(w => !GENERIC.has(w));
+    const matchingWords = distinctiveKeyWords.filter(kw =>
+      distinctiveAgencyWords.some(aw => aw.includes(kw) || kw.includes(aw)));
+    if (matchingWords.length >= 1 && distinctiveKeyWords.length > 0) {
+      return { badge: data.badge, level: data.level, coverage: 'covered' };
+    }
+  }
+
+  return { badge: null, level: 'unknown', coverage: 'uncovered' };
+}
+
+export function getDaysUntil(dateString: string): number {
+  if (!dateString) return 999;
+  const target = new Date(dateString);
+  const today = new Date();
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function formatSamDate(isoDateString: string): string {
+  if (!isoDateString) return 'TBD';
+  try {
+    const date = new Date(isoDateString);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    let tz = 'ET';
+    if (isoDateString.includes('-04:00') || isoDateString.includes('-0400')) tz = 'EDT';
+    else if (isoDateString.includes('-05:00') || isoDateString.includes('-0500')) tz = 'EST';
+    else if (isoDateString.includes('Z')) tz = 'UTC';
+    return `${month} ${day}, ${year} ${hours}:${minutes} ${ampm} ${tz}`;
+  } catch {
+    return isoDateString;
+  }
+}
+
+export function escapeHtml(text: string): string {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+interface StrategicScoreResult {
+  score: number;
+  summary: string;
+}
+
+function normalizeTextList(values: string[] | undefined): string[] {
+  return Array.isArray(values)
+    ? values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+}
+
+function scoreNoticeType(noticeType: string | undefined): { score: number; label: string } {
+  const type = (noticeType || '').toLowerCase();
+
+  if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+    return { score: 35, label: 'Open market research window' };
+  }
+
+  if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+    return { score: 28, label: 'Presolicitation positioning window' };
+  }
+
+  if (type.includes('combined')) {
+    return { score: 18, label: 'Combined synopsis/solicitation' };
+  }
+
+  if (type.includes('rfq') || type.includes('quote')) {
+    return { score: 16, label: 'RFQ with near-term action' };
+  }
+
+  if (type.includes('solicitation') || type.includes('rfp')) {
+    return { score: 14, label: 'Active solicitation' };
+  }
+
+  return { score: 8, label: 'Active federal opportunity' };
+}
+
+function scoreNaicsFit(oppNaics: string | undefined, userNaics: string[]): { score: number; label: string } {
+  if (!oppNaics || userNaics.length === 0) {
+    return { score: 6, label: 'General profile alignment' };
+  }
+
+  if (userNaics.includes(oppNaics)) {
+    return { score: 18, label: 'Exact NAICS match' };
+  }
+
+  const oppPrefix = oppNaics.slice(0, 4);
+  if (oppPrefix && userNaics.some(code => code.startsWith(oppPrefix) || oppNaics.startsWith(code.slice(0, 4)))) {
+    return { score: 12, label: 'Related NAICS match' };
+  }
+
+  const oppSector = oppNaics.slice(0, 2);
+  if (oppSector && userNaics.some(code => code.startsWith(oppSector))) {
+    return { score: 7, label: 'Same NAICS sector' };
+  }
+
+  return { score: 0, label: 'Weak NAICS fit' };
+}
+
+function scoreAgencyFit(agency: string | undefined, targetAgencies: string[]): { score: number; label: string } {
+  if (!agency || targetAgencies.length === 0) {
+    return { score: 0, label: 'No explicit agency target' };
+  }
+
+  const normalizedAgency = agency.toLowerCase();
+  const match = targetAgencies.find(target =>
+    normalizedAgency.includes(target.toLowerCase()) || target.toLowerCase().includes(normalizedAgency)
+  );
+
+  if (match) {
+    return { score: 14, label: `Target agency match: ${match}` };
+  }
+
+  return { score: 0, label: 'New agency' };
+}
+
+function scoreKeywordFit(opportunity: SAMOpportunity, keywords: string[]): { score: number; label: string } {
+  if (keywords.length === 0) {
+    return { score: 0, label: 'No strategic keywords configured' };
+  }
+
+  const searchableText = `${opportunity.title} ${opportunity.description || ''}`.toLowerCase();
+  const matches = keywords.filter(keyword => searchableText.includes(keyword.toLowerCase()));
+
+  if (matches.length >= 3) {
+    return { score: 15, label: `Strong keyword match: ${matches.slice(0, 3).join(', ')}` };
+  }
+
+  if (matches.length >= 1) {
+    return { score: 8, label: `Keyword match: ${matches.slice(0, 2).join(', ')}` };
+  }
+
+  return { score: 0, label: 'No keyword overlap' };
+}
+
+const BUSINESS_DESCRIPTION_STOP_WORDS = new Set([
+  'about', 'after', 'also', 'and', 'are', 'business', 'company', 'does', 'for',
+  'from', 'government', 'help', 'into', 'our', 'provide', 'provides', 'providing',
+  'services', 'support', 'that', 'the', 'their', 'this', 'through', 'with', 'your',
+]);
+
+function extractBusinessDescriptionTerms(description?: string): string[] {
+  if (!description) return [];
+
+  return Array.from(new Set(
+    description
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .map(term => term.trim())
+      .filter(term => term.length >= 4 && !BUSINESS_DESCRIPTION_STOP_WORDS.has(term))
+  )).slice(0, 20);
+}
+
+function scoreBusinessDescriptionFit(opportunity: SAMOpportunity, descriptionTerms: string[]): { score: number; label: string } {
+  if (descriptionTerms.length === 0) {
+    return { score: 0, label: 'No business description configured' };
+  }
+
+  const searchableText = `${opportunity.title} ${opportunity.description || ''}`.toLowerCase();
+  const matches = descriptionTerms.filter(term => searchableText.includes(term));
+
+  if (matches.length >= 3) {
+    return { score: 12, label: `Business description match: ${matches.slice(0, 3).join(', ')}` };
+  }
+
+  if (matches.length >= 1) {
+    return { score: 6, label: `Business description signal: ${matches.slice(0, 2).join(', ')}` };
+  }
+
+  return { score: 0, label: 'No business description overlap' };
+}
+
+function normalizeBusinessTypePreference(businessType: string | null | undefined): string | null {
+  if (!businessType) return null;
+
+  const normalized = businessType.toLowerCase().trim();
+  if (!normalized) return null;
+
+  if (normalized === 'small business') return 'small-business';
+  if (normalized === 'sdvosb') return 'sdvosb';
+  if (normalized === 'vosb') return 'vosb';
+  if (normalized === '8a' || normalized === '8(a)') return '8a';
+  if (normalized === 'wosb') return 'wosb';
+  if (normalized === 'edwosb') return 'edwosb';
+  if (normalized === 'hubzone') return 'hubzone';
+
+  return normalized;
+}
+
+function scoreSetAside(
+  setAside: string | null | undefined,
+  preferredBusinessType?: string
+): { score: number; label: string } {
+  const preferred = normalizeBusinessTypePreference(preferredBusinessType);
+
+  if (!setAside) {
+    if (preferred && preferred !== 'small-business') {
+      return { score: 5, label: 'Full and open opportunity stays in play' };
+    }
+    return { score: 4, label: 'Full and open opportunity' };
+  }
+
+  const normalized = setAside.toLowerCase();
+
+  if (preferred) {
+    if (preferred === 'small-business') {
+      if (normalized.includes('small')) {
+        return { score: 14, label: `Matches your small-business preference: ${setAside}` };
+      }
+      return { score: 6, label: `Full and open / unrestricted lane: ${setAside}` };
+    }
+
+    const preferenceMatchers: Record<string, string[]> = {
+      sdvosb: ['sdvosb', 'service-disabled veteran'],
+      vosb: ['vosb', 'veteran-owned'],
+      '8a': ['8(a)', '8a'],
+      wosb: ['wosb', 'woman-owned'],
+      edwosb: ['edwosb', 'economically disadvantaged women-owned'],
+      hubzone: ['hubzone'],
+    };
+
+    const matchesPreference = (preferenceMatchers[preferred] || []).some(token => normalized.includes(token));
+    if (matchesPreference) {
+      return { score: 18, label: `Matches your ${preferredBusinessType} preference: ${setAside}` };
+    }
+
+    if (normalized.includes('small')) {
+      return { score: 10, label: `General small-business lane: ${setAside}` };
+    }
+
+    return { score: 6, label: `Alternate competition lane: ${setAside}` };
+  }
+
+  if (normalized.includes('8') || normalized.includes('sdvosb') || normalized.includes('wosb') || normalized.includes('hub')) {
+    return { score: 12, label: `Set-aside opportunity: ${setAside}` };
+  }
+
+  if (normalized.includes('small')) {
+    return { score: 10, label: `Small business set-aside: ${setAside}` };
+  }
+
+  return { score: 6, label: `Restricted opportunity: ${setAside}` };
+}
+
+function scoreTiming(deadline: string): { score: number; label: string } {
+  const daysRemaining = getDaysUntil(deadline);
+
+  if (daysRemaining < 0) {
+    return { score: -20, label: 'Deadline has passed' };
+  }
+
+  if (daysRemaining <= 2) {
+    return { score: 4, label: 'Very short response window' };
+  }
+
+  if (daysRemaining <= 7) {
+    return { score: 14, label: 'Immediate action window' };
+  }
+
+  if (daysRemaining <= 21) {
+    return { score: 18, label: 'Strong action window' };
+  }
+
+  if (daysRemaining <= 45) {
+    return { score: 12, label: 'Good time to position' };
+  }
+
+  return { score: 6, label: 'Longer-term opportunity' };
+}
+
+function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStrategicRankingContext): StrategicScoreResult {
+  const naicsCodes = normalizeTextList(context?.naicsCodes);
+  const agencies = normalizeTextList(context?.agencies);
+  const keywords = normalizeTextList(context?.keywords);
+  const descriptionTerms = extractBusinessDescriptionTerms(context?.businessDescription);
+  const businessType = context?.businessType;
+
+  const noticeTypeFactor = scoreNoticeType(opportunity.noticeType);
+  const naicsFactor = scoreNaicsFit(opportunity.naicsCode, naicsCodes);
+  const agencyFactor = scoreAgencyFit(opportunity.department || opportunity.subTier, agencies);
+  const keywordFactor = scoreKeywordFit(opportunity, keywords);
+  const descriptionFactor = scoreBusinessDescriptionFit(opportunity, descriptionTerms);
+  const setAsideFactor = scoreSetAside(opportunity.setAsideDescription || opportunity.setAside, businessType);
+  const timingFactor = scoreTiming(opportunity.responseDeadline);
+  const feedbackFactor = scoreOpportunityWithMindyFeedback({
+    opportunityId: opportunity.noticeId,
+    title: opportunity.title,
+    agency: opportunity.department || opportunity.subTier,
+    naicsCode: opportunity.naicsCode,
+  }, context?.feedbackSignals);
+
+  const totalScore =
+    noticeTypeFactor.score +
+    naicsFactor.score +
+    agencyFactor.score +
+    keywordFactor.score +
+    descriptionFactor.score +
+    setAsideFactor.score +
+    timingFactor.score +
+    feedbackFactor.adjustment;
+
+  const topReasons = [
+    noticeTypeFactor,
+    naicsFactor,
+    agencyFactor,
+    keywordFactor,
+    descriptionFactor,
+    setAsideFactor,
+    timingFactor,
+    ...(feedbackFactor.adjustment > 0
+      ? feedbackFactor.reasons.map(label => ({ score: feedbackFactor.adjustment, label }))
+      : []),
+  ]
+    .filter(factor => factor.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map(factor => factor.label.toLowerCase());
+
+  const summary = topReasons.length > 0
+    ? `${topReasons.join(' • ')}.`
+    : 'Active opportunity worth a quick review.';
+
+  return {
+    score: totalScore,
+    summary: summary.charAt(0).toUpperCase() + summary.slice(1),
+  };
+}
+
+function buildNoticeSummary(opportunities: SAMOpportunity[]): NoticeSummary {
+  const summary: NoticeSummary = {
+    totalMatched: opportunities.length,
+    rfp: 0,
+    rfq: 0,
+    sourcesSought: 0,
+    preSol: 0,
+    combined: 0,
+    other: 0,
+  };
+
+  for (const opp of opportunities) {
+    const type = (opp.noticeType || '').toLowerCase();
+    if (type.includes('solicitation') || type.includes('rfp')) {
+      summary.rfp++;
+    } else if (type.includes('rfq') || type.includes('quote')) {
+      summary.rfq++;
+    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+      summary.sourcesSought++;
+    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+      summary.preSol++;
+    } else if (type.includes('combined')) {
+      summary.combined++;
+    } else {
+      summary.other++;
+    }
+  }
+
+  return summary;
+}
+
+// ============ BRIEFING GENERATOR (WITH ANTHROPIC) ============
+
+/**
+ * @deprecated DO NOT USE IN CRONS - Takes ~4 seconds per call (Claude API)
+ *
+ * For batch sending, use pre-computed templates from `briefing_templates` table
+ * with `generateAIEmailTemplate()` from `ai-email-template.ts`
+ *
+ * This function is only for:
+ * - Admin testing (single user)
+ * - Manual trigger endpoints
+ * - Template pre-computation (precompute-briefings cron)
+ */
+/**
+ * WINNABILITY GUARD (2026-08-19) — a DETERMINISTIC backstop, not a prompt rule.
+ *
+ * The LLM assessment path is fed the NOTICE ONLY: no past performance, no capabilities,
+ * no certifications, no vault. It therefore cannot know whether a reader can win anything.
+ * The prompt now forbids winnability language, but a prompt is a request, not a guarantee
+ * (this repo already learned that with the fact-guard: "prompt rules REDUCE invented facts
+ * but don't guarantee zero"). So any sentence that CLAIMS fit or odds is replaced with the
+ * honest deterministic summary instead of being shipped to a paying subscriber.
+ *
+ * ⚠️ This is the same class as the fabricated-agency bug: a confident sentence about a real
+ * business decision, generated from data that cannot support it.
+ */
+const WINNABILITY_CLAIM =
+  /\b(winnable|easy win|quick win|good fit|great fit|well[- ]suited|well[- ]positioned|strong candidate|ideal (?:for|candidate)|low competition|little competition|favou?rable odds|high (?:chance|probability)|you (?:should|can) win|perfect (?:for|match))\b/i;
+
+export function stripWinnabilityClaim(sentence: string, fallback: string): string {
+  const s = String(sentence || '').trim();
+  if (!s) return fallback;
+  return WINNABILITY_CLAIM.test(s) ? fallback : s;
+}
+
+export async function generateDailyBriefFromSam(samOpportunities: SAMOpportunity[]): Promise<SamDailyBriefing> {
+  // GUARD: Warn if called in what looks like a batch context
+  if (process.env.VERCEL_ENV === 'production') {
+    console.warn('[PERF WARNING] generateDailyBriefFromSam called - this is SLOW (~4s). For batch use templates!');
+  }
+  // Sort by deadline (soonest first) and filter active
+  const sorted = [...samOpportunities]
+    .filter(o => o.active && o.responseDeadline)
+    .sort((a, b) => new Date(a.responseDeadline).getTime() - new Date(b.responseDeadline).getTime())
+    .slice(0, 10);
+
+  // Ask Claude for strategic analysis of each opportunity
+  const anthropicKey = process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+  let assessmentsMap: Record<string, string> = {};
+  let actionTips: string[] = [];
+
+  if (anthropicKey && sorted.length > 0) {
+    try {
+      const anthropic = new Anthropic({ apiKey: anthropicKey });
+
+      const prompt = `You are a senior GovCon capture strategist. Analyze these ACTIVE SAM.gov solicitations and provide quick win assessments.
+
+ACTIVE SOLICITATIONS (FROM SAM.gov):
+${JSON.stringify(sorted.map(o => ({
+  title: o.title,
+  agency: o.department,
+  naics: o.naicsCode,
+  setAside: o.setAsideDescription || 'Full & Open',
+  deadline: o.responseDeadline,
+  type: o.noticeType,
+  description: o.description?.slice(0, 300),
+})), null, 2)}
+
+For each opportunity, generate a "quickWinAssessment" - ONE sentence that describes ONLY
+what is observable in the notice fields given above.
+
+⚠️ HARD CONSTRAINT (2026-08-19). You are given the NOTICE ONLY. You do NOT know the
+reader's company: no past performance, no capabilities, no certifications, no size, no
+vault. Therefore you MUST NOT assess winnability, fit, odds, advantage, or readiness.
+- NEVER say an opportunity is "winnable", "a good fit", "well-suited", "an easy win",
+  "low competition", or that the reader is "well-positioned" / "a strong candidate".
+- NEVER infer teaming needs, incumbency, or set-aside advantage for THIS reader.
+- ONLY restate observable notice facts: notice type, set-aside as posted, deadline
+  proximity, and what the work is.
+A sentence a stranger could write from the notice alone is correct. Anything that implies
+knowledge of the reader's company is a fabricated claim about a real business decision.
+
+Also provide 3 "actionTips" - brief actionable advice for this batch of opportunities.
+
+Return JSON:
+{
+  "assessments": [
+    { "title": "exact title from input", "quickWinAssessment": "one sentence assessment" }
+  ],
+  "actionTips": ["tip 1", "tip 2", "tip 3"]
+}
+
+Return ONLY valid JSON.`;
+
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const text = message.content[0].type === 'text' ? message.content[0].text : '';
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const data = JSON.parse(jsonMatch[0]);
+        assessmentsMap = Object.fromEntries(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (data.assessments || []).map((a: any) => [a.title, a.quickWinAssessment])
+        );
+        actionTips = data.actionTips || [];
+      }
+    } catch (err) {
+      console.error('[SamGreenTemplate] Claude analysis error:', err);
+    }
+  }
+
+  // Build the briefing
+  const opportunities: SamDailyOpportunity[] = sorted.slice(0, 5).map((opp, idx) => {
+    const buyer = getBuyerAgencyParts({
+      department: opp.department,
+      subTier: opp.subTier,
+      office: opp.office,
+    });
+    return {
+      rank: idx + 1,
+      title: opp.title,
+      agency: buyer.primary || 'Federal',
+      parentAgency: buyer.parent,
+      buyerOffice: buyer.secondary,
+      naicsCode: opp.naicsCode,
+      setAside: opp.setAsideDescription || opp.setAside,
+      popCity: opp.placeOfPerformance?.city,
+      popState: opp.placeOfPerformance?.state,
+      popZip: opp.placeOfPerformance?.zip,
+      popCountry: opp.placeOfPerformance?.country,
+      responseDeadline: formatSamDate(opp.responseDeadline),
+      daysRemaining: getDaysUntil(opp.responseDeadline),
+      noticeType: opp.noticeType,
+      solicitationNumber: opp.solicitationNumber,
+      samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+      // The LLM sentence is only used when it makes NO claim about the reader's odds;
+      // otherwise the honest notice-level fallback ships instead.
+      quickWinAssessment: stripWinnabilityClaim(
+        assessmentsMap[opp.title],
+        'Active opportunity matching your NAICS - review requirements and deadline.',
+      ),
+      postedDate: formatSamDate(opp.postedDate),
+    };
+  });
+
+  // Deadlines this week
+  const weekFromNow = 7;
+  const deadlinesThisWeek = sorted
+    .filter(o => getDaysUntil(o.responseDeadline) <= weekFromNow && getDaysUntil(o.responseDeadline) >= 0)
+    .map(o => {
+      const buyer = getBuyerAgencyParts({
+        department: o.department,
+        subTier: o.subTier,
+        office: o.office,
+      });
+      return {
+        title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
+        fullTitle: o.title,
+        // Format the deadline (was raw ISO — rendered inconsistently next to
+        // the formatted `opportunities` list). responseDeadline mirrors it so
+        // consumers reading either key get the same formatted value.
+        deadline: formatSamDate(o.responseDeadline),
+        responseDeadline: formatSamDate(o.responseDeadline),
+        daysRemaining: getDaysUntil(o.responseDeadline),
+        samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+        noticeType: o.noticeType || 'Notice',
+        noticeId: o.solicitationNumber || o.noticeId || '',
+        solicitationNumber: o.solicitationNumber,
+        agency: buyer.primary,
+        parentAgency: buyer.parent,
+        buyerOffice: buyer.secondary,
+        naicsCode: o.naicsCode || '',
+        // Prefer the human-readable set-aside DESCRIPTION (e.g. "Total Small
+        // Business Set-Aside (FAR 19.5)") like the rich opportunities list —
+        // the short `setAside` code is often empty, which left these cards
+        // with no Industry/Set-Aside line.
+        setAside: o.setAsideDescription || o.setAside || '',
+        popCity: o.placeOfPerformance?.city,
+        popState: o.placeOfPerformance?.state,
+        popZip: o.placeOfPerformance?.zip,
+        popCountry: o.placeOfPerformance?.country,
+      };
+    });
+
+  // Count notice types for summary
+  const noticeSummary = buildNoticeSummary(sorted);
+
+  return {
+    date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+    opportunities,
+    deadlinesThisWeek,
+    actionTips: actionTips.length > 0 ? actionTips : [
+      'Review solicitation documents within 48 hours of receiving this brief',
+      'Identify teaming partners for larger opportunities',
+      'Check SAM.gov for amendments and Q&A updates',
+    ],
+    noticeSummary,
+  };
+}
+
+// ============ BUILD BRIEFING FROM RAW OPPORTUNITIES (NO AI) ============
+
+export function buildSamGreenBriefing(
+  opportunities: SAMOpportunity[],
+  context?: SamStrategicRankingContext,
+  noticeSummaryOverride?: NoticeSummary
+): SamDailyBriefing {
+  // Fast deterministic strategic ranking for beta delivery.
+  // This keeps the hot path fast while improving over pure deadline sorting.
+  const ranked = [...opportunities]
+    .filter(o => o.active && o.responseDeadline)
+    .map(opportunity => ({
+      opportunity,
+      strategic: buildStrategicAssessment(opportunity, context),
+    }))
+    .sort((a, b) => {
+      if (b.strategic.score !== a.strategic.score) {
+        return b.strategic.score - a.strategic.score;
+      }
+      return new Date(a.opportunity.responseDeadline).getTime() - new Date(b.opportunity.responseDeadline).getTime();
+    })
+    .slice(0, 10);
+
+  const sorted = ranked.map(entry => entry.opportunity);
+
+  const briefingOpportunities: SamDailyOpportunity[] = ranked.slice(0, 5).map(({ opportunity: opp, strategic }, idx) => {
+    const buyer = getBuyerAgencyParts({
+      department: opp.department,
+      subTier: opp.subTier,
+      office: opp.office,
+    });
+    return {
+      rank: idx + 1,
+      title: opp.title,
+      agency: buyer.primary || 'Federal',
+      parentAgency: buyer.parent,
+      buyerOffice: buyer.secondary,
+      naicsCode: opp.naicsCode,
+      setAside: opp.setAsideDescription || opp.setAside,
+      popCity: opp.placeOfPerformance?.city,
+      popState: opp.placeOfPerformance?.state,
+      popZip: opp.placeOfPerformance?.zip,
+      popCountry: opp.placeOfPerformance?.country,
+      responseDeadline: formatSamDate(opp.responseDeadline),
+      daysRemaining: getDaysUntil(opp.responseDeadline),
+      noticeType: opp.noticeType,
+      solicitationNumber: opp.solicitationNumber,
+      samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+      quickWinAssessment: strategic.summary,
+      postedDate: formatSamDate(opp.postedDate),
+    };
+  });
+
+  const weekFromNow = 7;
+  const deadlinesThisWeek = sorted
+    .filter(o => getDaysUntil(o.responseDeadline) <= weekFromNow && getDaysUntil(o.responseDeadline) >= 0)
+    .map(o => {
+      const buyer = getBuyerAgencyParts({
+        department: o.department,
+        subTier: o.subTier,
+        office: o.office,
+      });
+      return {
+        title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
+        fullTitle: o.title,
+        // Format the deadline (was raw ISO — rendered inconsistently next to
+        // the formatted `opportunities` list). responseDeadline mirrors it so
+        // consumers reading either key get the same formatted value.
+        deadline: formatSamDate(o.responseDeadline),
+        responseDeadline: formatSamDate(o.responseDeadline),
+        daysRemaining: getDaysUntil(o.responseDeadline),
+        samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+        noticeType: o.noticeType || 'Notice',
+        noticeId: o.solicitationNumber || o.noticeId || '',
+        solicitationNumber: o.solicitationNumber,
+        agency: buyer.primary,
+        parentAgency: buyer.parent,
+        buyerOffice: buyer.secondary,
+        naicsCode: o.naicsCode || '',
+        // Prefer the human-readable set-aside DESCRIPTION (e.g. "Total Small
+        // Business Set-Aside (FAR 19.5)") like the rich opportunities list —
+        // the short `setAside` code is often empty, which left these cards
+        // with no Industry/Set-Aside line.
+        setAside: o.setAsideDescription || o.setAside || '',
+        popCity: o.placeOfPerformance?.city,
+        popState: o.placeOfPerformance?.state,
+        popZip: o.placeOfPerformance?.zip,
+        popCountry: o.placeOfPerformance?.country,
+      };
+    });
+
+  const noticeSummary = noticeSummaryOverride || buildNoticeSummary(
+    ranked.map(entry => entry.opportunity)
+  );
+
+  return {
+    date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+    opportunities: briefingOpportunities,
+    deadlinesThisWeek,
+    actionTips: [
+      'Review solicitation documents within 48 hours of receiving this brief',
+      'Identify teaming partners for larger opportunities',
+      'Check SAM.gov for amendments and Q&A updates',
+    ],
+    noticeSummary,
+  };
+}
+
+// ============ EMAIL HTML GENERATOR ============
+
+export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?: string, trackingToken?: string): { subject: string; htmlBody: string; textBody: string } {
+  const getUrgencyColor = (days: number) => {
+    if (days <= 3) return '#dc2626';
+    if (days <= 7) return '#f97316';
+    if (days <= 14) return '#eab308';
+    return '#22c55e';
+  };
+
+  const getUrgencyLabel = (days: number) => {
+    if (days <= 0) return 'DUE TODAY';
+    if (days === 1) return 'DUE TOMORROW';
+    if (days <= 3) return 'URGENT';
+    if (days <= 7) return 'THIS WEEK';
+    return `${days} DAYS`;
+  };
+
+  const getNoticeTypeInfo = (noticeType: string): { label: string; cssClass: string } => {
+    const type = (noticeType || '').toLowerCase();
+    if (type.includes('solicitation') || type.includes('rfp')) {
+      return { label: 'RFP', cssClass: 'type-rfp' };
+    } else if (type.includes('rfq') || type.includes('quote')) {
+      return { label: 'RFQ', cssClass: 'type-rfq' };
+    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+      return { label: 'Sources Sought', cssClass: 'type-sources' };
+    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+      return { label: 'Pre-Sol', cssClass: 'type-presol' };
+    } else if (type.includes('combined')) {
+      return { label: 'Combined', cssClass: 'type-combined' };
+    }
+    return { label: 'Notice', cssClass: 'type-other' };
+  };
+
+  const getBadgeStyle = (cssClass: string): string => {
+    const styles: Record<string, string> = {
+      'type-rfp': 'background:#dbeafe;color:#1e40af;',
+      'type-rfq': 'background:#fef3c7;color:#92400e;',
+      'type-sources': 'background:#d1fae5;color:#065f46;',
+      'type-presol': 'background:#f3e8ff;color:#6b21a8;',
+      'type-combined': 'background:#fce7f3;color:#9d174d;',
+      'type-other': 'background:#f3f4f6;color:#374151;',
+    };
+    return styles[cssClass] || styles['type-other'];
+  };
+
+  const getSatBadgeStyle = (level: string): string => {
+    if (level === 'high') return 'background:#dcfce7;color:#166534;';
+    if (level === 'moderate') return 'background:#fef9c3;color:#854d0e;';
+    return 'background:#f3f4f6;color:#374151;';
+  };
+
+  const renderBadge = (label: string, style: string): string => (
+    `<span style="display:inline-block;${style}font-size:12px;line-height:16px;font-weight:700;padding:4px 8px;border-radius:6px;margin:0 6px 6px 0;white-space:nowrap;">${escapeHtml(label)}</span>`
+  );
+
+  const renderMetaRow = (label: string, value: string): string => `
+    <tr>
+      <td class="meta-cell-label" style="width:120px;padding:4px 10px 4px 0;color:#6b7280;font-size:12px;line-height:18px;text-transform:uppercase;vertical-align:top;">${label}</td>
+      <td class="meta-cell-value" style="padding:4px 0;color:#111827;font-size:14px;line-height:20px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
+    </tr>
+  `;
+
+  const renderButton = (href: string, label: string, background: string, width = 160): string => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;margin:0 8px 8px 0;">
+      <tr>
+        <td bgcolor="${background}" style="background:${background};border-radius:8px;text-align:center;">
+          <a href="${href}" target="_blank" style="display:inline-block;width:${width}px;padding:12px 0;color:#ffffff !important;text-decoration:none !important;font-size:14px;line-height:18px;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <span style="color:#ffffff !important;text-decoration:none !important;">${label}</span>
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+
+
+/**
+ * Send the reader to the MAP, filtered to this opportunity's market — not off
+ * to sam.gov.
+ *
+ * Every card in this briefing used to exit to SAM. That click leaves Mindy and
+ * does not come back, and it was the single most-used link in the product
+ * (143 of 199 tracked opportunity clicks). The map is the surface people
+ * return to, so the briefing's job is to land them there with a filter already
+ * applied.
+ *
+ * Never a bare /opportunity-map — that is 136K unfiltered pins and no answer,
+ * the same rule the saved-search email enforces via ?ss=.
+ */
+function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: string; popState?: string }): string {
+  const p = new URLSearchParams();
+  if (opp.naicsCode) p.set('naics', opp.naicsCode);
+  if (opp.agency) p.set('subAgency', opp.agency);
+  else if (opp.parentAgency) p.set('agency', opp.parentAgency);
+  if (opp.popState) p.set('state', opp.popState);
+  const q = p.toString();
+  return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
+}
+
+  const renderOpportunityCard = (opp: SamDailyOpportunity): string => {
+    const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
+    const satInfo = getSatBadgeForAgency(opp.agency);
+    const mapHref = trackingToken ? generateTrackedLink(trackingToken, mapHrefFor(opp), 'open_in_map') : mapHrefFor(opp);
+    const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}`;
+    const badges = [
+      renderBadge(oppTypeInfo.label, getBadgeStyle(oppTypeInfo.cssClass)),
+      satInfo.badge ? renderBadge(satInfo.badge, getSatBadgeStyle(satInfo.level)) : '',
+      renderBadge(getUrgencyLabel(opp.daysRemaining), `background:${getUrgencyColor(opp.daysRemaining)};color:#ffffff;`),
+    ].join('');
+
+    return `
+      <div class="opp-card">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="width:36px;vertical-align:top;padding:0 10px 10px 0;">
+              <div style="width:30px;height:30px;border-radius:18px;background:#059669;color:#ffffff;text-align:center;font-size:14px;line-height:30px;font-weight:700;">${opp.rank}</div>
+            </td>
+            <td style="vertical-align:top;padding:0 0 10px 0;">
+              <h3 style="font-size:18px;line-height:24px;font-weight:800;color:#111827;margin:0 0 10px 0;">${escapeHtml(opp.title)}</h3>
+              <div style="line-height:22px;">${badges}</div>
+            </td>
+          </tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 12px 0;">
+          ${renderMetaRow('Buyer', opp.agency)}
+          ${opp.buyerOffice ? renderMetaRow('Office', opp.buyerOffice) : ''}
+          ${opp.parentAgency ? renderMetaRow('Parent', opp.parentAgency) : ''}
+          ${renderMetaRow('Posted', opp.postedDate)}
+          ${renderMetaRow('Response Due', opp.responseDeadline)}
+          ${renderMetaRow('NAICS', opp.naicsCode)}
+          ${renderMetaRow('Set-Aside', opp.setAside || 'Full & Open')}
+        </table>
+
+        <!-- "Quick Win Assessment" was renamed 2026-08-19 (Eric): it sounded like win
+             PROBABILITY, which is stronger than the evidence supports. "WHY IT RANKED" is
+             mechanically truthful — strategic.summary is literally the top-2 scoring
+             factors that produced this position. Mindy never claims you will win; it says
+             why these deserve attention first. -->
+        <div class="assessment-box">
+          <div class="assessment-label">Why it ranked #${opp.rank}</div>
+          <p class="assessment-text">${escapeHtml(opp.quickWinAssessment)}</p>
+        </div>
+
+        <div style="margin-top:14px;">
+          ${renderButton(mapHref, 'See it on the map ->', '#059669', 190)}
+          ${userEmail ? renderButton(muteHref, 'Not Interested', '#475569', 150) : ''}
+        </div>
+      </div>
+    `;
+  };
+
+  const renderDeadlineItem = (d: SamDailyBriefing['deadlinesThisWeek'][number]): string => {
+    const typeInfo = getNoticeTypeInfo(d.noticeType);
+    const satInfo = getSatBadgeForAgency(d.agency);
+    const mapHref = trackingToken ? generateTrackedLink(trackingToken, mapHrefFor(d), 'open_in_map_deadline') : mapHrefFor(d);
+    const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}`;
+    const daysLabel = d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : `${d.daysRemaining} days`;
+    const badges = [
+      renderBadge(typeInfo.label, getBadgeStyle(typeInfo.cssClass)),
+      satInfo.badge ? renderBadge(satInfo.badge, getSatBadgeStyle(satInfo.level)) : '',
+    ].join('');
+
+    return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px dashed #fcd34d;">
+        <tr>
+          <td style="padding:14px 0 8px 0;color:#78350f;font-size:16px;line-height:22px;font-weight:700;">
+            ${escapeHtml(d.title)}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 0 8px 0;line-height:22px;">
+            ${badges}
+            <span style="display:inline-block;background:${getUrgencyColor(d.daysRemaining)};color:#ffffff;font-size:13px;line-height:18px;font-weight:800;padding:6px 10px;border-radius:7px;margin:0 6px 6px 0;white-space:nowrap;">${daysLabel}</span>
+          </td>
+        </tr>
+        ${userEmail ? `
+        <tr>
+          <td style="padding:0 0 14px 0;">
+            ${renderButton(mapHref, 'View ->', '#059669', 96)}
+            ${renderButton(muteHref, 'Not Interested', '#475569', 132)}
+          </td>
+        </tr>
+        ` : ''}
+      </table>
+    `;
+  };
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Declare a light-only design. Without this, mobile clients (esp. Apple Mail)
+       auto-invert the email: the white card goes near-black but the dark value
+       text (#111827) and gray labels (#6b7280) DON'T invert cleanly → "BUYER /
+       POSTED" labels and values vanished on dark backgrounds (Eric, mobile QA). -->
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>Daily Brief - Active Solicitations</title>
+  <style>
+    :root { color-scheme: light only; supported-color-schemes: light only; }
+    /* Belt-and-suspenders: if a client still forces dark, pin the text colors so
+       the meta labels/values keep contrast instead of disappearing. */
+    @media (prefers-color-scheme: dark) {
+      .container { background: #ffffff !important; }
+      .meta-cell-label { color: #6b7280 !important; }
+      .meta-cell-value { color: #111827 !important; }
+      .opp-title, .opp-meta-value { color: #111827 !important; }
+    }
+    /* Outlook.com / Gmail dark-mode wrap these attrs around inverted nodes. */
+    [data-ogsc] .meta-cell-value, [data-ogsb] .meta-cell-value { color: #111827 !important; }
+    [data-ogsc] .meta-cell-label, [data-ogsb] .meta-cell-label { color: #6b7280 !important; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; }
+    .container { max-width: 680px; margin: 0 auto; background: #ffffff; }
+    .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 26px; font-weight: 700; }
+    .header p { margin: 12px 0 0; font-size: 15px; opacity: 0.95; }
+    .header-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; margin-top: 12px; }
+    .section { padding: 24px; }
+    .section-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb; }
+    .section-header h2 { margin: 0; font-size: 16px; color: #059669; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .opp-card { background: #f9fafb; border-radius: 10px; padding: 20px; margin-bottom: 16px; border-left: 4px solid #059669; }
+    .opp-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .opp-rank { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #059669; color: white; border-radius: 50%; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    .opp-title { font-size: 15px; font-weight: 700; color: #111827; margin: 0; flex: 1; padding-left: 10px; }
+    .opp-type-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+    .urgency-badge { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; color: white; white-space: nowrap; }
+    .opp-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; font-size: 13px; }
+    .opp-meta-item { display: flex; flex-direction: column; }
+    .opp-meta-label { color: #6b7280; font-size: 11px; text-transform: uppercase; }
+    .opp-meta-value { color: #111827; font-weight: 600; }
+    .assessment-box { background: #ecfdf5; border-radius: 6px; padding: 12px; margin: 12px 0; }
+    .assessment-label { font-size: 11px; color: #047857; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+    .assessment-text { font-size: 14px; color: #065f46; margin: 0; line-height: 1.5; }
+    .sam-link { display: inline-block; background: #059669; color: white; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; margin-top: 12px; }
+    .sam-link:hover { background: #047857; }
+    .deadline-section { background: #fef3c7; border-radius: 8px; padding: 16px; margin-top: 16px; }
+    .deadline-header { font-size: 14px; font-weight: 700; color: #92400e; margin: 0 0 12px; }
+    .deadline-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #fcd34d; }
+    .deadline-item:last-child { border-bottom: none; }
+    .deadline-title { font-size: 13px; color: #78350f; flex: 1; }
+    .deadline-days { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; color: white; }
+    .tips-section { background: #eff6ff; border-radius: 8px; padding: 16px; margin-top: 16px; }
+    .tips-header { font-size: 14px; font-weight: 700; color: #1e40af; margin: 0 0 12px; }
+    .tip-item { font-size: 13px; color: #1e3a8a; padding: 6px 0; padding-left: 20px; position: relative; }
+    .tip-item:before { content: "✓"; position: absolute; left: 0; color: #3b82f6; font-weight: bold; }
+    .footer { background: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb; }
+    .footer p { margin: 0 0 8px; font-size: 12px; color: #6b7280; }
+    .footer a { color: #059669; text-decoration: none; }
+    .source-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+    .notice-summary { background: #f0f9ff; padding: 16px; margin: 0; border-bottom: 1px solid #bae6fd; }
+    .notice-summary-title { font-size: 12px; font-weight: 700; color: #0369a1; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .notice-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .notice-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 16px; font-size: 12px; font-weight: 600; }
+    .notice-pill-count { margin-right: 4px; }
+    .pill-rfp { background: #dbeafe; color: #1e40af; }
+    .pill-rfq { background: #fef3c7; color: #92400e; }
+    .pill-sources { background: #d1fae5; color: #065f46; }
+    .pill-presol { background: #f3e8ff; color: #6b21a8; }
+    .pill-combined { background: #fce7f3; color: #9d174d; }
+    .pill-other { background: #f3f4f6; color: #374151; }
+    .deadline-type { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+    .type-rfp { background: #dbeafe; color: #1e40af; }
+    .type-rfq { background: #fef3c7; color: #92400e; }
+    .type-sources { background: #d1fae5; color: #065f46; }
+    .type-presol { background: #f3e8ff; color: #6b21a8; }
+    .type-combined { background: #fce7f3; color: #9d174d; }
+    .type-other { background: #f3f4f6; color: #374151; }
+    .sat-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; margin-left: 4px; }
+    .sat-high { background: #dcfce7; color: #166534; }
+    .sat-moderate { background: #fef9c3; color: #854d0e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Mindy FREE PREVIEW Banner -->
+    <div style="background: linear-gradient(90deg, #7c3aed 0%, #a855f7 100%); padding: 12px 20px; text-align: center;">
+      <p style="color: white; margin: 0; font-size: 13px; font-weight: 600;">
+        ${briefing.noticeSummary?.totalMatched && briefing.noticeSummary.totalMatched > briefing.opportunities.length
+          ? `${briefing.noticeSummary.totalMatched} opportunities matched your market. Mindy ranked these ${briefing.opportunities.length} highest for today.`
+          : `Mindy ranked your ${briefing.opportunities.length} ${briefing.opportunities.length === 1 ? 'opportunity' : 'opportunities'} for today.`}
+      </p>
+    </div>
+
+    <!-- HEADER — table + inline styles + bgcolor, NOT the .header class.
+         Outlook (Windows + new Outlook) strips <style> blocks and ignores
+         linear-gradient, so the old class-based header rendered a WHITE background
+         with white text = invisible in the inbox (Eric, 2026-07-18). bgcolor gives
+         Outlook a solid green; the gradient is a progressive enhancement for
+         clients that support it; every text color is set INLINE. -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#059669" style="background:#059669;background:linear-gradient(135deg,#059669 0%,#10b981 100%);">
+      <tr>
+        <td align="center" style="padding:32px 24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+          <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;">📋 Your Daily Briefing</h1>
+          <p style="margin:12px 0 0;font-size:15px;color:#ffffff;">${briefing.date}</p>
+          <div style="display:inline-block;background:#047857;padding:6px 14px;border-radius:20px;font-size:13px;margin-top:12px;color:#ffffff;">✅ VERIFIED FROM SAM.gov</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="notice-summary">
+      <div class="notice-summary-title">📊 Notice Type Summary (${briefing.noticeSummary.totalMatched} matched active)</div>
+      <div class="notice-pills">
+        ${briefing.noticeSummary.rfp > 0 ? `<span class="notice-pill pill-rfp"><span class="notice-pill-count">${briefing.noticeSummary.rfp}</span> RFP/Solicitation</span>` : ''}
+        ${briefing.noticeSummary.rfq > 0 ? `<span class="notice-pill pill-rfq"><span class="notice-pill-count">${briefing.noticeSummary.rfq}</span> RFQ</span>` : ''}
+        ${briefing.noticeSummary.sourcesSought > 0 ? `<span class="notice-pill pill-sources"><span class="notice-pill-count">${briefing.noticeSummary.sourcesSought}</span> Sources Sought/RFI</span>` : ''}
+        ${briefing.noticeSummary.preSol > 0 ? `<span class="notice-pill pill-presol"><span class="notice-pill-count">${briefing.noticeSummary.preSol}</span> Pre-Sol</span>` : ''}
+        ${briefing.noticeSummary.combined > 0 ? `<span class="notice-pill pill-combined"><span class="notice-pill-count">${briefing.noticeSummary.combined}</span> Combined</span>` : ''}
+        ${briefing.noticeSummary.other > 0 ? `<span class="notice-pill pill-other"><span class="notice-pill-count">${briefing.noticeSummary.other}</span> Other</span>` : ''}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Start with these ${briefing.opportunities.length}</h2>
+      </div>
+      ${briefing.opportunities.map(renderOpportunityCard).join('')}
+    </div>
+
+    ${briefing.deadlinesThisWeek.length > 0 ? `
+    <div class="section" style="padding-top: 0;">
+      <div class="deadline-section">
+        <h3 class="deadline-header">⏰ DEADLINES THIS WEEK</h3>
+        ${briefing.deadlinesThisWeek.map(renderDeadlineItem).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="section" style="padding-top: 0;">
+      <div class="tips-section">
+        <h3 class="tips-header">💡 ACTION TIPS</h3>
+        ${briefing.actionTips.map(tip => `<div class="tip-item">${escapeHtml(tip)}</div>`).join('')}
+      </div>
+    </div>
+
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${trackingToken ? generateTrackedLink(trackingToken, MINDY_APP_URL, 'browse_all_opportunities') : MINDY_APP_URL}" style="display: inline-block; background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Open Mindy Dashboard →</a>
+    </div>
+    <div class="footer">
+      <p>Generated by <strong>Mindy AI</strong> | Your Federal BD Intelligence Analyst</p>
+      <span class="source-badge">Data Source: SAM.gov Opportunities API</span>
+      <p style="margin-top: 12px;"><a href="${trackingToken ? generateTrackedLink(trackingToken, MINDY_PREFERENCES_URL, 'manage_preferences') : MINDY_PREFERENCES_URL}">Manage Preferences</a> | <a href="${trackingToken ? generateTrackedLink(trackingToken, MINDY_APP_URL, 'view_dashboard') : MINDY_APP_URL}">Open Mindy Dashboard</a></p>
+    </div>
+  </div>
+  ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
+</body>
+</html>
+`;
+
+  // Plain text version
+  let textBody = `📋 ACTIVE SOLICITATIONS - BID NOW\n${briefing.date}\n${'='.repeat(50)}\n\n`;
+  textBody += `✅ Data verified from SAM.gov\n\n`;
+
+  for (const opp of briefing.opportunities) {
+    textBody += `${opp.rank}. ${opp.title}\n`;
+    textBody += `   Agency: ${opp.agency}\n`;
+    textBody += `   NAICS: ${opp.naicsCode} | Set-Aside: ${opp.setAside || 'Full & Open'}\n`;
+    textBody += `   Response Due: ${opp.responseDeadline} (${opp.daysRemaining} days remaining)\n`;
+    textBody += `   Assessment: ${opp.quickWinAssessment}\n`;
+    textBody += `   SAM.gov: ${opp.samLink}\n`;
+    if (userEmail) {
+      textBody += `   → Not Interested: ${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}\n`;
+    }
+    textBody += `\n`;
+  }
+
+  if (briefing.deadlinesThisWeek.length > 0) {
+    textBody += `\n⏰ DEADLINES THIS WEEK\n${'─'.repeat(30)}\n`;
+    for (const d of briefing.deadlinesThisWeek) {
+      textBody += `• ${d.title} - ${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining + ' days'}\n`;
+      textBody += `  SAM.gov: ${d.samLink}\n`;
+    }
+  }
+
+  textBody += `\n💡 ACTION TIPS\n${'─'.repeat(30)}\n`;
+  for (const tip of briefing.actionTips) {
+    textBody += `✓ ${tip}\n`;
+  }
+
+  const subject = `📋 ${briefing.opportunities.length} Active Solicitations - ${briefing.date.split(',')[0]}`;
+
+  return { subject, htmlBody, textBody };
+}

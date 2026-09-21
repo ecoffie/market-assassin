@@ -1,0 +1,560 @@
+/**
+ * AI Generator for Recompete Briefings
+ *
+ * Uses Groq API to generate displacement analysis, teaming plays,
+ * and content hooks in Eric's voice and style.
+ */
+
+import {
+  RecompeteOpportunity,
+  TeamingPlay,
+  MarketIntel,
+  PriorityScorecardEntry,
+  RawRecompeteData,
+  RecompeteUserProfile,
+} from './types';
+import { getAgencyAcronym, formatContractValue } from './data-aggregator';
+import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+/**
+ * Generate displacement analysis for a contract
+ */
+async function generateDisplacementAngle(
+  contract: RawRecompeteData['expiringContracts'][0],
+  newsContext: string[]
+): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return getDefaultDisplacementAngle(contract);
+  }
+
+  const prompt = `You are a GovCon capture strategist. Generate a brief "displacement angle" explaining why this federal contract incumbent is vulnerable to being replaced.
+
+Contract details:
+- Agency: ${contract.agency}
+- Incumbent: ${contract.vendorName}
+- Value: ${formatContractValue(contract.obligatedAmount)}
+- NAICS: ${contract.naicsCode} (${contract.naicsDescription})
+- Set-aside: ${contract.setAsideType || 'Full & Open'}
+- Contract ending: ${contract.currentEndDate}
+
+Recent news context:
+${newsContext.slice(0, 3).join('\n')}
+
+Write ONE sentence (max 40 words) explaining why this incumbent is vulnerable. Use insider GovCon language like:
+- "displacement angle"
+- "transition risk"
+- "incumbent fatigue"
+- "measurable outcomes"
+- "SOC modernization"
+- "automation-led"
+- "KPI-based"
+
+Examples of good displacement angles:
+- "Cyber outcomes are measurable (MTTD/MTTR, vuln closure), making 'better SOC performance + cost' a strong displacement wedge."
+- "Labor-heavy field ops + distributed execution risk across many sites creates service-level exposure for a focused challenger team."
+- "Platform concentration risk + integration dependencies create openings for modular data/interop alternatives."
+
+Return ONLY the displacement angle text, nothing else.`;
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 100,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) {
+      console.error(`[AI] Groq error: ${response.status}`);
+      return getDefaultDisplacementAngle(contract);
+    }
+
+    const data = await response.json();
+    void recordLlmUsage({
+      tool: 'briefing_recompete',
+      userEmail: null,
+      provider: 'groq',
+      model: data.model || 'llama-3.1-8b-instant',
+      usage: data.usage,
+    });
+    return data.choices[0]?.message?.content?.trim() || getDefaultDisplacementAngle(contract);
+  } catch (error) {
+    console.error('[AI] Error generating displacement angle:', error);
+    return getDefaultDisplacementAngle(contract);
+  }
+}
+
+/**
+ * Default displacement angle when AI is unavailable
+ */
+function getDefaultDisplacementAngle(contract: RawRecompeteData['expiringContracts'][0]): string {
+  const naicsPrefix = contract.naicsCode.substring(0, 3);
+
+  // NAICS-based defaults
+  const anglesByNaics: Record<string, string[]> = {
+    '541': [
+      'Professional services scope vulnerable to outcome-based challenger with measurable delivery metrics.',
+      'Advisory-heavy scope often breakable by teams with concrete implementation + transformation outcomes.',
+      'IT modernization scope rewards challengers with faster deployment velocity and security hardening.',
+    ],
+    '518': [
+      'Cloud migration scope favors vendors with AIOps + zero-trust outcomes over legacy O&M narratives.',
+      'Data center modernization creates opening for consumption-based delivery models.',
+    ],
+    '561': [
+      'Labor-intensive support scope vulnerable to automation-led cost takeout strategy.',
+      'High-volume service delivery exposed on quality metrics and throughput optimization.',
+    ],
+    '236': [
+      'Construction management scope vulnerable to schedule recovery and risk governance challengers.',
+      'Project delivery pressure creates opening for teams with strong performance-based SLA track record.',
+    ],
+  };
+
+  const angles = anglesByNaics[naicsPrefix] || [
+    'Long-running incumbent program exposed to transition risk and performance reset pressure.',
+    'Contract scope creates openings for challengers with measurable outcomes and faster delivery.',
+    'Recompete window favors teams with concrete modernization narrative and transition readiness.',
+  ];
+
+  // DETERMINISTIC, and labelled. Two separate problems were here:
+  //
+  //  1. Math.random() meant the same contract got a DIFFERENT "analysis" on every run, and
+  //     two contractors looking at the same recompete saw different explanations. Nothing
+  //     about this contract drives the choice, so the variation was pure noise presented as
+  //     insight. Now keyed off the contract so it is at least stable and reproducible.
+  //
+  //  2. It renders under "Why vulnerable (displacement angle):" in the email, next to real
+  //     researched fields (incumbent, contract value, timing), and the briefing attaches
+  //     sources: ['USASpending','GovConWire','SAM.gov']. A reader has every reason to think
+  //     this sentence came from analysing THEIR contract. It did not — it is a canned line
+  //     picked by NAICS family. The citation made it look grounded, which is worse than
+  //     saying nothing.
+  //
+  // The prefix is the fix: it is still useful general guidance, it just no longer claims to
+  // be a finding about this specific award.
+  const idx = stableIndex(`${contract.naicsCode}:${contract.currentEndDate}:${contract.vendorName ?? ''}`, angles.length);
+  return `General pattern for this industry (not specific to this award): ${angles[idx]}`;
+}
+
+/** Stable, contract-derived index — same input always yields the same angle. */
+function stableIndex(seed: string, len: number): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return Math.abs(h) % Math.max(1, len);
+}
+
+/**
+ * Generate timing signal text
+ */
+function generateTimingSignal(contract: RawRecompeteData['expiringContracts'][0]): string {
+  const endDate = new Date(contract.currentEndDate);
+  const now = new Date();
+  const daysUntil = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const monthsUntil = Math.ceil(daysUntil / 30);
+
+  // Calculate expected FY quarter
+  const expectedAwardDate = new Date(endDate);
+  expectedAwardDate.setMonth(expectedAwardDate.getMonth() - 3); // Award typically 3 months before end
+
+  const fy = expectedAwardDate.getMonth() >= 9 ? expectedAwardDate.getFullYear() + 1 : expectedAwardDate.getFullYear();
+  const fyQuarter = Math.ceil(((expectedAwardDate.getMonth() + 3) % 12 + 1) / 3);
+
+  // Format month
+  const solicitationDate = new Date(endDate);
+  solicitationDate.setMonth(solicitationDate.getMonth() - 6);
+  const solMonth = solicitationDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+  if (daysUntil < 90) {
+    return `Current contract expires ${endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}; solicitation likely imminent; award in FY${String(fy).slice(2)} Q${fyQuarter}`;
+  } else if (daysUntil < 180) {
+    return `Solicitation expected ${solMonth}; award targeted FY${String(fy).slice(2)} Q${fyQuarter}; current deal expires ${endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+  } else if (daysUntil < 365) {
+    return `Recompete planning active; solicitation expected by ${solMonth}; award projected FY${String(fy).slice(2)} Q${fyQuarter}`;
+  } else {
+    return `Long-term capture window; contract ends ${endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}; early positioning phase`;
+  }
+}
+
+/**
+ * Generate teaming plays from opportunities
+ */
+/**
+ * Real top primes for an agency from USASpending awards (Eric: ground teaming —
+ * was hardcoded "cyber → SAIC" by theme, wrong for non-IT NAICS). Returns the
+ * companies that ACTUALLY win the most in this agency.
+ */
+async function getRealPrimesForAgency(agency: string, limit = 5): Promise<string[]> {
+  try {
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/recipient/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: {
+          keywords: [agency],
+          time_period: [fiscalYearTimePeriod()],
+          award_type_codes: ['A', 'B', 'C', 'D'],
+        },
+        limit,
+      }),
+    });
+    if (!res.ok) return [];
+    const j = await res.json();
+    return (j.results || []).filter((r: { name?: string }) => r.name).map((r: { name: string }) => r.name);
+  } catch { return []; }
+}
+
+async function generateTeamingPlays(
+  opportunities: RecompeteOpportunity[]
+): Promise<TeamingPlay[]> {
+
+  // Group opportunities by theme
+  const cyberOpps = opportunities.filter(o =>
+    o.contractName.toLowerCase().includes('cyber') ||
+    o.whyVulnerable.toLowerCase().includes('soc') ||
+    o.whyVulnerable.toLowerCase().includes('security')
+  );
+
+  const itModernizationOpps = opportunities.filter(o =>
+    o.contractName.toLowerCase().includes('it') ||
+    o.contractName.toLowerCase().includes('modernization') ||
+    o.whyVulnerable.toLowerCase().includes('modernization')
+  );
+
+  const setAsideOpps = opportunities.filter(o =>
+    o.setAsideType && (
+      o.setAsideType.includes('SDVOSB') ||
+      o.setAsideType.includes('8(a)') ||
+      o.setAsideType.includes('HUBZone')
+    )
+  );
+
+  // GROUND the primes: pull the REAL top winners for each play's agency from
+  // USASpending (Eric), and ALWAYS include the actual incumbent (it's in the
+  // data). Falls back to nothing rather than a wrong hardcoded guess.
+  const primesFor = async (opps: RecompeteOpportunity[]): Promise<string[]> => {
+    if (opps.length === 0) return [];
+    const incumbents = opps.map(o => o.incumbent).filter((x): x is string => !!x && x !== 'Unknown');
+    const agency = opps[0]?.agency;
+    const realPrimes = agency ? await getRealPrimesForAgency(agency, 5) : [];
+    // Incumbent(s) first (the surest teaming target), then real top primes, deduped.
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const n of [...incumbents, ...realPrimes]) {
+      const k = n.toLowerCase().trim();
+      if (k && !seen.has(k)) { seen.add(k); out.push(n); }
+      if (out.length >= 4) break;
+    }
+    return out;
+  };
+  const [cyberPrimes, itPrimes, setAsidePrimes] = await Promise.all([
+    primesFor(cyberOpps), primesFor(itModernizationOpps), primesFor(setAsideOpps),
+  ]);
+
+  const plays: TeamingPlay[] = [];
+
+  // Play A: Cyber cluster
+  if (cyberOpps.length > 0 && cyberPrimes.length > 0) {
+    plays.push({
+      id: 'play-cyber',
+      playName: 'Cyber outcome swap',
+      targetOpportunityIds: cyberOpps.slice(0, 2).map(o => o.id),
+      targetOpportunityNames: cyberOpps.slice(0, 2).map(o => o.contractName),
+      primesToApproach: cyberPrimes,
+      suggestedOpener: `"We're tracking the ${cyberOpps[0]?.agency || 'DHS'} cyber recompetes and can help you improve P(win) on measurable SOC outcomes, not just labor mix. We can bring a 2-week displacement brief mapping likely incumbent weak points and a transition-safe staffing wedge. Open to a quick fit call this week?"`,
+      theme: 'Help primes strengthen measurable SOC outcomes and transition confidence.',
+    });
+  }
+
+  // Play B: IT Modernization
+  if (itModernizationOpps.length > 0 && itPrimes.length > 0) {
+    plays.push({
+      id: 'play-it-mod',
+      playName: 'Mission-ops + modernization surge',
+      targetOpportunityIds: itModernizationOpps.slice(0, 3).map(o => o.id),
+      targetOpportunityNames: itModernizationOpps.slice(0, 3).map(o => o.contractName),
+      primesToApproach: itPrimes,
+      suggestedOpener: `"We specialize in mixed legacy/cloud operating environments where SLA misses happen during scale events. We can plug in as a surgical subcontractor focused on stability + cycle-time reduction without disrupting your prime delivery model. Worth a 30-minute whiteboard this week?"`,
+      theme: 'Support primes with transition architecture and delivery velocity.',
+    });
+  }
+
+  // Play C: Set-aside leverage
+  if (setAsideOpps.length > 0 && setAsidePrimes.length > 0) {
+    plays.push({
+      id: 'play-setaside',
+      playName: 'Set-aside execution play',
+      targetOpportunityIds: setAsideOpps.slice(0, 2).map(o => o.id),
+      targetOpportunityNames: setAsideOpps.slice(0, 2).map(o => o.contractName),
+      primesToApproach: setAsidePrimes,
+      suggestedOpener: `"You have vehicle access; we bring a displacement-ready technical narrative and rapid proposal support. Let's build a 'lower risk with measurable outcomes' story before amendment season tightens. Open to a quick teaming discussion?"`,
+      theme: 'Combine set-aside alignment with low-friction transition artifacts.',
+    });
+  }
+
+  // If we don't have themed plays, create generic ones
+  if (plays.length === 0 && opportunities.length > 0) {
+    const topThree = opportunities.slice(0, 3);
+    // Ground the generic play too: the actual incumbents on these recompetes +
+    // real primes for the agency — never hardcoded names (Eric).
+    const genericPrimes = await primesFor(topThree);
+    if (genericPrimes.length > 0) plays.push({
+      id: 'play-generic',
+      playName: 'Displacement rapid-response',
+      targetOpportunityIds: topThree.map(o => o.id),
+      targetOpportunityNames: topThree.map(o => o.contractName),
+      primesToApproach: genericPrimes,
+      suggestedOpener: `"We built a rapid-response pursuit cell that turns forecast signals into partner-ready capture actions in 10 business days. If you're deciding where to bid/no-bid on ${new Date().getFullYear()} recompetes, we can show where displacement odds are highest. Interested in a quick capture-fit diagnostic?"`,
+      theme: 'Rapid pursuit support for high-value recompetes.',
+    });
+  }
+
+  return plays.slice(0, 3);
+}
+
+/**
+ * Generate market intel from RSS news items
+ */
+function generateMarketIntel(
+  newsItems: RawRecompeteData['newsItems'],
+  profile: RecompeteUserProfile
+): MarketIntel[] {
+  const intel: MarketIntel[] = [];
+
+  // Keywords to categorize news
+  const categoryKeywords: Record<MarketIntel['category'], string[]> = {
+    award: ['award', 'wins', 'contract', 'selected', 'chosen', 'wins'],
+    policy: ['policy', 'regulation', 'rule', 'guidance', 'executive order', 'memo'],
+    budget: ['budget', 'funding', 'appropriation', 'spending', 'billion', 'million'],
+    personnel: ['appoint', 'resign', 'hire', 'leadership', 'director', 'secretary'],
+    acquisition: ['rfp', 'rfi', 'solicitation', 'sources sought', 'procurement', 'bid'],
+    other: [],
+  };
+
+  // Relevance templates based on category
+  const relevanceTemplates: Record<MarketIntel['category'], string[]> = {
+    award: [
+      'Watch for subcontracting opportunities or teaming positions.',
+      'May signal upcoming task orders or follow-on work in same agency.',
+      'Study this winner\'s approach for future capture strategy.',
+    ],
+    policy: [
+      'May impact proposal requirements or evaluation criteria.',
+      'Update your compliance posture before next solicitation.',
+      'Position for upcoming policy-aligned opportunities.',
+    ],
+    budget: [
+      'Indicates funding priority for your NAICS codes.',
+      'Anticipate increased solicitation activity in this area.',
+      'Align BD focus with agency spending trajectory.',
+    ],
+    personnel: [
+      'New leadership often triggers recompete activity.',
+      'Track for shifts in acquisition priorities.',
+      'Consider outreach once transition settles.',
+    ],
+    acquisition: [
+      'Early positioning opportunity—begin capture now.',
+      'Review requirements and assess fit for your capabilities.',
+      'Time to activate teaming conversations.',
+    ],
+    other: [
+      'Monitor for business development implications.',
+      'May create downstream opportunities.',
+    ],
+  };
+
+  for (const news of newsItems.slice(0, 10)) {
+    // Categorize by keywords
+    let category: MarketIntel['category'] = 'other';
+    const lowerTitle = news.title.toLowerCase();
+    const lowerSnippet = news.snippet.toLowerCase();
+
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(k => lowerTitle.includes(k) || lowerSnippet.includes(k))) {
+        category = cat as MarketIntel['category'];
+        break;
+      }
+    }
+
+    // Check relevance to user's agencies
+    const userAgencyMatch = profile.agencies.some(a =>
+      lowerTitle.includes(a.toLowerCase()) || lowerSnippet.includes(a.toLowerCase())
+    );
+
+    // Skip if not relevant and we already have enough
+    if (!userAgencyMatch && intel.length >= 5) continue;
+
+    // Generate relevance statement
+    const templates = relevanceTemplates[category];
+    const relevance = templates[Math.floor(Math.random() * templates.length)];
+
+    intel.push({
+      id: `intel-${intel.length + 1}`,
+      headline: news.title,
+      source: news.source,
+      publishedDate: news.publishedDate,
+      summary: news.snippet.substring(0, 200) + (news.snippet.length > 200 ? '...' : ''),
+      relevance: userAgencyMatch ? `Your tracked agency: ${relevance}` : relevance,
+      url: news.url,
+      category,
+    });
+
+    if (intel.length >= 5) break;
+  }
+
+  return intel;
+}
+
+/**
+ * Generate priority scorecard
+ */
+function generatePriorityScorecard(
+  opportunities: RecompeteOpportunity[]
+): PriorityScorecardEntry[] {
+  // Sort by displacement score, take top 3
+  const sorted = [...opportunities].sort((a, b) => b.displacementScore - a.displacementScore);
+
+  return sorted.slice(0, 3).map((opp, idx) => {
+    // Generate score between 8.5 and 9.5 based on displacement score
+    const score = 8.5 + (opp.displacementScore / 100) * 1.0;
+
+    // Generate "why now" based on timing
+    const whyNow = `${opp.timingSignal.split(';')[0]}; ${opp.whyVulnerable.split('.')[0].substring(0, 60)}`;
+
+    // Generate immediate action
+    const actions = [
+      'Build incumbent gap matrix and transition-risk narrative now.',
+      'Prepare pricing pressure + modernization counter-positioning.',
+      'Lock teaming around technical differentiators and O&M efficiency.',
+      'Map incumbent weak points and draft displacement storyline.',
+      'Identify subcontracting lanes and begin prime outreach.',
+    ];
+
+    return {
+      opportunityId: opp.id,
+      opportunityName: opp.contractName,
+      score: Math.round(score * 10) / 10,
+      whyNow,
+      immediateAction: actions[idx % actions.length],
+    };
+  });
+}
+
+/**
+ * Transform raw data into ranked opportunities with AI-generated content
+ */
+export async function transformToOpportunities(
+  rawData: RawRecompeteData,
+  profile: RecompeteUserProfile
+): Promise<RecompeteOpportunity[]> {
+  const opportunities: RecompeteOpportunity[] = [];
+
+  // Get news snippets for context
+  const newsSnippets = rawData.newsItems.map(n => `${n.title}: ${n.snippet}`);
+
+  // Process each contract
+  for (let i = 0; i < Math.min(rawData.expiringContracts.length, 15); i++) {
+    const contract = rawData.expiringContracts[i];
+
+    // Generate displacement angle (AI or default)
+    const whyVulnerable = await generateDisplacementAngle(contract, newsSnippets);
+
+    // Calculate displacement score
+    let displacementScore = 50; // Base score
+
+    // NAICS match bonus
+    if (profile.naicsCodes.some(n => contract.naicsCode.startsWith(n) || n.startsWith(contract.naicsCode))) {
+      displacementScore += 20;
+    }
+
+    // Value bonus
+    if (contract.obligatedAmount > 100_000_000) displacementScore += 15;
+    else if (contract.obligatedAmount > 50_000_000) displacementScore += 10;
+    else if (contract.obligatedAmount > 10_000_000) displacementScore += 5;
+
+    // Set-aside bonus
+    if (contract.setAsideType) displacementScore += 10;
+
+    // Watched competitor bonus
+    if (profile.watchedCompanies.some(c => contract.vendorName.toLowerCase().includes(c.toLowerCase()))) {
+      displacementScore += 15;
+    }
+
+    opportunities.push({
+      id: `opp-${i + 1}`,
+      rank: i + 1,
+      contractName: generateContractName(contract),
+      agency: contract.agency,
+      agencyAcronym: getAgencyAcronym(contract.agency),
+      incumbent: contract.vendorName,
+      contractValue: formatContractValue(contract.obligatedAmount),
+      contractValueNumeric: contract.obligatedAmount,
+      timingSignal: generateTimingSignal(contract),
+      currentContractExpires: contract.currentEndDate,
+      whyVulnerable,
+      setAsideType: contract.setAsideType || undefined,
+      displacementScore: Math.min(displacementScore, 100),
+      sources: ['USASpending', 'GovConWire', 'SAM.gov'],
+      actionUrl: `https://www.usaspending.gov/search/?hash=${encodeURIComponent(contract.piid)}`,
+    });
+  }
+
+  // Sort by displacement score
+  opportunities.sort((a, b) => b.displacementScore - a.displacementScore);
+
+  // Re-rank after sorting
+  opportunities.forEach((opp, idx) => {
+    opp.rank = idx + 1;
+    opp.id = `opp-${idx + 1}`;
+  });
+
+  return opportunities.slice(0, 10);
+}
+
+/**
+ * Generate a descriptive contract name
+ */
+function generateContractName(contract: RawRecompeteData['expiringContracts'][0]): string {
+  const agency = getAgencyAcronym(contract.agency);
+  const naicsDesc = contract.naicsDescription || '';
+
+  // Common patterns
+  if (naicsDesc.toLowerCase().includes('computer')) {
+    return `${agency} IT Services Support`;
+  }
+  if (naicsDesc.toLowerCase().includes('engineering')) {
+    return `${agency} Engineering & Technical Services`;
+  }
+  if (naicsDesc.toLowerCase().includes('consulting') || naicsDesc.toLowerCase().includes('management')) {
+    return `${agency} Program Management Support`;
+  }
+  if (naicsDesc.toLowerCase().includes('security')) {
+    return `${agency} Cyber Security Operations`;
+  }
+  if (naicsDesc.toLowerCase().includes('facilities')) {
+    return `${agency} Facilities Support Services`;
+  }
+
+  // Default: use NAICS description
+  return `${agency} ${naicsDesc.split(',')[0] || 'Support Services'}`;
+}
+
+export {
+  generateDisplacementAngle,
+  generateTimingSignal,
+  generateTeamingPlays,
+  generateMarketIntel,
+  generatePriorityScorecard,
+};

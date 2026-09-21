@@ -1,0 +1,178 @@
+<style>
+  :root {
+    --navy: #22357a;
+    --purple: #7c3aed;
+    --ink: #191b22;
+    --ink-soft: #565b6c;
+    --paper: #f8f7f3;
+    --card: #ffffff;
+    --line: #e6e3db;
+    --line-cool: #d6d9e4;
+    --accent-soft: #f2effb;
+    --rule: #cfc9bd;
+    --answer: #fbfaf6;
+    --answer-line: #ddd8ca;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --serif: Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --navy: #9fb0ee; --purple: #b79bf2;
+      --ink: #ecebe6; --ink-soft: #a3a7b5;
+      --paper: #16171c; --card: #1e2027; --line: #2d303a; --line-cool: #343846;
+      --accent-soft: #24203a; --rule: #3a3d49; --answer: #191b21; --answer-line: #33363f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --navy: #9fb0ee; --purple: #b79bf2;
+    --ink: #ecebe6; --ink-soft: #a3a7b5;
+    --paper: #16171c; --card: #1e2027; --line: #2d303a; --line-cool: #343846;
+    --accent-soft: #24203a; --rule: #3a3d49; --answer: #191b21; --answer-line: #33363f;
+  }
+  :root[data-theme="light"] {
+    --navy: #22357a; --purple: #7c3aed;
+    --ink: #191b22; --ink-soft: #565b6c;
+    --paper: #f8f7f3; --card: #ffffff; --line: #e6e3db; --line-cool: #d6d9e4;
+    --accent-soft: #f2effb; --rule: #cfc9bd; --answer: #fbfaf6; --answer-line: #ddd8ca;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 800px; margin: 0 auto; padding: 52px 28px 96px; }
+
+  .masthead { border-bottom: 3px solid currentColor; padding-bottom: 22px; }
+  .masthead { color: var(--ink); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--purple); font-weight: 600; display: flex; gap: 11px; align-items: center; flex-wrap: wrap; }
+  .eyebrow .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--line-cool); }
+  h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(28px, 4.6vw, 39px); line-height: 1.06; letter-spacing: -0.015em; text-wrap: balance; margin: 15px 0 12px; color: var(--ink); }
+  .standfirst { font-size: 15.5px; color: var(--ink-soft); max-width: 64ch; margin: 0; }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  .why { margin: 26px 0 8px; background: var(--accent-soft); border: 1px solid var(--line-cool); border-radius: 9px; padding: 15px 20px; font-size: 13.5px; color: var(--ink); }
+  .why b { color: var(--purple); }
+
+  section { margin-top: 44px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  .sec-head .mk { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--purple); letter-spacing: 0.04em; }
+  .sec-head h2 { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; color: var(--ink); }
+  .sec-sub { font-size: 13px; color: var(--ink-soft); margin: 0 0 18px 34px; }
+
+  .q { margin: 0 0 20px 34px; }
+  .q .ask { font-size: 15.5px; color: var(--ink); font-weight: 550; display: flex; gap: 10px; }
+  .q .ask .bullet { color: var(--purple); font-family: var(--serif); font-weight: 700; flex: none; }
+  .q .hint { font-size: 12.5px; color: var(--ink-soft); margin: 3px 0 0 22px; font-style: italic; }
+  .answer { margin: 9px 0 0 22px; min-height: 46px; border: 1px dashed var(--answer-line); background: var(--answer); border-radius: 7px; }
+
+  .foot { margin-top: 52px; border-top: 2px solid var(--rule); padding-top: 16px; font-family: var(--mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.03em; line-height: 1.7; }
+
+  @media print {
+    body { background: #fff; }
+    .why, .answer, .q, section { break-inside: avoid; }
+    .sec-head { break-after: avoid; }
+    .answer { min-height: 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow"><span>GCAP × Mindy</span><span class="dot"></span><span>Discovery</span><span class="dot"></span><span>NC SBTDC · Procurement Assistance</span></div>
+    <h1>A few questions so we build the right thing for GCAP</h1>
+    <p class="standfirst">Before we scope or price anything, we want to confirm what we already understand about GCAP and fill the gaps — <strong>how you actually work and report</strong>, not what we assume. Your answers shape what we build. Short answers are fine; anything you'd rather talk through, we'll cover on a call.</p>
+  </header>
+
+  <div class="why"><b>Why we're asking.</b> GCAP's value is building capability — moving a business from an opportunity to an honest assessment of its ability to win it, then closing the gap. We want Mindy to fit that, and to produce the reporting your funder expects. These questions make sure we align to your reality before we commit to a plan.</div>
+
+  <section>
+    <div class="sec-head"><span class="mk">✓</span><h2>What we already understand — confirm we've got it right</h2></div>
+    <p class="sec-sub">From our conversation, here's how we're reading GCAP. Correct anything that's off.</p>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">✓</span><span><strong>Scale:</strong> 8 counselors today, adding 4 more (→ 12), serving ~1,000 businesses.</span></div>
+      <div class="hint">This is what we're building the plan around — flag if the numbers have shifted.</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">✓</span><span><strong>Your assessment model:</strong> an opportunity comes in, and the counselor works the gap between <em>where the business is</em> and <em>where it needs to be</em> to win it — "I make the widget, but am I positioned to win <em>this</em>?" You map the move from point A to point B.</span></div>
+      <div class="hint">Did we capture your process right? What would you add?</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">✓</span><span><strong>The gaps you close</strong> include <strong>teaming</strong> — a business often can't win alone, so a core question is "where do we find the primes to partner with?" — alongside capability, positioning, and readiness gaps.</span></div>
+      <div class="hint">Is teaming / prime-finding one of the bigger gaps you work? What are the others?</div>
+      <div class="answer"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="mk">A</span><h2>The reporting you need to produce</h2></div>
+    <p class="sec-sub">This is the one we most want to get right — if Mindy produces the numbers you already have to report, it becomes the system that renews your funding, not just another tool. Tell us exactly what that report looks like.</p>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">1.</span><span>What do you report to your funder (SBTDC / SBA) as <strong>success</strong> — and who is the audience for it?</span></div>
+      <div class="hint">e.g. businesses served, counseling hours, milestones reached, capital accessed, jobs created, contracts won. And who reads it — your center director, SBTDC state HQ, SBA?</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">2.</span><span>In what <strong>format, system, and cadence</strong> does that reporting live today?</span></div>
+      <div class="hint">e.g. EDMIS, Neoserra exports, a spreadsheet you hand-build, a quarterly PDF — and monthly / quarterly / annually. If we can generate it in that shape, we save you the assembly.</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">3.</span><span>Which <strong>capability milestones</strong> count most — the events that, when a business hits them, prove your program worked?</span></div>
+      <div class="hint">e.g. SAM registration, a certification (WOSB / HUBZone / 8(a)), a completed capability statement, a first bid submitted, a first award. These are what a progression dashboard would track per business.</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">4.</span><span>If you could open one <strong>dashboard</strong> and see your whole caseload's progress at a glance, what would you want on it?</span></div>
+      <div class="hint">The 3–4 numbers or views that would actually change how you run the program — this is what we'd build first.</div>
+      <div class="answer"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="mk">B</span><h2>What matters most to you</h2></div>
+    <p class="sec-sub">So we lead with the parts that move the needle for GCAP, not everything at once.</p>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">5.</span><span>Of everything Mindy does, which <strong>capabilities</strong> matter most to you and your counselors?</span></div>
+      <div class="hint">e.g. matching a business to live opportunities, the 317K-contractor database for finding teaming partners / primes, market scans &amp; agency intel, forecasts, tracking each business's pipeline, the client-progress reporting above. Rank or star the ones that count.</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">6.</span><span>Across your caseload, where do most businesses <strong>stall</strong> — and if you could see that automatically for every business, would it change how you counsel?</span></div>
+      <div class="hint">The recurring stuck-point (no past performance, can't find a teaming partner, not bid-ready, etc.) is exactly what a progression view could surface.</div>
+      <div class="answer"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="mk">C</span><h2>How you operate</h2></div>
+    <p class="sec-sub">So the setup matches how your team actually runs.</p>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">7.</span><span>Do counselors run everything <strong>on behalf of</strong> the business, or should businesses get their own logins too?</span></div>
+      <div class="hint">This shapes the whole setup — counselor-managed vs. businesses self-serving with counselor oversight.</div>
+      <div class="answer"></div>
+    </div>
+
+    <div class="q">
+      <div class="ask"><span class="bullet">8.</span><span>Do you use <strong>Neoserra, Center IC, or another CRM</strong>? Should Mindy feed it rather than replace it?</span></div>
+      <div class="hint">We'd feed your system of record, not ask you to leave it.</div>
+      <div class="answer"></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    GCAP = Government Contracting Assistance Program · a division of the NC SBTDC<br>
+    Prepared by GovCon Giants · Mindy Federal Market Intelligence · getmindy.ai
+  </div>
+
+</div>

@@ -1,0 +1,30 @@
+DLA INTERNET BID BOARD SYSTEM (DIBBS) — SOLICITATIONS (how the Defense Logistics Agency buys, and how to find/read DIBBS solicitations)
+
+HOW DLA BUYS — think of DLA as a large quality-control agency that assures items meet the military customer's needs. Items are bought via:
+- Approved CAGE Code & Part Number stated in the solicitation item description. Only the exact CAGE + part number on the solicitation is the "Exact Item"; a vendor substitute is an "Alternate Item" (be careful offering substitutes).
+- Qualified Products List (QPL) / Qualified Manufacturers List (QML) — technical staff pre-qualifies products and manufacturers.
+- Source-controlled via approved sources (tested/approved by the OEMs).
+- Fully Competitive — the greatest competition, especially for new/small businesses. DLA provides a set of drawings / Technical Data Package (TDP); the business decides whether it can make the item in conformance and quotes based on time, cost, and profit.
+
+COMMON SOLICITATION TYPES:
+- Request for Quotation (RFQ): under $250,000; the most common type at DLA; average award under $4,000; most quoted through DIBBS. 30–40% of these are awarded WITHOUT human intervention — an automated system evaluates quotes and notifies the award electronically (≈85% of Simplified Acquisition solicitations under the threshold are automated).
+- Request for Proposal (RFP): over $250,000; may be negotiated (price, delivery time, quantity) after the solicitation closes; the proposal/negotiation is processed outside DIBBS.
+
+DIBBS HOME PAGE (dibbs.bsm.dla.mil) key areas:
+- Help / Online FAQ / batch-quoting help; also work with your local Procurement Technical Assistance Center (PTAC/APEX) for free help.
+- Master Solicitation — solicitation documents don't contain the full text of all provisions/clauses; you MUST become familiar with the Master Solicitation (which contains all provisions/clauses attached to every automated solicitation) to understand your rights and obligations.
+- Vendor Registration (requires a prior SAM account) — enables submitting electronic quotes for RFQs and receiving solicitation/award notifications.
+- Technical Data section — the DLA-managed Federal Stock Class (FSC) list lets vendors see whether an FSC is managed by DLA or GSA.
+- DIBBS Notices — check weekly/daily for policy changes, training, and free webinars (TKO training).
+
+DIBBS REGISTRATION steps: enter your CAGE code → company data is pulled from SAM → enter the Super User / Account Administrator name, phone, email (a temporary ID and PIN are emailed) → accept the agreement → set a complex password (≥15 characters, upper/lower/number/special, changed every 60 days) and three challenge questions → set Alternate Dispute Resolution choice, "quote valid for" (standard 90 days), and discount terms (standard net 30) which auto-fill into quotes → set Primary and Secondary (Alternate) POC emails (award and contract actions go ONLY to the Primary POC, so keep it current — consider a distribution list) → Vendor-Directed Solicitation Notification lets the Super User get emails for new solicitations matching chosen FSCs, NSNs, and approved-manufacturer CAGE codes (up to 3,000 values per category). Your Super User ID is your CAGE code + "01"; additional users are 02–99.
+
+NOTE: the system lets you quote, but you CANNOT receive an award until your SAM registration is current (a red warning shows when SAM is about to expire; SAM is renewed yearly).
+
+SEARCHING RFQs — search by NSN, FSC, Solicitation Number (SPM…), Purchase Request (PR), Nomenclature, Approved Part Number, or Approved OEM CAGE code. The wildcard (*) follows a search value (and may precede only in Nomenclature search). Think of an FSC as the "area code" (first four digits of the NSN), each containing thousands of NSNs. Use "Show Only" filters (e.g. "Items with Technical Documents" / "Items with Bidsets") to narrow a large list (in one example, FSC 3040 returned >1,450 open solicitations, narrowed to 522 with the Tech Docs filter).
+
+SOLICITATION ICONS: Tech Docs (drawings available); Fast Award (a purchase order may be awarded as soon as acceptable quotes are received, even before the closing date — the auto system re-evaluates every 24 hours); Set-Aside (small business / socio-economic — participation restricted; contact PTAC/SBA for certification questions); Micro Purchase (under $10,000, evaluated daily, can be awarded after one day if "fair & reasonable").
+
+ACQUISITION METHOD SUFFIX CODE (AMSC) — indicates the adequacy of available technical data / limited sources. Common: B = Source Control; C = Contracting from Approved Source; G = complete Technical Data Package available (best for manufacturers — download the TDP from cFolders and decide if you can make the item); H = Inadequate Data; T = QPL. Manufacturers should target AMSC "G" items (complete drawings); non-manufacturers focus on items purchased by CAGE code and part number.
+
+SOLICITATION STRUCTURE — RFQ: Cover Page (set-aside type, issuing activity/contracting officer, master-solicitation revision, return-by date/time); Section A (general contract requirements, quality/testing, contract history); Section B (item description, drawing/spec or code & part number list, delivery lines, packaging/shipping); Section D (required clauses the contractor reviews and fills in). RFP follows the Uniform Contract Format: Part I The Schedule (Sections A–H), Part II Contract Clauses (Section I), Part III Documents/Exhibits/Attachments (Section J), Part IV Representations & Instructions (Sections K–M).

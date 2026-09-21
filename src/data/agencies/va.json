@@ -1,0 +1,164 @@
+{
+  "name": "Department of Veterans Affairs",
+  "abbreviation": "VA",
+  "parentAgency": null,
+  "description": "The VA provides healthcare, benefits, and memorial services to veterans, their dependents, and survivors.",
+  "website": "https://www.va.gov",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$325.1 billion",
+    "procurementBudget": "$27.5 billion"
+  },
+  "painPoints": [
+    {
+      "point": "Electronic health records (EHR) modernization delays with Cerner/Oracle implementation",
+      "source": "VA OIG Reports 2025 - EHR Modernization",
+      "priority": "critical"
+    },
+    {
+      "point": "IT infrastructure modernization gaps affecting system reliability",
+      "source": "GAO High-Risk List 2025 - VA IT Management",
+      "priority": "high"
+    },
+    {
+      "point": "Claims processing automation and backlog reduction challenges",
+      "source": "VA Acquisition Forecast FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Telehealth platform scalability and interoperability improvements",
+      "source": "VA Telehealth Strategic Plan 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Legacy system integration and data migration complexities",
+      "source": "VA IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and patient data protection enhancements",
+      "source": "VA Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Workforce capacity in IT and healthcare technology roles",
+      "source": "VA Workforce Planning 2025",
+      "priority": "medium"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "EHR Modernization (Cerner/Oracle implementation)",
+      "source": "VA Budget Justification FY2025",
+      "funding": "$16B+",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Telehealth Expansion and Platform Enhancement",
+      "source": "VA Telehealth Strategic Plan",
+      "funding": "$M+"
+    },
+    {
+      "priority": "Claims Processing Automation and Backlog Reduction",
+      "source": "VA Acquisition Forecast",
+      "priority": "high"
+    },
+    {
+      "priority": "IT Infrastructure Modernization and Cloud Migration",
+      "source": "VA IT Modernization Strategy",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Cybersecurity and Zero Trust Implementation",
+      "source": "VA Cybersecurity Strategy 2025",
+      "priority": "high"
+    },
+    {
+      "priority": "Mental Health Services Technology Expansion",
+      "source": "VA Mental Health Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "priority": "Community Care Network Management Systems",
+      "source": "VA Community Care Strategy",
+      "priority": "medium"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "VA OIG Reports - https://www.va.gov/oig",
+      "GAO High-Risk List 2025 - https://www.gao.gov/highrisk",
+      "VA Acquisition Forecast - https://www.va.gov/osdbu/acquisition-forecast",
+      "VA Budget Justification FY2025 - https://www.va.gov/budget/products.asp"
+    ],
+    "secondary": [
+      "VA Strategic Plan 2025",
+      "GSA Acquisition Gateway Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "621111",
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "561110",
+    "541330",
+    "621491",
+    "532291"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "FSS (Federal Supply Schedule)",
+    "BPA (Blanket Purchase Agreement)"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Highest priority - goal of 12%",
+    "VOSB": "Highest priority - goal of 15%"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $25M",
+    "large": "$25M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "VA Schedule holders",
+      "Veteran-Owned Small Businesses (SDVOSB/VOSB)",
+      "Healthcare IT experience",
+      "Past performance with VA or healthcare",
+      "Telehealth capabilities"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach",
+      "Past performance in healthcare/VA",
+      "Price/cost",
+      "Veteran-owned status (strong preference)",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "VA Office of Acquisition, Logistics, and Construction (OALC)",
+    "VA Office of Information and Technology (OIT)",
+    "Veterans Health Administration (VHA)",
+    "Veterans Benefits Administration (VBA)"
+  ],
+  "insights": [
+    "VA has the highest small business goals in government - 25% total, 15% VOSB, 12% SDVOSB",
+    "EHR modernization is a $16B+ multi-year program with ongoing opportunities",
+    "Veteran-Owned Small Businesses receive strong preference",
+    "Telehealth expansion creates significant IT and service opportunities",
+    "VA uses VA Schedules extensively for quick procurement",
+    "Healthcare IT modernization is a continuous priority"
+  ]
+}
+

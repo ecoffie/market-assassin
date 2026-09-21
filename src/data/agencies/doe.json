@@ -1,0 +1,177 @@
+{
+  "name": "Department of Energy",
+  "abbreviation": "DOE",
+  "parentAgency": null,
+  "description": "DOE manages the nation's nuclear infrastructure, advances energy technologies, and ensures environmental cleanup of legacy nuclear sites.",
+  "website": "https://www.energy.gov",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$51.0 billion",
+    "procurementBudget": "$18.5 billion"
+  },
+  "painPoints": [
+    {
+      "point": "Environmental cleanup and remediation cost overruns and schedule delays at legacy nuclear sites (Hanford, Savannah River, etc.)",
+      "source": "GAO High-Risk List 2025 - DOE Environmental Cleanup",
+      "priority": "high"
+    },
+    {
+      "point": "Nuclear security infrastructure modernization delays and cost challenges",
+      "source": "DOE Budget Justification FY2025 - NNSA",
+      "priority": "high"
+    },
+    {
+      "point": "Grid modernization and resilience implementation challenges across multiple jurisdictions",
+      "source": "DOE Grid Modernization Initiative Reports",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity for energy infrastructure and critical systems protection",
+      "source": "DOE Cybersecurity Strategy 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Management and Operating (M&O) contract oversight and cost control",
+      "source": "GAO DOE Contract Management Reports",
+      "priority": "medium"
+    },
+    {
+      "point": "Clean energy technology deployment and commercialization acceleration",
+      "source": "DOE Clean Energy Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Nuclear waste management and permanent repository development",
+      "source": "DOE Nuclear Waste Management Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Workforce capacity and succession planning in nuclear operations",
+      "source": "DOE Workforce Planning 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting nuclear and energy IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Environmental Cleanup and Remediation (EM Program)",
+      "source": "DOE Budget Justification FY2025",
+      "funding": "$7.9B+",
+      "deadline": "Ongoing multi-decade program"
+    },
+    {
+      "priority": "Grid Modernization and Resilience",
+      "source": "Bipartisan Infrastructure Law / Inflation Reduction Act",
+      "funding": "$B+",
+      "deadline": "2025-2030"
+    },
+    {
+      "priority": "Nuclear Security Infrastructure Modernization (NNSA)",
+      "source": "DOE NNSA Strategic Plan",
+      "funding": "$B+",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Clean Energy Technology Development and Deployment",
+      "source": "DOE Clean Energy Strategic Plan",
+      "funding": "$B+",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity for Energy Infrastructure",
+      "source": "DOE Cybersecurity Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Nuclear Waste Management and Repository Development",
+      "source": "DOE Nuclear Waste Management Strategy"
+    },
+    {
+      "priority": "Advanced Manufacturing for Energy",
+      "source": "DOE Advanced Manufacturing Office"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO High-Risk List 2025 - https://www.gao.gov/highrisk",
+      "DOE Budget Justification FY2025 - https://www.energy.gov/cfo/budget-justification",
+      "DOE Acquisition Forecast - https://www.energy.gov/osbp/acquisition-forecast",
+      "GAO DOE Environmental Cleanup Reports"
+    ],
+    "secondary": [
+      "DOE Strategic Plans",
+      "NNSA Strategic Plan",
+      "GSA Acquisition Gateway Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541330",
+    "541511",
+    "541512",
+    "541519",
+    "562910",
+    "541611",
+    "237990",
+    "541715",
+    "541712",
+    "221112"
+  ],
+  "contractTypes": [
+    "Cost-Plus",
+    "Fixed-Price",
+    "IDIQ",
+    "Management and Operating (M&O) Contracts",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $50M",
+    "large": "$50M+ (M&O contracts can be $1B+)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Energy-specific expertise",
+      "Environmental remediation experience",
+      "Nuclear security capabilities",
+      "Past performance with DOE or energy sector",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-24 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and expertise",
+      "Past performance in energy/environmental",
+      "Price/cost",
+      "Small business participation",
+      "Safety and environmental compliance"
+    ]
+  },
+  "keyOffices": [
+    "Office of Environmental Management",
+    "National Nuclear Security Administration (NNSA)",
+    "Office of Energy Efficiency and Renewable Energy",
+    "Office of Nuclear Energy",
+    "Office of Science"
+  ],
+  "insights": [
+    "DOE manages massive environmental cleanup program ($7B+ annually)",
+    "Grid modernization and clean energy are major investment areas",
+    "Management and Operating (M&O) contracts are multi-billion dollar opportunities",
+    "Nuclear security and non-proliferation create specialized opportunities",
+    "Strong preference for small businesses in technology development",
+    "Cybersecurity for energy infrastructure is growing priority"
+  ]
+}
+

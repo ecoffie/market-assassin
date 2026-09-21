@@ -1,0 +1,1104 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
+import { suggestPrimesForAgencies, getPrimesByNAICS, suggestTier2ForAgencies } from '@/lib/utils/prime-contractors';
+import { suggestTribesForAgencies, getTribesByNAICS } from '@/lib/utils/tribal-businesses';
+import { getPainPointsForAgency, getPrioritiesForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
+import { getOpportunitiesByCoreInputs, getUrgencyLevel, getQuickWinStrategy } from '@/lib/utils/december-spend';
+import { getLiveForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStatistics } from '@/lib/utils/agency-forecasts-live';
+import { searchIDVContracts } from '@/lib/idv-search';
+import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
+import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, SimplifiedAcquisitionAgency } from '@/types/federal-market-assassin';
+import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
+import { MICRO_PURCHASE_THRESHOLD, SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
+import { fetchPricingIntel } from '@/lib/utils/calc-rates';
+import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
+import { validateReportInputs } from '@/lib/validate';
+import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
+import { getMarketAssassinTier } from '@/lib/access-codes';
+import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
+
+// Free reports available to all users (4 reports)
+const FREE_REPORT_KEYS = ['simplifiedAcquisition', 'budgetCheckup', 'governmentBuyers'];
+// Note: 'osbp' uses same key as governmentBuyers but different view
+
+function agencySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'agency';
+}
+
+// Remove duplicate rows from the pain-point / need / priority lists. The same
+// agency can appear more than once in the selection (e.g. picked both as a
+// parent agency and as a sub-office that resolves to the same name), and
+// flatMap then repeats every pain point / need for it — surfacing identical
+// "AGENCY / same text" rows in the report cards. Key on the normalized
+// (agency + text) pair and keep the first occurrence.
+function dedupeBy<T>(items: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const k = key(item).toLowerCase().replace(/\s+/g, ' ').trim();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
+}
+
+async function buildFallbackAgencyData(selectedAgencies: string[]): Promise<Agency[]> {
+  const uniqueAgencies = [...new Set(selectedAgencies.map((agency) => agency.trim()).filter(Boolean))];
+
+  // Cap live lookups so a 100-agency market doesn't fan out 100 USASpending
+  // calls. The Gov Buyers card shows the top agencies anyway; the rest keep
+  // their cached-budget estimate.
+  const LIVE_LOOKUP_CAP = 25;
+
+  return Promise.all(
+    uniqueAgencies.map(async (agencyName, idx) => {
+      const budget = getBudgetForAgency(agencyName);
+      const budgetEstimate =
+        budget?.fy2025?.obligated ||
+        budget?.fy2026?.obligated ||
+        budget?.fy2025?.budgetAuthority ||
+        budget?.fy2026?.budgetAuthority ||
+        0;
+
+      // Pull REAL obligations + contract counts from USASpending so the Gov
+      // Buyers card doesn't show "$0 / 0 contracts" for every agency. Without
+      // this the fallback hardcoded contractCount: 0 and only agencies present
+      // in the cached budget file (e.g. GSA) showed any dollar value.
+      let liveSpending = 0;
+      let liveContracts = 0;
+      if (idx < LIVE_LOOKUP_CAP) {
+        try {
+          const spending = await getAgencySpending(agencyName);
+          if (spending) {
+            liveSpending = spending.totalObligations || 0;
+            liveContracts = spending.contractCount || 0;
+          }
+        } catch {
+          // Non-fatal — fall back to the cached budget estimate below.
+        }
+      }
+
+      const enhancedInfo = getEnhancedAgencyInfo(agencyName, agencyName, agencyName);
+
+      return {
+        id: `fallback-${agencySlug(agencyName)}`,
+        name: agencyName,
+        contractingOffice: agencyName,
+        subAgency: agencyName,
+        parentAgency: agencyName,
+        setAsideSpending: liveSpending || budgetEstimate,
+        contractCount: liveContracts,
+        satSpending: 0,
+        satContractCount: 0,
+        microSpending: 0,
+        microContractCount: 0,
+        location: 'Nationwide',
+        hasSpecificOffice: false,
+        isEstimated: true,
+        command: enhancedInfo?.command || undefined,
+        website: enhancedInfo?.website || null,
+        forecastUrl: enhancedInfo?.forecastUrl || null,
+        samForecastUrl: enhancedInfo?.samForecastUrl || undefined,
+        osbp: enhancedInfo?.smallBusinessContact || null,
+      };
+    })
+  );
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { inputs, selectedAgencies, selectedAgencyData, userEmail }: { inputs: CoreInputs; selectedAgencies: string[]; selectedAgencyData?: Agency[]; userEmail?: string } = body;
+
+    // Input validation
+    const validation = validateReportInputs(body);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { success: false, error: validation.errors.join('; ') },
+        { status: 400 }
+      );
+    }
+
+    // Rate limiting: email-based if available, stricter IP-based for unauthenticated
+    const email = getEmailFromRequest(request, body);
+    if (email) {
+      const rl = await checkReportRateLimit(email);
+      if (!rl.allowed) return rateLimitResponse(rl);
+    } else {
+      // Stricter limit for unauthenticated: 5/hour vs 30/hour for authenticated fallback
+      const ip = getClientIP(request);
+      const rl = await checkUnauthenticatedIPRateLimit(ip);
+      if (!rl.allowed) return rateLimitResponse(rl);
+    }
+
+    // Server-side access verification - MI tiers (free/pro/none)
+    const auth = await verifyMIAccess(email);
+    if (auth.tier === 'none') {
+      console.log('[generate-all] Access denied:', { email, authError: auth.error });
+      return NextResponse.json(
+        {
+          success: false,
+          error: auth.error || 'Email required for access',
+          hint: !email
+            ? 'Please sign in to generate reports'
+            : 'Your session may have expired. Please sign in again.',
+        },
+        { status: 403 }
+      );
+    }
+
+    // Track the access tier for filtering reports later
+    const accessTier: MIAccessTier = auth.tier;
+
+    // Check if user is blocked for abuse
+    if (email && await isUserBlocked(email)) {
+      return NextResponse.json(
+        { success: false, error: 'Account suspended due to unusual activity. Contact support at hello@getmindy.ai' },
+        { status: 403 }
+      );
+    }
+
+    // Track generation for abuse monitoring
+    if (email) {
+      trackGeneration(email);
+    }
+
+    // Get pain points for selected agencies, using command-level data when available
+    const agenciesWithPainPoints = selectedAgencies.map(agencyName => {
+      // Find the full agency data if provided (includes command info)
+      const agencyData = selectedAgencyData?.find(a => a.name === agencyName || a.contractingOffice === agencyName);
+
+      if (agencyData) {
+        // Use enhanced pain points lookup with command hierarchy
+        const { painPoints, source } = getPainPointsForCommand(
+          agencyData.contractingOffice || agencyName,
+          agencyData.subAgency || '',
+          agencyData.parentAgency || '',
+          agencyData.command
+        );
+        return {
+          name: agencyName,
+          painPoints,
+          priorities: getPrioritiesForAgency(agencyName, agencyData.command),
+          painPointSource: source,
+          command: agencyData.command,
+        };
+      }
+
+      // Fallback to simple lookup
+      return {
+        name: agencyName,
+        painPoints: getPainPointsForAgency(agencyName),
+        priorities: getPrioritiesForAgency(agencyName),
+      };
+    });
+
+    // Generate Tier 2 Subcontracting Report using ONLY Tier 2 contractors (not prime contractors)
+    // Supports both NAICS and PSC code searches
+    const tier2Contractors = suggestTier2ForAgencies(
+      inputs.naicsCode,
+      inputs.pscCode
+    );
+
+    // Get prime contractors for the Prime Contractor section (separate from Tier 2)
+    const primeContractorPrimes = suggestPrimesForAgencies(
+      agenciesWithPainPoints,
+      inputs.naicsCode,
+      inputs.pscCode
+    );
+
+    const tier2Subcontracting = {
+      suggestedPrimes: tier2Contractors.map(tier2 => ({
+        name: tier2.name,
+        reason: `Tier 2 subcontractor${tier2.naicsCategories?.length ? (inputs.naicsCode ? ' matching your NAICS code' : inputs.pscCode ? ' matching your PSC category' : '') : ''}`,
+        opportunities: tier2.specialties || [],
+        relevantAgencies: tier2.agencies?.slice(0, 5) || [],
+        contactStrategy: tier2.sbloName && tier2.email
+          ? `Contact ${tier2.sbloName} at ${tier2.email}`
+          : tier2.email
+          ? `Contact at ${tier2.email}`
+          : `Contact ${tier2.name} for subcontracting opportunities`,
+        // Enhanced contact card data
+        sbloName: tier2.sbloName || null,
+        email: tier2.email || null,
+        phone: tier2.phone || null,
+        contractCount: null, // Not available for Tier 2
+        totalContractValue: null, // Not available for Tier 2
+        hasSubcontractPlan: false, // Not applicable for Tier 2
+        supplierPortal: null, // Not applicable for Tier 2
+        naicsCategories: tier2.naicsCategories || [],
+        tierClassification: tier2.tierClassification || 'Tier 2',
+        certifications: tier2.certifications || [],
+      })),
+      summary: {
+        totalPrimes: tier2Contractors.length,
+        opportunityCount: tier2Contractors.reduce((sum, t) => sum + (t.specialties?.length || 0), 0),
+      },
+      recommendations: [
+        'Contact Tier 2 subcontractors directly for partnership opportunities',
+        'Attend small business networking events to meet these contractors',
+        'Review their NAICS codes to ensure capability alignment',
+        tier2Contractors.some(t => t.email)
+          ? 'Use provided email addresses to reach out directly'
+          : 'Search SAM.gov for additional contact information',
+      ],
+    };
+
+    // Generate Tribal Contracting Report using bootcamp database
+    const suggestedTribes = suggestTribesForAgencies(
+      agenciesWithPainPoints.map(a => ({ name: a.name })),
+      inputs.naicsCode
+    );
+
+    const tribalContracting = {
+      opportunities: [],
+      suggestedTribes: suggestedTribes.slice(0, 10).map(tribe => ({
+        name: tribe.name,
+        region: tribe.region,
+        capabilities: tribe.capabilities || [],
+        contactInfo: tribe.contactPersonsEmail
+          ? {
+              name: tribe.contactPersonsName,
+              email: tribe.contactPersonsEmail,
+            }
+          : undefined,
+        certifications: tribe.activeSbaCertifications || [],
+        naicsCategories: tribe.naicsCategories || [],
+      })),
+      recommendedAgencies: selectedAgencies.slice(0, 5),
+      summary: {
+        totalOpportunities: suggestedTribes.length,
+        totalValue: 0, // Could be calculated if we had contract value data
+      },
+      recommendations: [
+        'Partner with 8(a) certified tribal businesses for subcontracting opportunities',
+        'Leverage tribal business set-asides and sole-source opportunities',
+        'Build teaming relationships with complementary capabilities',
+        suggestedTribes.some(t => t.contactPersonsEmail)
+          ? 'Contact suggested tribal businesses using provided email addresses'
+          : 'Research tribal business contact information for partnership outreach',
+      ],
+    };
+
+    // Prime Contractor Report uses primeContractorPrimes computed above (non-duplicates of Tier 2)
+    // Get similar agencies for "other agencies" suggestions
+    const similarAgenciesSet = new Set<string>();
+    selectedAgencies.forEach(agencyName => {
+      const similar = getSimilarAgencies(agencyName, 5);
+      similar.forEach(s => {
+        if (!selectedAgencies.includes(s.agency)) {
+          similarAgenciesSet.add(s.agency);
+        }
+      });
+    });
+
+    const primeContractor = {
+      suggestedPrimes: primeContractorPrimes.slice(0, 10).map(prime => ({
+        name: prime.name,
+        reason: `Prime contractor in your industry${prime.agencies?.length ? ' working with your target agencies' : ''}`,
+        subcontractingOpportunities: prime.specialties || [],
+        contractTypes: ['IDIQ', 'BPA', 'GWAC'], // Could be enhanced with actual data
+        smallBusinessLevel: prime.smallBusinessLevel || 'medium',
+        // Enhanced contact card data
+        sbloName: prime.sbloName || null,
+        email: prime.email || null,
+        phone: prime.phone || null,
+        contractCount: prime.contractCount || null,
+        totalContractValue: prime.totalContractValue || null,
+        hasSubcontractPlan: prime.hasSubcontractPlan || false,
+        supplierPortal: prime.supplierPortal || null,
+        naicsCategories: prime.naicsCategories || [],
+        // Bumped from 5 → 20 on 2026-05-25 so the client can filter
+        // primes against the user's saved target agencies (Teaming
+        // Candidates contextualization). 5 was too narrow — most
+        // primes have agency footprints of 10-50 entries.
+        agencies: prime.agencies?.slice(0, 20) || [],
+      })),
+      otherAgencies: Array.from(similarAgenciesSet).slice(0, 5).map(agencyName => {
+        const painPoints = getPainPointsForAgency(agencyName);
+        return {
+          name: agencyName,
+          reason: 'Similar pain points and needs to your target agencies',
+          matchingPainPoints: painPoints.slice(0, 3),
+          relevance: 'High - Similar challenges and opportunities',
+        };
+      }),
+      summary: {
+        totalPrimes: primeContractorPrimes.length,
+        totalOtherAgencies: similarAgenciesSet.size,
+      },
+      recommendations: [
+        'Build relationships with prime contractors in your industry',
+        'Attend prime contractor small business events',
+        'Consider exploring similar agencies with matching pain points',
+      ],
+    };
+
+    // Generate Agency Pain Points & Spending Priorities Report (Enhanced)
+    const allPainPoints = dedupeBy(
+      agenciesWithPainPoints.flatMap(a =>
+        a.painPoints.map(pp => ({ agency: a.name, painPoint: pp }))
+      ),
+      x => `${x.agency}|${x.painPoint}`
+    );
+
+    const allPriorities = dedupeBy(
+      agenciesWithPainPoints.flatMap(a =>
+        (a.priorities || []).map(pr => ({ agency: a.name, priority: pr }))
+      ),
+      x => `${x.agency}|${x.priority}`
+    );
+
+    // NAICS-to-keyword mapping for relevance scoring
+    const naicsKeywords: Record<string, string[]> = {
+      '54': ['consulting', 'professional', 'engineering', 'technical', 'IT', 'software', 'cyber', 'data', 'analytics', 'AI', 'cloud', 'digital', 'moderniz'],
+      '541': ['consulting', 'professional', 'engineering', 'technical', 'IT', 'software', 'cyber', 'data', 'analytics', 'AI', 'cloud', 'digital', 'moderniz'],
+      '23': ['construction', 'building', 'infrastructure', 'facility', 'renovation', 'HVAC', 'base infrastructure', 'energy'],
+      '236': ['construction', 'building', 'renovation', 'facility'],
+      '237': ['heavy construction', 'infrastructure', 'highway', 'bridge', 'utility'],
+      '238': ['specialty trade', 'electrical', 'plumbing', 'HVAC', 'mechanical'],
+      '56': ['administrative', 'facility support', 'security', 'janitorial', 'maintenance'],
+      '561': ['administrative', 'facility support', 'security', 'guard', 'staffing'],
+      '81': ['repair', 'maintenance', 'equipment'],
+      '811': ['repair', 'maintenance', 'equipment', 'vehicle'],
+      '518': ['hosting', 'cloud', 'data processing', 'data center'],
+      '336': ['manufacturing', 'aircraft', 'ship', 'vehicle', 'defense'],
+      '611': ['training', 'education', 'simulation'],
+      '621': ['health', 'medical', 'clinical'],
+      '622': ['hospital', 'health care'],
+    };
+
+    // Get keywords for user's NAICS
+    const userNaics = inputs.naicsCode || '';
+    const userKeywords: string[] = [];
+    // Check full code, 3-digit prefix, 2-digit sector
+    for (const prefix of [userNaics, userNaics.substring(0, 3), userNaics.substring(0, 2)]) {
+      if (naicsKeywords[prefix]) {
+        userKeywords.push(...naicsKeywords[prefix]);
+      }
+    }
+
+    // Score priority NAICS relevance
+    const scorePriorityRelevance = (priorityText: string): 'high' | 'medium' | 'low' => {
+      if (userKeywords.length === 0) return 'medium';
+      const lower = priorityText.toLowerCase();
+      const matchCount = userKeywords.filter(kw => lower.includes(kw.toLowerCase())).length;
+      if (matchCount >= 2) return 'high';
+      if (matchCount >= 1) return 'medium';
+      return 'low';
+    };
+
+    // Cross-reference: find areas where agency has BOTH a pain point AND a spending priority
+    const CROSS_REF_AREAS = [
+      { area: 'Cybersecurity', keywords: ['cyber', 'security', 'zero trust', 'cmmc', 'authorization'] },
+      { area: 'IT Modernization', keywords: ['moderniz', 'legacy system', 'cloud', 'digital', 'software'] },
+      { area: 'Infrastructure', keywords: ['infrastructure', 'facility', 'construction', 'building', 'base'] },
+      { area: 'Data & Analytics', keywords: ['data', 'analytics', 'AI', 'machine learning', 'artificial intelligence'] },
+      { area: 'Workforce', keywords: ['workforce', 'staffing', 'personnel', 'training', 'hiring'] },
+      { area: 'Supply Chain', keywords: ['supply chain', 'logistics', 'procurement', 'acquisition'] },
+      { area: 'Healthcare', keywords: ['health', 'medical', 'clinical', 'patient', 'EHR'] },
+      { area: 'Energy & Climate', keywords: ['energy', 'climate', 'renewable', 'sustainability', 'carbon'] },
+      { area: 'Compliance & Audit', keywords: ['compliance', 'audit', 'oversight', 'IG ', 'inspector general'] },
+      { area: 'Communications', keywords: ['5G', 'communication', 'network', 'spectrum', 'satellite'] },
+    ];
+
+    const highOpportunityMatches: Array<{
+      agency: string;
+      painPoint: string;
+      matchingPriority: string;
+      area: string;
+      fundingStatus: 'funded' | 'planned';
+      naicsRelevant: boolean;
+    }> = [];
+
+    for (const agencyData of agenciesWithPainPoints) {
+      const agencyPriorities = agencyData.priorities || [];
+      if (agencyPriorities.length === 0) continue;
+
+      for (const crossArea of CROSS_REF_AREAS) {
+        // Find pain points in this area
+        const matchingPainPoints = agencyData.painPoints.filter(pp =>
+          crossArea.keywords.some(kw => pp.toLowerCase().includes(kw))
+        );
+        // Find priorities in this area
+        const matchingPriorities = agencyPriorities.filter(pr =>
+          crossArea.keywords.some(kw => pr.toLowerCase().includes(kw))
+        );
+
+        if (matchingPainPoints.length > 0 && matchingPriorities.length > 0) {
+          const priority = matchingPriorities[0];
+          const isFunded = /\$[\d.]+[BMK]/i.test(priority);
+          const isNaicsRelevant = scorePriorityRelevance(priority) !== 'low';
+
+          highOpportunityMatches.push({
+            agency: agencyData.name,
+            painPoint: matchingPainPoints[0],
+            matchingPriority: priority,
+            area: crossArea.area,
+            fundingStatus: isFunded ? 'funded' : 'planned',
+            naicsRelevant: isNaicsRelevant,
+          });
+        }
+      }
+    }
+
+    // Sort: NAICS-relevant funded matches first, boosted by budget growth
+    highOpportunityMatches.sort((a, b) => {
+      const aBudget = getBudgetForAgency(a.agency);
+      const bBudget = getBudgetForAgency(b.agency);
+      const aBudgetGrowing = aBudget && aBudget.change.percent > 1 ? 3 : 0;
+      const bBudgetGrowing = bBudget && bBudget.change.percent > 1 ? 3 : 0;
+      const aScore = (a.naicsRelevant ? 4 : 0) + (a.fundingStatus === 'funded' ? 2 : 0) + aBudgetGrowing;
+      const bScore = (b.naicsRelevant ? 4 : 0) + (b.fundingStatus === 'funded' ? 2 : 0) + bBudgetGrowing;
+      return bScore - aScore;
+    });
+
+    const naicsRelevantPriorities = allPriorities.filter(pr =>
+      scorePriorityRelevance(pr.priority) !== 'low'
+    );
+
+    const agencyPainPoints = {
+      painPoints: allPainPoints.slice(0, 20).map(({ agency, painPoint }) => ({
+        agency,
+        painPoint,
+        opportunityMatch: scorePriorityRelevance(painPoint) === 'high'
+          ? `Strong NAICS ${userNaics} alignment — directly relevant to your capabilities`
+          : scorePriorityRelevance(painPoint) === 'medium'
+          ? `Moderate alignment with NAICS ${userNaics} capabilities`
+          : 'Your capabilities may address this agency challenge',
+        solutionPositioning: `Position your solutions to address: ${painPoint}`,
+        priority: painPoint.toLowerCase().includes('ndaa') || painPoint.toLowerCase().includes('critical')
+          ? 'high'
+          : 'medium',
+      })),
+      spendingPriorities: allPriorities.slice(0, 20).map(({ agency, priority }) => ({
+        agency,
+        priority,
+        fundingStatus: (/\$[\d.]+[BMK]/i.test(priority) ? 'funded' : 'planned') as 'funded' | 'planned',
+        actionItem: scorePriorityRelevance(priority) === 'high'
+          ? `High relevance to NAICS ${userNaics} — pursue actively`
+          : scorePriorityRelevance(priority) === 'medium'
+          ? `Moderate relevance — explore alignment with your capabilities`
+          : `Monitor for opportunities as they develop`,
+        naicsRelevance: scorePriorityRelevance(priority),
+      })),
+      highOpportunityMatches: highOpportunityMatches.slice(0, 15),
+      summary: {
+        totalPainPoints: allPainPoints.length,
+        totalSpendingPriorities: allPriorities.length,
+        highPriority: allPainPoints.filter(pp =>
+          pp.painPoint.toLowerCase().includes('ndaa') ||
+          pp.painPoint.toLowerCase().includes('critical')
+        ).length,
+        fundedPriorities: allPriorities.filter(pr =>
+          /\$[\d.]+[BMK]/i.test(pr.priority)
+        ).length,
+        highOpportunityMatches: highOpportunityMatches.length,
+        naicsRelevantPriorities: naicsRelevantPriorities.length,
+      },
+      recommendations: [
+        highOpportunityMatches.length > 0
+          ? `${highOpportunityMatches.length} high-opportunity matches found — agencies with BOTH a problem AND a funded priority in the same area`
+          : 'Cross-reference pain points with spending priorities to find funded opportunities',
+        naicsRelevantPriorities.length > 0
+          ? `${naicsRelevantPriorities.length} spending priorities align with your NAICS ${userNaics} capabilities`
+          : 'Review spending priorities for alignment with your capabilities',
+        'Target funded priorities (marked with $) — these have allocated budgets ready to spend',
+        'Reference pain points in capability statements and SBLO conversations',
+        'Highlight NDAA-related items for strategic positioning in proposals',
+        'Focus on high-opportunity matches first — these represent the strongest pursuit targets',
+      ],
+    };
+
+    const buyerAgencyData = selectedAgencyData && selectedAgencyData.length > 0
+      ? selectedAgencyData
+      : await buildFallbackAgencyData(selectedAgencies);
+    const usingEstimatedBuyerData = (!selectedAgencyData || selectedAgencyData.length === 0) && buyerAgencyData.length > 0;
+
+    // Generate Government Buyers Report using real USAspending data with enhanced command info.
+    // If USAspending lookup is unavailable/empty, fall back to target agencies so the dashboard
+    // still has a useful buyer map instead of showing zero agencies.
+    const governmentBuyersReport = buyerAgencyData.length > 0
+      ? (() => {
+          const agenciesWithCommandInfo = buyerAgencyData.map((agency) => {
+            // Get enhanced command info for all agencies (DoD and Civilian)
+            const commandInfo = getEnhancedAgencyInfo(
+              agency.contractingOffice || agency.name,
+              agency.subAgency || '',
+              agency.parentAgency || '',
+              agency.command
+            );
+
+            // Use OSBP from agency if available (from expanded DOD agencies), otherwise from command lookup
+            const osbpContact = agency.osbp
+              || (commandInfo?.osbpSource === 'directory' ? commandInfo.smallBusinessContact : null)
+              || null;
+
+            // Debug: Log civilian agencies without OSBP
+            if (!osbpContact && agency.parentAgency && !agency.parentAgency.includes('Defense')) {
+              console.log(`⚠️ No OSBP for civilian agency: "${agency.contractingOffice}" | sub: "${agency.subAgency}" | parent: "${agency.parentAgency}"`);
+            }
+
+            return {
+              contractingOffice: agency.contractingOffice || agency.name,
+              subAgency: agency.subAgency || agency.name,
+              parentAgency: agency.parentAgency,
+              hasSpecificOffice: agency.hasSpecificOffice ?? false,
+              spending: agency.setAsideSpending,
+              contractCount: agency.contractCount,
+              officeId: agency.officeId || agency.id,
+              subAgencyCode: agency.subAgencyCode || '',
+              contactStrategy: osbpContact
+                ? `Contact ${osbpContact.director} at ${osbpContact.email}`
+                : 'Contact the Office of Small Business Programs (OSBP)',
+              location: agency.location || 'Unknown',
+              // Enhanced command info
+              command: agency.command || commandInfo?.command || null,
+              website: agency.website || commandInfo?.website || null,
+              forecastUrl: agency.forecastUrl || commandInfo?.forecastUrl || null,
+              samForecastUrl: agency.samForecastUrl || commandInfo?.samForecastUrl || null,
+              osbp: osbpContact,
+            };
+          });
+
+          // Count how many have command-level data
+          const commandEnhancedCount = agenciesWithCommandInfo.filter(a => a.command).length;
+
+          return {
+            agencies: agenciesWithCommandInfo,
+            summary: {
+              totalAgencies: buyerAgencyData.length,
+              totalSpending: buyerAgencyData.reduce((sum, a) => sum + a.setAsideSpending, 0),
+              totalContracts: buyerAgencyData.reduce((sum, a) => sum + a.contractCount, 0),
+              commandEnhancedAgencies: commandEnhancedCount,
+              isEstimated: usingEstimatedBuyerData,
+            },
+            recommendations: [
+              ...(usingEstimatedBuyerData
+                ? ['Live buyer lookup returned no agency rows, so Mindy used your target agencies and cached budget data as an estimated buyer map']
+                : []),
+              commandEnhancedCount > 0
+                ? `${commandEnhancedCount} agencies have command-specific OSBP contacts - use these direct lines`
+                : 'Contact the Office of Small Business Programs (OSBP) at each agency',
+              'Use the provided forecast URLs to monitor upcoming opportunities',
+              'Visit command websites for industry day announcements',
+              'Attend industry days and networking events',
+              'Register in SAM.gov and agency-specific vendor databases',
+              'Prepare tailored capability statements for each agency',
+            ],
+          };
+        })()
+      : {
+          // No agency data provided — return empty report (no mock data)
+          agencies: [],
+          summary: {
+            totalAgencies: 0,
+            totalSpending: 0,
+            totalContracts: 0,
+            commandEnhancedAgencies: 0,
+          },
+          recommendations: [
+            'Agency data was not available — re-run the search to populate government buyer details',
+            'Contact the Office of Small Business Programs (OSBP) at each agency to introduce your capabilities',
+            'Register in SAM.gov and agency-specific vendor databases',
+          ],
+        };
+
+    // Generate Forecast List Report using LIVE Supabase forecasts (33,075 records)
+    const forecastListReport = await (async () => {
+      // Get forecasts for selected agencies, filtered by NAICS and business type
+      const allForecasts = await getLiveForecastsForSelectedAgencies(
+        selectedAgencies,
+        inputs.naicsCode,
+        inputs.businessType
+      );
+
+      // Get upcoming forecasts
+      const upcomingForecasts = getUpcomingForecasts(allForecasts, 20);
+
+      // Calculate statistics
+      const stats = getForecastStatistics(upcomingForecasts);
+
+      // Generate agency-specific forecast resources from command info
+      const agencyForecastResources: Array<{ command: string; forecastUrl: string; samForecastUrl: string }> = [];
+
+      if (selectedAgencyData && selectedAgencyData.length > 0) {
+        const seenCommands = new Set<string>();
+
+        selectedAgencyData
+          .filter(a => isDoDAgency(a.parentAgency || ''))
+          .forEach(a => {
+            const info = getEnhancedAgencyInfo(
+              a.contractingOffice || a.name,
+              a.subAgency || '',
+              a.parentAgency || '',
+              a.command
+            );
+
+            const commandKey = info.command || a.subAgency || a.parentAgency || '';
+            if (info.forecastUrl && !seenCommands.has(commandKey)) {
+              seenCommands.add(commandKey);
+              agencyForecastResources.push({
+                command: commandKey,
+                forecastUrl: info.forecastUrl,
+                samForecastUrl: info.samForecastUrl,
+              });
+            }
+          });
+      }
+
+      return {
+        forecasts: upcomingForecasts.map(forecast => ({
+          agency: forecast.agency,
+          quarter: forecast.quarter,
+          estimatedValue: forecast.estimatedValue,
+          solicitationDate: forecast.solicitationDate,
+          description: `${forecast.title} - ${forecast.description.substring(0, 150)}...`,
+          naicsCode: forecast.naicsCode,
+          contractType: forecast.contractType,
+          setAside: forecast.setAside,
+        })),
+        // Command-specific forecast resources
+        forecastResources: agencyForecastResources,
+        summary: {
+          totalForecasts: stats.totalForecasts,
+          totalValue: stats.totalValue,
+          forecastSources: agencyForecastResources.length,
+        },
+        recommendations: [
+          agencyForecastResources.length > 0
+            ? `${agencyForecastResources.length} command-specific forecast sources available - check these for the latest opportunities`
+            : 'Monitor solicitation dates and prepare proposals in advance',
+          'Review forecast details for NAICS codes matching your capabilities',
+          'Contact agency points of contact for additional information',
+          'Check agency forecast websites quarterly for updates and changes',
+          'Prepare capability statements tailored to forecasted opportunities',
+        ],
+      };
+    })();
+
+    const report: ComprehensiveReport = {
+      governmentBuyers: governmentBuyersReport,
+      tier2Subcontracting,
+      forecastList: forecastListReport,
+      agencyNeeds: (() => {
+        // Use command-level data if available, otherwise fall back to basic agency names
+        let needs;
+        if (selectedAgencyData && selectedAgencyData.length > 0) {
+          // Enhanced: Use command-level pain points for more specific matching
+          needs = generateAgencyNeedsWithCommands(
+            selectedAgencyData.map(a => ({
+              name: a.name,
+              contractingOffice: a.contractingOffice,
+              subAgency: a.subAgency,
+              parentAgency: a.parentAgency,
+              command: a.command,
+            })),
+            {
+              naicsCode: inputs.naicsCode,
+              businessType: inputs.businessType,
+              goodsOrServices: inputs.goodsOrServices,
+            }
+          );
+        } else {
+          // Fallback: Use basic agency names
+          needs = generateAgencyNeeds(selectedAgencies, {
+            naicsCode: inputs.naicsCode,
+            businessType: inputs.businessType,
+            goodsOrServices: inputs.goodsOrServices,
+          });
+        }
+
+        // Same agency selected twice (parent + sub-office) repeats identical
+        // "AGENCY / requirement" rows — dedupe so the card and the count agree.
+        needs = dedupeBy(needs, n => `${n.agency}|${n.requirement}`);
+
+        const totalNeeds = needs.length;
+        const matchedNeeds = needs.filter(n =>
+          n.capabilityMatch !== 'General capabilities align with agency needs'
+        ).length;
+        const matchRate = totalNeeds > 0 ? Math.round((matchedNeeds / totalNeeds) * 100) : 0;
+
+        // Count how many have command-level pain points
+        const commandLevelNeeds = needs.filter((n) =>
+          'painPointSource' in n && n.painPointSource && n.painPointSource !== n.agency
+        ).length;
+
+        return {
+          // Expose `need` (the field the dashboard card + type expect) alongside
+          // the original `requirement`, so the second line renders instead of
+          // showing blank. Keep the rest of the shape intact.
+          needs: needs.slice(0, 20).map(n => ({ ...n, need: n.requirement })), // Top 20 needs
+          summary: {
+            totalNeeds,
+            matchRate,
+          },
+          recommendations: [
+            commandLevelNeeds > 0 ? `${commandLevelNeeds} needs matched to specific DoD commands for targeted positioning` : 'Focus on NDAA-related needs for strategic positioning',
+            'Prioritize needs with strong capability matches',
+            'Develop capability statements addressing specific agency requirements',
+            'Reference agency needs in SBLO conversations and proposals',
+            'Track agency needs alignment with your solution development roadmap',
+          ],
+        };
+      })(),
+      agencyPainPoints,
+      decemberSpend: (() => {
+        const decemberOpportunities = getOpportunitiesByCoreInputs(inputs, selectedAgencies);
+        
+        return {
+          opportunities: decemberOpportunities.slice(0, 20).map(opp => ({
+            agency: opp.agency,
+            estimatedQ4Spend: opp.unobligatedBalanceAmount || 0,
+            urgencyLevel: getUrgencyLevel(opp),
+            quickWinStrategy: getQuickWinStrategy(opp, inputs),
+            program: opp.program,
+            primeContractor: opp.primeContractor || opp.prime_contractor || '',
+            sbloContact: (opp.sbloEmail || opp.sblo_email)
+              ? {
+                  name: opp.sbloName || opp.sblo_name || '',
+                  email: opp.sbloEmail || opp.sblo_email || '',
+                  phone: opp.sbloPhone || opp.sblo_phone || null,
+                }
+              : undefined,
+            hotNaics: opp.hotNaics || opp.hot_naics || '',
+          })),
+          summary: {
+            totalQ4Spend: decemberOpportunities.reduce((sum, opp) => 
+              sum + (opp.unobligatedBalanceAmount || 0), 0
+            ),
+            urgentOpportunities: decemberOpportunities.filter(opp => 
+              getUrgencyLevel(opp) === 'high'
+            ).length,
+          },
+          recommendations: (() => {
+            const month = new Date().toLocaleString('default', { month: 'long' });
+            const isQ4 = [7, 8, 9].includes(new Date().getMonth()); // Jul-Sep = fiscal Q4
+            const urgencyNote = isQ4
+              ? `Contact SBLOs immediately - ${month} is "use it or lose it" season for unspent funds`
+              : `Contact SBLOs now - agencies are planning ${month} acquisitions`;
+            return [
+              urgencyNote,
+              'Focus on opportunities with high unobligated balances',
+              'Prepare quick-turnaround capability statements',
+              'Emphasize your set-aside certifications for fast-track opportunities',
+              'Request 15-minute intro calls this week',
+              'Monitor SAM.gov daily for new postings',
+            ];
+          })(),
+        };
+      })(),
+      tribalContracting,
+      primeContractor,
+      idvContracts: await (async () => {
+        try {
+          const idvResult = await searchIDVContracts({
+            naicsCode: inputs.naicsCode,
+            pscCode: inputs.pscCode,  // Pass PSC code for filtering
+            minValue: 1000000, // $1M+ for meaningful IDV contracts
+            limit: 50
+          });
+
+          // Generate search context for recommendations
+          const searchContext = inputs.pscCode && inputs.naicsCode
+            ? `NAICS ${inputs.naicsCode} and PSC ${inputs.pscCode}`
+            : inputs.pscCode
+            ? `PSC ${inputs.pscCode}`
+            : inputs.naicsCode
+            ? `NAICS ${inputs.naicsCode}`
+            : 'your industry';
+
+          return {
+            contracts: idvResult.contracts,
+            summary: {
+              totalContracts: idvResult.contracts.length,
+              totalValue: idvResult.contracts.reduce((sum, c) => sum + c.awardAmount, 0),
+              uniquePrimes: new Set(idvResult.contracts.map(c => c.recipientName)).size,
+            },
+            recommendations: [
+              `These contracts match ${searchContext} - contact primes for subcontracting`,
+              'Contact the SBLO (Small Business Liaison Officer) at each prime contractor',
+              'Focus on IDVs with 1-2 years remaining - they need to meet subcontracting goals',
+              'Register in prime contractor supplier portals (many have them)',
+              'Prepare a strong capability statement highlighting your certifications',
+              'Large primes are required to subcontract with small businesses - use this leverage',
+            ],
+          };
+        } catch (error) {
+          console.error('Error fetching IDV contracts:', error);
+          return {
+            contracts: [],
+            summary: {
+              totalContracts: 0,
+              totalValue: 0,
+              uniquePrimes: 0,
+            },
+            recommendations: [
+              'IDV contract data temporarily unavailable',
+              'Try refreshing the report later',
+            ],
+          };
+        }
+      })(),
+      budgetCheckup: (() => {
+        // Build budget checkup from cached FY2025 vs FY2026 data
+        // Uses parent agency names for toptier budget lookups
+        const agencyNamesForBudget = selectedAgencyData && selectedAgencyData.length > 0
+          ? [...new Set(selectedAgencyData.map(a => a.parentAgency || a.name))]
+          : selectedAgencies;
+        return buildCachedBudgetCheckup(agencyNamesForBudget) || undefined;
+      })(),
+      simplifiedAcquisition: (() => {
+        // Build SAT analysis from selectedAgencyData (SAT fields flow from find-agencies)
+        if (!selectedAgencyData || selectedAgencyData.length === 0) return undefined;
+
+        const agenciesWithSAT = selectedAgencyData.filter(a =>
+          (a.satContractCount && a.satContractCount > 0) || (a.contractCount && a.contractCount > 0)
+        );
+        if (agenciesWithSAT.length === 0) return undefined;
+
+        const satAgencies: SimplifiedAcquisitionAgency[] = agenciesWithSAT.map(a => {
+          const satCount = a.satContractCount || 0;
+          const microCount = a.microContractCount || 0;
+          const totalCount = a.contractCount || 0;
+          const satSpend = a.satSpending || 0;
+          const microSpend = a.microSpending || 0;
+          const totalSpend = a.setAsideSpending || 0;
+
+          const satPercent = totalCount > 0 ? (satCount / totalCount) * 100 : 0;
+          const satSpendPercent = totalSpend > 0 ? (satSpend / totalSpend) * 100 : 0;
+          const microPercent = totalCount > 0 ? (microCount / totalCount) * 100 : 0;
+          const avgSATAwardSize = satCount > 0 ? satSpend / satCount : 0;
+
+          // Composite score: 60% SAT%, 20% micro%, 20% volume (log-scaled)
+          const volumeScore = Math.min(100, (Math.log10(Math.max(1, satCount)) / Math.log10(500)) * 100);
+          const satFriendlinessScore = Math.round(
+            satPercent * 0.6 + microPercent * 0.2 + volumeScore * 0.2
+          );
+
+          const accessibilityLevel: 'high' | 'moderate' | 'low' =
+            satPercent > 50 ? 'high' : satPercent > 25 ? 'moderate' : 'low';
+
+          return {
+            agency: a.name,
+            parentAgency: a.parentAgency || a.subAgency || '',
+            satSpending: satSpend,
+            satContractCount: satCount,
+            microSpending: microSpend,
+            microContractCount: microCount,
+            totalSpending: totalSpend,
+            totalContractCount: totalCount,
+            satPercent: Math.round(satPercent * 10) / 10,
+            satSpendPercent: Math.round(satSpendPercent * 10) / 10,
+            microPercent: Math.round(microPercent * 10) / 10,
+            avgSATAwardSize: Math.round(avgSATAwardSize),
+            satFriendlinessScore,
+            accessibilityLevel,
+            isEstimated: a.isEstimated,
+          };
+        });
+
+        // Sort by friendliness score descending
+        satAgencies.sort((a, b) => b.satFriendlinessScore - a.satFriendlinessScore);
+
+        const totalSATSpending = satAgencies.reduce((s, a) => s + a.satSpending, 0);
+        const totalSATContracts = satAgencies.reduce((s, a) => s + a.satContractCount, 0);
+        const totalMicroSpending = satAgencies.reduce((s, a) => s + a.microSpending, 0);
+        const totalMicroContracts = satAgencies.reduce((s, a) => s + a.microContractCount, 0);
+        const satFriendlyCount = satAgencies.filter(a => a.accessibilityLevel === 'high').length;
+        const topSATAgency = satAgencies.length > 0 ? satAgencies[0].agency : 'N/A';
+        const avgSATPercent = satAgencies.length > 0
+          ? Math.round(satAgencies.reduce((s, a) => s + a.satPercent, 0) / satAgencies.length * 10) / 10
+          : 0;
+
+        // Generate recommendations based on data
+        const recommendations: string[] = [];
+        if (satFriendlyCount > 0) {
+          recommendations.push(
+            `${satFriendlyCount} of ${satAgencies.length} agencies have high SAT activity (>50% simplified acquisitions). These are your best entry points for winning first contracts.`
+          );
+        }
+        if (totalMicroContracts > 0) {
+          recommendations.push(
+            `${totalMicroContracts} micro-purchases (under $${(MICRO_PURCHASE_THRESHOLD / 1000).toFixed(0)}K) found — these require minimal paperwork and use government purchase cards. Consider these for quick wins.`
+          );
+        }
+        const highScoreAgencies = satAgencies.filter(a => a.satFriendlinessScore >= 60).slice(0, 3);
+        if (highScoreAgencies.length > 0) {
+          recommendations.push(
+            `Top entry points: ${highScoreAgencies.map(a => a.agency).join(', ')}. Focus outreach on these offices first.`
+          );
+        }
+        if (avgSATPercent < 25) {
+          recommendations.push(
+            `Most agencies in your search use larger contracts above the $${(SIMPLIFIED_ACQUISITION_THRESHOLD / 1000).toFixed(0)}K simplified acquisition threshold. Consider expanding your search or positioning for subcontracting on larger awards.`
+          );
+        }
+
+        return {
+          agencies: satAgencies,
+          summary: {
+            totalSATSpending,
+            totalSATContracts,
+            totalMicroSpending,
+            totalMicroContracts,
+            avgSATPercent,
+            topSATAgency,
+            satFriendlyAgencies: satFriendlyCount,
+            totalAgenciesAnalyzed: satAgencies.length,
+          },
+          recommendations,
+        } as SimplifiedAcquisitionReport;
+      })(),
+      pricingIntel: await (async () => {
+        try {
+          const naics = inputs.naicsCode?.trim();
+          if (!naics) return undefined;
+          console.log(`[generate-all] Fetching pricing intel for NAICS ${naics}...`);
+          const data = await fetchPricingIntel(naics);
+          if (!data || data.laborCategories.length === 0) return undefined;
+          return data;
+        } catch (error) {
+          console.error('[generate-all] Pricing intel error:', error);
+          return undefined;
+        }
+      })(),
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        inputs,
+        selectedAgencies,
+        totalAgencies: selectedAgencies.length,
+        userEmail: userEmail || undefined,
+      },
+    };
+
+    // Save alert profile for ALL MA users (non-blocking)
+    // This updates their alert preferences with the NAICS/PSC codes they actually use
+    if (email) {
+      const userTier = await getMarketAssassinTier(email);
+      if (userTier) {
+        saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
+          console.error('[Alerts] Failed to save profile:', err);
+        });
+      }
+    }
+
+    // Filter reports based on access tier
+    // Free tier only gets: governmentBuyers, budgetCheckup, simplifiedAcquisition
+    const filteredReport = accessTier === 'free' ? {
+      governmentBuyers: report.governmentBuyers,
+      budgetCheckup: report.budgetCheckup,
+      simplifiedAcquisition: report.simplifiedAcquisition,
+      metadata: report.metadata,
+    } : report;
+
+    // INSTRUMENTATION INTEGRITY — `federal-market-assassin` was one of the two genuinely
+    // blind product surfaces (audited 2026-08-23: a live 918-line tool emitting ZERO
+    // engagement events, so Feature Usage showed 0 and nobody could tell whether that meant
+    // "unused" or "unobservable").
+    //
+    // Emitted HERE, on the report actually being produced — not on page load. The registry
+    // records what proves use: "a report generated — opening the 5-input form is not use".
+    // ⚠️ AWAITED, not fire-and-forget. MEASURED on prod 2026-08-23: the first report emitted
+    // NO event and an identical second one did — 1 event from 2 reports. A serverless function
+    // can terminate as soon as it responds, so a floating promise here is a coin flip and the
+    // surface would have under-reported forever while looking instrumented.
+    // The insert is a single indexed write (~ms) against a 27s report, and it is wrapped so a
+    // telemetry failure still cannot break the customer's report.
+    if (email) {
+      await logEngagement({
+        userEmail: email,
+        eventType: EventTypes.REPORT_GENERATE,
+        eventSource: 'federal-market-assassin',
+        metadata: {
+          surface: 'federal-market-assassin',
+          action: 'report_generated',
+          accessTier,
+          agencies: Array.isArray(selectedAgencies) ? selectedAgencies.length : 0,
+        },
+      }).catch(() => { /* never break the report on telemetry */ });
+    }
+
+    return NextResponse.json({
+      success: true,
+      report: filteredReport,
+      accessTier, // Let client know what tier they have
+    });
+  } catch (error) {
+    // Log detailed error for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('[generate-all] Error:', {
+      message: errorMessage,
+      stack: errorStack?.split('\n').slice(0, 5).join('\n'),
+    });
+
+    // Return more helpful error message
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Failed to generate reports: ${errorMessage}`,
+        // Include hint for common issues
+        hint: errorMessage.includes('fetch') || errorMessage.includes('network')
+          ? 'Network error - please try again'
+          : errorMessage.includes('timeout')
+          ? 'Request timed out - please try again'
+          : 'Please try again or contact support if the issue persists',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Save alert profile for MA Premium users
+ * Called after report generation to enable weekly alerts
+ *
+ * Supports:
+ * - NAICS code input (single or comma-separated prefixes like "236, 238")
+ * - PSC code input (will be expanded to related NAICS codes)
+ */
+async function saveAlertProfile(
+  email: string,
+  inputs: CoreInputs,
+  selectedAgencies: string[]
+): Promise<void> {
+  try {
+    // Build NAICS codes array - handle comma-separated input
+    const naicsCodes: string[] = [];
+    if (inputs.naicsCode) {
+      // Support comma-separated NAICS codes/prefixes (e.g., "236, 238320, 541")
+      const codes = inputs.naicsCode.split(/[,;\s]+/).map(c => c.trim()).filter(c => c);
+      naicsCodes.push(...codes);
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai'}/api/alerts/save-profile`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          naicsCodes,
+          pscCode: inputs.pscCode || null, // PSC code will be expanded to related NAICS
+          businessType: inputs.businessType || null,
+          targetAgencies: selectedAgencies.slice(0, 10), // Top 10 agencies
+          locationZip: inputs.zipCode || null,
+        }),
+      }
+    );
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`[Alerts] Saved alert profile for ${email}: ${result.data?.naicsCount || 0} NAICS codes`);
+    }
+  } catch (error) {
+    // Non-blocking, just log
+    console.error('[Alerts] Error saving profile:', error);
+  }
+}

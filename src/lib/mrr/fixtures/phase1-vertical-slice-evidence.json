@@ -1,0 +1,3683 @@
+{
+  "generatedAt": "2026-09-05T10:40:43.516Z",
+  "requirement": {
+    "title": "JOMIS Joint Medical Planning, Modeling and Simulation Capabilities",
+    "agency": "Defense Health Agency",
+    "keyword": "modeling and simulation",
+    "description": "The Defense Health Agency (DHA), Joint Operational Medicine Information Systems (JOMIS) Program Management Office is conducting market research on joint medical planning, modeling and simulation capabilities. Sources sought notice; responses due 2026-09-13.",
+    "sub_agency": "Department of Defense",
+    "naics": "541512",
+    "psc": "DA01",
+    "solicitation_number": "DHA_JOMIS_JMP_20260813",
+    "notice_id": "213a2fe3a447465e8f30699c9f056ec4"
+  },
+  "normalizationNotes": [],
+  "templateSha256": "a40251bb9a4dcad91be817e3d943b365f6257670ac4d821868ea5084b74c0f86",
+  "cells": [
+    {
+      "label": "§9 Award 1 contract number",
+      "state": "value",
+      "text": "36C10B22N0051EHRM",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 1 recipient",
+      "state": "value",
+      "text": "ORACLE HEALTH GOVERNMENT SERVICES, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 1 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 1 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 1 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 1 amount",
+      "state": "value",
+      "text": "$1,680,767,128 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 1 period of performance",
+      "state": "value",
+      "text": "2022-09-28 → 2027-12-24",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0051EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0051EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 2 contract number",
+      "state": "value",
+      "text": "47QFCA21F0018",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 2 recipient",
+      "state": "value",
+      "text": "BOOZ ALLEN HAMILTON INC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 2 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 2 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 2 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 2 amount",
+      "state": "value",
+      "text": "$1,379,603,153 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 2 period of performance",
+      "state": "value",
+      "text": "2021-03-09 → 2025-02-15",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0018_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 3 contract number",
+      "state": "value",
+      "text": "36C10B21N10070021",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 3 recipient",
+      "state": "value",
+      "text": "BOOZ ALLEN HAMILTON INC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 3 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 3 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 3 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 3 amount",
+      "state": "value",
+      "text": "$1,365,285,600 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 3 period of performance",
+      "state": "value",
+      "text": "2021-05-17 → 2026-08-07",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10070021"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10070021_3600_VA11816D1007_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 4 contract number",
+      "state": "value",
+      "text": "47QFCA21F0001",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 4 recipient",
+      "state": "value",
+      "text": "SCIENCE APPLICATIONS INTERNATIONAL CORPORATION",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 4 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 4 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 4 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 4 amount",
+      "state": "value",
+      "text": "$1,205,937,998 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 4 period of performance",
+      "state": "value",
+      "text": "2020-11-30 → 2026-11-27",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0001_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 5 contract number",
+      "state": "value",
+      "text": "36C10B21N10150056",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 5 recipient",
+      "state": "value",
+      "text": "BOOZ ALLEN HAMILTON INC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 5 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 5 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 5 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 5 amount",
+      "state": "value",
+      "text": "$1,139,008,033 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 5 period of performance",
+      "state": "value",
+      "text": "2021-01-08 → 2025-04-15",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150056"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150056_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 6 contract number",
+      "state": "value",
+      "text": "47QFRA24F0005",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 6 recipient",
+      "state": "value",
+      "text": "CACI, INC. - FEDERAL",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 6 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 6 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 6 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 6 amount",
+      "state": "value",
+      "text": "$862,845,351 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 6 period of performance",
+      "state": "value",
+      "text": "2024-05-01 → 2027-04-30",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0005"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0005_4732_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 7 contract number",
+      "state": "value",
+      "text": "75FCMC21F0002",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 7 recipient",
+      "state": "value",
+      "text": "ACCENTURE FEDERAL SERVICES LLC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 7 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 7 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 7 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 7 amount",
+      "state": "value",
+      "text": "$796,233,863 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 7 period of performance",
+      "state": "value",
+      "text": "2021-07-11 → 2027-01-10",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "75FCMC21F0002"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_75FCMC21F0002_7530_HHSM500201600003I_7530"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 8 contract number",
+      "state": "value",
+      "text": "36C10B22N0047EHRM",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 8 recipient",
+      "state": "value",
+      "text": "ORACLE HEALTH GOVERNMENT SERVICES, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 8 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 8 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 8 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 8 amount",
+      "state": "value",
+      "text": "$735,950,422 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 8 period of performance",
+      "state": "value",
+      "text": "2022-05-01 → 2027-06-30",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0047EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0047EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 9 contract number",
+      "state": "value",
+      "text": "36C10B21N10150057",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 9 recipient",
+      "state": "value",
+      "text": "BOOZ ALLEN HAMILTON INC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 9 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 9 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 9 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 9 amount",
+      "state": "value",
+      "text": "$713,794,281 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 9 period of performance",
+      "state": "value",
+      "text": "2021-09-30 → 2027-01-23",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B21N10150057"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B21N10150057_3600_VA11816D1015_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 10 contract number",
+      "state": "value",
+      "text": "47QFRA24F0006",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 10 recipient",
+      "state": "value",
+      "text": "BOOZ ALLEN HAMILTON INC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 10 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 10 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 10 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 10 amount",
+      "state": "value",
+      "text": "$663,100,865 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 10 period of performance",
+      "state": "value",
+      "text": "2024-05-01 → 2027-04-30",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFRA24F0006"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFRA24F0006_4732_47QTCK18D0004_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 11 contract number",
+      "state": "value",
+      "text": "70B04C24F00001129",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 11 recipient",
+      "state": "value",
+      "text": "CACI, INC. - FEDERAL",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 11 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 11 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 11 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 11 amount",
+      "state": "value",
+      "text": "$486,919,633 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 11 period of performance",
+      "state": "value",
+      "text": "2024-09-30 → 2026-09-30",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "70B04C24F00001129"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_70B04C24F00001129_7014_47QTCK18D0009_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 12 contract number",
+      "state": "value",
+      "text": "47QFCA21F0073",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 12 recipient",
+      "state": "value",
+      "text": "SALIENT CRGT, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 12 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 12 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 12 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 12 amount",
+      "state": "value",
+      "text": "$452,080,497 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 12 period of performance",
+      "state": "value",
+      "text": "2021-08-27 → 2027-09-06",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0073"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0073_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 13 contract number",
+      "state": "value",
+      "text": "47QFCA22F0018",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 13 recipient",
+      "state": "value",
+      "text": "GENERAL DYNAMICS INFORMATION TECHNOLOGY, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 13 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 13 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 13 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 13 amount",
+      "state": "value",
+      "text": "$450,259,426 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 13 period of performance",
+      "state": "value",
+      "text": "2022-04-04 → 2027-04-03",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0018"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0018_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 14 contract number",
+      "state": "value",
+      "text": "36C10B22N0045EHRM",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 14 recipient",
+      "state": "value",
+      "text": "ORACLE HEALTH GOVERNMENT SERVICES, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 14 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 14 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 14 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 14 amount",
+      "state": "value",
+      "text": "$423,192,138 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 14 period of performance",
+      "state": "value",
+      "text": "2022-08-15 → 2027-02-15",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N0045EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N0045EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 15 contract number",
+      "state": "value",
+      "text": "36C10B24F0420",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 15 recipient",
+      "state": "value",
+      "text": "IT CONCEPTS, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 15 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 15 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 15 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 15 amount",
+      "state": "value",
+      "text": "$408,590,308 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 15 period of performance",
+      "state": "value",
+      "text": "2024-09-30 → 2027-09-29",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24F0420"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24F0420_3600_GS35F0441Y_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 16 contract number",
+      "state": "value",
+      "text": "47QFCA23F0017",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 16 recipient",
+      "state": "value",
+      "text": "SCIENCE APPLICATIONS INTERNATIONAL CORPORATION",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 16 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 16 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 16 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 16 amount",
+      "state": "value",
+      "text": "$388,673,246 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 16 period of performance",
+      "state": "value",
+      "text": "2023-03-02 → 2027-03-01",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0017"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0017_4732_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 17 contract number",
+      "state": "value",
+      "text": "FA873022F0071",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 17 recipient",
+      "state": "value",
+      "text": "SCIENCE APPLICATIONS INTERNATIONAL CORPORATION",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 17 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 17 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 17 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 17 amount",
+      "state": "value",
+      "text": "$334,873,858 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 17 period of performance",
+      "state": "value",
+      "text": "2022-03-24 → 2026-08-08",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA873022F0071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA873022F0071_9700_47QTCK18D0001_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 18 contract number",
+      "state": "value",
+      "text": "47QFCA21F0014",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 18 recipient",
+      "state": "value",
+      "text": "EMPOWER AI, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 18 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 18 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 18 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 18 amount",
+      "state": "value",
+      "text": "$328,155,101 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 18 period of performance",
+      "state": "value",
+      "text": "2021-01-05 → 2026-07-04",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA21F0014"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA21F0014_4732_47QTCK18D0055_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 19 contract number",
+      "state": "value",
+      "text": "47QFCA22F0026",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 19 recipient",
+      "state": "value",
+      "text": "SALIENT CRGT, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 19 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 19 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 19 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 19 amount",
+      "state": "value",
+      "text": "$323,697,465 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 19 period of performance",
+      "state": "value",
+      "text": "2022-06-03 → 2027-06-02",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA22F0026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA22F0026_4732_47QTCK18D0060_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 20 contract number",
+      "state": "value",
+      "text": "47QFCA24F0009",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 20 recipient",
+      "state": "value",
+      "text": "GENERAL DYNAMICS INFORMATION TECHNOLOGY, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 20 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 20 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 20 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 20 amount",
+      "state": "value",
+      "text": "$323,428,246 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 20 period of performance",
+      "state": "value",
+      "text": "2024-02-05 → 2027-02-04",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA24F0009"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA24F0009_4732_47QTCK18D0003_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 21 contract number",
+      "state": "value",
+      "text": "47QFCA23F0039",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 21 recipient",
+      "state": "value",
+      "text": "LEIDOS, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 21 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 21 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 21 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 21 amount",
+      "state": "value",
+      "text": "$322,532,138 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 21 period of performance",
+      "state": "value",
+      "text": "2023-09-11 → 2030-12-31",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "47QFCA23F0039"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_47QFCA23F0039_4732_47QTCK18D0008_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 22 contract number",
+      "state": "value",
+      "text": "FA872624FB071",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 22 recipient",
+      "state": "value",
+      "text": "ACCENTURE FEDERAL SERVICES LLC",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 22 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 22 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 22 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 22 amount",
+      "state": "value",
+      "text": "$307,299,732 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 22 period of performance",
+      "state": "value",
+      "text": "2024-09-11 → 2026-06-10",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "FA872624FB071"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_FA872624FB071_9700_GS35F540GA_4732"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 23 contract number",
+      "state": "value",
+      "text": "36C10B24N0063EHRM",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 23 recipient",
+      "state": "value",
+      "text": "ORACLE HEALTH GOVERNMENT SERVICES, INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 23 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 23 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 23 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 23 amount",
+      "state": "value",
+      "text": "$299,999,849 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 23 period of performance",
+      "state": "value",
+      "text": "2024-09-30 → 2027-06-14",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B24N0063EHRM"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B24N0063EHRM_3600_36C10B18D5000_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 24 contract number",
+      "state": "value",
+      "text": "36C10B22N10280026",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 24 recipient",
+      "state": "value",
+      "text": "VETERANS EZ INFO INC.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 24 contract type",
+      "state": "value",
+      "text": "DELIVERY ORDER",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 24 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 24 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 24 amount",
+      "state": "value",
+      "text": "$284,648,783 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 24 period of performance",
+      "state": "value",
+      "text": "2022-09-28 → 2027-08-27",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "36C10B22N10280026"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_36C10B22N10280026_3600_VA11816D1028_3600"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 25 contract number",
+      "state": "value",
+      "text": "80GSFC21CA001",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 25 recipient",
+      "state": "value",
+      "text": "RAYTHEON COMPANY",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 25 contract type",
+      "state": "value",
+      "text": "DEFINITIVE CONTRACT",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 25 procurement method",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report a procurement method / extent competed",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ],
+      "reason": "the source did not report a procurement method / extent competed"
+    },
+    {
+      "label": "§9 Award 25 offerors",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — the source did not report the number of offerors",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ],
+      "reason": "the source did not report the number of offerors"
+    },
+    {
+      "label": "§9 Award 25 amount",
+      "state": "value",
+      "text": "$273,007,966 — award lifetime total to date, as reported by USASpending",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award 25 period of performance",
+      "state": "value",
+      "text": "2021-08-01 → 2027-01-31",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.116Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25,
+            "award": "80GSFC21CA001"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_80GSFC21CA001_8000_-NONE-_-NONE-"
+        }
+      ]
+    },
+    {
+      "label": "§9 Award history finding",
+      "state": "value",
+      "text": "25 award row(s) returned for the stated filters. Scope note: no awards matched when filtered to \"Defense Health Agency\", so the search was widened to the NAICS/PSC market. These rows are market-wide for the code and are NOT limited to the requiring activity.",
+      "evidence": [
+        {
+          "source": "Mindy MCP search_past_contracts",
+          "retrievedAt": "2026-09-05T10:40:45.115Z",
+          "query": {
+            "naics": "541512",
+            "psc": "DA01",
+            "include_idv": true,
+            "limit": 25
+          }
+        }
+      ]
+    },
+    {
+      "label": "§9 Predecessor / incumbent",
+      "state": "degraded",
+      "text": "Degraded — no sufficiently consistent predecessor award established — candidate awarding activity \"Department of the Army / Department of Defense\" does not correspond to requested \"Defense Health Agency\"; a shared department is not sufficient; requirement NAICS 541512 vs candidate 541712 — different industry",
+      "evidence": [
+        {
+          "source": "Mindy MCP get_solicitation_incumbent",
+          "retrievedAt": "2026-09-05T10:40:47.302Z",
+          "query": {
+            "solicitation_number": "DHA_JOMIS_JMP_20260813",
+            "notice_id": "213a2fe3a447465e8f30699c9f056ec4"
+          },
+          "url": "https://www.usaspending.gov/award/CONT_AWD_0024_9700_W909MY12D0004_9700"
+        }
+      ],
+      "reason": "no sufficiently consistent predecessor award established — candidate awarding activity \"Department of the Army / Department of Defense\" does not correspond to requested \"Defense Health Agency\"; a shared department is not sufficient; requirement NAICS 541512 vs candidate 541712 — different industry"
+    },
+    {
+      "label": "§5 Primary PSC",
+      "state": "value",
+      "text": "DA01",
+      "evidence": [
+        {
+          "source": "Requirement intake (operator-supplied)",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "psc": "DA01"
+          }
+        }
+      ]
+    },
+    {
+      "label": "§5 PSC description",
+      "state": "unknown",
+      "text": "Unknown / Insufficient evidence — no title for PSC DA01 in the grounded coverage result",
+      "evidence": [
+        {
+          "source": "Mindy MCP get_keyword_coverage",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "keyword": "modeling and simulation"
+          }
+        }
+      ],
+      "reason": "no title for PSC DA01 in the grounded coverage result"
+    },
+    {
+      "label": "§5 Primary NAICS",
+      "state": "value",
+      "text": "541512",
+      "evidence": [
+        {
+          "source": "Requirement intake (operator-supplied)",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "naics": "541512"
+          }
+        }
+      ]
+    },
+    {
+      "label": "§5 NAICS description",
+      "state": "value",
+      "text": "Computer Systems Design Services",
+      "evidence": [
+        {
+          "source": "Mindy MCP get_keyword_coverage",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "keyword": "modeling and simulation"
+          }
+        }
+      ]
+    },
+    {
+      "label": "§5 SBA size standard",
+      "state": "value",
+      "text": "$34.0 million in average annual receipts (13 CFR 121.201, as in force 2026-09-01)",
+      "evidence": [
+        {
+          "source": "SBA 13 CFR 121.201, as in force 2026-09-01 (13 CFR 121.201)",
+          "retrievedAt": "2026-09-05T10:40:44.705Z",
+          "query": {
+            "naics": "541512"
+          },
+          "url": "https://www.ecfr.gov/current/title-13/section-121.201"
+        }
+      ]
+    },
+    {
+      "label": "§5 Basis for NAICS selection",
+      "state": "value",
+      "text": "Measured against federal obligations matching \"modeling and simulation\": $412.6M across 20 NAICS code(s). 541512 represents 4.7% of that measured market. Coverage set (20 code(s)): 541715, 541330, 541713, 541512, 541712, 334511, 541511, 541519, 541611, 541720, 541613, 541990, 928110, 541690, 334111, 511210, 541620, 513210, 334220, 424120.",
+      "evidence": [
+        {
+          "source": "Mindy MCP get_keyword_coverage",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "keyword": "modeling and simulation"
+          }
+        }
+      ]
+    },
+    {
+      "label": "§5 Measured market total",
+      "state": "value",
+      "text": "$412,644,102",
+      "evidence": [
+        {
+          "source": "Mindy MCP get_keyword_coverage",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "keyword": "modeling and simulation"
+          }
+        }
+      ]
+    },
+    {
+      "label": "§5 Cumulative coverage",
+      "state": "value",
+      "text": "90%",
+      "evidence": [
+        {
+          "source": "Mindy MCP get_keyword_coverage",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "keyword": "modeling and simulation"
+          }
+        }
+      ]
+    },
+    {
+      "label": "§5 Coverage keyword",
+      "state": "value",
+      "text": "modeling and simulation",
+      "evidence": [
+        {
+          "source": "Requirement intake (operator-supplied)",
+          "retrievedAt": "2026-09-05T10:40:44.704Z",
+          "query": {
+            "keyword": "modeling and simulation"
+          }
+        }
+      ]
+    }
+  ],
+  "calls": [
+    {
+      "tool": "derive_company_keywords",
+      "args": {
+        "description": "The Defense Health Agency (DHA), Joint Operational Medicine Information Systems (JOMIS) Program Management Office is conducting market research on joint medical planning, modeling and simulation capabilities. Sources sought notice; responses due 2026-09-13.",
+        "code_titles": [
+          "JOMIS Joint Medical Planning, Modeling and Simulation Capabilities"
+        ],
+        "limit": 12
+      },
+      "ok": true,
+      "retrievedAt": "2026-09-05T10:40:43.519Z"
+    },
+    {
+      "tool": "get_keyword_coverage",
+      "args": {
+        "keyword": "modeling and simulation"
+      },
+      "ok": true,
+      "retrievedAt": "2026-09-05T10:40:44.704Z"
+    },
+    {
+      "tool": "search_past_contracts",
+      "args": {
+        "naics": "541512",
+        "psc": "DA01",
+        "agency": "Defense Health Agency",
+        "include_idv": true,
+        "limit": 25
+      },
+      "ok": true,
+      "retrievedAt": "2026-09-05T10:40:44.977Z"
+    },
+    {
+      "tool": "search_past_contracts",
+      "args": {
+        "naics": "541512",
+        "psc": "DA01",
+        "include_idv": true,
+        "limit": 25
+      },
+      "ok": true,
+      "retrievedAt": "2026-09-05T10:40:45.115Z"
+    },
+    {
+      "tool": "get_solicitation_incumbent",
+      "args": {
+        "solicitation_number": "DHA_JOMIS_JMP_20260813",
+        "notice_id": "213a2fe3a447465e8f30699c9f056ec4"
+      },
+      "ok": true,
+      "retrievedAt": "2026-09-05T10:40:47.302Z"
+    }
+  ],
+  "predecessor": {
+    "status": "degraded",
+    "source": "get_solicitation_incumbent",
+    "checks": [
+      {
+        "name": "grounded and not degraded",
+        "passed": true,
+        "detail": "grounded=true, degraded=false"
+      },
+      {
+        "name": "agency consistency",
+        "passed": false,
+        "detail": "candidate awarding activity \"Department of the Army / Department of Defense\" does not correspond to requested \"Defense Health Agency\"; a shared department is not sufficient"
+      },
+      {
+        "name": "NAICS consistency",
+        "passed": false,
+        "detail": "requirement NAICS 541512 vs candidate 541712 — different industry"
+      },
+      {
+        "name": "title similarity",
+        "passed": true,
+        "detail": "3/7 significant token(s) shared (43%): modeling, simulation, capabilities"
+      },
+      {
+        "name": "traceable award identifier and source link",
+        "passed": true,
+        "detail": "id=0024"
+      },
+      {
+        "name": "tool-reported confidence (recorded, not decisive)",
+        "passed": false,
+        "detail": "matchConfidence=low"
+      }
+    ],
+    "candidate": {
+      "awardId": "0024",
+      "generatedId": "CONT_AWD_0024_9700_W909MY12D0004_9700",
+      "description": "IGF::OT::IGF  SUPPORT TO BE PROVIDED UNDER THIS TASK ORDER INCLUDES SUPPORT TO THE NIGHT VISION AND ELECTRONIC SENSORS DIRECTORATE (NVESD) MODELING AND SIMULATION DIVISION IN ITS MISSION TO DIRECT THE DEVELOPMENT OF STATE-OF-THE-ART SENSOR MODELS AND SIMULATION CAPABILITIES FOR END-TO-END ELECTRONIC SENSOR PERFORMANCE ASSESSMENTS TO INCLUDE SUPPORT FOR ARMY DECISIONS ON CURRENT AND ADVANCED ELECTRONIC SENSOR SYSTEMS, SINGLE AND FUSED SENSOR PLATFORMS, AND MAN-IN-THE-LOOP EXPERIMENTATION. THE PERIOD OF PERFORMANCE (POP) IS TWENTY-FOUR (24) MONTHS FROM DATE OF AWARD.",
+      "recipientName": "POLARIS ALPHA ADVANCED SYSTEMS INC",
+      "recipientCity": "FREDERICKSBURG",
+      "recipientState": "VA",
+      "recipientCongressionalDistrict": "07",
+      "recipientUei": "CS7FLKH7S8C5",
+      "obligated": 8126789.92,
+      "currentValue": 8126789.92,
+      "ceiling": 8126789.92,
+      "parentIdvId": "CONT_IDV_W909MY12D0004_9700",
+      "parentIdvPiid": "W909MY12D0004",
+      "popStart": "2015-09-21",
+      "popEnd": "2018-05-21",
+      "popPotentialEnd": "2018-05-21",
+      "naicsCode": "541712",
+      "naicsDescription": "Research and Development in the Physical, Engineering, and Life Sciences (except Biotechnology)",
+      "pscCode": "AD92",
+      "pscDescription": "R&D- DEFENSE OTHER: OTHER (APPLIED RESEARCH/EXPLORATORY DEVELOPMENT)",
+      "awardingAgency": "Department of Defense",
+      "awardingSubAgency": "Department of the Army",
+      "awardingOffice": "W6QK ACC-APG CONT CT WASH OFC",
+      "fundingAccount": null,
+      "usaSpendingUrl": "https://www.usaspending.gov/award/CONT_AWD_0024_9700_W909MY12D0004_9700",
+      "matchConfidence": "low",
+      "matchScore": 150
+    }
+  },
+  "limitations": [
+    "Only §5 (Taxonomy) and §9 (Procurement History) are implemented. All other sections are Phase 2 placeholders.",
+    "Predecessor / incumbent results are inferential and agency-validated; they are never a certified contract lineage.",
+    "SBA size standards come from a limited versioned local fixture (U.S. Small Business Administration, Small Business Size Regulations — Table of Small Business Size Standards (13 CFR 121.201, as in force 2026-09-01); 13 CFR 121.201), not the full published table, though every included value was read from the authoritative source.",
+    "§11 Potential Suppliers and §12 Small Business / Rule of Two are intentionally deferred: they require parent-company deduplication, which the 2026-09-04 data-readiness audit found unresolved.",
+    "No Independent Government Estimate, supplier count, or Rule-of-Two recommendation is generated.",
+    "Award amounts are reproduced with the source’s own label; obligated, current and ceiling values are not interchanged, and lifetime totals are never summed.",
+    "This artifact is a draft for review. PROTOTYPE — NOT FOR SIGNATURE."
+  ]
+}

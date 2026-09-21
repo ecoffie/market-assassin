@@ -1,0 +1,89 @@
+{
+  "vaultEmail": "tavares-eval@test.local",
+  "cases": [
+    {
+      "notice_id": "6370d4ab98794779888555f721e3712e",
+      "label": "Cannon AFB - Sources Sought Notice: Small Arms Firing Range (SAFR) Cle",
+      "notice_type": "Sources Sought",
+      "naics": "562910",
+      "sectionSet": "loi"
+    },
+    {
+      "notice_id": "ad327f28e5384568b091b2d314e292f9",
+      "label": "Y1LZ--Design-Build to Install Parking Shades  and Reconfigure Parking ",
+      "notice_type": "Sources Sought",
+      "naics": "236220",
+      "sectionSet": "loi"
+    },
+    {
+      "notice_id": "882c4ce03dd14561bac1c3bc067f5138",
+      "label": "Ft. Stewart Job Order Contract (JOC)",
+      "notice_type": "Sources Sought",
+      "naics": "236220",
+      "sectionSet": "loi"
+    },
+    {
+      "notice_id": "a56bb1f31de243b5a1bf7c7d2622171c",
+      "label": "Six (6) Double Wide Trailer Purchase",
+      "notice_type": "Sources Sought",
+      "naics": "236220",
+      "sectionSet": "loi"
+    },
+    {
+      "notice_id": "8e4accc8b7c04a9c8662f5e1f53be178",
+      "label": "15340 - Mezzanine & Modular Office",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "705c6d8e57d74887acf1a650e42fade9",
+      "label": "15340 - Mezzanine & Modular Office",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "a485683f42fc44ddbd0a191891dcbf9d",
+      "label": "15340 - Mezzanine & Modular Office",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "eb5582d94ca143869b40c79bc882e053",
+      "label": "15340 - Mezzanine & Modular Office",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "37f803538c7d4f9885931afd38711c47",
+      "label": "LCAAP Contaminated Waste Plant Construction",
+      "notice_type": "Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "7b70391c87104e359dbb25379d3554be",
+      "label": "Argon Piping Supply, Installation and Testing",
+      "notice_type": "Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "c648a998a8f74877a2e47630b3f949c2",
+      "label": "USACE SPK Hill Air Force Base Plating Shop Renovation SATOC",
+      "notice_type": "Solicitation",
+      "naics": "236210",
+      "sectionSet": "rfp"
+    },
+    {
+      "notice_id": "ed54ba38cc3140d98f981a6139676523",
+      "label": "Y1DZ--Renovate Building 9A for EHRM Administration-  EHRM Project 557-",
+      "notice_type": "Solicitation",
+      "naics": "236220",
+      "sectionSet": "rfp"
+    }
+  ]
+}

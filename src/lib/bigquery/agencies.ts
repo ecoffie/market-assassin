@@ -1,0 +1,259 @@
+/**
+ * Agency-level queries — powers /agencies/[slug] pages with BQ data.
+ */
+import { BQ_TABLES } from './client';
+import { agencyKeyword } from '@/lib/gov-contacts/agency-search';
+import { queryCached } from './cache';
+
+export interface AgencyProfile {
+  awarding_agency: string;
+  total_obligated: number;
+  recipient_count: number;
+  naics_count: number;
+  transaction_count: number;
+}
+
+export async function getAgencyProfile(agencyName: string): Promise<AgencyProfile | null> {
+  const rows = await queryCached<AgencyProfile>({
+    cacheKey: `agency:profile:${agencyName}`,
+    query: `
+      SELECT * FROM ${BQ_TABLES.agencySummary}
+      WHERE awarding_agency = @agency LIMIT 1
+    `,
+    params: { agency: agencyName },
+  });
+  return rows[0] ?? null;
+}
+
+export interface TopRecipientForAgency {
+  recipient_uei: string;
+  recipient_name: string;
+  total_amount: number;
+  award_count: number;
+}
+
+export async function getTopRecipientsForAgency(
+  agencyName: string,
+  limit = 20,
+): Promise<TopRecipientForAgency[]> {
+  // Reads the pre-aggregated agency_top_recipients rollup (clustered by
+  // awarding_agency) — a few MB — instead of scanning the full ~10 GiB
+  // awards table on every cold miss. This was the dominant BQ-quota
+  // burner. Rollup is rebuilt monthly (scripts/bq-build-agency-rollups.sql).
+  // Pre-rolled by recipient_name with the canonical (highest-spend) UEI.
+  return queryCached<TopRecipientForAgency>({
+    cacheKey: `agency:${agencyName}:top-recipients-rollup:${limit}:v1`,
+    query: `
+      SELECT recipient_uei, recipient_name, total_amount, award_count
+      FROM ${BQ_TABLES.agencyTopRecipients}
+      WHERE awarding_agency = @agency
+      ORDER BY rank
+      LIMIT @limit
+    `,
+    params: { agency: agencyName, limit },
+  });
+}
+
+export interface TopNaicsForAgency {
+  naics_code: string;
+  naics_description: string;
+  total_amount: number;
+}
+
+export async function getTopNaicsForAgency(
+  agencyName: string,
+  limit = 15,
+): Promise<TopNaicsForAgency[]> {
+  // Reads the agency_top_naics rollup (clustered by awarding_agency)
+  // instead of scanning the full awards table. See getTopRecipientsForAgency.
+  return queryCached<TopNaicsForAgency>({
+    cacheKey: `agency:${agencyName}:top-naics-rollup:${limit}:v1`,
+    query: `
+      SELECT naics_code, naics_description, total_amount
+      FROM ${BQ_TABLES.agencyTopNaics}
+      WHERE awarding_agency = @agency
+      ORDER BY rank
+      LIMIT @limit
+    `,
+    params: { agency: agencyName, limit },
+  });
+}
+
+export interface AgencyOfficeRow {
+  awarding_office: string;
+  awarding_office_code: string | null;
+  total_amount: number;
+  award_count: number;
+}
+
+/**
+ * Contracting offices for an agency, from the agency_office_summary rollup
+ * (top 100 per agency by spend). Powers the Decision Makers office drill-down
+ * — SAM POC data has no office, but awards.awarding_office does. Cheap (~MB,
+ * cached): the rollup is tiny. Matches by contains() because the rollup's
+ * agency names (title-case "Department of Defense") differ from SAM's
+ * ("DEPT OF DEFENSE") — caller passes whichever it has.
+ */
+// liveBq: authenticated Mindy callers pass true to allow a cold BQ scan; public
+// SEO callers omit it → cache-only (no cold scan). See bigquery/cache.ts cacheOnly.
+/**
+ * The keyword `getOfficesForAgency` contains-matches `awarding_agency` on.
+ *
+ * The key is the FIRST distinctive token, via the shared `agencyKeyword()`.
+ *
+ * This used to take the LONGEST word, on the theory that longest == most
+ * distinctive. It is not — it is often the most GENERIC, and it put another
+ * agency's offices on the page (Eric's screenshot, 2026-07-17):
+ *
+ *   "HEALTH AND HUMAN SERVICES, DEPARTMENT OF" -> longest = "services"
+ *      -> LIKE %services% -> matches GENERAL *SERVICES* ADMINISTRATION
+ *      -> "Top contracting offices in HHS" listed GSA FAS AAS FEDSIM $64B,
+ *         GSA/FAS AUTOMOTIVE CENTER $19B, GSA FAS AAS REGION 4 $11B.
+ *   "GENERAL SERVICES ADMINISTRATION" -> longest = "administration"
+ *      -> matches NASA, SBA, FAA — every "...Administration".
+ *
+ * `agencyKeyword()` strips the filler ("department of", "administration",
+ * "agency"…) and takes the lead token: HHS -> "health", GSA -> "general",
+ * NASA -> "aeronautics". Same function the contact search already uses, so the
+ * office panel and the contact list now agree on what an agency IS.
+ *
+ * EXPORTED so the agreement gate can check it. It was inline and private, which
+ * is why nobody noticed it disagreed with every other agency resolver — you
+ * cannot gate what you cannot call. The collision gate found EIGHT bad pairs
+ * against the old logic, not just the one that was visible on screen.
+ */
+export function officeAgencyKey(agencyName: string): string {
+  const needle = (agencyName || '').trim().toLowerCase();
+  if (!needle) return '';
+  return agencyKeyword(agencyName).toLowerCase() || needle;
+}
+
+export async function getOfficesForAgency(agencyName: string, limit = 100, liveBq = false): Promise<AgencyOfficeRow[]> {
+  const key = officeAgencyKey(agencyName);
+  if (!key) return [];
+  return queryCached<AgencyOfficeRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `agency-offices:${key}:${limit}:v2`,
+    query: `
+      SELECT awarding_office, awarding_office_code, total_amount, award_count
+      FROM ${BQ_TABLES.agencyOfficeSummary}
+      WHERE LOWER(awarding_agency) LIKE @needle
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { needle: `%${key}%`, limit },
+  });
+}
+
+/**
+ * Contracting OFFICES under a (sub)agency for a specific NAICS — the office-level
+ * drill-down that surfaces the real buying offices (NAVFAC Mid-Atlantic, USACE
+ * districts) hidden inside "Department of the Navy/Army" (Eric: break out USACE/
+ * NAVFAC as their own rows). Queries the raw awards table because the office
+ * rollup isn't NAICS-keyed. ~GB scan per (agency,naics) cold; cached.
+ */
+export async function getOfficesForAgencyNaics(
+  subAgencyName: string,
+  naicsPrefix: string,
+  limit = 12,
+  liveBq = false,
+): Promise<AgencyOfficeRow[]> {
+  const needle = (subAgencyName || '').trim().toLowerCase();
+  const prefix = (naicsPrefix || '').replace(/[^0-9]/g, '');
+  if (!needle || !prefix) return [];
+  const STOP = new Set(['department', 'of', 'the', 'and', 'for', 'u.s.', 'us', 'office']);
+  const key = needle.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).sort((a, b) => b.length - a.length)[0] || needle;
+  return queryCached<AgencyOfficeRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `agency-offices-naics:${key}:${prefix}:${limit}:v1`,
+    query: `
+      SELECT awarding_office, awarding_office_code,
+             SUM(obligation_amount) AS total_amount,
+             COUNT(*) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE naics_code LIKE @prefix
+        AND LOWER(awarding_sub_agency) LIKE @needle
+        AND awarding_office IS NOT NULL
+        AND obligation_amount > 0
+      GROUP BY awarding_office, awarding_office_code
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { needle: `%${key}%`, prefix: `${prefix}%`, limit },
+  });
+}
+
+export interface AgencySatRow {
+  awarding_agency: string;
+  total_amount: number;
+  setaside_amount: number;
+  sat_ratio: number; // 0..1 — share of this agency's NAICS spend that is set-aside
+}
+
+/**
+ * Set-aside ratio per agency for a given NAICS — "of what this agency spends in
+ * your NAICS, how much goes to set-asides." The reliable source for the Target
+ * List SAT column (the old path relied on a flaky ~40s USASpending call + an
+ * empty cache, leaving e.g. VA construction at 0% when it's actually 78%).
+ * Cached; ~2-3 GB scan per NAICS prefix on a cold miss.
+ */
+export async function getAgencySatForNaics(naicsPrefix: string, liveBq = false): Promise<AgencySatRow[]> {
+  const prefix = (naicsPrefix || '').replace(/[^0-9]/g, '').slice(0, 6);
+  if (!prefix) return [];
+  return queryCached<AgencySatRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `agency-sat:naics:${prefix}:v1`,
+    query: `
+      SELECT
+        awarding_agency,
+        SUM(obligation_amount) AS total_amount,
+        SUM(IF(set_aside IS NOT NULL AND set_aside NOT IN ('', 'NONE', 'NO SET ASIDE USED.'), obligation_amount, 0)) AS setaside_amount,
+        SAFE_DIVIDE(
+          SUM(IF(set_aside IS NOT NULL AND set_aside NOT IN ('', 'NONE', 'NO SET ASIDE USED.'), obligation_amount, 0)),
+          SUM(obligation_amount)
+        ) AS sat_ratio
+      FROM ${BQ_TABLES.awards}
+      WHERE naics_code LIKE @prefix AND awarding_agency IS NOT NULL
+      GROUP BY awarding_agency
+      HAVING total_amount > 0
+    `,
+    params: { prefix: `${prefix}%` },
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
+  });
+}
+
+// Parent → SUB-AGENCY rollup — the level the agency page was missing (Department of the
+// Navy/Army/Air Force/DLA under "Department of Defense"). Grouped by awarding_sub_agency for a
+// parent agency, ranked by $. Scans the awards table (the sub-agency dimension isn't in the
+// pre-rolled agency summaries); ~1-2 GB per parent cold, cached. Excludes the self row (where
+// sub == parent, e.g. VA's single-tier structure) so it doesn't duplicate the parent.
+export interface SubAgencyRow {
+  awarding_sub_agency: string;
+  total_amount: number;
+  award_count: number;
+  recipient_count: number;
+}
+
+export async function getSubAgenciesForAgency(bqAgencyName: string, limit = 8): Promise<SubAgencyRow[]> {
+  if (!bqAgencyName) return [];
+  return queryCached<SubAgencyRow>({
+    cacheKey: `agency:${bqAgencyName}:sub-agencies:${limit}:v1`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    query: `
+      SELECT
+        awarding_sub_agency,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count,
+        COUNT(DISTINCT recipient_uei) AS recipient_count
+      FROM ${BQ_TABLES.awards}
+      WHERE awarding_agency = @agency
+        AND obligation_amount > 0
+        AND awarding_sub_agency IS NOT NULL
+        AND awarding_sub_agency != @agency
+      GROUP BY awarding_sub_agency
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { agency: bqAgencyName, limit },
+  });
+}

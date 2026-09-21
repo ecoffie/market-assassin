@@ -1,0 +1,199 @@
+{
+  "name": "Department of Agriculture",
+  "abbreviation": "USDA",
+  "parentAgency": null,
+  "description": "The U.S. Department of Agriculture provides leadership on food, agriculture, natural resources, rural infrastructure, nutrition, and related issues based on public policy, the best available science, and effective management.",
+  "website": "https://www.usda.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$26.6 billion (discretionary appropriations)",
+    "procurementBudget": "Significant procurement across 70+ covered programs in 10 agencies"
+  },
+  "painPoints": [
+    {
+      "point": "Improper payments crisis - $162 billion in FY2024 including $10.5B in SNAP alone",
+      "source": "GAO-24-107307 Priority Open Recommendations & USDA FY2024 Payment Integrity Report",
+      "priority": "critical"
+    },
+    {
+      "point": "Legacy IT systems inefficiencies requiring modernization across Farm Service Agency and mission areas",
+      "source": "USDA IT Strategic Plan FY22-FY26 & GAO Priority Recommendations",
+      "priority": "critical"
+    },
+    {
+      "point": "Cybersecurity vulnerabilities - risks from unsecure data collection, adversarial foreign access, and potential agroterrorism",
+      "source": "USDA Farm Security and National Security Report & Forest Service FSM 6600 Updates",
+      "priority": "critical"
+    },
+    {
+      "point": "Climate change threatening rural infrastructure investments in housing, energy, water utilities, and agriculture",
+      "source": "USDA Climate Adaptation Plan 2024-2027",
+      "priority": "high"
+    },
+    {
+      "point": "Performance gaps - only 42% of metrics met or exceeded targets in FY2023, 38% unmet",
+      "source": "USDA FY2025 Performance Plan FY2023 Performance Report",
+      "priority": "high"
+    },
+    {
+      "point": "Limited broadband access in rural areas constraining precision agriculture and economic development",
+      "source": "USDA ReConnect Program & Rural Broadband Expansion Initiatives",
+      "priority": "high"
+    },
+    {
+      "point": "IT program performance monitoring gaps within Farm Production and Conservation mission area",
+      "source": "GAO Priority Recommendations - IT Program Efficiency Goals",
+      "priority": "medium"
+    },
+    {
+      "point": "Food Safety and Inspection Service adaptation challenges to climate-driven operational changes",
+      "source": "FSIS Strategic Planning & USDA Climate Adaptation Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting agricultural and rural development IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Rural broadband expansion through ReConnect and Broadband Technical Assistance programs",
+      "source": "USDA ReConnect Program & Bipartisan Infrastructure Law BTA Program",
+      "funding": "$25 million for BTA Program, multi-billion for ReConnect",
+      "deadline": "Round 5 applications closed May 2024, Round 6 TBD"
+    },
+    {
+      "priority": "IT modernization - Farm Service Agency systems and digital tools for Rural Development",
+      "source": "USDA FY2025 Budget Summary & IT Strategic Plan FY22-FY26",
+      "funding": "$1 million for digital tools and customer feedback",
+      "priority": "critical"
+    },
+    {
+      "priority": "Cybersecurity enhancement and Federal Acquisition Regulations (FAR) compliance",
+      "source": "Forest Service FSM 6600 Chapter 80 Updates June 2025",
+      "deadline": "FY2025 implementation",
+      "priority": "critical"
+    },
+    {
+      "priority": "Climate adaptation and resilience for rural infrastructure, agriculture, and food safety operations",
+      "source": "USDA Climate Adaptation Plan 2024-2027",
+      "deadline": "2024-2027 implementation timeline",
+      "priority": "high"
+    },
+    {
+      "priority": "Improper payment reduction in SNAP, farm programs, and Coronavirus Food Assistance Program",
+      "source": "GAO-24-107307 Priority Recommendations",
+      "priority": "critical"
+    },
+    {
+      "priority": "Acquisition Program Management Office (APMO) establishment and procurement innovation",
+      "source": "USDA Office of Contracting and Procurement FY2025 Initiatives",
+      "deadline": "First Acquisition Program Management Desk Book in development"
+    },
+    {
+      "priority": "Justice40 Initiative implementation across 70 covered programs for equitable procurement benefits",
+      "source": "USDA FY2025 Budget Summary - Justice40 as of November 2023",
+      "priority": "high"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "USDA FY2025 Budget Summary - https://www.usda.gov/sites/default/files/documents/2025-usda-budget-summary.pdf",
+      "GAO-24-107307 Priority Open Recommendations - https://www.gao.gov/assets/gao-24-107307.pdf",
+      "USDA IT Strategic Plan FY22-FY26 - https://www.usda.gov/sites/default/files/documents/usda_it_strategic_plan_final.pdf",
+      "USDA Climate Adaptation Plan 2024-2027 - https://www.sustainability.gov/pdfs/usda-2024-cap.pdf",
+      "USDA Strategic Plan FY2022-2026 - https://www.usda.gov/sites/default/files/documents/usda-fy-2022-2026-strategic-plan.pdf"
+    ],
+    "secondary": [
+      "USDA FY2025 Performance Plan FY2023 Performance Report - https://www.usda.gov/sites/default/files/documents/fy25-performance-plan-fy23-performance-report.pdf",
+      "USDA ReConnect Program Overview - https://www.usda.gov/reconnect",
+      "Forest Service Procurement & Property Services - https://www.fs.usda.gov/business/",
+      "USDA Forecast of Business Opportunities - https://www.usda.gov/da/osdbu/forecast"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541330",
+    "541511",
+    "541512",
+    "541519",
+    "541690",
+    "541990",
+    "517311",
+    "237130",
+    "541620",
+    "541715"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "BPA (Blanket Purchase Agreement)",
+    "GSA Schedule contracts",
+    "Grants and Cooperative Agreements",
+    "ReConnect Loans and Grants"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - Justice40 Initiative emphasizes small business inclusion",
+    "WOSB": "Active use for eligible contracts",
+    "8a": "Regular use for rural development and IT services",
+    "HUBZone": "Very strong preference - rural mission alignment",
+    "SDVOSB": "Active use - veteran-owned rural businesses prioritized",
+    "VOSB": "Regular use",
+    "TribalPreference": "Active use for rural and agricultural programs"
+  },
+  "typicalContractSizes": {
+    "small": "$100K - $5M (IT services, consulting, rural infrastructure design)",
+    "medium": "$5M - $100M (broadband deployment, facility construction, IT modernization)",
+    "large": "$100M - $1B+ (ReConnect broadband programs, enterprise IT systems)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Rural broadband deployment and telecommunications expertise",
+      "Agricultural IT systems and precision agriculture technology",
+      "Cybersecurity and FAR compliance capabilities",
+      "Climate adaptation and resilience planning",
+      "Food safety and inspection technology",
+      "Rural infrastructure construction and engineering",
+      "Payment integrity and fraud detection systems",
+      "Grants management and oversight services",
+      "Rural community development experience"
+    ],
+    "contractingTimeline": "6-18 months average, program-specific for ReConnect and major initiatives",
+    "competitionLevel": "Moderate to high - HUBZone and rural small businesses have competitive advantage",
+    "evaluationFactors": [
+      "Technical approach and agricultural/rural expertise",
+      "Past performance with USDA or rural agencies",
+      "HUBZone and small business status",
+      "Cybersecurity and compliance capabilities",
+      "Price/cost reasonableness",
+      "Rural presence and community engagement",
+      "Justice40 Initiative alignment"
+    ]
+  },
+  "keyOffices": [
+    "Farm Service Agency (FSA)",
+    "Rural Development (RD)",
+    "Food Safety and Inspection Service (FSIS)",
+    "Forest Service (USFS)",
+    "Natural Resources Conservation Service (NRCS)",
+    "Food and Nutrition Service (FNS)",
+    "Animal and Plant Health Inspection Service (APHIS)",
+    "Agricultural Research Service (ARS)",
+    "Office of Contracting and Procurement (OCP)",
+    "Farm Production and Conservation (FPAC) Mission Area"
+  ],
+  "insights": [
+    "$162B in improper payments FY2024 creates urgent need for payment integrity and fraud detection systems",
+    "ReConnect broadband program represents multi-billion dollar opportunity for rural telecommunications contractors",
+    "HUBZone preference is exceptionally strong due to USDA's rural mission - significant competitive advantage",
+    "New Acquisition Program Management Office (APMO) signals procurement modernization and innovation focus",
+    "Climate adaptation is cross-cutting priority affecting all programs from food safety to rural infrastructure",
+    "Justice40 Initiative across 70 programs creates opportunities for disadvantaged and small businesses",
+    "Legacy IT modernization at Farm Service Agency represents multi-year contract opportunities",
+    "Forest Service updated cybersecurity directive (FSM 6600) June 2025 - compliance contracts likely",
+    "Only 42% of performance metrics met FY2023 - management consulting and process improvement opportunities",
+    "USDA procurement forecast updated annually - check USDA OSDBU and GSA Acquisition Gateway in October"
+  ]
+}
