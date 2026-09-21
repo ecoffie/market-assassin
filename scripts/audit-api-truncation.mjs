@@ -42,7 +42,7 @@
  *   node scripts/audit-api-truncation.mjs --list      # every finding
  *   node scripts/audit-api-truncation.mjs --update-baseline
  */
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { runBaselineGate } from './lib/finding-identity.mjs';
 
