@@ -33,6 +33,7 @@ import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { computeEmailMapConverter, type EmailMapConverter } from '@/lib/analytics/email-map-converter';
 import { computeMarketPulse } from '@/lib/analytics/market-pulse';
+import { JOURNEY_STEPS, tokensForStep } from '@/lib/analytics/journey-steps';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -42,38 +43,21 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 // build/submit, the Saved->Pursuit hop) joins into ONE read. Add them or those events are excluded.
 const MAP_SOURCES = ['opportunity_map', 'source_feed', 'pursuits', 'proposal', 'saved'];
 
-// The ordered journey. Each step lists the metadata action/kind token(s) that COUNT as that step,
-// and which LOOP it belongs to. The DISCOVERY loop is measured by engagement/return (NOT conversion);
-// the EXECUTION loop is a legitimate funnel and the ONLY place a drop callout may appear.
-// map_open is emitted as action 'map_view' (once/session); the rest are their own tokens. We de-dupe
-// within a step (a user firing popup_open 5x on 5 pins is one reach for the step's user count).
-// Token lists fold in the PRE-EXISTING app-panel tokens observed live in user_engagement
-// (save_to_pipeline, open_details, open_sam …) alongside the map's own tokens.
-type Loop = 'discovery' | 'execution';
-export const JOURNEY_STEPS: { step: string; label: string; tokens: string[]; loop: Loop }[] = [
-  // ── DISCOVERY loop — browsing is the point; measured by return, not conversion ──
-  { step: 'map_open',         label: 'Map opened',       tokens: ['map_view'],                          loop: 'discovery' },
-  { step: 'pin_clicked',      label: 'Pin clicked',      tokens: ['pin_clicked'],                       loop: 'discovery' },
-  { step: 'popup_open',       label: 'Popup opened',     tokens: ['popup_open'],                        loop: 'discovery' },
-  // A listing opens via: map __track 'listing_open', __trackCard 'click' (card→drawer), or the app panel's 'open_details'.
-  { step: 'listing_open',     label: 'Listing opened',   tokens: ['listing_open', 'click', 'open_details'], loop: 'discovery' },
-  // "Saved" is the end of the discovery loop — a bookmark, not a commitment to bid.
-  // ⚠️ `shortlist_saved` (W2/#1601) and `watch_created` (W1/#1600) are DISCOVERY-ONLY on purpose.
-  // They are absent from the EXECUTION `pursuit_started` step below because #1603 ruled that a save
-  // is a save: the anonymous claim path was explicitly stopped from auto-promoting saves into
-  // pursuits, so counting them as pursuits here would re-introduce that conflation in the reporting
-  // layer after it was removed from the product. Without these two tokens the funnel showed the
-  // anonymous save features as zero — indistinguishable from nobody using them.
-  { step: 'saved',            label: 'Saved',            tokens: ['save_to_pipeline', 'pursuit_started', 'start_pursuit_clicked', 'shortlist_saved', 'watch_created'], loop: 'discovery' },
-  // ── EXECUTION loop — the rare minority path (Principle 01). A pursuit is far rarer than a save,
-  //    and that is healthy. A drop callout is meaningful HERE (a started-but-never-submitted proposal
-  //    is a real stall), and ONLY here. ──
-  { step: 'pursuit_started',  label: 'Pursuit started',  tokens: ['pursuit_started', 'save_to_pipeline', 'start_pursuit_clicked'], loop: 'execution' },
-  { step: 'proposal_started', label: 'Proposal opened',   tokens: ['proposal_started', 'proposal_opened'], loop: 'execution' },
-  { step: 'proposal_built',   label: 'Section drafted',   tokens: ['section_built'],                   loop: 'execution' },
-  { step: 'proposal_exported',label: 'Proposal exported', tokens: ['export_proposal'],                 loop: 'execution' },
-  { step: 'proposal_submitted',label:'Proposal submitted',tokens: ['proposal_submitted'],              loop: 'execution' },
-];
+// The ordered journey now lives in ONE module, `@/lib/analytics/journey-steps`, because it was
+// previously declared here AND hand-copied into the right-column `savedUsers` counter below AND
+// mirrored a third time in the unit test. SAVED / WATCHING / PURSUING are three different states
+// and that mapping is the fact this endpoint is built on, so it has exactly one home.
+//
+// ⚠️ Measured on production 2026-09-21: the discovery "Saved" step and the execution
+// "Pursuit started" step were declared with the SAME three tokens and therefore returned
+// byte-identical numbers (58 users / 108 events each). The endpoint whose stated Principle 01 is
+// "a pursuit is far rarer than a save" defined the two as the same event. At the same time the
+// tokens that record a real save (shortlist_saved / shortlist_attached → anonymous_shortlist) and
+// a real watch (watch_created / watch_claimed → saved_searches) were emitted by the Map and read
+// by NOTHING. See journey-steps.ts; `state-separation.unit.test.ts` fails the build if a save or
+// watch token ever re-enters an execution step.
+// The SAVED step's tokens, derived — never a second hand-written list (that copy is what drifted).
+const SAVED_STEP_TOKENS = new Set(tokensForStep('saved'));
 
 // Terminal PURSUIT OUTCOMES — NOT a funnel step (a pursuit ends won/lost/no-bid, they don't chain),
 // so they're reported as a separate breakdown ("how many pursuits end won/lost/no-bid?").
@@ -84,12 +68,6 @@ const OUTCOME_TOKENS: Record<string, string> = { pursuit_won: 'won', pursuit_los
 const IMPRESSION_TOKENS = new Set(['impression', 'cards_shown']);
 const LISTING_OPEN_TOKENS = new Set(['listing_open', 'click', 'open_details']);
 const SHARE_TOKENS = new Set(['listing_share', 'share', 'share_listing']);
-
-// The discovery "Saved" step's tokens, derived from JOURNEY_STEPS so the step count and the
-// right-column engagement.saved counter can never disagree. Exported for the unit test.
-export const SAVED_TOKENS = new Set(
-  JOURNEY_STEPS.find((s) => s.step === 'saved')!.tokens,
-);
 
 // daily_alert opens land in user_engagement via the email tracking pixel:
 //   /api/track?t=<token> -> recordEmailOpen() -> logEmailOpen(user, 'daily_alert') -> user_engagement
@@ -253,11 +231,10 @@ export async function GET(request: NextRequest) {
     // Right-column engagement volume (measured as VOLUME, never as a conversion rate).
     if (LISTING_OPEN_TOKENS.has(token)) { listingOpenUsers.add(email); listingOpenEvents += 1; listingOpenForRatio += 1; }
     if (SHARE_TOKENS.has(token)) { listingShareUsers.add(email); listingShareEvents += 1; }
-    // DERIVED from the 'saved' step's own token list, never a second hardcoded copy. This counter
-    // and the funnel step count the same action, so a token added to one and missed by the other
-    // puts two different numbers for "Saved" in the SAME payload — the failure this file already
-    // records above (the tokenToSteps overwrite: step said 0 while engagement.saved said 6).
-    if (SAVED_TOKENS.has(token)) { savedUsers.add(email); savedEvents += 1; }
+    // Derived from the SAVED step itself. This was a hand-written copy of that step's tokens, and
+    // the two lists drifted apart once already (the step reported 0 users while this counter
+    // reported 6 — two numbers for one action in the same payload). One list, read twice.
+    if (SAVED_STEP_TOKENS.has(token)) { savedUsers.add(email); savedEvents += 1; }
     if (IMPRESSION_TOKENS.has(token)) impressionEvents += 1;
 
     // Strategy rollup — independent of the funnel steps.
@@ -626,7 +603,10 @@ export async function GET(request: NextRequest) {
   // so a user who never opened a listing isn't counted as "shallow" (they never entered the decision).
   // null when nobody opened a listing (no data yet), never a fabricated 0%.
   const listingOpenerSet = stepUsers['listing_open'];
-  const decisionCommitSet = stepUsers['saved']; // save_to_pipeline / pursuit_started
+  // "DEEP" is the SAVED step — kept it in any form: a real save (anonymous_shortlist) or a pursuit
+  // (user_pipeline). Reading the step rather than re-listing tokens is what keeps this honest to
+  // its own definition; it used to be reachable only by pursuing, so a saver read as "considered".
+  const decisionCommitSet = stepUsers['saved'];
   // Per-user listing-open EVENT counts (from the raw rows) → distinguishes single vs multi-open.
   const perUserListingOpens: Record<string, number> = {};
   for (const r of rows) {

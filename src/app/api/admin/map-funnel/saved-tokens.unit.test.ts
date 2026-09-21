@@ -1,41 +1,42 @@
 /**
- * Guard: the discovery "Saved" step and the right-column `engagement.saved` counter must count the
- * SAME tokens, and must include the anonymous save/watch events.
+ * The map-funnel "Saved" counter must be DERIVED from the journey step, never a
+ * second hand-written token list.
  *
- * Two separate bugs are pinned here:
- *  1. The route previously hardcoded the saved tokens TWICE — once in JOURNEY_STEPS and once in the
- *     engagement counter. That is how "Saved: 0 users" shipped next to "engagement.saved: 6" in the
- *     same payload. Importing the real exported constant (never a copy) is the point of this file:
- *     a mirrored token list in a test cannot detect drift in the thing it mirrors.
- *  2. `shortlist_saved` / `watch_created` shipped in PRs #1600/#1601 and no token list knew about
- *     them, so the funnel reported zero anonymous saves — identical to nobody using the feature.
+ * History: the route declared the saved tokens twice — once in its own
+ * JOURNEY_STEPS and once in the right-column `savedUsers` counter ~180 lines
+ * below — and the two drifted, so one payload reported two different numbers for
+ * the same action. #1605 then moved the step definition into
+ * `@/lib/analytics/journey-steps` as the single home.
+ *
+ * The three-state invariants themselves (a save/watch token never entering an
+ * execution step, SAVED being a strict superset of PURSUIT_STARTED, WATCHING
+ * being its own step) are guarded in `src/lib/analytics/state-separation.unit.test.ts`
+ * against that same shared constant. This file guards only the thing that suite
+ * does not: that the ROUTE still derives its counter instead of re-declaring it.
  */
 import { describe, it, expect } from 'vitest';
-import { SAVED_TOKENS, JOURNEY_STEPS } from './route';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { SAVE_TOKENS, WATCH_TOKENS, tokensForStep } from '@/lib/analytics/journey-steps';
 
-describe('map-funnel saved tokens', () => {
-  it('counts the anonymous save and watch events', () => {
-    expect(SAVED_TOKENS.has('shortlist_saved')).toBe(true);
-    expect(SAVED_TOKENS.has('watch_created')).toBe(true);
+const ROUTE = readFileSync(join(process.cwd(), 'src/app/api/admin/map-funnel/route.ts'), 'utf8');
+
+describe('the saved counter is derived, not duplicated', () => {
+  it('derives its token set from the saved step', () => {
+    expect(ROUTE).toMatch(/tokensForStep\('saved'\)/);
   });
 
-  it('is DERIVED from the saved step, so the two counters cannot disagree', () => {
-    const step = JOURNEY_STEPS.find((s) => s.step === 'saved')!;
-    expect([...SAVED_TOKENS].sort()).toEqual([...step.tokens].sort());
-  });
-
-  it('keeps the pre-existing save tokens', () => {
-    for (const t of ['save_to_pipeline', 'pursuit_started', 'start_pursuit_clicked']) {
-      expect(SAVED_TOKENS.has(t)).toBe(true);
+  it('does not re-declare save or watch tokens as a literal in the route', () => {
+    // Strip comments: the route legitimately NAMES these tokens while explaining
+    // the history above, and flagging that would be a false positive.
+    const code = ROUTE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const t of [...SAVE_TOKENS, ...WATCH_TOKENS]) {
+      expect(code).not.toContain(`'${t}'`);
     }
   });
 
-  it('does NOT promote an anonymous save into the EXECUTION pursuit step', () => {
-    // #1603 stopped the product from auto-promoting a claimed save into a pursuit ("a save is a
-    // save"). Adding these tokens to the execution step would re-create that conflation in the
-    // reporting layer, inflating pursuit_started with people who only bookmarked something.
-    const pursuit = JOURNEY_STEPS.find((s) => s.step === 'pursuit_started')!;
-    expect(pursuit.tokens).not.toContain('shortlist_saved');
-    expect(pursuit.tokens).not.toContain('watch_created');
+  it('the saved step really does carry the anonymous save tokens', () => {
+    const saved = tokensForStep('saved');
+    for (const t of SAVE_TOKENS) expect(saved).toContain(t);
   });
 });

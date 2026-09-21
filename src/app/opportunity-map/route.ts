@@ -4394,7 +4394,18 @@ const VIEWPORT_JS = `<script>
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b})})
       .then(function(r){return r.json();}).then(function(d){
-        if(d&&d.success){ _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
+        if(d&&d.success){
+          // WATCHING is a first-class state and this is the path MOST people use:
+          // measured on prod 2026-09-21, 62 of 62 saved_searches created in 30 days
+          // (34 distinct users) came through HERE, and not one was instrumented. The
+          // anonymous branch above emitted watch_created while this one emitted
+          // nothing, so the only "keep" number the funnel could show was the PURSUIT
+          // count. A watch is not a pursuit, and an uninstrumented watch reads as zero
+          // watches — worse than unknown. anonymous:false keeps the two paths
+          // distinguishable without needing two tokens.
+          // (No backticks in here: this block lives inside a TS template literal.)
+          try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE}); }catch(e){}
+          _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
         else _ssMsg('Couldn\\'t save');
       }).catch(function(){ _ssMsg('Couldn\\'t save'); });
   };

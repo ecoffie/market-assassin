@@ -382,7 +382,7 @@ export default function MapFunnelDashboard() {
           </Card>
 
           {/* Discovery steps — NEUTRAL context (counts + "N of the step above"). NO drop callout. */}
-          <Card title="Discovery steps — neutral context" sub="Map opened → pin → popup → listing → saved. Counts + share of the step above. NO drop is flagged: a lower step here is browsing, the normal state.">
+          <Card title="Discovery steps — neutral context" sub="Map opened → pin → popup → listing → saved, plus watching a market (a parallel outcome, not a later stage — you can watch without opening a listing). Counts + share of map openers. NO drop is flagged: a lower step here is browsing, the normal state.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {discSteps.map((s, i) => {
                 const w = discTop > 0 ? Math.max((s.users / discTop) * 100, s.users > 0 ? 2 : 0) : 0;
