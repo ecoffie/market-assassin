@@ -111,7 +111,7 @@ risk before June 27.
 - [ ] Script: INSERT cron_jobs rows for the ~12 Phase-1 jobs (minute :00, sensible hours)
 - [ ] Verify each row's cron_expr minute is :00 (dispatcher-reachable)
 - [ ] Remove the corresponding entries from vercel.json (~37 lines)
-- [ ] `npm run predeploy` (the gate) + deploy
+- [ ] `npm run deploy:checks` (the gate) + deploy
 - [ ] Watch `cron_job_runs` for 24–48h: every migrated job shows a success run
 - [ ] Confirm native cron count: `grep -c '"path"' vercel.json` → ~63
 
