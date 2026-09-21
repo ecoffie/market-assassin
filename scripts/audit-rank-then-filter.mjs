@@ -42,11 +42,17 @@
  *      is legitimate (a genuine national "top contractors" listicle), so we do NOT flag.
  *
  * Baseline ratchet: pre-existing findings are recorded in
- * tests/fixtures/rank-then-filter-baseline.json (keyed on `path:line` + a short snippet
- * for stability) so they block nothing today — only a NEW finding fails the push. The
- * snippet in the key means an edit that only shifts a known line still matches by text,
- * reducing the `path:line`-drift false-NEW that bites the sibling gates. `--list` prints
- * every finding; `--update-baseline` accepts the current set. Drive it toward zero.
+ * tests/fixtures/rank-then-filter-baseline.json so they block nothing today — only a NEW
+ * finding fails the push. `--list` prints every finding; `--update-baseline` accepts the
+ * current set. Drive it toward zero.
+ *
+ * FINDING IDENTITY (fixed 2026-09-21). This gate keyed on `path:line` PLUS an 80-char
+ * snippet, which was a partial mitigation and is worth understanding before trusting it:
+ * the snippet made the key *look* content-addressed, but `path:line` was still IN the key,
+ * so line drift still renamed the entry — the snippet only made the resulting false-NEW
+ * easier to recognise by eye, never prevented it. Keys are now content-addressed only
+ * (`scripts/lib/finding-identity.mjs`): `file#rank-then-filter(helper):sha1-10[@n]` over
+ * the normalized call line. Line movement is invisible; a changed call is a new finding.
  *
  * Scope: src/ only. The ranked-fetch helpers are library functions consumed by routes /
  * components / mcp tools under src/; scripts/ hold no `companiesPins`-style scoped view
@@ -60,14 +66,27 @@
  *   1 = a new rank-then-filter site → BLOCKS the push
  *
  * Run:  node scripts/audit-rank-then-filter.mjs                 (gate mode)
- *       node scripts/audit-rank-then-filter.mjs --list           (print every finding)
+ *       node scripts/audit-rank-then-filter.mjs --list           (finding + key + what is stale)
+ *       node scripts/audit-rank-then-filter.mjs --migrate-baseline [--prune-stale]
+ *       node scripts/audit-rank-then-filter.mjs --prune-baseline  (TIGHTEN: drop gone findings)
  *       node scripts/audit-rank-then-filter.mjs --update-baseline (accept current set)
  */
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
+import {
+  assignFindingKeys,
+  partitionFindings,
+  readBaseline,
+  writeBaseline,
+  isLegacyBaselineKey,
+  planMigration,
+} from './lib/finding-identity.mjs';
 
 const SCAN_ROOTS = ['src'];
 const BASELINE_FILE = 'tests/fixtures/rank-then-filter-baseline.json';
+const BASELINE_NOTE =
+  'Rank-globally-then-filter sites accepted as pre-existing (or genuinely global). Keys are '
+  + 'CONTENT-ADDRESSED (see keyFormat) so line movement cannot manufacture a false NEW finding.';
 const EXCLUDE = /\.test\.|\.spec\./;
 
 // The ranked-fetch helpers. Each takes flat scope params (state/naics/psc/agency/
@@ -150,38 +169,105 @@ for (const root of SCAN_ROOTS) {
         .join('\n');
       if (!POST_FILTER_TELL.test(neigh)) continue;
 
-      const snippet = lines[i].trim().slice(0, 80);
-      findings.push({ key: `${p}:${i + 1} :: ${snippet}`, label: `${p}:${i + 1} (${helper})` });
+      // Evidence = the normalized call line. NOT the 11-line argument block: reformatting
+      // the options object must not rename the finding.
+      findings.push({ file: p, line: i + 1, rule: 'rank-then-filter', tag: helper, evidence: lines[i] });
     }
   }
 }
 
 const args = process.argv.slice(2);
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).allowed || [])
-  : new Set();
+const keyed = assignFindingKeys(findings);
+const label = (f) => `${f.file}:${f.line} (${f.tag})`;
+const byKey = new Map(keyed.map((f) => [f.key, f]));
+const { keys: baselineKeys } = readBaseline(BASELINE_FILE, 'allowed');
+const legacyCount = baselineKeys.filter(isLegacyBaselineKey).length;
+
+if (args.includes('--migrate-baseline')) {
+  if (!legacyCount) {
+    console.log('[rank-then-filter] baseline is already content-addressed — nothing to migrate.');
+    process.exit(0);
+  }
+  const plan = planMigration(keyed, baselineKeys);
+  console.log(`[rank-then-filter] migration plan`);
+  console.log(`  current findings          : ${plan.findings}`);
+  console.log(`  legacy baseline entries   : ${plan.legacyEntries}`);
+  console.log(`  carried (stay accepted)   : ${plan.carried.length}`);
+  console.log(`  findings NOT in baseline  : ${plan.unmatchedFindings.length}`);
+  console.log(`  matched after a line shift: ${plan.shifted.length}`);
+  plan.shifted.forEach((s) => console.log(`      ${s.from}  →  ${s.to}  (same file, 1:1, line moved)`));
+  console.log(`  stale legacy entries      : ${plan.staleLegacy.length}`);
+  if (plan.unmatchedFindings.length) {
+    console.error(`\n✗ REFUSING: ${plan.unmatchedFindings.length} current finding(s) are not in the legacy baseline.`);
+    plan.unmatchedFindings.forEach((f) => console.error('    ' + label(f)));
+    process.exit(1);
+  }
+  if (plan.staleLegacy.length && !args.includes('--prune-stale')) {
+    console.error(`\n✗ REFUSING: ${plan.staleLegacy.length} legacy entr(ies) match NO current finding.`);
+    plan.staleLegacy.forEach((k) => console.error('    ' + k));
+    console.error(`\n  Re-run with --prune-stale to drop exactly these.`);
+    process.exit(1);
+  }
+  writeBaseline(BASELINE_FILE, 'allowed', plan.carried.map((f) => f.key), { note: BASELINE_NOTE });
+  console.log(`\n✓ migrated: ${plan.carried.length} finding(s) now keyed by content`
+    + (plan.staleLegacy.length ? `; ${plan.staleLegacy.length} stale legacy entr(ies) pruned` : ''));
+  process.exit(0);
+}
 
 if (args.includes('--update-baseline')) {
-  const allowed = findings.map((f) => f.key).sort();
-  writeFileSync(BASELINE_FILE, JSON.stringify({ allowed }, null, 2) + '\n');
-  console.log(`[rank-then-filter] baseline updated: ${allowed.length} known finding(s) recorded.`);
+  writeBaseline(BASELINE_FILE, 'allowed', keyed.map((f) => f.key), { note: BASELINE_NOTE });
+  console.log(`[rank-then-filter] baseline updated: ${keyed.length} known finding(s) recorded.`);
   process.exit(0);
 }
 
-const newViolations = findings.filter((f) => !baseline.has(f.key));
+const { fresh, stale } = partitionFindings(keyed, baselineKeys);
 
+// --list is read-only inspection and exits 0; it runs BEFORE the legacy refusal so it
+// still works on an unmigrated baseline. (All five sibling gates behave the same way.)
 if (args.includes('--list')) {
-  console.log(`[rank-then-filter] ${findings.length} total finding(s):`);
-  findings.forEach((f) => console.log('  ' + (baseline.has(f.key) ? '(known) ' : 'NEW ') + f.label));
-}
-
-if (newViolations.length === 0) {
-  console.log(`[rank-then-filter] OK — no new rank-then-filter sites (${findings.length} baseline-known).`);
+  console.log(`[rank-then-filter] ${keyed.length} total finding(s):`);
+  keyed.forEach((f) => console.log(
+    '  ' + (baselineKeys.includes(f.key) ? '(known) ' : legacyCount ? '(legacy baseline) ' : 'NEW ') + label(f) + '  ' + f.key,
+  ));
+  if (stale.length && !legacyCount) {
+    console.log(`\n  ${stale.length} baseline entr(ies) match no finding — the baseline can TIGHTEN:`);
+    stale.forEach((k) => console.log('    (gone) ' + k));
+  }
   process.exit(0);
 }
 
-console.error(`\n[rank-then-filter] ✗ ${newViolations.length} NEW rank-globally-then-filter site(s):\n`);
-newViolations.forEach((f) => console.error('  ' + f.label));
+if (legacyCount) {
+  console.error(`\n[rank-then-filter] ✗ baseline holds ${legacyCount} legacy \`path:line\` entr(ies).`);
+  console.error(`  Run: node scripts/audit-rank-then-filter.mjs --migrate-baseline\n`);
+  process.exit(1);
+}
+
+if (args.includes('--prune-baseline')) {
+  if (!stale.length) {
+    console.log('[rank-then-filter] nothing to prune — every baseline entry still matches a finding.');
+    process.exit(0);
+  }
+  if (fresh.length) {
+    console.error(`[rank-then-filter] ✗ refusing to prune while ${fresh.length} NEW finding(s) are unresolved.`);
+    process.exit(1);
+  }
+  writeBaseline(BASELINE_FILE, 'allowed', baselineKeys.filter((k) => byKey.has(k)), { note: BASELINE_NOTE });
+  console.log(`[rank-then-filter] pruned ${stale.length} stale entr(ies): ${baselineKeys.length} → ${baselineKeys.length - stale.length}.`);
+  process.exit(0);
+}
+
+if (fresh.length === 0) {
+  console.log(`[rank-then-filter] OK — no new rank-then-filter sites (${keyed.length} baseline-known).`);
+  if (stale.length) {
+    console.log(`\n[rank-then-filter] ℹ ${stale.length} baseline entr(ies) no longer match any finding — the baseline can TIGHTEN from ${baselineKeys.length} to ${baselineKeys.length - stale.length}:`);
+    stale.forEach((k) => console.log('    (gone) ' + k));
+    console.log(`  node scripts/audit-rank-then-filter.mjs --prune-baseline\n`);
+  }
+  process.exit(0);
+}
+
+console.error(`\n[rank-then-filter] ✗ ${fresh.length} NEW rank-globally-then-filter site(s):\n`);
+fresh.forEach((f) => console.error('  ' + label(f)));
 console.error(`\n  Why: a ranked+limited award/recipient fetch with NO scope (state/naics/psc/agency/bbox)`);
 console.error(`  ranks over the WHOLE corpus, then the surrounding code narrows it to a viewport/state/`);
 console.error(`  segment — so the top-N is all national whales and the local/segment firms never survive`);

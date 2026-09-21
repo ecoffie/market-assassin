@@ -1,5 +1,8 @@
 {
   "allowed": [
-    "src/lib/gov-contacts/sblo-lookup.ts:192 :: const { rows } = await searchRecipients({ search: companyName, liveBq: true, sor"
-  ]
+    "src/lib/gov-contacts/sblo-lookup.ts#rank-then-filter(searchRecipients):6a4b3bcead"
+  ],
+  "note": "Rank-globally-then-filter sites accepted as pre-existing (or genuinely global). Keys are CONTENT-ADDRESSED (see keyFormat) so line movement cannot manufacture a false NEW finding.",
+  "updated": "2026-09-21",
+  "keyFormat": "file#rule(tag):sha1-10[@n] — content-addressed; run --list to map a key to its current line"
 }

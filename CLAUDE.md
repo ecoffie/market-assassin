@@ -2102,9 +2102,10 @@ for current numbering). **Two rules, two different bugs:**
 | **B** count-null | `count ?? 0` / `count \|\| 0` with no `error` bound **from the query** | see Bug Prevention Rule #11 |
 
 **Baseline ratchet:** existing debt is recorded in `tests/fixtures/supabase-errors-baseline.json`
-(**103** = 74 rule-A + 26 rule-B + 3 `.mjs`), so it blocks nothing today — anything **NEW** fails
-the push. `--list` prints every finding; `--update-baseline` accepts the current set.
-**Drive it toward zero; never re-baseline reflexively** (see the wart below).
+(**109** as of 2026-09-21 — run `--list`, never trust a count in prose), so it blocks nothing
+today — anything **NEW** fails the push. `--list` prints every finding **and its key**;
+`--update-baseline` accepts the current set; `--prune-baseline` TIGHTENS it.
+**Drive it toward zero; never re-baseline reflexively.**
 
 **⚠️ It was blind on FOUR independent axes, each individually reasonable.** Fixing one proved
 nothing about the others — every widening found the next one still hiding:
@@ -2132,8 +2133,39 @@ nothing about the others — every widening found the next one still hiding:
 → revert → expect exit 0. A first attempt at this looked like the ratchet was broken; the probe
 was a single-column select, which rule A ignores by design.
 
-**Known wart:** the baseline keys on `path:line`, so an edit that shifts lines in a known file
-surfaces a **false NEW finding**. Re-baseline deliberately, never reflexively.
+**✅ FIXED 2026-09-21 — findings are CONTENT-ADDRESSED, not line-keyed.** This section used to
+end with a "known wart": the baseline keyed on `path:line`, so shifting lines in a known file
+surfaced a **false NEW finding**, and the advice was "re-baseline deliberately." Advice is not a
+control, and the wart was not cosmetic: **`--update-baseline` accepts EVERY current finding**, so
+a false NEW trains the exact reflex that lets a genuinely new bug in the same push be adopted as
+"known." A line number is a property of everything ABOVE a finding, not of the finding.
+
+Identity now lives in **`scripts/lib/finding-identity.mjs`** and is shared by all five
+baseline-ratchet gates (this one · `audit-rank-then-filter` · `audit-api-truncation` ·
+`audit-mutation-receipts` · `audit-unranged-selects`):
+
+    <file>#<rule>(<table>):<sha1-10>[@<n>]
+
+sha1 over the rule's own **normalized trigger statement** — comments stripped, whitespace
+collapsed. Deliberately NOT the surrounding block (an unrelated `.eq()` added nearby must not
+rename the finding — that is line-drift one level up) and not incidental detail like a select's
+column count. `@n` is an occurrence ordinal for findings that are byte-identical after
+normalization; they stay SEPARATE entries so fixing one of three leaves exactly one entry to
+tighten instead of silently matching the survivors.
+
+- **`--migrate-baseline`** converts a legacy baseline and **refuses** unless acceptance is
+  preserved exactly (a finding the old baseline didn't accept, or a stale entry, stops it;
+  `--prune-stale` drops stale ones deliberately). A 1:1 line shift inside ONE file is rescued and
+  printed — because migrating is itself an edit that moves lines (measured: adding one import to
+  `audit-unranged-selects.mjs` moved that gate's finding **in its own source** 77 → 78).
+- **`--prune-baseline`** acts on the third state content addressing made visible for the first
+  time: a baseline entry matching no finding means the finding is GONE and the accepted set can
+  shrink. Under `path:line` that was indistinguishable from drift. Reported every run, never
+  auto-applied, and refused while any NEW finding is unresolved.
+- Contract pinned by `src/lib/gate-finding-identity.unit.test.ts` (25 tests).
+- Migration was 1:1 where the code hadn't moved on: supabase-errors 109→109, api-truncation
+  28→28, rank-then-filter 1→1. Two baselines were already **stale and nobody could tell**:
+  mutation-receipts 14→11 and unranged-selects 62→60.
 
 **Standout debt in the baseline (not fixed):** `admin/data-health` does `count || 0` with no
 error bound — the endpoint whose job is reporting data health would report a fabricated 0.
@@ -2179,9 +2211,15 @@ Two guards learned by testing: **strip comments first** (a fix that quotes `sort
 while explaining it must not flag), and **skip the helper's own `function` definition** (the
 lib file names the helper but isn't calling it — that was a false positive on `awards-search.ts`).
 
-**Baseline ratchet:** `tests/fixtures/rank-then-filter-baseline.json`, keyed on `path:line` +
-a short snippet (the snippet reduces the `path:line`-drift false-NEW that bites the sibling
-gates). `--list` prints every finding; `--update-baseline` accepts the current set. Exit 0 =
+**Baseline ratchet:** `tests/fixtures/rank-then-filter-baseline.json`. This gate used to key on
+`path:line` **plus** an 80-char snippet, and this doc claimed the snippet "reduces the
+`path:line`-drift false-NEW that bites the sibling gates." **It did not — measured 2026-09-21:**
+inserting five blank lines above the one baselined finding still produced `✗ 1 NEW
+rank-globally-then-filter site(s)`, exit 1, because `path:line` was still IN the key. The snippet
+only made the false NEW easier to recognise by eye. Keys are now content-addressed via the shared
+`scripts/lib/finding-identity.mjs` (see the silent-failure gate section above for the format and
+the `--migrate-baseline` / `--prune-baseline` flags). `--list` prints every finding **and its
+key**; `--update-baseline` accepts the current set. Exit 0 =
 no NEW findings; exit 1 = a new site blocks the push. **Baselined at 1:**
 `src/lib/gov-contacts/sblo-lookup.ts:192` — a company-NAME lookup (`search: companyName`) that
 ranks by $ only to pick the biggest substring match for a single named prime, then re-selects

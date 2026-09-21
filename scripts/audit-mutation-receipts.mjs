@@ -28,8 +28,9 @@
  *   node scripts/audit-mutation-receipts.mjs --list
  *   node scripts/audit-mutation-receipts.mjs --update-baseline
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { runBaselineGate } from './lib/finding-identity.mjs';
 
 const ROOT = process.cwd();
 const SCAN = [join(ROOT, 'src/app/api'), join(ROOT, 'src/lib'), join(ROOT, 'scripts')];
@@ -98,48 +99,24 @@ for (const f of files) {
   if (bad.length) offenders.push({ file: relative(ROOT, f), bad });
 }
 
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).violations || [])
-  : new Set();
-const keys = offenders.flatMap((o) => o.bad.map((b) => `${o.file}:${b.line}`));
-
-if (process.argv.includes('--update-baseline')) {
-  mkdirSync(dirname(BASELINE_FILE), { recursive: true });
-  writeFileSync(BASELINE_FILE, JSON.stringify({
-    note: 'INT-005: mutation RETURNING payloads counted as affected-row totals. The gate blocks NEW ones. Shrink this list; never grow it.',
-    updated: new Date().toISOString().slice(0, 10),
-    violations: keys.sort(),
-  }, null, 2) + '\n');
-  console.log(`baseline updated — ${keys.length} accepted violation(s) recorded`);
-  process.exit(0);
-}
-
-if (process.argv.includes('--list')) {
-  for (const o of offenders) {
-    console.log(`\n  ${o.file}`);
-    for (const b of o.bad) console.log(`      ${b.line}: ${b.snippet}`);
-  }
-  console.log(`\n  ${keys.length} finding(s) across ${offenders.length} file(s), ${files.length} scanned`);
-  process.exit(0);
-}
-
-const fresh = offenders
-  .map((o) => ({ ...o, bad: o.bad.filter((b) => !baseline.has(`${o.file}:${b.line}`)) }))
-  .filter((o) => o.bad.length);
-
-if (!fresh.length) {
-  console.log(`\x1b[32m✓ INT-005: no NEW mutation-receipt counts (${files.length} files, ${baseline.size} baselined)\x1b[0m`);
-  process.exit(0);
-}
-
-const total = fresh.reduce((s, o) => s + o.bad.length, 0);
-console.error(`\x1b[31m✗ INT-005: ${total} NEW mutation RETURNING payload(s) counted as a write total\x1b[0m`);
-console.error('  The mutation affects every matching row; the returned payload is capped at 1,000.');
-console.error('  Counting it under-reports the work actually done — and nothing errors.\n');
-for (const o of fresh) {
-  console.error(`  ${o.file}`);
-  for (const b of o.bad) console.error(`      ${b.line}: ${b.snippet}`);
-}
-console.error("\n  Fix: add { count: 'exact' } to the mutation and read `count`,");
-console.error('  or  // truncation-ok: <why this payload cannot be capped>');
-process.exit(1);
+// Findings carry their own evidence (the mutation line) so the baseline key is
+// content-addressed — see scripts/lib/finding-identity.mjs for why `path:line` was a bug.
+runBaselineGate({
+  name: 'INT-005',
+  script: 'audit-mutation-receipts.mjs',
+  findings: offenders.flatMap((o) => o.bad.map((b) => ({
+    file: o.file, line: b.line, rule: 'mutation-receipt', evidence: b.snippet, detail: b.snippet,
+  }))),
+  baselineFile: BASELINE_FILE,
+  field: 'violations',
+  note: 'INT-005: mutation RETURNING payloads counted as affected-row totals. Keys are CONTENT-ADDRESSED (see keyFormat). The gate blocks NEW ones. Shrink this list; never grow it.',
+  scanned: `${files.length} files scanned`,
+  okMessage: (n) => `\x1b[32m✓ INT-005: no NEW mutation-receipt counts (${files.length} files, ${n} baselined)\x1b[0m`,
+  failHeader: (n) => `\x1b[31m✗ INT-005: ${n} NEW mutation RETURNING payload(s) counted as a write total\x1b[0m\n`
+    + '  The mutation affects every matching row; the returned payload is capped at 1,000.\n'
+    + '  Counting it under-reports the work actually done — and nothing errors.\n',
+  failAdvice: [
+    "\n  Fix: add { count: 'exact' } to the mutation and read `count`,",
+    '  or  // truncation-ok: <why this payload cannot be capped>',
+  ],
+});
