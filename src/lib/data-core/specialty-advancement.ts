@@ -111,3 +111,64 @@ export function corpusHeadline(rows: SourceAdvancement[]): {
             .join(', ')})`,
   };
 }
+
+export type ProducerState =
+  | 'running_advancing'
+  | 'running_not_advancing'
+  | 'running_never_advanced'
+  | 'parked_historical'
+  | 'parked_never_advanced';
+
+export interface ProducerStatus {
+  source: string;
+  jobName: string;
+  jobEnabled: boolean;
+  rowsHeld: number;
+  lastScrapedAt: string | null;
+  daysSinceScrape: number | null;
+  state: ProducerState;
+}
+
+const PRODUCER_STATES: ProducerState[] = [
+  'running_advancing', 'running_not_advancing', 'running_never_advanced',
+  'parked_historical', 'parked_never_advanced',
+];
+
+/**
+ * Producer schedule state BESIDE data advancement.
+ *
+ * `running_not_advancing` and `running_never_advanced` are the false-green
+ * conditions: a job still scheduled while its source produces nothing. DARPA sat
+ * in the first for 168 days and NSF in the second forever, each reporting
+ * HTTP 200 daily.
+ *
+ * An unrecognised state degrades to `running_never_advanced` — the most alarming
+ * reading — so a vocabulary change can never quietly present as healthy.
+ */
+export async function getResearchProducerStatus(db: SupabaseClient): Promise<ProducerStatus[]> {
+  const { data, error } = await db.rpc('research_producer_status');
+  if (error) throw new Error(`research_producer_status: ${error.message}`);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    source: String(r.source),
+    jobName: String(r.job_name),
+    jobEnabled: r.job_enabled === true,
+    rowsHeld: Number(r.rows_held ?? 0),
+    lastScrapedAt: (r.last_scraped_at as string) ?? null,
+    daysSinceScrape: r.days_since_scrape == null ? null : Number(r.days_since_scrape),
+    state: PRODUCER_STATES.includes(r.producer_state as ProducerState)
+      ? (r.producer_state as ProducerState)
+      : 'running_never_advanced',
+  }));
+}
+
+/** Producers still scheduled while their source produces nothing. */
+export function falseGreenProducers(rows: ProducerStatus[]): ProducerStatus[] {
+  return rows.filter(
+    (r) => r.state === 'running_not_advancing' || r.state === 'running_never_advanced',
+  );
+}
+
+/** A parked producer is NEVER healthy, whatever its last job status said. */
+export function isHealthyProducer(r: ProducerStatus): boolean {
+  return r.state === 'running_advancing';
+}
