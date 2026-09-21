@@ -89,6 +89,28 @@ function buildKey(cacheKey: string): string {
 }
 
 /**
+ * Write rows into a queryCached() key WITHOUT going through BigQuery.
+ *
+ * For batch warmers only. The point is cost shape: warming N slugs by calling
+ * the per-slug reader N times is N BigQuery scans, which is precisely the
+ * pattern that exhausted the daily quota and took the authenticated Contractors
+ * panel down (see src/lib/seo/live-bq.ts). A warmer can instead run ONE batched
+ * scan for all N and prime each key from the result.
+ *
+ * Callers own correctness: the rows written here must be the same shape the
+ * matching queryCached() reader expects, or a cache hit will deserialize into
+ * the wrong type. Keep the cacheKey string identical to the reader's, version
+ * suffix included.
+ */
+export async function primeCache<T>(
+  cacheKey: string,
+  rows: T[],
+  ttlSeconds?: number,
+): Promise<void> {
+  await kv.set(buildKey(cacheKey), rows, { ex: ttlSeconds ?? DEFAULT_TTL_SECONDS });
+}
+
+/**
  * Keys whose most recent queryCached() call failed with no stale cache to cover it.
  * Bounded so a long-lived lambda cannot grow it without limit.
  */

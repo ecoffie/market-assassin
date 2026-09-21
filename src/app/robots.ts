@@ -44,6 +44,20 @@ export default function robots(): MetadataRoute.Robots {
           // not an indexable destination. Blocking it protects crawl budget
           // and prevents bots from hammering the PIID lookup at scale — the
           // canonical award pages under /awards/ stay fully crawlable.
+          //
+          // REVIEWED 2026-09-21 and deliberately KEPT. Contract-number (PIID)
+          // lookups are the site's #1 query class by impressions and its worst
+          // by conversion: "19aqmm24f2376" drew 430 impressions at average
+          // position 1.8 and ZERO clicks; across six months the whole site took
+          // 13,976 impressions and 32 clicks, 28 of them the branded query
+          // "getmindy.ai". Pasting a PIID into Google is a reference lookup, not
+          // a buyer. Opening this path would buy more of the traffic that
+          // already does not convert.
+          //
+          // Noted while reviewing, NOT fixed here: /contracts/<piid> currently
+          // 307s to the generic /awards index rather than to that award's own
+          // /awards/[id] page, so the identifier is dropped. Harmless today
+          // because the path is blocked, but it is a broken vanity redirect.
           '/contracts/',
           // /reports/* are PRIVATE capability-URL deliverables (Mindy Intelligence —
           // the unguessable id IS the access control). They must never be indexed.

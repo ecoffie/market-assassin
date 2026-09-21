@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Opportunity Hunter | GovCon Giants',
+  title: 'Opportunity Hunter | Mindy',
   description: 'Discover 50+ agencies awarding contracts to businesses like yours. Find federal contracting opportunities.',
 };
 

@@ -273,6 +273,39 @@ export function assertSafeBigQueryShape(query: string): void {
   }
 }
 
+/**
+ * Estimate a query's cost WITHOUT running it.
+ *
+ * A BigQuery dry run is free: it consumes no slots, bills no bytes and counts
+ * against no quota. It returns what the query WOULD scan.
+ *
+ * This exists because "measure before you spend" had no implementation. The
+ * crawler-facing cold-scan path exhausted the daily quota and took the
+ * authenticated Contractors panel down with it, and every guard added since
+ * (RUNTIME_MAX_BYTES, the cacheOnly default, the SEO kill switch) caps the
+ * damage AFTER a query is issued. This is the one that answers the question
+ * beforehand, so a warmer can size its batches against a real number instead
+ * of a guess.
+ *
+ * ALWAYS dry-run a new batch shape before executing it against production.
+ */
+export async function bqDryRun(opts: {
+  query: string;
+  params?: Record<string, unknown>;
+}): Promise<{ bytesProcessed: number; gib: number }> {
+  assertSafeBigQueryShape(opts.query);
+  const client = getClient();
+  const [job] = await client.createQueryJob({
+    query: opts.query,
+    params: opts.params,
+    location: 'US',
+    dryRun: true,
+    labels: { ...DEFAULT_LABELS, dry_run: 'true' },
+  });
+  const bytes = Number(job.metadata?.statistics?.totalBytesProcessed ?? 0);
+  return { bytesProcessed: bytes, gib: bytes / 1024 ** 3 };
+}
+
 export async function bqQuery<T = Record<string, unknown>>(opts: BqQueryParams): Promise<T[]> {
   assertSafeBigQueryShape(opts.query);
   const client = getClient();

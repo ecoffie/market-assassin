@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: '2026 GovCon Action Plan | GovCon Giants',
+  title: '2026 GovCon Action Plan | Mindy',
   description: 'Your step-by-step roadmap to winning federal contracts in 2026.',
 };
 

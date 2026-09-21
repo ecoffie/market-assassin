@@ -1,7 +1,7 @@
 import TestProtocolClient from './TestProtocolClient';
 
 export const metadata = {
-  title: 'Test Protocol | GovCon Giants',
+  title: 'Test Protocol | Mindy',
   robots: 'noindex, nofollow',
 };
 

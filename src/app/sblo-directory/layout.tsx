@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'SBLO Contact Directory | GovCon Giants',
+  title: 'SBLO Contact Directory | Mindy',
   description: '225 Small Business Liaison Officers across 76+ federal agencies with direct contact info.',
 };
 
