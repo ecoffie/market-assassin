@@ -1,2 +1,3 @@
 .vercel/
-secret.env
+.env
+.env.*
