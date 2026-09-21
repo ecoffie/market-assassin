@@ -28,6 +28,7 @@
  * cron_jobs row. Never the same push.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 import { createClient } from '@supabase/supabase-js';
 import {
   collectBillDocuments,
@@ -447,8 +448,22 @@ export async function GET(request: NextRequest) {
           : 'no_new_evidence'
         : 'advanced';
 
+  // The dispatcher fire-and-forgets this route (timeout_ms 290s) and records
+  // `dispatched` at 12s, which the watchdog ignores — so before this, the WEEKLY
+  // run's outcome was never observable and the source had to be proven by its
+  // corpus instead. Report the REAL outcome; a failed/blocked document makes the
+  // run an error even though the HTTP response is a 200 with details.
+  const runOk = failed === 0 && blocked === 0 && collectFailures === 0;
+  if (mode === 'execute') {
+    await reportCronOutcome(
+      'institute-legislation-sync',
+      runOk ? 'success' : 'partial',
+      runOk ? undefined : `failed=${failed} blocked=${blocked} collectFailures=${collectFailures}`,
+    ).catch(() => {});
+  }
+
   return NextResponse.json({
-    success: failed === 0 && blocked === 0 && collectFailures === 0,
+    success: runOk,
     mode,
     pollOk: true,
     status,

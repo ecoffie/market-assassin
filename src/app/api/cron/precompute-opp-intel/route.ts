@@ -15,6 +15,7 @@
  *   Dispatcher-fired (cron_jobs row). Manual: GET ?limit=40
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 import { createClient } from '@supabase/supabase-js';
 import { buildOppIntel } from '@/lib/opportunities/opp-intel';
 import { extractSowCardFacts, sowCardFactsHasContent } from '@/lib/opportunities/sow-card-facts';
@@ -130,5 +131,14 @@ export async function GET(request: NextRequest) {
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
 
+  // Fire-and-forget route (timeout_ms 290s): the dispatcher records `dispatched`
+  // at 12s and the watchdog ignores it, so the drain's outcome was invisible.
+  // A run where every item failed is NOT a success, whatever the HTTP status.
+  const outcome = done > 0 && failed >= done ? 'partial' : 'success';
+  await reportCronOutcome(
+    'precompute-opp-intel',
+    outcome,
+    outcome === 'partial' ? `processed=${done} failed=${failed}` : undefined,
+  ).catch(() => {});
   return NextResponse.json({ success: true, processed: done, failed, remaining: Math.max(0, (remaining ?? 0) - done) });
 }

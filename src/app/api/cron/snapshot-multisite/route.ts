@@ -45,6 +45,7 @@ import type {
   ScrapeLogEntry,
   SourceId,
 } from '@/lib/scrapers/types';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 // ============================================================================
 // CONFIGURATION
@@ -217,6 +218,39 @@ export async function GET(request: NextRequest) {
 
   // Return response
   const totalDurationMs = Date.now() - startTime;
+
+  // ── Long-job completion reporting ────────────────────────────────────────
+  // ONE route serves three cron_jobs rows (source is a query param), so the
+  // job name cannot be inferred from the path. Only a run scraping exactly one
+  // mapped source reports — a multi-source or unmapped run has no single job to
+  // speak for, and guessing would write a status onto the wrong job.
+  //
+  // This is where DARPA and NSF looked green for 30 straight days: the route
+  // returned 200 having scraped nothing, and nobody could tell which job that
+  // 200 belonged to. A source that found NOTHING is reported `partial`, never
+  // success — a 200 is not evidence of advancement.
+  const CRON_JOB_BY_SOURCE: Record<string, string> = {
+    nih_reporter: 'snapshot-multisite-nih',
+    nsf_sbir: 'snapshot-multisite-nsf',
+    darpa_baa: 'snapshot-multisite-darpa',
+  };
+  if (!dryRun && sourcesToScrape.length === 1) {
+    const jobName = CRON_JOB_BY_SOURCE[sourcesToScrape[0]];
+    if (jobName) {
+      const r = results[sourcesToScrape[0]] as { error?: string; totalFound?: number } | undefined;
+      if (r?.error) {
+        await reportCronOutcome(jobName, 'error', r.error).catch(() => {});
+      } else if (!r || !r.totalFound) {
+        await reportCronOutcome(
+          jobName,
+          'partial',
+          'scraped 0 records — a 200 is not evidence of advancement',
+        ).catch(() => {});
+      } else {
+        await reportCronOutcome(jobName, 'success').catch(() => {});
+      }
+    }
+  }
 
   return NextResponse.json({
     success: true,
