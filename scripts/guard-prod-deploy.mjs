@@ -45,10 +45,15 @@
  *   3. ON main — not a feature branch, not detached.
  *   4. EXACTLY origin/main — 0 behind (missing merged work, the incident above)
  *      and 0 ahead (unpushed commits ship code nobody reviewed).
- *   5. CLEAN — no modified tracked files, and no untracked files that would be
- *      uploaded. `.vercelignore` in this repo records that the CLI "uploads the
- *      working directory and does NOT honour .gitignore", so an untracked file is
- *      deployable content unless `.vercelignore` excludes it.
+ *   5. CLEAN — no modified tracked files, and nothing extra that would be uploaded.
+ *      `.vercelignore` in this repo records that the CLI "uploads the working
+ *      directory and does NOT honour .gitignore", so BOTH ordinary untracked files
+ *      AND GITIGNORED ones are deployable content unless `.vercelignore` excludes
+ *      them. `git status --porcelain` lists only the first kind — it hides exactly
+ *      what .gitignore covers, which is the larger and more sensitive half. On this
+ *      repo that hidden half included `.env.local` and two `.env.local.*-backup`
+ *      files, none of them excluded by `.vercelignore`. So the enumeration uses
+ *      `--ignored`, and "git says clean" is not evidence that nothing extra ships.
  *
  * ESCAPE HATCH. Emergency rollbacks are real. `ALLOW_NONMAIN_PROD_DEPLOY="<reason>"`
  * downgrades 3-5 to loud warnings. The reason must be a real sentence (>= 8 chars):
@@ -83,25 +88,121 @@ export const EXPECTED_PROJECT_ID = 'prj_8EXxyyIhcQkBRMMfwiYbxuzYIpVu';
 export const EXPECTED_ORG_ID = 'team_w3016JFXskPwzWfNUjFO8fes';
 const MIN_REASON_LENGTH = 8;
 
+const normalizePath = (s) => s.trim().replace(/^\.\//, '').replace(/\/+$/, '');
+
 /**
- * Does `.vercelignore` definitely exclude this path?
+ * Decide whether ONE `.vercelignore` pattern matches a path.
  *
- * Deliberately conservative: only simple literal and directory patterns are
- * honoured. Anything with a glob returns FALSE (= "not proven excluded"), so the
- * file still blocks. Guessing that a pattern excludes a file is how unreviewed
- * content reaches production; a false block costs one `git add`.
+ * Returns `null` for "cannot evaluate" — deliberately distinct from `false`, because
+ * the two mean opposite things for a NEGATION. Only a small, precisely-specified
+ * subset of gitignore syntax is evaluated; everything else is `null`:
+ *
+ *   `dir/` or `a/b`   anchored  — the path itself or anything beneath it
+ *   `name`            unanchored — that basename at ANY depth (gitignore semantics,
+ *                     which is how `.DS_Store` also covers `docs/.DS_Store`)
+ *   `**​/name`         same as unanchored `name`
+ *   `prefix*`         a single TRAILING star, no slash — any path SEGMENT starting
+ *                     with `prefix` (this is what makes `.env.*` cover the
+ *                     timestamped `.env.local.*-backup` files)
+ *
+ * Anything else — an interior `*`, `?`, a character class, a multi-star pattern —
+ * returns `null`. Widening this set is fine; guessing is not.
+ */
+export function matchesVercelPattern(pattern, filePath) {
+  const p = normalizePath(filePath);
+  let body = pattern.trim();
+  if (!body || !p) return null;
+
+  const anchored = body.includes('/') && !body.replace(/\/+$/, '').startsWith('**/');
+  if (body.startsWith('**/')) body = body.slice(3);
+  const clean = normalizePath(body);
+  if (!clean) return null;
+
+  const segments = p.split('/');
+
+  // `prefix*` — one trailing star only, and no path separator.
+  if (/^[^*?[\]/]+\*$/.test(clean)) {
+    const prefix = clean.slice(0, -1);
+    return segments.some((seg) => seg.startsWith(prefix));
+  }
+
+  if (/[*?[\]]/.test(clean)) return null; // not in the evaluated subset
+
+  if (anchored) return p === clean || p.startsWith(`${clean}/`);
+
+  // Unanchored literal: matches that name at any depth, and anything beneath it.
+  return (
+    p === clean ||
+    p.startsWith(`${clean}/`) ||
+    p.endsWith(`/${clean}`) ||
+    p.includes(`/${clean}/`)
+  );
+}
+
+/**
+ * Does `.vercelignore` DEFINITELY exclude this path?
+ *
+ * "Definitely" is the whole contract. Returning true means the guard will stay
+ * silent about a file that ships, so every uncertainty resolves to FALSE (= "not
+ * proven excluded" = it still blocks). A false block costs one `.vercelignore`
+ * line; a false exclusion is how unreviewed content reaches production.
+ *
+ * Patterns are evaluated IN ORDER, last match winning, because `.vercelignore`
+ * follows .gitignore semantics — and that includes `!` NEGATION, which RE-INCLUDES
+ * a path. A negation is an EXCEPTION to an exclusion, and the two must never be
+ * confused: given
+ *
+ *     .claude/
+ *     !.claude/keep-me.txt
+ *
+ * `.claude/keep-me.txt` IS uploaded. Matching only the first line and reporting
+ * "excluded" would hide exactly the file that ships. Three conservative rules:
+ *
+ *   - a negation we CANNOT evaluate (globbed) => never claim exclusion at all;
+ *   - a positive pattern we cannot evaluate (globbed) => skip it, claim nothing;
+ *   - a negation naming something UNDER this path => this path is not wholly
+ *     excluded, so do not claim it is. That matters because git collapses an
+ *     untracked/ignored directory into a single entry, so `p` is often a DIRECTORY
+ *     and one re-included child is enough to make the directory uploadable.
  */
 export function isVercelIgnored(filePath, patterns = []) {
-  const p = filePath.replace(/^\.\//, '').replace(/\/+$/, '');
+  const p = normalizePath(filePath);
+  if (!p) return false;
+
+  let excluded = false;
+
   for (const raw of patterns) {
-    const pattern = raw.trim();
-    if (!pattern || pattern.startsWith('#')) continue;
-    if (/[*?[\]!]/.test(pattern)) continue; // globbed — cannot prove, so do not
-    const clean = pattern.replace(/^\.\//, '').replace(/\/+$/, '');
-    if (!clean) continue;
-    if (p === clean || p.startsWith(`${clean}/`)) return true;
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const negated = line.startsWith('!');
+    const body = negated ? line.slice(1).trim() : line;
+    if (!body) continue;
+
+    const match = matchesVercelPattern(body, p);
+
+    if (match === null) {
+      // An un-evaluatable RE-INCLUDE could resurrect anything under any exclusion,
+      // so the honest answer for this file is "unknown" — which must block.
+      if (negated) return false;
+      continue; // positive pattern we cannot evaluate: claim nothing
+    }
+
+    if (match) {
+      excluded = !negated;
+      continue;
+    }
+
+    // A re-included CHILD of a collapsed directory entry: `p` is not WHOLLY excluded,
+    // so do not report it as excluded. git collapses an untracked/ignored directory
+    // into one entry, so `p` is frequently a directory and one exception is enough.
+    if (negated) {
+      const child = normalizePath(body);
+      if (child.startsWith(`${p}/`)) excluded = false;
+    }
   }
-  return false;
+
+  return excluded;
 }
 
 /**
@@ -119,6 +220,7 @@ export function isVercelIgnored(filePath, patterns = []) {
  *   ahead?: number|null,
  *   dirtyTracked?: string[],
  *   untrackedDeployable?: string[],
+ *   gitignoredDeployable?: string[],
  *   untrackedIgnored?: string[],
  *   gitErrors?: string[],
  *   fetchAttempted?: boolean,
@@ -139,6 +241,7 @@ export function evaluateProdDeployGuard(facts = {}) {
     ahead = null,
     dirtyTracked = [],
     untrackedDeployable = [],
+    gitignoredDeployable = [],
     untrackedIgnored = [],
     gitErrors = [],
     fetchAttempted = true,
@@ -311,6 +414,19 @@ export function evaluateProdDeployGuard(facts = {}) {
     });
   }
 
+  if (gitignoredDeployable.length > 0) {
+    findings.push({
+      code: 'gitignored_deployable',
+      message:
+        `${gitignoredDeployable.length} GITIGNORED path(s) are not excluded by .vercelignore. ` +
+        'git hides these from a normal status, but the CLI uploads the working directory and ' +
+        'does not honour .gitignore — so "git says clean" does NOT mean "nothing extra ships". ' +
+        'Add them to .vercelignore: ' +
+        `${gitignoredDeployable.slice(0, 5).join(', ')}${gitignoredDeployable.length > 5 ? ', …' : ''}`,
+      overridable: true,
+    });
+  }
+
   if (overrideRejected) {
     findings.push({
       code: 'override_not_a_reason',
@@ -459,16 +575,28 @@ function gatherFacts(cwd, { fetch: shouldFetch }) {
     }
   }
 
-  const porcelain = tracked('status --porcelain', () =>
-    gitPorcelain(['status', '--porcelain'], cwd),
+  // `--ignored` is load-bearing, not a detail. A plain `git status --porcelain`
+  // lists ONLY ordinary untracked files — it hides everything .gitignore covers.
+  // But .vercelignore records that the CLI "uploads the working directory and does
+  // NOT honour .gitignore", so gitignored files are uploaded too. Enumerating only
+  // the untracked ones inspects the smaller half of what actually ships: measured
+  // on this repo, .env.local and two .env.local.*-backup files are gitignored,
+  // therefore invisible to the old check, and NOT excluded by .vercelignore.
+  const porcelain = tracked('status --porcelain --ignored', () =>
+    gitPorcelain(['status', '--porcelain', '--ignored'], cwd),
   );
   const lines = (porcelain ?? '').split('\n').filter(Boolean);
-  const dirtyTracked = lines.filter((l) => !l.startsWith('??')).map((l) => l.slice(3).trim());
+  const dirtyTracked = lines
+    .filter((l) => !l.startsWith('??') && !l.startsWith('!!'))
+    .map((l) => l.slice(3).trim());
   const untrackedAll = lines.filter((l) => l.startsWith('??')).map((l) => l.slice(3).trim());
+  const gitignoredAll = lines.filter((l) => l.startsWith('!!')).map((l) => l.slice(3).trim());
 
   const ignorePatterns = readVercelIgnore(cwd);
-  const untrackedDeployable = untrackedAll.filter((f) => !isVercelIgnored(f, ignorePatterns));
-  const untrackedIgnored = untrackedAll.filter((f) => isVercelIgnored(f, ignorePatterns));
+  const excluded = (f) => isVercelIgnored(f, ignorePatterns);
+  const untrackedDeployable = untrackedAll.filter((f) => !excluded(f));
+  const gitignoredDeployable = gitignoredAll.filter((f) => !excluded(f));
+  const untrackedIgnored = [...untrackedAll, ...gitignoredAll].filter(excluded);
 
   const link = readVercelLink(cwd);
 
@@ -484,6 +612,7 @@ function gatherFacts(cwd, { fetch: shouldFetch }) {
     ahead,
     dirtyTracked,
     untrackedDeployable,
+    gitignoredDeployable,
     untrackedIgnored,
     gitErrors,
     fetchAttempted: Boolean(shouldFetch),
@@ -556,6 +685,24 @@ function selfTest() {
         untrackedDeployable: ['src/app/secret-draft.tsx'],
       }),
       (r) => !r.ok && r.blocking.some((f) => f.code === 'untracked_deployable'),
+    ],
+    [
+      'gitignored file not excluded by .vercelignore refuses',
+      evaluateProdDeployGuard({
+        ...linked,
+        branch: 'main',
+        headSha: 'a'.repeat(40),
+        remoteMainSha: 'a'.repeat(40),
+        behind: 0,
+        ahead: 0,
+        gitignoredDeployable: ['.env.local'],
+      }),
+      (r) => !r.ok && r.blocking.some((f) => f.code === 'gitignored_deployable'),
+    ],
+    [
+      'a "!" negation is not mistaken for an exclusion',
+      { ok: isVercelIgnored('bundle', ['bundle/', '!bundle/keep.txt']) === false },
+      (r) => r.ok,
     ],
     [
       'clean main passes',

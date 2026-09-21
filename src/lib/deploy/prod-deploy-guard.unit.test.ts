@@ -245,6 +245,37 @@ describe('isVercelIgnored — conservative by design', () => {
   it('does not let a prefix collision match a sibling', () => {
     expect(isVercelIgnored('.nextgen/thing', ['.next'])).toBe(false);
   });
+
+  it('matches an unanchored name at any DEPTH, like gitignore', () => {
+    expect(isVercelIgnored('docs/.DS_Store', ['.DS_Store'])).toBe(true);
+    expect(isVercelIgnored('a/b/node_modules/x', ['node_modules'])).toBe(true);
+  });
+
+  it('evaluates a trailing-star pattern so .env.* reaches timestamped backups', () => {
+    const pats = ['.env', '.env.*'];
+    expect(isVercelIgnored('.env.local', pats)).toBe(true);
+    expect(isVercelIgnored('.env.local.broken-development-backup-20260914-125908', pats)).toBe(true);
+  });
+
+  it('a "!" negation RE-INCLUDES — it is an exception, not an exclusion', () => {
+    const pats = ['.claude/', '!.claude/keep-me.txt'];
+    expect(isVercelIgnored('.claude/other.txt', pats)).toBe(true);
+    expect(isVercelIgnored('.claude/keep-me.txt', pats)).toBe(false);
+  });
+
+  it('a re-included CHILD un-excludes the collapsed DIRECTORY entry', () => {
+    // git reports an untracked directory as one entry, so claiming the directory is
+    // excluded would hide the very child that ships.
+    expect(isVercelIgnored('bundle', ['bundle/', '!bundle/keep.txt'])).toBe(false);
+  });
+
+  it('never claims exclusion when a negation cannot be evaluated', () => {
+    expect(isVercelIgnored('bundle/thing.txt', ['bundle/', '!bundle/**/*.keep'])).toBe(false);
+  });
+
+  it('order matters — a later positive pattern re-excludes', () => {
+    expect(isVercelIgnored('bundle/keep.txt', ['bundle/', '!bundle/keep.txt', 'bundle/'])).toBe(true);
+  });
 });
 
 describe('prod deploy guard — the escape hatch must stay deliberate', () => {

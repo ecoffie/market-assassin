@@ -114,10 +114,20 @@ checkout is:
 3. **on `main`** — not a feature branch, not detached.
 4. **exactly `origin/main`** — 0 behind (the incident above) and 0 ahead (unpushed,
    unreviewed code).
-5. **clean** — no modified tracked files, **and no untracked files that would be uploaded**.
+5. **clean** — no modified tracked files, **and nothing extra that would be uploaded**.
    `.vercelignore` records that the CLI "uploads the working directory and does NOT honour
-   `.gitignore`", so an untracked file is deployable content unless `.vercelignore` excludes
-   it. Glob patterns are treated as *not proven to exclude*, so the file still blocks.
+   `.gitignore`", so **both untracked AND gitignored** paths are deployable content unless
+   `.vercelignore` excludes them.
+   ⚠️ **`git status --porcelain` lists only the untracked half — it hides exactly what
+   `.gitignore` covers**, which here was the larger and more sensitive half: `.env.local`
+   and two `.env.local.*-backup` files, none excluded by `.vercelignore`. The enumeration
+   uses `--ignored`, so **"git says clean" is not evidence that nothing extra ships**.
+   ⚠️ **A `!` negation RE-INCLUDES** — it is an exception, not an exclusion. Matching only
+   the broader exclusion above it would report "excluded" for a path that ships, and git
+   collapses an untracked directory into ONE entry, so a single re-included child makes the
+   whole directory uploadable. A negation that can't be evaluated means *nothing* is claimed
+   as excluded. `.vercelignore` was extended (additively — every prior entry kept) so the
+   intentional exclusions are explicit.
 
 Emergency hatch: `ALLOW_NONMAIN_PROD_DEPLOY="<reason>"` waives 3–5 and prints them as
 warnings. The reason must be a real sentence — `=1` is rejected, because a bypass nobody can
