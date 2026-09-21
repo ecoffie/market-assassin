@@ -309,8 +309,10 @@ describe('describeCoverageTimestamp', () => {
     expect(d.warehouse_max_action_date).toBe('2026-09-18');
     expect(d.ingest.freshness_status).toBe('healthy');
     expect(d.coverage_complete_established).toBe(true);
+    expect(d.coverage_complete_established_meaning).toMatch(/Does NOT mean/i);
     expect(d.freshness_note).toMatch(/Three clocks/i);
     expect(d.freshness_note).toMatch(/does not mean the dataset is stale/i);
+    expect(d.freshness_note).toMatch(/not that this recipient's history is exhaustive/i);
   });
 
   it('keeps coverage unknown when only recipient last action is present', () => {

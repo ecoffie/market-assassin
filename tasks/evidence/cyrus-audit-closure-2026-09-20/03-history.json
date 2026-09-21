@@ -22,7 +22,8 @@
         "run_age_days": 0
       },
       "coverage_complete_established": true,
-      "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage."
+      "coverage_complete_established_meaning": "True only when warehouse max action_date and ingest clocks were attached and classified. Does NOT mean this recipient's award history is exhaustive or that coverage of the corpus is complete.",
+      "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage. coverage_complete_established=true means clocks were attached — not that this recipient's history is exhaustive."
     },
     "contractor": {
       "company": "CYRUS MANAGEMENT SOLUTIONS LLC",

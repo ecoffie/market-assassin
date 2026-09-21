@@ -561,8 +561,10 @@ export function describeCoverageTimestamp(opts: {
   /**
    * True only when warehouse max + ingest clocks are attached.
    * A recent recipient action alone never establishes complete coverage.
+   * Does NOT mean this recipient's award history is exhaustive.
    */
   coverage_complete_established: boolean;
+  coverage_complete_established_meaning: string;
   freshness_note: string;
 } {
   const last = opts.lastRecipientActionDate ? String(opts.lastRecipientActionDate).slice(0, 10) : null;
@@ -591,7 +593,8 @@ export function describeCoverageTimestamp(opts: {
       `Three clocks: recipient last action ${last ?? 'unknown'}; warehouse awards reach ` +
       `action_date ${warehouse}; ingest freshness=${freshness.status}. ` +
       `A contractor's quieter last_action_date does not mean the dataset is stale, and a ` +
-      `recent recipient action alone does not establish complete warehouse coverage.`;
+      `recent recipient action alone does not establish complete warehouse coverage. ` +
+      `coverage_complete_established=${coverageComplete} means clocks were attached — not that this recipient's history is exhaustive.`;
   } else if (warehouse) {
     freshnessNote =
       `Warehouse awards currently reach action_date ${warehouse}. Ingest clocks were not ` +
@@ -622,6 +625,9 @@ export function describeCoverageTimestamp(opts: {
       run_age_days: freshness?.runAgeDays ?? null,
     },
     coverage_complete_established: coverageComplete,
+    coverage_complete_established_meaning:
+      'True only when warehouse max action_date and ingest clocks were attached and classified. ' +
+      'Does NOT mean this recipient\'s award history is exhaustive or that coverage of the corpus is complete.',
     freshness_note: freshnessNote,
   };
 }

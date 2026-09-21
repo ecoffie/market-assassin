@@ -2,8 +2,8 @@
  * Public MCP acceptance for Cyrus audit closure — run ONLY after an approved
  * production release that contains this branch's merge SHA.
  *
- * Mints a one-shot key, calls the three tools, saves responses, revokes the key.
- * Compare acceptance booleans to tasks/evidence/cyrus-audit-closure-2026-09-20/04-baseline-summary.json.
+ * Shares checkCyrusThreeToolAcceptance with the local baseline runner.
+ * Exits non-zero on tool errors or failed assertions.
  *
  *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/cyrus-audit-closure-mcp-acceptance.ts
  */
@@ -14,11 +14,15 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { issueApiKey, revokeApiKey } from '../src/lib/mcp/api-keys';
 import { grantSignupCreditsIfFirst, getBalance, grantCredits } from '../src/lib/mcp/credits';
+import {
+  assertCyrusAcceptanceOrThrow,
+  checkCyrusThreeToolAcceptance,
+  CYRUS_COMPANY,
+  CYRUS_UEI,
+} from '../src/lib/contractor/cyrus-acceptance';
 
 const MCP_URL = process.env.MCP_URL || 'https://mcp.getmindy.ai/mcp';
 const ACTOR = 'cyrus-audit-closure-mcp@getmindy.ai';
-const UEI = 'N1N9JPDYHVC7';
-const COMPANY = 'Cyrus Management Solutions';
 const OUT_DIR = join(process.cwd(), 'tasks/evidence/cyrus-audit-closure-mcp-acceptance');
 const LOCAL_BASELINE = join(
   process.cwd(),
@@ -27,9 +31,14 @@ const LOCAL_BASELINE = join(
 
 function parseToolJson(result: unknown): unknown {
   const r = result as {
+    isError?: boolean;
     content?: Array<{ type?: string; text?: string }>;
     structuredContent?: unknown;
   };
+  if (r?.isError) {
+    const text = (r?.content || []).map((c) => c.text || '').join('\n');
+    throw new Error(`MCP tool isError: ${text.slice(0, 500)}`);
+  }
   if (r?.structuredContent) return r.structuredContent;
   const text = (r?.content || []).map((c) => c.text || '').join('\n');
   const jsonStart = text.indexOf('{');
@@ -44,36 +53,17 @@ function parseToolJson(result: unknown): unknown {
   try {
     return JSON.parse(text);
   } catch {
-    return { raw_text: text };
+    throw new Error(`MCP tool returned non-JSON: ${text.slice(0, 300)}`);
   }
 }
 
 async function callTool(client: Client, name: string, args: Record<string, unknown>) {
-  const result = await client.callTool({ name, arguments: args });
-  return parseToolJson(result);
-}
-
-function checks(profile: Record<string, unknown>, history: Record<string, unknown>) {
-  const cov = (profile.coverage || {}) as Record<string, unknown>;
-  const ingest = (cov.ingest || {}) as Record<string, unknown>;
-  const h = (history.history || history) as Record<string, unknown>;
-  const hCov = (h.coverage_timestamp || {}) as Record<string, unknown>;
-  const hIngest = (hCov.ingest || {}) as Record<string, unknown>;
-  const sa = (profile.historical_set_asides || {}) as Record<string, unknown>;
-  const hSa = (h.historical_set_asides || {}) as Record<string, unknown>;
-  return {
-    F1_freshness_three_clocks:
-      Boolean(cov.warehouse_max_action_date || hCov.warehouse_max_action_date) &&
-      (ingest.freshness_status || hIngest.freshness_status) != null &&
-      (ingest.freshness_status || hIngest.freshness_status) !== 'unknown',
-    F2_set_aside_provenance:
-      Boolean(sa.scope) && Boolean(hSa.scope) && Boolean(sa.contributing_ueis_by_label),
-    F3_null_first_positive_note: Boolean(sa.null_first_positive_note),
-    F4_last_fy_deprecated:
-      (sa.deprecated as { last_fy_by_label?: { status?: string } } | undefined)
-        ?.last_fy_by_label?.status === 'deprecated',
-    no_award_origin_field: !Object.prototype.hasOwnProperty.call(sa, 'award_origin_fy_by_label'),
-  };
+  try {
+    const result = await client.callTool({ name, arguments: args });
+    return parseToolJson(result);
+  } catch (e) {
+    throw new Error(`${name} failed: ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 async function main() {
@@ -104,18 +94,25 @@ async function main() {
     const client = new Client({ name: 'cyrus-audit-closure', version: '1.0.0' });
     await client.connect(transport);
 
-    const profile = (await callTool(client, 'get_contractor_profile', {
-      company_name: COMPANY,
-    })) as Record<string, unknown>;
-    const sam = await callTool(client, 'lookup_sam_entity', { uei: UEI });
-    const history = (await callTool(client, 'get_contractor_award_history', {
-      uei: UEI,
+    const profile = await callTool(client, 'get_contractor_profile', {
+      company_name: CYRUS_COMPANY,
+    });
+    const sam = await callTool(client, 'lookup_sam_entity', { uei: CYRUS_UEI });
+    const history = await callTool(client, 'get_contractor_award_history', {
+      uei: CYRUS_UEI,
       award_limit: 20,
-    })) as Record<string, unknown>;
+    });
 
     await client.close().catch(() => {});
 
-    const acceptance = checks(profile, history);
+    const acceptance = checkCyrusThreeToolAcceptance({
+      profile,
+      sam,
+      history,
+      expectedUei: CYRUS_UEI,
+    });
+    assertCyrusAcceptanceOrThrow(acceptance, 'public MCP cyrus acceptance');
+
     const runnerSha = (() => {
       try {
         return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
@@ -124,19 +121,42 @@ async function main() {
       }
     })();
 
+    const localFlags =
+      (localBaseline as { acceptance?: { flags?: Record<string, boolean> } } | null)?.acceptance
+        ?.flags ?? null;
+    const flagDrift =
+      localFlags == null
+        ? null
+        : Object.keys({ ...localFlags, ...acceptance.flags }).filter(
+            (k) => Boolean(localFlags[k]) !== Boolean(acceptance.flags[k]),
+          );
+
     const summary = {
       environment: 'authenticated_public_mcp',
       mcpUrl: MCP_URL,
       startedAt,
       finishedAt: new Date().toISOString(),
       runnerSha,
+      checker: 'src/lib/contractor/cyrus-acceptance.ts',
       note: 'Record the ACTUAL Vercel serving SHA separately via vercel inspect; runner SHA is local checkout only.',
-      acceptance,
-      localBaselineAcceptance:
-        (localBaseline as { acceptance?: unknown } | null)?.acceptance ?? null,
+      acceptance: {
+        ok: acceptance.ok,
+        flags: acceptance.flags,
+        assertion_count: acceptance.assertions.length,
+        failures: acceptance.failures,
+      },
+      localBaselineOk:
+        (localBaseline as { acceptance?: { ok?: boolean } } | null)?.acceptance?.ok ?? null,
+      flag_drift_vs_local: flagDrift,
       compare:
-        'PASS only if acceptance matches local baseline booleans AND serving deploy contains the merge SHA.',
+        'PASS only if acceptance.ok, flag_drift empty, AND serving deploy contains the merge SHA.',
     };
+
+    if (flagDrift && flagDrift.length > 0) {
+      throw new Error(
+        `public MCP flags drifted from local baseline: ${flagDrift.join(', ')}`,
+      );
+    }
 
     writeFileSync(join(OUT_DIR, '01-profile.json'), JSON.stringify(profile, null, 2));
     writeFileSync(join(OUT_DIR, '02-sam.json'), JSON.stringify(sam, null, 2));
@@ -149,6 +169,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e);
+  console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });
