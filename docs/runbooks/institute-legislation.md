@@ -3,14 +3,51 @@
 **Dataset:** `strategic_intelligence`
 **Instance:** `institute_legislation`
 **Discovery:** https://api.congress.gov/v3/bill
-**Cron:** `/api/cron/institute-legislation-sync` — **NOT YET ENABLED (Gate 5)**
+**Cron:** `/api/cron/institute-legislation-sync` — **ENABLED**, weekly `40 13 * * 0`
+**Control state:** ⛔ **PARKED / BLOCKED_CONTROLLED** — see the next section before
+acting on anything below.
+
+## ⛔ PARKED / BLOCKED_CONTROLLED — the credential dependency
+
+Set 2026-09-21 (`supabase/migrations/20260921_park_institute_legislation.sql`).
+The live control-plane row says so; this runbook exists so a human reads the same fact:
+
+| `data_source_instances.institute_legislation` | value | means |
+|---|---|---|
+| `source_state` | `upstream_quiet` | the DATA is not advancing. **Never `current`** |
+| `intervention_state` | `blocked` | a human is blocked, and knows why |
+| `manual_action_type` | `credential_renewal` | ⚠️ **the blocker is a MISSING CREDENTIAL** |
+
+**The blocker, explicitly: `CONGRESS_API_KEY` is ABSENT in production.** Re-verified
+2026-09-21 — `vercel env ls production` returns a `GOVINFO_API_KEY` row and **no**
+`CONGRESS_API_KEY` row at all. `congressApiKey()` is
+`CONGRESS_API_KEY || GOVINFO_API_KEY || ''` (`src/lib/institute/legislation.ts:60`), so
+the collector still runs on the fallback and the route's `missing_api_key` 502 guard
+never fires. The configured credential for this source simply does not exist. This is a
+**config** fact — not a mystery, and not an upstream outage.
+
+**Unblock = provision `CONGRESS_API_KEY`, then wire the corpus to a surface.** Both
+halves are required: the 29 held rows reach **zero** customer surfaces today, so a key
+alone changes nothing a customer can see.
+
+⚠️ **The job stays ENABLED on purpose.** Unlike DARPA/NSF it emits no false-green: its
+outcome is reported terminally (#1593) and, structurally, **this route never writes
+`data_source_instances`** — so no scheduled run can stamp `source_state`,
+`last_data_advance` or any instance clock while the source is parked. EXECUTION success
+(`cron_job_runs.status`) and DATA advancement (`last_source_advance`) are separate
+records; a `success` run over an unchanged corpus is the expected steady state and must
+never be read as the corpus having advanced.
+
+Do **not** clear these two states because a run looked healthy. Only the two unblock
+steps above may clear them.
 
 ## What this source is
 
 Congress API → `institute_sources` (one row per legislative **version**) → optional
-derived pain point with an `intelligence_changes` history row. Authenticated with the
-existing api.data.gov key (`CONGRESS_API_KEY` or `GOVINFO_API_KEY`); this is *not*
-govinfo.gov, whose key is separately recorded invalid.
+derived pain point with an `intelligence_changes` history row. Authenticated with an
+api.data.gov key (`CONGRESS_API_KEY` **or** the `GOVINFO_API_KEY` fallback currently in
+use — see the parked section above); this is *not* govinfo.gov, whose key is separately
+recorded invalid.
 
 ## Why it exists
 
@@ -84,6 +121,27 @@ failed: 0     collectFailures: 0
 | `unknown_incomplete_scan` | A ceiling — absence is **not** established |
 | `evidenceUpdated` > 0 on an unchanged corpus | Investigate: something source-derived really changed, or a writer is churning a field |
 | `knownReadError` set | Corpus read failed — tracking is UNKNOWN, not empty. Do not stamp clocks |
+
+## ⚠️ Derived pain points are stamped `source: 'gao'` — including legislative ones
+
+`deriveFromInstituteSource` (`src/lib/strategic-intel/derive.ts:102`) hardcodes
+`source: 'gao'` on **every** derived pain point, and the customer reader
+`loadSourcedPainPointsForAgency` selects `.eq('source', 'gao')`. So that filter does
+**not** separate legislation from GAO — a legislative derivation would pass straight
+through it onto `/api/pain-points`, MCP `get_agency_intel`, `target-market-research` and
+`agency-hierarchy`, labelled `source_type: 'gao'`.
+
+**Measured 2026-09-21: exposure is ZERO, and the reason is the OTHER gate.** All 29 held
+titles are checked against `isDefensiblePainPoint` → `PROBLEM_MARKERS`, and **0 of 29**
+match, so no legislative pain point has ever been derived (production: 0 rows in
+`agency_pain_points_db` citing a legislative `institute_source_id`, 0 rows in
+`intelligence_changes`; all 24 pain points are genuine GAO reports).
+
+⚠️ **This is a near miss, not a design.** `PROBLEM_MARKERS` includes `oversight`,
+`needed`, `improvements`, `gaps`, `delays` — ordinary committee-report vocabulary. The
+first NDAA report title carrying one of those words would be written as a GAO-sourced
+claim. **Before provisioning `CONGRESS_API_KEY`, give the derivation a real provenance
+value** (or gate it off for `LEGISLATIVE_SOURCE_TYPES`).
 
 ## Related
 
