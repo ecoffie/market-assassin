@@ -68,15 +68,28 @@ function getSupabase() {
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
-  // Verify cron secret OR admin password
+  // ── Auth ────────────────────────────────────────────────────────────────
+  // This route previously accepted ONLY `x-vercel-cron-secret` or `?password=`.
+  // The dispatcher (`api/cron/dispatch`) sends `Authorization: Bearer
+  // $CRON_SECRET`, which matched NEITHER — so the scheduled job could not
+  // authenticate, and the admin password was pasted into the stored
+  // `cron_jobs.route` value as a workaround. That put a live credential in a
+  // database row, in every dispatcher log line, and in any query of that table.
+  //
+  // Accepting the dispatcher's own mechanism removes the reason the secret was
+  // ever inlined. The other two paths are kept for Vercel-native cron and manual
+  // admin invocation.
   const headersList = await headers();
   const cronSecret = headersList.get('x-vercel-cron-secret');
   const isVercelCron = cronSecret === process.env.CRON_SECRET;
 
-  const password = request.nextUrl.searchParams.get('password');
-  const isAdmin = password === ADMIN_PASSWORD;
+  const bearer = headersList.get('authorization')?.replace('Bearer ', '');
+  const isDispatcher = Boolean(process.env.CRON_SECRET) && bearer === process.env.CRON_SECRET;
 
-  if (!isVercelCron && !isAdmin) {
+  const password = request.nextUrl.searchParams.get('password');
+  const isAdmin = Boolean(ADMIN_PASSWORD) && password === ADMIN_PASSWORD;
+
+  if (!isVercelCron && !isDispatcher && !isAdmin) {
     return NextResponse.json(
       { error: 'Unauthorized. Use Vercel cron or provide password.' },
       { status: 401 }

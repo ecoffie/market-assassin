@@ -246,6 +246,19 @@ else
   fail=1
 fi
 
+# 6c) HARD BLOCK: no credential in a stored cron_jobs.route value. The admin
+#     password was inlined as ?password= because the route did not accept the
+#     dispatcher's Authorization: Bearer $CRON_SECRET — putting a live secret in
+#     a DB column and in every dispatcher log line. Reports job + param name only.
+echo -e "  ${BOLD}6c/13${NC} cron route credentials…"
+if node scripts/audit-cron-route-credentials.mjs > /tmp/mindy-prepush-croncreds.log 2>&1; then
+  echo -e "      ${GREEN}✓ no credentials embedded in cron routes${NC}"
+else
+  echo -e "      ${RED}✗ credential stored in a cron_jobs.route — push blocked${NC}"
+  cat /tmp/mindy-prepush-croncreds.log | sed 's/^/        /'
+  fail=1
+fi
+
 echo -e "  ${BOLD}7/13${NC} rank-then-filter audit…"
 if node scripts/audit-rank-then-filter.mjs > /tmp/mindy-prepush-rankfilter.log 2>&1; then
   echo -e "      ${GREEN}✓ no new rank-globally-then-filter sites${NC}"
