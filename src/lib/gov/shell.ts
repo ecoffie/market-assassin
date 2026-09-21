@@ -114,12 +114,28 @@ export function govFooter(): string {
 }
 
 /** Wrap page-body HTML in the full document: head (embedded CSS) + top bar + body + footer. */
-export function govPage(opts: { title: string; description: string; active: GovNavActive; body: string }): string {
+/**
+ * `canonical` is an absolute self-referencing URL for this page.
+ *
+ * These are ROUTE HANDLERS, so Next's `metadata`/`alternates` never applies to
+ * them — the head is whatever this template emits. Measured on production
+ * 2026-09-21 by crawling all 36,070 sitemap URLs: /research, /research/about
+ * and /research/how-we-publish emitted NO canonical at all. Optional, so every
+ * existing caller keeps its current behaviour until it opts in.
+ */
+export function govPage(opts: {
+  title: string;
+  description: string;
+  active: GovNavActive;
+  body: string;
+  canonical?: string;
+}): string {
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${opts.title}</title>
 <meta name="description" content="${opts.description}">
+${opts.canonical ? `<link rel="canonical" href="${opts.canonical}">` : ''}
 <meta property="og:title" content="${opts.title}">
 <meta property="og:description" content="${opts.description}">
 <style>${GOV_CSS}</style>

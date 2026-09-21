@@ -78,6 +78,7 @@ function buildBody(): string {
 }
 
 const HTML = govPage({
+  canonical: 'https://getmindy.ai/research/about',
   title: 'Why the Mindy Institute Exists — Measuring the Federal Procurement Market',
   description:
     'The Mindy Institute develops transparent, repeatable, evidence-based measures of how the public procurement market behaves. We publish only what the Observatory can support.',
