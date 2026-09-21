@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'December Spend Forecast | GovCon Giants',
+  title: 'December Spend Forecast | Mindy',
   description: 'Year-end government spending predictions with hot agencies and categories.',
 };
 

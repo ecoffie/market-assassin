@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'About | GovCon Giants',
+  title: 'About | Mindy',
   description: 'Learn about GovCon Giants and our mission to help small businesses win federal contracts.',
 };
 

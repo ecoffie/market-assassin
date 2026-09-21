@@ -10,7 +10,7 @@
  * Each function caches independently — top NAICS for Lockheed
  * doesn't have to recompute when only the awards list changed.
  */
-import { BQ_TABLES } from './client';
+import { BQ_TABLES, bqQuery } from './client';
 import { queryCached } from './cache';
 import { bqUnavailable } from './cache';
 import { readServedPage } from '../awards-serving';
@@ -124,7 +124,9 @@ export interface RollupProfile {
 // Shared SQL fragment: the computed-slug expression mirrors recipientSlug()
 // exactly (lowercase, & → " and ", non-alphanum → "-", trim, 120 cap). Used
 // by both the rollup slug lookup and the sibling-redirect resolver.
-const COMPUTED_SLUG_SQL = (col: string) => `
+// Exported so batch warmers derive slugs with the EXACT same SQL the readers use.
+// A warmer that reimplements this drifts, and a drifted slug warms a key nothing reads.
+export const COMPUTED_SLUG_SQL = (col: string) => `
   SUBSTR(
     REGEXP_REPLACE(
       REGEXP_REPLACE(
@@ -176,11 +178,13 @@ export function normalizeCompanyName(slugOrName: string): string {
  */
 // liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
 // callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
-export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
-  const rows = await queryCached<RollupProfile>({
-    cacheOnly: !liveBq,
-    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
-    query: `
+/**
+ * ONE query for a contractor profile by slug, shared by the page reader and the
+ * batch warmer. Parameterised on an ARRAY so the batch form is the same SQL,
+ * not a second implementation of it (see CANONICAL_SLUG_SQL for why that rule
+ * exists — a forked copy silently dropped an arm and left 49 URLs 404).
+ */
+export const ROLLUP_BY_SLUG_SQL = `
       WITH slugged AS (
         SELECT
           *,
@@ -200,13 +204,43 @@ export async function getRollupBySlug(slug: string, liveBq = false): Promise<Rol
         CAST(last_action_date AS STRING) AS last_action_date,
         distinct_agency_count, distinct_naics_count
       FROM slugged
-      WHERE computed_slug = @slug
-      ORDER BY total_obligated DESC
-      LIMIT 1
-    `,
-    params: { slug },
+      WHERE computed_slug IN UNNEST(@slugs)
+      -- One row per slug, highest spend wins.
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY computed_slug ORDER BY total_obligated DESC
+      ) = 1
+    `;
+
+// liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
+// callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
+export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
+  const rows = await queryCached<RollupProfile>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
+    query: ROLLUP_BY_SLUG_SQL,
+    params: { slugs: [slug] },
   });
   return rows[0] ?? null;
+}
+
+/**
+ * Batch form of getRollupBySlug — ONE scan for N slugs, same SQL.
+ *
+ * For warmers only: it neither reads nor writes the per-slug cache, because the
+ * caller decides what to prime and under which key. `maximumBytesBilled` is
+ * required, not optional — a warmer without a ceiling is the outage this whole
+ * subsystem exists to prevent.
+ */
+export async function getRollupsBySlugBatch(
+  slugs: string[],
+  maximumBytesBilled: string,
+): Promise<RollupProfile[]> {
+  if (slugs.length === 0) return [];
+  return bqQuery<RollupProfile>({
+    query: ROLLUP_BY_SLUG_SQL,
+    params: { slugs },
+    maximumBytesBilled,
+  });
 }
 
 /**
@@ -261,16 +295,55 @@ export async function getRollupOrSingleBySlug(
  * this maps any child UEI's name-slug to the parent's canonical slug so old
  * inbound links land on the live parent page instead of a 404.
  */
-export async function resolveCanonicalSlug(slug: string): Promise<string | null> {
-  // Normalized (suffix-stripped) form of the requested slug, for the name-merge
-  // arm — catches pre-merge ROLLUP-name variants (e.g. the slug
-  // "general-dynamics-corporation" whose rollup got merged into
-  // "general-dynamics-corp"; that variant is no longer a rollup name nor an
-  // exact child recipient_name, so only the normalized form finds it).
-  const normSlug = normalizeCompanyName(slug);
-  const rows = await queryCached<{ canonical_slug: string }>({
-    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
-    query: `
+/**
+ * ONE query, three arms, used by BOTH the single-slug resolver and the batch
+ * warmer. Do not fork it.
+ *
+ * It was forked once, on 2026-09-21, by a warm script that re-implemented the
+ * "direct" and "child_match" arms in batched form and silently dropped
+ * "norm_match". The result: 49 slugs stayed 404 after a warm that reported
+ * success, among them general-dynamics-corporation — the exact example the
+ * norm_match comment below is written about. A second implementation of this
+ * resolution is a second set of bugs.
+ *
+ * @slugs / @normSlugs are PARALLEL arrays (index i of one pairs with index i of
+ * the other), zipped back together in the `requested` CTE so the normalized arm
+ * can report which slug was actually asked for.
+ */
+/**
+ * The three resolution arms, defined ONCE, emitted with either a scalar
+ * predicate (single slug) or an array predicate (batch).
+ *
+ * WHY NOT LITERALLY ONE STRING
+ * ----------------------------
+ * A single array-parameterised query looks cleaner and is 40× too slow. Measured
+ * 2026-09-21: rewriting the scalar `WHERE ${slugExpr} = @slug` as a JOIN against
+ * an UNNEST(@slugs) CTE defeated BigQuery's filter pushdown, so the
+ * recipients × rollups UNNEST(child_ueis) join ran BEFORE filtering. The result
+ * was 9,106 CPU seconds against 27 MB scanned — over the on-demand
+ * CPU-to-bytes ratio, so the query is REFUSED, not merely slow:
+ *
+ *   "This query used 9106 CPU seconds but would charge only 27M Analysis bytes.
+ *    This exceeds the ratio supported by the on-demand pricing model."
+ *
+ * Note what that means for cost estimation: a dry run reports BYTES, and this
+ * query's failure mode is CPU. Bytes alone will not catch it.
+ *
+ * So the arms — direct, child_match, norm_match — live in one builder (forking
+ * them is what silently dropped norm_match and left 49 URLs 404), while the
+ * PREDICATE differs so each shape keeps its pushdown.
+ */
+function canonicalSlugSql(mode: 'single' | 'batch'): string {
+  // single: scalar equality, pushed down into the scan.
+  // batch:  array membership, still a filter (not a join), so it pushes down too.
+  const slugPred = (expr: string) =>
+    mode === 'single' ? `${expr} = @slug` : `${expr} IN UNNEST(@slugs)`;
+  const normPred = (expr: string) =>
+    mode === 'single' ? `${expr} = @normSlug` : `${expr} IN UNNEST(@normSlugs)`;
+  // What to report back as "the slug that was asked for".
+  const requested = (expr: string) => (mode === 'single' ? '@slug' : expr);
+
+  return `
       WITH rollups AS (
         SELECT
           ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug,
@@ -281,42 +354,108 @@ export async function resolveCanonicalSlug(slug: string): Promise<string | null>
       ),
       -- Direct hit: the slug matches a rollup name. Canonical = highest-spend.
       direct AS (
-        SELECT canonical_slug, total_obligated, 0 AS tiebreak
+        SELECT ${requested('canonical_slug')} AS requested_slug,
+               canonical_slug, total_obligated, 0 AS tiebreak
         FROM rollups
-        WHERE canonical_slug = @slug
+        WHERE ${slugPred('canonical_slug')}
       ),
       -- Indirect hit: the slug matches a CHILD UEI's recipient name. Map to
       -- the rollup that contains that child.
       child_match AS (
-        SELECT r.canonical_slug, r.total_obligated, 1 AS tiebreak
+        SELECT ${requested(COMPUTED_SLUG_SQL('c.recipient_name'))} AS requested_slug,
+               r.canonical_slug, r.total_obligated, 1 AS tiebreak
         FROM ${BQ_TABLES.recipients} c
         JOIN rollups r ON c.recipient_uei IN UNNEST(r.child_ueis)
         WHERE c.recipient_name IS NOT NULL
-          AND ${COMPUTED_SLUG_SQL('c.recipient_name')} = @slug
+          AND ${slugPred(COMPUTED_SLUG_SQL('c.recipient_name'))}
       ),
       -- Name-merge hit: the slug's normalized (suffix-stripped) form matches a
-      -- merged rollup's normalized name. Catches legal-suffix variants that the
-      -- merge collapsed (corp vs corporation). Lowest priority so an exact slug
-      -- always wins over a normalized match.
+      -- merged rollup's normalized name. Catches legal-suffix variants the merge
+      -- collapsed (corp vs corporation). Lowest priority so an exact slug wins.
       norm_match AS (
-        SELECT canonical_slug, total_obligated, 2 AS tiebreak
+        SELECT ${mode === 'single' ? '@slug' : 'norm_name'} AS requested_slug,
+               canonical_slug, total_obligated, 2 AS tiebreak
         FROM rollups
-        WHERE norm_name = @normSlug AND norm_name != ''
+        WHERE ${normPred('norm_name')} AND norm_name != ''
       )
-      SELECT canonical_slug
+      SELECT requested_slug, canonical_slug
       FROM (
         SELECT * FROM direct
         UNION ALL SELECT * FROM child_match
         UNION ALL SELECT * FROM norm_match
       )
-      ORDER BY tiebreak ASC, total_obligated DESC
-      LIMIT 1
-    `,
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY requested_slug ORDER BY tiebreak ASC, total_obligated DESC
+      ) = 1
+    `;
+}
+
+/** Single-slug form — what the public page and the MCP tools resolve through. */
+export const CANONICAL_SLUG_SQL = canonicalSlugSql('single');
+/** Batch form — warmers only. */
+export const CANONICAL_SLUG_BATCH_SQL = canonicalSlugSql('batch');
+
+export async function resolveCanonicalSlug(
+  slug: string,
+  liveBq = false,
+): Promise<string | null> {
+  const normSlug = normalizeCompanyName(slug);
+  const rows = await queryCached<{ requested_slug: string; canonical_slug: string }>({
+    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
+    query: CANONICAL_SLUG_SQL,
     params: { slug, normSlug },
+    // Default cache-ONLY, and deliberately so. This query joins the full
+    // recipients table against the rollup table through UNNEST(child_ueis) —
+    // it is not cheap, and it fires on exactly the traffic pattern that
+    // drained the BigQuery daily quota: a crawler walking slugs that match no
+    // rollup name.
+    //
+    // But cache-only had a cost nobody had measured. This resolver is the ONLY
+    // thing standing between a retired slug and notFound(), and its cache key
+    // had no warmer at all — so it always missed, always returned null, and
+    // always fell through to a 404. Measured 2026-09-21:
+    // /contractors/caci-inc-federal 404s while the rollup that absorbed it
+    // serves 200 and sits in the sitemap. Google reported the old URL a soft 404.
+    // 861 previously-indexed URLs were in that state.
+    //
+    // The repair is a WARM PATH, not an open door: `npm run seo:warm-slugs`
+    // passes liveBq=true for a bounded, known list of slugs, populating this
+    // key so the redirect works on the next crawl. The crawler path itself is
+    // unchanged and still cannot trigger a scan.
+    cacheOnly: !liveBq,
   });
   const canonical = rows[0]?.canonical_slug ?? null;
   // null when unknown slug; null when already canonical (no redirect needed).
   return canonical && canonical !== slug ? canonical : null;
+}
+
+/**
+ * Batch form of resolveCanonicalSlug — ONE scan for N slugs, same SQL.
+ *
+ * For warmers only. It deliberately does NOT read or write the per-slug cache;
+ * the caller decides what to prime, because the reader's key encodes the
+ * REQUESTED slug while this returns (requested → canonical) pairs.
+ *
+ * Returns only genuine redirects: a slug that resolves to itself is already
+ * canonical and is omitted, matching what the single-slug reader returns.
+ */
+export async function resolveCanonicalSlugsBatch(
+  slugs: string[],
+  maximumBytesBilled: string,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (slugs.length === 0) return out;
+  const rows = await bqQuery<{ requested_slug: string; canonical_slug: string }>({
+    query: CANONICAL_SLUG_BATCH_SQL,
+    params: { slugs, normSlugs: slugs.map(normalizeCompanyName) },
+    maximumBytesBilled,
+  });
+  for (const r of rows) {
+    if (r.canonical_slug && r.canonical_slug !== r.requested_slug) {
+      out.set(r.requested_slug, r.canonical_slug);
+    }
+  }
+  return out;
 }
 
 /**
@@ -1189,12 +1328,18 @@ export async function getTopRecipientsForSitemap(
       LIMIT @limit
     `,
     params: { limit },
-    // Self-warm on a cold key. queryCached defaults cacheOnly:true (returns []
-    // on a miss to block cost spikes), but the sitemap has no other warmer — so
-    // a fresh cacheKey (e.g. the :v5 bump) would leave the contractor block
-    // permanently empty. This query is a single 0.016 GB scan gated to once/day
-    // by the route's `revalidate = 86400`, so a live cold-load is safe here.
-    cacheOnly: false,
+    // ⚠️ CACHE-ONLY. This used to be `cacheOnly: false` — sitemap generation
+    // could cold-scan BigQuery. The scan is small (~0.016 GB, once/day), but the
+    // SHAPE is the one that is banned: a public, crawler-reachable route wired to
+    // the warehouse. getmindy.ai and the authenticated product share one GCP
+    // project quota, and when that quota goes the product goes with it.
+    //
+    // The contractor block is now fed by the bounded warm job
+    // (`npm run seo:warm-slugs`), which materializes this key deliberately and
+    // under hard limits. If the key is cold the block is EMPTY and the sitemap
+    // simply omits contractors — fail closed. An omitted URL returns on the next
+    // warm; a drained quota is a day-long product outage.
+    cacheOnly: true,
   });
 }
 

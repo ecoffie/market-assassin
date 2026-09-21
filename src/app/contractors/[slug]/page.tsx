@@ -37,6 +37,8 @@ import {
   recipientSlug,
 } from '@/lib/bigquery/recipients';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
+import { AGENCIES_SEO } from '@/data/agencies-seo';
+import { recordWarmMiss } from '@/lib/seo/served-slugs';
 import {
   getSubawardsPaidOutSummary,
   getSubawardsReceivedSummary,
@@ -77,6 +79,21 @@ function fmtDate(value: string | null | undefined): string {
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+/**
+ * Agencies that have a real `/agencies/[slug]` landing page (~49 of them).
+ * Built once at module load; mirrors the same gate in `/naics/[code]`.
+ */
+const LINKABLE_AGENCIES = new Set(AGENCIES_SEO.map((a) => a.slug));
+
+function agencySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -166,7 +183,20 @@ export default async function ContractorPage({ params }: PageProps) {
     // queries below also stay cache-only. Re-enable: ENABLE_SEO_LIVE_BQ=1.
     const liveBq = seoLiveBqEnabled();
     recipient = await getRollupOrSingleBySlug(slug, liveBq);
-    if (!recipient) notFound();
+    if (!recipient) {
+      // CACHE MISS on a public request path. We do NOT know whether this
+      // contractor exists — only that nothing is materialized for it — and we
+      // are not allowed to find out synchronously: a crawler-triggered cold
+      // scan is the exact shape that drained the BigQuery daily quota and took
+      // the authenticated Contractors panel down with it.
+      //
+      // So record the slug for the next bounded warm job and return. If the
+      // contractor is real, the warm materializes it and the URL starts serving;
+      // if it is not, the warm reports it as genuinely gone and it stays a 404.
+      // Either way the decision is made OFFLINE, under limits, never here.
+      await recordWarmMiss(slug);
+      notFound();
+    }
     needsLiveBq = liveBq;
   }
 
@@ -395,7 +425,22 @@ export default async function ContractorPage({ params }: PageProps) {
               {topAgencies.map((a) => (
                 <li key={a.awarding_agency} className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="truncate text-slate-100 font-medium">{a.awarding_agency}</p>
+                    {/* Link out to the agency's own landing page when one exists.
+                        Until 2026-09-21 this rendered as plain text, so a contractor
+                        page linked to nothing but its own tabs and the hub — 5 internal
+                        links total. With no path between clusters there was nothing for
+                        crawl equity to travel along, and Google parked the whole surface
+                        under "Crawled - currently not indexed". */}
+                    {LINKABLE_AGENCIES.has(agencySlug(a.awarding_agency)) ? (
+                      <Link
+                        href={`/agencies/${agencySlug(a.awarding_agency)}`}
+                        className="truncate block text-slate-100 font-medium hover:text-purple-300 hover:underline"
+                      >
+                        {a.awarding_agency}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-slate-100 font-medium">{a.awarding_agency}</p>
+                    )}
                     <p className="text-xs text-slate-500">{(Number(a.pct_of_total) * 100).toFixed(1)}% of total obligations</p>
                   </div>
                   <span className="shrink-0 font-mono text-purple-400 font-semibold">{fmtMoney(Number(a.total_amount))}</span>
@@ -414,7 +459,12 @@ export default async function ContractorPage({ params }: PageProps) {
               {topNaics.map((n) => (
                 <li key={n.naics_code} className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-mono text-slate-100">{n.naics_code}</p>
+                    <Link
+                      href={`/naics/${n.naics_code}`}
+                      className="font-mono text-slate-100 hover:text-purple-300 hover:underline"
+                    >
+                      {n.naics_code}
+                    </Link>
                     <p className="truncate text-xs text-slate-400">{n.naics_description}</p>
                     <p className="text-xs text-slate-500 mt-1">{n.award_count} awards</p>
                   </div>
