@@ -996,3 +996,91 @@ $900M GPS III). A check that cannot fail is not a check.
 **Final state:** 6/6 surfaces clean · 111/111 `contract_pattern` rows retained with
 `source_url` · 3 GAO titles containing "Congressional" preserved · 53,809 opportunities
 still carrying legitimate priorities. No broad string deletion.
+
+## 2026-09-21 — DIBBS: "job completed" and "data advanced" were the same number
+
+**Defect.** `dibbs_rfqs` held **57,816 rows and no column recording when any of them
+arrived**. Both timestamps it carries (`scraped_at`, `synced_at`) are set by the ingest on
+every upserted row, and `upsertDibbsRfqs` conflicts on `solicitation_number` — so a run that
+re-reads the same daily DLA index file and adds NOTHING NEW still reports a large `upserted`
+and still drives `max(synced_at)` to now. Both readings present as a healthy, advancing feed.
+
+That is the darpa_baa / nsf_sbir false-green shape (60 green checkmarks over two dead
+sources, `20260920_specialty_source_advancement.sql`), and DIBBS could not even be *checked*
+for it. `sam_opportunities_advancement()` and `research_source_advancement()` both existed;
+there was no `dibbs_*_advancement()`. The control plane had already inherited the error:
+`data_source_instances.dibbs_dla_flat_files` was registered `source_state='current'`,
+`intervention_state='none_required'`, `last_data_advance=NULL` — asserted healthy on a
+quantity nothing had ever measured, and the sibling assessment "DIBBS is advancing (1d
+behind)" was derived from that same touch clock.
+
+**Measured error denominator (production, `cron_job_runs`, 2026-07-01 → 2026-09-21).** ONE
+enabled job, `sync-dibbs` (`0 8 * * *`, `enabled=true`, route
+`/api/cron/sync-dibbs?maxItems=2500&daysBack=2`). 70 run rows / 13 errors = **18.6%**
+all-time; 30 runs / 4 errors = **13.3%** last 30 days; **1 error in 26 runs (3.8%) since
+2026-08-27**, the current hardened regime. Business days only: 9/51 all-time, 4/21 in 30d.
+⚠️ 13 calendar days have NO run row at all (2026-07-04 and 07-16→07-27), so every rate above
+is over runs RECORDED, not runs due. ⚠️ `http_status` is NULL on 20 of the last 26 runs
+(`duration_ms` exactly 12001 — the dispatcher's fire-and-forget ack), so `status` written by
+`reportCronOutcome` is the only usable verdict field; reading `http_status` would report
+UNKNOWN for 77% of runs.
+
+**Reconciled against a second, independent derivation** (`count(*) GROUP BY synced_at::date`
+in `dibbs_rfqs` vs the run log) — they DISAGREE: `2026-07-31 Fri` and `2026-07-29 Wed` each
+report a non-error status with **0 rows upserted**. Four Sundays (08-23, 09-06, 09-13, 09-20)
+also show 0 rows, but those are the correctly-labelled `noDataWindow` path and are honest.
+
+**Proof anchors** (re-grep these; a revert breaks them):
+- `supabase/migrations/20260921_dibbs_advancement_oracle.sql` — `ADD COLUMN IF NOT EXISTS first_seen_at TIMESTAMPTZ;`
+- `supabase/migrations/20260921_dibbs_advancement_oracle.sql` — `WHEN max(d.first_seen_at) IS NULL` → `'unmeasured'`
+- `src/lib/dibbs/ingest.ts` — `async function readAdvancementMark`
+- `src/lib/dibbs/ingest.ts` — `return count ?? null; // a null count is UNKNOWN, not zero`
+- `src/app/api/cron/sync-dibbs/route.ts` — `COMPLETED WITHOUT ADVANCING`
+- `src/lib/dibbs/advancement-oracle.unit.test.ts` — `THE FALSE-GREEN SHAPE`
+
+**Why the column is added bare and only then defaulted.** `ADD COLUMN ... DEFAULT NOW()`
+backfills every existing row with the migration timestamp and would claim all 57,816 rows
+arrived that day — a fabricated advancement inside the migration built to stop fabricated
+advancement. Existing rows stay NULL and are reported as `rows_unmeasured`, a population, not
+folded into a state.
+
+**Exact-DDL validation** (BEGIN → run the file verbatim → probe → ROLLBACK, against
+production): applied clean; column nullable with `DEFAULT now()`; **0 of 57,816 existing rows
+backfilled**; index present; the oracle ran on the live corpus returning
+`advancement_state='unmeasured'`, `last_touch=2026-09-19T08:01:36Z`, `last_data_advance=NULL`.
+A probe INSERT stamped `first_seen_at`; re-upserting that same id the way the ingest does
+moved `synced_at` **1 hour ahead while `first_seen_at` did not move** — the load-bearing
+property. Re-applied in the same transaction: idempotent, still exactly 1 column + 1 index.
+ROLLBACK confirmed: 0 `first_seen_at` columns and 0 probe rows left in production.
+
+**Deliberately NOT changed.** The fetcher, the cost guard, the STARVED verdict, and the
+routing are untouched, and `inserted === 0` does not fail a run — changing the fetcher in the
+same pass would destroy the before/after this exists to supply, and there are **zero
+observations** of how often a real business day legitimately adds nothing (there was no column
+to measure it with). Thresholding on zero observations is how the STARVED check spent three
+Sundays paging over a healthy weekend.
+
+**THERE IS NO RETRY — the answer to "do later runs recover what a failed run missed?"**
+No. At `daysBack=2` the lookback window advances exactly as fast as the daily schedule, so
+each business day's index file is requestable on **exactly ONE** scheduled run. Measured over
+40 consecutive scheduled runs: **29 of 29 business-day files get 1 chance each** (today's own
+file excluded — it is requested but never published at 04:00 ET, so requesting it cannot
+ingest anything). A single failed run therefore loses ONE BUSINESS DAY of DLA RFQs
+permanently; nothing ever asks for that file again. At `daysBack=3`, 28 of 29 files would get
+a second chance; at `daysBack=4`, 27 of 30 get a third. **Not changed here** — the cron row
+carries `daysBack=2` in production and widening it raises the Apify item count on days the
+direct path fails, so it is a costed production decision, not a drive-by edit. Pinned by
+`advancement-oracle.unit.test.ts` so any future widening is deliberate.
+
+**Also measured, documented, and NOT silenced — the Monday window gap.** `recentIndexFiles(2)`
+on a Monday returns exactly ONE filename, *today's*, because Sunday is filtered as a weekend;
+DLA has not published it at 08:00 UTC / 04:00 ET. So the direct path can only ever return 0 on
+a Monday, and production confirms it with no exceptions: across **all 10 Mondays on record,
+`via_direct` = 0 every time** (6,700 Monday rows, 100% from Apify). 2 of those 10 paged as
+STARVED (2026-08-24, 2026-09-21, both `direct:empty(0) → apify:rows(1)`); the other 8 were
+masked by Apify succeeding at ~$16–19 a run. Asserted in the test, not suppressed: whether a
+starved Monday LOSES records was unmeasurable before `first_seen_at` existed — Apify delivers
+1,100–2,100 Monday rows and nothing could say whether any were new — so silencing the alarm
+now would be turning UNKNOWN into healthy.
+
+---

@@ -241,10 +241,44 @@ export async function GET(request: NextRequest) {
 
     // Healthy run — overwrite the dispatcher's 'dispatched' with the real
     // outcome so a genuine success is distinguishable from "we never found out".
+    //
+    // ── "COMPLETED" AND "ADVANCED" ARE NOW DIFFERENT NUMBERS ─────────────────
+    // `upserted` is a TOUCH count: the upsert conflicts on solicitation_number and
+    // re-stamps synced_at, so re-reading the same daily index file reports a large
+    // `upserted` AND moves max(synced_at) to now while adding nothing new. Every
+    // health signal this route used to emit was that kind of signal — which is the
+    // shape that banked 60 green checkmarks over two dead research sources.
+    //
+    // `inserted` is the advancement, from the insert-only first_seen_at clock
+    // (20260921_dibbs_advancement_oracle.sql). It is `null`, never 0, when unreadable.
+    //
+    // The DURABLE record is first_seen_at itself, not this response and not a string in
+    // the run log — per-day advancement stays reconstructible forever with
+    //   select first_seen_at::date, count(*) from dibbs_rfqs group by 1 order by 1 desc;
+    // which is strictly better than a text blob, and is why nothing is written into
+    // reportCronOutcome's message here: that argument lands in cron_job_runs.error, and
+    // putting a healthy statistic in the error column would corrupt the one field a
+    // postmortem uses to classify failures.
+    //
+    // ⚠️ DELIBERATELY NOT A VERDICT YET. `inserted === 0` does NOT fail the run. Before
+    // today there was no first-seen column, so how often a real business day
+    // legitimately adds nothing has NEVER been measured — and picking a paging
+    // threshold from zero observations is exactly how the STARVED check spent three
+    // Sundays paging over a healthy weekend. Record first, threshold after a week of
+    // real values. Changing the fetcher or the verdict in this same pass would also
+    // destroy the before/after this change exists to supply.
+    const advancement = result.inserted === null ? 'unknown' : String(result.inserted);
+    if (result.inserted === 0 && result.upserted > 0) {
+      console.warn(
+        `[sync-dibbs] COMPLETED WITHOUT ADVANCING: upserted ${result.upserted} rows, inserted 0. ` +
+          `synced_at moved to now anyway, so the last-touch clock will read "current".`,
+      );
+    }
     await reportCronOutcome('sync-dibbs', 'success');
     return NextResponse.json({
       success: true, ...result, truncated, starved,
-      message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}${truncated ? ' (TRUNCATED)' : ''}`,
+      advanced: result.inserted === null ? null : result.inserted > 0,
+      message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}, inserted ${advancement}${truncated ? ' (TRUNCATED)' : ''}`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'DIBBS sync failed';
