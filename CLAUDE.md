@@ -78,6 +78,54 @@ cp -R .vercel .claude/worktrees/<slug>/.vercel   # from the main checkout
 cwd. A green READY is not proof — grep the live URL for a string that exists only
 on the feature branch. Full rule: `.cursor/rules/ship-after-fix.mdc`.
 
+### ⛔ A PRODUCTION deploy must come from `origin/main` — gated by `npm run guard:prod-deploy`
+
+Linking `.vercel` correctly is necessary and **not sufficient**. On **2026-09-21T01:47:09Z**,
+20 seconds after PR #1597 was squash-merged, `vercel --prod` ran from the correctly-linked
+**feature-branch** worktree (`fix/cyrus-freshness-provenance` @ `dece7dba`). It built the
+branch tree, went READY at 01:53:16Z, and took all four production aliases (`getmindy.ai`,
+`mcp.getmindy.ai`, `mi.govcongiants.com`, `tools.govcongiants.org`) away from the legitimate
+git build of the merge commit that had started 20 seconds earlier.
+
+**The branch head was not stale in any way a human would notice** — it was the exact head that
+had just been reviewed and merged. What it lacked was the work merged *around* it (#1595,
+#1596, #1598). One of those was load-bearing: #1595 had taught `api/cron/snapshot-multisite`
+to accept the dispatcher's `Authorization: Bearer $CRON_SECRET`, and its migration had already
+stripped the inline `?password=` workaround out of `cron_jobs.route` in the live DB. So the
+enabled daily job had **no working auth path left**. Measured: correct bearer → **401** on the
+branch build, **400** ("missing source", i.e. auth passed) on restored main.
+
+Nothing failed loudly. The build was green, the aliases were Ready, and the Cyrus acceptance
+suite run against it passed **33/33** — because it only exercised the Cyrus code, which *was*
+present. **A green build proves the tree you uploaded compiles. It cannot tell you that you
+uploaded the wrong tree.**
+
+`npm run deploy` now runs **`npm run guard:prod-deploy` first** (fail fast, before the long
+`predeploy` suite). The guard refuses unless the checkout is:
+
+1. **linked to `market-assassin`** — `.vercel/project.json` present *in this directory*
+   (absent → the CLI walks up to a parent checkout). **Never overridable.**
+2. **on `main`** — not a feature branch, not detached.
+3. **exactly `origin/main`** — 0 behind (the incident above) and 0 ahead (unpushed,
+   unreviewed code).
+4. **clean** — no modified tracked files; a CLI deploy uploads the working directory.
+
+Emergency hatch: `ALLOW_NONMAIN_PROD_DEPLOY="<reason>"` waives 2–4 and prints them as
+warnings. The reason must be a real sentence — `=1` is rejected, because a bypass nobody can
+read later is how this recurs.
+
+**Prefer `vercel promote <deployment>` over rebuilding.** To fix a bad alias, promote the
+existing Ready build of the right commit — that is how this incident was resolved (promoted
+`dpl_EBUSQ57JWB5TJtzafJWkJQYaF1sj`, main @ `1262c59e`).
+
+⚠️ **A squash merge breaks ancestry checks.** `#1597` was squashed, so `dece7dba` is *not* an
+ancestor of `1262c59e` and `git merge-base --is-ancestor` fails on a perfectly good release.
+Verify a squashed feature by **content equivalence** (`git diff --quiet <head> <squash> -- <paths>`)
+against the **squash commit**, never by feature-head ancestry.
+
+Guard: `scripts/guard-prod-deploy.mjs` (`--json`, `--no-fetch`, `--self-test`) ·
+tests `src/lib/deploy/prod-deploy-guard.unit.test.ts`.
+
 ---
 
 ## 🎯 Current priority order — READ BEFORE PICKING UP WORK
