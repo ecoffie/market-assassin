@@ -366,5 +366,14 @@ the gate is still a gate:
    333112 lawn-mower manufacturing, df 17. Same shape as (2).
 
 All three fail the same way: a code resolved from one word, then trusted to
-name a market. Evidence read from the notice itself does not have that failure
-mode, which is why the detail-evidence path was acceptable where these were not.
+name a market.
+
+⛔ **This paragraph used to end "…which is why the detail-evidence path was
+acceptable where these were not." That sentence is withdrawn** — it survived
+the retraction above by ~100 lines and closed the file, so it read as a
+standing endorsement of the approach this branch REMOVED. Reading the notice's
+own text does avoid the resolved-code failure mode, and it introduces its own:
+the term lands in submission boilerplate, a table of contents, FAR clause
+text, a scope exclusion or the wrong word sense — ~19 of 26 hits (73%)
+measured. **A body-relevance path is not acceptable today.** The bar it must
+clear first is `src/lib/beginner/__fixtures__/body-relevance-cases.ts`.

@@ -121,7 +121,7 @@ export const BODY_RELEVANCE_CASES: BodyRelevanceCase[] = [
     klass: 'negation',
     input: 'we do pest control',
     term: 'pest control',
-    title: 'RRS/DFAS Grounds MXS',
+    title: 'RRS/DFAS Grounds MXS and Snow Removal',
     naics: '561730',
     passage: '1.1.8. PEST CONTROL (RESERVED)',
     admit: false,
@@ -172,7 +172,7 @@ export const BODY_RELEVANCE_CASES: BodyRelevanceCase[] = [
     title: 'PSW Landscaping Hilo, Hawaii',
     naics: '561730',
     passage:
-      'The purpose of this contract is to have frequent mowing, weeding, and general lawn maintenance year-round at the Institute of Pacific Islands Forestry',
+      'The purpose of this contract is to have frequent mowing, weeding, and general lawn maintenance year-round at the Institute of Pacific Island Forestry Laboratory',
     admit: true,
   },
   {
