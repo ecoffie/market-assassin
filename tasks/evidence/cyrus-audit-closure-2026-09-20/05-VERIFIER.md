@@ -4,20 +4,69 @@
 **BLOCKERs: none**  
 **Mode:** read-only product inspection; evidence write limited to this file.  
 **Worktree:** `/Users/ericcoffie/Projects/market-assassin/.claude/worktrees/cyrus-freshness-provenance`  
-**Branch:** `fix/cyrus-freshness-provenance` (`8901bc09`) vs `origin/main`  
+**Branch:** `fix/cyrus-freshness-provenance`  
 **Subject baseline:** Cyrus Management Solutions LLC · UEI `N1N9JPDYHVC7`  
-**Verifier UTC:** 2026-09-21 (session)
+**Verifier UTC:** 2026-09-21T01:20Z (session)
 
 ---
 
-## Scope read
+## Verdict
 
-- Disposition: `00-DISPOSITION.md` (O1–O16, N1–N5, F1–F4 freeze)
-- Local three-tool baseline: `04-baseline-summary.json` + `01-profile.json` / `02-sam.json` / `03-history.json`
-- Round-3 before/after: `tasks/evidence/cyrus-freshness-provenance-2026-09-20/{before,after}-repro.json`
-- Diff: `git diff --stat origin/main...HEAD` → 11 paths, **+1004 / −32**; product surface is additive (no deletions/renames under `src/`)
+**PASS_WITH_NOTES** — HEAD includes the shared fail-hard checker; the required vitest suite is **64/64 green** at this SHA; both closure runners import that checker; Cyrus local evidence (`01–04`) satisfies identity / counting / freshness / set-aside honesty contracts; `#1580` / O12 untouched. Residual notes are operational caveats (canary ≠ Cyrus; local ≠ public MCP), not product BLOCKERs.
 
-Product commits on branch: `5ff4af98` (freshness + provenance) · `8901bc09` (awards-ingest test skip when bq CLI missing).
+---
+
+## HEAD SHA
+
+```
+8e1771672b65f7b7b0f5c8cff4aae436beb52f7f
+```
+
+Recent tip commit: `fix(cyrus): share fail-hard three-tool acceptance checker` — introduces / lands `src/lib/contractor/cyrus-acceptance.ts` (+ unit tests). Confirmed present on disk at this worktree.
+
+Branch status at verify time: `fix/cyrus-freshness-provenance` ahead of `origin/fix/cyrus-freshness-provenance` by 1 (local tip = `8e177167`).
+
+---
+
+## Suite execution results
+
+**Exact command (executed, not read-only):**
+
+```bash
+cd /Users/ericcoffie/Projects/market-assassin/.claude/worktrees/cyrus-freshness-provenance
+npx vitest run \
+  src/lib/contractor/cyrus-acceptance.unit.test.ts \
+  src/lib/contractor/award-history-shape.unit.test.ts \
+  src/lib/bigquery/bq-history-completeness.unit.test.ts \
+  src/lib/chat/tier2-tools.unit.test.ts
+```
+
+**Result:**
+
+| Metric | Count |
+|--------|-------|
+| Test files | **4 passed / 4** |
+| Tests | **64 passed / 64** |
+| Failed | **0** |
+| Duration | ~835ms |
+
+Per-file: `cyrus-acceptance` 9 · `award-history-shape` 26 · `tier2-tools` 19 · `bq-history-completeness` 10.
+
+**BLOCKER gate:** none — suite green.
+
+Local baseline was re-run after the tip commit against HEAD `8e177167`: `acceptance.ok=true`, `assertion_count=27`, `failures=[]`, `codeSha` matches HEAD, shared `checker` path, flags-format summary (`sam_has8a_current_boolean: true` — no null extractor).
+
+---
+
+## Shared-checker verification
+
+| Check | Result |
+|-------|--------|
+| `src/lib/contractor/cyrus-acceptance.ts` on HEAD | **Yes** |
+| Imported by `scripts/cyrus-audit-closure-baseline.ts` | **Yes** (`checkCyrusThreeToolAcceptance`, `assertCyrusAcceptanceOrThrow`, …) |
+| Imported by `scripts/cyrus-audit-closure-mcp-acceptance.ts` | **Yes** (same shared exports) |
+| Fail-hard | Both runners call `assertCyrusAcceptanceOrThrow` and `process.exit(1)` on failure |
+| Summary wiring | `04-baseline-summary.json` → `"checker": "src/lib/contractor/cyrus-acceptance.ts"`, `flags.sam_has8a_current_boolean: true` (boolean flag, **not** null `has8a`) |
 
 ---
 
@@ -25,117 +74,59 @@ Product commits on branch: `5ff4af98` (freshness + provenance) · `8901bc09` (aw
 
 ### 1. Did any existing functionality disappear?
 
-**No.** Diff is additive honesty/provenance fields plus a set-aside cache-key bump (`v3-m` → `v4-m`) that forces cold refill — not a removed capability.
-
-Preserved on the Cyrus baseline:
-
-| Surface | Still present |
-|---------|----------------|
-| Profile / history award identity | UEI `N1N9JPDYHVC7`, name match, `award_count` / `unique_awards` = **17** |
-| Counting bases | `unique_awards` 17 · `fiscal_year_award_count_sum` 51 · `recent_grain=obligation_actions` |
-| Activity | both `dormant`, `last_positive_obligation_fy=2020` |
-| Agency honesty | `count: null` + `count_unavailable: true` on top agencies; profile `top_agencies_capped` |
-| Mod / grain labels | profile `mod_classification` / `is_modification` / `grain`; history camelCase equivalents |
-| `last_fy_by_label` | retained; machine `deprecated.last_fy_by_label` |
-
-O12 / `#1580` untouched (no PSC blank-row changes in this diff).
+**No.** Diff vs `origin/main` is additive honesty / freshness / provenance (+ shared acceptance checker + evidence). Product paths modified under `src/` are enhancements (clocks, meaning fields, set-aside provenance, cache-key bump for cold refill). No deleted product capability surface for Cyrus. `#1580` / O12 (blank PSC) explicitly out of scope and absent from the path list.
 
 ### 2. Can a customer infer something stronger than the evidence supports?
 
-**Mostly no — notes below are residual over-read risks, not silent fabrication.**
+**Mostly no — mitigated.**  
+`coverage_complete_established=true` is now paired with explicit `coverage_complete_established_meaning` (history + profile `coverage.coverage_timestamp`) and freshness notes denying recipient-exhaustive / corpus-complete claims. Shared checker fails if notes claim recipient-exhaustive coverage. Historical 8(a) set-asides still carry cert/graduation / award-origin denials; SAM `has8a=false` is current registration only. Residual skimming risk on the *flag name* alone remains a **note**, not a silent fabrication.
 
-Guards that hold on live Cyrus payloads:
+### 3. Do profile / SAM / history disagree for an unexplained reason?
 
-- Historical `8(A) SOLE SOURCE` / `8A COMPETED` carry notes denying certification / graduation / award origin; `null_first_positive_note` present; no `award_origin_fy*` fields.
-- SAM `entity.has8a === false` (current) while warehouse set-asides show past 8(a) **actions** — explained dual-source, not a invented graduation claim.
-- Zero agency-year cells: **19** `zero_net_obligations`, all `unused_vehicle === false`, notes forbid unused-vehicle from $0 alone.
-- Soft warehouse clock load (`read-warehouse-coverage.ts`): missing env / read failure → `null` → clocks unknown; does not invent `healthy`.
+**No unexplained disagreement** on Cyrus `01–04`:
 
-**NOTES (not BLOCKERs):**
-
-1. **`coverage_complete_established: true` naming.** Code + JSDoc mean “warehouse max + ingest clocks are attached and freshness is measured,” **not** “this contractor’s award history is exhaustive.” Freshness notes correctly warn that a quiet recipient last action ≠ stale corpus and that a recent recipient action alone ≠ complete coverage. A skimming consumer could still over-read the flag name. Mitigated by note text; rename deferred.
-2. **`04-baseline-summary.json` `cross.sam_certs`** records `has8a: null` / `lookup_status: null` while `02-sam.json` has `has8a: false`, `lookup_status: found`. Extractor gap in the summary file only — raw SAM capture is correct. Review packet text matches raw SAM.
-3. **`after-repro.json` is not the Cyrus subject.** PR packet documents canary UEI `FCJCDUZV7RM3` (`activity_status: active`). Cyrus closure evidence is `01–04`. Do not treat after-repro dollar/activity fields as Cyrus regression proof.
-
-### 3. Do profile, SAM, and history disagree for an unexplained reason?
-
-**No unexplained disagreement.**
-
-| Axis | Profile | History | SAM | Verdict |
-|------|---------|---------|-----|---------|
-| Identity | `N1N9JPDYHVC7` / CYRUS… | same + `match_status=unique` | same UEI / legal name | Agree |
-| Award count | 17 + counting_bases | 17 + counting_bases | n/a | Agree |
-| Dollars | `$14,956,164.46` | same | n/a | Agree for this single-UEI rollup (`uei_count=1`); `totals_note` still warns parent-rollup ≠ single-UEI in general |
-| Activity | dormant / FY2020 | same | n/a | Agree |
-| Set-asides | labels + FYs + `scope.kind=profile_rollup` | same labels/FYs + `history_single_uei` | current `has8a=false`, WOSB self-id | **Explained:** warehouse historical actions ≠ current SAM cert |
-| Freshness clocks | as_of `2026-06-16`, warehouse max `2026-09-18`, ingest healthy | same three clocks | n/a | Agree |
-| Recent action limits | 5 returned | 20 returned (`award_limit=20`) | n/a | Expected limit difference, not conflict |
-| Mod field casing | snake_case | camelCase | n/a | Pre-existing dual convention; values agree (e.g. A00005 → modification / true) |
-| Invalid PoP canary | — | PIID `693JK418P500008` → `invalid` / `end_before_start` | — | O10 still observable |
+| Axis | Agree? |
+|------|--------|
+| UEI `N1N9JPDYHVC7` / Cyrus name | Yes across profile, SAM, history match |
+| Award count 17 + counting bases (17 / FY-sum 51 / obligation_actions grain) | Yes |
+| Activity dormant / last positive FY2020 | Yes |
+| Dollars ~$14.96M | Yes for this single-UEI rollup |
+| Set-asides: warehouse historical actions vs SAM current `has8a=false` | **Explained** dual-source |
+| Freshness three clocks + ingest healthy | Agree |
+| Scopes `profile_rollup` vs `history_single_uei` | Expected |
 
 ### 4. Are complete / grounded / freshness claims justified?
 
-**Yes, under the contracts shipped in this branch.**
-
-| Claim | Evidence | Justified? |
-|-------|----------|------------|
-| Profile `enrichment_status=complete` | recent_awards length 5; set-asides labeled; agencies present | Yes |
-| Set-aside `coverage=complete` | warehouse query returned labels + provenance; not warm-empty-as-none | Yes |
-| SAM `_meta.grounded=true` | entity found, unique match | Yes |
-| History `_meta.grounded` / award_count 17 | rows present | Yes |
-| `coverage_complete_established=true` | warehouse max + ingest clocks + freshness ≠ unmeasured (see naming note above) | Yes per code contract |
-| Before (F1) | `before-repro.json`: warehouse max / ingest unwired on payloads | Defect reproduced |
-| After (F1–F4) | Cyrus `01–04` + documented canary `after-repro.json` | Repairs evidenced |
+**Yes, under shipped contracts.** Profile enrichment / set-aside coverage-complete, SAM `_meta.grounded=true`, history award_count 17 grounded, and `coverage_complete_established=true` justified as “clocks attached + classified,” **not** exhaustive history — meaning field + note text + checker guard.
 
 ---
 
-## Unit-test protection matrix
+## Prior NOTES — addressed or residual
 
-| Required invariant | Where protected | Status |
-|--------------------|-----------------|--------|
-| Warm agencies + cold awards → Pass-2 fills awards | `tier2-tools.unit.test.ts` — *Cyrus path: warm agencies + cold awards…* | **Covered** |
-| Warm empty ≠ unavailable | `tier2-tools.unit.test.ts` — warm-empty set-aside; `bq-history-completeness` — unavailable → `coverage=unavailable` | **Covered** |
-| Denied budget + warm empty → complete, labels `[]` | `tier2-tools.unit.test.ts` — *warm-empty set-aside with cold budget denied…* | **Covered** |
-| Set-aside not from capped recent sample | note assertions (`not derived from the capped recent_awards` / warehouse scope notes) in tier2 + shape tests | **Covered** |
-| Positive mod ≠ award origin | `award-history-shape.unit.test.ts` — first-positive / origin denial cases | **Covered** |
-| Historical set-asides ≠ certification | shape + bq-history note assertions; no `award_origin_fy` | **Covered** |
-| Unknown mods / dates | shape `classifyModNumber` unknown; bq-history blank mod + invalid PoP | **Covered** |
-| Counting bases grains | `buildCountingBases` unit + bq-history unique vs FY-sum | **Covered** |
-| `profile_rollup` vs `history_single_uei` | tier2 profile scope; bq-history history scope | **Covered** |
-
-Additional F1–F4 coverage in the same suites: three-clock `describeCoverageTimestamp`, `null_first_positive_note`, deprecated `last_fy`, `unused_vehicle: false` (shape + history integration).
-
-Verifier did **not** re-run vitest in this pass; protection is confirmed by reading the tests and the review packet’s reported `55 passed` on those three files. Re-run before merge if CI has not yet greenlit this SHA.
+| Prior note | Status |
+|------------|--------|
+| `coverage_complete_established` over-read | **Addressed** — `coverage_complete_established_meaning` present; freshness notes deny exhaustive history; unit + shared checker guard overclaim text |
+| `04-baseline-summary.json` `sam_certs` null `has8a` | **Addressed** — summary now uses shared-checker **flags** (`sam_has8a_current_boolean: true`); no null `has8a` in summary; raw `02-sam.json` still authoritative for entity payload |
+| `after-repro.json` canary ≠ Cyrus | **Still residual (intentional)** — canary UEI `FCJCDUZV7RM3`; Cyrus proof remains `01–04` |
+| local ≠ public MCP production closure | **Still residual (intentional)** — summary `environment: local_code_against_live_data`, `not: authenticated_public_mcp` |
 
 ---
 
-## Disposition spot-check (finish-line items)
+## `#1580` / O12
 
-| ID | Acceptance | Verifier |
-|----|------------|----------|
-| F1 / O4 | Three clocks + `coverage_complete_established` when clocks present | **Pass** (naming note) |
-| F2 | Contributing UEIs + supporting actions; machine scope | **Pass** on Cyrus `01`/`03` (`N1N9JPDYHVC7`) |
-| F3 | `null_first_positive_note` | **Pass** |
-| F4 | deprecated `last_fy` + unused_vehicle false | **Pass** |
-| O6 | counting_bases grains | **Pass** |
-| O8 | agency `count` null | **Pass** |
-| O1 / N2–N3 | no award_origin; historical ≠ cert | **Pass** |
-| N1 | Pass-2 unit | **Pass** |
-| N4 | warm-empty + denied budget unit | **Pass** |
-| N5 | scope kinds | **Pass** |
-| O12 | untouched | **Pass** |
+**Untouched.** Disposition marks O12 / `#1580` out of scope. `git diff --name-only origin/main...HEAD` contains **no** PSC blank-row / `#1580` product paths.
 
 ---
 
-## Verdict
+## Notes (non-blocking)
 
-**PASS_WITH_NOTES** — product changes and Cyrus local baseline satisfy the frozen disposition for F1–F4 and the regression invariants listed above. No merge BLOCKERs from this verifier pass.
+1. Soft residual: a consumer who reads **only** the boolean `coverage_complete_established` and ignores `*_meaning` / freshness notes could still over-read — mitigated in payload + checker, rename still optional later.
+2. Treat freshness `after-repro.json` as canary `FCJCDUZV7RM3`, not Cyrus.
+3. This verify pass is **local suite + evidence inspection**, not authenticated public MCP production closure (separate release acceptance).
+4. Tip `8e177167` is one commit ahead of origin at verify time — push is outside verifier scope.
 
-**Notes to carry (non-blocking):**
+---
 
-1. `coverage_complete_established` is easy to over-read; keep note text (or rename later).
-2. Fix or ignore `04-baseline-summary.json` `sam_certs` nulls — trust `02-sam.json`.
-3. Treat `after-repro.json` as canary (`FCJCDUZV7RM3`), not Cyrus; Cyrus proof is `01–04`.
-4. This is **local_code_against_live_data**, not authenticated public MCP production closure (disposition finish-line item 6 / separate release acceptance).
+## BLOCKERs
 
-**Not done by this verifier:** merge, deploy, push, or product code edits.
+**none**
