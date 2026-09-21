@@ -58,6 +58,24 @@
   .sumline{font-size:13px;color:var(--sub);margin-top:5px}
   .sumline b{color:var(--ink);font-weight:600}
 
+  /* RETURN BRIEF — "what changed since your last visit".
+     Renders ONLY when there is something true to say. A returning visitor whose market
+     we cannot recover sees this element stay hidden; it never says "no changes", because
+     59% of returners have no recoverable market and a calm zero there would be a
+     completeness claim we cannot support. */
+  .retbrief{margin-top:10px;border:1px solid #cfe3f5;background:#f3f8fd;border-radius:10px;
+    padding:9px 11px;font-size:12.5px;line-height:1.45;color:var(--ink)}
+  .retbrief .rb-since{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;color:#1d4ed8;display:block;margin-bottom:3px}
+  .retbrief .rb-line b{font-weight:700}
+  .retbrief .rb-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .retbrief .rb-act{font-size:11.5px;font-weight:600;border:1px solid #bcd7f0;background:#fff;
+    color:#1d4ed8;border-radius:999px;padding:4px 10px;cursor:pointer;text-decoration:none;
+    display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .retbrief .rb-act:hover{border-color:#1d4ed8}
+  .retbrief .rb-x{float:right;border:0;background:none;color:var(--faint);cursor:pointer;
+    font-size:13px;line-height:1;padding:0 0 0 8px}
+
   /* filter bar (sticky, Airbnb-style pills) */
   .fbar{padding:12px 20px 10px;flex:none;border-bottom:1px solid var(--line);background:#fff}
   .fscroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
@@ -448,6 +466,9 @@
         <div class="brand">Federal Opportunities</div>
       </div>
       <div class="sumline" id="sumline"></div>
+      <!-- Filled by RETURN_BRIEF_JS only when /api/app/return-brief returns a class it
+           can actually defend. Stays hidden otherwise — absence, never a zero. -->
+      <div class="retbrief" id="retBrief" hidden></div>
     </div>
 
     <div class="fbar">

@@ -9132,6 +9132,95 @@ const ASK_MINDY_JS = `<script>(function(){
 //     blocks the drawer open. A tracking failure must never touch the user's flow.
 //   • eventType is a VALID catalog type (link_click / tool_use); metadata carries {kind, opp, variant,
 //     est, src} so the analysis can split click vs impression + the hero variant (estimate_only for v1).
+// ── RETURN BRIEF — "what changed since your last visit" ──────────────────────────────
+//
+// RETURNING IS THE CONVERSION. 8,096 of 9,315 monthly users visit one day and never come
+// back. The 414 who DO return to this map are shown exactly what they were shown last
+// time, with no way to tell what moved — so returning has no reward and the habit never
+// forms. This strip is that reward, and it is allowed to say only what Mindy can prove.
+//
+// THE RULES THIS BLOCK OBEYS (the server enforces them; this is the render side):
+//  · The SENTENCE comes from the server (`brief.line`). This block never counts anything
+//    and never decides whether there is news — a client-side copy of that rule is the one
+//    nobody tests, and it would let the strip and the API disagree.
+//  · An EMPTY line renders NOTHING. It must never fall back to "no changes since your
+//    last visit": 59% of returners have no market we can recover, and a calm zero there
+//    is a completeness claim we cannot support.
+//  · The market CTA is a MARKET link (scope params) and the listing CTA is a RECORD link
+//    (`?opp=<notice_id>` alone). Both are the map's own existing typed addresses — see
+//    docs/engineering/record-links-vs-market-links.md. A record link must carry nothing
+//    that could exclude the record, and a closed listing fails every status filter.
+//
+// This is its OWN <script> IIFE and cannot see the closures in other emitted blocks, so it
+// reaches the shared identity through window.__anonId / window.__track (the documented
+// cross-block bridge).
+const RETURN_BRIEF_JS = `<script>(function(){
+  var EL=document.getElementById('retBrief'); if(!EL) return;
+  var DISMISS_KEY='mindy_retbrief_dismissed';
+  function em(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} return ''; }
+  function tok(){ try{ return localStorage.getItem('mi_beta_auth_token')||''; }catch(e){ return ''; } }
+  function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function track(kind,action,meta){ try{ if(typeof window.__track==='function') window.__track(kind,action,meta||{}); }catch(e){} }
+  try{ if(sessionStorage.getItem(DISMISS_KEY)==='1') return; }catch(e){}
+
+  var e=em(), url, headers={};
+  if(e){ url='/api/app/return-brief?email='+encodeURIComponent(e); var t=tok(); if(t) headers['x-mi-auth-token']=t; }
+  else { var a=''; try{ a=(typeof window.__anonId==='function')?(window.__anonId()||''):''; }catch(_x){ a=''; }
+         if(!a) return; url='/api/app/return-brief?anonId='+encodeURIComponent(a); }
+
+  fetch(url,{headers:headers}).then(function(r){ return r.ok?r.json():null; }).then(function(b){
+    // No brief, not a return, or nothing TRUE to say -> render nothing at all.
+    if(!b || !b.isReturn || !b.line) return;
+
+    var acts=[];
+    // MARKET link: scope only, exactly the scope the count was computed from.
+    if(b.newInMarket && b.newInMarket.state==='measured' && b.newInMarket.count>0 && b.newInMarket.detail){
+      var sc=b.newInMarket.detail.scope||{};
+      var lbl=sc.label?('See '+b.newInMarket.count+' new in '+sc.label):('See '+b.newInMarket.count+' new');
+      acts.push({href:b.newInMarket.detail.link,label:lbl,kind:'market'});
+    }
+    // RECORD links: one per closed listing, ?opp=<notice_id> and nothing else.
+    if(b.listingClosed && b.listingClosed.state==='measured' && b.listingClosed.detail){
+      var ls=b.listingClosed.detail.listings||[];
+      for(var i=0;i<ls.length && i<3;i++){
+        var ttl=ls[i].title||ls[i].noticeId;
+        if(ttl.length>46) ttl=ttl.slice(0,44)+'…';
+        acts.push({href:'/opportunity-map?opp='+encodeURIComponent(ls[i].noticeId),label:'Closed: '+ttl,kind:'record',nid:ls[i].noticeId});
+      }
+    }
+
+    var since=b.gapLabel?('Since your last visit · '+b.gapLabel):'Since your last visit';
+    var h='<button class="rb-x" id="rbX" aria-label="Dismiss">✕</button>'
+        + '<span class="rb-since">'+esc(since)+'</span>'
+        + '<div class="rb-line">'+esc(b.line)+'</div>';
+    if(acts.length){
+      h+='<div class="rb-acts">';
+      for(var k=0;k<acts.length;k++) h+='<a class="rb-act" href="'+esc(acts[k].href)+'" data-k="'+esc(acts[k].kind)+'">'+esc(acts[k].label)+'</a>';
+      h+='</div>';
+    }
+    EL.innerHTML=h; EL.hidden=false;
+
+    track('tool_use','return_brief_shown',{
+      anon:(b._meta&&b._meta.identityKind)==='anon',
+      gap_label:b.gapLabel||'',
+      new_count:(b.newInMarket&&b.newInMarket.state==='measured')?b.newInMarket.count:null,
+      closed_count:(b.listingClosed&&b.listingClosed.state==='measured')?b.listingClosed.count:null,
+      // States ride along so "we showed nothing" can be told apart from "we had nothing":
+      // a null count with state 'no_basis' is a coverage gap, not a quiet zero.
+      new_state:b.newInMarket?b.newInMarket.state:null,
+      closed_state:b.listingClosed?b.listingClosed.state:null,
+      scope_basis:(b.newInMarket&&b.newInMarket.detail&&b.newInMarket.detail.scope)?b.newInMarket.detail.scope.basis:null
+    });
+
+    var x=document.getElementById('rbX');
+    if(x) x.onclick=function(){ EL.hidden=true; try{ sessionStorage.setItem(DISMISS_KEY,'1'); }catch(e){} track('tool_use','return_brief_dismissed',{}); };
+    var links=EL.querySelectorAll('.rb-act');
+    for(var m=0;m<links.length;m++){
+      (function(el){ el.addEventListener('click',function(){ track('link_click','return_brief_click',{link_kind:el.getAttribute('data-k')||''}); }); })(links[m]);
+    }
+  }).catch(function(){ /* a brief that cannot load renders nothing — never a fabricated calm */ });
+})();</script>`;
+
 const CARD_TRACK_JS = `<script>(function(){
   function em(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){} return ''; }
   var seen={}; // opp id -> 1, so an impression fires at most ONCE per opp per page load
@@ -9451,7 +9540,7 @@ export async function GET(request: NextRequest) {
     // SETTINGS_DRAWER_HTML sits BEFORE LOGIN_MODAL_HTML for the same reason MOBILE_HTML does —
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + RETURN_BRIEF_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

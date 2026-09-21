@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +12,23 @@ import { lockDirForRegistry } from './lock';
 import { createLease } from './lease';
 import type { AgentTaskRegistry, TaskRecord } from './types';
 
+
+// ── TIMEOUT, not an assertion ─────────────────────────────────────────────────────
+// Every test in this file shells out to the agent-tasks CLI, which runs real Git. The
+// global budget is 10s (vitest.config.ts), and several of these specs chain four or
+// more CLI invocations — each of which pays for a `git worktree` enumeration.
+//
+// This repository currently has 31 linked worktrees (parallel agent sessions), and that
+// enumeration scales with the count, so on 2026-09-21 the pre-push gate started failing
+// here on a NON-DETERMINISTIC subset: a different spec each run, 14s against a 10s
+// budget, and reproduced identically on a clean `origin/main` checkout with no feature
+// code present at all. It is wall-clock, not correctness.
+//
+// Raising a timeout weakens NO assertion — every expect() in this file is unchanged and
+// still has to pass. What it removes is a gate that blocks unrelated work whenever the
+// machine happens to be busy, which is the failure mode that teaches people to reach for
+// `--no-verify`.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 /**
  * PHASE 3A.6 — CLI supersession from a lease-free `integration` phase.
  *
