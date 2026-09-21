@@ -30,7 +30,9 @@ describe('translateOpportunity', () => {
     expect(card.noticeLabel).toBe('Open to bid now');
     expect(card.setAsideLabel).toBe('Small Business set-aside');
     expect(card.audienceLabel).toBe("Who it's for: Small businesses");
-    expect(card.dueLabel).toBe('Due in 8 days · Sept 16');
+    // CHANGED 2026-09-21: a BID deadline and a market-research response date
+    // are different promises. The stage now supplies the verb.
+    expect(card.dueLabel).toBe('Bid due in 8 days · Sept 16');
     expect(card.plainMeaning).toContain('accepting offers');
     expect(card.nextStep).toContain('Open the listing');
     expect(card.referenceNumber).toBe('47QSHA26Q0001');
@@ -230,13 +232,19 @@ describe('searchBeginnerOpportunities grounding states', () => {
     );
     expect(result.outcome.kind).toBe('results');
     if (result.outcome.kind === 'results') {
-      expect(result.outcome.cards.map((c) => c.referenceNumber)).toEqual(['HVAC-1', 'HVAC-2', 'ROAD-1']);
+      // CHANGED 2026-09-21: relevance is ACTIVITY EVIDENCE, not NAICS sector.
+      // ROAD-1 ("Repair A Avenue at Building 300") shares sector 23 with the
+      // HVAC coverage set but names no HVAC work — the old sector gate kept it
+      // for that alone. IT-1 carries 541512, which IS in the established code
+      // set, so it survives as ADJACENT evidence (never a described match).
+      // Dale Carnegie is still dropped, which is what this test is named for.
+      expect(result.outcome.cards.map((c) => c.referenceNumber)).toEqual(['HVAC-1', 'HVAC-2', 'IT-1']);
       expect(result.outcome.cards.some((c) => /Dale Carnegie/i.test(c.title))).toBe(false);
       expect(new Set(result.outcome.cards.map((c) => c.dueLabel)).size).toBeGreaterThanOrEqual(2);
       expect(result.outcome.cards.map((c) => c.dueLabel)).toEqual([
-        'Due in 8 days · Sept 16',
+        'Bid due in 8 days · Sept 16',
         'Deadline: check listing',
-        'Due in 12 days · Sept 20',
+        'Deadline: check listing',
       ]);
     }
   });

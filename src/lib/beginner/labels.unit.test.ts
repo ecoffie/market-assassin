@@ -31,8 +31,18 @@ describe('set-aside translation', () => {
     expect(translateSetAside('HZC').kind).toBe('hubzone');
     expect(translateSetAside('No Set aside used').kind).toBe('open');
     expect(translateSetAside('NONE').kind).toBe('open');
-    expect(translateSetAside(null).kind).toBe('open');
-    expect(translateSetAside('').kind).toBe('open');
+    // CHANGED 2026-09-21: absent ≠ unrestricted. 4,261 of 9,030 active open
+    // notices carry no set-aside at all, and every one of them was rendered
+    // "Who it's for: Any business that can do the work" — a confident
+    // eligibility read produced from an empty field, on 47.2% of the corpus.
+    expect(translateSetAside(null).kind).toBe('not_stated');
+    expect(translateSetAside('').kind).toBe('not_stated');
+    expect(translateSetAside(null).audience).toContain('Not listed');
+    expect(translateSetAside(null).audience).not.toContain('Any business that can do the work');
+    // An EXPLICIT unrestricted statement still reads as open.
+    expect(translateSetAside('No Set aside used').audience).toContain(
+      'Any business that can do the work',
+    );
   });
 
   it('never renders a raw SAM code as the beginner label', () => {

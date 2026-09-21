@@ -38,6 +38,8 @@ const UNAVAILABLE_VIEW = {
   },
   directCards: [],
   uncoveredCards: [],
+  relatedCards: [],
+  relatedLabel: 'Related — broader or adjacent',
   ctaVariant: 'more' as const,
   classificationPath: 'unavailable' as const,
 };
@@ -68,6 +70,8 @@ export async function POST(request: NextRequest) {
       reveal: null,
       directCards: [],
       uncoveredCards: [],
+      relatedCards: [],
+      relatedLabel: 'Related — broader or adjacent',
       ctaVariant: 'more',
       classificationPath: 'need_followup',
     });

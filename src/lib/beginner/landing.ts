@@ -9,7 +9,7 @@
  * window — do not print them as "the federal market."
  */
 
-import type { CtaVariant, RevealState } from './labels';
+import type { CtaVariant, NoticeStage, RevealState, StageCounts } from './labels';
 import type {
   BeginnerOpportunityCard,
   BeginnerSearchResult,
@@ -23,6 +23,8 @@ export const LANDING_SEARCH_LIMIT = 8;
 
 export interface PublicBeginnerCard {
   title: string;
+  /** open_bid | market_research | upcoming | … — drives the stage grouping. */
+  stage: NoticeStage;
   noticeLabel: string | null;
   audienceLabel: string | null;
   dueLabel: string;
@@ -43,6 +45,19 @@ export interface BeginnerMarketReveal {
   directLabel: string;
   expandedLabel: string;
   agencies?: { count: number; names?: string[] };
+  /**
+   * The stage MIX behind `directMatchCount`. A single "13 opportunities" over
+   * 8 RFIs, 1 pre-solicitation and 4 biddable notices is the Bug-3 headline —
+   * the count must carry its own composition.
+   */
+  stages?: StageCounts;
+  /** Plain-English rendering of `stages`, e.g. "1 open to bid now and 2 …". */
+  stageSummary?: string;
+  /**
+   * The words actually sent to SAM. Named in the copy so a zero reads as
+   * "those words are not in any title", never as "the market is empty".
+   */
+  searchedTerms?: string[];
   translatedTerms?: string[];
   revealState: RevealState;
   explanation: string;
@@ -57,6 +72,13 @@ export interface HiddenMarketLandingView {
   reveal: BeginnerMarketReveal | null;
   directCards: PublicBeginnerCard[];
   uncoveredCards: PublicBeginnerCard[];
+  /**
+   * Weaker-but-real evidence, shown under its own heading. Separating these
+   * from `directCards` is the whole point: "Matches what you described" is a
+   * claim, and a shortened word or a code-family overlap does not earn it.
+   */
+  relatedCards: PublicBeginnerCard[];
+  relatedLabel: string;
   ctaVariant: CtaVariant;
   classificationPath: ResolutionState;
 }
@@ -114,6 +136,7 @@ export function buildMarketReveal(result: BeginnerSearchResult): string[] {
 export function toPublicBeginnerCard(card: BeginnerOpportunityCard): PublicBeginnerCard {
   return {
     title: card.title,
+    stage: card.stage,
     noticeLabel: card.noticeLabel,
     audienceLabel: card.audienceLabel,
     dueLabel: card.dueLabel,
