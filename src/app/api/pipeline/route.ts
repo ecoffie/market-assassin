@@ -13,13 +13,9 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
-import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
-import { isValidSamNoticeId } from '@/lib/sam/utils';
-import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
-import { computeNextAction } from '@/lib/pipeline/next-action';
-import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
-import { familyAttachmentForNotice, indexFamiliesByNoticeId, type FamilyNoticeRow } from '@/lib/sam/solicitation-family';
+import { indexFamiliesByNoticeId, type FamilyNoticeRow } from '@/lib/sam/solicitation-family';
+import { createCanonicalPursuit, type PursuitDraft } from '@/lib/pipeline/create-pursuit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -290,326 +286,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // AUTH STAYS HERE. The shared writer takes an already-verified identity and
+    // never authenticates — so reusing it elsewhere cannot weaken this route.
     const authSession = requireMIAuthSession(request, body.user_email);
     if (!authSession.ok) return authSession.response;
 
     // Normalize email
     body.user_email = body.user_email.toLowerCase();
-    // COACH MODE: use the ACTIVE workspace, not the caller's own. A coach tracking
-    // in a client workspace must write to the CLIENT's workspace_id — else the row
-    // lands in the coach's own pipeline and My Pursuits (which reads the client
-    // workspace via the same resolver) shows 0. resolveActiveWorkspace returns the
-    // client's workspaceId when the coach is authorized for that x-active-workspace,
-    // and falls back to the caller's own workspace otherwise. (Mirrors GET.)
+    // COACH MODE: use the ACTIVE workspace, not the caller's own. A coach
+    // tracking in a client workspace must write to the CLIENT's workspace_id —
+    // else the row lands in the coach's own pipeline and My Pursuits (which
+    // reads the client workspace via the same resolver) shows 0. (Mirrors GET.)
     const { workspaceId, asClient } = await resolveActiveWorkspace(body.user_email, request);
 
-    // Set defaults
-    body.stage = body.stage || 'tracking';
-    body.priority = body.priority || 'medium';
-    body.source = body.source || 'manual';
-    body.is_prime = body.is_prime ?? true;
-
-    body.workspace_id = workspaceId;
-    // Attribute the row to the CLIENT profile in coach mode (so client-scoped
-    // surfaces — owner-attributed alerts, pursuit-change digests — key off the
-    // client, not the coach). In self mode, owner is the caller.
-    body.owner_email = body.owner_email || (asClient ? clientNotificationEmail(workspaceId) : body.user_email);
-    body.created_by = body.user_email;
-    body.updated_by = body.user_email;
-
-    // Reject malformed notice_id values. React render keys like
-    // 'deadline-140R6026Q0068' have been leaking into this field via
-    // email action URLs, which then breaks SAM API lookups (fetchPursuitDocs,
-    // attachment resolution). Null-out garbage instead of storing it so
-    // downstream code can fall back to title-based search gracefully.
-    if (body.notice_id && !isValidSamNoticeId(body.notice_id)) {
-      console.warn(`[Pipeline POST] rejecting malformed notice_id "${body.notice_id}" for "${body.title}"`);
-      body.notice_id = undefined;
-    }
-
-    // user_pipeline has no notice_type column; clients may still send the
-    // SAM type for display. Capture it for the write-time next_action stamp
-    // below, then drop it before insert, then recover canonical SAM data from
-    // notice_id/solicitation/title so future reads and doc fetches have the
-    // strongest possible key.
+    // user_pipeline has no notice_type column; clients may still send the SAM
+    // type for display. Capture it for the write-time next_action stamp, then
+    // let the writer drop it.
     const clientNoticeType =
       ((body as unknown as Record<string, unknown>).notice_type as string | null | undefined) ?? null;
-    delete (body as unknown as Record<string, unknown>).notice_type;
 
-    const samMatch = await lookupSamOpportunityForPipeline(getSupabase(), {
-      noticeId: body.notice_id,
-      title: body.title,
-      agency: body.agency,
-    });
-    // Persist the canonical SAM UUID, not a solicitation number. The attachment
-    // fetcher keys off notice_id and SAM's file API only matches the 32-char
-    // UUID — saving "70203926CGASHED" instead of the UUID was silently breaking
-    // every attachment fetch. Prefer the resolved UUID whenever the stored value
-    // isn't already one. (Old logic only filled when the field was empty, so a
-    // user-supplied solicitation number was kept and the UUID discarded.)
-    const isUuid = (v?: string | null) => !!v && /^[a-f0-9]{32}$/i.test(v.trim());
-    if (samMatch?.noticeId && isUuid(samMatch.noticeId) && !isUuid(body.notice_id)) {
-      body.notice_id = samMatch.noticeId;
+    const result = await createCanonicalPursuit(
+      {
+        db: getSupabase(),
+        callerEmail: body.user_email,
+        workspaceId,
+        asClient,
+        clientOwnerEmail: clientNotificationEmail(workspaceId),
+      },
+      body as unknown as PursuitDraft,
+      { clientNoticeType },
+    );
+
+    if (result.kind === 'duplicate') {
+      return NextResponse.json(
+        { error: 'Opportunity already in pipeline', opportunity: result.existing },
+        { status: 409 }
+      );
     }
-    if (samMatch?.responseDeadline && !body.response_deadline) {
-      const d = new Date(samMatch.responseDeadline);
-      if (!Number.isNaN(d.getTime())) {
-        body.response_deadline = d.toISOString();
-      }
-    }
-
-    // Reject value_estimate strings that are display labels ("Due in
-    // 6 days", "Open market research window...") instead of dollar
-    // amounts. Audit 2026-05-26 found DashboardPanel writing item.amount
-    // (a display label) into value_estimate. Null-out garbage so the
-    // Pipeline Value column stays scannable.
-    if (body.value_estimate && !isCleanValueEstimate(body.value_estimate)) {
-      console.warn(`[Pipeline POST] rejecting non-dollar value_estimate "${body.value_estimate}" for "${body.title}"`);
-      body.value_estimate = undefined;
-    }
-
-    // Backfill response_deadline from the SAM cache when the caller
-    // didn't supply one but we have a valid notice_id. Several save
-    // paths (Today's Intel, Source Feed, Alerts) can hand us an
-    // opportunity object whose response_deadline was empty/expired in
-    // their feed, so the pursuit lands with "No deadline" even though
-    // SAM has the date. One lookup here fixes every save path at once.
-    if ((!body.response_deadline) && body.notice_id && isValidSamNoticeId(body.notice_id)) {
-      try {
-        const { data: samRow } = await getSupabase()
-          .from('sam_opportunities')
-          .select('response_deadline')
-          .eq('notice_id', body.notice_id)
-          .maybeSingle();
-        if (samRow?.response_deadline) {
-          const d = new Date(samRow.response_deadline);
-          if (!Number.isNaN(d.getTime())) {
-            body.response_deadline = d.toISOString();
-          }
-        }
-      } catch (e) {
-        // Non-fatal — a missing deadline just means the drawer shows
-        // "No deadline", same as before this backfill existed.
-        console.warn('[Pipeline POST] deadline backfill lookup failed:', e);
-      }
-    }
-
-    // Write-time next_action stamp — the SAME computeNextAction() the AlertsPanel
-    // uses, now applied to EVERY track path (market-intel dashboard, daily-alert,
-    // source-feed…), not just the ones that pre-send next_action. Measured
-    // 2026-07-19: ~63% of post-ship tracked rows (sources market_intel_dashboard /
-    // mi_beta_alerts / daily_alert) landed with next_action=NULL and no
-    // follow-through button, dragging fill to 22% while stamped sources hit 100%.
-    // Notice type comes from the client payload when present, else the SAM cache
-    // (market-intel/daily-alert omit it). Respect a client-supplied next_action.
-    if (!body.next_action) {
-      let noticeType: string | null = clientNoticeType;
-      if (!noticeType && body.notice_id && isValidSamNoticeId(body.notice_id)) {
-        try {
-          const { data: ntRow } = await getSupabase()
-            .from('sam_opportunities')
-            .select('notice_type')
-            .eq('notice_id', body.notice_id)
-            .maybeSingle();
-          noticeType = ntRow?.notice_type || null;
-        } catch (e) {
-          // Non-fatal — an unstamped row still tracks fine; the render-time
-          // fallback recomputes a button when it can.
-          console.warn('[Pipeline POST] next_action type lookup failed:', e);
-        }
-      }
-      const na = computeNextAction(noticeType, body.set_aside ?? null).key;
-      // 'track_only' = no actionable next step → keep NULL (honest: the fill
-      // metric then measures real next-actions, and no dead-end button renders).
-      if (na && na !== 'track_only') {
-        body.next_action = na;
-      }
-    }
-
-    // Decision-time (#122): freeze WHEN this user first discovered this opportunity — their earliest
-    // logged view of this notice, else now() as an honest floor. decision_time = created_at −
-    // discovered_at, the crown-jewel Procurement Intelligence Report metric that can't be backfilled.
-    // Never fails the save (resolveDiscoveredAt floors to now() on any lookup error).
-    if (!body.discovered_at) {
-      body.discovered_at = await resolveDiscoveredAt(getSupabase(), {
-        userEmail: body.user_email,
-        noticeId: body.notice_id,
-        nowIso: new Date().toISOString(),
-      });
-    }
-
-    let { data, error } = await getSupabase()
-      .from('user_pipeline')
-      .insert(body)
-      .select()
-      .single();
-
-    // Unknown-column safety. This started as a discovered_at-only retry (migration ordering), but
-    // the same failure arrived from the other direction on 2026-08-13: the map posted
-    // `solicitation_number`, which user_pipeline has never had, and EVERY "Start pursuit" /
-    // "Track this buy" on an opportunity carrying one 500'd. The payload was only saved when the
-    // value happened to be undefined, because JSON.stringify drops those keys — so the bug looked
-    // intermittent. The caller is fixed, but a save is the wrong place to be strict: losing a
-    // user's pursuit because a field name drifted is worse than ignoring the field.
-    //
-    // So: drop whatever column the error names and retry, a few times, for BOTH shapes —
-    // Postgres 42703 (undefined column) and PostgREST PGRST204 ("Could not find the 'x' column
-    // ... in the schema cache"). Bounded, and it only ever REMOVES keys, so it cannot widen what
-    // gets written. A genuinely bad insert still surfaces its error below.
-    for (let attempt = 0; attempt < 5 && error; attempt++) {
-      const isMissingColumn = error.code === '42703' || error.code === 'PGRST204';
-      if (!isMissingColumn) break;
-      const named = /'([^']+)' column|column "([^"]+)"/.exec(error.message || '');
-      const col = named?.[1] || named?.[2];
-      if (!col || !(col in body)) break;
-      console.warn('[pipeline] dropping unknown column and retrying:', col);
-      delete (body as unknown as Record<string, unknown>)[col];
-      ({ data, error } = await getSupabase().from('user_pipeline').insert(body).select().single());
-    }
-
-    if (error) {
-      // Check for duplicate
-      if (error.code === '23505') {
-        // Return the EXISTING row alongside the 409. Callers that only want "is it saved?" are
-        // unaffected (this is additive), but the ones that need to DO something with the pursuit —
-        // the map's "Generate proposal", which opens /opportunity-map/proposal?pursuit=<id> — would
-        // otherwise be stuck exactly in the common case: an opportunity the user already tracked.
-        // Best-effort: a failed lookup still returns the same 409, just without the row.
-        let existing: unknown = null;
-        try {
-          const { data: dup } = await getSupabase()
-            .from('user_pipeline')
-            .select('*')
-            .eq('user_email', body.user_email)
-            .eq('notice_id', body.notice_id)
-            .limit(1)
-            .maybeSingle();
-          existing = dup ?? null;
-          if (dup?.notice_id) {
-            const attached = await familyAttachmentForNotice(dup.notice_id, {
-              persist: true,
-              client: getSupabase(),
-            });
-            if (attached?.view.family_id && dup.id) {
-              await getSupabase()
-                .from('user_pipeline')
-                .update({ family_id: attached.view.family_id })
-                .eq('id', dup.id);
-              existing = {
-                ...dup,
-                family_id: attached.view.family_id,
-                family: attached.attachment,
-              };
-            }
-          }
-        } catch { /* best-effort — the 409 is the contract, the row is a bonus */ }
-        return NextResponse.json(
-          { error: 'Opportunity already in pipeline', opportunity: existing },
-          { status: 409 }
-        );
-      }
-      // Surface the actual Postgres error so the client toast / log
-      // tells us what column mismatched, what RLS rejected, etc.
-      // Previously this threw into the generic catch-all 500 below.
-      console.error('Pipeline POST Postgres error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      });
+    if (result.kind === 'error') {
+      // Surface the actual Postgres error so the client toast / log tells us
+      // what column mismatched, what RLS rejected, etc.
       return NextResponse.json(
         {
-          error: error.message || 'Failed to add to pipeline',
-          details: error.details || null,
-          hint: error.hint || null,
-          code: error.code || null,
+          error: result.error.message,
+          details: result.error.details,
+          hint: result.error.hint,
+          code: result.error.code,
         },
         { status: 500 }
       );
     }
 
-    await recordAppActivity({
-      workspaceId,
-      userEmail: body.user_email,
-      actorEmail: body.user_email,
-      entityType: 'pipeline',
-      entityId: data.id,
-      action: 'created',
-      summary: `Added ${data.title} to pipeline`,
-      metadata: { stage: data.stage, priority: data.priority },
-    });
-
-    // Background-task SAM doc fetch. Uses Next.js after() so the
-    // lambda stays alive past the response (the OLD fire-and-forget
-    // approach was getting killed mid-pdf-parse by Vercel teardown,
-    // which surfaced as 'DOMMatrix is not defined' — see commit
-    // history 2026-05-26). The fetcher updates user_pipeline.docs_status
-    // as it runs so the UI can poll.
-    if (data.notice_id && data.id) {
-      after(async () => {
-        try {
-          await fetchPursuitDocsAuto({
-            pipelineId: data.id,
-            userEmail: body.user_email,
-            noticeId: data.notice_id,
-            source: data.source,
-            title: data.title,
-            agency: data.agency,
-          });
-        } catch (err) {
-          console.warn('[Pipeline POST] background doc fetch threw:', err);
-          // fetchPursuitDocs sets docs_status='fetching' before the slow work;
-          // if it throws before its own terminal write, the row is wedged at
-          // 'fetching' (infinite spinner). Terminalize it to 'failed' here so
-          // the drawer shows Retry instead of spinning forever.
-          try {
-            await getSupabase()
-              .from('user_pipeline')
-              .update({ docs_status: 'failed', docs_fetched_at: new Date().toISOString() })
-              .eq('id', data.id)
-              .in('docs_status', ['fetching', 'pending']);
-          } catch { /* best-effort */ }
-        }
-      });
-    }
-
-    let family = null;
-    if (data?.notice_id) {
-      try {
-        const attached = await familyAttachmentForNotice(data.notice_id, {
-          persist: true,
-          client: getSupabase(),
-        });
-        if (attached) {
-          family = attached.attachment;
-          if (attached.view.family_id) {
-            const { error: famErr } = await getSupabase()
-              .from('user_pipeline')
-              .update({ family_id: attached.view.family_id })
-              .eq('id', data.id);
-            if (famErr && famErr.code !== '42703' && famErr.code !== 'PGRST204') {
-              console.warn('[pipeline] family_id write failed:', famErr.message);
-            } else if (!famErr) {
-              data = { ...data, family_id: attached.view.family_id };
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[pipeline] family attach skipped:', e instanceof Error ? e.message : e);
-      }
-    }
+    // Background-task SAM doc fetch. Uses Next.js after() so the lambda stays
+    // alive past the response (the OLD fire-and-forget approach was getting
+    // killed mid-pdf-parse by Vercel teardown, which surfaced as 'DOMMatrix is
+    // not defined'). Bounded by this route's maxDuration = 300 above.
+    if (result.postWrite) after(result.postWrite);
 
     return NextResponse.json({
       success: true,
-      opportunity: data,
-      family,
+      opportunity: result.pursuit,
+      family: result.family,
       message: 'Added to pipeline'
     });
   } catch (error) {
-    // Non-Postgres exception (e.g. ensureWorkspaceMember threw, JSON
-    // parse failed, recordAppActivity blew up). Echo the message
-    // verbatim so the client toast shows it instead of a generic
-    // "Failed to add" that hides the cause.
+    // Non-Postgres exception (e.g. ensureWorkspaceMember threw, JSON parse
+    // failed, recordAppActivity blew up). Echo the message verbatim so the
+    // client toast shows it instead of a generic "Failed to add".
     const message = error instanceof Error ? error.message : String(error);
     console.error('Pipeline POST error:', error);
     return NextResponse.json(

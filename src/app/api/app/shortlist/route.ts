@@ -14,10 +14,11 @@
  *
  * `/api/pipeline` is untouched.
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import {
   isAnonId, addToAnonShortlist, claimAnonShortlist,
   countAnonShortlist, listAnonShortlist, MAX_ANON_SHORTLIST,
@@ -25,6 +26,12 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// A claim creates canonical pursuits, and each one schedules the same
+// background SAM document fetch /api/pipeline does. That work runs inside
+// after(), bounded by THIS function's maxDuration — at the ~60s default a cold
+// notice (download + PDF extract) is killed mid-fetch and the row wedges at
+// docs_status='fetching' forever. 300s matches /api/pipeline.
+export const maxDuration = 300;
 
 const db = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -55,9 +62,33 @@ export async function POST(request: NextRequest) {
     if (!verifiedEmail) {
       return NextResponse.json({ success: false, error: 'session carries no account' }, { status: 401 });
     }
-    const r = await claimAnonShortlist(db(), anonId, verifiedEmail);
+    // COACH MODE PARITY. The same resolver /api/pipeline POST uses, given the
+    // same request — so a coach claiming inside a client workspace lands the
+    // pursuit in the CLIENT's workspace, exactly where a normal Start Pursuit
+    // would put it. Never the coach's personal workspace.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(verifiedEmail, request);
+
+    const r = await claimAnonShortlist(db(), anonId, {
+      verifiedEmail,
+      workspaceId,
+      asClient,
+      clientOwnerEmail: clientNotificationEmail(workspaceId),
+    });
     if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 400 });
-    return NextResponse.json({ success: true, promoted: r.promoted, alreadyTracked: r.alreadyTracked });
+
+    // Background document fetch for each pursuit just created — scheduled the
+    // same way /api/pipeline schedules it, never fire-and-forget.
+    for (const task of r.postWrite) after(task);
+
+    // `failed` is reported, not hidden: those rows stayed unclaimed and the
+    // next claim retries them. Reporting only promoted/alreadyTracked would
+    // turn a partial failure into a clean-looking success.
+    return NextResponse.json({
+      success: true,
+      promoted: r.promoted,
+      alreadyTracked: r.alreadyTracked,
+      failed: r.failed,
+    });
   }
 
   // ── Abuse control on an unauthenticated write ────────────────────────────

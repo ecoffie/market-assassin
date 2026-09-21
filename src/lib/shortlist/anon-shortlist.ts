@@ -26,6 +26,7 @@
  * database.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createCanonicalPursuit } from '@/lib/pipeline/create-pursuit';
 
 const ANON_RE = /^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -114,35 +115,77 @@ export async function listAnonShortlist(
 
 export interface ClaimResult {
   ok: boolean;
+  /** Shortlist rows that became a NEW canonical pursuit. */
   promoted: number;
+  /** Rows the account already pursued — resolved, never overwritten. */
   alreadyTracked: number;
-  /** Rows whose canonical metadata could not be read — retryable, not silent. */
-  failed?: number;
+  /** Rows that could not be promoted this time. Left unclaimed for retry. */
+  failed: number;
+  /**
+   * Background document fetches for the pursuits just created. The ROUTE must
+   * schedule these with `after()`, and must declare maxDuration = 300 — a
+   * fire-and-forget call here would be killed by Vercel teardown mid-PDF-parse.
+   */
+  postWrite: Array<() => Promise<void>>;
   error?: string;
 }
+
+/** The verified account and resolved workspace a claim writes into. */
+export interface ClaimContext {
+  /** From a validated MI session. NEVER from a request body. */
+  verifiedEmail: string;
+  /** From resolveActiveWorkspace — the CLIENT's workspace in coach mode. */
+  workspaceId: string;
+  asClient: boolean;
+  clientOwnerEmail: string;
+}
+
+/** Truthful provenance for a pursuit that began as an anonymous map listing. */
+export const CLAIMED_SOURCE = 'opportunity_map_claimed';
 
 /**
  * Promote an anonymous shortlist into a VERIFIED account's pursuits.
  *
- * ⚠️ `verifiedEmail` MUST come from a validated MI session. The first version
- * accepted an arbitrary email from the request body, which let one client insert
- * rows into another user's pursuit space.
+ * ⚠️ `ctx.verifiedEmail` MUST come from a validated MI session. The first
+ * version accepted an arbitrary email from the request body, which let one
+ * client insert rows into another user's pursuit space.
  *
- * Order matters: a row is marked claimed ONLY after its pursuit write succeeds,
- * so a failure leaves the shortlist intact and the user can retry. An
- * opportunity the account ALREADY pursues is left completely alone — the
- * account's own pursuit is the better record and is never overwritten.
+ * ── ONE PURSUIT IMPLEMENTATION ─────────────────────────────────────────────
+ * This does NOT insert into `user_pipeline`. It calls `createCanonicalPursuit`,
+ * the same writer `/api/pipeline` POST uses, so a claimed listing becomes a
+ * pursuit with the same workspace, owner attribution, canonical SAM UUID,
+ * deadline, next action, discovery time, family truth, activity record and
+ * document fetch. A direct insert here would have created a second-class
+ * pursuit that looks identical in the table and behaves differently everywhere.
+ *
+ * ── THE THREE OUTCOMES, AND WHY EACH RESOLVES THE WAY IT DOES ──────────────
+ * · ALREADY TRACKED → the account's own pursuit is the better record and is
+ *   left completely untouched. The shortlist row is still marked claimed,
+ *   because its value HAS transferred — the pursuit exists. Leaving it open was
+ *   a real bug: the row stayed unclaimed forever and was reconsidered on every
+ *   Map load.
+ * · CREATED → marked claimed only AFTER the pursuit write is confirmed.
+ * · FAILED (metadata read error, or a pursuit write that errored) → left
+ *   UNCLAIMED and counted. A failed read is UNKNOWN, never "no such
+ *   opportunity" and never a silent skip.
+ *
+ * ── IDEMPOTENCY ────────────────────────────────────────────────────────────
+ * The invariant is: the pursuit exists BEFORE the shortlist row is marked. If
+ * the pursuit write succeeds but the marking fails, the next attempt finds the
+ * pursuit (as already-tracked, or as a 23505 duplicate) and resolves the row
+ * then — without creating a second pursuit and without rolling back a real one.
  */
 export async function claimAnonShortlist(
   db: SupabaseClient,
   anonId: string,
-  verifiedEmail: string,
+  ctx: ClaimContext,
 ): Promise<ClaimResult> {
+  const empty = { promoted: 0, alreadyTracked: 0, failed: 0, postWrite: [] as Array<() => Promise<void>> };
   const owner = anonId?.trim().toLowerCase();
-  const email = verifiedEmail?.trim().toLowerCase();
-  if (!isAnonId(owner)) return { ok: false, promoted: 0, alreadyTracked: 0, error: 'invalid anon id' };
+  const email = ctx.verifiedEmail?.trim().toLowerCase();
+  if (!isAnonId(owner)) return { ok: false, ...empty, error: 'invalid anon id' };
   if (!email || !email.includes('@') || isAnonId(email)) {
-    return { ok: false, promoted: 0, alreadyTracked: 0, error: 'a verified account email is required' };
+    return { ok: false, ...empty, error: 'a verified account email is required' };
   }
 
   const { data: rows, error: readErr } = await db
@@ -151,62 +194,117 @@ export async function claimAnonShortlist(
     .eq('owner_anon_id', owner)
     .is('claimed_at', null)
     .limit(MAX_ANON_SHORTLIST);
-  if (readErr) return { ok: false, promoted: 0, alreadyTracked: 0, error: readErr.message };
+  if (readErr) return { ok: false, ...empty, error: readErr.message };
   const shortlist = (rows ?? []) as { id: string; notice_id: string }[];
-  if (shortlist.length === 0) return { ok: true, promoted: 0, alreadyTracked: 0 };
+  if (shortlist.length === 0) return { ok: true, ...empty };
 
+  // Which of these the account ALREADY pursues. Keyed on user_email + notice_id
+  // because that is exactly the UNIQUE constraint on user_pipeline.
   const { data: existing, error: exErr } = await db
     .from('user_pipeline')
     .select('notice_id')
     .eq('user_email', email)
     .in('notice_id', shortlist.map((r) => r.notice_id));
-  if (exErr) return { ok: false, promoted: 0, alreadyTracked: 0, error: exErr.message };
+  if (exErr) return { ok: false, ...empty, error: exErr.message };
   const tracked = new Set((existing ?? []).map((r) => (r as { notice_id: string }).notice_id));
 
+  const writeCtx = {
+    db,
+    callerEmail: email,
+    workspaceId: ctx.workspaceId,
+    asClient: ctx.asClient,
+    clientOwnerEmail: ctx.clientOwnerEmail,
+  };
+
   let promoted = 0;
+  let alreadyTracked = 0;
   let failed = 0;
+  const postWrite: Array<() => Promise<void>> = [];
+
+  const markClaimed = async (id: string) => {
+    const { error } = await db
+      .from('anonymous_shortlist')
+      .update({ claimed_at: new Date().toISOString(), claimed_by: email })
+      .eq('id', id);
+    // The pursuit already exists, so a failure here is recoverable on the next
+    // attempt (it will re-resolve as already-tracked). Surface it; never undo
+    // the real pursuit.
+    if (error) console.error(`[anon-shortlist] claim marking failed for row ${id}: ${error.message}`);
+  };
+
   for (const row of shortlist) {
-    if (tracked.has(row.notice_id)) continue;
+    // ALREADY TRACKED — resolve the shortlist row, modify nothing else.
+    if (tracked.has(row.notice_id)) {
+      alreadyTracked += 1;
+      await markClaimed(row.id);
+      continue;
+    }
 
     // Metadata comes from the CANONICAL record, never from anything a browser
     // sent. The shortlist stores no title/agency at all.
     const { data: opp, error: oppErr } = await db
       .from('sam_opportunities')
       // unranged-ok: single row by primary key.
-      .select('notice_id,title,department,naics_code,response_deadline')
+      .select('notice_id,title,department,naics_code,set_aside,response_deadline,notice_type')
       .eq('notice_id', row.notice_id)
       .maybeSingle();
     // A FAILED read is not "no such opportunity". Swallowing it would silently
     // drop a promotion the user asked for and report success. Surface it and
-    // leave the shortlist row unclaimed so the next attempt can retry.
+    // leave the row unclaimed so the next attempt can retry.
     if (oppErr) {
       failed += 1;
       console.error(`[anon-shortlist] metadata read failed for ${row.notice_id}: ${oppErr.message}`);
       continue;
     }
-    if (!opp) continue;
+    if (!opp) {
+      // The FK makes this near-impossible, but a notice deleted between save and
+      // claim is a genuine absence, not an error.
+      failed += 1;
+      console.warn(`[anon-shortlist] no canonical opportunity for ${row.notice_id}`);
+      continue;
+    }
     const o = opp as Record<string, unknown>;
 
-    const { error: insErr } = await db.from('user_pipeline').insert({
-      user_email: email,
-      notice_id: row.notice_id,
-      title: (o.title as string) ?? null,
-      agency: (o.department as string) ?? null,
-      naics_code: (o.naics_code as string) ?? null,
-      response_deadline: (o.response_deadline as string) ?? null,
-      source: 'opportunity_map_claimed',
-    });
-    // A duplicate here means the account gained the pursuit between our read and
-    // this write — still "already tracked", never an error.
-    if (insErr && insErr.code !== '23505') continue;
+    const result = await createCanonicalPursuit(
+      writeCtx,
+      {
+        notice_id: row.notice_id,
+        title: (o.title as string) ?? row.notice_id,
+        agency: (o.department as string) ?? undefined,
+        naics_code: (o.naics_code as string) ?? undefined,
+        set_aside: (o.set_aside as string) ?? undefined,
+        response_deadline: (o.response_deadline as string) ?? undefined,
+        source: CLAIMED_SOURCE,
+      },
+      {
+        clientNoticeType: (o.notice_type as string) ?? null,
+        // The person who viewed this listing was ANONYMOUS at the time. That
+        // anon identity is the one carrying the first-view event, so it is
+        // included alongside the account and the EARLIEST real observation
+        // wins. Neither is invented — see createCanonicalPursuit.
+        discoveryIdentities: [owner, email],
+      },
+    );
+
+    if (result.kind === 'error') {
+      // Leave the row UNCLAIMED. Retry stays safe.
+      failed += 1;
+      console.error(`[anon-shortlist] pursuit write failed for ${row.notice_id}: ${result.error.message}`);
+      continue;
+    }
+    if (result.kind === 'duplicate') {
+      // The account gained this pursuit between our read and this write. Still
+      // "already tracked" — the value transferred, so resolve the row.
+      alreadyTracked += 1;
+      await markClaimed(row.id);
+      continue;
+    }
 
     // Mark claimed ONLY after the pursuit exists.
-    await db
-      .from('anonymous_shortlist')
-      .update({ claimed_at: new Date().toISOString(), claimed_by: email })
-      .eq('id', row.id);
-    if (!insErr) promoted += 1;
+    await markClaimed(row.id);
+    promoted += 1;
+    if (result.postWrite) postWrite.push(result.postWrite);
   }
 
-  return { ok: true, promoted, alreadyTracked: shortlist.length - promoted - failed, failed };
+  return { ok: true, promoted, alreadyTracked, failed, postWrite };
 }
