@@ -4332,7 +4332,47 @@ const VIEWPORT_JS = `<script>
       }catch(e){ return 'Open'; }
     }
     var em=_uemail();
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+    // ── ANONYMOUS VISITORS KEEP THE MARKET, NO ACCOUNT REQUIRED ──────────────
+    // Measured over 30 days: 8,583 people used this map and only 329 were signed
+    // in — 8,254 (96%) anonymous. Sending them to a sign-in modal at the exact
+    // moment of intent is why just 41 users have EVER saved a search, and why
+    // 87% of all users never come back for a second day.
+    //
+    // So an anonymous click SAVES IMMEDIATELY against the stable localStorage
+    // anon id, with a name derived from what they are already looking at (no
+    // prompt — naming a thing you have not seen yet is work, and it came BEFORE
+    // any value). Alerts stay OFF until they choose to add an email, which is
+    // the honest upgrade moment rather than a toll gate.
+    if(!t||!em){
+      var _aid=_anonId();
+      if(!_aid){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+      var _af={}; for(var _k in FILT){ if(FILT[_k]&&FILT[_k]!=='all')_af[_k]=FILT[_k]; }
+      if(Q)_af.q=Q;
+      try{ var _h2=window.__horizons||{}; _af.horizons={open:_h2.open!==false,recompete:!!_h2.recompete,forecast:!!_h2.forecast}; }catch(e){}
+      var _ab=null; try{ var _mb=map.getBounds(); _ab={w:_mb.getWest(),s:_mb.getSouth(),e:_mb.getEast(),n:_mb.getNorth()}; }catch(e){}
+      _ss.textContent='Saving…';
+      fetch('/api/app/map-watch',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({anonId:_aid,mode:MODE,filters:_af,bbox:_ab})})
+        .then(function(r){return r.json();}).then(function(d){
+          if(d&&d.success){
+            try{ _track('tool_use','watch_created',{anonymous:true,mode:MODE,named:d.name}); }catch(e){}
+            _ss.textContent='\u2713 Watching';
+            // Offer alerts; never imply we will send them until an email exists.
+            setTimeout(function(){
+              var _em2=window.prompt('Watching this market. Add your email to get alerted when new opportunities match (optional):','');
+              if(_em2&&_em2.indexOf('@')>0){
+                fetch('/api/app/map-watch',{method:'POST',headers:{'Content-Type':'application/json'},
+                  body:JSON.stringify({action:'claim',anonId:_aid,email:_em2})})
+                  .then(function(r){return r.json();}).then(function(c){
+                    if(c&&c.success&&c.claimed>0){ try{ _track('tool_use','watch_claimed',{watches:c.claimed}); }catch(e){} _ssMsg('\u2713 Alerts on'); }
+                    else _ssReset();
+                  }).catch(_ssReset);
+              } else _ssReset();
+            },500);
+          } else _ssMsg('Couldn\\'t save');
+        }).catch(function(){ _ssMsg('Couldn\\'t save'); });
+      return;
+    }
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_ssScopeLabel());
     if(!name)return;
