@@ -18,22 +18,25 @@
  * Dollar totals from get_keyword_coverage are never shown.
  */
 
-import { isDistinctiveKeyword, keywordCandidates } from '@/lib/market/keyword-sanitize';
 import { isGenericPsc } from '@/lib/market/keyword-coverage';
 import type { KeywordCoverage } from '@/lib/market/keyword-coverage';
 import type { KeywordCoverageToolResult } from '@/mcp/tools/keyword-coverage';
 import {
-  BEGINNER_REPAIR_VERBS,
-  beginnerCoverageCandidates,
-  isBeginnerProsePhrase,
   resolveBusiness,
   type ResolveBusinessDeps,
   type ResolveBusinessInput,
 } from './resolve-business';
 import { translateOpportunities } from './translate-opportunity';
 import { keyedItems, opportunityKey } from './opportunity-key';
-import { filterRelevantOpportunities } from './relevance';
-import { toPublicBeginnerCard, type PublicBeginnerCard, type BeginnerMarketReveal, type HiddenMarketLandingView } from './landing';
+import { classifyOpportunities, type RelevanceContext } from './relevance';
+import { extractBusinessActivity, type BusinessActivity } from './activity';
+import {
+  describeStageMix,
+  emptyStageCounts,
+  noticeStage,
+  type StageCounts,
+} from './labels';
+import { toPublicBeginnerCard, type BeginnerMarketReveal, type HiddenMarketLandingView } from './landing';
 import { ctaLabel, type CtaVariant, type RevealState } from './labels';
 import {
   CLASSIFY_UNAVAILABLE_MESSAGE,
@@ -42,7 +45,6 @@ import {
   FOLLOW_UP_PROMPT,
   UNAVAILABLE_MESSAGE,
   type EligibilityEvidence,
-  type ResolutionState,
   type ResolvedBusiness,
   type SamSearchItem,
   type SamSearchResult,
@@ -66,6 +68,13 @@ export const HIDDEN_MARKET_SEARCH_LIMIT = 40;
 export const DIRECT_GROUP_LABEL = 'Matches what you described';
 export const UNCOVERED_GROUP_LABEL = 'Opportunities Mindy uncovered';
 export const AWARDED_GROUP_LABEL = 'Recently awarded';
+/**
+ * Everything that has REAL but weaker evidence: a shortened form of the user's
+ * word ("trucking" → "Trucks"), a code-family overlap, or an outlier sector
+ * among that term's own matches. Shown, but never as "matches what you
+ * described" — the batch requirement to separate direct from broader.
+ */
+export const RELATED_GROUP_LABEL = 'Related — broader or adjacent';
 export const AWARDED_ONLY_EXPLANATION =
   'Nothing matching is open to bid right now. Government recently awarded task orders for this work.';
 
@@ -78,6 +87,15 @@ export interface HiddenMarketResult {
   direct: { status: PopulationStatus; items: SamSearchItem[] };
   expanded: { status: PopulationStatus; items: SamSearchItem[] };
   netNewItems: SamSearchItem[];
+  /** Weaker-but-real evidence from either search. Never in the direct group. */
+  related: SamSearchItem[];
+  /** What we decided the user actually sells. */
+  activity: BusinessActivity;
+  /**
+   * No business activity survived the context strip ("I help businesses").
+   * The honest answer is a question, NOT an outage and NOT a confident list.
+   */
+  needsClarification?: boolean;
   reveal: BeginnerMarketReveal;
   /** True when the uncovered group is Award Notices, not open solicitations. */
   awardedFallback?: boolean;
@@ -222,25 +240,25 @@ function asItems(result: SamSearchResult): SamSearchItem[] | null {
   return result.items;
 }
 
-/** User's own words, not coverage/gerund expansions. */
-export function beginnerDirectKeyword(text: string): string | null {
-  const combined = (text || '').trim();
-  if (!combined) return null;
-  const stripped = combined
-    .replace(/^(i|we|my|our)\s+/i, '')
-    .replace(/^(do|does|did|doing|am|are|is)\s+/i, '')
-    .trim();
-  const candidates = keywordCandidates(stripped).filter((k) => !/^(i|we|my|our)\b/i.test(k.trim()));
-  const usable = candidates.filter((k) => !isBeginnerProsePhrase(k));
-  // Title search is ILIKE for the whole keyword. "fix doors" misses "Replace Doors".
-  // Repair-verb + object → search the object the government actually writes.
-  const words = stripped.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
-  if (words.some((w) => BEGINNER_REPAIR_VERBS.has(w))) {
-    const noun = usable.find((k) => !k.includes(' ') && isDistinctiveKeyword(k));
-    if (noun) return noun;
-  }
-  const pick = (usable[0] || stripped).trim();
-  return pick.length >= 3 ? pick : null;
+/**
+ * The keyword we actually search.
+ *
+ * ⚠️ THIS USED TO BE `keywordCandidates(text)[0]`, which ranks by POSITION
+ * ("people lead with what they do"). Beginner prose leads with WHO YOU ARE, so
+ * on 2026-09-21 this function returned:
+ *   "can a 2 person garbage company do government contracts" → "person"
+ *   "we do IT support for small offices"                     → "small"
+ *   "we install commercial roofing"                          → "install"
+ *   "physical security guard services"                       → "physical"
+ *   "staffing agency"                                        → "agency"
+ * "person" is the entire reason the screenshot returned a personnel-security
+ * platform, a PERSONAL alert device and PERSONAL services contractors.
+ *
+ * It now asks ./activity for the business activity. Kept as a named export
+ * because the live oracle (scripts/verify-beginner-try.mjs) reports it.
+ */
+export function beginnerDirectKeyword(text: string, derived: readonly string[] = []): string | null {
+  return extractBusinessActivity(text || '', derived).head;
 }
 
 function norm(s: string): string {
@@ -416,10 +434,19 @@ export function decideRevealState(args: {
   return 'direct_only';
 }
 
-function explanationFor(state: RevealState, reveal: Pick<BeginnerMarketReveal, 'directMatchCount' | 'expandedMatchCount' | 'totalUniqueCount'>): string {
+function explanationFor(
+  state: RevealState,
+  reveal: Pick<BeginnerMarketReveal, 'directMatchCount' | 'expandedMatchCount' | 'totalUniqueCount'>,
+  stageSummary?: string,
+): string {
   const direct = reveal.directMatchCount;
   const expanded = reveal.expandedMatchCount;
   const total = reveal.totalUniqueCount;
+  // ⚠️ `stageSummary` is the mix of the DIRECT group only. Appending it to a
+  // sentence whose number is the A+B total reads as "7 — 2 open to bid and 2
+  // coming soon", which does not add up. Only the branches that quote the
+  // direct count may carry it.
+  const mix = stageSummary ? ` — ${stageSummary}.` : '.';
   switch (state) {
     case 'strong':
       return total == null
@@ -428,17 +455,32 @@ function explanationFor(state: RevealState, reveal: Pick<BeginnerMarketReveal, '
     case 'expanded_only':
       return `Your words didn't match open solicitations directly — but Mindy translated what you do and found ${expanded} in related government buying categories.`;
     case 'direct_only':
-      return `Government buys this. Mindy found ${direct} current ${direct === 1 ? 'opportunity' : 'opportunities'} matching what you described.`;
+      return `Government buys this. Mindy found ${direct} current ${direct === 1 ? 'opportunity' : 'opportunities'} matching what you described${mix}`;
     case 'thin':
-      return 'Government buys this — the open market is small right now. Here is what we found.';
+      return `Government buys this — the open market is small right now. Mindy found ${
+        countPhrase(direct, 'current opportunity', 'current opportunities') || 'what is below'
+      }${mix}`;
     case 'unavailable':
       return "Mindy couldn't measure the broader market right now.";
   }
 }
 
-function countPhrase(n: number | null, noun: string): string {
+/**
+ * ⚠️ This printed "13 current opportunitys" on prod (naive `${noun}s`).
+ * Captured 2026-09-21 in the same response as the three false positives.
+ */
+function countPhrase(n: number | null, singular: string, plural: string): string {
   if (n == null) return '';
-  return n === 1 ? `1 ${noun}` : `${n} ${noun}s`;
+  return n === 1 ? `1 ${singular}` : `${n} ${plural}`;
+}
+
+export function countStages(items: readonly SamSearchItem[]): StageCounts {
+  const counts = emptyStageCounts();
+  for (const item of items) {
+    counts[noticeStage(item.type, item.title)] += 1;
+    counts.total += 1;
+  }
+  return counts;
 }
 
 export function buildHiddenMarketReveal(args: {
@@ -505,6 +547,9 @@ export function buildHiddenMarketReveal(args: {
     );
   } else {
     limitations.push('Counts are current open listings from this search, not a complete market census.');
+    limitations.push(
+      'A listing is shown only when its TITLE names your work. Some listings mention it only in the details, and this search cannot confirm that.',
+    );
   }
 
   const revealState = decideRevealState({
@@ -515,10 +560,15 @@ export function buildHiddenMarketReveal(args: {
     totalUniqueCount,
   });
 
+  const stages = countStages(directOk ? directItems : []);
+  const stageSummary = stages.total > 0 ? describeStageMix(stages) : undefined;
+
   const base: BeginnerMarketReveal = {
     directMatchCount,
     expandedMatchCount,
     totalUniqueCount,
+    stages,
+    stageSummary,
     directLabel: DIRECT_GROUP_LABEL,
     expandedLabel: awardedFallback ? AWARDED_GROUP_LABEL : UNCOVERED_GROUP_LABEL,
     translatedTerms: awardedFallback ? undefined : translatedTerms.length ? translatedTerms : undefined,
@@ -534,10 +584,15 @@ export function buildHiddenMarketReveal(args: {
   } else if (!structured && (revealState === 'direct_only' || revealState === 'thin')) {
     base.explanation =
       revealState === 'thin'
-        ? 'Here is what we found. Try describing your business a little more specifically if this is not it.'
-        : `Mindy found ${countPhrase(directMatchCount, 'current opportunity') || 'matches'} from what you described.`;
+        ? `Mindy found ${
+            countPhrase(directMatchCount, 'current opportunity', 'current opportunities') ||
+            'what is below'
+          } from what you described${stageSummary ? ` — ${stageSummary}.` : '.'} Try describing your business a little more specifically if this is not it.`
+        : `Mindy found ${
+            countPhrase(directMatchCount, 'current opportunity', 'current opportunities') || 'matches'
+          } from what you described${stageSummary ? ` — ${stageSummary}.` : '.'}`;
   } else {
-    base.explanation = explanationFor(revealState, base);
+    base.explanation = explanationFor(revealState, base, stageSummary);
   }
   if (revealState === 'unavailable') {
     base.expandedMatchCount = expandedMatchCount == null ? null : expandedMatchCount;
@@ -576,6 +631,8 @@ export async function searchBeginnerHiddenMarket(
     getCoverage: deps.getCoverage ?? skipUsaSpendingCoverage,
   });
   const userText = [input.description, input.followUp].filter(Boolean).join('\n');
+  const derivedKeywords = resolution.keywords.status === 'known' ? resolution.keywords.items : [];
+  const activity = extractBusinessActivity(userText, derivedKeywords);
   const emptyPop = { status: 'skipped' as const, items: [] as SamSearchItem[] };
 
   const emptyReveal = (state: RevealState, extra: Partial<BeginnerMarketReveal> = {}): BeginnerMarketReveal => ({
@@ -600,6 +657,8 @@ export async function searchBeginnerHiddenMarket(
       direct: { status: 'unavailable', items: [] },
       expanded: emptyPop,
       netNewItems: [],
+      related: [],
+      activity,
       reveal: emptyReveal('unavailable'),
     };
   }
@@ -612,11 +671,19 @@ export async function searchBeginnerHiddenMarket(
       direct: emptyPop,
       expanded: emptyPop,
       netNewItems: [],
+      related: [],
+      activity,
       reveal: emptyReveal('unavailable', { explanation: resolution.followUpPrompt || FOLLOW_UP_PROMPT, revealState: 'unavailable' }),
     };
   }
 
-  const directKeyword = beginnerDirectKeyword(userText);
+  /**
+   * No activity survived — every content word was company/meta context
+   * ("I help businesses"). Searching one of those words is exactly how the
+   * screenshot happened, so ask instead. A clarifying question is an honest
+   * answer; a confident list of unrelated contracts is not.
+   */
+  const directKeyword = activity.head;
   if (!directKeyword) {
     return {
       resolution,
@@ -625,6 +692,9 @@ export async function searchBeginnerHiddenMarket(
       direct: emptyPop,
       expanded: emptyPop,
       netNewItems: [],
+      related: [],
+      activity,
+      needsClarification: true,
       reveal: emptyReveal('unavailable', { explanation: FOLLOW_UP_PROMPT }),
     };
   }
@@ -641,12 +711,19 @@ export async function searchBeginnerHiddenMarket(
   // in sam_opportunities. Do NOT invent extras when coverage already decided
   // there is no hidden language ("I do lawn care" → coverage keyword is lawn care).
   if (!expandedKeyword && !resolution.coverageKeyword) {
-    const known = resolution.keywords.status === 'known' ? resolution.keywords.items : [];
+    // A SECOND real activity term beats a gerund: a business that says
+    // "commercial cleaning and small construction" has two markets, and
+    // "cleaning" alone shows only one of them.
     expandedKeyword =
-      beginnerCoverageCandidates(userText, known).find(
-        (k) => k.toLowerCase() !== directKeyword.toLowerCase() && !isBeginnerProsePhrase(k),
-      ) ?? null;
+      activity.terms.find((t) => t.toLowerCase() !== directKeyword.toLowerCase()) ?? null;
   }
+  // ⚠️ REMOVED 2026-09-21: a `beginnerCoverageCandidates` fallback here
+  // invented gerunds from whatever word was left over — measured live, "I own
+  // a landscaping business" searched "own", "we do IT support for small
+  // offices" searched "smalling" and "staffing agency" searched "agencying".
+  // "own" returned courier services and cargo tie-downs under "Opportunities
+  // Mindy uncovered". A second ACTIVITY term (above) is the only honest
+  // expansion; when there isn't one, there is no hidden market to show.
 
   const searchSam = deps.searchSam ?? defaultSearchSam;
   const limit = input.limit ?? HIDDEN_MARKET_SEARCH_LIMIT;
@@ -658,17 +735,66 @@ export async function searchBeginnerHiddenMarket(
 
   const [direct, expandedOpen] = await Promise.all([directPromise, expandedPromise]);
 
+  const relevance: RelevanceContext = {
+    activity,
+    codes: resolution.naicsCodes.status === 'known' ? resolution.naicsCodes.items : [],
+    broaderTerms: expandedKeyword ? [expandedKeyword] : [],
+  };
+  const related: SamSearchItem[] = [];
+  const classify = (items: readonly SamSearchItem[]): SamSearchItem[] => {
+    const out = classifyOpportunities(items, relevance);
+    related.push(...out.broader);
+    return out.direct;
+  };
+
+  /**
+   * Count distinct NOTICES, not rows. Two things inflate a row count:
+   *  - the same notice reached by two searches (opportunityKey handles it)
+   *  - the cache holding the same notice twice under different notice_ids —
+   *    "Shank 2.0" was three of the original thirteen, and "Remediation and
+   *    Specialty Cleaning Services" / "USDA-ARS Tifton Roofing Remodel" are
+   *    each two rows in the live cache today.
+   * The second needs a content key. Collapsing two genuinely different
+   * notices that share a title, deadline AND agency would undercount by one;
+   * inflating a headline claim is the worse error.
+   */
+  const contentKey = (item: SamSearchItem): string =>
+    [
+      (item.title || '').toLowerCase().replace(/\s+/g, ' ').trim(),
+      item.deadline || '',
+      (item.agency || '').toLowerCase().trim(),
+    ].join('|');
+
+  const dedupe = (items: readonly SamSearchItem[]): SamSearchItem[] => {
+    const seen = new Set<string>();
+    const out: SamSearchItem[] = [];
+    for (const item of items) {
+      const key = opportunityKey(item);
+      if (key && seen.has(key)) continue;
+      const ck = contentKey(item);
+      if (seen.has(ck)) continue;
+      if (key) seen.add(key);
+      seen.add(ck);
+      out.push(item);
+    }
+    return out;
+  };
+
   const directItems =
-    direct.status === 'ok' ? filterRelevantOpportunities(direct.items, resolution) : direct.items;
+    direct.status === 'ok' ? dedupe(classify(direct.items)) : direct.items;
   const expandedTitleFiltered =
     expandedOpen.status === 'ok' && expandedKeyword
       ? expandedOpen.items.filter((item) => titleMatchesExpanded(item, expandedKeyword))
       : expandedOpen.items;
   let expanded: { status: PopulationStatus; items: SamSearchItem[] } = expandedOpen;
+  // ⚠️ The expanded population is BY CONSTRUCTION the words the user did NOT
+  // use — that is the whole "hidden market" idea. Judging it against the
+  // user's own activity terms would reject all of it. It has its own title
+  // gate (`titleMatchesExpanded`, the distinctive token of the buying phrase)
+  // and its own clearly-different heading, so it is never claimed as
+  // "matches what you described".
   let expandedItems =
-    expanded.status === 'ok'
-      ? filterRelevantOpportunities(expandedTitleFiltered, resolution)
-      : expandedTitleFiltered;
+    expanded.status === 'ok' ? dedupe(expandedTitleFiltered) : expandedTitleFiltered;
   let awardedFallback = false;
 
   const openHitCount =
@@ -683,10 +809,10 @@ export async function searchBeginnerHiddenMarket(
       runSearch(resolveAwardedSearch(deps), directKeyword, limit),
       runSearch(resolveTaskOrderSearch(deps), directKeyword, limit),
     ]);
-    const samItems =
-      awarded.status === 'ok' ? filterRelevantOpportunities(awarded.items, resolution) : [];
-    const bqItems =
-      taskOrders.status === 'ok' ? filterRelevantOpportunities(taskOrders.items, resolution) : [];
+    const samItems = awarded.status === 'ok' ? classify(awarded.items) : [];
+    const bqItems = taskOrders.status === 'ok' ? classify(taskOrders.items) : [];
+    // Awarded/task-order rows ARE searched on the user's own keyword, so they
+    // go through the activity gate like the direct population.
     const merged = mergeAwardedItems(bqItems, samItems);
     if (merged.length > 0) {
       expanded = { status: 'ok', items: merged };
@@ -706,6 +832,15 @@ export async function searchBeginnerHiddenMarket(
     awardedFallback,
   });
 
+  const directKeys = new Set(directItems.map(opportunityKey).filter(Boolean) as string[]);
+  const expandedKeys = new Set(expandedItems.map(opportunityKey).filter(Boolean) as string[]);
+  const relatedOnly = dedupe(
+    related.filter((item) => {
+      const key = opportunityKey(item);
+      return !key || (!directKeys.has(key) && !expandedKeys.has(key));
+    }),
+  );
+
   return {
     resolution,
     directKeyword,
@@ -714,6 +849,8 @@ export async function searchBeginnerHiddenMarket(
     expanded: { ...expanded, items: expandedItems },
     netNewItems:
       expanded.status === 'ok' && direct.status === 'ok' ? netNewItems(directItems, expandedItems) : [],
+    related: relatedOnly,
+    activity,
     reveal,
     awardedFallback,
   };
@@ -724,10 +861,11 @@ export function toHiddenMarketLandingView(
   opts: { nowMs?: number; eligibility?: EligibilityEvidence; ctaVariant?: CtaVariant } = {},
 ): HiddenMarketLandingView {
   const { resolution, reveal, direct, netNewItems: uncovered } = result;
+  const relatedItems = result.related ?? [];
   const nowMs = opts.nowMs;
   const eligibility = opts.eligibility ?? { established: false };
 
-  if (resolution.state === 'need_followup') {
+  if (resolution.state === 'need_followup' || result.needsClarification) {
     return {
       outcome: 'need_followup',
       classification: resolution.state,
@@ -736,6 +874,8 @@ export function toHiddenMarketLandingView(
       reveal: null,
       directCards: [],
       uncoveredCards: [],
+      relatedCards: [],
+      relatedLabel: RELATED_GROUP_LABEL,
       ctaVariant: 'more',
       classificationPath: resolution.state,
     };
@@ -750,6 +890,8 @@ export function toHiddenMarketLandingView(
       reveal,
       directCards: [],
       uncoveredCards: [],
+      relatedCards: [],
+      relatedLabel: RELATED_GROUP_LABEL,
       ctaVariant: 'more',
       classificationPath: resolution.state,
     };
@@ -757,7 +899,24 @@ export function toHiddenMarketLandingView(
 
   const showUncovered = reveal.revealState === 'strong' || reveal.revealState === 'expanded_only';
   const n = REVEAL_THRESHOLDS.cardsPerGroup;
-  const directCards = translateOpportunities(direct.items.slice(0, n), {
+  // A beginner should meet the biddable work first: the screenshot led with
+  // an RFI. Ordering is presentation only — it never changes a count.
+  const STAGE_ORDER: Record<string, number> = {
+    open_bid: 0,
+    market_research: 1,
+    upcoming: 2,
+    informational: 3,
+    awarded: 4,
+    unknown: 5,
+  };
+  const byStage = (items: readonly SamSearchItem[]): SamSearchItem[] =>
+    [...items].sort(
+      (a, b) =>
+        (STAGE_ORDER[noticeStage(a.type, a.title)] ?? 9) -
+        (STAGE_ORDER[noticeStage(b.type, b.title)] ?? 9),
+    );
+
+  const directCards = translateOpportunities(byStage(direct.items).slice(0, n), {
     nowMs,
     eligibility,
     searchContext: null,
@@ -766,7 +925,7 @@ export function toHiddenMarketLandingView(
     .map(toPublicBeginnerCard);
 
   const uncoveredCards = showUncovered
-    ? translateOpportunities(uncovered.slice(0, n), {
+    ? translateOpportunities(byStage(uncovered).slice(0, n), {
         nowMs,
         eligibility,
         searchContext: null,
@@ -775,7 +934,17 @@ export function toHiddenMarketLandingView(
         .map(toPublicBeginnerCard)
     : [];
 
-  const hasAny = directCards.length + uncoveredCards.length > 0;
+  const relatedCards = translateOpportunities(byStage(relatedItems).slice(0, n), {
+    nowMs,
+    eligibility,
+    searchContext: null,
+  })
+    .filter((c) => c.grounded)
+    .map(toPublicBeginnerCard);
+
+  // A page with ONLY related cards is still a result — an honest, clearly
+  // labelled adjacent one. It is not "we found nothing".
+  const hasAny = directCards.length + uncoveredCards.length + relatedCards.length > 0;
   let outcome: HiddenMarketLandingView['outcome'] = 'results';
   let message: string | null = null;
   if (!hasAny) {
@@ -804,6 +973,8 @@ export function toHiddenMarketLandingView(
     reveal: viewReveal,
     directCards,
     uncoveredCards,
+    relatedCards,
+    relatedLabel: RELATED_GROUP_LABEL,
     ctaVariant,
     classificationPath: resolution.state,
   };

@@ -86,12 +86,20 @@ function coverageOk(keyword: string): KeywordCoverageToolResult {
 describe('beginnerDirectKeyword', () => {
   it('searches the object for a repair-verb description so titles like Replace Doors match', () => {
     expect(beginnerDirectKeyword('fix doors')).toBe('doors');
-    expect(beginnerDirectKeyword('I clean office buildings')).toMatch(/clean office buildings/i);
+    // CHANGED 2026-09-21: the keyword is now the ACTIVITY, not the sentence.
+    // "%clean office buildings%" matches no SAM title at all — it only ever
+    // "worked" because search_sam_opportunities silently retries token-by-token
+    // on a zero result. The keyword is now for RECALL and the evidence gate
+    // supplies PRECISION, so a broad-but-correct activity word is right here.
+    expect(beginnerDirectKeyword('I clean office buildings')).toBe('clean');
   });
 
   it('searches lidar, not the whole sentence, for a six-word drone description', () => {
     expect(beginnerDirectKeyword('work with lidar for uas drones')).toBe('lidar');
-    expect(beginnerDirectKeyword('I do window washing')).toBe('window washing');
+    // CHANGED 2026-09-21: see above — the single activity noun is searched and
+    // "window washing" is still held as evidence (activity.terms), so a
+    // "Window Washing Services" title still outranks a bare "window" hit.
+    expect(beginnerDirectKeyword('I do window washing')).toBe('window');
   });
 });
 
@@ -470,8 +478,10 @@ describe('searchBeginnerHiddenMarket', () => {
   });
 
   it('counts expanded as net-new after dedupe, and never sums A+B as a total', async () => {
-    const directHit = item();
-    const overlap = item({ title: 'Same janitorial notice' });
+    // The fixture must be in the SAME market as the description, or the
+    // relevance gate (correctly) drops it and this stops testing dedupe math.
+    const directHit = item({ title: 'Interior Cleaning Services' });
+    const overlap = item({ title: 'Same janitorial cleaning notice' });
     const hidden = [
       item({
         title: 'Janitorial Custodial',
@@ -609,11 +619,20 @@ describe('searchBeginnerHiddenMarket', () => {
         }),
       },
     );
-    expect(result.direct.items.map((i) => i.solicitation)).toEqual(['HVAC-1']);
-    expect(result.direct.items.some((i) => /Dale Carnegie/i.test(i.title || ''))).toBe(false);
+    // CHANGED 2026-09-21: "Replace Air Handling Units" names no word the user
+    // typed — only its NAICS (238220) says it is HVAC work. Code overlap alone
+    // can no longer produce a DESCRIBED match, so it moves to the explicitly
+    // adjacent group. It is still SHOWN; it just stops claiming to match the
+    // user's words. Dale Carnegie appears in neither group, which is what this
+    // test exists for.
+    expect(result.direct.items.map((i) => i.solicitation)).toEqual([]);
+    expect(result.related.map((i) => i.solicitation)).toEqual(['HVAC-1']);
+    expect(result.related.some((i) => /Dale Carnegie/i.test(i.title || ''))).toBe(false);
     const view = toHiddenMarketLandingView(result, { nowMs: NOW });
     expect(view.directCards.some((c) => /Dale Carnegie/i.test(c.title))).toBe(false);
-    expect(view.directCards[0]?.dueLabel).toBe('Due in 7 days · Sept 16');
+    expect(view.relatedCards.some((c) => /Dale Carnegie/i.test(c.title))).toBe(false);
+    expect(view.relatedCards.map((c) => c.referenceNumber)).toEqual(['HVAC-1']);
+    expect(view.relatedCards[0]?.dueLabel).toBe('Bid due in 7 days · Sept 16');
   });
 
   it('does not say here is what we found when SAM returned nothing', async () => {

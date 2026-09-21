@@ -14,6 +14,8 @@ const EMPTY_VIEW: HiddenMarketLandingView = {
   reveal: null,
   directCards: [],
   uncoveredCards: [],
+  relatedCards: [],
+  relatedLabel: 'Related — broader or adjacent',
   ctaVariant: 'more',
   classificationPath: 'need_followup',
 };
@@ -129,7 +131,8 @@ function RevealHero({ view }: { view: HiddenMarketLandingView }) {
     case 'thin':
       return (
         <p className="text-lg text-ink">
-          Government buys this — the open market is small right now. Here is what we found.
+          Government buys this — the open market is small right now. Mindy found{' '}
+          <strong>{direct}</strong> {direct === 1 ? 'opportunity' : 'opportunities'}.
         </p>
       );
     case 'unavailable':
@@ -335,6 +338,13 @@ export function TryLanding() {
                     <strong>{showTerms.join(' · ')}</strong>
                   </p>
                 )}
+                {reveal?.stageSummary && (
+                  <p className="text-sm text-ink-soft">
+                    Of the {reveal.directMatchCount} matching what you described:{' '}
+                    <strong>{reveal.stageSummary}</strong>. Only the &ldquo;open to bid&rdquo; ones
+                    are asking for a priced offer today.
+                  </p>
+                )}
                 {reveal?.agencies && reveal.agencies.count >= 2 && (
                   <p className="text-sm text-muted">
                     Listings from {reveal.agencies.count} agencies.
@@ -382,6 +392,32 @@ export function TryLanding() {
                         revealState: reveal?.revealState ?? null,
                         classificationPath: view.classificationPath,
                         group: 'uncovered',
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {view.relatedCards.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                  {view.relatedLabel}
+                </h2>
+                <p className="text-sm text-muted">
+                  Not a direct match to your words — a broader or neighbouring version of
+                  the same work. Worth a look, but read the listing before you commit.
+                </p>
+                {view.relatedCards.map((card) => (
+                  <BeginnerOpportunityCard
+                    key={card.samUrl || card.referenceNumber || card.title}
+                    card={card}
+                    tone="aha"
+                    onOpen={() =>
+                      track('beginner_opportunity_opened', {
+                        revealState: reveal?.revealState ?? null,
+                        classificationPath: view.classificationPath,
+                        group: 'related',
                       })
                     }
                   />

@@ -3,6 +3,20 @@
  * Do not map set-aside / notice / dates here; that lives in src/lib/beginner.
  */
 import type { PublicBeginnerCard } from '@/lib/beginner';
+import { STAGE_LABEL } from '@/lib/beginner/labels';
+
+/**
+ * Stage is the thing a beginner most needs and least knows: an RFI and a
+ * Solicitation look identical on a card. Colour + words, not colour alone.
+ */
+const STAGE_STYLE: Record<PublicBeginnerCard['stage'], string> = {
+  open_bid: 'bg-emerald-900/40 text-emerald-200 ring-1 ring-emerald-700/50',
+  market_research: 'bg-amber-900/40 text-amber-200 ring-1 ring-amber-700/50',
+  upcoming: 'bg-sky-900/40 text-sky-200 ring-1 ring-sky-700/50',
+  awarded: 'bg-zinc-800 text-zinc-300 ring-1 ring-zinc-600/50',
+  informational: 'bg-zinc-800 text-zinc-300 ring-1 ring-zinc-600/50',
+  unknown: 'bg-zinc-800 text-zinc-300 ring-1 ring-zinc-600/50',
+};
 
 export function BeginnerOpportunityCard({
   card,
@@ -21,7 +35,15 @@ export function BeginnerOpportunityCard({
     <article className="rounded-xl border border-hairline bg-surface p-4">
       <h3 className="text-base font-semibold text-ink">{card.title}</h3>
       <div className="mt-2 flex flex-wrap gap-2 text-sm">
-        {card.noticeLabel && (
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_STYLE[card.stage]}`}
+          data-stage={card.stage}
+        >
+          {STAGE_LABEL[card.stage]}
+        </span>
+        {/* The stage badge already says it. A second chip rendered "Coming
+            soon — not open yet" next to "Coming soon — get ready". */}
+        {card.stage === 'unknown' && card.noticeLabel && (
           <span className="rounded-full bg-navy px-2.5 py-0.5 text-ink">{card.noticeLabel}</span>
         )}
       </div>

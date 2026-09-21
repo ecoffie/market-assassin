@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { filterRelevantOpportunities, isRelevantOpportunity, naicsSector } from './relevance';
+import {
+  activityFor,
+  classifyOpportunities,
+  filterRelevantOpportunities,
+  isRelevantOpportunity,
+  naicsSector,
+} from './relevance';
+
+/** Tier for one item under a resolution — the sharper contract after 2026-09-21. */
+function tierOf(it: SamSearchItem, r: ResolvedBusiness) {
+  const codes = r.naicsCodes.status === 'known' ? r.naicsCodes.items : [];
+  return classifyOpportunities([it], { activity: activityFor(r), codes }).evidence[0].evidence.tier;
+}
 import type { ResolvedBusiness, SamSearchItem } from './types';
 
 function resolution(over: Partial<ResolvedBusiness> = {}): ResolvedBusiness {
@@ -86,7 +98,12 @@ describe('isRelevantOpportunity', () => {
   it('does not let a dirty coverage IT code admit an IT listing into an HVAC market', () => {
     const r = resolution({ primaryNaics: null });
     expect(naicsSector('541512')).toBe('54');
-    expect(isRelevantOpportunity(item({ title: 'Cybersecurity support', naics: '541512' }), r)).toBe(false);
+    // CHANGED 2026-09-21: code overlap alone can no longer produce a DESCRIBED
+    // match ("broad or incorrectly resolved codes can still produce false
+    // matches"). 541512 is in the coverage set, so the listing is still shown
+    // — under the explicitly-broader heading, never "matches what you
+    // described". That distinction is the fix; silently deleting it is not.
+    expect(tierOf(item({ title: 'Cybersecurity support', naics: '541512' }), r)).toBe('broader');
   });
 
   it('does not keep automobile doors just because coverage said door repair', () => {
@@ -98,10 +115,12 @@ describe('isRelevantOpportunity', () => {
       naicsCodes: { status: 'known', items: ['236220', '238290'] },
       primaryNaics: '236220',
     });
-    expect(
-      isRelevantOpportunity(item({ title: 'Automobile Door Assemblies', naics: '336111' }), r),
-    ).toBe(false);
+    // CHANGED 2026-09-21: "Door" is a SHORTENED form of the user's "doors",
+    // and shortening a word drops meaning (an object is not the service), so
+    // it is adjacent evidence — not a described match.
+    expect(tierOf(item({ title: 'Automobile Door Assemblies', naics: '336111' }), r)).toBe('broader');
     expect(isRelevantOpportunity(item({ title: 'Replace Garage Doors', naics: '238290' }), r)).toBe(true);
+    expect(tierOf(item({ title: 'Replace Garage Doors', naics: '238290' }), r)).toBe('direct');
   });
 
   it('drops uncoded keyword hits when a structured NAICS market exists', () => {
@@ -165,7 +184,11 @@ describe('filterRelevantOpportunities', () => {
       ],
       resolution(),
     );
-    expect(kept.map((i) => i.solicitation)).toEqual(['HVAC-1', 'ROAD-1']);
+    // CHANGED 2026-09-21: ROAD-1 ("Repair A Avenue at Building 300") is road
+    // work. The old gate kept it because 237310 shares NAICS sector 23 with
+    // the HVAC coverage set — sector agreement, not evidence. HVAC-1 survives
+    // on an exact code match, as adjacent evidence.
+    expect(kept.map((i) => i.solicitation)).toEqual(['HVAC-1']);
     expect(kept.some((i) => /Dale Carnegie/i.test(i.title || ''))).toBe(false);
   });
 });

@@ -47,6 +47,7 @@ const sb = createClient(url, key);
 const { beginnerDirectKeyword, searchBeginnerHiddenMarket, toHiddenMarketLandingView } =
   await import('@/lib/beginner/hidden-market');
 const { isDistinctiveKeyword } = await import('@/lib/market/keyword-sanitize');
+const { stripBuyerNames } = await import('@/lib/beginner/relevance');
 
 const todayIso = new Date().toISOString();
 const SELECT =
@@ -141,7 +142,11 @@ const NOT_A_BUSINESS_NOUN = new Set([
 ]);
 
 function distinctiveTokensFromTitle(title) {
-  const words = String(title || '')
+  // ⚠️ Strip ORGANISATION names before harvesting. 7 of the 8 live titles
+  // containing "engineers" are "U.S. Army Corps of Engineers" — the BUYER.
+  // Mining a buyer's name as a business noun makes the harness demand results
+  // for "I do engineers", and the relevance gate is right to give none.
+  const words = stripBuyerNames(String(title || ''))
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
@@ -185,6 +190,36 @@ function distinctiveTokensFromTitle(title) {
       description: 'I do stuff',
       expect: 'need_followup',
     },
+    // ── /try relevance batch, 2026-09-21 ────────────────────────────────
+    // THE SCREENSHOT INPUT. Before the fix this searched the literal word
+    // "person" (out of "2 person") and returned 13 results: a personnel-
+    // security platform, a PERSONAL alert device and PERSONAL services
+    // contractors. It must now find waste work, or nothing.
+    {
+      description: 'can a 2 person garbage company do government contracts',
+      expect: 'results',
+      titleMust: /garbage|trash|refuse|waste|sanitation/i,
+      titleMustNot: /personnel|personal|hypersonic|warhead/i,
+    },
+    {
+      description: 'physical security guard services',
+      expect: 'results',
+      titleMust: /guard|security/i,
+      // "Coast Guard"/"National Guard" are BUYERS; a grill/cattle/snow guard
+      // is a part. None may appear as a described match.
+      titleMustNot: /coast guard|national guard|grill guard|cattle guard|snow guard|lifeguard/i,
+    },
+    {
+      description: 'I own a landscaping business',
+      expect: 'results',
+      titleMust: /landscap|grounds|mowing/i,
+    },
+    // Every content word is company/meta context — the honest answer is a
+    // question, not a confident list of unrelated contracts.
+    {
+      description: 'I help businesses',
+      expect: 'need_followup',
+    },
     {
       description: 'zzqwxjunkterm999xyz',
       expect: 'no_cards',
@@ -219,11 +254,17 @@ function distinctiveTokensFromTitle(title) {
       }
       const cards = [...(view.directCards || []), ...(view.uncoveredCards || [])];
       const titled = cards.filter((c) => pin.titleMust.test(c.title || ''));
-      const ok = view.outcome === 'results' && cards.length > 0 && titled.length > 0;
+      // A described match must never carry a forbidden sense of the word.
+      const leaked = pin.titleMustNot
+        ? (view.directCards || []).filter((c) => pin.titleMustNot.test(c.title || ''))
+        : [];
+      const ok =
+        view.outcome === 'results' && cards.length > 0 && titled.length > 0 && leaked.length === 0;
       record(
         `pinned "${pin.description}" → results`,
         ok,
-        `outcome=${view.outcome} keyword=${result.directKeyword} ${titled.length}/${cards.length} title-hit`,
+        `outcome=${view.outcome} keyword=${result.directKeyword} ${titled.length}/${cards.length} title-hit` +
+          (leaked.length ? ` LEAKED: ${leaked.map((c) => c.title).join(' | ')}` : ''),
       );
     } catch (e) {
       record(`pinned "${pin.description}"`, false, 'threw: ' + (e?.message || e));

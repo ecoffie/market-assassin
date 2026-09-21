@@ -5,6 +5,8 @@
  * renders this view model, never NAICS/PSC/office/set-aside/notice codes.
  */
 
+import type { NoticeStage } from './labels';
+
 /** How we got from a plain-English description to a search. */
 export type ResolutionState =
   | 'structured' // coverage grounded a NAICS/PSC internally
@@ -103,6 +105,8 @@ export interface ResolvedBusiness {
 
 export interface BeginnerOpportunityCard {
   title: string;
+  /** Can you bid this, respond to research, or only get ready? See labels.ts. */
+  stage: NoticeStage;
   noticeLabel: string | null;
   setAsideLabel: string | null;
   /** "Who it's for: …" — category language, never "you qualify" without evidence. */
