@@ -17,6 +17,11 @@ import {
   findUnmappedBehaviourTokens,
   dayKey,
   MIN_REPORTABLE_COHORT,
+  PRODUCT_REGIME_BOUNDARY,
+  SAVE_LAUNCH_DATE,
+  REGIME_LABELS,
+  regimeBand,
+  saveBandStarted,
   COMPOSITION_DRIFT_LIMIT,
   SAVE_ACTIONS,
   WATCH_ACTIONS,
@@ -301,6 +306,79 @@ describe('passive email opens are not returns', () => {
     ], { [u1]: f, [u2]: f });
     expect(profiles.get(u1)!.returnDays).toEqual([]);
     expect(profiles.get(u2)!.returnDays).toHaveLength(1);
+  });
+});
+
+describe('PRODUCT REGIME — 2026-08-23 (Maps + MCP + new homepage)', () => {
+  it('puts a pre-launch cohort in its own band, never in the current one', () => {
+    expect(regimeBand('2026-08-22')).toBe('pre_launch');
+    expect(regimeBand('2026-08-23')).toBe('current'); // the boundary day IS the new product
+    expect(regimeBand('2026-09-20')).toBe('current');
+  });
+
+  it('labels the pre-launch band as PRE-LAUNCH wherever it is printed', () => {
+    // The rule: never quote a pre-2026-08-23 cohort as the current product's baseline unlabelled.
+    expect(REGIME_LABELS.pre_launch).toContain('PRE-LAUNCH');
+    expect(REGIME_LABELS.current).toContain('current product');
+  });
+
+  it('reports the save band as NOT YET STARTED while no save date is set', () => {
+    // Anonymous saving is unreachable on main today. "Nobody saved" and "nobody COULD save" are
+    // different facts; only one of them is about users, so the band must not render as 0.
+    expect(SAVE_LAUNCH_DATE).toBeNull();
+    expect(saveBandStarted()).toBe(false);
+  });
+
+  it('pins the boundary to the verified date', () => {
+    // Anonymous telemetry's first event ever is 2026-08-22 — one day before launch. Moving this
+    // constant silently re-bases every current-product number, so it is asserted, not assumed.
+    expect(PRODUCT_REGIME_BOUNDARY).toBe('2026-08-23');
+  });
+});
+
+describe('STRUCTURAL IMPOSSIBILITY — a window older than the apparatus', () => {
+  function popOfAge(count: number, ageDays: number): UserProfile[] {
+    const events: RetentionEvent[] = [];
+    const firstSeen: FirstSeenMap = {};
+    for (let i = 0; i < count; i++) {
+      const u = `s${i}`; const f = daysAgo(ageDays); firstSeen[u] = f;
+      events.push(ev(u, f, 'listing_open'));
+    }
+    return [...buildProfiles(events, firstSeen).profiles.values()];
+  }
+
+  it('refuses a D30 when the population has only 30 days of telemetry', () => {
+    // The live case: anonymous telemetry began 2026-08-22, so a mature D30 cohort contains ZERO
+    // anonymous users. Measured on production: 0. That is the apparatus being younger than the
+    // question, not users failing to return.
+    const cell = retentionAt(popOfAge(500, 30), 30, NOW);
+    expect(cell.denominator).toBe(0);
+    expect(cell.rate).toBeNull();
+    expect(cell.unmeasurableReason).toBe('structural_history_too_short');
+    expect(cell.daysOfHistory).toBe(30);
+    expect(cell.daysRequired).toBe(31);
+  });
+
+  it('distinguishes structural impossibility from an ordinary not-yet-eligible cohort', () => {
+    // 200 days of history, but this particular DN still has nobody old enough → a DIFFERENT reason.
+    const cell = retentionAt(popOfAge(500, 200), 30, NOW);
+    expect(cell.denominator).toBe(500);
+    expect(cell.unmeasurableReason).toBe('none');
+  });
+
+  it('reports below_min_cohort separately from both', () => {
+    const cell = retentionAt(popOfAge(5, 200), 7, NOW);
+    expect(cell.denominator).toBe(5);
+    expect(cell.rate).toBeNull();
+    expect(cell.unmeasurableReason).toBe('below_min_cohort');
+  });
+
+  it('a measurable horizon over the SAME short-history population is still reported', () => {
+    // 30 days of history cannot answer D30, but it answers D7 fine — the guard must be per-horizon,
+    // not a blanket "this population is too young for anything".
+    const cell = retentionAt(popOfAge(500, 30), 7, NOW);
+    expect(cell.denominator).toBe(500);
+    expect(cell.unmeasurableReason).toBe('none');
   });
 });
 

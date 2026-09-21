@@ -196,6 +196,59 @@ const MAP_SOURCES: ReadonlySet<string> = new Set([
 export type AcquisitionSurface = 'map' | 'email' | 'app';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT REGIME — the boundary that decides which numbers describe TODAY'S product
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Maps, MCP and the new homepage all launched on this date. It is a PRODUCT boundary, not a
+ * calendar convenience: a cohort whose first exposure predates it met a different product, so its
+ * retention cannot be quoted as the current product's baseline.
+ *
+ * Verified against production 2026-09-21, and the evidence is stark:
+ *   - New users/week stepped 106 (wk of 8/10) → 683 (8/17, ramp) → 1,934 (8/24) → 1,997 (8/31).
+ *   - The `anon:<uuid>` identity's FIRST event in the entire table is 2026-08-22T03:06:50Z — one
+ *     day before launch. Anonymous telemetry does not exist before this boundary at all.
+ *
+ * THE RULE: never compare current Mindy retention against a cohort first seen before this date
+ * without labelling it PRE-LAUNCH.
+ */
+export const PRODUCT_REGIME_BOUNDARY = '2026-08-23';
+
+/**
+ * The day anonymous saving / watches / continuity became genuinely REACHABLE in production.
+ *
+ * `null` means NOT YET STARTED — and that is the honest state as of 2026-09-21: #1608 is unmerged
+ * and the anonymous `savePursuit` path is still dead on `main`, so no visitor has been able to
+ * save. A band that has not begun must report NOT YET STARTED; it must never render as an empty
+ * cohort with a 0, because "nobody saved" and "nobody COULD save" are different facts and only one
+ * of them is about users.
+ *
+ * Set this to the ship date (YYYY-MM-DD) the day it goes live. It is deliberately ONE constant.
+ */
+export const SAVE_LAUNCH_DATE: string | null = null;
+
+/** The three cohort bands. `current` is the default lens for current-product retention. */
+export type RegimeBand = 'pre_launch' | 'current' | 'post_save_launch';
+
+export const REGIME_LABELS: Record<RegimeBand, string> = {
+  pre_launch: 'PRE-8/23 (PRE-LAUNCH — old Map/homepage, historical only)',
+  current: 'POST-8/23 (current product)',
+  post_save_launch: 'POST-SAVE-LAUNCH (anonymous save reachable)',
+};
+
+/** Which regime a user belongs to, decided by the day they were FIRST seen. */
+export function regimeBand(day0: string): RegimeBand {
+  if (day0 < PRODUCT_REGIME_BOUNDARY) return 'pre_launch';
+  if (SAVE_LAUNCH_DATE !== null && day0 >= SAVE_LAUNCH_DATE) return 'post_save_launch';
+  return 'current';
+}
+
+/** True when the save band has not begun, so it must report NOT YET STARTED rather than zeros. */
+export function saveBandStarted(): boolean {
+  return SAVE_LAUNCH_DATE !== null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Thresholds — every one of these is a stated policy, not a magic number
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -396,6 +449,21 @@ export interface RetentionCell {
   reportable: boolean;
   /** Segment mix of the DENOMINATOR, as percentages. The raw material for Trap 3. */
   mix: Record<AcquisitionSurface, number>;
+  /**
+   * WHY there is no rate — the distinction that stops a blank cell being read as "bad retention".
+   *
+   * `structural_history_too_short` is the important one: this population's telemetry is YOUNGER
+   * than the window being asked about, so no user could POSSIBLY have had N days, whatever they
+   * did. Anonymous Map D30 is the live instance — anonymous telemetry began 2026-08-22, so a
+   * mature D30 (first seen <= today-31) contains ZERO anonymous users. Measured: 0. That is not
+   * an immature cohort that will fill in tomorrow's run at the current rate; it is a question the
+   * apparatus cannot answer yet, and it must be refused rather than estimated.
+   */
+  unmeasurableReason: 'none' | 'structural_history_too_short' | 'no_eligible_users' | 'below_min_cohort';
+  /** Days of telemetry this population actually has (oldest first-seen → now). */
+  daysOfHistory: number;
+  /** Days of history a mature DN needs (N + 1). */
+  daysRequired: number;
 }
 
 /**
@@ -408,11 +476,23 @@ export function retentionAt(
   n: number,
   nowMs: number,
 ): RetentionCell {
-  const cutoff = nowMs - n * DAY_MS;
+  // Eligibility is measured in COMPLETED CALENDAR DAYS, not elapsed milliseconds.
+  //
+  // A user is eligible for DN only once the whole window [day0+1, day0+N] lies in finished days —
+  // i.e. day0 <= today-(N+1). Today is still being written, so a user whose window ends TODAY could
+  // still return in the next few hours; counting them now biases every rate downward, the same
+  // partial-day trap that makes "today's DAU" always look like a collapse.
+  //
+  // It also makes the arithmetic agree with how the boundary was verified in SQL
+  // (`first_seen <= CURRENT_DATE - 31` for D30, which returns ZERO anonymous users). An ms-based
+  // cutoff instead admitted a sliver — the handful of identities from the first three hours of
+  // anonymous telemetry's existence — and reported a D30 over 82 of 8,375 users as if it described
+  // the band. Same input, two answers; the calendar rule is the defensible one.
+  const eligibleCutoffDay = dayKey(nowMs - (n + 1) * DAY_MS);
   const eligible: UserProfile[] = [];
   let notYetEligible = 0;
   for (const p of users) {
-    if (p.firstSeenMs <= cutoff) eligible.push(p);
+    if (p.day0 <= eligibleCutoffDay) eligible.push(p);
     else notYetEligible += 1;
   }
 
@@ -433,16 +513,38 @@ export function retentionAt(
     }
   }
 
+  // How much telemetry this population HAS, vs how much a mature DN needs. When the oldest user
+  // in the population is younger than N+1 days, the denominator is 0 for a STRUCTURAL reason —
+  // the apparatus is younger than the window — not because people failed to come back.
+  const oldest = users.reduce((a, p) => Math.min(a, p.firstSeenMs), Number.POSITIVE_INFINITY);
+  const daysOfHistory = users.length === 0 || !Number.isFinite(oldest)
+    ? 0
+    : Math.round((Date.parse(`${dayKey(nowMs)}T00:00:00Z`) - Date.parse(`${dayKey(oldest)}T00:00:00Z`)) / DAY_MS);
+  const daysRequired = n + 1;
+
+  let unmeasurableReason: RetentionCell['unmeasurableReason'] = 'none';
+  if (denominator === 0) {
+    unmeasurableReason = daysOfHistory < daysRequired
+      ? 'structural_history_too_short'
+      : 'no_eligible_users';
+  } else if (!reportable) {
+    unmeasurableReason = 'below_min_cohort';
+  }
+
   return {
     n,
     denominator,
     returned,
-    // Two separate reasons for null, both meaning "we do not know": nobody is old enough, or the
-    // cohort is too small for a percentage to mean anything. Neither is 0%.
+    // Three separate reasons for null, all meaning "we do not know": the apparatus is younger than
+    // the window, nobody is old enough yet, or the cohort is too small for a percentage to mean
+    // anything. None of them is 0%.
     rate: denominator > 0 && reportable ? Math.round((returned / denominator) * 1000) / 10 : null,
     notYetEligible,
     reportable,
     mix,
+    unmeasurableReason,
+    daysOfHistory,
+    daysRequired,
   };
 }
 

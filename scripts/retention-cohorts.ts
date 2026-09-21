@@ -47,6 +47,12 @@ import {
   type CohortKey,
   type RetentionCell,
   type AcquisitionSurface,
+  type RegimeBand,
+  PRODUCT_REGIME_BOUNDARY,
+  SAVE_LAUNCH_DATE,
+  REGIME_LABELS,
+  regimeBand,
+  saveBandStarted,
 } from '../src/lib/analytics/retention-cohorts';
 
 const HORIZONS = [1, 3, 7, 30];
@@ -139,6 +145,28 @@ async function main() {
     [[...WATCH_ACTIONS]],
   );
 
+  // ── 4b. MCP: can it enter these cohorts at all? ──
+  // MCP creates value in the agent WITHOUT the user ever landing in Mindy, so an MCP-originated
+  // identity inside a retention cohort would count a visit that never happened. Rather than assume
+  // it emits nothing, ASK — and record the answer in the payload so the exclusion (or its absence)
+  // is evidence, not a claim. Measured 2026-09-21: 0 rows, so nothing needs excluding.
+  const { rows: mcpRows } = await client.query<{ event_source: string | null; events: string; users: string }>(
+    `SELECT event_source, count(*) AS events, count(DISTINCT user_email) AS users
+       FROM user_engagement
+      WHERE event_source ILIKE '%mcp%' OR event_type ILIKE '%mcp%'
+         OR metadata->>'action' ILIKE '%mcp%' OR metadata->>'surface' ILIKE '%mcp%'
+      GROUP BY 1`,
+  );
+  const mcpEvents = mcpRows.reduce((a, r) => a + Number(r.events), 0);
+  const mcpExposure = {
+    writesEngagementRows: mcpEvents > 0,
+    events: mcpEvents,
+    sources: mcpRows.map((r) => r.event_source),
+    note: mcpEvents > 0
+      ? 'MCP-originated rows EXIST — they must be excluded from destination retention (an MCP call is not a visit).'
+      : 'MCP writes NO user_engagement rows, so no MCP identity can enter these cohorts and no exclusion is required.',
+  };
+
   await client.end();
 
   // ── 5. Arithmetic (pure, unit-tested).
@@ -160,6 +188,24 @@ async function main() {
   // right one. Retention WITHIN one acquisition surface is comparable across horizons, because the
   // population no longer changes shape as N grows. So the curve people should actually read is the
   // per-segment one — and each segment carries its own denominators.
+  // ── PRODUCT REGIME BANDS ──
+  // Maps + MCP + the new homepage launched 2026-08-23, so a single blended series describes two
+  // different products. Every band below carries its label wherever a rate is printed.
+  const BANDS: RegimeBand[] = ['pre_launch', 'current', 'post_save_launch'];
+  const byBand = BANDS.map((band) => {
+    const users = all.filter((p) => regimeBand(p.day0) === band);
+    const mapUsers = users.filter((p) => p.acquisitionSurface === 'map');
+    return {
+      band,
+      label: REGIME_LABELS[band],
+      started: band === 'post_save_launch' ? saveBandStarted() : true,
+      users: users.length,
+      horizons: HORIZONS.map((n) => retentionAt(users, n, nowMs)),
+      mapOnly: { users: mapUsers.length, horizons: HORIZONS.map((n) => retentionAt(mapUsers, n, nowMs)) },
+      activity: activityShape(users, nowMs),
+    };
+  });
+
   const SEGMENTS: AcquisitionSurface[] = ['map', 'email', 'app'];
   const bySegment = SEGMENTS.map((seg) => {
     const users = all.filter((p) => p.acquisitionSurface === seg);
@@ -211,7 +257,10 @@ async function main() {
       saveEventUsersAllTime: Number(saveEvRow.users),
       watchEventUsersAllTime: Number(watchEvRow.users),
     },
+    productRegime: { boundary: PRODUCT_REGIME_BOUNDARY, saveLaunchDate: SAVE_LAUNCH_DATE, saveBandStarted: saveBandStarted() },
+    mcp: mcpExposure,
     overall: { horizons: overallCells, drift: [...drift.entries()].map(([n, d]) => ({ n, ...d })) },
+    byBand,
     bySegment,
     activity: shape,
     dau: { day: yesterday, active: activeYesterday.length, returning: returningYesterday, new: activeYesterday.length - returningYesterday },
@@ -226,7 +275,7 @@ async function main() {
   };
 
   if (asJson) { console.log(JSON.stringify(payload, null, 2)); }
-  else { renderText(payload, cohortTable, overallCells, drift, bySegment); }
+  else { renderText(payload, cohortTable, overallCells, drift, bySegment, byBand); }
 
   // A stale vocabulary is a hard failure, not a footnote: it makes "0 savers" unreadable.
   if (unmapped.length > 0) {
@@ -237,7 +286,7 @@ async function main() {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function renderText(p: any, cohortTable: any[], overall: RetentionCell[], drift: Map<number, { driftPp: number | null; comparableToD1: boolean }>, bySegment: any[]) {
+function renderText(p: any, cohortTable: any[], overall: RetentionCell[], drift: Map<number, { driftPp: number | null; comparableToD1: boolean }>, bySegment: any[], byBand: any[]) {
   const L = console.log;
   L('');
   L('════════════════════════════════════════════════════════════════════════');
@@ -262,7 +311,35 @@ function renderText(p: any, cohortTable: any[], overall: RetentionCell[], drift:
     L(`  D${String(c.n).padEnd(2)}  ${String(c.denominator).padStart(9)}   ${String(c.returned).padStart(8)}   ${pct(c.rate)}   ${String(c.notYetEligible).padStart(16)}   ${`${c.mix.map}/${c.mix.email}/${c.mix.app}`.padStart(18)}   ${cmp}`);
   }
 
-  L('\n── RETENTION BY ACQUISITION SURFACE (the COMPARABLE curve) ──');
+  L('\n── PRODUCT REGIME BANDS ──');
+  L(`  Maps + MCP + the new homepage launched ${p.productRegime.boundary}. A cohort first seen`);
+  L('  before that met a DIFFERENT product; its retention is historical, never the current baseline.');
+  L('');
+  for (const b of byBand) {
+    if (!b.started) {
+      L(`  ${b.label}`);
+      L('    ⏳ NOT YET STARTED — anonymous saving is not reachable in production yet, so no');
+      L('       visitor has been ABLE to save. This is not 0% retention; there is no cohort.');
+      L('       Set SAVE_LAUNCH_DATE in src/lib/analytics/retention-cohorts.ts the day it ships.');
+      continue;
+    }
+    L(`  ${b.label}  —  ${b.users} users`);
+    L('    scope         D1      D3      D7     D30     (returned/denominator)');
+    for (const [name, h] of [['all', b.horizons], ['map-only', b.mapOnly.horizons]] as [string, RetentionCell[]][]) {
+      L(`    ${name.padEnd(12)} ${h.map((c) => pct(c.rate)).join('  ')}`);
+      L(`    ${' '.repeat(12)} ${h.map((c) => `${c.returned}/${c.denominator}`).join('   ')}`);
+      for (const c of h) {
+        if (c.unmeasurableReason === 'structural_history_too_short') {
+          L(`      ⛔ D${c.n} UNMEASURED — STRUCTURALLY IMPOSSIBLE: this population has only`);
+          L(`         ${c.daysOfHistory} days of telemetry; a mature D${c.n} needs ${c.daysRequired}. No user could have had`);
+          L(`         the window, whatever they did. Not a rate, not a blank, not a zero.`);
+        }
+      }
+    }
+    L('');
+  }
+
+  L('── RETENTION BY ACQUISITION SURFACE (the COMPARABLE curve) ──');
   L('  Within one surface the population does not change shape as N grows, so these DN values');
   L('  CAN be read as a curve. The blended numbers above cannot.');
   L('');
@@ -315,6 +392,7 @@ function renderText(p: any, cohortTable: any[], overall: RetentionCell[], drift:
   L('  • user_engagement is NEVER reconciled anon -> email: a visitor who signs up appears as TWO');
   L('    users, reading as churn for the first and acquisition for the second.');
   L('  • Save/watch events are browser-emitted best-effort; table rows > event counts is expected.');
+  L(`  • MCP: ${p.mcp.note}`);
   if (p.leftCensoredUsers > 0) L(`  • ${p.leftCensoredUsers} users excluded: no all-history first-seen (unknown, not assumed).`);
   L('');
 }
