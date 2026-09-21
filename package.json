@@ -70,7 +70,8 @@
     "verify:env": "node scripts/verify-env-local.mjs",
     "verify:forecast-agency": "npx tsx scripts/verify-forecast-agency-identity.ts",
     "verify:maps-account": "node scripts/verify-maps-account.mjs",
-    "verify:gateway-exports": "npx tsx scripts/verify-gateway-exports.ts"
+    "verify:gateway-exports": "npx tsx scripts/verify-gateway-exports.ts",
+    "retention:cohorts": "npx tsx scripts/retention-cohorts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

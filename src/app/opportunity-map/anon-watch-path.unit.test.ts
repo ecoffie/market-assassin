@@ -78,6 +78,30 @@ describe('adoption is measurable', () => {
   it('marks the anonymous watch as anonymous in telemetry', () => {
     expect(SRC).toMatch(/watch_created',\{anonymous:true/);
   });
+
+  // BOTH watch paths must emit, or WATCHING reads as zero.
+  //
+  // Measured on prod 2026-09-21: 62 of 62 saved_searches created in 30 days (34
+  // distinct users) came through the SIGNED-IN branch, and it emitted nothing at
+  // all — so the Journey Analytics endpoint had no watch signal whatsoever and
+  // the only "keep" number it could show was the pursuit count. An instrumented
+  // anonymous branch beside an uninstrumented signed-in one is exactly how a
+  // real, popular action renders as 0.
+  it('the SIGNED-IN save-search also emits watch_created', () => {
+    expect(SRC).toMatch(/watch_created',\{anonymous:false/);
+  });
+
+  it('the signed-in emit sits on the saved-searches success branch, not the anon one', () => {
+    const signedIn = SRC.slice(SRC.indexOf("fetch('/api/app/saved-searches',{method:'POST'"));
+    // Within the signed-in fetch's own .then, before the handler ends.
+    const emit = signedIn.indexOf("watch_created',{anonymous:false");
+    const alertsOn = signedIn.indexOf("Saved — alerts on");
+    expect(emit).toBeGreaterThan(-1);
+    expect(alertsOn).toBeGreaterThan(-1);
+    // Same success branch: the emit immediately precedes the success label.
+    expect(alertsOn - emit).toBeGreaterThan(0);
+    expect(alertsOn - emit).toBeLessThan(400);
+  });
 });
 
 describe('the signed-in path is untouched', () => {
