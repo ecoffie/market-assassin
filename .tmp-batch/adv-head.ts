@@ -1,0 +1,91 @@
+import { extractBusinessActivity } from '@/lib/beginner/activity';
+
+const INPUTS = [
+  // homograph products / buyer collisions
+  'I run a crane company',
+  'we rent cranes',
+  'we do crane rental and rigging',
+  'I own a marine repair business',
+  'marine construction company',
+  'we make springs',
+  'spring manufacturing company',
+  'we clean tanks',
+  'we build tanks',
+  'we make seals and gaskets',
+  'we sell arms',
+  'I own a mill',
+  'we do milling',
+  'printing press company',
+  'we do commercial printing',
+  'we do plant maintenance',
+  'we sell plants',
+  'we build bridges',
+  'bridge inspection company',
+  'mine reclamation company',
+  'we do mine safety training',
+  'I run a ranger supply store',
+  'eagle scout supplies',
+  'we do patrol services',
+  // adjective-led / size-led
+  'certified small disadvantaged veteran owned company',
+  'woman owned small business that does catering',
+  'a reliable licensed bonded janitorial outfit',
+  'we are a tiny family owned moving company',
+  // two-letter domains
+  'hr consulting',
+  'ai company',
+  'we do qa testing',
+  'it staffing',
+  // verbs not on the demote list
+  'we mow lawns',
+  'we wash windows',
+  'we paint houses',
+  'we weld',
+  'we pave parking lots',
+  'we cook meals',
+  'we drive trucks',
+  'we guard buildings',
+  'we train employees',
+  'we survey land',
+  'we inspect elevators',
+  'we monitor alarms',
+  'we print banners',
+  'we scan documents',
+  'we store records',
+  'we shred paper',
+  'we tow vehicles',
+  'we stock shelves',
+  // plurals (search + gate interaction)
+  'we fix roofs',
+  'we install windows',
+  'we clean carpets',
+  'we repair elevators',
+  'we build fences',
+  'we sell uniforms',
+  'we repair boilers',
+  'we service generators',
+  'we do translations',
+  'we make signs',
+  // non-English-ish / broken phrasing
+  'me do cleaning for office',
+  'company small 2 people do landscape',
+  'yo tengo una compania de limpieza',
+  'garbage. trash. dumpster.',
+  'TRASH REMOVAL!!!',
+  // known-good regressions
+  'can a 2 person garbage company do government contracts',
+  'physical security guard services',
+  'we do IT support for small offices',
+  'I help businesses',
+];
+
+for (const input of INPUTS) {
+  const a = extractBusinessActivity(input);
+  console.log(
+    (a.head ?? 'NULL').padEnd(22),
+    a.confidence.padEnd(5),
+    a.rung.padEnd(8),
+    JSON.stringify(a.terms).padEnd(46),
+    '<=', input,
+  );
+}
