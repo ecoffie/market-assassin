@@ -188,6 +188,89 @@ throws — **separate, unfixed, out of scope here.**
 
 ---
 
+## 🔤 A MATCH IS A CLAIM — READ before touching /try, the match engine, or SEO page generation
+
+**`docs/engineering/try-relevance-regression.md`** is the record; the frozen set is
+`src/lib/beginner/__fixtures__/try-relevance-cases.ts`.
+
+> **Only the business ACTIVITY may establish a match. Words that describe the company,
+> the customer or the act of contracting — person, company, government, contracts,
+> small, help — can never put an opportunity in "Matches what you described".**
+
+**Why it is a rule.** On 2026-09-21 prod answered *"can a 2 person garbage company do
+government contracts"* with 13 results, none about garbage: a DoD personnel-security
+platform, a PERSONAL alert device, PERSONAL services contractors. Two causes, both
+measured: the searched keyword was the literal word **`person`** (out of "2 person"),
+because `keywordCandidates()` ranks by POSITION — true of expert phrasing, false of
+beginner prose, which leads with who you ARE; and the gate was `title.includes(token)`
+with **no word boundary**, so `person` ⊂ `personnel` ⊂ `personal`. Same class as the
+earlier "Dale Carnegie *Building*" match. Measured heads before the fix: `small` for IT
+support, `install` for roofing, `physical` for security guard, `agency` for staffing.
+
+- **`src/lib/beginner/activity.ts` is the only place that decides what we search.** A
+  ladder, not a score (summing per-token scores prefers LONGER phrases, which then match
+  no SAM title at all — "clean office" 0 rows vs "clean" 40): distinctive single activity
+  noun → anchored phrase → a typed-but-generic word → **ask a question**.
+- **`src/lib/beginner/relevance.ts` decides what qualifies**, in three tiers —
+  `direct` (activity term, word-boundary, in the title) · `broader` (a shortened form, a
+  broader-search term, or a code overlap) · `reject`. **Expanding the user's word is safe
+  (`cater`→`Catering`); shortening it is not (`trucking`→`Trucks`)** — an object is not
+  the service.
+- ⚠️ **/try resolves NO NAICS.** It passes `skipUsaSpendingCoverage`, so `naicsCodes` is
+  always empty and `classification` is always `keyword_fallback`. A gate of the form
+  "NAICS/PSC must intersect the resolved set" returns ZERO for every /try query. Codes
+  corroborate or demote; they never admit. A NULL NAICS never deletes a title match.
+- ⚠️ **Absent ≠ unrestricted.** `classifySetAside(null)` is `not_stated`, not `open`.
+  **4,261 of 9,030 active open notices (47.2%)** carry no set-aside at all and every one
+  used to render *"Who it's for: Any business that can do the work"*. A FILTER may assume
+  NULL means Full & Open; a SENTENCE ON A CARD may not.
+- ⚠️ **An RFI is not a bid.** Every card carries a `stage` (`open_bid` /
+  `market_research` / `upcoming` / …) and the count carries its own mix. The original 13
+  were 8 market-research + 1 pre-sol + 4 biddable under one "13 current opportunities".
+- **Rejected with evidence, do not re-propose:** ranking activity words by
+  `naics_vocabulary` (`physical` w1481 beats `guard` w1206; `window`→agriculture), and
+  expanding the market from the direct hits' NAICS (the one live "garbage" hit is 562998,
+  whose mined vocabulary is *grease trap cleaning*).
+- **Gates:** `src/lib/beginner/try-relevance.unit.test.ts` (hermetic, drives the frozen
+  set) + `npm run verify:beginner-try` (live cache; 11 pinned + 800 sampled searches).
+- **SEO page generation stays blocked on this set passing** — every programmatic page
+  inherits this matcher.
+- **Adversarial round (same day) found the same class twice more, both now pinned:**
+  ownership self-description (`woman owned small business that does catering` searched
+  **`owned`** → nine Government-Owned fuel-depot contracts) and verbs that are also nouns
+  (`we drive trucks` → **`drive`** → DISK DRIVE / AC DRIVE, 26 cards, zero trucking). A
+  verb that IS the service also emits the compound the buyer writes — `crane rental`,
+  `vehicle towing`, `alarm monitoring` — but **never for install/repair/replace/remove/
+  clean**, where the object already names the work ("we install windows" narrowed from 36
+  live notices to 1 before that was fixed).
+- ⚠️ **PLURAL IS NOT DERIVATION, and the SQL keyword must be SINGULAR.** "we build fences"
+  printed *"Mindy found 0 current opportunities"* above three live fence cards — 14 open
+  fence notices existed. SAM's title search is an ILIKE substring, so `%fences%` cannot
+  match "Fence". Measured after: fences 0→11, roofs 3→24, windows 2→24.
+- ⚠️ **AN EXACT-TOKEN MISS IS NOT MARKET ABSENCE.** `/try` matches the words in a
+  listing's TITLE. Zero open titles contain "lawn" or "mowing", while ~18 open
+  grounds-maintenance notices (NAICS 561730) are exactly that business. No copy may say
+  *"nothing matching is open"* or *"the open market is small"* — both shipped, and the
+  second was live on the garbage case (1 title match reported as a small market beside
+  ~20 open refuse/solid-waste notices). Say which words were searched and that the limit
+  is the SEARCH. Guarded by the live oracle's `no_market_absence_claim` pin.
+- ⛔ **There is NO body-text rescue, and the one that was built is RETRACTED.** A
+  `detail-evidence.ts` fallback read the notice's description on an empty result and quoted
+  the line; independent review measured **~19 of 26 hits (73%) wrong** — submission
+  boilerplate, a table of contents, FAR clause text, a scope EXCLUSION quoted as proof.
+  Removed 2026-09-21. Its own "multi-word terms must be a PHRASE within 40 chars" guard was
+  **order-free proximity and did not work** (`"the staffing plan shall address medical
+  surveillance requirements"` matched `"medical staffing"`). Evidence + the bar a
+  replacement must clear: `src/lib/beginner/__fixtures__/body-relevance-cases.ts` and
+  `tasks/body-relevance-followup-2026-09-21.md`. **Do not substitute another heuristic
+  without clearing that bar**, and do not re-propose a word→code→market hop — three are now
+  measured and rejected (`physical` outranks `guard`; 562998 → "grease trap"; `lawn` →
+  333112 lawn-mower manufacturing).
+- **`verify:beginner-try --sample` is a RECALL FLOOR, not a precision score** — nouns are
+  harvested from live titles, and it only asserts not-empty / not-follow-up. A build
+  returning the whole corpus would score 1000/1000. Precision lives in the frozen set and
+  the pinned oracles.
+
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 
 **`docs/engineering/a-number-is-a-product-feature.md`** is the frozen principle (Eric,

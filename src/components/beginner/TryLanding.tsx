@@ -14,6 +14,8 @@ const EMPTY_VIEW: HiddenMarketLandingView = {
   reveal: null,
   directCards: [],
   uncoveredCards: [],
+  relatedCards: [],
+  relatedLabel: 'Related — broader or adjacent',
   ctaVariant: 'more',
   classificationPath: 'need_followup',
 };
@@ -84,59 +86,38 @@ function track(action: string, extra: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * ⚠️ RENDERS `reveal.explanation` — it does NOT write its own copy.
+ *
+ * It used to switch on `revealState` with a hardcoded sentence per branch, a
+ * second copy of strings that already live in `hidden-market.ts`. They drifted:
+ * after the lib's market-absence claims were fixed, "we mow lawns" still
+ * rendered "Mindy translated what you do and found 3 in related government
+ * buying categories" over two AWARD notices that matched the user's literal
+ * words — wrong provenance and a claim the lib had already stopped making.
+ * One source of copy, or the next fix only lands in half the product.
+ */
+/**
+ * The headline counts a POPULATION; the group renders at most
+ * REVEAL_THRESHOLDS.cardsPerGroup cards. "found 11" above three cards is
+ * technically true and reads as a miscount, so say which it is.
+ */
+function ShowingOf({ shown, total }: { shown: number; total?: number | null }) {
+  if (typeof total !== 'number' || total <= shown) return null;
+  return (
+    <span className="ml-2 font-normal normal-case text-faint">
+      showing {shown} of {total}
+    </span>
+  );
+}
+
 function RevealHero({ view }: { view: HiddenMarketLandingView }) {
   const reveal = view.reveal;
   if (view.outcome === 'need_followup' && view.message) {
     return <p className="text-lg text-ink">{view.message}</p>;
   }
-  if (!reveal) return null;
-
-  const direct = reveal.directMatchCount;
-  const expanded = reveal.expandedMatchCount;
-  const total = reveal.totalUniqueCount;
-
-  switch (reveal.revealState) {
-    case 'strong':
-      return (
-        <p className="text-lg text-ink">
-          {total == null ? (
-            <>
-              You&apos;d have found <strong>{direct}</strong>. Mindy found{' '}
-              <strong>{expanded}</strong> more that those words missed.
-            </>
-          ) : (
-            <>
-              You&apos;d have found <strong>{direct}</strong>. Mindy found <strong>{total}</strong>.
-            </>
-          )}{' '}
-          Government buyers describe this work in ways most people would never search.
-        </p>
-      );
-    case 'expanded_only':
-      return (
-        <p className="text-lg text-ink">
-          Your words didn&apos;t match open solicitations directly — but Mindy translated what you
-          do and found <strong>{expanded}</strong> in related government buying categories.
-        </p>
-      );
-    case 'direct_only':
-      return (
-        <p className="text-lg text-ink">
-          Government buys this. Mindy found <strong>{direct}</strong> current{' '}
-          {direct === 1 ? 'opportunity' : 'opportunities'} matching what you described.
-        </p>
-      );
-    case 'thin':
-      return (
-        <p className="text-lg text-ink">
-          Government buys this — the open market is small right now. Here is what we found.
-        </p>
-      );
-    case 'unavailable':
-      return (
-        <p className="text-lg text-ink">Mindy couldn&apos;t measure the broader market right now.</p>
-      );
-  }
+  if (!reveal?.explanation) return null;
+  return <p className="text-lg text-ink">{reveal.explanation}</p>;
 }
 
 export function TryLanding() {
@@ -335,6 +316,13 @@ export function TryLanding() {
                     <strong>{showTerms.join(' · ')}</strong>
                   </p>
                 )}
+                {reveal?.stageSummary && (
+                  <p className="text-sm text-ink-soft">
+                    Of the {reveal.directMatchCount} matching what you described:{' '}
+                    <strong>{reveal.stageSummary}</strong>. Only the &ldquo;open to bid&rdquo; ones
+                    are asking for a priced offer today.
+                  </p>
+                )}
                 {reveal?.agencies && reveal.agencies.count >= 2 && (
                   <p className="text-sm text-muted">
                     Listings from {reveal.agencies.count} agencies.
@@ -349,6 +337,7 @@ export function TryLanding() {
               <div className="space-y-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
                   {reveal?.directLabel || 'Matches what you described'}
+                  <ShowingOf shown={view.directCards.length} total={reveal?.directMatchCount} />
                 </h2>
                 {view.directCards.map((card) => (
                   <BeginnerOpportunityCard
@@ -371,6 +360,7 @@ export function TryLanding() {
               <div className="space-y-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
                   {reveal?.expandedLabel || 'Opportunities Mindy uncovered'}
+                  <ShowingOf shown={view.uncoveredCards.length} total={reveal?.expandedMatchCount} />
                 </h2>
                 {view.uncoveredCards.map((card) => (
                   <BeginnerOpportunityCard
@@ -382,6 +372,32 @@ export function TryLanding() {
                         revealState: reveal?.revealState ?? null,
                         classificationPath: view.classificationPath,
                         group: 'uncovered',
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {view.relatedCards.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                  {view.relatedLabel}
+                </h2>
+                <p className="text-sm text-muted">
+                  Not a direct match to your words — a broader or neighbouring version of
+                  the same work. Worth a look, but read the listing before you commit.
+                </p>
+                {view.relatedCards.map((card) => (
+                  <BeginnerOpportunityCard
+                    key={card.samUrl || card.referenceNumber || card.title}
+                    card={card}
+                    tone="aha"
+                    onOpen={() =>
+                      track('beginner_opportunity_opened', {
+                        revealState: reveal?.revealState ?? null,
+                        classificationPath: view.classificationPath,
+                        group: 'related',
                       })
                     }
                   />

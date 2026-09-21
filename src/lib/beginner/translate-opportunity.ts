@@ -8,9 +8,9 @@
 import {
   applyEligibilityGuard,
   beginnerPscLabel,
-  formatAwardedLabel,
   formatBeginnerAmount,
-  formatDueLabel,
+  formatStageDueLabel,
+  noticeStage,
   translateNoticeType,
   translateSetAside,
 } from './labels';
@@ -44,7 +44,8 @@ export function translateOpportunity(
     amount.kind === 'omitted' ? null : amount.kind === 'value' || amount.kind === 'zero' || amount.kind === 'missing'
       ? amount.label
       : null;
-  const dueLabel = notice.kind === 'award' ? formatAwardedLabel(item.deadline) : formatDueLabel(item.deadline, nowMs);
+  const stage = noticeStage(item.type, item.title);
+  const dueLabel = formatStageDueLabel(item.deadline, nowMs, stage);
   const pscLabel = beginnerPscLabel(item.psc_description, item.psc_code);
   const agency = (item.agency || '').trim() || null;
   const reference = (item.solicitation || '').trim() || null;
@@ -52,6 +53,7 @@ export function translateOpportunity(
 
   return {
     title: displayTitle(item.title),
+    stage,
     noticeLabel: notice.label,
     setAsideLabel: setAside.label,
     audienceLabel: eligibility.audienceLabel,

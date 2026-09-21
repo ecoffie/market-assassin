@@ -26,6 +26,7 @@ import { classifyNoticeType } from '@/lib/utils/notice-type';
 import type { EligibilityEvidence, EligibilityProgram } from './types';
 
 export type SetAsideKind =
+  | 'not_stated'
   | 'open'
   | 'sb'
   | '8a'
@@ -48,10 +49,24 @@ export interface SetAsideCopy {
 }
 
 const SET_ASIDE_COPY: Record<Exclude<SetAsideKind, 'unknown' | 'other'>, SetAsideCopy> = {
+  /**
+   * The record says nothing. MEASURED 2026-09-21: 4,261 of 9,030 active open
+   * notices (47.2%) have NO set_aside_description AND no set_aside_code — and
+   * every one of them used to render "Any business that can do the work".
+   * That is a confident eligibility read produced from an absent field, on
+   * nearly half the corpus. Absent is not unrestricted.
+   */
+  not_stated: {
+    kind: 'not_stated',
+    label: 'Set-aside not listed',
+    explanation: 'This notice does not say whether the work is set aside. Check the SAM listing.',
+    audience: "Who it's for: Not listed on this notice — check the SAM listing",
+    program: null,
+  },
   open: {
     kind: 'open',
     label: 'Open competition',
-    explanation: 'No small-business set-aside is listed.',
+    explanation: 'The notice states there is no set-aside.',
     audience: "Who it's for: Any business that can do the work",
     program: null,
   },
@@ -111,14 +126,18 @@ function norm(s: string): string {
 }
 
 /**
- * Classify a SAM set-aside description OR code. Null/empty on SAM open
- * opportunities is Full & Open (map-filters: ~4,801 active rows have NULL
- * set_aside_code). That is SAM-specific — do not reuse for recompete rows
- * where NULL means unknown.
+ * Classify a SAM set-aside description OR code.
+ *
+ * ⚠️ Null/empty is `not_stated`, NOT `open`. The map's filter layer treats a
+ * NULL set_aside_code as Full & Open because that is the right default for a
+ * FILTER (it decides which rows a query returns). It is the wrong default for
+ * a CLAIM shown to a beginner: "Any business that can do the work" told 47.2%
+ * of open notices' readers something the record never said. A filter may
+ * assume; a sentence on a card may not.
  */
 export function classifySetAside(raw: string | null | undefined): SetAsideKind {
   const t = (raw || '').trim();
-  if (!t) return 'open';
+  if (!t) return 'not_stated';
   const n = norm(t);
   if (
     n === 'none' ||
@@ -136,6 +155,18 @@ export function classifySetAside(raw: string | null | undefined): SetAsideKind {
   if (n.includes('sdvosb') || n.includes('servicedisabled')) return 'sdvosb';
   if (n.includes('hubzone') || n === 'hzc' || n === 'hzs' || n === 'hz') return 'hubzone';
   if (n === '8a' || n === '8an' || n.startsWith('8a') || n.includes('8a')) return '8a';
+  // Programme-specific reservations that CONTAIN "small business" but are not
+  // open to every small business. Checked BEFORE the small-business catch-all,
+  // or "Indian Small Business Economic Enterprise" reads as "Small businesses"
+  // and overstates a beginner's eligibility.
+  if (
+    n.includes('indiansmallbusiness') ||
+    n.includes('indianeconomicenterprise') ||
+    n.includes('buyindian') ||
+    n.includes('emergingsmallbusiness')
+  ) {
+    return 'other';
+  }
   if (n === 'sba' || n === 'sbp' || n === 'sb' || n.includes('smallbusiness') || n.includes('totalsmall')) {
     return 'sb';
   }
@@ -286,6 +317,101 @@ export function translateNoticeType(
   };
 }
 
+/**
+ * WHAT STAGE IS THIS? — the beginner distinction that decides what to DO.
+ *
+ * An RFI and a Solicitation are both "opportunities", but only one of them
+ * you can bid. The screenshot headline said "13 current opportunities" over a
+ * set that was 8 market-research notices, 1 pre-solicitation and 4 biddable —
+ * a beginner reading that can miss a real bid deadline while preparing a
+ * capability statement, or the reverse.
+ *
+ * Derived from `notice_type` on the record. `unknown` stays unknown: a notice
+ * type we do not recognise is never promoted to "open to bid".
+ */
+export type NoticeStage =
+  | 'open_bid'
+  | 'market_research'
+  | 'upcoming'
+  | 'awarded'
+  | 'informational'
+  | 'unknown';
+
+export const STAGE_LABEL: Record<NoticeStage, string> = {
+  open_bid: 'Open to bid now',
+  market_research: 'Market research — not a bid',
+  upcoming: 'Coming soon — not open yet',
+  awarded: 'Already awarded',
+  informational: 'Announcement only',
+  unknown: 'Stage not stated',
+};
+
+/** Plural-safe group headings for the stage-split counts. */
+export const STAGE_GROUP_LABEL: Record<NoticeStage, (n: number) => string> = {
+  open_bid: (n) => `${n} open to bid now`,
+  market_research: (n) => `${n} market research ${n === 1 ? 'notice' : 'notices'} (not a bid)`,
+  upcoming: (n) => `${n} coming soon`,
+  awarded: (n) => `${n} already awarded`,
+  informational: (n) => `${n} ${n === 1 ? 'announcement' : 'announcements'}`,
+  unknown: (n) => `${n} with no stage stated`,
+};
+
+export function noticeStage(noticeType: string | null | undefined, title?: string | null): NoticeStage {
+  const kind = translateNoticeType(noticeType, title).kind;
+  switch (kind) {
+    case 'solicitation':
+      return 'open_bid';
+    case 'sources_sought':
+      return 'market_research';
+    case 'presolicitation':
+      return 'upcoming';
+    case 'award':
+      return 'awarded';
+    case 'informational':
+      return 'informational';
+    default:
+      return 'unknown';
+  }
+}
+
+export interface StageCounts {
+  open_bid: number;
+  market_research: number;
+  upcoming: number;
+  awarded: number;
+  informational: number;
+  unknown: number;
+  total: number;
+}
+
+export function emptyStageCounts(): StageCounts {
+  return {
+    open_bid: 0,
+    market_research: 0,
+    upcoming: 0,
+    awarded: 0,
+    informational: 0,
+    unknown: 0,
+    total: 0,
+  };
+}
+
+/**
+ * Headline copy that never blurs the stages. "13 current opportunities" is
+ * replaced by the actual mix, in the order a beginner should act on it.
+ */
+export function describeStageMix(counts: StageCounts): string {
+  const parts: string[] = [];
+  const order: NoticeStage[] = ['open_bid', 'market_research', 'upcoming', 'awarded', 'informational', 'unknown'];
+  for (const stage of order) {
+    const n = counts[stage];
+    if (n > 0) parts.push(STAGE_GROUP_LABEL[stage](n));
+  }
+  if (parts.length === 0) return 'Nothing open right now.';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
 const EPOCH_FLOOR = Date.UTC(1980, 0, 1);
 
 export function parseDeadlineMs(iso: string | null | undefined): number | null {
@@ -323,6 +449,39 @@ export function formatDueLabel(iso: string | null | undefined, nowMs: number): s
   if (days === 0) return `Due today · ${when}`;
   if (days === 1) return `Due in 1 day · ${when}`;
   return `Due in ${days} days · ${when}`;
+}
+
+/**
+ * A BID deadline and a MARKET-RESEARCH response date are not the same promise.
+ * `formatDueLabel` says "Due in 8 days" for both, which reads as "bid by then"
+ * on an RFI. The stage picks the verb; the date arithmetic is shared.
+ */
+export function formatStageDueLabel(
+  iso: string | null | undefined,
+  nowMs: number,
+  stage: NoticeStage,
+): string {
+  if (stage === 'awarded') return formatAwardedLabel(iso);
+  const base = formatDueLabel(iso, nowMs);
+  if (base === MISSING_DUE_LABEL) {
+    if (stage === 'market_research') return 'Response date: check listing';
+    return MISSING_DUE_LABEL;
+  }
+  if (base.startsWith('Closed')) return base;
+  switch (stage) {
+    case 'market_research':
+      return `Response ${lowerFirst(base)}`;
+    case 'upcoming':
+      return `Expected ${lowerFirst(base)}`;
+    case 'open_bid':
+      return `Bid ${lowerFirst(base)}`;
+    default:
+      return base;
+  }
+}
+
+function lowerFirst(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
 /** Award notices have no bid deadline. Prefer posted/award date over "Deadline: check listing". */

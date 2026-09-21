@@ -131,7 +131,11 @@ describe('toBeginnerLandingView', () => {
       {
         deriveKeywords: async () => deriveOk(['janitorial services']),
         getCoverage: async ({ keyword }) => coverageMiss(keyword),
-        searchSam: async () => ({ ok: true, count: 1, items: [item()] }),
+        // Must be in the SAME market as the description: since 2026-09-21 the
+        // relevance gate needs activity evidence in the title, so an HVAC
+        // fixture under a cleaning description would (correctly) be dropped
+        // and this would stop testing the reveal copy.
+        searchSam: async () => ({ ok: true, count: 1, items: [item({ title: 'Interior Cleaning Services' })] }),
       },
     );
     const view = toBeginnerLandingView(result);
