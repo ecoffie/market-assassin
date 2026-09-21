@@ -281,8 +281,16 @@ describe('staging schema (deterministic STRING landing)', () => {
 });
 
 const gcpReady = Boolean(process.env.GCP_SA_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+const bqCliReady = (() => {
+  try {
+    const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
+    return spawnSync('bq', ['version'], { encoding: 'utf8' }).status === 0;
+  } catch {
+    return false;
+  }
+})();
 
-describe.skipIf(!gcpReady)('staging load integration (two-member export)', () => {
+describe.skipIf(!gcpReady || !bqCliReady)('staging load integration (two-member export)', () => {
   const fixtureDir = join(process.cwd(), 'scripts/fixtures/awards-ingest');
   const PROJECT = 'market-assasin';
   const TABLE = 'awards_ingest_staging_fixture_test';
