@@ -191,7 +191,8 @@ async function storeIntelligence(items: AgencyIntelligence[]): Promise<number> {
  */
 export async function getAgencyIntelligence(
   agencyName: string,
-  types?: string[]
+  types?: string[],
+  opts: { includeUnsupportedAttribution?: boolean } = {},
 ): Promise<AgencyIntelligence[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -227,8 +228,18 @@ export async function getAgencyIntelligence(
   const resolution = resolveAgency({ agencyName });
   if (!resolution.resolved || !resolution.canonicalAgency) return [];
 
+  // ⚠️ AGENCY-SPECIFIC READ → the QUARANTINED view, never the base table.
+  //
+  // Option C (approved 2026-09-20): GAO rows classified `artifact_agency` (148)
+  // or `unsupported_by_title` (64) are unreachable through an agency lookup,
+  // because that is the only context in which a wrong agency is a false claim.
+  // The 212 rows still EXIST in `agency_intelligence`; admin, data-health and
+  // historical-research surfaces read the base table and still see all 445.
+  //
+  // `opts.includeUnsupportedAttribution` is the deliberate escape hatch for a
+  // non-agency-specific caller that legitimately needs the full corpus.
   let query = supabase
-    .from('agency_intelligence')
+    .from(opts.includeUnsupportedAttribution ? 'agency_intelligence' : 'agency_intelligence_agency_safe')
     .select('*')
     .eq('agency_name', resolution.canonicalAgency)
     .order('updated_at', { ascending: false });
@@ -273,8 +284,10 @@ export async function getIntelligenceForBriefing(
   )];
   if (canonical.length === 0) return [];
 
+  // Agency-specific by construction (it takes a list of agencies), so it reads
+  // the quarantined view for the same reason as getAgencyIntelligence.
   const { data, error } = await supabase
-    .from('agency_intelligence')
+    .from('agency_intelligence_agency_safe')
     .select('*')
     .in('agency_name', canonical)
     .gte('fiscal_year', new Date().getFullYear() - 1)
@@ -387,7 +400,18 @@ export async function getUnifiedAgencyIntelligence(
       if (record.intelligence_type === 'gao_high_risk') {
         const gaoEntry = `${record.title}`;
         if (!result.gaoReports.includes(gaoEntry)) {
-          result.gaoReports.push(`${gaoEntry} [LEGACY_GOVINFO — not living Institute]`);
+          // Rows reaching here already passed the attribution quarantine, but
+          // `no_title_evidence` (211 of 445) means the title could not adjudicate
+          // the agency EITHER WAY. It must never read as corroborated — labelling
+          // it identically to a corroborated row would assert what we do not know.
+          const evidence = (record as { attribution_evidence?: string | null }).attribution_evidence;
+          const attributionNote =
+            evidence === 'no_title_evidence'
+              ? ' [agency attribution UNRESOLVED — not corroborated by the report title]'
+              : '';
+          result.gaoReports.push(
+            `${gaoEntry} [LEGACY_GOVINFO — not living Institute]${attributionNote}`,
+          );
         }
       } else if (record.intelligence_type === 'contract_pattern') {
         // A spending OBSERVATION is not a stated agency PRIORITY. Promoting it to
