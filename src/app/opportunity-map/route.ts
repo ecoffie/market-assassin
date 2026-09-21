@@ -4763,6 +4763,14 @@ const SAVE_JS = `<script>
         }
       }
     }catch(e){}
+    // RACE: the drawer's own detail fetch and this shortlist restore are two
+    // independent requests, and the drawer usually wins — so marking the drawer
+    // only at render time left it unmarked whenever the restore landed second
+    // (measured in the browser: __anonSaved held the notice id while the Save
+    // control still read "Start pursuit"). The drawer Save control carries no
+    // data-nid, so the loop above cannot reach it either. Marking from BOTH
+    // ends means whichever finishes last paints the state; both are idempotent.
+    try{ window.__markDrawerSaved&&window.__markDrawerSaved(); }catch(e){}
   }
   // Re-apply the marks to a feed that has been REDRAWN. The marks were painted ONCE,
   // when this block loads — but drawFeed rebuilds every card on each filter change,

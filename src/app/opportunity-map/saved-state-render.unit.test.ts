@@ -231,3 +231,28 @@ describe('F · a feed repaint still restores the VISIBLE saved state', () => {
     expect(MAP).toMatch(/__remarkSaved/);
   });
 });
+
+// ── G ─────────────────────────────────────────────────────────────────────
+describe('G · the restore and the drawer render race, so BOTH ends mark', () => {
+  it('the drawer render calls the marker', () => {
+    expect(MAP).toMatch(/buildTabs\(\);[\s\S]{0,180}window\.__markDrawerSaved&&window\.__markDrawerSaved\(\)/);
+  });
+
+  it('the shortlist restore ALSO calls the marker, for when it lands second', () => {
+    // Measured in a real browser: the drawer's detail fetch normally resolves
+    // FIRST, so a drawer-render-only hook ran against an empty __anonSaved and
+    // the Save control stayed on "Start pursuit" while the card was correct.
+    const fn = MAP.slice(MAP.indexOf('function _markSaved(ids){'), MAP.indexOf('window.__remarkSaved=function()'));
+    expect(fn).toMatch(/window\.__markDrawerSaved&&window\.__markDrawerSaved\(\)/);
+  });
+
+  it('marking the drawer twice is idempotent and still writes nothing', () => {
+    const b = saveBtn();
+    const first = runDrawerMark({ id: NID }, [NID], [b]);
+    const second = runDrawerMark({ id: NID }, [NID], [b]);
+    expect(b.dataset.saved).toBe('1');
+    expect(b.textContent).toBe('\u2713 Saved');
+    expect(first.posts).toEqual([]);
+    expect(second.posts).toEqual([]);
+  });
+});
