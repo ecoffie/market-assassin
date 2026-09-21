@@ -1,0 +1,232 @@
+{
+  "environment": "local_code_against_live_data",
+  "not": "authenticated_public_mcp",
+  "startedAt": "2026-09-21T00:58:26.250Z",
+  "finishedAt": "2026-09-21T00:58:27.288Z",
+  "codeSha": "8901bc0988a807780559dba11a6d2c35caa2a1c1",
+  "inputs": {
+    "get_contractor_profile": {
+      "company_name": "Cyrus Management Solutions"
+    },
+    "lookup_sam_entity": {
+      "uei": "N1N9JPDYHVC7"
+    },
+    "get_contractor_award_history": {
+      "uei": "N1N9JPDYHVC7",
+      "award_limit": 20
+    }
+  },
+  "acceptance": {
+    "F1_freshness_three_clocks": true,
+    "F2_set_aside_provenance": true,
+    "F3_null_first_positive_note": true,
+    "F4_last_fy_deprecated": true,
+    "F4_zero_unused_vehicle_false": true,
+    "O6_counting_bases": true,
+    "O8_agency_count_null": true,
+    "no_award_origin_field": true
+  },
+  "cross": {
+    "identity": {
+      "profile_uei": "N1N9JPDYHVC7",
+      "profile_name": "CYRUS MANAGEMENT SOLUTIONS LLC",
+      "sam_uei": "N1N9JPDYHVC7",
+      "sam_has8a": false,
+      "sam_lookup_ok": true,
+      "history_company": "CYRUS MANAGEMENT SOLUTIONS LLC",
+      "history_match": {
+        "method": "recipient_uei",
+        "confidence": "high",
+        "name": "CYRUS MANAGEMENT SOLUTIONS LLC",
+        "match_status": "unique"
+      }
+    },
+    "scope": {
+      "profile_set_aside_scope": {
+        "kind": "profile_rollup",
+        "uei_count": 1
+      },
+      "history_set_aside_scope": {
+        "kind": "history_single_uei",
+        "uei_count": 1
+      },
+      "profile_coverage_scope": "parent_rollup"
+    },
+    "awards_counts": {
+      "profile_award_count": 17,
+      "profile_counting_bases": {
+        "unique_awards": 17,
+        "fiscal_year_award_count_sum": 51,
+        "recent_actions_returned": 5,
+        "recent_unique_awards": 2,
+        "recent_grain": "obligation_actions",
+        "note": "award_count / unique_awards = distinct awards in the warehouse profile. Summing per-FY award counts double-counts awards with actions in multiple years. recent_* rows are obligation actions (often modifications), not unique awards."
+      },
+      "history_award_count": 17,
+      "history_counting_bases": {
+        "unique_awards": 17,
+        "fiscal_year_award_count_sum": 51,
+        "recent_actions_returned": 20,
+        "recent_unique_awards": 8,
+        "recent_grain": "obligation_actions",
+        "note": "award_count / unique_awards = distinct awards in the warehouse profile. Summing per-FY award counts double-counts awards with actions in multiple years. recent_* rows are obligation actions (often modifications), not unique awards."
+      }
+    },
+    "freshness": {
+      "profile": {
+        "as_of": "2026-06-16",
+        "warehouse_max_action_date": "2026-09-18",
+        "coverage_complete_established": true,
+        "ingest.freshness_status": "healthy",
+        "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage."
+      },
+      "history": {
+        "last_recipient_action_date": "2026-06-16",
+        "warehouse_max_action_date": "2026-09-18",
+        "coverage_complete_established": true,
+        "ingest.freshness_status": "healthy",
+        "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage."
+      }
+    },
+    "set_asides": {
+      "profile": {
+        "labels": [
+          "8(A) SOLE SOURCE",
+          "8A COMPETED"
+        ],
+        "coverage": "complete",
+        "scope": {
+          "kind": "profile_rollup",
+          "uei_count": 1
+        },
+        "null_first_positive_note": "A null first_observed_positive_action_fy does not prove every action was a deobligation — it only means no positive-obligation action was observed for that label in this warehouse scope.",
+        "deprecated.last_fy_by_label.status": "deprecated"
+      },
+      "history": {
+        "labels": [
+          "8(A) SOLE SOURCE",
+          "8A COMPETED"
+        ],
+        "coverage": "complete",
+        "scope": {
+          "kind": "history_single_uei",
+          "uei_count": 1
+        },
+        "null_first_positive_note": "A null first_observed_positive_action_fy does not prove every action was a deobligation — it only means no positive-obligation action was observed for that label in this warehouse scope.",
+        "deprecated.last_fy_by_label.status": "deprecated"
+      },
+      "profile_contributing_sample": {
+        "label": "8(A) SOLE SOURCE",
+        "contributing_ueis": [
+          "N1N9JPDYHVC7"
+        ],
+        "supporting_actions": [
+          {
+            "uei": "N1N9JPDYHVC7",
+            "award_id": "CONT_AWD_TIRNO17C00059_2050_-NONE-_-NONE-",
+            "fiscal_year": 2017,
+            "obligation_amount": 3737545.6,
+            "action_date": "2017-09-29"
+          },
+          {
+            "uei": "N1N9JPDYHVC7",
+            "award_id": "CONT_AWD_TIRNO17C00072_2050_-NONE-_-NONE-",
+            "fiscal_year": 2017,
+            "obligation_amount": 3012541.12,
+            "action_date": "2017-09-28"
+          }
+        ],
+        "first_positive": 2016
+      }
+    },
+    "activity": {
+      "profile_status": "dormant",
+      "profile_last_positive": 2020,
+      "history_status": "dormant"
+    },
+    "sam_certs": {
+      "has8a": false,
+      "hasWOSB": true,
+      "lookup_status": "found"
+    },
+    "zero_dollar_cells": [
+      {
+        "fy": 2016,
+        "agency": "General Services Administration",
+        "amount": 0,
+        "count": 1,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2017,
+        "agency": "General Services Administration",
+        "amount": 0,
+        "count": 2,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2018,
+        "agency": "Department of the Treasury",
+        "amount": 0,
+        "count": 1,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2018,
+        "agency": "General Services Administration",
+        "amount": 0,
+        "count": 1,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2019,
+        "agency": "General Services Administration",
+        "amount": 0,
+        "count": 2,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2020,
+        "agency": "Department of Defense",
+        "amount": 0,
+        "count": 1,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2020,
+        "agency": "General Services Administration",
+        "amount": 0,
+        "count": 2,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 2 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      },
+      {
+        "fy": 2021,
+        "agency": "Department of the Treasury",
+        "amount": 0,
+        "count": 1,
+        "classification": "zero_net_obligations",
+        "unused_vehicle": false,
+        "classification_note": "Zero net with 1 award action(s). Without authoritative award-type evidence this is not classified as an unused vehicle — zero-dollar rows alone are insufficient."
+      }
+    ]
+  },
+  "raw_paths": {
+    "profile": "01-profile.json",
+    "sam": "02-sam.json",
+    "history": "03-history.json"
+  }
+}

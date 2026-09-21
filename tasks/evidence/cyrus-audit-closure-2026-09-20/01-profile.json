@@ -1,0 +1,350 @@
+{
+  "ok": true,
+  "found": true,
+  "resolution": "unique",
+  "match_status": "unique",
+  "source": "recipients_rollup",
+  "coverage": {
+    "dataset": "recipients_rollup",
+    "measure": "total_obligated",
+    "scope": "parent_rollup",
+    "as_of": "2026-06-16",
+    "as_of_meaning": "Most recent action_date on this recipient in the warehouse — not warehouse max action_date, not the ingest run date, and not proof the corpus stopped updating or is complete.",
+    "warehouse_max_action_date": "2026-09-18",
+    "ingest": {
+      "last_built": "2026-09-20",
+      "acquired_at": "2026-09-20T18:16:56.112Z",
+      "merged_at": "2026-09-20T18:18:56.743Z",
+      "recipients_rebuilt_at": "2026-09-20T18:19:35.838Z",
+      "freshness_status": "healthy",
+      "source_age_days": 3,
+      "run_age_days": 0
+    },
+    "coverage_complete_established": true,
+    "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage.",
+    "coverage_timestamp": {
+      "last_recipient_action_date": "2026-06-16",
+      "last_recipient_action_meaning": "Most recent action_date on this recipient in the warehouse — not warehouse max action_date, not the ingest run date, and not proof the corpus stopped updating or is complete.",
+      "warehouse_max_action_date": "2026-09-18",
+      "warehouse_max_action_meaning": "Latest action_date observed across the awards warehouse (all recipients). Missing → unknown.",
+      "ingest": {
+        "last_built": "2026-09-20",
+        "acquired_at": "2026-09-20T18:16:56.112Z",
+        "merged_at": "2026-09-20T18:18:56.743Z",
+        "recipients_rebuilt_at": "2026-09-20T18:19:35.838Z",
+        "freshness_status": "healthy",
+        "source_age_days": 3,
+        "run_age_days": 0
+      },
+      "coverage_complete_established": true,
+      "freshness_note": "Three clocks: recipient last action 2026-06-16; warehouse awards reach action_date 2026-09-18; ingest freshness=healthy. A contractor's quieter last_action_date does not mean the dataset is stale, and a recent recipient action alone does not establish complete warehouse coverage."
+    },
+    "not_equivalent_to": "recipients.total_obligated"
+  },
+  "company": {
+    "name": "CYRUS MANAGEMENT SOLUTIONS LLC",
+    "uei": "N1N9JPDYHVC7",
+    "location": "UPPER MARLBORO, MD",
+    "total_obligated": 14956164.46,
+    "award_count": 17,
+    "agencies_served": 6,
+    "first_award": "2015-11-19",
+    "last_award": "2026-06-16",
+    "last_positive_obligation_fy": 2020,
+    "activity_status": "dormant",
+    "activity_note": "Period-scoped observation for FY2025–FY2026 (reference FY2026): activity_status=dormant. Last FY with an explicit positive-obligation component: FY2020. Federal obligations are not company revenue. A negative net FY can still contain positive obligation actions.",
+    "activity_observation_period": {
+      "reference_fy": 2026,
+      "lookback_years": 2,
+      "window_start_fy": 2025,
+      "window_end_fy": 2026,
+      "series_coverage": "adequate",
+      "years_present": [
+        2025,
+        2026
+      ],
+      "years_missing": []
+    },
+    "obligations_are_not_revenue": true
+  },
+  "counting_bases": {
+    "unique_awards": 17,
+    "fiscal_year_award_count_sum": 51,
+    "recent_actions_returned": 5,
+    "recent_unique_awards": 2,
+    "recent_grain": "obligation_actions",
+    "note": "award_count / unique_awards = distinct awards in the warehouse profile. Summing per-FY award counts double-counts awards with actions in multiple years. recent_* rows are obligation actions (often modifications), not unique awards."
+  },
+  "top_agencies": [
+    {
+      "awarding_agency": "Department of the Treasury",
+      "total_amount": 8123479.930000002,
+      "pct_of_total": 0.5431526212302697,
+      "count": null,
+      "count_unavailable": true
+    },
+    {
+      "awarding_agency": "Department of Transportation",
+      "total_amount": 3634878.0600000005,
+      "pct_of_total": 0.24303544332649044,
+      "count": null,
+      "count_unavailable": true
+    },
+    {
+      "awarding_agency": "Department of Defense",
+      "total_amount": 3304315.4799999995,
+      "pct_of_total": 0.2209333475061292,
+      "count": null,
+      "count_unavailable": true
+    },
+    {
+      "awarding_agency": "General Services Administration",
+      "total_amount": 0,
+      "pct_of_total": 0,
+      "count": null,
+      "count_unavailable": true
+    },
+    {
+      "awarding_agency": "Department of State",
+      "total_amount": -52029.87,
+      "pct_of_total": -0.003478824409771167,
+      "count": null,
+      "count_unavailable": true
+    }
+  ],
+  "top_agencies_returned": 5,
+  "top_agencies_limit": 5,
+  "top_agencies_capped": true,
+  "top_agencies_note": "Showing top 5 of 6 agencies by net obligations (includes $0/negative nets). Cap is explicit.",
+  "recent_awards": [
+    {
+      "award_id": "CONT_AWD_DTOS5917P00052_6901_-NONE-_-NONE-",
+      "piid": "DTOS5917P00052",
+      "mod_number": "A00005",
+      "mod_classification": "modification",
+      "is_modification": true,
+      "awarding_agency": "Department of Transportation",
+      "awarding_office": "693JJ3 ACQUISITION AND GRANTS MGT",
+      "naics_code": "541511",
+      "naics_description": "CUSTOM COMPUTER PROGRAMMING SERVICES",
+      "description": "CYBER SECURITY SERVICES IGF::OT::IGF",
+      "obligation_amount": 142225.2,
+      "action_date": "2020-08-21",
+      "pop_start_date": "2017-02-23",
+      "pop_end_date": "2021-02-28",
+      "date_range_assessment": "valid",
+      "date_range_valid": true,
+      "date_range_issue": null,
+      "pop_state": "MD",
+      "set_aside": "8(A) SOLE SOURCE",
+      "grain": "obligation_action"
+    },
+    {
+      "award_id": "CONT_AWD_DTOS5917P00052_6901_-NONE-_-NONE-",
+      "piid": "DTOS5917P00052",
+      "mod_number": "A00004",
+      "mod_classification": "modification",
+      "is_modification": true,
+      "awarding_agency": "Department of Transportation",
+      "awarding_office": "693JJ3 ACQUISITION AND GRANTS MGT",
+      "naics_code": "541511",
+      "naics_description": "CUSTOM COMPUTER PROGRAMMING SERVICES",
+      "description": "CYBER SECURITY SERVICES IGF::OT::IGF",
+      "obligation_amount": 145872,
+      "action_date": "2020-01-16",
+      "pop_start_date": "2017-02-23",
+      "pop_end_date": "2020-08-31",
+      "date_range_assessment": "valid",
+      "date_range_valid": true,
+      "date_range_issue": null,
+      "pop_state": "MD",
+      "set_aside": "8(A) SOLE SOURCE",
+      "grain": "obligation_action"
+    },
+    {
+      "award_id": "CONT_AWD_DTFH6115C00013_6925_-NONE-_-NONE-",
+      "piid": "DTFH6115C00013",
+      "mod_number": "P00016",
+      "mod_classification": "modification",
+      "is_modification": true,
+      "awarding_agency": "Department of Transportation",
+      "awarding_office": "693JJ3 ACQUISITION AND GRANTS MGT",
+      "naics_code": "541519",
+      "naics_description": "OTHER COMPUTER RELATED SERVICES",
+      "description": "IGF::OT::IGF  8A SOLE SOURCE CONTRACT FOR EA, IA SUPPORT",
+      "obligation_amount": 389951.38,
+      "action_date": "2019-04-17",
+      "pop_start_date": "2014-12-24",
+      "pop_end_date": "2019-11-23",
+      "date_range_assessment": "valid",
+      "date_range_valid": true,
+      "date_range_issue": null,
+      "pop_state": "DC",
+      "set_aside": "8(A) SOLE SOURCE",
+      "grain": "obligation_action"
+    },
+    {
+      "award_id": "CONT_AWD_DTFH6115C00013_6925_-NONE-_-NONE-",
+      "piid": "DTFH6115C00013",
+      "mod_number": "P00015",
+      "mod_classification": "modification",
+      "is_modification": true,
+      "awarding_agency": "Department of Transportation",
+      "awarding_office": "693JJ3 ACQUISITION AND GRANTS MGT",
+      "naics_code": "541519",
+      "naics_description": "OTHER COMPUTER RELATED SERVICES",
+      "description": "IGF::OT::IGF  8A SOLE SOURCE CONTRACT FOR EA, IA SUPPORT",
+      "obligation_amount": 35147.67,
+      "action_date": "2019-03-20",
+      "pop_start_date": "2014-12-24",
+      "pop_end_date": "2019-11-23",
+      "date_range_assessment": "valid",
+      "date_range_valid": true,
+      "date_range_issue": null,
+      "pop_state": "DC",
+      "set_aside": "8(A) SOLE SOURCE",
+      "grain": "obligation_action"
+    },
+    {
+      "award_id": "CONT_AWD_DTOS5917P00052_6901_-NONE-_-NONE-",
+      "piid": "DTOS5917P00052",
+      "mod_number": "A00003",
+      "mod_classification": "modification",
+      "is_modification": true,
+      "awarding_agency": "Department of Transportation",
+      "awarding_office": "693JJ3 ACQUISITION AND GRANTS MGT",
+      "naics_code": "541511",
+      "naics_description": "CUSTOM COMPUTER PROGRAMMING SERVICES",
+      "description": "CYBER SECURITY SERVICES IGF::OT::IGF",
+      "obligation_amount": 291744,
+      "action_date": "2019-02-27",
+      "pop_start_date": "2017-02-23",
+      "pop_end_date": "2020-02-28",
+      "date_range_assessment": "valid",
+      "date_range_valid": true,
+      "date_range_issue": null,
+      "pop_state": "MD",
+      "set_aside": "8(A) SOLE SOURCE",
+      "grain": "obligation_action"
+    }
+  ],
+  "recent_awards_note": "recent_awards are dollar-bearing obligation actions (often modifications). See counting_bases for unique awards in this sample.",
+  "historical_set_asides": {
+    "labels": [
+      "8(A) SOLE SOURCE",
+      "8A COMPETED"
+    ],
+    "last_observed_action_fy_by_label": {
+      "8(A) SOLE SOURCE": 2022,
+      "8A COMPETED": 2023
+    },
+    "first_observed_positive_action_fy_by_label": {
+      "8(A) SOLE SOURCE": 2016,
+      "8A COMPETED": null
+    },
+    "last_fy_by_label": {
+      "8(A) SOLE SOURCE": 2022,
+      "8A COMPETED": 2023
+    },
+    "deprecated": {
+      "last_fy_by_label": {
+        "status": "deprecated",
+        "prefer": "last_observed_action_fy_by_label",
+        "meaning": "Alias of last_observed_action_fy_by_label kept for compatibility. Not award origin and not certification."
+      }
+    },
+    "contributing_ueis_by_label": {
+      "8(A) SOLE SOURCE": [
+        "N1N9JPDYHVC7"
+      ],
+      "8A COMPETED": [
+        "N1N9JPDYHVC7"
+      ]
+    },
+    "supporting_actions_by_label": {
+      "8(A) SOLE SOURCE": [
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_AWD_TIRNO17C00059_2050_-NONE-_-NONE-",
+          "fiscal_year": 2017,
+          "obligation_amount": 3737545.6,
+          "action_date": "2017-09-29"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_AWD_TIRNO17C00072_2050_-NONE-_-NONE-",
+          "fiscal_year": 2017,
+          "obligation_amount": 3012541.12,
+          "action_date": "2017-09-28"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_AWD_N0018917PZ163_9700_-NONE-_-NONE-",
+          "fiscal_year": 2017,
+          "obligation_amount": 1941495.48,
+          "action_date": "2017-03-15"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_AWD_TIRNO14C00039_2050_-NONE-_-NONE-",
+          "fiscal_year": 2016,
+          "obligation_amount": 1422471.57,
+          "action_date": "2016-08-30"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_AWD_N0018917PZ163_9700_-NONE-_-NONE-",
+          "fiscal_year": 2018,
+          "obligation_amount": 870856.2,
+          "action_date": "2018-03-01"
+        }
+      ],
+      "8A COMPETED": [
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_IDV_GS00Q17GWD2310_4732",
+          "fiscal_year": 2021,
+          "obligation_amount": 0,
+          "action_date": "2021-09-20"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_IDV_GS00Q17GWD2310_4732",
+          "fiscal_year": 2020,
+          "obligation_amount": 0,
+          "action_date": "2020-08-13"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_IDV_GS00Q17GWD2310_4732",
+          "fiscal_year": 2017,
+          "obligation_amount": 0,
+          "action_date": "2017-06-13"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_IDV_GS00Q17GWD2310_4732",
+          "fiscal_year": 2023,
+          "obligation_amount": 0,
+          "action_date": "2023-04-18"
+        },
+        {
+          "uei": "N1N9JPDYHVC7",
+          "award_id": "CONT_IDV_GS00Q17GWD2310_4732",
+          "fiscal_year": 2019,
+          "obligation_amount": 0,
+          "action_date": "2018-10-22"
+        }
+      ]
+    },
+    "null_first_positive_note": "A null first_observed_positive_action_fy does not prove every action was a deobligation — it only means no positive-obligation action was observed for that label in this warehouse scope.",
+    "scope": {
+      "kind": "profile_rollup",
+      "uei_count": 1
+    },
+    "coverage": "complete",
+    "note": "Historical set-aside codes observed on warehouse award actions. last_observed_action_fy is the latest action FY for that code (may be a deobligation). first_observed_positive_action_fy is the earliest positive-obligation action FY when present — a later positive modification is still an action FY, not award origin. A null first_observed_positive_action_fy does not prove every action was a deobligation — it only means no positive-obligation action was observed for that label in this warehouse scope. Award origin is unknown unless a dedicated origin signal is present. None of these fields is current SAM certification status or a graduation/exit reason. last_fy_by_label is a deprecated alias of last_observed_action_fy_by_label. Aggregated across warehouse award actions for this profile's UEI set (not derived from the capped recent_awards sample). Award origin is not established by this query."
+  },
+  "enrichment_status": "complete",
+  "totals_note": "Profile dollars may come from a parent rollup; award history is one UEI. Do not treat the two totals as the same figure."
+}
