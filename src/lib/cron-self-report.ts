@@ -31,6 +31,29 @@ import { createClient } from '@supabase/supabase-js';
 export type CronOutcome = 'success' | 'error' | 'partial';
 
 /**
+ * The cron_jobs row that claimed THIS request, as the dispatcher declared it in
+ * `x-cron-job`.
+ *
+ * Needed because a route can be the target of MORE THAN ONE job:
+ * `/api/cron/daily-alerts` is fired by both `daily-alerts` and `daily-alerts-10`;
+ * `/api/cron/weekly-alerts` by both `weekly-alerts` and `weekly-alerts-mon`.
+ * `reportCronOutcome` writes BY JOB NAME, so such a route has no safe constant to
+ * pass — and writing a terminal status onto the wrong row is worse than leaving
+ * the run unconfirmed. Returning null here is the honest answer: the caller then
+ * reports nothing (a manual curl, or a deployment predating the dispatcher
+ * change, has no claimed job to speak for).
+ *
+ * Validated against the cron_jobs naming shape so a stray header cannot address
+ * an arbitrary row.
+ */
+export function dispatchedJobName(headers: { get(name: string): string | null }): string | null {
+  const raw = headers.get('x-cron-job');
+  if (!raw) return null;
+  const name = raw.trim();
+  return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(name) ? name : null;
+}
+
+/**
  * Write a terminal status for `jobName` into cron_jobs (and close out its most
  * recent cron_job_runs row, so run history matches).
  *

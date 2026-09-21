@@ -28,6 +28,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { INVARIANTS, passes, type Invariant } from '@/lib/data-invariants/registry';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,8 @@ export const maxDuration = 120;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const STATE_KEY = 'datainv:breaches'; // ids currently in breach, as alerted
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'data-invariants-watch';
 const ALERT_TO = process.env.WATCHDOG_ALERT_EMAIL || 'eric@govcongiants.com';
 
 /** ET + UTC together — "did it run today?" is unanswerable otherwise. */
@@ -69,6 +72,7 @@ export async function GET(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
+    if (!dryRun) await reportCronOutcome(CRON_JOB_NAME, 'error', 'Supabase not configured');
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   }
   const db = createClient(url, key, { auth: { persistSession: false } });
@@ -156,6 +160,32 @@ export async function GET(request: NextRequest) {
 
   if (!dryRun) {
     try { await kv.set(STATE_KEY, nowBreachedIds); } catch { /* ignore */ }
+  }
+
+  // TERMINAL SELF-REPORT. All 30 runs in the 30 days before this was wired were
+  // recorded `dispatched` with http_status NULL — this watch queries every invariant
+  // serially and outlives the dispatcher's 12s ack, so nothing ever confirmed the
+  // WATCH ITSELF had run. A silent watchdog is the worst kind: it reads as "no
+  // breaches" when it may simply never have looked.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate, and here they point opposite ways: a
+  // BREACHED invariant is a healthy run of the watch (it found what it looks for),
+  // so it is a success. A run whose PROBES failed to evaluate is the reverse — it
+  // completed while establishing nothing, which is partial, never success. That
+  // distinction is exactly what `ok: true // a failed probe is not a data breach`
+  // encodes per-probe, carried up to the job's own status.
+  if (!dryRun) {
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      probeErrors.length === results.length && results.length > 0
+        ? 'error'
+        : probeErrors.length > 0
+          ? 'partial'
+          : 'success',
+      probeErrors.length > 0
+        ? `${probeErrors.length}/${results.length} probes failed to evaluate: ${probeErrors.map((p) => p.id).join(',')}`
+        : undefined,
+    );
   }
 
   return NextResponse.json({

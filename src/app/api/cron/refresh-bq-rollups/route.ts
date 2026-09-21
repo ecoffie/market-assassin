@@ -20,10 +20,14 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // generous — the build scans the full table
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'refresh-bq-rollups';
 
 // Drop the surrounding backticks BQ_TABLES adds, since these statements
 // reference the fully-qualified names directly.
@@ -153,6 +157,22 @@ async function handle(request: NextRequest) {
   }
 
   const allOk = results.every(r => r.ok);
+
+  // TERMINAL SELF-REPORT. Its one run in the preceding 30 days (it is monthly) was
+  // recorded `dispatched` with http_status NULL — full-table BigQuery aggregates take
+  // far longer than the dispatcher's 12s ack, so the 500 below never reached anything
+  // and a month of broken rollups would have looked identical to a healthy month.
+  //
+  // EXECUTION vs ADVANCEMENT: every statement is a rollup WRITE, so a statement that
+  // failed is a rollup that did not advance. Some failing is partial; all failing is an
+  // error.
+  const okCount = results.filter((r) => r.ok).length;
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    allOk ? 'success' : okCount === 0 ? 'error' : 'partial',
+    allOk ? undefined : `${results.length - okCount}/${results.length} rollup statements failed`,
+  );
+
   return NextResponse.json({ success: allOk, results }, { status: allOk ? 200 : 500 });
 }
 

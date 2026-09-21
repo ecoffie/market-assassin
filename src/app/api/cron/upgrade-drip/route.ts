@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { UPGRADE_DRIP, dripForDay } from '@/lib/mindy/upgrade-drip';
 import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 /**
  * GET /api/cron/upgrade-drip
@@ -24,6 +25,9 @@ import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'upgrade-drip';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const CHECKOUT_URL = 'https://getmindy.ai/checkout/mindy-pro-monthly?utm_source=email&utm_medium=upgrade_drip';
@@ -147,6 +151,28 @@ export async function GET(request: NextRequest) {
     }
     await new Promise((r) => setTimeout(r, 120));
   }
+
+  // TERMINAL SELF-REPORT. All 30 runs in the 30 days before this was wired were
+  // recorded `dispatched` with http_status NULL — the send loop paces at 120ms per
+  // recipient up to a 500 cap, so it always outlives the dispatcher's 12s ack. These
+  // are CUSTOMER-FACING upgrade emails: a run that quietly sent none looked exactly
+  // like a run that sent 300.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate. An empty queue (nothing due today) is a
+  // real success. A non-empty queue that produced ZERO sends is not: sendEmail
+  // returns false on a cap/suppression/provider failure without throwing, which is
+  // how a dead provider would otherwise read as a clean run.
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    slice.length === 0
+      ? 'success'
+      : sent === 0
+        ? 'error'
+        : failures.length > 0
+          ? 'partial'
+          : 'success',
+    failures.length > 0 ? `${failures.length}/${slice.length} sends failed` : undefined,
+  );
 
   return NextResponse.json({
     success: true,

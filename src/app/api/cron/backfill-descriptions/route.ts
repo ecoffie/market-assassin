@@ -24,10 +24,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isDescriptionLink, fetchNoticeDescription } from '@/lib/sam/notice-description';
 import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
+import { reportCronOutcome, dispatchedJobName } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
+
+/**
+ * The cron_jobs row that claimed this request, or null when it is not a dispatcher fire.
+ *
+ * TWO rows share this route — `backfill-descriptions` (active corpus) and
+ * `backfill-descriptions-inactive` (`?inactive=1`). The query string does distinguish
+ * them, but a hand-run curl carries the same params, and `reportCronOutcome` writes BY
+ * JOB NAME — so the name comes from the dispatcher's `x-cron-job` header only. No header
+ * → nothing is reported, which is the honest answer for a manual run.
+ */
+function claimedJob(request: NextRequest): string | null {
+  if (request.headers.get('x-cron-dispatch') !== '1') return null;
+  return dispatchedJobName(request.headers);
+}
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -95,6 +110,7 @@ async function processOne(supabase: ReturnType<typeof sb>, row: Row, pool: KeyPo
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const mode = url.searchParams.get('mode') || 'preview';
+  const job = claimedJob(request);
   const active = url.searchParams.get('inactive') !== '1';
   // Re-sweep mode: re-claim the abandoned '' rows (description='' AND checked_at IS NULL) instead of
   // the normal link/null scope. A one-time drain to recover transient-failure poison; genuine empties
@@ -121,13 +137,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, mode: 'preview', target: active ? 'active' : 'inactive', scope: resweep ? 'resweep' : 'link', remaining: remaining || 0 });
   }
   if (pool.keys.length === 0) {
+    if (job) await reportCronOutcome(job, 'error', 'No SAM API keys configured');
     return NextResponse.json({ success: false, error: 'No SAM API keys configured' }, { status: 500 });
   }
 
   const { data, error } = await scoped(
     supabase.from('sam_opportunities').select('id, notice_id, raw_data'),
   ).limit(limit);
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (error) {
+    if (job) await reportCronOutcome(job, 'error', `claim failed: ${error.message}`);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
   const rows = (data || []) as Row[];
 
   // Concurrency pool with a soft time budget so we return before the platform kills us.
@@ -150,6 +170,36 @@ export async function GET(request: NextRequest) {
     }
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
+
+  // TERMINAL SELF-REPORT. `backfill-descriptions` recorded `dispatched` with http_status
+  // NULL on 202 of 4,106 runs and `-inactive` on 196 of 4,253 in the preceding 30 days —
+  // whenever the 4-minute soft budget is actually used, the run outlives the dispatcher's
+  // 12s ack and the body below reaches a closed connection.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate. `rateLimited` means every SAM key's daily
+  // quota was spent and the remaining rows were deliberately NOT burned: the run
+  // completed, the corpus did not advance — error, not success. A batch that claimed rows
+  // and processed none is partial. `empty` rows ARE advancement (they are stamped and
+  // leave the queue), so a run of genuinely-empty descriptions is a success.
+  if (job) {
+    await reportCronOutcome(
+      job,
+      rateLimited
+        ? 'error'
+        : rows.length > 0 && processed === 0
+          ? 'partial'
+          : fail > 0
+            ? 'partial'
+            : 'success',
+      rateLimited
+        ? `SAM daily quota exhausted after ${processed}/${rows.length} rows`
+        : rows.length > 0 && processed === 0
+          ? `0 of ${rows.length} claimed rows processed`
+          : fail > 0
+            ? `${fail} of ${rows.length} rows failed`
+            : undefined,
+    );
+  }
 
   return NextResponse.json({
     success: true,

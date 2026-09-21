@@ -38,6 +38,10 @@ import { fetchExpiringForNaics, type SyncedContract } from '@/lib/recompete/usas
 import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete/change-log';
 import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
 import { preserveRicherEnrichment, type EnrichmentFields } from '@/lib/recompete/preserve-enrichment';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'sync-recompete-contracts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -156,6 +160,11 @@ export async function GET(request: NextRequest) {
     lim: limit,
   });
   if (targetErr) {
+    // Only the scheduled shape (mode=execute) speaks for the job; a hand-run
+    // preview must not overwrite its status.
+    if (mode === 'execute') {
+      await reportCronOutcome(CRON_JOB_NAME, 'error', `staleness scan failed: ${targetErr.message}`);
+    }
     return NextResponse.json(
       { error: `staleness scan failed: ${targetErr.message}` },
       { status: 500 },
@@ -343,8 +352,33 @@ export async function GET(request: NextRequest) {
 
   // A truncated or failed shard is a FAILED job, not a quiet short result. This
   // is the exact shape of every bug in this series: an incomplete run that looks
-  // complete. The dispatcher records the non-2xx against cron_jobs.
+  // complete.
   const incomplete = truncated.length > 0 || Object.keys(failed).length > 0;
+
+  // TERMINAL SELF-REPORT — and a correction. This block used to claim "the
+  // dispatcher records the non-2xx against cron_jobs". It does not, for THIS job:
+  // it runs to a 240s budget, so the dispatcher gave up listening at 12s and every
+  // one of its 719 runs in the preceding 30 days was recorded `dispatched` with
+  // http_status NULL. The 500 below was written to a closed connection, which means
+  // the "fail loud" intent above had no audience at all. Now it does.
+  //
+  // EXECUTION vs ADVANCEMENT stay separate: a run that claimed NAICS and wrote no
+  // rows completed but advanced nothing, so it is partial rather than success —
+  // genuinely-empty NAICS shards are normal here, which is why that case is partial
+  // (worth a look across days) and not error.
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    incomplete
+      ? 'error'
+      : naicsList.length > 0 && rowsWritten === 0
+        ? 'partial'
+        : 'success',
+    incomplete
+      ? `incomplete: ${truncated.length} truncated, ${Object.keys(failed).length} failed`
+      : naicsList.length > 0 && rowsWritten === 0
+        ? `0 rows written across ${naicsList.length} claimed NAICS`
+        : undefined,
+  );
 
   return NextResponse.json(
     {

@@ -28,10 +28,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // scans one filter set per saved search; bounded by SCAN_LIMIT + batch
+
+// Fired by exactly ONE cron_jobs row.
+const CRON_JOB_NAME = 'snapshot-watchlist';
 
 const SCAN_LIMIT = 500; // per-search match cap (PostgREST hard-caps at 1000); `capped` flags the floor
 
@@ -66,6 +70,7 @@ export async function GET(request: NextRequest) {
     .select('id, user_email, filters, last_seen_notice_ids')
     .eq('mode', 'open');
   if (sErr) {
+    await reportCronOutcome(CRON_JOB_NAME, 'error', `saved_searches read failed: ${sErr.message}`);
     return NextResponse.json({ success: false, error: sErr.message }, { status: 500 });
   }
 
@@ -136,6 +141,13 @@ export async function GET(request: NextRequest) {
   }
 
   if (!rows.length) {
+    // Nothing computed. If searches existed but every scan failed, the run finished
+    // without advancing anything — partial, not success.
+    await reportCronOutcome(
+      CRON_JOB_NAME,
+      failed > 0 ? 'partial' : 'success',
+      failed > 0 ? `${failed} saved-search scans failed, 0 snapshot rows computed` : undefined,
+    );
     return NextResponse.json({ success: true, date: snapshotDate, processed: 0, failed, message: 'no open saved searches to snapshot' });
   }
 
@@ -146,10 +158,29 @@ export async function GET(request: NextRequest) {
   if (upErr) {
     // The migration may not have landed yet — degrade clean rather than 500 the dispatcher.
     if (tableMissing(upErr)) {
+      // Computed but could not persist: EXECUTION finished, ADVANCEMENT is zero.
+      // Reporting this as success is precisely the "200 while writing nothing" scar,
+      // so it is partial even though the body is a 200 by design.
+      await reportCronOutcome(
+        CRON_JOB_NAME,
+        'partial',
+        `daily_saved_search_snapshots missing — ${rows.length} rows computed, 0 written`,
+      );
       return NextResponse.json({ success: true, date: snapshotDate, processed: 0, skipped: 'table_missing', computed: rows.length });
     }
+    await reportCronOutcome(CRON_JOB_NAME, 'error', `snapshot upsert failed: ${upErr.message}`);
     return NextResponse.json({ success: false, error: upErr.message, date: snapshotDate }, { status: 500 });
   }
+
+  // TERMINAL SELF-REPORT. All 30 runs in the 30 days before this was wired were
+  // recorded `dispatched` with http_status NULL: the job scans one filter set per
+  // saved search under a 300s ceiling, so it always outlives the dispatcher's 12s
+  // ack and none of these returns reached a listener.
+  await reportCronOutcome(
+    CRON_JOB_NAME,
+    failed > 0 ? 'partial' : 'success',
+    failed > 0 ? `${failed} saved-search scans failed, ${processed} snapshotted` : undefined,
+  );
 
   return NextResponse.json({ success: true, date: snapshotDate, processed, failed });
 }
