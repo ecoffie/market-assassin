@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 820" role="img" aria-labelledby="title desc">
-  <title id="title">Mindy AI</title>
-  <desc id="desc">Mindy AI blue chat mark with three purple dots.</desc>
-  <path fill="#253f91" d="M0 820V206C0 91 91 0 206 0c46 0 91 14 130 40l321 209c20 13 46 13 66 0l321-209c39-26 84-40 130-40 115 0 206 91 206 206v614H0Z" transform="scale(.742)" />
-  <path fill="#fff" d="M257 234c0-34 28-62 62-62 17 0 32 7 44 18l78 78c89 88 209 138 335 138 126 0 247-50 336-139l104-104c12-12 28-18 45-18 35 0 63 28 63 63v406c0 42-34 76-76 76H518L257 820V234Z" transform="translate(35 0) scale(.72)" />
-  <circle cx="334" cy="487" r="62" fill="#8b5cf6" />
-  <circle cx="512" cy="487" r="62" fill="#a78bfa" />
-  <circle cx="690" cy="487" r="62" fill="#c4b5fd" />
-</svg>
