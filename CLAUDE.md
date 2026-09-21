@@ -56,6 +56,28 @@ by hand.
 
 ---
 
+## ⚠️ Node 24 is required — a wrong Node reports itself as a LOCKFILE error
+
+`engines.node` is `24.x`; CI (`.github/workflows/*`) and Vercel both build on 24. Measured
+2026-09-21 against an **unmodified** `package-lock.json`:
+
+| toolchain | `npm ci` |
+|---|---|
+| node 24.13.0 / npm 11.6.2 | **exit 0** |
+| node 22.14.0 / npm 10.9.2 | **EUSAGE** — `Missing: proxy-agent@8.0.2 from lock file` |
+
+**The lockfile was correct both times.** npm 10 resolves puppeteer's `@puppeteer/browsers`
+peer range differently and demands a nested `proxy-agent` that the npm 11 lockfile has no
+reason to contain — so a **toolchain** mismatch is reported as **lockfile corruption**. That
+misdiagnosis cost a real investigation and nearly shipped a needless 97-line lockfile rewrite
+as a "fix".
+
+`.npmrc` sets `engine-strict=true`, so npm now refuses with `EBADENGINE … Required:
+{"node":"24.x"}` instead. **Do not "fix" the lockfile when you see a Missing-from-lock error
+— check `node -v` first.** Pinned by `src/lib/deploy/npm-engine-strict.unit.test.ts`.
+
+---
+
 ## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first
 
 `vercel --prod` uploads the directory that owns the nearest `.vercel/project.json`,
