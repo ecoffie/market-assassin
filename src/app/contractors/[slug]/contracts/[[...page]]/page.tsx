@@ -19,6 +19,7 @@ import {
   resolveCanonicalSlug,
   getPaginatedAwardsForRecipient,
 } from '@/lib/bigquery/recipients';
+import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { getAwardsSourceAsOf } from '@/lib/awards-serving';
 
@@ -134,7 +135,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   const tail = pageNum > 1 ? `/contracts/${pageNum}` : '/contracts';
   const recipient = await getRollupBySlug(slug);
   if (!recipient) {
-    const canonical = await resolveCanonicalSlug(slug);
+    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
     if (canonical) permanentRedirect(`/contractors/${canonical}${tail}`);
     notFound();
   }

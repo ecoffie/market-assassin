@@ -1,6 +1,11 @@
 import Link from 'next/link';
 
 export const metadata = {
+  // Self-canonical. Without this the ROOT layout's `alternates: { canonical: '/' }`
+  // default applies and this page tells Google to index the homepage instead of
+  // itself. Measured on production 2026-09-21 by crawling all 36,070 sitemap
+  // URLs: this page canonicalised to https://getmindy.ai.
+  alternates: { canonical: 'https://getmindy.ai/terms' },
   title: 'Terms of Service — Mindy',
   description: 'Terms of Service for Mindy by GovCon Giants.',
   robots: { index: true, follow: true },

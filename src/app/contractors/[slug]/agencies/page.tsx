@@ -18,6 +18,7 @@ import {
   getAllAgenciesForRecipient,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
+import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 
 const SITE_URL = 'https://getmindy.ai';
@@ -80,7 +81,7 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
   const { slug } = await params;
   const recipient = await getRollupBySlug(slug);
   if (!recipient) {
-    const canonical = await resolveCanonicalSlug(slug);
+    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
     if (canonical) permanentRedirect(`/contractors/${canonical}/agencies`);
     notFound();
   }

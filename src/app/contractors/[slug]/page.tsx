@@ -36,6 +36,7 @@ import {
   getSimilarRecipients,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
+import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { recordWarmMiss } from '@/lib/seo/served-slugs';
@@ -170,7 +171,7 @@ export default async function ContractorPage({ params }: PageProps) {
     // Slug doesn't match any rollup NAME. Before 404ing, check whether it's a
     // subsidiary slug (a child UEI's own name) that should consolidate onto its
     // parent — if so, 308 there.
-    const canonical = await resolveCanonicalSlug(slug);
+    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
     if (canonical) permanentRedirect(`/contractors/${canonical}`);
 
     // Last-ditch fallback: live BQ rollup + base-recipients table (catches
