@@ -20,7 +20,7 @@ How features move from competitive intel to production. Every feature follows th
 |--------|----------|-----------------|
 | Competitor gaps | `COMPETITIVE-INTEL.md` | Weekly |
 | User requests | Support emails, bootcamp feedback | Ongoing |
-| SEO opportunities | `~/govcon-funnels/SEO-3-MONTH-PLAN.md` | Weekly |
+| SEO opportunities | `/Users/ericcoffie/Projects/govcon-funnels/SEO-3-MONTH-PLAN.md` | Weekly |
 | Market signals | Reddit, LinkedIn, industry news | Weekly |
 | Internal ideas | Slack, session notes | Ongoing |
 
@@ -135,7 +135,7 @@ Before writing a PRD, answer:
 | Active PRDs | `tasks/prd-*.md` |
 | Current work | `tasks/todo.md` |
 | Roadmap | `market-assassin/TOOL-BUILD.md` |
-| SEO plan | `~/govcon-funnels/SEO-3-MONTH-PLAN.md` |
+| SEO plan | `/Users/ericcoffie/Projects/govcon-funnels/SEO-3-MONTH-PLAN.md` |
 | Lessons | `tasks/lessons.md` |
 | Session history | `market-assassin/MEMORY.md` |
 

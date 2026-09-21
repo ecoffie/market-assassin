@@ -56,8 +56,9 @@
  * on the select line or the line above it. The reason is required — an
  * unexplained suppression is how a gate rots.
  */
-import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { runBaselineGate } from './lib/finding-identity.mjs';
 
 const DIR = 'scripts';
 const BASELINE_FILE = 'tests/fixtures/unranged-select-baseline.json';
@@ -103,42 +104,28 @@ for (const f of files) {
   if (bad.length) offenders.push({ file: f, bad, kind });
 }
 
-// Baseline: `${file}:${line}` keys accepted as pre-existing.
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).violations || [])
-  : new Set();
-
-const keys = offenders.flatMap((o) => o.bad.map((b) => `${o.file}:${b.line}`));
-
-if (process.argv.includes('--update-baseline')) {
-  mkdirSync(dirname(BASELINE_FILE), { recursive: true });
-  writeFileSync(BASELINE_FILE, JSON.stringify({
-    note: 'Pre-existing un-ranged list selects under scripts/ (WRITE = mutates the wrong rows; READ = reports a fabricated number). The gate blocks only NEW ones. Shrink this list; never grow it.',
-    updated: new Date().toISOString().slice(0, 10),
-    violations: keys.sort(),
-  }, null, 2) + '\n');
-  console.log(`baseline updated — ${keys.length} accepted violation(s) recorded`);
-  process.exit(0);
-}
-
-const fresh = offenders
-  .map((o) => ({ ...o, bad: o.bad.filter((b) => !baseline.has(`${o.file}:${b.line}`)) }))
-  .filter((o) => o.bad.length);
-
-if (!fresh.length) {
-  console.log(`\x1b[32m✓ no NEW un-ranged list selects (${scanned} scripts scanned, ${baseline.size} baselined)\x1b[0m`);
-  process.exit(0);
-}
-
-const total = fresh.reduce((a, o) => a + o.bad.length, 0);
-const kinds = [...new Set(fresh.map((o) => o.kind))].join('+');
-console.error(`\x1b[31m✗ ${total} NEW un-ranged list select(s) in ${fresh.length} script(s) [${kinds}]\x1b[0m`);
-console.error('  PostgREST caps an unranged select at 1,000 rows SILENTLY — a script that');
-console.error('  WRITE: mutates the wrong population.  READ: reports a fabricated number\n  (measured 2026-08-22: "24 accounts, 0 new" when the truth was 59 and 23).\n');
-for (const o of fresh) {
-  console.error(`  ${o.file}`);
-  for (const b of o.bad) console.error(`      ${b.line}: ${b.text}`);
-}
-console.error('\n  Fix: add .range(from, to) and page, or .limit(n) for a deliberately bounded read.');
-console.error('  Or annotate with  // unranged-ok: <reason>  if the bound is genuinely safe.');
-process.exit(1);
+// Findings carry their own evidence (the select line) so the baseline key is
+// content-addressed — see scripts/lib/finding-identity.mjs for why `path:line` was a bug.
+// `kind` (WRITE/READ) is a property of the FILE, not of the finding, so it is reported but
+// deliberately kept OUT of the identity: adding a `.delete()` elsewhere in the same script
+// must not rename an unrelated select.
+runBaselineGate({
+  name: 'unranged-selects',
+  script: 'audit-unranged-selects.mjs',
+  findings: offenders.flatMap((o) => o.bad.map((b) => ({
+    file: o.file, line: b.line, rule: 'unranged-select', evidence: b.text, detail: `[${o.kind}] ${b.text}`,
+  }))),
+  baselineFile: BASELINE_FILE,
+  field: 'violations',
+  note: 'Pre-existing un-ranged list selects under scripts/ (WRITE = mutates the wrong rows; READ = reports a fabricated number). Keys are CONTENT-ADDRESSED (see keyFormat). The gate blocks only NEW ones. Shrink this list; never grow it.',
+  scanned: `${scanned} scripts scanned`,
+  okMessage: (n) => `\x1b[32m✓ no NEW un-ranged list selects (${scanned} scripts scanned, ${n} baselined)\x1b[0m`,
+  failHeader: (n) => `\x1b[31m✗ ${n} NEW un-ranged list select(s) under scripts/\x1b[0m\n`
+    + '  PostgREST caps an unranged select at 1,000 rows SILENTLY — a script that\n'
+    + '  WRITE: mutates the wrong population.  READ: reports a fabricated number\n'
+    + '  (measured 2026-08-22: "24 accounts, 0 new" when the truth was 59 and 23).\n',
+  failAdvice: [
+    '\n  Fix: add .range(from, to) and page, or .limit(n) for a deliberately bounded read.',
+    '  Or annotate with  // unranged-ok: <reason>  if the bound is genuinely safe.',
+  ],
+});

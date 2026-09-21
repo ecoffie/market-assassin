@@ -36,20 +36,39 @@
  *
  * Baseline: pre-existing sites are recorded as "known" so they don't block a push;
  * only NEW ones fail the gate. Fix a known one → it drops out; add a new bad pattern
- * → gate blocks. Drive the baseline toward zero. NOTE: the baseline keys on
- * `path:line`, so an edit that shifts lines in a known file surfaces a false NEW
- * finding — re-baseline deliberately, never reflexively.
+ * → gate blocks. Drive the baseline toward zero.
+ *
+ * FINDING IDENTITY (fixed 2026-09-21 — was the documented "known wart"). The baseline
+ * used to key on `path:line`. A line number is a property of everything ABOVE a finding,
+ * not of the finding, so inserting a line anywhere earlier renamed every finding below it
+ * and the gate reported them all as NEW — while the code got no worse. That did not merely
+ * annoy: a false NEW trains the operator to reach for `--update-baseline`, which accepts
+ * EVERY current finding including a genuinely new one in the same push. Keys are now
+ * content-addressed (`scripts/lib/finding-identity.mjs`): `file#rule(table):sha1-10[@n]`
+ * over the rule's own normalized trigger statement. Move the line, reformat around it, edit
+ * its neighbours — same finding. Change the trigger — a different finding.
  *
  * Exit codes:
  *   0 = no NEW findings (baseline-known allowed)
  *   1 = a new swallowed-error site → BLOCKS the push
+ *   1 = the baseline still holds legacy `path:line` keys → run --migrate-baseline
  *
  * Run:  node scripts/audit-supabase-errors.mjs            (gate mode)
- *       node scripts/audit-supabase-errors.mjs --list      (print every finding)
+ *       node scripts/audit-supabase-errors.mjs --list      (finding + its key, and what is stale)
+ *       node scripts/audit-supabase-errors.mjs --migrate-baseline [--prune-stale]
+ *       node scripts/audit-supabase-errors.mjs --prune-baseline   (TIGHTEN: drop gone findings)
  *       node scripts/audit-supabase-errors.mjs --update-baseline  (accept current set)
  */
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
+import {
+  assignFindingKeys,
+  partitionFindings,
+  readBaseline,
+  writeBaseline,
+  isLegacyBaselineKey,
+  planMigration,
+} from './lib/finding-identity.mjs';
 
 // `scripts` added 2026-07-16: this audit was blind to admin/, cron/ AND scripts/ —
 // which is precisely where the unattended, destructive code lives, and precisely
@@ -64,6 +83,9 @@ import { join } from 'path';
 // would have changed nothing.
 const SCAN_ROOTS = ['src', 'scripts'];
 const BASELINE_FILE = 'tests/fixtures/supabase-errors-baseline.json';
+const BASELINE_NOTE =
+  'Swallowed-error + count-null findings accepted as pre-existing debt. Keys are CONTENT-ADDRESSED '
+  + '(see keyFormat) so line movement cannot manufacture a false NEW finding. Shrink this list; never grow it.';
 
 // Paths worth auditing. NOT "user-facing" any more — a cron has no user and that is
 // the reason to audit it, not a reason to skip it.
@@ -117,6 +139,67 @@ function selectColumnCount(block) {
   return parts.length;
 }
 
+/**
+ * Where does the FUNCTION containing line `i` begin?
+ *
+ * Rule B suppresses a finding when the error was handled — but "handled" has a semantic
+ * boundary, and the rule used to approximate it with a flat 30-line budget. That let a
+ * legitimate fix in one function silence an unrelated unsafe count in the NEXT function
+ * (measured in src/lib/seo/facets.ts). Handling never crosses a function boundary, so the
+ * suppression window must not either.
+ *
+ * Walks up from `i` tracking brace depth: going backwards a `}` means we are entering a
+ * nested block and a `{` means we are leaving one, so depth < 0 marks the line that OPENS
+ * the block we are in. If that opener looks like a function/method/arrow, that is our
+ * boundary. Otherwise it is an ordinary `if`/`try`/loop block, so we step out and keep
+ * climbing — the enclosing FUNCTION is what matters, not the innermost brace.
+ *
+ * Deliberately a brace walk, not a parser: same tool choice as the detectors themselves.
+ * Failure mode is to return a WIDER window (file top), which can only suppress as much as
+ * the old behaviour — never less. Braces inside strings/regexes can skew the count, which
+ * is why MAX_CLIMB bounds the walk instead of letting it run away.
+ */
+const MAX_CLIMB = 400;
+
+/**
+ * Control-flow keywords that LOOK exactly like a method signature to a regex:
+ * `if (deleteError) {` has the same shape as `handler(req) {`.
+ *
+ * Getting this wrong is not cosmetic — it was wrong in the first draft of this fix and the
+ * proof caught it. Treating `if (…) {` as a function boundary cut the window down to a single
+ * `else` branch and manufactured a FALSE POSITIVE on admin/send-all-now, code that consults
+ * `deleteError` and only then reads `count || 0` inside the else. A gate that flags correct
+ * error handling is precisely what trains people to re-baseline reflexively.
+ */
+const CONTROL_KEYWORDS = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'do', 'else', 'with',
+  'return', 'typeof', 'await', 'new', 'try', 'finally',
+]);
+const METHOD_SHAPE = /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:static\s+)?(?:get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*(?::\s*[^{]*)?\{\s*$/;
+
+function isFunctionOpener(line) {
+  if (/\bfunction\b|=>|\bconstructor\b/.test(line)) return true;
+  const m = line.match(METHOD_SHAPE);
+  return !!m && !CONTROL_KEYWORDS.has(m[1]);
+}
+
+function enclosingScopeStart(lines, i) {
+  let depth = 0;
+  const floor = Math.max(0, i - MAX_CLIMB);
+  for (let k = i - 1; k >= floor; k--) {
+    const l = lines[k].replace(/\/\/[^\n]*$/, '');
+    const opens = (l.match(/\{/g) || []).length;
+    const closes = (l.match(/\}/g) || []).length;
+    depth += closes - opens;
+    if (depth < 0) {
+      // `k` opens the block we sit in. A function boundary stops the walk.
+      if (isFunctionOpener(l)) return k;
+      depth = 0; // ordinary block — step out and keep climbing
+    }
+  }
+  return floor;
+}
+
 const findings = [];
 
 for (const root of SCAN_ROOTS) {
@@ -143,7 +226,16 @@ for (const root of SCAN_ROOTS) {
       if (nCols >= 2) {
         // capture the table name for the report if present
         const t = block.match(/\.from\(\s*[`'"]([a-zA-Z0-9_]+)[`'"]/);
-        findings.push(`${p}:${i + 1}${t ? ` (${t[1]})` : ''}`);
+        findings.push({
+          file: p,
+          line: i + 1,
+          rule: 'swallowed-select',
+          tag: t ? t[1] : '',
+          // Evidence = the destructure statement itself, which is what the rule asserts
+          // about. NOT the 10-line block: an unrelated `.eq()` added inside the block
+          // must not rename the finding, or content addressing reinvents line drift.
+          evidence: line,
+        });
       }
     }
 
@@ -182,7 +274,30 @@ for (const root of SCAN_ROOTS) {
       // exactly this reason, and every one of them rendered "0 opportunities match your
       // profile" on a query failure.
       const back = lines.slice(Math.max(0, i - LOOKBACK), i + 1).join('\n');
-      const bindsError = /\{[^}]*\berror\b[^}]*\}\s*=\s*await/.test(back) || /\b\w+\.error\b/.test(back);
+
+      // ⚠️ TWO WINDOWS, ON PURPOSE — they answer two different questions.
+      //
+      // `back` (raw LOOKBACK lines, above) answers "is this even a Supabase count?" Being
+      // generous there can only make the gate flag MORE, so a line budget is fine.
+      //
+      // `scope` answers "was the error HANDLED for this operation?" — and a line budget is
+      // exactly wrong for that, because handling has a SEMANTIC boundary. A valid fix in one
+      // function was silencing an unrelated unsafe count in the NEXT function whenever the two
+      // sat within 30 lines. Measured live in src/lib/seo/facets.ts: binding + consulting the
+      // error in `getPscOpps` made the independent `count || 0` in `getSetAsideNaicsOpps`
+      // disappear from the gate — a false NEGATIVE inside the gate built to stop exactly this
+      // class of silent zero. Suppression must never cross a function boundary.
+      //
+      // The window is the INTERSECTION of the line budget and the function boundary, never
+      // the union. Taking the function alone would WIDEN it inside a long function and start
+      // hiding findings that are flagged today — measured while writing this: a bare function
+      // scope made 4 real findings (podcast-highlights ×2, forecasts ×2) vanish. A strict
+      // subset of the old window can only reveal findings, never conceal one, which is the
+      // property a gate fix has to have.
+      const scope = lines
+        .slice(Math.max(enclosingScopeStart(lines, i), i - LOOKBACK, 0), i + 1)
+        .join('\n');
+      const bindsError = /\{[^}]*\berror\b[^}]*\}\s*=\s*await/.test(scope) || /\b\w+\.error\b/.test(scope);
 
       // BINDING THE ERROR IS NOT THE SAME AS HANDLING IT.
       //
@@ -193,7 +308,7 @@ for (const root of SCAN_ROOTS) {
       //
       // So a binding only earns the skip if the error is actually CONSULTED nearby: tested,
       // thrown, logged, returned, or assigned to something. A bare mention does not count.
-      const errName = (back.match(/\{[^}]*\berror\s*:\s*(\w+)/) || [])[1];
+      const errName = (scope.match(/\{[^}]*\berror\s*:\s*(\w+)/) || [])[1];
       const consulted = new RegExp(
         `(if\\s*\\(\\s*!?\\s*(${errName || 'error'})\\b)`          // if (error) / if (!error)
         + `|((${errName || 'error'})\\s*(\\?\\.|&&|\\|\\||\\?))`  // error?. / error && / error ||
@@ -201,7 +316,7 @@ for (const root of SCAN_ROOTS) {
         + `|(console\\.(error|warn)\\([^\\n]*\\b(${errName || 'error'})\\b)`
         + `|(return[^\\n]*\\b(${errName || 'error'})\\b)`
         + `|(\\b\\w+\\s*=\\s*(${errName || 'error'})\\b)`,          // degraded = error
-      ).test(back);
+      ).test(scope);
       if (bindsError && consulted) continue;
       // Is this actually a Supabase count? `sb.` alone is too loose now that the audit covers
       // all of src/ -- it matches CSS class names in browser JS (`sb.inner` in the map's inline
@@ -210,56 +325,146 @@ for (const root of SCAN_ROOTS) {
       if (!/\.from\(|supabase|getSupabase|\bsb\(\)|\bsb\.from\b/.test(back)) continue;
 
       const tbl = back.match(/\.from\(\s*[`'"]([a-zA-Z0-9_]+)[`'"]/);
-      findings.push(`${p}:${i + 1}${tbl ? ` (${tbl[1]})` : ''} [count-null]`);
+      findings.push({
+        file: p,
+        line: i + 1,
+        rule: 'count-null',
+        tag: tbl ? tbl[1] : '',
+        evidence: code,
+      });
     }
   }
 }
 
 const args = process.argv.slice(2);
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).allowed || [])
-  : new Set();
+const keyed = assignFindingKeys(findings);
+const label = (f) => `${f.file}:${f.line}${f.tag ? ` (${f.tag})` : ''}${f.rule === 'count-null' ? ' [count-null]' : ''}`;
+const byKey = new Map(keyed.map((f) => [f.key, f]));
+const { keys: baselineKeys } = readBaseline(BASELINE_FILE, 'allowed');
+const legacyCount = baselineKeys.filter(isLegacyBaselineKey).length;
 
-if (args.includes('--update-baseline')) {
-  writeFileSync(BASELINE_FILE, JSON.stringify({ allowed: findings.sort() }, null, 2) + '\n');
-  console.log(`[supabase-errors] baseline updated: ${findings.length} known finding(s) recorded.`);
+// ── migrate: path:line → content-addressed, proving nothing is silently dropped ──
+if (args.includes('--migrate-baseline')) {
+  if (!legacyCount) {
+    console.log('[supabase-errors] baseline is already content-addressed — nothing to migrate.');
+    process.exit(0);
+  }
+  const plan = planMigration(keyed, baselineKeys);
+  console.log(`[supabase-errors] migration plan`);
+  console.log(`  current findings          : ${plan.findings}`);
+  console.log(`  legacy baseline entries   : ${plan.legacyEntries}`);
+  console.log(`  carried (stay accepted)   : ${plan.carried.length}`);
+  console.log(`  findings NOT in baseline  : ${plan.unmatchedFindings.length}`);
+  console.log(`  matched after a line shift: ${plan.shifted.length}`);
+  plan.shifted.forEach((s) => console.log(`      ${s.from}  →  ${s.to}  (same file, 1:1, line moved)`));
+  console.log(`  stale legacy entries      : ${plan.staleLegacy.length}`);
+  if (plan.unmatchedFindings.length) {
+    console.error(`\n✗ REFUSING: ${plan.unmatchedFindings.length} current finding(s) are not in the legacy baseline.`);
+    console.error(`  A migration must preserve acceptance EXACTLY — it is not a re-baseline. Fix or accept these first:`);
+    plan.unmatchedFindings.forEach((f) => console.error('    ' + label(f)));
+    process.exit(1);
+  }
+  if (plan.staleLegacy.length && !args.includes('--prune-stale')) {
+    console.error(`\n✗ REFUSING: ${plan.staleLegacy.length} legacy entr(ies) match NO current finding.`);
+    console.error(`  They are gone from the code — dropping them TIGHTENS the ratchet, which is a deliberate act:`);
+    plan.staleLegacy.forEach((k) => console.error('    ' + k));
+    console.error(`\n  Re-run with --prune-stale to drop exactly these and keep the ${plan.carried.length} live ones.`);
+    process.exit(1);
+  }
+  writeBaseline(BASELINE_FILE, 'allowed', plan.carried.map((f) => f.key), { note: BASELINE_NOTE });
+  console.log(`\n✓ migrated: ${plan.carried.length} finding(s) now keyed by content`
+    + (plan.staleLegacy.length ? `; ${plan.staleLegacy.length} stale legacy entr(ies) pruned` : ''));
   process.exit(0);
 }
 
-const newViolations = findings.filter((f) => !baseline.has(f));
-
-if (args.includes('--list')) {
-  console.log(`[supabase-errors] ${findings.length} total finding(s):`);
-  findings.forEach((f) => console.log('  ' + (baseline.has(f) ? '(known) ' : 'NEW ') + f));
+if (args.includes('--update-baseline')) {
+  writeBaseline(BASELINE_FILE, 'allowed', keyed.map((f) => f.key), { note: BASELINE_NOTE });
+  console.log(`[supabase-errors] baseline updated: ${keyed.length} known finding(s) recorded.`);
+  process.exit(0);
 }
 
-if (newViolations.length === 0) {
-  console.log(`[supabase-errors] OK — no new swallowed-error reads (${findings.length} baseline-known).`);
+const { fresh, stale } = partitionFindings(keyed, baselineKeys);
+
+// --list is read-only and is exactly what you want while a baseline is still legacy,
+// so it runs BEFORE the legacy refusal.
+if (args.includes('--list')) {
+  console.log(`[supabase-errors] ${keyed.length} total finding(s):`);
+  keyed.forEach((f) => console.log(
+    '  ' + (baselineKeys.includes(f.key) ? '(known) ' : legacyCount ? '(legacy baseline) ' : 'NEW ') + label(f) + '  ' + f.key,
+  ));
+  if (stale.length && !legacyCount) {
+    console.log(`\n  ${stale.length} baseline entr(ies) match no finding — the baseline can TIGHTEN:`);
+    stale.forEach((k) => console.log('    (gone) ' + k));
+  }
+  process.exit(0);
+}
+
+// A legacy baseline is itself a defect: those keys move whenever a line above them moves,
+// which manufactures a false NEW finding and trains the reflex to --update-baseline (which
+// accepts EVERYTHING, new bugs included). Fail loudly rather than pretend to ratchet.
+if (legacyCount) {
+  console.error(`\n[supabase-errors] ✗ baseline holds ${legacyCount} legacy \`path:line\` entr(ies).`);
+  console.error(`  A line number is a property of everything ABOVE a finding, not of the finding.`);
+  console.error(`  Run: node scripts/audit-supabase-errors.mjs --migrate-baseline\n`);
+  process.exit(1);
+}
+
+// A stale entry is the third state content addressing makes visible: the finding is GONE.
+// Reported, never auto-applied and never blocking — shrinking the accepted set is deliberate.
+function reportStale() {
+  if (!stale.length) return;
+  console.log(`\n[supabase-errors] ℹ ${stale.length} baseline entr(ies) no longer match any finding — fixed or removed.`);
+  stale.forEach((k) => console.log('    (gone) ' + k));
+  console.log(`  The baseline can TIGHTEN from ${baselineKeys.length} to ${baselineKeys.length - stale.length}:`);
+  console.log(`  node scripts/audit-supabase-errors.mjs --prune-baseline\n`);
+}
+
+if (args.includes('--prune-baseline')) {
+  if (!stale.length) {
+    console.log('[supabase-errors] nothing to prune — every baseline entry still matches a finding.');
+    process.exit(0);
+  }
+  if (fresh.length) {
+    console.error(`[supabase-errors] ✗ refusing to prune while ${fresh.length} NEW finding(s) are unresolved — fix those first.`);
+    process.exit(1);
+  }
+  writeBaseline(BASELINE_FILE, 'allowed', baselineKeys.filter((k) => byKey.has(k)), { note: BASELINE_NOTE });
+  console.log(`[supabase-errors] pruned ${stale.length} stale entr(ies): ${baselineKeys.length} → ${baselineKeys.length - stale.length}.`);
+  process.exit(0);
+}
+
+if (fresh.length === 0) {
+  console.log(`[supabase-errors] OK — no new swallowed-error reads (${keyed.length} baseline-known).`);
+  reportStale();
   process.exit(0);
 }
 
 // Two rules, two different fixes — say which one fired, or the message sends the
 // reader to the wrong repair.
-const newCountNull = newViolations.filter((f) => f.endsWith('[count-null]'));
-const newSwallowed = newViolations.filter((f) => !f.endsWith('[count-null]'));
+const newCountNull = fresh.filter((f) => f.rule === 'count-null');
+const newSwallowed = fresh.filter((f) => f.rule !== 'count-null');
 
-console.error(`\n[supabase-errors] ✗ ${newViolations.length} NEW finding(s):\n`);
+console.error(`\n[supabase-errors] ✗ ${fresh.length} NEW finding(s):\n`);
 
 if (newSwallowed.length) {
   console.error(`  ${newSwallowed.length} swallowed-error read(s) — a hardcoded multi-column .select() whose { error } is ignored:`);
-  newSwallowed.forEach((f) => console.error('    ' + f));
+  newSwallowed.forEach((f) => console.error('    ' + label(f)));
   console.error(`\n  Why: a bad/renamed column makes PostgREST fail the WHOLE query → data=null → a silent generic/empty result for the user.`);
   console.error(`  Fix: destructure { data, error } and surface the error (console.error / return 500). See tasks/smart-profile-dead-table-findings.md.\n`);
 }
 
 if (newCountNull.length) {
   console.error(`  ${newCountNull.length} null count coalesced to zero (\`count ?? 0\`) with no { error } bound:`);
-  newCountNull.forEach((f) => console.error('    ' + f));
+  newCountNull.forEach((f) => console.error('    ' + label(f)));
   console.error(`\n  Why: a table that does not exist returns count=null, error=null, HTTP 204 — NO error.`);
   console.error(`  \`?? 0\` turns "I don't know" into "zero" and destroys the only signal separating missing from empty.`);
   console.error(`  It reads as defensive null-handling; it is data fabrication. #307: the fabricated 0 hit \`if (n === 0) continue\``);
   console.error(`  and cancelled the delete for five tables that never existed. cron/snapshot-metrics: nine days of fake metrics.`);
   console.error(`  Fix: bind { count, error }, surface the error, and return/render null as UNKNOWN — never 0.\n`);
+}
+
+if (stale.length) {
+  console.error(`  (Separately: ${stale.length} baseline entr(ies) now match nothing — see --prune-baseline. That is NOT what blocked this push.)\n`);
 }
 
 console.error(`(If intentional, run: node scripts/audit-supabase-errors.mjs --update-baseline)\n`);

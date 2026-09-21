@@ -39,7 +39,7 @@
     "audit:client-auth": "node scripts/audit-client-auth.mjs",
     "audit:email-sender": "node scripts/audit-email-sender.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
-    "test:unit": "vitest run",
+    "test:unit": "VITEST_MAX_FORKS=4 vitest run",
     "test:unit:watch": "vitest",
     "mcp:dev": "node scripts/mcp-dev.mjs",
     "mcp:smoke": "node scripts/mcp-smoke.mjs",

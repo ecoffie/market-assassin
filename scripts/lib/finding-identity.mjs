@@ -1,0 +1,387 @@
+/**
+ * finding-identity — ONE stable, semantic identity for a pre-push gate finding.
+ *
+ * ## The wart this replaces
+ *
+ * Every baseline-ratchet gate in this repo keyed its accepted findings by
+ * `path:line`. A line number is not a property of the finding; it is a property of
+ * everything ABOVE the finding. So an edit anywhere earlier in the file renames every
+ * finding below it, and the gate reports them as NEW:
+ *
+ *     - the finding did not change
+ *     - the code did not get worse
+ *     - the push is blocked anyway
+ *
+ * CLAUDE.md recorded this as a "known wart" and prescribed the fix ("re-baseline
+ * deliberately, never reflexively") — which is advice, not a control. The observed
+ * consequence is the one that matters: a false NEW finding trains the operator to run
+ * `--update-baseline` to get unblocked, and an `--update-baseline` run accepts EVERY
+ * current finding, including a genuinely new one that happened to land in the same
+ * push. That is how a ratchet stops meaning anything. Line-keyed identity does not
+ * merely annoy; it manufactures the exact reflex that erodes the gate.
+ *
+ * ## The identity
+ *
+ *     <file>#<rule>(<tag>):<fingerprint>[@<n>]
+ *
+ * - `file`      — the finding's location as the gate reports it. A finding in a
+ *                 different file IS a different finding (a different place to fix), so
+ *                 path stays in the key. A file RENAME therefore surfaces as new; that
+ *                 is rarer than line drift, and it is a real change of address.
+ * - `rule`      — which rule fired. Two rules can flag the same line for different
+ *                 reasons and they are not the same finding.
+ * - `tag`       — the identifier the rule extracted (usually the table). Optional,
+ *                 human-readable, and part of the fingerprint too.
+ * - fingerprint — sha1 over the rule's own normalized EVIDENCE (see below), first 10
+ *                 hex. Content-addressed, so line movement cannot touch it.
+ * - `@n`        — occurrence ordinal, added ONLY when one file has 2+ findings that
+ *                 are byte-identical after normalization (same rule, same tag, same
+ *                 evidence). See "Duplicates" below.
+ *
+ * ## What goes in the fingerprint: the SMALLEST evidence, not the whole block
+ *
+ * The fingerprint hashes the rule's TRIGGER — the statement the rule actually asserts
+ * something about — plus the extracted tag. Deliberately NOT the surrounding 10-line
+ * block, and NOT incidental detail like a select's column count:
+ *
+ * - hashing the block would make an unrelated edit inside the block (adding an `.eq()`,
+ *   reformatting) a false NEW finding — the same disease as line numbers, one level up;
+ * - hashing incidental detail (a column added to a `.select()`) would flag a query whose
+ *   defect is unchanged.
+ *
+ * So: change the trigger and you changed the finding. Move it, reformat around it, or
+ * edit its neighbours and it is still the same finding.
+ *
+ * Normalization strips comments and collapses whitespace, which is load-bearing for a
+ * second reason these gates learned the hard way: several FIXES quote the bad pattern in
+ * a comment while explaining it. Comments must not reach the fingerprint any more than
+ * they reach the detector.
+ *
+ * ## Duplicates (the `@n` ordinal) — the decision and why
+ *
+ * Two findings in one file that are identical after normalization are genuinely
+ * indistinguishable by content. They are kept as SEPARATE baseline entries
+ * (`…:abc123`, `…:abc123@2`) rather than collapsed into one, because collapsing would
+ * silently weaken the ratchet: fix one of two identical sites and a collapsed key would
+ * still match, so the gate would report nothing to tighten and the second site would sit
+ * accepted forever. With ordinals, fixing one leaves exactly one stale entry and the
+ * tooling says the baseline can tighten by 1.
+ *
+ * Ordinals are assigned in source order, so swapping the order of two identical findings
+ * swaps their ordinals — but the SET of keys is unchanged, and the gate compares sets.
+ * The ordinal therefore never manufactures a false NEW finding; it only preserves
+ * cardinality.
+ *
+ * ## Stale baseline entries
+ *
+ * Content addressing makes the third state visible for the first time. A baseline entry
+ * that matches no current finding means the finding is GONE (fixed, deleted, or moved
+ * out of scope) and the baseline can TIGHTEN. Under `path:line` that state was
+ * indistinguishable from line drift, so nobody could act on it. `partitionFindings`
+ * returns it, gates print it, and `--prune-baseline` accepts it. It is reported, never
+ * auto-applied: shrinking the accepted set is a deliberate act, the same as growing it.
+ */
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+/**
+ * Strip comments and collapse whitespace so cosmetic edits cannot change identity.
+ * Comment stripping is not cosmetic here — a fix that QUOTES the bad pattern while
+ * explaining it must not contribute to the fingerprint.
+ */
+export function normalizeEvidence(text) {
+  return String(text ?? '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Field separator for the hashed parts: a NUL, which cannot occur in source text, so
+ * `('a','bc')` and `('ab','c')` can never hash alike.
+ *
+ * Built with `String.fromCharCode(0)` rather than written as a literal escape, because a
+ * literal here has already been mangled once into a REAL NUL byte in this file — which made
+ * git classify the module as binary and refuse to show a reviewable diff. The separator is
+ * byte-identical either way, so this changes no fingerprint.
+ */
+const SEP = String.fromCharCode(0);
+
+/** sha1 of the normalized parts, first 10 hex. Deterministic across machines and runs. */
+export function fingerprint(...parts) {
+  const h = createHash('sha1');
+  h.update(parts.map((p) => normalizeEvidence(p)).join(SEP));
+  return h.digest('hex').slice(0, 10);
+}
+
+/** The legacy `path:line` key, kept ONLY so a migration can match an old baseline. */
+export function legacyKey(finding) {
+  return `${finding.file}:${finding.line}`;
+}
+
+/**
+ * Give every finding a stable key. Mutates nothing; returns a new array of
+ * `{ ...finding, key, legacy }`. `findings` must be in source order for the duplicate
+ * ordinal to be deterministic.
+ *
+ * A finding is `{ file, line, rule, tag?, evidence }`.
+ */
+export function assignFindingKeys(findings) {
+  const seen = new Map();
+  return findings.map((f) => {
+    const tag = f.tag ? `(${f.tag})` : '';
+    const base = `${f.file}#${f.rule}${tag}:${fingerprint(f.rule, f.tag || '', f.evidence)}`;
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+    return { ...f, key: n === 1 ? base : `${base}@${n}`, legacy: legacyKey(f) };
+  });
+}
+
+/**
+ * Split keyed findings against a baseline into the three states the ratchet cares about.
+ *
+ *   fresh — a finding with no baseline entry → BLOCKS the push.
+ *   known — a finding the baseline already accepts → allowed.
+ *   stale — a baseline entry matching no finding → the baseline can TIGHTEN (reported,
+ *           never auto-applied, never blocking).
+ */
+export function partitionFindings(keyed, baselineKeys) {
+  const baseline = baselineKeys instanceof Set ? baselineKeys : new Set(baselineKeys || []);
+  const live = new Set(keyed.map((f) => f.key));
+  return {
+    fresh: keyed.filter((f) => !baseline.has(f.key)),
+    known: keyed.filter((f) => baseline.has(f.key)),
+    stale: [...baseline].filter((k) => !live.has(k)).sort(),
+  };
+}
+
+/** Read a baseline file's accepted key list. Returns `{ keys, json }` (keys may be []). */
+export function readBaseline(path, field) {
+  if (!existsSync(path)) return { keys: [], json: {} };
+  const json = JSON.parse(readFileSync(path, 'utf8'));
+  return { keys: json[field] || [], json };
+}
+
+/** Write a baseline file, preserving its other fields and stamping the date. */
+export function writeBaseline(path, field, keys, extra = {}) {
+  mkdirSync(dirname(path), { recursive: true });
+  const { json } = readBaseline(path, field);
+  const out = {
+    ...json,
+    ...extra,
+    updated: new Date().toISOString().slice(0, 10),
+    keyFormat: 'file#rule(tag):sha1-10[@n] — content-addressed; run --list to map a key to its current line',
+    [field]: [...keys].sort(),
+  };
+  writeFileSync(path, JSON.stringify(out, null, 2) + '\n');
+}
+
+/** True for an old `path:line`-shaped entry (no `#rule:` segment). */
+export function isLegacyBaselineKey(k) {
+  return typeof k === 'string' && !/#[a-z0-9-]+(\([^)]*\))?:[0-9a-f]{10}/.test(k);
+}
+
+/**
+ * Migrate a `path:line` baseline to content-addressed keys, and PROVE nothing was lost.
+ *
+ * The rule: every current finding that the old baseline accepted must still be accepted.
+ * A legacy entry matching no current finding is not a finding at all — the code moved on
+ * without anyone noticing — so it is reported as `staleLegacy` and dropped only when the
+ * caller passes `pruneStale`. Refusing by default is the point: shrinking the accepted
+ * set is as deliberate as growing it.
+ *
+ * Returns a report; writes nothing.
+ */
+export function planMigration(keyed, legacyBaselineKeys) {
+  const legacy = new Set(legacyBaselineKeys || []);
+  // A legacy entry may carry trailing detail (` (table)`, ` [count-null]`, ` :: snippet`),
+  // so match on the `path:line` prefix rather than requiring an exact string.
+  const prefixOf = (k) => {
+    const m = String(k).match(/^(.*?:\d+)(?:\D.*)?$/);
+    return m ? m[1] : String(k);
+  };
+  const legacyByPrefix = new Map();
+  for (const k of legacy) {
+    const p = prefixOf(k);
+    if (!legacyByPrefix.has(p)) legacyByPrefix.set(p, []);
+    legacyByPrefix.get(p).push(k);
+  }
+
+  const matchedLegacy = new Set();
+  const carried = [];
+  let unmatchedFindings = [];
+  for (const f of keyed) {
+    const hits = legacyByPrefix.get(f.legacy);
+    if (hits && hits.length) {
+      hits.forEach((h) => matchedLegacy.add(h));
+      carried.push(f);
+    } else {
+      unmatchedFindings.push(f);
+    }
+  }
+
+  // ── Second pass: the line-shift rescue, and why it has to exist ───────────────
+  //
+  // Migrating is itself an edit, and an edit moves lines. Measured while shipping this:
+  // adding ONE import line to audit-unranged-selects.mjs moved that gate's finding in its
+  // OWN source from :77 to :78, so a strict `path:line` match called the baselined finding
+  // gone and the identical finding new — the very false-NEW this change removes, biting
+  // the migration that removes it.
+  //
+  // So: a leftover live finding is matched to a leftover legacy entry when BOTH are alone
+  // in the same FILE (exactly one of each). One-to-one inside one file is unambiguous; any
+  // other ratio stays unmatched and the migration refuses, because guessing which of two
+  // findings a legacy entry meant is how acceptance gets silently reassigned.
+  const fileOf = (k) => String(k).replace(/:\d+(?:\D.*)?$/, '');
+  const leftoverLegacy = [...legacy].filter((k) => !matchedLegacy.has(k));
+  const shifted = [];
+  for (const file of new Set(unmatchedFindings.map((f) => f.file))) {
+    const liveHere = unmatchedFindings.filter((f) => f.file === file);
+    const legacyHere = leftoverLegacy.filter((k) => fileOf(k) === file);
+    if (liveHere.length === 1 && legacyHere.length === 1) {
+      matchedLegacy.add(legacyHere[0]);
+      carried.push(liveHere[0]);
+      shifted.push({ from: legacyHere[0], to: `${liveHere[0].file}:${liveHere[0].line}` });
+    }
+  }
+  const shiftedKeys = new Set(shifted.map((s) => s.to));
+  unmatchedFindings = unmatchedFindings.filter((f) => !shiftedKeys.has(`${f.file}:${f.line}`));
+
+  return {
+    findings: keyed.length,
+    legacyEntries: legacy.size,
+    carried,                                    // findings whose acceptance is preserved
+    unmatchedFindings,                           // findings the old baseline did NOT accept
+    shifted,                                     // same file, line moved — reported, not hidden
+    staleLegacy: [...legacy].filter((k) => !matchedLegacy.has(k)).sort(),
+  };
+}
+
+/**
+ * The whole ratchet, once, for gates that don't need bespoke messaging. Handles identity,
+ * the legacy-baseline refusal, `--migrate-baseline [--prune-stale]`, `--update-baseline`,
+ * `--prune-baseline`, `--list`, and the three-state partition. CALLS process.exit.
+ *
+ * `findings` are `{ file, line, rule, tag?, evidence, detail? }` in source order.
+ */
+export function runBaselineGate(opts) {
+  const {
+    name,
+    findings,
+    baselineFile,
+    field = 'violations',
+    note,
+    scanned = '',
+    label = (f) => `${f.file}:${f.line}${f.detail ? `: ${f.detail}` : ''}`,
+    okMessage = (n) => `\x1b[32m✓ ${name}: no NEW findings (${n} baselined)${scanned ? ` — ${scanned}` : ''}\x1b[0m`,
+    failHeader = (n) => `\x1b[31m✗ ${name}: ${n} NEW finding(s)\x1b[0m`,
+    failAdvice = [],
+    argv = process.argv.slice(2),
+  } = opts;
+
+  const keyed = assignFindingKeys(findings);
+  const byKey = new Map(keyed.map((f) => [f.key, f]));
+  const { keys: baselineKeys } = readBaseline(baselineFile, field);
+  const legacyCount = baselineKeys.filter(isLegacyBaselineKey).length;
+  const cmd = `node scripts/${opts.script}`;
+
+  if (argv.includes('--migrate-baseline')) {
+    if (!legacyCount) {
+      console.log(`[${name}] baseline is already content-addressed — nothing to migrate.`);
+      process.exit(0);
+    }
+    const plan = planMigration(keyed, baselineKeys);
+    console.log(`[${name}] migration plan`);
+    console.log(`  current findings          : ${plan.findings}`);
+    console.log(`  legacy baseline entries   : ${plan.legacyEntries}`);
+    console.log(`  carried (stay accepted)   : ${plan.carried.length}`);
+    console.log(`  findings NOT in baseline  : ${plan.unmatchedFindings.length}`);
+    console.log(`  matched after a line shift: ${plan.shifted.length}`);
+    plan.shifted.forEach((s) => console.log(`      ${s.from}  →  ${s.to}  (same file, 1:1, line moved)`));
+    console.log(`  stale legacy entries      : ${plan.staleLegacy.length}`);
+    if (plan.unmatchedFindings.length) {
+      console.error(`\n✗ REFUSING: ${plan.unmatchedFindings.length} current finding(s) are not in the legacy baseline.`);
+      console.error(`  A migration must preserve acceptance EXACTLY — it is not a re-baseline.`);
+      plan.unmatchedFindings.forEach((f) => console.error('    ' + label(f)));
+      process.exit(1);
+    }
+    if (plan.staleLegacy.length && !argv.includes('--prune-stale')) {
+      console.error(`\n✗ REFUSING: ${plan.staleLegacy.length} legacy entr(ies) match NO current finding.`);
+      console.error(`  They are gone from the code — dropping them TIGHTENS the ratchet, a deliberate act:`);
+      plan.staleLegacy.forEach((k) => console.error('    ' + k));
+      console.error(`\n  Re-run with --prune-stale to drop exactly these and keep the ${plan.carried.length} live ones.`);
+      process.exit(1);
+    }
+    writeBaseline(baselineFile, field, plan.carried.map((f) => f.key), note ? { note } : {});
+    console.log(`\n✓ migrated: ${plan.carried.length} finding(s) now keyed by content`
+      + (plan.staleLegacy.length ? `; ${plan.staleLegacy.length} stale legacy entr(ies) pruned` : ''));
+    process.exit(0);
+  }
+
+  if (argv.includes('--update-baseline')) {
+    writeBaseline(baselineFile, field, keyed.map((f) => f.key), note ? { note } : {});
+    console.log(`[${name}] baseline updated — ${keyed.length} accepted finding(s) recorded`);
+    process.exit(0);
+  }
+
+  const { fresh, stale } = partitionFindings(keyed, baselineKeys);
+
+  // --list is read-only and is exactly what you want while a baseline is still legacy,
+  // so it runs BEFORE the legacy refusal.
+  if (argv.includes('--list')) {
+    console.log(`[${name}] ${keyed.length} total finding(s):`);
+    keyed.forEach((f) => console.log(
+      '  ' + (baselineKeys.includes(f.key) ? '(known) ' : legacyCount ? '(legacy baseline) ' : 'NEW ') + label(f) + '  ' + f.key,
+    ));
+    if (stale.length && !legacyCount) {
+      console.log(`\n  ${stale.length} baseline entr(ies) match no finding — the baseline can TIGHTEN:`);
+      stale.forEach((k) => console.log('    (gone) ' + k));
+    }
+    process.exit(0);
+  }
+
+  if (legacyCount) {
+    console.error(`\n[${name}] ✗ baseline holds ${legacyCount} legacy \`path:line\` entr(ies).`);
+    console.error(`  A line number is a property of everything ABOVE a finding, not of the finding, so`);
+    console.error(`  line drift renames known entries and manufactures a false NEW finding.`);
+    console.error(`  Run: ${cmd} --migrate-baseline\n`);
+    process.exit(1);
+  }
+
+  if (argv.includes('--prune-baseline')) {
+    if (!stale.length) {
+      console.log(`[${name}] nothing to prune — every baseline entry still matches a finding.`);
+      process.exit(0);
+    }
+    if (fresh.length) {
+      console.error(`[${name}] ✗ refusing to prune while ${fresh.length} NEW finding(s) are unresolved — fix those first.`);
+      process.exit(1);
+    }
+    writeBaseline(baselineFile, field, baselineKeys.filter((k) => byKey.has(k)), note ? { note } : {});
+    console.log(`[${name}] pruned ${stale.length} stale entr(ies): ${baselineKeys.length} → ${baselineKeys.length - stale.length}.`);
+    process.exit(0);
+  }
+
+  const tighten = () => {
+    if (!stale.length) return;
+    console.log(`\n[${name}] ℹ ${stale.length} baseline entr(ies) no longer match any finding — fixed or removed.`);
+    stale.forEach((k) => console.log('    (gone) ' + k));
+    console.log(`  The baseline can TIGHTEN from ${baselineKeys.length} to ${baselineKeys.length - stale.length}: ${cmd} --prune-baseline\n`);
+  };
+
+  if (!fresh.length) {
+    console.log(okMessage(baselineKeys.length));
+    tighten();
+    process.exit(0);
+  }
+
+  console.error(failHeader(fresh.length));
+  fresh.forEach((f) => console.error('      ' + label(f)));
+  failAdvice.forEach((l) => console.error(l));
+  if (stale.length) {
+    console.error(`\n  (Separately: ${stale.length} baseline entr(ies) now match nothing — see --prune-baseline. That is NOT what blocked this push.)`);
+  }
+  process.exit(1);
+}

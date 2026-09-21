@@ -16,8 +16,9 @@
  *       node scripts/audit-client-auth.mjs --list     (print every finding)
  *       node scripts/audit-client-auth.mjs --update-baseline  (accept current set)
  */
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
+import { runBaselineGate } from './lib/finding-identity.mjs';
 
 const API_ROOT = 'src/app/api/app';
 const COMPONENT_ROOT = 'src/components/app';
@@ -73,43 +74,49 @@ for (const p of walk(COMPONENT_ROOT, (f) => /\.(tsx|ts)$/.test(f))) {
       headerOnly.push(`${p}:${i + 1} -> ${enforced}`);
       continue;
     }
-    findings.push(`${p}:${i + 1} -> ${enforced}`);
+    findings.push({
+      file: p,
+      line: i + 1,
+      rule: 'unauthed-gated-fetch',
+      tag: enforced,
+      // Evidence = the fetch call line itself (the trigger). The gated ROUTE is in the tag
+      // and therefore in the fingerprint too, so re-pointing a fetch at a different gated
+      // route is correctly a different finding.
+      evidence: lines[i],
+      detail: `-> ${enforced}`,
+    });
   }
 }
 
 const args = process.argv.slice(2);
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).allowed || [])
-  : new Set();
-
-if (args.includes('--update-baseline')) {
-  writeFileSync(BASELINE_FILE, JSON.stringify({ allowed: findings.sort() }, null, 2) + '\n');
-  console.log(`[client-auth] baseline updated: ${findings.length} known finding(s) recorded.`);
-  process.exit(0);
-}
-
-const newViolations = findings.filter((f) => !baseline.has(f));
-
-if (args.includes('--list')) {
-  console.log(`[client-auth] ${enforcing.size} gated routes; ${findings.length} no-auth finding(s), ${headerOnly.length} header-only (no 401-refresh):`);
-  findings.forEach((f) => console.log('  ' + (baseline.has(f) ? '(known) ' : 'NEW ') + f));
-  headerOnly.forEach((f) => console.log('  (warn) ' + f));
-}
 
 // WARN (non-blocking): gated raw fetches that send the token but aren't authedFetch,
 // so they can't recover from an expired token. Surfaced so the count trends to zero
 // and nobody adds new ones by copy-paste, without hard-blocking existing code.
+// Printed BEFORE the gate, because runBaselineGate owns --list and exits.
+if (args.includes('--list')) {
+  console.log(`[client-auth] ${enforcing.size} gated routes; ${headerOnly.length} header-only (no 401-refresh):`);
+  headerOnly.forEach((f) => console.log('  (warn) ' + f));
+}
 if (headerOnly.length > 0) {
   console.warn(`[client-auth] ⚠ ${headerOnly.length} gated fetch(es) send the token but aren't authedFetch → no expired-token (401) recovery. Prefer authedFetch(url, email, init). Run --list to see them.`);
 }
 
-if (newViolations.length === 0) {
-  console.log(`[client-auth] OK — no new unauthenticated gated fetches (${findings.length} baseline-known).`);
-  process.exit(0);
-}
-
-console.error(`\n[client-auth] ✗ ${newViolations.length} NEW unauthenticated fetch(es) to a 2FA-gated /api/app route:\n`);
-newViolations.forEach((f) => console.error('  ' + f));
-console.error(`\nFix: route the fetch through authedFetch(url, email, init) — see memory authed_fetch_401_class.`);
-console.error(`(If intentional, run: node scripts/audit-client-auth.mjs --update-baseline)\n`);
-process.exit(1);
+// Content-addressed baseline keys — see scripts/lib/finding-identity.mjs for why `path:line`
+// was a bug. This gate's baseline is EMPTY today, so nothing can drift yet; the wart would
+// have returned the first time a finding was accepted, which is why it is fixed now and not
+// "when it starts hurting".
+runBaselineGate({
+  name: 'client-auth',
+  script: 'audit-client-auth.mjs',
+  findings,
+  baselineFile: BASELINE_FILE,
+  field: 'allowed',
+  note: 'Unauthenticated client fetches to 2FA-gated /api/app routes, accepted as pre-existing. Keys are CONTENT-ADDRESSED (see keyFormat). Shrink this list; never grow it. EMPTY is the correct state.',
+  scanned: `${enforcing.size} gated routes`,
+  okMessage: (n) => `[client-auth] OK — no new unauthenticated gated fetches (${n} baseline-known).`,
+  failHeader: (n) => `\n[client-auth] ✗ ${n} NEW unauthenticated fetch(es) to a 2FA-gated /api/app route:\n`,
+  failAdvice: [
+    `\nFix: route the fetch through authedFetch(url, email, init) — see memory authed_fetch_401_class.`,
+  ],
+});

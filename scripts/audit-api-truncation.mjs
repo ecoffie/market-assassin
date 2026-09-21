@@ -42,8 +42,9 @@
  *   node scripts/audit-api-truncation.mjs --list      # every finding
  *   node scripts/audit-api-truncation.mjs --update-baseline
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { runBaselineGate } from './lib/finding-identity.mjs';
 
 const ROOT = process.cwd();
 const SCAN = join(ROOT, 'src/app/api');
@@ -120,49 +121,24 @@ for (const f of files) {
   if (bad.length) offenders.push({ file: relative(ROOT, f), bad });
 }
 
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).violations || [])
-  : new Set();
-
-const keys = offenders.flatMap((o) => o.bad.map((b) => `${o.file}:${b.line}`));
-
-if (process.argv.includes('--update-baseline')) {
-  mkdirSync(dirname(BASELINE_FILE), { recursive: true });
-  writeFileSync(BASELINE_FILE, JSON.stringify({
-    note: 'Pre-existing unpaginated population reads under src/app/api. The gate blocks only NEW ones. Shrink this list; never grow it. Suppress a genuinely bounded query with `// truncation-ok: <reason>`.',
-    updated: new Date().toISOString().slice(0, 10),
-    violations: keys.sort(),
-  }, null, 2) + '\n');
-  console.log(`baseline updated — ${keys.length} accepted violation(s) recorded`);
-  process.exit(0);
-}
-
-if (process.argv.includes('--list')) {
-  for (const o of offenders) {
-    console.log(`\n  ${o.file}`);
-    for (const b of o.bad) console.log(`      ${b.line}: ${b.snippet}`);
-  }
-  console.log(`\n  ${keys.length} finding(s) across ${offenders.length} route(s), ${files.length} files scanned`);
-  process.exit(0);
-}
-
-const fresh = offenders
-  .map((o) => ({ ...o, bad: o.bad.filter((b) => !baseline.has(`${o.file}:${b.line}`)) }))
-  .filter((o) => o.bad.length);
-
-if (!fresh.length) {
-  console.log(`\x1b[32m✓ no NEW unpaginated population reads (${files.length} api files, ${baseline.size} baselined)\x1b[0m`);
-  process.exit(0);
-}
-
-const total = fresh.reduce((s, o) => s + o.bad.length, 0);
-console.error(`\x1b[31m✗ ${total} NEW unpaginated population read(s) in ${fresh.length} API route(s)\x1b[0m`);
-console.error('  Potential PostgREST 1,000-row truncation: this route derives a population metric');
-console.error('  (count, cohort, percentage, or eligibility) from an unpaginated query.\n');
-for (const o of fresh) {
-  console.error(`  ${o.file}`);
-  for (const b of o.bad) console.error(`      ${b.line}: ${b.snippet}`);
-}
-console.error('\n  Fix: paginate with .range(), use count:\'exact\'/head:true or an RPC,');
-console.error('  or suppress with  // truncation-ok: <why the cap cannot affect correctness>');
-process.exit(1);
+// Findings carry their own evidence (the `.select(` line) so the baseline key is
+// content-addressed — see scripts/lib/finding-identity.mjs for why `path:line` was a bug.
+runBaselineGate({
+  name: 'api-truncation',
+  script: 'audit-api-truncation.mjs',
+  findings: offenders.flatMap((o) => o.bad.map((b) => ({
+    file: o.file, line: b.line, rule: 'unpaginated-population', evidence: b.snippet, detail: b.snippet,
+  }))),
+  baselineFile: BASELINE_FILE,
+  field: 'violations',
+  note: 'Pre-existing unpaginated population reads under src/app/api. Keys are CONTENT-ADDRESSED (see keyFormat). The gate blocks only NEW ones. Shrink this list; never grow it. Suppress a genuinely bounded query with `// truncation-ok: <reason>`.',
+  scanned: `${files.length} api files`,
+  okMessage: (n) => `\x1b[32m✓ no NEW unpaginated population reads (${files.length} api files, ${n} baselined)\x1b[0m`,
+  failHeader: (n) => `\x1b[31m✗ ${n} NEW unpaginated population read(s) in API route(s)\x1b[0m\n`
+    + '  Potential PostgREST 1,000-row truncation: this route derives a population metric\n'
+    + '  (count, cohort, percentage, or eligibility) from an unpaginated query.\n',
+  failAdvice: [
+    "\n  Fix: paginate with .range(), use count:'exact'/head:true or an RPC,",
+    '  or suppress with  // truncation-ok: <why the cap cannot affect correctness>',
+  ],
+});

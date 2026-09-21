@@ -631,6 +631,35 @@ return (
 
 ---
 
+## ⚠️ The unit suite is CONCURRENCY-PINNED — `VITEST_MAX_FORKS=4`
+
+Set in **ONE** place: the `test:unit` script in `package.json`. That is the same command the
+pre-push gate's step 4 runs *and* the one `.github/workflows/decision-chain.yml` runs, so the
+gate and CI cannot drift. **Do not add a competing `--maxWorkers`/pool flag anywhere else, and
+do not use `VITEST_MAX_WORKERS`** — Vitest 3.2.6 reads `VITEST_MAX_FORKS` and applies it to
+`poolOptions.forks.maxForks`; `vitest.config.ts` sets no `pool`, so the default `forks` pool is
+what runs.
+
+**Why:** unbounded, the suite forks one worker per core, saturates all 16 and drives load to
+70–112. Vitest then reports **0 test failures** and still exits NON-ZERO with
+`[vitest-worker]: Timeout calling "onTaskUpdate"` — an RPC timeout, not a test result, that
+reads exactly like a real failure. Six agents hit it across two waves. **Waiting for a quiet
+machine does not help: the suite is what makes the machine busy.**
+
+Measured 2026-09-21 — the inventory is unchanged, only the concurrency:
+
+| | max concurrent forks | files | tests | exit |
+|---|---|---|---|---|
+| unbounded (`npx vitest run`) | **15** | 612 passed / 2 skipped (614) | 6,869 passed / 21 skipped (6,890) | 0 |
+| `VITEST_MAX_FORKS=4` | **4** | 612 passed / 2 skipped (614) | 6,869 passed / 21 skipped (6,890) | 0 |
+
+Nothing is skipped or filtered to buy the stability, and a deliberately failing test still
+fails under the bounded setting (verified inject → red → revert → green). **Never reach for
+`--no-verify` when step 4 fails: read the log first — "0 failed" with a worker RPC timeout is
+this, not your change.**
+
+---
+
 ## Pre-Deploy QA
 
 **ALWAYS run before deployment:**
@@ -989,7 +1018,7 @@ curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&p
 |---------|----------|------------|---------|
 | **Market Assassin** | This project | `getmindy.ai` | Dev/staging tools |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
-| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.com` | Marketing site |
+| **GovCon Funnels** | `/Users/ericcoffie/Projects/govcon-funnels` | `govcongiants.com` | Marketing site |
 | **LinkedIn Deal Magnet** | `/Users/ericcoffie/Linkedin App` | `linkedin-deal-magnet.vercel.app` | Profile optimizer (separate product) |
 
 ---
@@ -2102,9 +2131,10 @@ for current numbering). **Two rules, two different bugs:**
 | **B** count-null | `count ?? 0` / `count \|\| 0` with no `error` bound **from the query** | see Bug Prevention Rule #11 |
 
 **Baseline ratchet:** existing debt is recorded in `tests/fixtures/supabase-errors-baseline.json`
-(**103** = 74 rule-A + 26 rule-B + 3 `.mjs`), so it blocks nothing today — anything **NEW** fails
-the push. `--list` prints every finding; `--update-baseline` accepts the current set.
-**Drive it toward zero; never re-baseline reflexively** (see the wart below).
+(**109** as of 2026-09-21 — run `--list`, never trust a count in prose), so it blocks nothing
+today — anything **NEW** fails the push. `--list` prints every finding **and its key**;
+`--update-baseline` accepts the current set; `--prune-baseline` TIGHTENS it.
+**Drive it toward zero; never re-baseline reflexively.**
 
 **⚠️ It was blind on FOUR independent axes, each individually reasonable.** Fixing one proved
 nothing about the others — every widening found the next one still hiding:
@@ -2132,8 +2162,56 @@ nothing about the others — every widening found the next one still hiding:
 → revert → expect exit 0. A first attempt at this looked like the ratchet was broken; the probe
 was a single-column select, which rule A ignores by design.
 
-**Known wart:** the baseline keys on `path:line`, so an edit that shifts lines in a known file
-surfaces a **false NEW finding**. Re-baseline deliberately, never reflexively.
+**✅ FIXED 2026-09-21 — findings are CONTENT-ADDRESSED, not line-keyed.** This section used to
+end with a "known wart": the baseline keyed on `path:line`, so shifting lines in a known file
+surfaced a **false NEW finding**, and the advice was "re-baseline deliberately." Advice is not a
+control, and the wart was not cosmetic: **`--update-baseline` accepts EVERY current finding**, so
+a false NEW trains the exact reflex that lets a genuinely new bug in the same push be adopted as
+"known." A line number is a property of everything ABOVE a finding, not of the finding.
+
+Identity now lives in **`scripts/lib/finding-identity.mjs`** and is shared by all five
+baseline-ratchet gates (this one · `audit-rank-then-filter` · `audit-api-truncation` ·
+`audit-mutation-receipts` · `audit-unranged-selects`):
+
+    <file>#<rule>(<table>):<sha1-10>[@<n>]
+
+sha1 over the rule's own **normalized trigger statement** — comments stripped, whitespace
+collapsed. Deliberately NOT the surrounding block (an unrelated `.eq()` added nearby must not
+rename the finding — that is line-drift one level up) and not incidental detail like a select's
+column count. `@n` is an occurrence ordinal for findings that are byte-identical after
+normalization; they stay SEPARATE entries so fixing one of three leaves exactly one entry to
+tighten instead of silently matching the survivors.
+
+- **`--migrate-baseline`** converts a legacy baseline and **refuses** unless acceptance is
+  preserved exactly (a finding the old baseline didn't accept, or a stale entry, stops it;
+  `--prune-stale` drops stale ones deliberately). A 1:1 line shift inside ONE file is rescued and
+  printed — because migrating is itself an edit that moves lines (measured: adding one import to
+  `audit-unranged-selects.mjs` moved that gate's finding **in its own source** 77 → 78).
+- **`--prune-baseline`** acts on the third state content addressing made visible for the first
+  time: a baseline entry matching no finding means the finding is GONE and the accepted set can
+  shrink. Under `path:line` that was indistinguishable from drift. Reported every run, never
+  auto-applied, and refused while any NEW finding is unresolved.
+- Contract pinned by `src/lib/gate-finding-identity.unit.test.ts` (25 tests).
+- Migration was 1:1 where the code hadn't moved on: supabase-errors 109→109, api-truncation
+  28→28, rank-then-filter 1→1. Two baselines were already **stale and nobody could tell**:
+  mutation-receipts 14→11 and unranged-selects 62→60.
+- **All SEVEN baseline gates now share it**, including the two whose baselines are EMPTY
+  (`audit-client-auth`, `audit-persist-expansion`). Empty is their correct state — they were
+  migrated before a finding was ever accepted, because the wart only returns once one is.
+
+**⚠️ Rule B's suppression window is the FUNCTION, not a line budget (fixed 2026-09-21).**
+"Was the error handled?" has a semantic boundary; `LOOKBACK = 30` did not respect it, so a
+legitimate fix in one function silenced an unrelated unsafe count in the NEXT function. Real
+instance: `src/lib/admin/member-grants.ts` `getTierCounts` does `const { count } = await q;
+return count || 0;` with NO error bound, and it was invisible to the gate because
+`getGrantLog` — a *different* function 15 lines above — consults its own `error`. The window is
+now `max(enclosingScopeStart, i - LOOKBACK)`: **the intersection, never the union.** Taking the
+function alone WIDENS it inside a long function and starts hiding findings (measured: 4 real
+findings vanished), and a gate fix must only ever reveal. Two traps, both caught by testing:
+`if (deleteError) {` is regex-identical to a method signature, so treating it as a function
+boundary flags correctly-handled code (`CONTROL_KEYWORDS`); and the *provenance* window
+(`.from(` detection) deliberately keeps the full `LOOKBACK`, because being generous there can
+only flag more. Baseline 109 → **110**: exactly one previously-hidden real finding, 0 lost.
 
 **Standout debt in the baseline (not fixed):** `admin/data-health` does `count || 0` with no
 error bound — the endpoint whose job is reporting data health would report a fabricated 0.
@@ -2179,9 +2257,15 @@ Two guards learned by testing: **strip comments first** (a fix that quotes `sort
 while explaining it must not flag), and **skip the helper's own `function` definition** (the
 lib file names the helper but isn't calling it — that was a false positive on `awards-search.ts`).
 
-**Baseline ratchet:** `tests/fixtures/rank-then-filter-baseline.json`, keyed on `path:line` +
-a short snippet (the snippet reduces the `path:line`-drift false-NEW that bites the sibling
-gates). `--list` prints every finding; `--update-baseline` accepts the current set. Exit 0 =
+**Baseline ratchet:** `tests/fixtures/rank-then-filter-baseline.json`. This gate used to key on
+`path:line` **plus** an 80-char snippet, and this doc claimed the snippet "reduces the
+`path:line`-drift false-NEW that bites the sibling gates." **It did not — measured 2026-09-21:**
+inserting five blank lines above the one baselined finding still produced `✗ 1 NEW
+rank-globally-then-filter site(s)`, exit 1, because `path:line` was still IN the key. The snippet
+only made the false NEW easier to recognise by eye. Keys are now content-addressed via the shared
+`scripts/lib/finding-identity.mjs` (see the silent-failure gate section above for the format and
+the `--migrate-baseline` / `--prune-baseline` flags). `--list` prints every finding **and its
+key**; `--update-baseline` accepts the current set. Exit 0 =
 no NEW findings; exit 1 = a new site blocks the push. **Baselined at 1:**
 `src/lib/gov-contacts/sblo-lookup.ts:192` — a company-NAME lookup (`search: companyName`) that
 ranks by $ only to pick the biggest substring match for a single named prime, then re-selects
@@ -2925,13 +3009,21 @@ npm run db:check -- <table> <column>                     # did the migration REA
 ```
 Never trust "Success. No rows returned" from the SQL editor — `db:check` is the proof.
 
-**Cron is registered** — it's a `cron_jobs` row, **NOT** `vercel.json`. The dispatcher ticks
-roughly HOURLY, so a `*/10` expression really fires ~once/hr. Columns are
+**Cron is registered** — it's a `cron_jobs` row, **NOT** `vercel.json`. The dispatcher
+**evaluates due jobs EVERY MINUTE** (`vercel.json` → `/api/cron/dispatch?tick=minute` on
+`* * * * *`), so a `*/10` expression really does fire every ~10 minutes. Columns are
 **`job_name` / `cron_expr` / `enabled`** (NOT `name`/`cron_expression`/`active`), and `enabled`
-is the *string* `'true'`:
+is a **boolean** — the predicate is `enabled = true`:
 ```bash
 npm run db -- cron_jobs --select job_name,cron_expr,enabled --eq enabled=true
 ```
+*Corrected 2026-09-21, both verified in this repo and previously wrong here: the doc said the
+dispatcher "ticks roughly HOURLY, so a `*/10` expression really fires ~once/hr" (contradicted by
+`vercel.json`'s minute tick — `run-proposal-jobs` at `* * * * *` logged 42,865 runs in 30 days,
+which an hourly dispatcher cannot produce), and it said `enabled` is the STRING `'true'`
+(contradicted by `supabase/migrations/20260604_cron_dispatcher.sql:17`
+`enabled boolean NOT NULL DEFAULT true` and by `dispatch/route.ts` `.eq('enabled', true)`).
+Three agents independently lost time to the boolean one.*
 
 **Env var is in prod:** `vercel env ls production | grep -i <VAR>`. Remember a var only binds on
 a build *after* `vercel env add` — trigger a fresh deploy.

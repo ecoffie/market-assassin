@@ -282,7 +282,7 @@ Annual Savings: $XX,XXX
 ## Technical Requirements
 
 ### Implementation
-- **Location:** `govcon-funnels` repository (`/Users/ericcoffie/govcon-funnels`)
+- **Location:** `govcon-funnels` repository (`/Users/ericcoffie/Projects/govcon-funnels`)
 - **Route:** `/mi` (new page)
 - **Framework:** Next.js (matches existing site)
 - **Styling:** Tailwind CSS (matches existing site)

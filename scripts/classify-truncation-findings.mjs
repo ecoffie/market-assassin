@@ -26,6 +26,7 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const BASELINE = join(process.cwd(), 'tests/fixtures/api-truncation-baseline.json');
 /**
@@ -48,18 +49,44 @@ export function classifyTruncationFindings() {
   if (!existsSync(BASELINE)) {
     return { measured: false, operational: -1, adminReview: -1, bounded: -1, total: -1 };
   }
+  // WHERE the file+line come from, and why not from the baseline key.
+  //
+  // This used to read tests/fixtures/api-truncation-baseline.json and split each entry on its
+  // LAST colon to recover `file` and `line`. That worked only while the baseline keyed findings
+  // on `path:line` — and that key was the bug fixed on 2026-09-21 (a line number describes
+  // everything ABOVE a finding, so line drift manufactured false NEW findings). Keys are now
+  // content-addressed (`file#rule:hash`), where a last-colon split yields `file#rule` and a hex
+  // hash: every readFileSync would throw and every finding would land in adminReview.
+  //
+  // Measured before this was fixed: 0 operational / 0 admin-review / 28 BOUNDED became
+  // 0 / 28 / 0 — same total, inverted meaning, no error. That number reaches a human through
+  // platform-health's `decisionMetricsIntegrity`, so it is exactly the "plausible enough to
+  // influence a decision" failure the risk split exists to prevent.
+  //
+  // So ask the gate. `--list` is the gate's own report of what it currently finds and which
+  // findings the baseline accepts, which is strictly closer to "derived from what CI enforces"
+  // than re-deriving positions from a key that no longer encodes them.
   let entries;
   try {
-    entries = JSON.parse(readFileSync(BASELINE, 'utf8')).violations || [];
+    const out = execFileSync('node', [join(process.cwd(), 'scripts/audit-api-truncation.mjs'), '--list'], {
+      encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, cwd: process.cwd(),
+    });
+    entries = out.split('\n')
+      .map((l) => l.match(/^\s+\(known\)\s+(\S+?):(\d+)(?::|\s)/))
+      .filter(Boolean)
+      .map((m) => ({ file: m[1], line: Number(m[2]) }));
+    // An empty parse against a non-empty baseline means the report shape moved — that is
+    // unknown, never zero. (`count ?? 0` is data fabrication; so is this.)
+    const known = (JSON.parse(readFileSync(BASELINE, 'utf8')).violations || []).length;
+    if (known > 0 && entries.length === 0) {
+      return { measured: false, operational: -1, adminReview: -1, bounded: -1, total: -1 };
+    }
   } catch {
     return { measured: false, operational: -1, adminReview: -1, bounded: -1, total: -1 };
   }
 
   let operational = 0, adminReview = 0, bounded = 0;
-  for (const entry of entries) {
-    const idx = entry.lastIndexOf(':');
-    const file = entry.slice(0, idx);
-    const line = Number(entry.slice(idx + 1));
+  for (const { file, line } of entries) {
     let ctx = '';
     try {
       const lines = readFileSync(join(process.cwd(), file), 'utf8').split('\n');

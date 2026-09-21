@@ -2,7 +2,7 @@
   "measured": true,
   "operational": 0,
   "adminReview": 0,
-  "bounded": 32,
-  "total": 32,
+  "bounded": 28,
+  "total": 28,
   "generatedFrom": "api-truncation-baseline.json"
 }
