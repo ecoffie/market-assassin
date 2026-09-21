@@ -1,9 +1,9 @@
 {
   "environment": "local_code_against_live_data",
   "not": "authenticated_public_mcp",
-  "startedAt": "2026-09-21T01:35:20.516Z",
-  "finishedAt": "2026-09-21T01:35:22.157Z",
-  "codeSha": "e730b30599ebe30e9800cc5838ce900f844bc9da",
+  "startedAt": "2026-09-21T01:41:04.444Z",
+  "finishedAt": "2026-09-21T01:41:05.693Z",
+  "codeSha": "e1e461072b531e2c4f43c323cd4729909bdd7c9f",
   "checker": "src/lib/contractor/cyrus-acceptance.ts",
   "inputs": {
     "get_contractor_profile": {
@@ -47,13 +47,14 @@
       "set_aside_null_first_positive_note": true,
       "set_aside_provenance": true,
       "set_aside_contributor_truncation_disclosed": true,
-      "set_aside_unknown_contributors_preserved": true,
+      "set_aside_unknown_contributors_preserved_profile": true,
+      "set_aside_unknown_contributors_preserved_history": true,
       "set_aside_last_fy_deprecated": true,
       "agency_count_unavailable": true,
       "zero_dollar_vehicle_usage_not_established": true,
       "sam_has8a_current_boolean": true
     },
-    "assertion_count": 32,
+    "assertion_count": 33,
     "failures": []
   },
   "identity": {

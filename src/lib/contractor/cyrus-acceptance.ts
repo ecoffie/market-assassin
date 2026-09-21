@@ -138,11 +138,11 @@ export function checkCyrusThreeToolAcceptance(input: {
     }
   }
 
-  const contributing = asRecord(profileSa.contributing_ueis_by_label) ?? {};
-  const hasContributing = Object.values(contributing).some(
-    (v) => Array.isArray(v) && v.length > 0,
-  );
-  const hasUnknownContributor = Object.values(contributing).some((v) => v === null);
+  const contributingProfile = asRecord(profileSa.contributing_ueis_by_label) ?? {};
+  const contributingHistory = asRecord(historySa.contributing_ueis_by_label) ?? {};
+  const hasContributing =
+    Object.values(contributingProfile).some((v) => Array.isArray(v) && v.length > 0) ||
+    Object.values(contributingHistory).some((v) => Array.isArray(v) && v.length > 0);
   const supporting = asRecord(profileSa.supporting_actions_by_label) ?? {};
   const hasSupporting = Object.values(supporting).some(
     (v) => Array.isArray(v) && v.length > 0,
@@ -155,11 +155,44 @@ export function checkCyrusThreeToolAcceptance(input: {
     : Array.isArray(historySa.contributing_ueis_truncated_labels)
       ? historySa.contributing_ueis_truncated_labels
       : null;
-  const unknownLabels = Array.isArray(profileSa.contributing_ueis_unknown_labels)
-    ? profileSa.contributing_ueis_unknown_labels
-    : Array.isArray(historySa.contributing_ueis_unknown_labels)
-      ? historySa.contributing_ueis_unknown_labels
-      : null;
+  const profileUnknownLabels = Array.isArray(profileSa.contributing_ueis_unknown_labels)
+    ? (profileSa.contributing_ueis_unknown_labels as unknown[])
+    : null;
+  const historyUnknownLabels = Array.isArray(historySa.contributing_ueis_unknown_labels)
+    ? (historySa.contributing_ueis_unknown_labels as unknown[])
+    : null;
+
+  /** Every listed unknown label must have contributing[label] === null (strict). */
+  function unknownContributorsPreserved(
+    unknownLabels: unknown[] | null,
+    contributing: Record<string, unknown>,
+    side: string,
+  ): { ok: boolean; detail: string } {
+    if (!Array.isArray(unknownLabels)) {
+      return { ok: false, detail: `${side}: contributing_ueis_unknown_labels missing` };
+    }
+    const violated = unknownLabels
+      .map((l) => String(l))
+      .filter((label) => contributing[label] !== null);
+    return {
+      ok: violated.length === 0,
+      detail:
+        violated.length === 0
+          ? `${side}: ${unknownLabels.length} unknown label(s) all null`
+          : `${side}: unknown labels with non-null contributing: ${violated.join(', ')}`,
+    };
+  }
+
+  const profileUnknownOk = unknownContributorsPreserved(
+    profileUnknownLabels,
+    contributingProfile,
+    'profile',
+  );
+  const historyUnknownOk = unknownContributorsPreserved(
+    historyUnknownLabels,
+    contributingHistory,
+    'history',
+  );
 
   const note = String(profileSa.note || '');
   const nullFirstNote = String(profileSa.null_first_positive_note || '');
@@ -356,16 +389,19 @@ export function checkCyrusThreeToolAcceptance(input: {
       Number.isFinite(contribLimit) &&
         contribLimit > 0 &&
         Array.isArray(truncLabels) &&
-        Array.isArray(unknownLabels),
-      `sample_limit=${String(contribLimit)} truncated=${JSON.stringify(truncLabels)} unknown=${JSON.stringify(unknownLabels)}`,
+        Array.isArray(profileUnknownLabels) &&
+        Array.isArray(historyUnknownLabels),
+      `sample_limit=${String(contribLimit)} truncated=${JSON.stringify(truncLabels)} profile_unknown=${JSON.stringify(profileUnknownLabels)} history_unknown=${JSON.stringify(historyUnknownLabels)}`,
     ),
     assert(
-      'set_aside_unknown_contributors_preserved',
-      // Null entries mean unknown — never a substituted queried-UEI array disguised as evidence.
-      // When unknown_labels is non-empty, those labels must have null (not invented arrays).
-      (unknownLabels?.length ?? 0) === 0 ||
-        (unknownLabels as string[]).every((label) => contributing[label] === null || hasUnknownContributor),
-      `unknown_labels=${JSON.stringify(unknownLabels)}; null values preserved=${hasUnknownContributor}`,
+      'set_aside_unknown_contributors_preserved_profile',
+      profileUnknownOk.ok,
+      profileUnknownOk.detail,
+    ),
+    assert(
+      'set_aside_unknown_contributors_preserved_history',
+      historyUnknownOk.ok,
+      historyUnknownOk.detail,
     ),
     assert(
       'set_aside_last_fy_deprecated',

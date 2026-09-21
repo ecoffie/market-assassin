@@ -73,7 +73,8 @@ File: `src/lib/contractor/cyrus-acceptance.ts` (also imported by both closure ru
 | `counting_distinct_award_grain` | `unique_awards_grain === 'distinct_awards'` on profile + history counting bases |
 | `agency_cell_distinct_award_grain` | Zero-$ cells carry `count_grain: 'distinct_awards'` + numeric `distinct_award_count` |
 | `set_aside_contributor_truncation_disclosed` | Requires `contributing_ueis_sample_limit`, `contributing_ueis_truncated_labels`, `contributing_ueis_unknown_labels` |
-| `set_aside_unknown_contributors_preserved` | Unknown contributor labels must not be disguised as invented UEI arrays |
+| `set_aside_unknown_contributors_preserved_profile` | Every `contributing_ueis_unknown_labels` entry on **profile** must have `contributing_ueis_by_label[label] === null` (strict; no any-null loophole) |
+| `set_aside_unknown_contributors_preserved_history` | Same strict check on **history** |
 
 Shape helpers in `award-history-shape.ts` match: `describeCoverageTimestamp` always emits `coverage_complete_established: false`; `classifyAgencyYearObligations` always emits `unused_vehicle: null` / `vehicle_usage: 'not_established'`; `summarizeHistoricalSetAsides` preserves `contributingUeis == null` as null + unknown label.
 
@@ -113,7 +114,7 @@ Fail-before test #3 proves unlabeled grains fail.
 | `contributing_ueis_truncated_labels` | `[]` (disclosed) | `[]` |
 | `contributing_ueis_unknown_labels` | `[]` | `[]` |
 
-Cyrus live labels (`8(A) SOLE SOURCE`, `8A COMPETED`) carry real UEI lists — not a substitution case. Null-preservation + truncation disclosure proven by fail-before/pass-after test #4 and shape helper (`contributingUeis == null` → `null` + unknown label; sample at limit → truncated label). Summary: `set_aside_contributor_truncation_disclosed=true`, `set_aside_unknown_contributors_preserved=true`.
+Cyrus live labels (`8(A) SOLE SOURCE`, `8A COMPETED`) carry real UEI lists — not a substitution case. Null-preservation + truncation disclosure proven by fail-before/pass-after test #4 and shape helper (`contributingUeis == null` → `null` + unknown label; sample at limit → truncated label). **Assertion follow-up:** unknown labels are checked strictly per side — `contributing[label] === null` for each unknown label on profile and on history separately (no “any null elsewhere” loophole). Mixed-label regression `4b`: one legitimately null unknown label + one incorrectly populated unknown label → both profile/history flags fail. Summary: `set_aside_contributor_truncation_disclosed=true`, `set_aside_unknown_contributors_preserved_profile=true`, `set_aside_unknown_contributors_preserved_history=true`.
 
 ---
 

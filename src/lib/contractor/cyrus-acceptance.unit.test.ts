@@ -153,6 +153,8 @@ describe('checkCyrusThreeToolAcceptance', () => {
     expect(r.flags.counting_distinct_award_grain).toBe(true);
     expect(r.flags.zero_dollar_vehicle_usage_not_established).toBe(true);
     expect(r.flags.set_aside_contributor_truncation_disclosed).toBe(true);
+    expect(r.flags.set_aside_unknown_contributors_preserved_profile).toBe(true);
+    expect(r.flags.set_aside_unknown_contributors_preserved_history).toBe(true);
   });
 
   it('normalizeHistoryPayload unwraps nested history', () => {
@@ -332,6 +334,38 @@ describe('four review corrections — fail-before / pass-after', () => {
 
     const after = checkCyrusThreeToolAcceptance(goodTrio());
     expect(after.flags.set_aside_contributor_truncation_disclosed).toBe(true);
-    expect(after.flags.set_aside_unknown_contributors_preserved).toBe(true);
+    expect(after.flags.set_aside_unknown_contributors_preserved_profile).toBe(true);
+    expect(after.flags.set_aside_unknown_contributors_preserved_history).toBe(true);
+  });
+
+  it('4b mixed unknown labels: one null + one incorrectly populated must fail (profile and history)', () => {
+    const mixed = goodTrio();
+    // Legitimately unknown (null) beside a label claimed unknown but populated with a UEI.
+    for (const side of [mixed.profile.historical_set_asides, mixed.history.historical_set_asides]) {
+      side.contributing_ueis_by_label = {
+        ...side.contributing_ueis_by_label,
+        NO_EVIDENCE: null,
+        FAKE_UNKNOWN: [CYRUS_UEI],
+      };
+      side.contributing_ueis_unknown_labels = ['NO_EVIDENCE', 'FAKE_UNKNOWN'];
+    }
+    const r = checkCyrusThreeToolAcceptance(mixed);
+    expect(r.flags.set_aside_unknown_contributors_preserved_profile).toBe(false);
+    expect(r.flags.set_aside_unknown_contributors_preserved_history).toBe(false);
+    expect(r.ok).toBe(false);
+
+    // Same fixture with both unknown labels correctly null → pass those assertions.
+    const fixed = goodTrio();
+    for (const side of [fixed.profile.historical_set_asides, fixed.history.historical_set_asides]) {
+      side.contributing_ueis_by_label = {
+        ...side.contributing_ueis_by_label,
+        NO_EVIDENCE: null,
+        FAKE_UNKNOWN: null,
+      };
+      side.contributing_ueis_unknown_labels = ['NO_EVIDENCE', 'FAKE_UNKNOWN'];
+    }
+    const ok = checkCyrusThreeToolAcceptance(fixed);
+    expect(ok.flags.set_aside_unknown_contributors_preserved_profile).toBe(true);
+    expect(ok.flags.set_aside_unknown_contributors_preserved_history).toBe(true);
   });
 });
