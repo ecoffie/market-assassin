@@ -1,7 +1,0 @@
-/**
- * RETIRED (410 Gone) — enrolled leads into the dropped `user_alert_settings` subsystem.
- * See src/lib/retired-route.ts / tasks/smart-profile-dead-table-findings.md.
- */
-import { retiredAlertRoute } from '@/lib/retired-route';
-
-export const GET = retiredAlertRoute('enroll-leads-to-alerts');
