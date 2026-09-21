@@ -52,6 +52,7 @@ import {
   SHORT_TOTALS_NOTE,
   summarizeHistoricalSetAsides,
 } from '@/lib/contractor/award-history-shape';
+import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 
 /** Clamp a caller-supplied result limit to [1, max], defaulting when absent/invalid. */
 function resolveLimit(raw: unknown, def: number, max: number): number {
@@ -291,14 +292,15 @@ export function makeTier2Tools(email: string) {
     const awardsCacheKey = `rollup:${profile.rollup_uei}:recent-awards:${RECENT_LIMIT}:v4-m`;
     const agenciesCacheKey = `rollup:${profile.rollup_uei}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`;
     const yearlyCacheKey = `rollup:${profile.rollup_uei}:yearly-totals:v3-m`;
-    const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v3-m`;
+    const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v4-m`;
 
     // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
-    let [awards, agencies, yearly, setAsideHist] = await Promise.all([
+    let [awards, agencies, yearly, setAsideHist, warehouseCoverage] = await Promise.all([
       getRecentAwardsForRecipient(childUeis, profile.rollup_uei, RECENT_LIMIT, false).catch(() => []),
       getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, false).catch(() => []),
       getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
       getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
+      loadAwardsWarehouseCoverage().catch(() => null),
     ]);
 
     // Pass 2 — per-surface cold fill only when the cache marks a MISS/FAILURE.
@@ -372,6 +374,16 @@ export function makeTier2Tools(email: string) {
     });
     const coverageTs = describeCoverageTimestamp({
       lastRecipientActionDate: profile.last_action_date ?? null,
+      warehouseMaxActionDate: warehouseCoverage?.clocks?.sourceActionMax ?? null,
+      ingest: warehouseCoverage
+        ? {
+            last_built: warehouseCoverage.lastBuilt,
+            acquired_at: warehouseCoverage.clocks?.acquiredAt ?? null,
+            merged_at: warehouseCoverage.clocks?.mergedAt ?? null,
+            recipients_rebuilt_at: warehouseCoverage.clocks?.recipientsRebuiltAt ?? null,
+            freshness: warehouseCoverage.freshness,
+          }
+        : null,
     });
     const agenciesServed = profile.distinct_agency_count ?? agencies.length;
     // Reuse warehouse set-aside aggregation (same query as award-history drawer).
@@ -386,9 +398,19 @@ export function makeTier2Tools(email: string) {
               r.first_observed_positive_action_fy == null
                 ? null
                 : Number(r.first_observed_positive_action_fy),
+            contributingUeis: r.contributing_ueis ?? childUeis,
+            supportingActions: (r.supporting_actions ?? []).map((a) => ({
+              uei: a?.uei ?? null,
+              award_id: a?.award_id ?? null,
+              fiscal_year: a?.fiscal_year == null ? null : Number(a.fiscal_year),
+              obligation_amount:
+                a?.obligation_amount == null ? null : Number(a.obligation_amount),
+              action_date: a?.action_date ?? null,
+            })),
           })),
       {
         coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+        scope: { kind: 'profile_rollup', uei_count: childUeis.length },
         scopeNote:
           childUeis.length > 1
             ? `Aggregated across warehouse award actions for this profile's UEI set (${childUeis.length} UEIs on the rollup; not derived from the capped recent_awards sample). Award origin is not established by this query.`
@@ -442,10 +464,14 @@ export function makeTier2Tools(email: string) {
         dataset: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
         measure: 'total_obligated',
         scope: totalsScope,
-        // Recipient last action — NOT warehouse ingest freshness.
+        // Recipient last action — NOT warehouse max and NOT ingest freshness.
         as_of: profile.last_action_date ?? null,
         as_of_meaning: coverageTs.last_recipient_action_meaning,
+        warehouse_max_action_date: coverageTs.warehouse_max_action_date,
+        ingest: coverageTs.ingest,
+        coverage_complete_established: coverageTs.coverage_complete_established,
         freshness_note: coverageTs.freshness_note,
+        coverage_timestamp: coverageTs,
         not_equivalent_to: totalsScope === 'single_uei'
           ? 'recipients_rollup.total_obligated'
           : 'recipients.total_obligated',
