@@ -221,22 +221,67 @@ export async function claimAnonShortlist(
   let failed = 0;
   const postWrite: Array<() => Promise<void>> = [];
 
-  const markClaimed = async (id: string) => {
-    const { error } = await db
+  /**
+   * Resolve ONE shortlist row, and PROVE it.
+   *
+   * ⚠️ The first version logged the error and let the caller count the row as
+   * promoted anyway, so this state was reachable: the pursuit exists, the
+   * shortlist row is still unclaimed, and the API reports `promoted: 1,
+   * failed: 0`. That contradicts the partial-failure contract — and an UPDATE
+   * matching ZERO rows with no database error was treated as success too.
+   *
+   * So the mutation is counted exactly and scoped defensively: this id, owned
+   * by THIS anon identity, and still unclaimed. Exactly one row must transition
+   * — unless we can positively prove it was resolved concurrently. UNKNOWN, an
+   * error, and zero-affected are never silently treated as resolved.
+   */
+  const markClaimed = async (row: { id: string }): Promise<{ ok: boolean; reason?: string }> => {
+    const { count, error } = await db
       .from('anonymous_shortlist')
-      .update({ claimed_at: new Date().toISOString(), claimed_by: email })
-      .eq('id', id);
-    // The pursuit already exists, so a failure here is recoverable on the next
-    // attempt (it will re-resolve as already-tracked). Surface it; never undo
-    // the real pursuit.
-    if (error) console.error(`[anon-shortlist] claim marking failed for row ${id}: ${error.message}`);
+      .update(
+        { claimed_at: new Date().toISOString(), claimed_by: email },
+        { count: 'exact' },
+      )
+      .eq('id', row.id)
+      .eq('owner_anon_id', owner)
+      .is('claimed_at', null);
+
+    if (error) return { ok: false, reason: error.message };
+    // Bug Prevention Rule #11: a NULL count is UNKNOWN, never zero — and here
+    // "unknown" must not be read as "resolved".
+    if (count == null) return { ok: false, reason: 'claim count returned NULL — unknown, not zero' };
+    if (count === 1) return { ok: true };
+    if (count === 0) {
+      // Either a concurrent claim already resolved it, or the row is not where
+      // we think it is. Those are different facts, so read back and decide on
+      // evidence rather than assuming the benign one.
+      const { data, error: readErr } = await db
+        .from('anonymous_shortlist')
+        // unranged-ok: single row by primary key.
+        .select('id,claimed_at')
+        .eq('id', row.id)
+        .maybeSingle();
+      if (readErr) return { ok: false, reason: `0 rows updated; read-back failed: ${readErr.message}` };
+      if (data && (data as { claimed_at: string | null }).claimed_at) {
+        return { ok: true };  // provably resolved concurrently
+      }
+      return { ok: false, reason: '0 rows updated and the row is still unclaimed' };
+    }
+    return { ok: false, reason: `expected to resolve exactly 1 row, affected ${count}` };
   };
 
   for (const row of shortlist) {
     // ALREADY TRACKED — resolve the shortlist row, modify nothing else.
     if (tracked.has(row.notice_id)) {
+      const marked = await markClaimed(row);
+      if (!marked.ok) {
+        // The pursuit exists but the shortlist row did NOT resolve. Counting it
+        // as alreadyTracked would report a resolution that did not happen.
+        failed += 1;
+        console.error(`[anon-shortlist] claim marking failed for ${row.notice_id}: ${marked.reason}`);
+        continue;
+      }
       alreadyTracked += 1;
-      await markClaimed(row.id);
       continue;
     }
 
@@ -295,15 +340,31 @@ export async function claimAnonShortlist(
     if (result.kind === 'duplicate') {
       // The account gained this pursuit between our read and this write. Still
       // "already tracked" — the value transferred, so resolve the row.
+      const marked = await markClaimed(row);
+      if (!marked.ok) {
+        failed += 1;
+        console.error(`[anon-shortlist] claim marking failed for ${row.notice_id}: ${marked.reason}`);
+        continue;
+      }
       alreadyTracked += 1;
-      await markClaimed(row.id);
       continue;
     }
 
-    // Mark claimed ONLY after the pursuit exists.
-    await markClaimed(row.id);
-    promoted += 1;
+    // The pursuit now EXISTS. Whatever happens next, it stays — its documents
+    // are still fetched and it is never rolled back.
     if (result.postWrite) postWrite.push(result.postWrite);
+
+    // Mark claimed ONLY after the pursuit exists, and only count this attempt
+    // as promoted if the row actually transitioned. If it did not, the claim is
+    // unresolved: the next retry finds the real pursuit as already-tracked and
+    // resolves the shortlist then, without creating a second pursuit.
+    const marked = await markClaimed(row);
+    if (!marked.ok) {
+      failed += 1;
+      console.error(`[anon-shortlist] pursuit created but claim marking failed for ${row.notice_id}: ${marked.reason}`);
+      continue;
+    }
+    promoted += 1;
   }
 
   return { ok: true, promoted, alreadyTracked, failed, postWrite };

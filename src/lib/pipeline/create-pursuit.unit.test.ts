@@ -68,6 +68,12 @@ function recordingDb(opts: {
   insertErr?: { code?: string; message: string } | null;
   oppErr?: { message: string } | null;
   opp?: unknown;
+  /** Outcome of the claim-marker UPDATE on anonymous_shortlist. */
+  markErr?: { message: string } | null;
+  markCount?: number | null;
+  /** What a read-back of the shortlist row shows after a 0-row update. */
+  markReadBack?: { claimed_at: string | null } | null;
+  markReadBackErr?: { message: string } | null;
 } = {}) {
   const inserts: Record<string, unknown>[] = [];
   const shortlistUpdates: Record<string, unknown>[] = [];
@@ -78,7 +84,19 @@ function recordingDb(opts: {
     const chain = () => q;
     q.select = chain; q.eq = chain; q.is = chain; q.in = chain; q.order = chain; q.limit = chain;
     q.update = (patch: Record<string, unknown>) => {
-      if (table === 'anonymous_shortlist') shortlistUpdates.push(patch);
+      if (table === 'anonymous_shortlist') {
+        shortlistUpdates.push(patch);
+        // The marker awaits the query itself, so resolve with its count/error.
+        const res = {
+          count: opts.markErr ? null : (opts.markCount === undefined ? 1 : opts.markCount),
+          error: opts.markErr ?? null,
+          data: null,
+        };
+        const upd: Record<string, unknown> = {};
+        upd.eq = () => upd; upd.is = () => upd;
+        upd.then = (r: (v: unknown) => unknown) => Promise.resolve(res).then(r);
+        return upd;
+      }
       if (table === 'user_pipeline') pipelineUpdates.push(patch);
       return q;
     };
@@ -97,6 +115,11 @@ function recordingDb(opts: {
       if (table === 'sam_opportunities') {
         if (opts.oppErr) return { data: null, error: opts.oppErr };
         return { data: opts.opp === undefined ? OPP : opts.opp, error: null };
+      }
+      if (table === 'anonymous_shortlist') {
+        // The marker's read-back after a 0-row update.
+        if (opts.markReadBackErr) return { data: null, error: opts.markReadBackErr };
+        return { data: opts.markReadBack ?? null, error: null };
       }
       return { data: null, error: null };
     };
@@ -348,9 +371,12 @@ describe('a failure is UNKNOWN, never a silent skip', () => {
     // The ordering invariant that makes retry safe, asserted on the source.
     const claimFn = SHORTLIST_LIB.slice(SHORTLIST_LIB.indexOf('export async function claimAnonShortlist'));
     const writeAt = claimFn.indexOf('createCanonicalPursuit(');
-    const markAt = claimFn.indexOf('await markClaimed(row.id);\n    promoted');
+    const markAt = claimFn.indexOf('const marked = await markClaimed(row);', writeAt);
+    const promoteAt = claimFn.indexOf('promoted += 1;', markAt);
     expect(writeAt).toBeGreaterThan(-1);
+    // pursuit write -> mark -> only then count it promoted
     expect(markAt).toBeGreaterThan(writeAt);
+    expect(promoteAt).toBeGreaterThan(markAt);
   });
 
   it('the route reports `failed` rather than hiding a partial failure', () => {
@@ -487,5 +513,107 @@ describe('behaviour carried over from /api/pipeline', () => {
     await createCanonicalPursuit(CTX(a.db), draft as never);
     expect(draft.notice_type).toBe('Solicitation');
     expect(draft.workspace_id).toBeUndefined();
+  });
+});
+
+// ── 11. THE CLAIM MARKER MUST BE FALSIFIABLE ───────────────────────────────
+
+const CLAIM_CTX = {
+  verifiedEmail: 'buyer@example.com', workspaceId: 'ws-1',
+  asClient: false, clientOwnerEmail: 'ws-1@clients.getmindy.ai',
+};
+
+describe('resolving a shortlist row is proven, never assumed', () => {
+  it('scopes the mutation defensively and counts it exactly', () => {
+    const fn = SHORTLIST_LIB.slice(SHORTLIST_LIB.indexOf('const markClaimed'));
+    expect(fn).toMatch(/\{ count: 'exact' \}/);
+    expect(fn).toMatch(/\.eq\('id', row\.id\)/);
+    expect(fn).toMatch(/\.eq\('owner_anon_id', owner\)/);
+    expect(fn).toMatch(/\.is\('claimed_at', null\)/);
+  });
+
+  it('a mark UPDATE database error counts as failed, never as resolved', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      markErr: { message: 'connection reset' },
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    expect(r.failed).toBe(1);
+    expect(r.promoted).toBe(0);
+    expect(r.alreadyTracked).toBe(0);
+    // The real pursuit was created and STAYS.
+    expect(b.inserts).toHaveLength(1);
+  });
+
+  it('a mark UPDATE affecting ZERO rows is not a clean resolution', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      markCount: 0,
+      markReadBack: { claimed_at: null },   // still unclaimed → genuinely unresolved
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    expect(r.failed).toBe(1);
+    expect(r.promoted).toBe(0);
+  });
+
+  it('a NULL count is UNKNOWN, never resolved', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      markCount: null,
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    expect(r.failed).toBe(1);
+    expect(r.promoted).toBe(0);
+  });
+
+  it('ZERO rows BUT provably claimed concurrently IS a resolution', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      markCount: 0,
+      markReadBack: { claimed_at: '2026-09-21T00:00:00Z' },  // someone else resolved it
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    expect(r.promoted).toBe(1);
+    expect(r.failed).toBe(0);
+  });
+
+  it('new pursuit created + mark fails → postWrite still returned, row retryable', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      markErr: { message: 'update rejected' },
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    // The pursuit exists, so its documents are still fetched…
+    expect(r.postWrite).toHaveLength(1);
+    // …and it is never rolled back.
+    expect(b.inserts).toHaveLength(1);
+    // The claim attempt is unresolved, so the next retry re-resolves it.
+    expect(r.failed).toBe(1);
+    expect(r.promoted).toBe(0);
+  });
+
+  it('existing pursuit + mark succeeds → untouched, resolved, alreadyTracked', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      alreadyTracked: [UUID],
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    expect(r.alreadyTracked).toBe(1);
+    expect(r.failed).toBe(0);
+    expect(b.inserts).toHaveLength(0);       // existing pursuit untouched
+    expect(b.pipelineUpdates).toHaveLength(0);
+    expect(b.shortlistUpdates).toHaveLength(1);
+  });
+
+  it('existing pursuit + mark FAILS → failed, not a false alreadyTracked', async () => {
+    const b = recordingDb({
+      shortlistRows: [{ id: 'sl-1', notice_id: UUID }],
+      alreadyTracked: [UUID],
+      markErr: { message: 'update rejected' },
+    });
+    const r = await claimAnonShortlist(b.db, ANON, CLAIM_CTX);
+    expect(r.failed).toBe(1);
+    expect(r.alreadyTracked).toBe(0);
+    expect(b.inserts).toHaveLength(0);
   });
 });

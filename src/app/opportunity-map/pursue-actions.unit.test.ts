@@ -60,7 +60,12 @@ describe('tracking a buy actually saves', () => {
   it('never posts solicitation_number — user_pipeline has no such column', () => {
     // Both call sites (popup save + drawer save) posted it. The column list is
     // notice_id/title/agency/naics_code/response_deadline/... — verified against the live table.
-    expect(map).not.toContain('solicitation_number');
+    // Assert on CODE, not prose: the map now carries comments that NAME
+    // solicitation_number while explaining why it must never be posted (and why
+    // nid != sol). Flagging those is a false positive — the same "strip comments
+    // first" trap the repo's audit gates document.
+    const mapCode = map.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(mapCode).not.toContain('solicitation_number');
     // notice_id IS the key and must survive.
     expect(map).toContain('notice_id:CUR.id');
     expect(map).toContain('notice_id:o.sol');

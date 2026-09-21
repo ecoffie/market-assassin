@@ -59,7 +59,11 @@ describe('the browser cannot manufacture an opportunity', () => {
   it('the Map sends ONLY the notice id', () => {
     // Assert the exact anonymous-save payload anywhere in the file, rather than
     // slicing on a keyword that also occurs in prose.
-    expect(MAP).toMatch(/body:JSON\.stringify\(\{anonId:_aid2,noticeId:_o2\.sol\}\)/);
+    // The CANONICAL notice id (_nid2), never the solicitation number. Review
+    // round 3: 99.0% of open SAM rows have nid != sol, so _o2.sol here meant
+    // the save failed the notice_id lookup and the FK for the whole corpus.
+    expect(MAP).toMatch(/body:JSON\.stringify\(\{anonId:_aid2,noticeId:_nid2\}\)/);
+    expect(MAP).not.toMatch(/noticeId:_o2\.sol/);
     // No client-supplied opportunity metadata may be posted to the shortlist.
     const call = MAP.slice(MAP.indexOf("fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},"));
     const payload = call.slice(0, call.indexOf('})})') + 4);
@@ -136,16 +140,19 @@ describe('promotion is safe and idempotent', () => {
   it('marks claimed ONLY after the pursuit write succeeds', () => {
     const body = LIB.slice(LIB.indexOf('export async function claimAnonShortlist'));
     const writeIdx = body.indexOf('createCanonicalPursuit(');
-    const markIdx = body.indexOf('await markClaimed(row.id);\n    promoted');
+    const markIdx = body.indexOf('const marked = await markClaimed(row);', writeIdx);
+    const promoteIdx = body.indexOf('promoted += 1;', markIdx);
     expect(writeIdx).toBeGreaterThan(-1);
     expect(markIdx).toBeGreaterThan(writeIdx);
+    // promoted is counted only AFTER the row is proven resolved.
+    expect(promoteIdx).toBeGreaterThan(markIdx);
   });
 
   it('never overwrites an existing pursuit, but DOES resolve the shortlist row', () => {
     // Leaving it unclaimed was the loop: the row was reconsidered on every Map
     // load forever. Its value HAS transferred — the pursuit exists.
     const body = LIB.slice(LIB.indexOf('export async function claimAnonShortlist'));
-    expect(body).toMatch(/if \(tracked\.has\(row\.notice_id\)\) \{[\s\S]{0,160}alreadyTracked \+= 1;[\s\S]{0,80}await markClaimed\(row\.id\);/);
+    expect(body).toMatch(/if \(tracked\.has\(row\.notice_id\)\) \{[\s\S]{0,120}await markClaimed\(row\)[\s\S]{0,400}alreadyTracked \+= 1;/);
     // …and nothing in this lib updates an existing pursuit row.
     expect(body).not.toMatch(/from\('user_pipeline'\)[\s\S]{0,80}\.update\(/);
   });

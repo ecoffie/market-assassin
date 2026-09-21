@@ -1571,7 +1571,11 @@ function drawFeed(){
   feed.innerHTML='';
   rows.forEach(o=>{
     const c=document.createElement('article');
-    c.className='card';c.dataset.sol=o.sol;c.tabIndex=0;
+    // data-sol = solicitation_number (the card's existing select/highlight key).
+    // data-nid = the CANONICAL sam_opportunities.notice_id. They are different
+    // values on 99.0% of open SAM rows, so anything keyed on the notice id
+    // (the anonymous shortlist restore) must read data-nid, never data-sol.
+    c.className='card';c.dataset.sol=o.sol;c.dataset.nid=o.nid||'';c.tabIndex=0;
     c.innerHTML=cardHTML(o);
     c.onclick=()=>select(o.sol,true);
     c.onkeydown=e=>{if(e.key==='Enter')select(o.sol,true);};
