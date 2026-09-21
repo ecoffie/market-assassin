@@ -4724,6 +4724,21 @@ const SAVE_JS = `<script>
   function _anonKey(){ try{ return (typeof window.__anonId==='function')?(window.__anonId()||''):''; }catch(e){ return ''; } }
   function _signedInEmail(){ var t=tok(); return t?email(t):''; }
   // Mark every element whose CANONICAL notice id is in the saved set.
+  // A saved CARD has to SAY so. Setting dataset.saved alone changed nothing the
+  // visitor could see: the browser acceptance gate proved the correct card was
+  // found and flagged (1 of 878 [data-nid] elements) while the screen looked
+  // identical to an unsaved one, so returning told the user nothing. The chip
+  // reuses the card's existing .chip row style; it is not a new surface.
+  function _cardSavedChip(el){
+    try{
+      if(el.querySelector('.chip.saved'))return;            // idempotent across repaints
+      var row=document.createElement('div');
+      row.className='crow1 savedrow';
+      row.innerHTML='<span class="chip saved">\u2713 Saved</span>';
+      var bodyEl=el.querySelector('.cbody');
+      if(bodyEl)bodyEl.insertBefore(row,bodyEl.firstChild); else el.insertBefore(row,el.firstChild);
+    }catch(e){}
+  }
   function _markSaved(ids){
     if(!ids)return;  // a failed read is UNKNOWN, not empty
     for(var i=0;i<ids.length;i++)window.__anonSaved[ids[i]]=1;
@@ -4731,7 +4746,10 @@ const SAVE_JS = `<script>
       var bs=document.querySelectorAll('[data-nid]');
       for(var j=0;j<bs.length;j++){
         var b=bs[j]; if(window.__anonSaved[b.getAttribute('data-nid')]){
-          b.dataset.saved='1'; if(b.tagName==='BUTTON')b.textContent='\u2713 Saved'; }
+          b.dataset.saved='1';
+          if(b.tagName==='BUTTON')b.textContent='\u2713 Saved';
+          else _cardSavedChip(b);
+        }
       }
     }catch(e){}
   }
@@ -5728,6 +5746,31 @@ const DRAWER_JS = `<script>
   // move rendered as a lone "Try again" with its title and description gone (Eric 2026-08-13).
   // When a title div exists, write into THAT and leave the description alone; otherwise the button
   // is plain text and behaves exactly as before.
+  // Reopening a saved SAM listing must show it as saved. This RENDERS EXISTING
+  // STATE ONLY: it reads window.__anonSaved (already populated by the shortlist
+  // restore) and never POSTs, never creates a pursuit and never asks for
+  // sign-in. saveCurrentOpp already early-returns on dataset.saved==='1', so
+  // setting it here is also what makes a click on a reopened listing a no-op
+  // instead of a second write.
+  //
+  // Gated to a canonical 32-hex sam_opportunities.notice_id, the same test the
+  // save path uses. A DLA solicitation number, a PIID, an fc- id, a UEI or a
+  // contact id can never satisfy it, so a solicitation number cannot collide
+  // with a saved notice id.
+  window.__markDrawerSaved=function(){
+    try{
+      var id=String((CUR&&CUR.id)||'');
+      if(CUR&&CUR.kind)return; if(CUR&&CUR.isDla)return; if(CUR&&CUR.dibbsUrl)return;
+      if(!/^[a-f0-9]{32}$/i.test(id))return;
+      if(!(window.__anonSaved&&window.__anonSaved[id]))return;
+      var bs=document.querySelectorAll('button[onclick*="saveCurrentOpp"]');
+      for(var i=0;i<bs.length;i++){
+        var b=bs[i];
+        if(b.dataset.saved==='1')continue;
+        b.dataset.saved='1'; setBtnLabel(b,'\u2713 Saved'); b.classList.add('saved');
+      }
+    }catch(e){}
+  };
   function setBtnLabel(btn,text){
     var t=btn.querySelector?btn.querySelector('.fc-move-t'):null;
     if(t)t.textContent=text; else btn.textContent=text;
@@ -7295,6 +7338,8 @@ const DRAWER_JS = `<script>
       if(mktBox)mktBox.innerHTML='';
       loadForecastRoster(agency);   // Buyer intelligence still gets the agency roster
       buildTabs();
+      // Render the saved state the visitor already has (no fetch, no write).
+      try{ window.__markDrawerSaved&&window.__markDrawerSaved(); }catch(e){}
     }
     var id=String((o&&(o.nid||o.sol))||''); if(!id){ fail(); return; }
     fetch('/api/app/forecast-detail?id='+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){
