@@ -116,4 +116,22 @@ surface's MEANING equals MCP's; MCP's module cannot re-import a legacy matcher. 
 agency argument → red; re-importing buildSearchOr → red; revert → green.
 
 ## 7. Hosted acceptance (production) — small set, after deploy
-_(filled after merge + deploy)_
+
+Production proven to serve the change: `maps-account-build` stamp = **`f3a51f5a`** (the #1639 merge), confirmed by
+`git merge-base --is-ancestor`. Then 4 hosted `find_opportunities` calls via the Mindy connector (40 credits budgeted;
+balance read with the free `get_balance` before and after).
+
+| call | hosted result | = replay? |
+|---|---|---|
+| `-computers` | needs_positive_scope on all 3 horizons; `billing_outcome: nonbillable_invalid_input`; **charged 0** | yes |
+| `ai governance` | Open 10 (2 DIRECT) · Recompete 0 · Forecast 13, top = "AI Governance - RFI (VA-26-00070202)"; eligibility `ALL(artificial intelligence · governance)` | yes |
+| `janitorial` + agency `USDA` | Open 9 · Recompete 172 · Forecast 37 — every buyer a USDA component (Forest Service, ARS, OCFO); no DLA / EPA / Pretrial | yes |
+| `cyber cloud compliance network server` | Open 528 (272 direct · 21 related) · Recompete 15,688 (50 direct · 149 related, split in the host note) · Forecast 719; `ANY(cybersecurity · cloud · server) rank-only(compliance · network)` | yes |
+
+Credits: 38,943 → 38,913 = **30 for 3 billable calls; the exclusion-only call was not charged.**
+
+Observed live (pre-existing, recorded): for Andre's list, DLA part notices ("SERVER,AUTOMATIC DA") rank near the
+top because DLA descriptions carry cybersecurity clause boilerplate, which MCP's unchanged cyber labeller reads as
+DIRECT. Same body-boilerplate class as §5 — a labeller/proximity follow-up, not a Phase B regression.
+
+**Phase B stops here.** Next (not started): Maps Open onto the seam, gated by the cross-surface test.
