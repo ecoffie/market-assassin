@@ -1554,8 +1554,11 @@ const COMPLIANCE_MATRIX_TOOL_DEF = {
       'Every candidate row is checked against the source text Mindy holds: requirements[] = trusted rows whose ' +
       'source_quote was found in source_doc (verification.found_in gives the character range); section appears only ' +
       'when the document prints it. interpretations[] = paraphrases carrying the real source sentence; withheld[] = ' +
-      'candidates that could not be verified (never present them as requirements). _meta.extraction_coverage says ' +
-      'which documents were actually read — a partial read is NOT the complete requirement set. grounded=false = ' +
+      'candidates that could not be verified (never present them as requirements). Every requirement-bearing document ' +
+      'in the package is read in full; _meta.extraction_coverage lists each document\'s disposition (read, or excluded ' +
+      'with a reason: wage-rate tables, duplicates, a misfiled document for another contract) and any uncovered_ranges. ' +
+      '_meta.extraction_completeness: source_text = complete; unproven / partial / unavailable = NOT the complete ' +
+      'requirement set (completeness_reasons says why). grounded=false = ' +
       'nothing verified; degraded=true = the source or model failed, not "no requirements". Amendments keep their ' +
       'own source_doc but superseded language is not resolved.',
     parameters: {

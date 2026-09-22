@@ -26,7 +26,9 @@ function doc(filename: string, text: string, availability = 'complete', kind: st
   };
 }
 
+let CORPUS = ''; // every document's text in the current package (what a quote can truly come from)
 function pkg(documents: ReturnType<typeof doc>[]) {
+  CORPUS = documents.map((d) => d.extracted_text).join(' ');
   const assembled = assembleNoticeSourceText({ sow_text: null, description: null, documents });
   return {
     notice_id: 'n1', description: null, sow_text: null, documents, degraded: false,
@@ -34,9 +36,23 @@ function pkg(documents: ReturnType<typeof doc>[]) {
   };
 }
 
-const llmReturns = (rows: unknown[]) => llmMock.mockResolvedValue({ text: JSON.stringify({ requirements: rows }) });
+// A faithful model stand-in: each window is read separately (Completeness Poteto), so a
+// row comes back only from a window whose text holds its quote; a FABRICATED quote (in
+// no window) comes back once, from the first window — as a real model would invent it.
+const flat = (x: string) => x.replace(/\s+/g, ' ');
+const llmReturns = (rows: Array<{ source_quote?: string }>) => {
+  let calls = 0;
+  llmMock.mockImplementation(async ({ user }: { user: string }) => {
+    const first = calls++ === 0;
+    const corpus = flat(`${CORPUS} ${user}`);
+    const picked = rows.filter((r) => flat(user).includes(flat(String(r.source_quote ?? ''))) ||
+      (first && !corpus.includes(flat(String(r.source_quote ?? '')))));
+    return { text: JSON.stringify({ requirements: picked }), model: 'test-model' };
+  });
+};
 
 beforeEach(() => {
+  CORPUS = '';
   llmMock.mockReset();
   docsMock.mockReset();
 });
@@ -77,15 +93,25 @@ describe('extract_compliance_matrix — truth contract', () => {
   });
 
   it('extraction_coverage says exactly which documents the model read — no completeness claim from partial text', async () => {
-    const big = 'The contractor shall provide all labor. '.repeat(1500); // 60K chars > 50K window
+    // Completeness Poteto: a 60K document is no longer cut at 50K — it is read in full,
+    // in windows. Partial text now comes from a FAILED window, and the principle holds:
+    // what was not processed is named, and completeness is not claimed.
+    const big = 'The contractor shall provide all labor. '.repeat(1500); // 60K chars
     docsMock.mockResolvedValue(pkg([doc('Base.docx', big), doc('Exhibit C.docx', 'Offerors shall submit Exhibit C.')]));
     llmReturns([{ id: 'REQ-001', requirement: 'Provide all labor.', category: 'technical', source_quote: 'The contractor shall provide all labor.' }]);
+    const ok = await extractComplianceMatrix({ notice_id: 'n1' });
+    expect(ok._meta.extraction_coverage).toMatchObject({ complete: true, chars_read: ok._meta.extraction_coverage!.relevant_chars });
+    expect(ok._meta.extraction_coverage!.documents.find((d) => d.filename === 'Exhibit C.docx')).toMatchObject({ fully_read: true });
+
+    const impl = llmMock.getMockImplementation()!;
+    let n = 0;
+    llmMock.mockImplementation(async (a: { user: string }) => { if (n++ === 1) throw new Error('provider down'); return impl(a); });
     const r = await extractComplianceMatrix({ notice_id: 'n1' });
     const ec = r._meta.extraction_coverage!;
     expect(ec.complete).toBe(false);
-    expect(ec.chars_read).toBeLessThan(ec.source_chars);
-    expect(ec.documents.find((d) => d.filename === 'Exhibit C.docx')).toMatchObject({ chars_read: 0, fully_read: false });
-    expect(r._meta.extraction_completeness).toBe('unproven');
+    expect(ec.chars_read).toBeLessThan(ec.relevant_chars);
+    expect(ec.uncovered_ranges.length).toBeGreaterThan(0);
+    expect(r._meta.extraction_completeness).toBe('partial');
     expect(r._meta.truncated_attachments).toBe(0); // complete docs are not "truncated"
   });
 
