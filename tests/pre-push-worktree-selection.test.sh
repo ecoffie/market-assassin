@@ -3,9 +3,12 @@
 # REAL-REPOSITORY regression for the pre-push gate's checkout selection.
 #
 # THE BUG THIS PINS: the gate derived its root from the HOOK FILE's location
-# (`dirname "$0"/..`). `npm run hooks:install` sets `core.hooksPath` to an
-# ABSOLUTE path inside the primary checkout, and every linked worktree shares
-# that config — so a push from a worktree validated the PRIMARY tree. Measured
+# (`dirname "$0"/..`). The SUPPORTED config is RELATIVE — `core.hooksPath=.githooks`,
+# what `npm run hooks:install` writes — and git resolves that per working tree,
+# so each worktree runs its own hook and the old derivation was fine. This repo
+# was found with an ABSOLUTE hooksPath into the primary checkout (not written by
+# hooks:install), which every linked worktree shares: the primary's hook CODE
+# runs with cwd in the pushed worktree, so the gate validated the PRIMARY tree. Measured
 # 2026-09-22 on a docs-only branch: it failed on another session's scratch file
 # and on three unit tests that passed in the pushing worktree's own full suite.
 # The branch under push was never examined.
@@ -136,32 +139,57 @@ setup_fixture() {
   # package.json — confirm, because the resolver depends on it.
   [ -f "$base/worktree/package.json" ] || { echo "fixture broken: worktree has no package.json"; exit 2; }
 
-  # THE CONDITION UNDER TEST: one shared, ABSOLUTE hooksPath in the primary.
-  mkdir -p "$base/primary/.githooks"
-  cp "$RESOLVER" "$base/primary/.githooks/resolve-checkout.sh"
-  chmod +x "$base/primary/.githooks/resolve-checkout.sh"
-  cat > "$base/primary/.githooks/pre-push" <<'HOOK'
+  # Install a hook in BOTH checkouts, each stamped with WHICH ONE it is, so a
+  # test can prove which hook CODE executed — not merely which tree was read.
+  install_hook "$base/primary"  PRIMARY  "$base"
+  install_hook "$base/worktree" WORKTREE "$base"
+
+  # `hooks_mode` decides the condition under test:
+  #   relative — the SUPPORTED config that `npm run hooks:install` writes.
+  #              Git resolves it per working tree, so each runs its own hook.
+  #   absolute — the misconfiguration found in this repo on 2026-09-22: an
+  #              absolute path into the PRIMARY checkout, shared by every
+  #              worktree, so the primary's hook code runs everywhere.
+  case "${hooks_mode:-relative}" in
+    relative) git -C "$base/primary" config core.hooksPath ".githooks" ;;
+    absolute) git -C "$base/primary" config core.hooksPath "$base/primary/.githooks" ;;
+    *) die_hard "unknown hooks_mode '${hooks_mode:-}'" ;;
+  esac
+}
+
+# A stub gate that uses the REAL resolver, stamps which checkout's code ran,
+# and fails when the validated checkout carries a FAIL marker.
+install_hook() {
+  local checkout="$1" label="$2" base="$3"
+  under_tmp "$checkout" || die_hard "install_hook outside \$TMP: $checkout"
+  mkdir -p "$checkout/.githooks" || die_hard "mkdir $checkout/.githooks"
+  cp "$RESOLVER" "$checkout/.githooks/resolve-checkout.sh" || die_hard "cp resolver"
+  chmod +x "$checkout/.githooks/resolve-checkout.sh"
+  cat > "$checkout/.githooks/pre-push" <<HOOK
 #!/usr/bin/env bash
 set -uo pipefail
-HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
-if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh")"; then
-  echo "GATE: could not establish checkout — blocking" >&2; exit 1
+echo "GATE: hook code from $label"
+echo "$label" >> "$base/which-hook-ran"
+HOOK_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+if ! ROOT="\$("\$HOOK_DIR/resolve-checkout.sh" "\$HOOK_DIR" 2>&1)"; then
+  echo "GATE: blocked — \$ROOT" >&2; exit 1
 fi
-cd "$ROOT" || exit 1
-echo "GATE: validated checkout $ROOT"
-echo "GATE: HEAD $(git rev-parse --short HEAD)"
-if [ -f "$ROOT/FAIL" ]; then
+cd "\$ROOT" || exit 1
+echo "GATE: validated checkout \$ROOT"
+echo "GATE: HEAD \$(git rev-parse --short HEAD)"
+if [ -f "\$ROOT/FAIL" ]; then
   echo "GATE: this checkout is marked failing" >&2; exit 1
 fi
 exit 0
 HOOK
-  chmod +x "$base/primary/.githooks/pre-push"
-  # Absolute + shared: exactly how `npm run hooks:install` leaves it.
-  git -C "$base/primary" config core.hooksPath "$base/primary/.githooks"
+  chmod +x "$checkout/.githooks/pre-push"
 }
 
-# ── 1. valid worktree + FAILING primary  → push from worktree MUST SUCCEED ──
-A="$TMP/case-a"; setup_fixture "$A"
+# ── CASE A — the SUPPORTED relative config ────────────────────────────────
+# core.hooksPath=.githooks  → git runs each working tree's OWN hook.
+# A valid worktree must push even when the primary checkout is broken, the
+# WORKTREE's hook code must be the one that ran, and the primary's must not.
+A="$TMP/case-a"; hooks_mode=relative setup_fixture "$A"
 touch "$A/primary/FAIL"                       # primary is broken
 rm -f "$A/worktree/FAIL"                      # worktree is fine
 (
@@ -169,40 +197,93 @@ rm -f "$A/worktree/FAIL"                      # worktree is fine
   echo change > w.txt && git add -A && git commit -qm w
 ) >/dev/null 2>&1
 out_a="$(cd "$A/worktree" && git push origin feature 2>&1)"; rc_a=$?
+ran_a="$(cat "$A/which-hook-ran" 2>/dev/null | tr '\n' ',')"
+
 if [ $rc_a -eq 0 ]; then
-  ok "valid worktree + failing primary → push allowed (gate read the worktree)"
+  ok "A/relative: valid worktree + failing primary → push allowed"
 else
-  bad "valid worktree + failing primary → push was BLOCKED" "$(echo "$out_a" | tail -3)"
+  bad "A/relative: push was BLOCKED" "$(echo "$out_a" | tail -3)"
+fi
+if [ "$ran_a" = "WORKTREE," ]; then
+  ok "A/relative: the WORKTREE's hook code ran, and only it"
+else
+  bad "A/relative: wrong hook code executed" "which-hook-ran=[$ran_a]"
 fi
 if grep -qF "GATE: validated checkout $A/worktree" <<<"$out_a"; then
-  ok "gate printed the worktree as the validated checkout"
+  ok "A/relative: gate named the worktree as the validated checkout"
 else
-  bad "gate did not name the worktree as the validated checkout" "$(echo "$out_a" | grep GATE: | head -2)"
+  bad "A/relative: gate did not name the worktree" "$(echo "$out_a" | grep GATE: | head -2)"
 fi
 if grep -q "GATE: HEAD " <<<"$out_a"; then
-  ok "gate printed the validated HEAD"
+  ok "A/relative: gate printed the validated HEAD"
 else
-  bad "gate did not print the validated HEAD"
+  bad "A/relative: gate did not print the validated HEAD"
 fi
 
-# ── 2. FAILING worktree + valid primary → push from worktree MUST FAIL ──────
-B="$TMP/case-b"; setup_fixture "$B"
-rm -f "$B/primary/FAIL"                       # primary is fine
-touch "$B/worktree/FAIL"                      # worktree is broken
-(
-  cd "$B/worktree" || die_hard "cd $B/worktree"
-  echo change > w.txt && git add -A && git commit -qm w
-) >/dev/null 2>&1
+# ── CASE A2 — relative config, FAILING worktree, valid primary → BLOCK ─────
+A2="$TMP/case-a2"; hooks_mode=relative setup_fixture "$A2"
+rm -f "$A2/primary/FAIL"
+touch "$A2/worktree/FAIL"
+( cd "$A2/worktree" || die_hard "cd"; echo c > c.txt; git add -A; git commit -qm c ) >/dev/null 2>&1
+out_a2="$(cd "$A2/worktree" && git push origin feature 2>&1)"; rc_a2=$?
+if [ $rc_a2 -ne 0 ]; then
+  ok "A/relative: failing worktree + valid primary → blocked (no free pass)"
+else
+  bad "A/relative: failing worktree was ALLOWED — the gate read the wrong tree"
+fi
+
+# ── CASE B — the MISCONFIGURED absolute-primary hooksPath ─────────────────
+# The primary's hook code runs with cwd in the worktree. Resolving the cwd
+# correctly is not enough: the gate implementation came from somewhere else, so
+# it must FAIL CLOSED and say so — never report the worktree as validated.
+B="$TMP/case-b"; hooks_mode=absolute setup_fixture "$B"
+rm -f "$B/primary/FAIL" "$B/worktree/FAIL"    # BOTH trees are fine…
+( cd "$B/worktree" || die_hard "cd"; echo b > b.txt; git add -A; git commit -qm b ) >/dev/null 2>&1
 out_b="$(cd "$B/worktree" && git push origin feature 2>&1)"; rc_b=$?
-if [ $rc_b -ne 0 ]; then
-  ok "failing worktree + valid primary → push blocked (no free pass from the primary)"
+ran_b="$(cat "$B/which-hook-ran" 2>/dev/null | tr '\n' ',')"
+
+if [ "$ran_b" = "PRIMARY," ]; then
+  ok "B/absolute: confirmed the PRIMARY's hook code is what git ran"
 else
-  bad "failing worktree + valid primary → push was ALLOWED — the gate read the wrong tree"
+  bad "B/absolute: expected the primary's hook code to run" "which-hook-ran=[$ran_b]"
+fi
+# …and the push must still be refused, purely on hook-code ownership.
+if [ $rc_b -ne 0 ]; then
+  ok "B/absolute: push BLOCKED even though both trees are valid"
+else
+  bad "B/absolute: push was ALLOWED — a foreign hook gated this branch"
+fi
+if grep -q "hook code belongs to ANOTHER CHECKOUT" <<<"$out_b"; then
+  ok "B/absolute: diagnostic says the hook belongs to another checkout"
+else
+  bad "B/absolute: diagnostic did not explain the ownership mismatch" "$(echo "$out_b" | tail -4)"
+fi
+if grep -q "npm run hooks:install" <<<"$out_b"; then
+  ok "B/absolute: diagnostic tells the operator how to restore the supported config"
+else
+  bad "B/absolute: diagnostic gave no repair instruction"
+fi
+if grep -qF "GATE: validated checkout $B/worktree" <<<"$out_b"; then
+  bad "B/absolute: reported the worktree as VALIDATED despite the foreign hook"
+else
+  ok "B/absolute: never reported the worktree as validated"
 fi
 
-# ── 3. the ORIGINAL buggy resolution must fail case 2 ───────────────────────
-# Proves these cases actually discriminate, rather than passing for free.
-C="$TMP/case-c"; setup_fixture "$C"
+# ── CASE B2 — an absolute path naming THIS checkout is still allowed ───────
+# The documented repair escape: git -c core.hooksPath="$PWD/.githooks" push
+B2="$TMP/case-b2"; hooks_mode=relative setup_fixture "$B2"
+rm -f "$B2/primary/FAIL" "$B2/worktree/FAIL"
+( cd "$B2/worktree" || die_hard "cd"; echo x > x.txt; git add -A; git commit -qm x ) >/dev/null 2>&1
+out_b2="$(cd "$B2/worktree" && git -c core.hooksPath="$B2/worktree/.githooks" push origin feature 2>&1)"; rc_b2=$?
+if [ $rc_b2 -eq 0 ] && grep -qF "GATE: validated checkout $B2/worktree" <<<"$out_b2"; then
+  ok "B2: absolute override naming THIS checkout is allowed (repair escape works)"
+else
+  bad "B2: the one-command repair escape was refused" "$(echo "$out_b2" | tail -3)"
+fi
+
+# ── CONTROL — the ORIGINAL resolution must fail CASE A2 ───────────────────
+# Proves these cases discriminate rather than passing for free.
+C="$TMP/case-c"; hooks_mode=relative setup_fixture "$C"
 cat > "$C/primary/.githooks/pre-push" <<'HOOK'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -213,6 +294,7 @@ echo "GATE(old): validated checkout $ROOT"
 exit 0
 HOOK
 chmod +x "$C/primary/.githooks/pre-push"
+git -C "$C/primary" config core.hooksPath "$C/primary/.githooks"
 rm -f "$C/primary/FAIL"; touch "$C/worktree/FAIL"
 ( cd "$C/worktree" || die_hard "cd $C/worktree"; echo c > c.txt; git add -A; git commit -qm c ) >/dev/null 2>&1
 out_c="$(cd "$C/worktree" && git push origin feature 2>&1)"; rc_c=$?
@@ -248,32 +330,47 @@ else
   bad "inherited GIT_DIR/GIT_WORK_TREE changed the answer" "got: $out_f"
 fi
 
-# ── 6. THE ANCHOR ITSELF must fail closed ──────────────────────────────────
+# ── THE ANCHOR ITSELF must fail closed, for the RIGHT REASON ──────────────
 # Regression for the defect found in review: a failed `mktemp -d` silently made
 # $TMP the CURRENT DIRECTORY (bash's `cd ""` returns 0 without moving), every
 # guard below then compared against the real tree, and the EXIT trap deleted
 # it — while this script printed 8/8 and exited 0. Under gate step 1a the cwd
 # is the checkout being pushed.
 #
-# Re-invokes THIS script from a sentinel that looks like a checkout, with a
-# TMPDIR that cannot work, and requires: non-zero exit AND the sentinel intact.
+# ⚠️ FALSIFIABILITY. An earlier version copied this script somewhere else and
+# asked only for a non-zero exit. That passes for the WRONG REASON: the copy
+# had no .githooks/resolve-checkout.sh beside its inferred repo root, so it
+# would exit non-zero even if the anchor guard never fired. Two changes:
+#   • run the REAL script, by absolute path, so the resolver is present;
+#   • make TMPDIR deterministically unusable — a REGULAR FILE inside the
+#     already-validated outer $TMP, so `mktemp -d "$TMPDIR/…"` fails ENOTDIR
+#     regardless of global filesystem state;
+#   • require the SPECIFIC containment refusal, not merely a non-zero exit.
 if [ "${PREPUSH_SEL_SELFTEST:-}" != "1" ]; then
   sentinel="$TMP/anchor-sentinel"
-  mkdir -p "$sentinel/src"
+  mkdir -p "$sentinel/src" || die_hard "mkdir sentinel"
   printf '{"name":"market-assassin"}\n' > "$sentinel/package.json"
   echo precious > "$sentinel/src/precious.ts"
-  cp "${BASH_SOURCE[0]}" "$sentinel/selftest.sh"
-  (
-    cd "$sentinel" || die_hard "cd $sentinel"
-    PREPUSH_SEL_SELFTEST=1 TMPDIR=/nonexistent-anchor-probe/ bash selftest.sh
-  ) >/dev/null 2>&1
-  rc_anchor=$?
-  if [ $rc_anchor -ne 0 ] && [ -f "$sentinel/src/precious.ts" ]; then
-    ok "anchor fails closed on an unusable TMPDIR, leaving the cwd intact"
-  elif [ ! -f "$sentinel/src/precious.ts" ]; then
-    bad "ANCHOR DESTROYED THE CWD — \$TMP degraded to the working directory"
+  notdir="$TMP/not-a-directory"
+  : > "$notdir" || die_hard "could not create $notdir"
+  [ -f "$notdir" ] && [ ! -d "$notdir" ] || die_hard "$notdir is not a regular file"
+
+  out_anchor="$(
+    cd "$sentinel" || exit 97
+    PREPUSH_SEL_SELFTEST=1 TMPDIR="$notdir" \
+      bash "$REPO_ROOT/tests/pre-push-worktree-selection.test.sh" 2>&1
+  )"; rc_anchor=$?
+
+  anchor_ok=1; anchor_why=""
+  add_why() { anchor_ok=0; anchor_why="${anchor_why:+$anchor_why; }$1"; }
+  [ $rc_anchor -ne 0 ] || add_why "exited 0"
+  [ -f "$sentinel/src/precious.ts" ] || add_why "SENTINEL WAS DELETED"
+  grep -q "CONTAINMENT: mktemp -d failed" <<<"$out_anchor" \
+    || add_why "no specific anchor refusal in output"
+  if [ $anchor_ok -eq 1 ]; then
+    ok "anchor fails closed on an unusable TMPDIR, for the right reason, cwd intact"
   else
-    bad "anchor did not fail closed on an unusable TMPDIR" "exit=$rc_anchor"
+    bad "anchor regression: $anchor_why" "exit=$rc_anchor out=$(echo "$out_anchor" | tail -2)"
   fi
 fi
 

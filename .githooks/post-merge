@@ -19,8 +19,10 @@ set -uo pipefail
 # Report-only here, but it is the identical defect, so it uses the identical
 # fix. See .githooks/resolve-checkout.sh.
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
-if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" 2>/dev/null)"; then
-  # Report-only hook: stay silent rather than block a merge.
+# Same ownership rule as pre-push: this hook must not run the PRIMARY
+# checkout's reporting logic against a different worktree while pretending it
+# belongs there. Report-only, so a mismatch is silent rather than blocking.
+if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR" 2>/dev/null)"; then
   exit 0
 fi
 cd "$ROOT" || exit 0

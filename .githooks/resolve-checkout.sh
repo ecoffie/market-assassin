@@ -1,39 +1,66 @@
 #!/usr/bin/env bash
 #
-# WHICH CHECKOUT IS BEING PUSHED?
+# WHICH CHECKOUT IS BEING PUSHED, AND DID THIS HOOK COME FROM IT?
 #
-# ⚠️ This exists because the pre-push gate spent weeks validating the WRONG
-# TREE. It derived its root from the HOOK FILE's location:
+# Usage:  resolve-checkout.sh [HOOK_DIR]
+#   no arg   — print the physical toplevel of the checkout we are running in.
+#   HOOK_DIR — additionally require that HOOK_DIR's parent IS that checkout,
+#              i.e. the hook CODE and the tree it validates are the same
+#              checkout. Fails closed when they differ.
 #
-#     ROOT="$(cd "$(dirname "$0")/.." && pwd)"     # ← the bug
+# ── The supported configuration ───────────────────────────────────────────
 #
-# `npm run hooks:install` sets `core.hooksPath` to an ABSOLUTE path inside the
-# primary checkout. Every linked worktree shares that config, so `$0` is always
-# `<primary>/.githooks/pre-push` no matter where you push from — and the gate
-# `cd`s into the PRIMARY checkout and typechecks and tests THAT.
+#   core.hooksPath = .githooks        (RELATIVE — what `npm run hooks:install`
+#                                      and the npm `prepare` script set)
 #
-# Measured 2026-09-22: pushing a docs-only branch from a worktree failed on
-# `scripts/_trace-rc1.ts` (a scratch file belonging to another session working
-# in the primary checkout) and on three `src/lib/usaspending` unit tests that
-# passed in isolation and in the pushing worktree's own full suite. The branch
-# under push was never examined. Same family as the documented
-# "`vercel --prod` from a worktree uploads the parent tree" trap.
+# Git resolves a RELATIVE hooksPath against the top of the working tree being
+# operated on, so a push from a linked worktree runs THAT WORKTREE'S hook.
+# Under this supported config the old `dirname "$0"/..` derivation happened to
+# be correct, because the hook really did live in the tree being pushed.
 #
-# THE INVARIANT: the gate validates the checkout that is being pushed.
+# ── The state that broke it ───────────────────────────────────────────────
 #
-# Resolution, in order:
-#   1. Git invokes a pre-push hook with the cwd at the top of the working tree
-#      that is being pushed. That cwd is the primary signal.
-#   2. Inherited GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE point at the pushing
-#      worktree's admin files, but they also make a plain `git rev-parse` in a
-#      subshell answer for whatever they name rather than for the cwd. Clear
-#      them before asking, so the answer describes where we actually are.
-#   3. FAIL CLOSED. If the toplevel cannot be established, or does not look
-#      like this repository, print why and exit non-zero. A gate that cannot
-#      tell which tree it is checking must not report on any tree.
+# Measured in this repository on 2026-09-22:
 #
-# Prints the absolute path of the validated checkout on stdout. Diagnostics go
-# to stderr so `$(resolve-checkout.sh)` stays clean.
+#   core.hooksPath = /Users/ericcoffie/Projects/market-assassin/.githooks
+#
+# an ABSOLUTE path into the primary checkout. That is NOT what hooks:install
+# writes — something else set it — but git honours it from every linked
+# worktree, so:
+#
+#   • the PRIMARY checkout's hook CODE executes,
+#   • with cwd in the linked WORKTREE being pushed.
+#
+# The old derivation then `cd`ed to the primary and typechecked and tested THAT
+# while printing a verdict on your branch. A docs-only push was blocked by
+# another session's scratch file (`scripts/_trace-rc1.ts`) and by three
+# `src/lib/usaspending` unit tests that passed in the pushing worktree's own
+# full suite. The branch under push was never examined.
+#
+# ── The invariant ─────────────────────────────────────────────────────────
+#
+#   THE HOOK CODE AND THE CHECKOUT IT VALIDATES MUST BE THE SAME CHECKOUT.
+#
+# Resolving cwd correctly is only half of it: under an absolute primary
+# hooksPath a stale primary hook would validate the right tree with the WRONG
+# GATE IMPLEMENTATION. We do NOT silently compensate for that — we fail closed
+# and tell the operator to restore the supported relative config, because a
+# gate whose code came from somewhere else is not this branch's gate.
+#
+# The one-command repair escape stays valid:
+#     git -c core.hooksPath="$PWD/.githooks" push
+# there the absolute path belongs to the CURRENT checkout, so HOOK_ROOT == ROOT.
+#
+# ── Resolution, in order ──────────────────────────────────────────────────
+#   1. Git invokes the hook with cwd inside the working tree being operated on.
+#   2. Inherited GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE name that tree's admin
+#      files and would make a plain `git rev-parse` answer for them rather than
+#      for the cwd. Clear them first.
+#   3. FAIL CLOSED — on an unresolvable toplevel, a foreign repository, or a
+#      hook that belongs to a different checkout.
+#
+# Prints the absolute (physical) path of the validated checkout on stdout.
+# Diagnostics go to stderr so `$(resolve-checkout.sh)` stays clean.
 
 set -uo pipefail
 
@@ -61,5 +88,29 @@ actual_name="$(node -e 'try{process.stdout.write(require(process.argv[1]).name||
   "$toplevel/package.json" 2>/dev/null)"
 [ "$actual_name" = "$expected_name" ] \
   || die "package.json name is '${actual_name:-<unreadable>}', expected '$expected_name' at $toplevel"
+
+# ── Hook-code ownership ───────────────────────────────────────────────────
+# Only when the caller names its own hook directory. The hook that is running
+# must live in the checkout we just validated.
+if [ $# -ge 1 ] && [ -n "${1:-}" ]; then
+  hook_dir="$1"
+  [ -d "$hook_dir" ] || die "hook dir does not exist: $hook_dir"
+  hook_root="$(cd "$hook_dir/.." && pwd -P)" \
+    || die "cannot resolve the checkout owning $hook_dir"
+  if [ "$hook_root" != "$toplevel" ]; then
+    die "$(printf '%s\n' \
+      "hook code belongs to ANOTHER CHECKOUT — refusing to validate." \
+      "  hook code : $hook_dir" \
+      "              (owned by $hook_root)" \
+      "  pushing   : $toplevel" \
+      "core.hooksPath is an absolute path into a different checkout, so this" \
+      "tree would be gated by another checkout's hook implementation." \
+      "Restore the supported configuration:   npm run hooks:install" \
+      "(that sets the RELATIVE  core.hooksPath=.githooks , which makes git run" \
+      "each worktree's own hook). To publish a repair to the hook itself, use a" \
+      "one-command override that names THIS checkout:" \
+      "    git -c core.hooksPath=\"\$PWD/.githooks\" push")"
+  fi
+fi
 
 printf '%s\n' "$toplevel"

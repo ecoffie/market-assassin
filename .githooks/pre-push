@@ -11,16 +11,18 @@
 
 set -uo pipefail
 
-# ⚠️ THE GATE VALIDATES THE CHECKOUT BEING PUSHED — never the hook's own
-# location. This used to be `ROOT="$(cd "$(dirname "$0")/.." && pwd)"`, and
-# because `core.hooksPath` is an ABSOLUTE path inside the primary checkout,
-# every worktree push typechecked and tested the PRIMARY tree instead of the
-# branch under push. See .githooks/resolve-checkout.sh for the measurement.
-# Resolution FAILS CLOSED: if we cannot establish which tree we are checking,
-# we block rather than report on the wrong one.
+# ⚠️ TWO THINGS MUST HOLD, and resolve-checkout.sh enforces both, failing closed:
+#   1. the gate validates the checkout BEING PUSHED (not the hook's location),
+#   2. the hook CODE came from that same checkout.
+# This used to be `ROOT="$(cd "$(dirname "$0")/.." && pwd)"`. That is correct
+# under the SUPPORTED relative `core.hooksPath=.githooks` — git runs each
+# worktree's own hook — but this repo was found with an ABSOLUTE hooksPath into
+# the primary checkout, where the primary's hook runs with cwd in the pushed
+# worktree. The gate then examined the primary tree and reported on your branch.
+# See .githooks/resolve-checkout.sh for the measurement.
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
-if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh")"; then
-  echo "✗ pre-push gate: could not establish which checkout is being pushed — blocking." >&2
+if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR")"; then
+  echo "✗ pre-push gate: blocked (see above) — refusing to report on a tree I cannot vouch for." >&2
   exit 1
 fi
 cd "$ROOT" || { echo "✗ pre-push gate: cannot enter $ROOT — blocking." >&2; exit 1; }

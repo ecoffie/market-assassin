@@ -2098,18 +2098,36 @@ FAILS CLOSED.** Regression: `tests/pre-push-worktree-selection.test.sh`, wired i
 blocking step **1a**. The gate now prints the validated checkout path and HEAD on every
 run — a green gate that does not name your tree is not a green gate for your tree.
 
+**Two invariants, both enforced, both failing closed:**
+
+1. the gate validates the checkout **being pushed**, and
+2. the hook **code** came from that same checkout.
+
+**The supported configuration is `core.hooksPath = .githooks` — RELATIVE.** That is what
+`npm run hooks:install` and the npm `prepare` script write, and git resolves a relative
+hooksPath against the top of the working tree being operated on, so **each worktree runs
+its own hook**. Under that config the old derivation happened to be correct.
+
 **The bug it replaces.** The hook derived its root from the hook FILE:
 
 ```bash
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"     # ← wrong
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"     # ← wrong whenever hooksPath is absolute
 ```
 
-`npm run hooks:install` sets **`core.hooksPath` to an ABSOLUTE path inside the primary
-checkout**, and every linked worktree shares that config. So `$0` is always
-`<primary>/.githooks/pre-push` regardless of where you push from, and the gate `cd`ed into
-the **primary checkout** and typechecked and tested **that** — while reporting a verdict on
-your branch. With ~30 worktrees live here, the primary is usually another session's
-in-flight tree.
+This repository was found on 2026-09-22 with
+`core.hooksPath = /Users/ericcoffie/Projects/market-assassin/.githooks` — an **absolute**
+path into the primary checkout. ⚠️ That is **not** what `hooks:install` writes; something
+else set it. Git honours it from every linked worktree, so the **primary's hook code** runs
+with cwd in the **worktree being pushed**. The gate then `cd`ed to the primary and
+typechecked and tested **that** while reporting a verdict on your branch. With ~30
+worktrees live here, the primary is usually another session's in-flight tree.
+
+⚠️ **Resolving the cwd is only half the fix.** Under an absolute primary hooksPath a
+*stale* primary hook would validate the right tree with the **wrong gate implementation**.
+So ownership is checked too, and we **do not silently compensate** — the push is refused
+with instructions to restore `npm run hooks:install`. The one-command repair escape stays
+valid because there the absolute path names the *current* checkout:
+`git -c core.hooksPath="$PWD/.githooks" push`.
 
 **Measured 2026-09-22.** A docs-only branch pushed from a worktree was blocked by
 `scripts/_trace-rc1.ts` (another session's scratch file, absent from the pushing worktree
