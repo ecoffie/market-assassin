@@ -13,7 +13,21 @@
 # Enabled via `core.hooksPath=.githooks` (same as pre-push; auto-set by npm's prepare script).
 
 set -uo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# ⚠️ SAME BUG AS pre-push: deriving the root from the hook FILE's location is
+# wrong whenever core.hooksPath is an absolute path shared by every worktree —
+# this reported on the PRIMARY checkout no matter where the merge happened.
+# Report-only here, but it is the identical defect, so it uses the identical
+# fix. See .githooks/resolve-checkout.sh.
+# Same canonicalization as pre-push. Report-only, so a symlinked hook file or
+# a foreign hook directory is a silent no-op rather than a failure.
+[ -L "$0" ] && exit 0
+HOOK_DIR="$(cd -P "$(dirname "$0")" && pwd -P)"
+# Same ownership rule as pre-push: this hook must not run the PRIMARY
+# checkout's reporting logic against a different worktree while pretending it
+# belongs there. Report-only, so a mismatch is silent rather than blocking.
+if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR" 2>/dev/null)"; then
+  exit 0
+fi
 cd "$ROOT" || exit 0
 
 # Only on main — mid-feature merges into a topic branch are noise.

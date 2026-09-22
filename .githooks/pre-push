@@ -10,13 +10,45 @@
 # with `git push --no-verify` (use sparingly — it exists for genuine hotfixes).
 
 set -uo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+
+# ⚠️ TWO THINGS MUST HOLD, and resolve-checkout.sh enforces both, failing closed:
+#   1. the gate validates the checkout BEING PUSHED (not the hook's location),
+#   2. the hook CODE came from that same checkout.
+# This used to be `ROOT="$(cd "$(dirname "$0")/.." && pwd)"`. That is correct
+# under the SUPPORTED relative `core.hooksPath=.githooks` — git runs each
+# worktree's own hook — but this repo was found with an ABSOLUTE hooksPath into
+# the primary checkout, where the primary's hook runs with cwd in the pushed
+# worktree. The gate then examined the primary tree and reported on your branch.
+# See .githooks/resolve-checkout.sh for the measurement.
+# ⚠️ The hook SOURCE must be canonical before its ownership means anything.
+#   • a symlinked hook FILE (worktree/.githooks/pre-push -> primary/...) leaves
+#     the directory local, so a directory-level check would pass while git
+#     executes the primary's code. The supported checkout has a real tracked
+#     hook file, so a symlink here is always wrong.
+#   • a symlinked hook DIRECTORY is caught by resolving physically, never via a
+#     lexical `..`.
+if [ -L "$0" ]; then
+  echo "✗ pre-push gate: refusing a SYMLINKED hook file — $0" >&2
+  echo "  The hook that runs must be the real file tracked in the checkout" >&2
+  echo "  being pushed. Restore it with:   npm run hooks:install" >&2
+  exit 1
+fi
+HOOK_DIR="$(cd -P "$(dirname "$0")" && pwd -P)"
+if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR")"; then
+  echo "✗ pre-push gate: blocked (see above) — refusing to report on a tree I cannot vouch for." >&2
+  exit 1
+fi
+cd "$ROOT" || { echo "✗ pre-push gate: cannot enter $ROOT — blocking." >&2; exit 1; }
 
 BOLD='\033[1m'; RED='\033[0;31m'; GREEN='\033[0;32m'; YEL='\033[0;33m'; NC='\033[0m'
 fail=0
 
+# Say WHICH tree and WHICH commit was examined, so a green gate is auditable.
+GATE_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo '<unknown>')"
+GATE_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '<detached>')"
 echo -e "${BOLD}── pre-push gate ──${NC}"
+echo -e "  ${BOLD}checkout${NC} $ROOT"
+echo -e "  ${BOLD}HEAD${NC}     $GATE_HEAD ($GATE_BRANCH)"
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
 echo -e "  ${BOLD}1/13${NC} typecheck (tsc --noEmit)…"
@@ -25,6 +57,17 @@ if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
 else
   echo -e "      ${RED}✗ typecheck FAILED — push blocked${NC}"
   grep "error TS" /tmp/mindy-prepush-tsc.log | head -15 | sed 's/^/        /'
+  fail=1
+fi
+
+# 1a) HARD BLOCK: the gate must validate the checkout being pushed. If this
+# regresses, every other step in this file reports on the wrong tree.
+echo -e "  ${BOLD}1a/13${NC} pre-push checkout selection…"
+if bash tests/pre-push-worktree-selection.test.sh > /tmp/mindy-prepush-selection.log 2>&1; then
+  echo -e "      ${GREEN}✓ gate validates the pushed checkout (worktree-safe)${NC}"
+else
+  echo -e "      ${RED}✗ checkout-selection regression — push blocked${NC}"
+  grep -aE "✗|FAIL" /tmp/mindy-prepush-selection.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 
