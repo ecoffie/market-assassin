@@ -254,6 +254,16 @@ support, `install` for roofing, `physical` for security guard, `agency` for staf
   second was live on the garbage case (1 title match reported as a small market beside
   ~20 open refuse/solid-waste notices). Say which words were searched and that the limit
   is the SEARCH. Guarded by the live oracle's `no_market_absence_claim` pin.
+- ✅ **The original /try relevance repair is CLOSED** (Eric, 2026-09-22) on live verification
+  of `086484e7`. **That closed the repair, not every search limitation** — do not reopen
+  #1610. Next batch, in order (`tasks/body-relevance-followup-2026-09-21.md`): (1)
+  **product-versus-service matching in AWARDED results** — a detailing business is shown
+  "DETAILING BOTTLE 12 OZ CLEAR PLASTIC"; ⚠️ the "Already awarded" label explains TIMING,
+  not relevance, and is **not** a disclosure of it. It arrives via the BigQuery task-order
+  path, so the awarded fallback carries the whole homograph class. (2) **poor broader-term
+  selection** — `pickExpandedKeyword` yields `"guard repair"` for a security-guard business
+  (0 open titles contain it). (3) **body-based retrieval** against the preserved cases.
+  SAM document access is a **separate track**.
 - ⛔ **There is NO body-text rescue, and the one that was built is RETRACTED.** A
   `detail-evidence.ts` fallback read the notice's description on an empty result and quoted
   the line; independent review measured **~19 of 26 hits (73%) wrong** — submission

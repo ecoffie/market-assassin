@@ -1,4 +1,34 @@
-# Follow-up: body relevance for /try (NOT started)
+# Follow-up: /try retrieval quality (NOT started)
+
+> **The original `/try` relevance repair is CLOSED** (Eric, 2026-09-22), on live
+> verification of `086484e7` on getmindy.ai: the garbage query returns relevant
+> work, vague input asks for clarification, and counts match the displayed
+> cards. **That closed the repair, not every search limitation.** #1610 is not
+> to be reopened. The three priorities below are the NEXT batch.
+>
+> **SAM document access is a separate track** and is not part of this.
+
+## Next batch — priority order (Eric, 2026-09-22)
+
+1. **Product-versus-service matching in AWARDED results.** Confirmed defect,
+   see `product_not_service` in the fixture: a detailing business is shown
+   "DETAILING BOTTLE 12 OZ CLEAR PLASTIC". ⚠️ Labelling a result "Already
+   awarded" explains its TIMING; it does **not** make it relevant, and the
+   label must not be treated as a disclosure of the relevance problem. Note
+   this one arrives through the **BigQuery task-order path**, not
+   `sam_opportunities` — the awarded fallback applies the same activity gate,
+   so the whole homograph class reaches it.
+2. **Poor broader-term selection.** `pickExpandedKeyword` turns "physical
+   security guard services" into **`"guard repair"`** — zero open titles
+   contain that phrase (measured 2026-09-22), so the uncovered group is filled
+   by the SAM tool's token-retry rather than by a term anyone chose. Now more
+   visible because the copy names the term it searched.
+3. **Body-based retrieval**, against the preserved positive AND negative cases
+   below. This is the original subject of this file.
+
+---
+
+## Body relevance (priority 3)
 
 **Status: not started. Evidence frozen, nothing built.**
 Fixtures: `src/lib/beginner/__fixtures__/body-relevance-cases.ts`
