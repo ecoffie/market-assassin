@@ -15,10 +15,16 @@ import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fisc
 import { termOfArtSynonyms, sectorSubTradeKeywords } from './sector-expansions';
 
 /**
- * How many curated alternates the identity fallback may try. Bounded because
- * each one is a live BQ round-trip; the curated lists are short by design.
+ * How many curated alternates the identity fallback may measure.
+ *
+ * Bounded because each is a live BQ query — but they run in PARALLEL, so the
+ * cost is fan-out width, not latency. It was 4, which silently truncated an
+ * 11-trade construction family to its first four and left "concrete" (the
+ * single largest trade, $441.8M) out of the union — the family then measured
+ * SMALLER than a subtrade it should contain. The curated lists are short and
+ * hand-authored; cover the whole family rather than an arbitrary prefix.
  */
-const MAX_IDENTITY_FALLBACK_TERMS = 4;
+export const MAX_IDENTITY_FALLBACK_TERMS = 12;
 import {
   KEYWORD_COVERAGE_PRIMARY_SENSE,
   KEYWORD_COVERAGE_QUESTION,
@@ -253,8 +259,13 @@ export interface KeywordCoverage {
    * from the curated sector/term-of-art corpus instead. The report labels the
    * market by what the user asked for, and discloses what actually resolved it.
    */
-  identityResolvedVia?: string;
-  identityBasis?: 'literal' | 'curated_sector_synonym';
+  /**
+   * The curated TERMS whose measurements recovered this market. Evidence only —
+   * it does NOT rename the capability. "building construction and renovation"
+   * measured via [roofing, masonry, concrete] is still construction, not roofing.
+   */
+  identityResolvedVia?: string[];
+  identityBasis?: 'literal' | 'curated_sector_family';
   totalMarket: number;            // $ total: SUM(obligation_amount) on description-matched FY actions
   naicsCount: number;             // distinct NAICS that bought it
   // Dollar-sorted. v1 lead = biggest by action obligations in the description-matched
@@ -380,6 +391,58 @@ const COV_TTL_MS = 10 * 60 * 1000;
 
 function coverageCacheKey(keyword: string, coverageTarget: number, awardIdPrefix?: string): string {
   return `${keyword.trim().toLowerCase()}|${coverageTarget}|${awardIdPrefix || 'all'}`;
+}
+
+/**
+ * Union several curated-alternate measurements into ONE market.
+ *
+ * A broad capability ("building construction and renovation") is a FAMILY of
+ * trades, not whichever trade happens to measure biggest. Summing the per-term
+ * NAICS/PSC/agency buckets keeps the market broad and keeps the reported total
+ * consistent with the codes behind it.
+ *
+ * ⚠️ Award-level double counting: the same award can match two terms (a job
+ * described as "roofing and masonry"). The NAICS/PSC/agency buckets are summed
+ * because a dollar bought through 238160 is genuinely 238160 spend under either
+ * term; `uniqueAwardCount` is summed as an UPPER BOUND and labelled as such,
+ * because BQ returns counts, not ids, so exact de-duplication is not available
+ * here. The totals are therefore "at most" figures for a multi-term family —
+ * stated rather than silently precise.
+ */
+function mergeCoverageRows(rows: KeywordCoverageBqRow[], keyword: string): KeywordCoverageBqRow {
+  if (rows.length === 1) return { ...rows[0], keyword };
+  const bucket = (all: { code: string; name: string; amount: number }[]) => {
+    const m = new Map<string, { code: string; name: string; amount: number }>();
+    for (const b of all) {
+      const hit = m.get(b.code);
+      if (hit) hit.amount += b.amount;
+      else m.set(b.code, { ...b });
+    }
+    return [...m.values()].sort((a, b) => b.amount - a.amount);
+  };
+  const agencyMap = new Map<string, { name: string; amount: number }>();
+  for (const r of rows) {
+    for (const a of r.agencies) {
+      const hit = agencyMap.get(a.name);
+      if (hit) hit.amount += a.amount;
+      else agencyMap.set(a.name, { ...a });
+    }
+  }
+  const naics = bucket(rows.flatMap((r) => r.naics));
+  const pscs = bucket(rows.flatMap((r) => r.pscs));
+  return {
+    ...rows[0],
+    keyword,
+    totalMarket: rows.reduce((s, r) => s + r.totalMarket, 0),
+    transactionCount: rows.reduce((s, r) => s + r.transactionCount, 0),
+    uniqueAwardCount: rows.reduce((s, r) => s + r.uniqueAwardCount, 0),
+    naics,
+    pscs,
+    agencies: [...agencyMap.values()].sort((a, b) => b.amount - a.amount),
+    naicsCount: naics.length,
+    pscCount: pscs.length,
+    maxActionDate: rows.map((r) => r.maxActionDate).filter(Boolean).sort().at(-1) ?? null,
+  };
 }
 
 function rowToCoverage(row: KeywordCoverageBqRow, coverageTarget: number): KeywordCoverage {
@@ -536,7 +599,7 @@ export async function queryKeywordCoverage(
           }).then((row) => ({ row, term: alt })),
         ),
       );
-      let best: { row: Awaited<ReturnType<typeof runKeywordCoverageBq>>; term: string } | null = null;
+      const measured: { row: KeywordCoverageBqRow; term: string }[] = [];
       for (const r of settled) {
         if (r.status === 'rejected') {
           // A deadline hit during the fan-out is the CALLER's deadline — surface it.
@@ -546,19 +609,29 @@ export async function queryKeywordCoverage(
           }
           continue; // one alternate failing is not the market failing
         }
-        const { row: altRow, term } = r.value;
-        if (altRow.transactionCount > 0 && (!best || altRow.totalMarket > best.row.totalMarket)) {
-          best = { row: altRow, term };
-        }
+        if (r.value.row.transactionCount > 0) measured.push(r.value);
       }
-      if (best) {
-        // Label the market by what the user ASKED for; measure it by the term
-        // that actually resolves. Never silently rename their market.
-        const cov = rowToCoverage({ ...best.row, keyword: raw }, coverageTarget);
+
+      if (measured.length > 0) {
+        // ── IDENTITY IS NOT THE WINNING SUBTRADE ────────────────────────────
+        // Picking the largest alternate made "building construction and
+        // renovation" silently BECOME "roofing" — roofing is the term that
+        // measured best, not the customer's capability. Identity selection and
+        // market measurement are different questions, so they are answered
+        // separately:
+        //   MEASUREMENT: union every curated alternate that returned rows, so a
+        //     broad phrase stays broad when the evidence supports several
+        //     related trades.
+        //   IDENTITY: stays the phrase the user typed. identityResolvedVia
+        //     records the measurement TERMS as evidence, never as a rename.
+        // A single measuring alternate is still just that one term's market —
+        // no union to build, and nothing broader is claimed.
+        const mergedRow = mergeCoverageRows(measured.map((m) => m.row), raw);
+        const cov = rowToCoverage(mergedRow, coverageTarget);
         const resolved: KeywordCoverage = {
           ...cov,
-          identityResolvedVia: best.term,
-          identityBasis: 'curated_sector_synonym',
+          identityResolvedVia: measured.map((m) => m.term),
+          identityBasis: 'curated_sector_family',
         };
         if (!opts?.signal?.aborted && !signal?.aborted) {
           _covCache.set(cacheKey, { at: Date.now(), val: resolved });

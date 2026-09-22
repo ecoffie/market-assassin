@@ -71,7 +71,7 @@ interface ReportLike {
       window?: string | null;
       state_scoped?: boolean;
       requested_state?: string | null;
-      identity_resolved_via?: string | null;
+      identity_resolved_via?: string[] | null;
     } | null;
     size_tiers?: {
       basis: 'named' | 'term_of_art' | 'code_total';

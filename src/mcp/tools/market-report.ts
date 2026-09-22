@@ -161,7 +161,8 @@ export interface MarketReportSummary {
     window: string | null;
     state_scoped: boolean;
     requested_state: string | null;
-    identity_resolved_via: string | null;
+    /** Measurement terms that recovered the market — evidence, not a rename. */
+    identity_resolved_via: string[] | null;
   } | null;
   /**
    * The bridge: how we got from the literal keyword to the reported market.
@@ -443,7 +444,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     (() => {
       const subjectNaics = naicsCodes.length
         ? naicsCodes
-        : (coverage?.allNaics ?? []).map((n) => n.code).filter(Boolean);
+        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
+        // multi-trade family carries long-tail noise — a construction family
+        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
+        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
+        // the whole tail put those back on the page, which is exactly the
+        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
+        // smallest set covering ~90% of the measured market — 14 clean
+        // construction codes here — so it is the defensible subject boundary.
+        : (coverage?.coverageCodes?.length
+            ? coverage.coverageCodes
+            : (coverage?.allNaics ?? []).map((n) => n.code)
+          ).filter(Boolean);
       if (!subjectNaics.length && !primaryNaics) {
         // No defensible subject filter exists → withhold the section.
         return Promise.resolve({
