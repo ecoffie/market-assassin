@@ -179,6 +179,16 @@ export function mapKeywordCoverageBqRow(
       amount: coerceBqNumber(a.amount),
     }))
     .filter((a) => a.name);
+  // EMPTY IS KNOWLEDGE, FAILURE IS UNKNOWN: an aggregate row always carries a COUNT.
+  // A missing / non-numeric count is an unusable response, not "zero transactions" —
+  // coerceBqNumber would turn it into 0 and a billable measured-empty market.
+  const rawCount = raw.transaction_count as unknown;
+  const unwrapped = rawCount && typeof rawCount === 'object' && 'value' in rawCount
+    ? (rawCount as { value: unknown }).value
+    : rawCount;
+  if (unwrapped == null || unwrapped === '' || !Number.isFinite(Number(unwrapped))) {
+    throw new Error('keyword-coverage BQ row malformed: transaction_count missing or non-numeric');
+  }
   const maxRaw = raw.max_action_date == null ? '' : String(raw.max_action_date).trim();
   return {
     keyword: input.keyword,

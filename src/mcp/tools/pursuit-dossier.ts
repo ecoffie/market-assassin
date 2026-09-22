@@ -184,7 +184,7 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   if (!notice) {
     // The anchor THREW → Mindy could not perform the lookup (non-billable). A clean
     // anchor that found nothing is a real "no such notice" answer and stays billable.
-    if (anchor.degraded) {
+    if (anchor.degraded || a?._meta?.degraded === true) {
       return miss('The solicitation lookup did not complete (upstream error). Retry — this is not evidence the notice does not exist.',
         sol, started, { degraded: true, outcome: 'nonbillable_system_failure' });
     }

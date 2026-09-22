@@ -312,8 +312,8 @@ export interface MarketReportResult {
      *   measurement_failure  — the REQUIRED measurement failed; market UNKNOWN
      */
     publication_state?: 'publish' | 'insufficient_evidence' | 'measurement_failure';
-    /** Present only when the call is non-billable (see credit-integrity.ts). */
-    billing_outcome?: 'nonbillable_system_failure';
+    /** A pure function of publication_state (see credit-integrity.ts). */
+    billing_outcome?: 'billable_success' | 'billable_no_result' | 'nonbillable_system_failure';
     /** Per-section outcome so a missing section states WHY it is missing. */
     section_status?: { name: string; status: SectionStatus; required: boolean }[];
     /** Sections whose query FAILED — unknown, never an established zero. */
@@ -448,7 +448,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const coverage = coverageOutcome.value;
   const codeSizeOutcome: SectionOutcome<Awaited<ReturnType<typeof codeMarketSize>>> =
     !keyword && naicsCodes.length
-      ? await runSection(codeMarketSize({ naics: naicsCodes[0] }), (m) => !!m && (m.totalMarket ?? 0) > 0)
+      ? await runSection(codeMarketSize({ naics: naicsCodes[0], strict: true }), (m) => !!m && (m.totalMarket ?? 0) > 0)
       : { status: 'empty', value: null };
   const marketSize = keyword ? coverage : codeSizeOutcome.value;
   /** The outcome of the REQUIRED market measurement for THIS report's axis. */
@@ -908,7 +908,12 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       ? 'publish'
       : 'insufficient_evidence';
   const deliverableWorthy = publicationState === 'publish';
-  const degraded = [coverage === null && keyword !== '', agenciesR.degraded, competitionR.degraded, recompetesR.degraded, forecastsR.degraded, agencyDetailR.degraded, sbaR.degraded].some(Boolean);
+  // EMPTY IS KNOWLEDGE, FAILURE IS UNKNOWN. `coverage === null` used to count as
+  // degraded, but keywordCoverage returns null ONLY for a query that succeeded and
+  // measured zero awards (failures and deadlines throw → status 'failed'). Counting
+  // that as degraded made a completed, genuinely-empty market look like an upstream
+  // failure — and DEFECT-7 then refused to bill it.
+  const degraded = [requiredMeasurement.status === 'failed', agenciesR.degraded, competitionR.degraded, recompetesR.degraded, forecastsR.degraded, agencyDetailR.degraded, sbaR.degraded].some(Boolean);
 
   const result: MarketReportResult = {
     subject,
@@ -933,9 +938,11 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
        * (billable); measurement_failure means the REQUIRED measurement did not
        * complete, so the caller is not charged — even when optional sections grounded.
        */
-      ...(publicationState === 'measurement_failure'
-        ? { billing_outcome: 'nonbillable_system_failure' as const }
-        : {}),
+      billing_outcome: publicationState === 'measurement_failure'
+        ? 'nonbillable_system_failure' as const
+        : publicationState === 'publish'
+          ? 'billable_success' as const
+          : 'billable_no_result' as const,
       /** Per-section outcome — tells the caller WHY a section is missing. */
       section_status: sectionStatuses,
       /** Sections whose query FAILED (unknown, never an established zero). */
