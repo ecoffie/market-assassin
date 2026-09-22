@@ -118,7 +118,7 @@ async function readAll(limit: number): Promise<{ text: string; calls: number; fi
   // never be what "proves" completeness — the tool's own next_page must end it.
   const maxCalls = Math.ceil(TOTAL / limit) + 5;
   while (res.next_page && calls < maxCalls) {
-    res = await solicitationDocuments({ notice_id: NOTICE, text_limit: limit, documents: res.next_page.documents });
+    res = await solicitationDocuments({ notice_id: NOTICE, text_limit: limit, document_ids: res.next_page.document_ids, documents: res.next_page.documents });
     text += res.documents[0].extracted_text;
     calls++;
   }
@@ -162,8 +162,30 @@ describe('get_solicitation_documents — full-document access', () => {
     const res = await solicitationDocuments({ notice_id: NOTICE, text_limit: 20_000 });
     expect(res.next_page).not.toBeNull();
     expect(res.next_page!.documents[0]).toMatchObject({ document_id: 'file-solicitation', offset: 20_000 });
-    const second = await solicitationDocuments({ notice_id: NOTICE, documents: res.next_page!.documents });
+    const second = await solicitationDocuments({ notice_id: NOTICE, document_ids: res.next_page!.document_ids, documents: res.next_page!.documents });
     expect(second.documents[0].text_window.offset).toBe(20_000);
+  });
+
+  it('next_page is SCOPED — a continuation does not re-send completed documents', async () => {
+    // Two docs: one long (pages), one short (completes in the first window).
+    mockWarm.mockResolvedValue({
+      data: [
+        warmRows[0],
+        { ...warmRows[0], sam_file_id: 'file-short', filename: 'Exhibit.docx', extracted_text: 'short', char_count: 5, page_count: null },
+      ],
+    });
+    const first = await solicitationDocuments({ notice_id: NOTICE, text_limit: 20_000 });
+    expect(first.documents).toHaveLength(2);
+    // Only the long doc has more text, so only it may be carried forward.
+    expect(first.next_page!.document_ids).toEqual(['file-solicitation']);
+    const second = await solicitationDocuments({
+      notice_id: NOTICE,
+      document_ids: first.next_page!.document_ids,
+      documents: first.next_page!.documents,
+    });
+    // The completed doc is NOT re-sent from offset 0 (which would double-count it).
+    expect(second.documents).toHaveLength(1);
+    expect(second.documents[0].document_id).toBe('file-solicitation');
   });
 
   it('documents are addressed by stable document_id, not array position', async () => {

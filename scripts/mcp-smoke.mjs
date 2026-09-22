@@ -433,7 +433,7 @@ try {
     if (sdS.next_page) {
       const p2 = await client.callTool({
         name: 'get_solicitation_documents',
-        arguments: { notice_id: noticeRef, documents: sdS.next_page.documents },
+        arguments: { notice_id: noticeRef, document_ids: sdS.next_page.document_ids, documents: sdS.next_page.documents },
       });
       const p2S = p2.structuredContent;
       const want = sdS.next_page.documents[0];

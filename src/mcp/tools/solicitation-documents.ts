@@ -45,8 +45,12 @@ export interface SolicitationDocumentsToolResult {
   documents: SolicitationDocument[];
   /** Notice-level completeness. `complete:false` means KEEP PAGING. */
   coverage: SolicitationDocumentsResult['coverage'];
-  /** Ready-to-send continuation calls; empty when nothing is left to read. */
-  next_page: { notice_id: string; documents: DocTextRequest[] } | null;
+  /**
+   * Ready-to-send continuation call, or null when nothing is left to read.
+   * SCOPED: `document_ids` restricts the next response to the documents that
+   * actually have more text, so completed documents are not re-sent.
+   */
+  next_page: { notice_id: string; document_ids: string[]; documents: DocTextRequest[] } | null;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -84,6 +88,11 @@ export async function solicitationDocuments(
     more.length > 0
       ? {
           notice_id: res.notice_id,
+          // SCOPE the continuation to only the documents that still have text.
+          // Without document_ids the next call re-sends every COMPLETED document
+          // from offset 0, which both wastes the response budget and makes naive
+          // accumulation double-count them (caught by the VA acceptance case).
+          document_ids: more.map((d) => d.document_id),
           documents: more.map((d) => ({
             document_id: d.document_id,
             offset: d.text_window.next_offset as number,

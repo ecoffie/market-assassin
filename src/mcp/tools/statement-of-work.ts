@@ -13,6 +13,7 @@
  */
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
+import { summarizeSourceCoverage, coverageCaveat, type SourceCoverage } from '@/lib/sam/source-coverage';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface StatementOfWorkInput {
@@ -34,6 +35,8 @@ export interface StatementOfWorkResult {
     method: 'sow_heading' | 'classified_sow' | 'clin_scope' | 'none';
     sow_chars: number;
     has_clin_scope: boolean;
+    /** What the SOURCE text was missing when built from a notice_id. */
+    source_coverage?: SourceCoverage;
   };
 }
 
@@ -41,7 +44,7 @@ export interface StatementOfWorkResult {
  *  as a fallback. Mirrors the compliance-matrix notice fetch. */
 async function textFromNotice(
   noticeId: string,
-): Promise<{ combined: string; classifiedSow: string; degraded: boolean }> {
+): Promise<{ combined: string; classifiedSow: string; degraded: boolean; coverage: SourceCoverage | null }> {
   try {
     // Full window per document — a SOW's scope often continues well past the
     // first 20k chars, and a partial read silently drops requirements.
@@ -51,10 +54,10 @@ async function textFromNotice(
     for (const d of docs.documents) {
       if (d.extracted_text) parts.push(`--- ${d.filename || 'attachment'} ---\n${d.extracted_text}`);
     }
-    return { combined: parts.join('\n\n').trim(), classifiedSow: (docs.sow_text || '').trim(), degraded: false };
+    return { combined: parts.join('\n\n').trim(), classifiedSow: (docs.sow_text || '').trim(), degraded: false, coverage: summarizeSourceCoverage(docs) };
   } catch (err) {
     console.error('[statement-of-work] notice fetch failed', noticeId, err);
-    return { combined: '', classifiedSow: '', degraded: true };
+    return { combined: '', classifiedSow: '', degraded: true, coverage: null };
   }
 }
 
@@ -66,12 +69,14 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
   let classifiedSow = '';
   let source: 'notice_id' | 'text' | 'none' = rfpText ? 'text' : 'none';
   let fetchDegraded = false;
+  let sourceCoverage: SourceCoverage | null = null;
 
   if (!rfpText && noticeId) {
     const fetched = await textFromNotice(noticeId);
     combined = fetched.combined;
     classifiedSow = fetched.classifiedSow;
     fetchDegraded = fetched.degraded;
+    sourceCoverage = fetched.coverage;
     source = 'notice_id';
   }
 
@@ -148,6 +153,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
       method,
       sow_chars: sowText.length,
       has_clin_scope: clin !== null,
+      ...(sourceCoverage ? { source_coverage: sourceCoverage } : {}),
     },
   };
 
@@ -162,6 +168,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
       how_to_use:
         'Use sow_text as the scope of work to brief subcontractors or seed a technical response. When method=clin_scope, it is a CLIN summary — confirm against the full solicitation + drawings before relying on it.',
       key_caveats: [
+        ...(sourceCoverage && coverageCaveat(sourceCoverage) ? [coverageCaveat(sourceCoverage) as string] : []),
         'The SOW is detected by heading boundaries; a solicitation with unusual formatting may under- or over-capture — verify the start/end against the source.',
         'This returns the SCOPE text only, not the Section L/M instructions or evaluation factors — pair with extract_compliance_matrix for the full requirement set.',
         'clin_scope is reconstructed from the pricing schedule, not the narrative SOW — it lists what to price, not full performance detail.',

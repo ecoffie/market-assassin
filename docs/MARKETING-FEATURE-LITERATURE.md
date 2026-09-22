@@ -6322,14 +6322,19 @@ had.
 **SEO.** Read a full federal solicitation with AI / RFP evaluation factors
 extraction / AI proposal compliance matrix from SAM.gov attachments.
 
-**Proof.** Live, 2026-09-22. DLA `SPE60525R0222`: all 14 attachments discovered
-and 2,380,326 characters assembled in 5 calls; `DFARS 252.215-7016` (postaward
-debriefings) — the clause a client debriefing question turned on, previously
-reportable only as PARTIAL — is now confirmable. `Attachment B - Schedule.pdf`
-200,000 → 573,558 characters. VA `36C24226Q0857`: 362,651 characters in 2 calls,
-with `52.212-1`, `52.212-2`, evaluation factors, insurance, asbestos and
-limitations on subcontracting all retrievable — the five gaps that had forced a
-bid/no-bid outside the product. The four unusable extractions now self-report as
-`container_stub` or `unreadable_encoding` instead of `complete`. 15 regressions
-across `solicitation-documents-paging` and `extraction-quality`, proven to fail
-when truncation honesty is removed.
+**Proof.** Live, 2026-09-22, accepted on VA `36C24226Q0857`: the app's
+attachment inventory and MCP's match exactly (7/7 by file id); every document
+reconstructs byte-for-byte through paging (assembled length equals the stored
+`char_count` for all 7); and `52.212-1` (instructions, p48), `52.212-2`
+(evaluation factors, p58), insurance (p29) and `VAAR 852.219-75` /
+limitations-on-subcontracting (p42) are all retrievable — the four late sections
+that had forced the bid/no-bid decision outside the product. Extraction no longer
+discards text: the ceiling that silently dropped 373,558 characters from a
+274-page priced schedule is gone. Downstream, `extract_compliance_matrix`,
+`extract_statement_of_work` and `draft_proposal` now carry a `source_coverage`
+gap list, so a matrix built from a partial read says so instead of reading as the
+solicitation's full requirement set. 21 regressions across
+`solicitation-documents-paging`, `source-coverage` and `extraction-quality`,
+proven to fail when truncation honesty is removed. Container-stub and
+font-subset PDFs are detected and disclosed, not yet recovered (see
+`tasks/FOLLOWUP-dla-container-ocr-2026-09-22.md`).
