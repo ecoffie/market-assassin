@@ -166,11 +166,11 @@ describe('incumbent matcher — PSC + title-derived work-words (not a hardcoded 
   });
   it('HARD-DISCOUNTS to 0 when no distinctive token AND no PSC match — a big same-NAICS IDV cannot win on $', () => {
     expect(incSrc).toContain('if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch)');
-    expect(incSrc).toMatch(/return \{ score: 0, distinctiveHits, pscMatch \}/);
+    expect(incSrc).toMatch(/return \{ score: 0, distinctiveHits, workHits, locationHits, pscMatch \}/);
   });
   it('a PSC match is a STRONG same-product signal (threaded through findLikelyPriorAwards → scoreAwardEvidence)', () => {
     expect(incSrc).toMatch(/psc_code\?: string \| null;/);          // the input carries PSC
-    expect(incSrc).toContain('scoreAwardEvidence(r as never, titleWords, agencyHint, input.psc_code ?? null)');
+    expect(incSrc).toContain('scoreAwardEvidence(r as never, titleWords, agencyHint, input.psc_code ?? null, noticePlaceTokens)');
     expect(incSrc).toContain('if (pscMatch) score += 45');           // PSC match = large boost
   });
   it('the amount signal stays capped at +5 — size never buys the match', () => {

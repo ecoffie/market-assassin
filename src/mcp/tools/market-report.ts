@@ -961,8 +961,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     },
   };
 
-  // Client-ready deliverable (Mindy-branded, self-contained).
-  result.deliverable.html = renderMarketReportHtml(result);
+  /**
+   * Client-ready deliverable (Mindy-branded, self-contained) — ONLY above the
+   * evidence bar.
+   *
+   * ⚠️ The gate withheld `deliverable.url` and persistence but still RENDERED and
+   * returned the branded HTML, and the HTML is the artifact a customer actually
+   * forwards to their client. Withholding the link while handing over the page
+   * reads as "we published it, here it is inline" — the refusal has to cover both
+   * or it covers neither. The caller keeps every structured section (the data is
+   * honest and it paid for it); what is withheld is the client-facing page.
+   */
+  result.deliverable.html = deliverableWorthy ? renderMarketReportHtml(result) : '';
 
   // Persist → shareable link. Only for a verified caller, and only when we actually
   // found something (an empty report isn't a deliverable worth a client link).

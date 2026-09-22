@@ -14,6 +14,18 @@ export interface IncumbentEvidence {
   naicsMatch: boolean;
   matchConfidence: 'high' | 'medium' | 'low';
   /**
+   * RULE D (2026-09-22) — distinctive hits split into WORK evidence and LOCATION
+   * corroboration. Both RC-3 incidents reached "supported" on hits that were
+   * ENTIRELY geography (East/Orange/Lyons; United/States), which the sector rules
+   * above cannot see because a same-sector candidate can be built the same way.
+   * Location may corroborate an incumbent; it may never establish one.
+   *
+   * Optional: callers that predate the split fall back to `distinctiveHits`, so
+   * their behaviour is unchanged.
+   */
+  workHits?: number;
+  locationHits?: number;
+  /**
    * 2-digit NAICS sectors of the notice and the candidate award, when both are
    * known. A conflict (e.g. 23 construction vs 51 telecom) means the award is
    * for a different KIND of work, not merely a different code.
@@ -81,7 +93,27 @@ export function groundIncumbent(ev: IncumbentEvidence | null | undefined): Incum
     };
   }
 
-  const workEvidence = ev.distinctiveHits >= 2 || ev.pscMatch;
+  // ── GUARDRAIL 3 (RULE D): location is not identity ──────────────────────
+  // With no non-locational hit the WORK itself is unevidenced, whether because
+  // every hit was a place or because nothing matched at all. A PSC match is
+  // independent product-class evidence and still carries.
+  const workHits = ev.workHits ?? ev.distinctiveHits;
+  const locationHits = ev.locationHits ?? 0;
+  if (workHits === 0 && !ev.pscMatch) {
+    return {
+      grounded: false,
+      certainty: 'uncertain',
+      reason: locationHits > 0
+        ? `Every distinctive token this award matched (${locationHits}) is a PLACE — a city, state, ` +
+          'region or facility name — not the work. Location can corroborate an incumbent; it can ' +
+          'never establish one. Shown as a prior award only.'
+        : 'Nothing describing the WORK matched this award and its PSC does not match the notice, so ' +
+          'there is no evidence it is the same requirement. A shared NAICS code is not evidence — ' +
+          'NAICS agreement or disagreement never identifies an incumbent. Shown as a prior award only.',
+    };
+  }
+
+  const workEvidence = workHits >= 2 || ev.pscMatch;
   // NAICS is recorded, never a gate on its own: a match does not make it
   // grounded. The guardrails above bound the DOWNSIDE; this bounds the upside.
   if (ev.matchConfidence === 'high' && workEvidence) {

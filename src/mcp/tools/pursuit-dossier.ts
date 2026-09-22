@@ -24,6 +24,7 @@ import {
   dedupeAgainstPackage,
 } from '@/lib/gov-contacts/package-named-contacts';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
+import { canEnrichIncumbentFinancials } from '@/lib/usaspending/incumbent-location-evidence';
 
 /** Inline doc text cap inside the dossier — full text is via get_solicitation_documents. */
 const DOSSIER_DOC_TEXT_CAP = 1_500;
@@ -66,6 +67,8 @@ export interface PursuitDossierResult {
     naics: string | null;
     agency: string | null;
     incumbent_name: string | null;
+    /** True when RULE C refused financial enrichment on an unsupported incumbent. */
+    incumbent_financials_withheld: boolean;
     grounded_incumbent: boolean;
     sections: { docs: boolean; competition: boolean; pricing: boolean; contacts: number; financials: boolean };
     elapsed_ms: number;
@@ -155,6 +158,7 @@ function miss(
     _meta: {
       grounded: false, degraded: billing?.degraded ?? false, solicitation: sol, naics: null, agency: null,
       incumbent_name: null,
+      incumbent_financials_withheld: true,
       grounded_incumbent: false,
       sections: { docs: false, competition: false, pricing: false, contacts: 0, financials: false },
       elapsed_ms: Date.now() - started,
@@ -196,7 +200,19 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   const office = pick(notice, 'office', 'officeAddress', 'dodaac');
   const noticeId = pick(notice, 'notice_id', 'noticeId') || sol;
   const namedIncumbentRow = groundedIncumbent ? incumbent : null;
-  const incumbentName = (namedIncumbentRow as { recipientName?: string } | null)?.recipientName;
+  /**
+   * RULE C (2026-09-22) — a false incumbent must not cascade into SEC financial
+   * enrichment. Both RC-3 candidates reached "supported" on geography alone and
+   * would have pulled AT&T's and Lockheed's filings onto a VA demolition IDIQ and a
+   * DLA fuel buy. Enrichment requires >= medium confidence AND `supported`
+   * certainty, asserted HERE as well as in the matcher so a future scoring change
+   * cannot silently re-open the cascade.
+   */
+  const enrichmentAllowed = canEnrichIncumbentFinancials(
+    namedIncumbentRow as { matchConfidence?: 'high' | 'medium' | 'low'; incumbent_certainty?: string } | null,
+  );
+  const groundedIncumbentName = (namedIncumbentRow as { recipientName?: string } | null)?.recipientName;
+  const incumbentName = enrichmentAllowed ? groundedIncumbentName : undefined;
 
   // 2) Fan out — parallel, each guarded — on what the notice gave us.
   const [docs, depth, pricing, contacts, financials] = await Promise.all([
@@ -299,7 +315,9 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
       solicitation: sol,
       naics: naics ?? null,
       agency: agency ?? null,
-      incumbent_name: incumbentName ?? null,
+      incumbent_name: groundedIncumbentName ?? null,
+      /** True when RULE C refused enrichment on an unsupported incumbent. */
+      incumbent_financials_withheld: !enrichmentAllowed,
       grounded_incumbent: groundedIncumbent,
       sections: {
         docs: !!docs.value,
