@@ -151,6 +151,20 @@ export interface MarketReportSummary {
   axis: 'keyword' | 'naics' | 'agency';
   total_market: number | null;
   /**
+   * RC-5 — provenance for `total_market`, so a headline and a section total that
+   * measure different things are LABELLED rather than read as a contradiction.
+   * `state_scoped:false` with a non-null `requested_state` is the explicit
+   * disclosure that the headline is national while the sections are not.
+   */
+  total_market_basis?: {
+    source: 'lead_naics_code' | 'keyword_description_match' | 'explicit_code';
+    window: string | null;
+    state_scoped: boolean;
+    requested_state: string | null;
+    /** Measurement terms that recovered the market — evidence, not a rename. */
+    identity_resolved_via: string[] | null;
+  } | null;
+  /**
    * The bridge: how we got from the literal keyword to the reported market.
    * Null for a NAICS/agency report, where there is no keyword to bridge from.
    */
@@ -430,7 +444,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     (() => {
       const subjectNaics = naicsCodes.length
         ? naicsCodes
-        : (coverage?.allNaics ?? []).map((n) => n.code).filter(Boolean);
+        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
+        // multi-trade family carries long-tail noise — a construction family
+        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
+        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
+        // the whole tail put those back on the page, which is exactly the
+        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
+        // smallest set covering ~90% of the measured market — 14 clean
+        // construction codes here — so it is the defensible subject boundary.
+        : (coverage?.coverageCodes?.length
+            ? coverage.coverageCodes
+            : (coverage?.allNaics ?? []).map((n) => n.code)
+          ).filter(Boolean);
       if (!subjectNaics.length && !primaryNaics) {
         // No defensible subject filter exists → withhold the section.
         return Promise.resolve({
@@ -571,6 +596,43 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     ? `Contracts in this market rarely use the word "${keyword}" — its lead code's vocabulary reads: ${undercount.marketVocabulary.slice(0, 6).join(', ')}. Treat the total as a floor and search these terms too.`
     : null;
 
+  /**
+   * RC-5 (2026-09-22) — WHAT the headline number measures.
+   *
+   * Two independent measurements were presented as interchangeable totals.
+   * Traced on d80cad92:
+   *   MA / 236220 -> headline $30.6B (codeMarketSize, 1 FY, NATIONAL) vs
+   *                  sections   $851.3M (spend-query, 3 FY, MA-scoped)
+   *   drones      -> headline $90.0M (keywordCoverage, 1 FY, literal term) vs
+   *                  sections   $10.3B (spend-query, 3 FY, +6 synonyms)
+   * The gap is never one bug: PERIOD, TERM SET and GEOGRAPHY all differ. A
+   * customer seeing both figures without labels reads a contradiction.
+   */
+  const totalMarketBasis = (() => {
+    const source = dominantSize?.totalMarket
+      ? ('lead_naics_code' as const)
+      : coverage?.totalMarket
+        ? ('keyword_description_match' as const)
+        : marketSize
+          ? ('explicit_code' as const)
+          : null;
+    if (!source) return null;
+    return {
+      source,
+      /** Measurement window for THIS number — not the sections' window. */
+      window: coverage?.windowLabel ?? null,
+      /**
+       * The headline measurements are NATIONAL; the sections honour `state`.
+       * That asymmetry is the entire MA/236220 discrepancy, so state it.
+       */
+      state_scoped: false,
+      requested_state: state ?? null,
+      /** What resolved identity when the literal phrase measured nothing (RC-1). */
+      identity_resolved_via: coverage?.identityResolvedVia ?? null,
+    };
+  })();
+
+
   const summary: MarketReportSummary = {
     subject,
     axis,
@@ -587,6 +649,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     recompetes: contracts.length,
     forecasts: forecasts.length,
     contacts: contactsSection?.people.length ?? 0,
+    total_market_basis: totalMarketBasis,
   };
 
   const basis: MarketReportBasis | null = scope

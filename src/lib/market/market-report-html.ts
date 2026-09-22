@@ -65,6 +65,14 @@ interface ReportLike {
   } | null;
   summary: {
     total_market: number | null;
+    /** RC-5 provenance — see MarketReportSummary in market-report.ts. */
+    total_market_basis?: {
+      source?: string;
+      window?: string | null;
+      state_scoped?: boolean;
+      requested_state?: string | null;
+      identity_resolved_via?: string[] | null;
+    } | null;
     size_tiers?: {
       basis: 'named' | 'term_of_art' | 'code_total';
       label: string;
@@ -240,10 +248,28 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       )
     : '';
 
+  // RC-5 — when the headline and the sections measure different scopes, SAY SO.
+  // Presenting both figures unlabelled is what read as a contradiction.
+  const scopeNote = summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
+    ? `<p class="note">“Total market” is the <strong>national</strong> figure for this market${
+        summary.total_market_basis.window ? ` (${esc(summary.total_market_basis.window)})` : ''
+      }. The agency, contractor and recompete sections below are scoped to <strong>${esc(
+        summary.total_market_basis.requested_state,
+      )}</strong> over a longer window, so those dollars are smaller by design — they answer a different question.</p>`
+    : '';
+
   const body = [
     // Summary band
     `<section class="summary">
-      ${statCard('Total market', money(summary.total_market))}
+      ${statCard(
+        // RC-5: name WHAT this measures. A national 1-FY headline beside
+        // state-scoped 3-FY sections is not a contradiction once it is labelled.
+        summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
+          ? 'Total market (national)'
+          : 'Total market',
+        money(summary.total_market),
+        summary.total_market_basis?.window ?? undefined,
+      )}
       ${summary.naics_count != null ? statCard('Buying NAICS', num(summary.naics_count)) : ''}
       ${summary.top_psc ? statCard('Top product (PSC)', summary.top_psc.code, summary.top_psc.name) : ''}
       ${statCard('Top agencies', num(summary.buying_agencies))}
@@ -252,6 +278,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${statCard('Forecasts', num(summary.forecasts))}
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
     </section>`,
+    scopeNote,
     // THE BRIDGE — how the headline was derived, shown so a client can audit it.
     // A single unlabeled number is what made a $46.3B hypersonics headline
     // indefensible: nobody could see which awards it was built from.
