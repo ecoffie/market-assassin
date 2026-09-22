@@ -2139,6 +2139,41 @@ not see it. Do not cite those gate lines as branch validation.
 checkout-local override — `git -c core.hooksPath="$PWD/.githooks" push`. Never
 `--no-verify`, and never rewrite the shared `core.hooksPath`; other sessions depend on it.
 
+### ⛔ Rules for any test that CREATES or MUTATES git repositories
+
+Written after this test re-initialised the real repository as **bare**
+(`core.bare=true`), which broke `git status` in the primary checkout while another session
+was working in it, and committed two fixture commits ("seed", "w") onto the branch under
+test. Two mechanisms, both ordinary:
+
+- **Inherited `GIT_DIR`.** Git sets it for hooks. `git init --bare <path>` honoured it
+  over its own path argument and applied to the real repository.
+- **A failed `cd` that did not abort.** `set -e` was not in use, so
+  `( cd "$fixture"; git add -A; git commit )` carried on in the previous cwd — the source
+  tree — when the fixture did not exist.
+
+**Non-negotiable, in this order:**
+
+1. **Scrub the git environment BEFORE the first git command** — `GIT_DIR`,
+   `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
+   `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_PREFIX`,
+   `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_n`/`VALUE_n`; pin
+   `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` to `/dev/null`. Not after setup — before.
+2. **Operate exclusively inside a validated temporary directory.** Assert every path is
+   under `$TMP` *before* git is pointed at it, and assert every repo git creates resolves
+   back under `$TMP`. Use `pwd -P` (`git rev-parse --show-toplevel` always answers with the
+   PHYSICAL path, so `/var` vs `/private/var` will fail a correct resolver).
+3. **Every `cd` gets `|| die`.** A test without `set -e` treats a failed `cd` as "carry on
+   here", and "here" is the source tree.
+4. ⛔ **Never point `GIT_DIR` at the real repository, even to prove a negative.** Use a
+   **disposable sentinel repository** under `$TMP`. The env-var regression in
+   `tests/pre-push-worktree-selection.test.sh` does exactly this — its `GIT_DIR` is a
+   fixture path, never the working repo.
+
+`git -c key=value <cmd>` exports `GIT_CONFIG_PARAMETERS` to every child, so a `-c`
+override used to publish a fix leaks into any repository the test creates. Rule 1 closes
+that too.
+
 ---
 
 ## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)
