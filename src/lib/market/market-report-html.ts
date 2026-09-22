@@ -316,8 +316,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   header.rp .kick { font-size:12px; letter-spacing:.12em; text-transform:uppercase; opacity:.85; font-weight:700; }
   header.rp h1 { margin:6px 0 2px; font-size:30px; line-height:1.15; }
   header.rp .meta { font-size:13px; opacity:.9; margin-top:6px; }
-  /* align-items:start so one tall card (e.g. a PSC with a long name) doesn't stretch the whole
-     row — each card sizes to its own content (Eric 2026-08-02). */
   .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:22px 0 8px; align-items:start; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
   .stat-v { font-size:20px; font-weight:800; color:var(--navy); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -351,7 +349,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
             border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
   @media (max-width:560px){ .pdfbtn { display:none; } }
-  /* Print = the PDF path (server-side HTML→PDF needs Chromium, which isn't in the lambda). */
   @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
 </style></head>
 <body><div class="wrap">

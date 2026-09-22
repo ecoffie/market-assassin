@@ -77,6 +77,8 @@ export interface PriorAwardHit extends AwardDetail {
   distinctiveHits?: number;
   pscMatch?: boolean;
   naicsMatch?: boolean;
+  noticeSector?: string | null;
+  awardSector?: string | null;
   incumbent_certainty?: IncumbentCertainty;
 }
 
@@ -385,6 +387,20 @@ const NONDISTINCTIVE = new Set([
   'facility', 'facilities', 'laboratory', 'laboratories', 'lab', 'labs', 'center', 'centers',
   'base', 'station', 'district', 'region', 'regional', 'installation', 'complex', 'campus', 'site',
   'building', 'buildings', 'plant', 'depot', 'yard', 'field', 'area', 'zone', 'located', 'location',
+  // ⚠️ GEOGRAPHY + GOVERNMENT CONTEXT (RC-3, 2026-09-22). These produced BOTH
+  // known false positives, and in both cases they were the ONLY matching tokens:
+  //   "…East Orange and Lyons" (VA demolition) → AT&T "EAST ORANGE & LYONS NJ
+  //     GUEST WIFI" on East/Orange/Lyons.
+  //   "…Northeastern United States" (DLA fuel) → Lockheed PAC-3 "...FOR THE
+  //     UNITED STATES (US) AND FOREIGN MILITARY SALES" on United/States.
+  // A place name says WHERE the work happens, never WHAT is bought — two
+  // contracts in the same city are not the same contract.
+  'east', 'west', 'north', 'south', 'northeast', 'northwest', 'southeast', 'southwest',
+  'northeastern', 'northwestern', 'southeastern', 'southwestern', 'eastern', 'western',
+  'northern', 'southern', 'central', 'upper', 'lower', 'united', 'states', 'state',
+  'america', 'american', 'usa', 'domestic', 'foreign', 'overseas', 'continental',
+  'county', 'city', 'town', 'township', 'village', 'metro', 'metropolitan', 'valley',
+  'island', 'islands', 'port', 'harbor', 'river', 'lake', 'mountain', 'park',
 ]);
 
 function scoreAwardEvidence(
@@ -552,11 +568,21 @@ export async function findLikelyPriorAwards(input: {
         confScore >= 90 ? 'high' : confScore >= 65 ? 'medium' : 'low';
       if (recencyCap === 'low') matchConfidence = 'low';
       else if (recencyCap === 'medium' && matchConfidence === 'high') matchConfidence = 'medium';
+      // 2-digit sector, when BOTH sides are known. A missing code yields null,
+      // which means "cannot compare" — never a silent pass.
+      const noticeSector = input.naics_code ? String(input.naics_code).slice(0, 2) : null;
+      const awardSector = detail.naicsCode ? String(detail.naicsCode).slice(0, 2) : null;
       const grounding = groundIncumbent({
         distinctiveHits: evidence.distinctiveHits,
         pscMatch: evidence.pscMatch,
         naicsMatch,
         matchConfidence,
+        noticeSector,
+        awardSector,
+        // No verified-identity source exists yet (no named predecessor on the
+        // notice, no shared PIID/UEI link). Asserting one here would be exactly
+        // the unearned override the guardrail exists to prevent.
+        verifiedIdentity: false,
       });
       hits.push({
         ...detail,
@@ -565,6 +591,8 @@ export async function findLikelyPriorAwards(input: {
         distinctiveHits: evidence.distinctiveHits,
         pscMatch: evidence.pscMatch,
         naicsMatch,
+        noticeSector,
+        awardSector,
         incumbent_certainty: grounding.certainty,
       });
     } catch {
@@ -639,6 +667,9 @@ export async function resolveSolicitationIncumbent(query: string): Promise<Solic
     pscMatch: !!incumbent.pscMatch,
     naicsMatch: !!incumbent.naicsMatch,
     matchConfidence: incumbent.matchConfidence,
+    noticeSector: incumbent.noticeSector ?? null,
+    awardSector: incumbent.awardSector ?? null,
+    verifiedIdentity: false,
   } : null);
   if (incumbent) incumbent.incumbent_certainty = grounding.certainty;
   const named = namedIncumbent(grounding, incumbent);

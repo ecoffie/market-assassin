@@ -249,7 +249,17 @@ export interface MarketReportResult {
    * no verified caller); the html is still valid.
    */
   deliverable: { html: string; url: string | null; report_id: string | null };
-  _meta: { grounded: boolean; degraded: boolean; sections_grounded: number; sections_total: number; saved: boolean };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    sections_grounded: number;
+    sections_total: number;
+    saved: boolean;
+    /** True when the report was too thin to publish as a client-facing artifact. */
+    deliverable_withheld?: boolean;
+    /** Operator-readable diagnostic when the deliverable is withheld. */
+    deliverable_withheld_reason?: string | null;
+  };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
 }
 
@@ -404,7 +414,38 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         )
       : Promise.resolve({ value: null, degraded: false }),
     // Recompetes honor the FULL NAICS union + agency (queryExpiringContracts takes a list).
-    guard(expiringContracts({ naicsCodes: naicsCodes.length ? naicsCodes : undefined, naics: naicsCodes.length ? undefined : primaryNaics, agency: agency || undefined, state, limit: 15 })),
+    //
+    // ⚠️ RC-2 (2026-09-22): on the KEYWORD axis `resolveMarketScope` returns
+    // basis='keyword' with naicsCodes=[], so this call used to receive NO subject
+    // filter at all and returned the global head of recompete_opportunities. A
+    // "drones" report and a "building construction and renovation" report both
+    // returned the SAME 15 rows — dental equipment (339114), bullion/nonferrous
+    // (331491), textiles (314910). Unrelated recompetes in a branded report read
+    // as the market's real recompetes, so they are worse than none.
+    //
+    // The defensible subject boundary on the keyword axis is the keyword's own
+    // measured buying NAICS (`coverage.allNaics` — the same set the coverage
+    // banner reports). When neither axis yields one, we return NO recompetes
+    // rather than unrelated ones.
+    (() => {
+      const subjectNaics = naicsCodes.length
+        ? naicsCodes
+        : (coverage?.allNaics ?? []).map((n) => n.code).filter(Boolean);
+      if (!subjectNaics.length && !primaryNaics) {
+        // No defensible subject filter exists → withhold the section.
+        return Promise.resolve({
+          value: { contracts: [] as unknown[], count: 0, withheld_reason: 'no_subject_naics' },
+          degraded: false,
+        });
+      }
+      return guard(expiringContracts({
+        naicsCodes: subjectNaics.length ? subjectNaics : undefined,
+        naics: subjectNaics.length ? undefined : primaryNaics,
+        agency: agency || undefined,
+        state,
+        limit: 15,
+      }));
+    })(),
     // Forecasts honor the FULL NAICS UNION (queryForecasts splits a comma list), NOT one code —
     // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668
     // rows. And NO toptier agency filter: agency_forecasts.source_agency is stored as SHORT CODES
@@ -605,6 +646,24 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     !!sbaR.value,
   ];
   const sectionsGrounded = groundedFlags.filter(Boolean).length;
+
+  /**
+   * RC-4 (2026-09-22) — a degraded report may not become a branded deliverable.
+   *
+   * Ports the refusal principle already working in capability_market_match: below
+   * the evidence bar the artifact is WITHHELD and a diagnostic is returned, because
+   * a Mindy-branded page a customer forwards to their client reads as a researched
+   * answer regardless of how thin it is. A one-section report is a diagnostic, not
+   * a market report.
+   *
+   * The bar is the MARKET TOTAL plus at least one more grounded section. The total
+   * is required specifically because every other section is a list that can be
+   * plausibly empty, while a report whose headline dollar figure is unknown has no
+   * subject at all. Measured: the known construction case grounds 1/7 (withheld);
+   * the drones case grounds 5/7 (published).
+   */
+  const MIN_GROUNDED_SECTIONS = 2;
+  const deliverableWorthy = !!summary.total_market && sectionsGrounded >= MIN_GROUNDED_SECTIONS;
   const degraded = [coverage === null && keyword !== '', agenciesR.degraded, competitionR.degraded, recompetesR.degraded, forecastsR.degraded, agencyDetailR.degraded, sbaR.degraded].some(Boolean);
 
   const result: MarketReportResult = {
@@ -615,7 +674,22 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     reconciliation,
     sections,
     deliverable: { html: '', url: null, report_id: null },
-    _meta: { grounded: sectionsGrounded > 0, degraded, sections_grounded: sectionsGrounded, sections_total: groundedFlags.length, saved: false },
+    _meta: {
+      grounded: sectionsGrounded > 0,
+      degraded,
+      sections_grounded: sectionsGrounded,
+      sections_total: groundedFlags.length,
+      saved: false,
+      /** False when the report is too thin to be a client-facing artifact. */
+      deliverable_withheld: !deliverableWorthy,
+      deliverable_withheld_reason: deliverableWorthy
+        ? null
+        : !summary.total_market
+          ? `No market total could be established for "${subject}", so there is no subject to report on. ` +
+            'Refine the keyword, or supply an explicit NAICS/PSC scope.'
+          : `Only ${sectionsGrounded} of ${groundedFlags.length} sections returned data — too thin to ` +
+            'publish as a client-facing report. The structured sections below are still usable as a diagnostic.',
+    },
   };
 
   // Client-ready deliverable (Mindy-branded, self-contained).
@@ -624,7 +698,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // Persist → shareable link. Only for a verified caller, and only when we actually
   // found something (an empty report isn't a deliverable worth a client link).
   // Best-effort: a storage failure must not lose the report the caller paid for.
-  if (input.userEmail && sectionsGrounded > 0) {
+  if (input.userEmail && deliverableWorthy) {
     const { deliverable: _omit, ...payload } = result; // store the payload; HTML re-renders on view
     const id = await saveMarketReport({
       ownerEmail: input.userEmail,
