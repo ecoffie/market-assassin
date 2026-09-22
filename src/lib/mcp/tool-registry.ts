@@ -1234,7 +1234,9 @@ const SOLICITATION_DOCUMENTS_TOOL_DEF = {
         },
         text_limit: {
           type: 'number',
-          description: 'Chars of text per document in this response. Default 20000, max 120000.',
+          description:
+            'Chars of text PER DOCUMENT. Default 20000, max 120000 per document. This is NOT a total ' +
+            'response cap — a notice with N attachments can return up to N x this. Use document_ids to bound the total.',
         },
         text_offset: {
           type: 'number',

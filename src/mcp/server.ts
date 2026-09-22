@@ -1029,7 +1029,13 @@ server.registerTool(
       'no text/attachments.',
     inputSchema: {
       notice_id: z.string().describe('SAM notice id (UUID) or solicitation number — from search_sam_opportunities.'),
-      text_limit: z.number().optional().describe('Chars of text per document (default 20000, max 120000).'),
+      text_limit: z
+        .number()
+        .optional()
+        .describe(
+          'Chars of text PER DOCUMENT (default 20000, max 120000 per document). NOT a total response cap — a ' +
+            'notice with N attachments can return up to N x this. Use document_ids to bound the total.',
+        ),
       text_offset: z.number().optional().describe('Start offset applied to every document.'),
       documents: z
         .array(

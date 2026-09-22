@@ -24,7 +24,7 @@ import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SolicitationDocumentsToolInput {
   notice_id: string;
-  /** Chars of text per document in THIS response (default 20k, max 120k). */
+  /** Chars of text PER DOCUMENT in this response (default 20k, max 120k per document — not a total response cap). */
   text_limit?: number;
   /** Start offset, applied to every document unless overridden per-document. */
   text_offset?: number;

@@ -46,7 +46,12 @@ const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
 const CACHE_TTL = 30 * 24 * 60 * 60; // 30 days
 const INLINE_CAP = 20_000; // DEFAULT chars per doc when the caller doesn't page
-const MAX_WINDOW_CHARS = 120_000; // hard ceiling for ONE response window (payload safety)
+// PER-DOCUMENT window ceiling. NOT a total response-size limit: it is applied
+// inside the per-document map, so a notice with N attachments can return up to
+// N x this in one response (measured: 14 DLA attachments = 481,351 chars at
+// text_limit 120,000). Callers that need a bounded TOTAL should page with
+// document_ids rather than relying on this constant.
+const MAX_WINDOW_CHARS = 120_000;
 // Store what was extracted. This was 40_000, which silently DISCARDED text above
 // that on the cold path — so a textMode:'full' read was full on the cold call and
 // 40k on every warm read for the 30-day TTL (disclosed via extracted_text_truncated,
@@ -200,12 +205,13 @@ function windowText(
 ): { text: string; window: TextWindow; availability: TextAvailability; truncated: boolean } {
   const total = full.length;
   const start = Math.max(0, Math.min(Math.floor(offset) || 0, total));
-  // MAX_WINDOW_CHARS bounds an MCP RESPONSE. textMode:'full' is the INTERNAL
-  // consumer path and must return the whole stored string, so it is signalled by
-  // opts.unbounded — never by a numeric limit. A MAX_SAFE_INTEGER sentinel was
-  // caller-reachable: `documents:[{limit: 9007199254740991}]` escaped the clamp
-  // and could return ~1MB per document. A flag cannot be expressed by any
-  // caller-supplied number, so the bound holds by construction.
+  // MAX_WINDOW_CHARS bounds ONE DOCUMENT's window, not the whole response.
+  // textMode:'full' is the INTERNAL consumer path and must return the whole
+  // stored string, so it is signalled by opts.unbounded — never by a numeric
+  // limit. A MAX_SAFE_INTEGER sentinel was caller-reachable:
+  // `documents:[{limit: 9007199254740991}]` escaped the clamp and could return
+  // ~1MB for a single document. A flag cannot be expressed by any
+  // caller-supplied number, so the per-document bound holds by construction.
   const requested = Math.floor(limit) || INLINE_CAP;
   const size = opts.unbounded
     ? Math.max(1, total)

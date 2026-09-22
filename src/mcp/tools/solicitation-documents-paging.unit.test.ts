@@ -230,6 +230,23 @@ describe('get_solicitation_documents — full-document access', () => {
     expect(viaTop.documents[0].text_window.returned_chars).toBe(120_000);
   });
 
+  it('the 120k bound is PER DOCUMENT — the response total scales with attachment count', async () => {
+    // Pins the documented semantics so the comments and the code cannot drift.
+    // Measured on the real DLA notice: 14 attachments returned 481,351 chars in
+    // ONE response at text_limit 120,000 — 4x the per-document ceiling.
+    mockWarm.mockResolvedValue({
+      data: [
+        warmRows[0],
+        { ...warmRows[0], sam_file_id: 'file-b', filename: 'B.pdf' },
+        { ...warmRows[0], sam_file_id: 'file-c', filename: 'C.pdf' },
+      ],
+    });
+    const res = await solicitationDocuments({ notice_id: NOTICE, text_limit: 120_000 });
+    for (const d of res.documents) expect(d.text_window.returned_chars).toBe(120_000);
+    // The aggregate is N x the per-doc bound, NOT the per-doc bound.
+    expect(res._meta.returned_chars).toBe(360_000);
+  });
+
   it("textMode:'full' is NOT clamped to MAX_WINDOW_CHARS (internal consumers)", async () => {
     // Regression: windowText clamped every request to MAX_WINDOW_CHARS, so the
     // internal full-text path silently truncated at 120k. Caught by comparing a
