@@ -32,6 +32,7 @@ import {
   type ConfidenceConstraint,
   type IncumbentCertainty,
 } from '@/lib/usaspending/incumbent-evidence';
+import { locationTokens, splitEvidenceHits } from '@/lib/usaspending/incumbent-location-evidence';
 
 const SAM_SEARCH = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_PUBLIC = 'https://sam.gov/api/prod/sgs/v1/search/';
@@ -64,6 +65,8 @@ export interface ResolvedNotice {
   response_deadline: string | null;
   ui_link: string | null;
   source: 'cache' | 'sam_api' | 'sam_public';
+  /** Place of performance across every version of this family — Rule D evidence only. */
+  family_places?: string[];
   active?: boolean | null;
   archive_date?: string | null;
   status?: SolicitationStatus;
@@ -81,6 +84,10 @@ export interface PriorAwardHit extends AwardDetail {
   matchConfidence: 'high' | 'medium' | 'low';
   matchScore: number;
   distinctiveHits?: number;
+  /** Distinctive hits describing the WORK (location tokens excluded) — Rule D. */
+  workHits?: number;
+  /** Distinctive hits that were geography: corroboration only, never identity. */
+  locationHits?: number;
   pscMatch?: boolean;
   naicsMatch?: boolean;
   noticeSector?: string | null;
@@ -427,21 +434,30 @@ export function scoreAwardEvidence(
   titleWords: string[],
   agencyHint: string | null,
   oppPsc?: string | null,
-): { score: number; distinctiveHits: number; pscMatch: boolean } {
+  /** RULE D: this notice's own place tokens (pop_city/pop_state). */
+  noticePlaceTokens?: Set<string>,
+): { score: number; distinctiveHits: number; workHits: number; locationHits: number; pscMatch: boolean } {
   const desc = `${row.Description || ''} ${row['Recipient Name'] || ''}`.toLowerCase();
   let score = 0;
 
   const distinctive = titleWords.filter((w) => w.length >= 3 && !NONDISTINCTIVE.has(w.toLowerCase()));
-  const distinctiveHits = distinctive.filter((w) => desc.includes(w.toLowerCase())).length;
+  const hitTokens = distinctive.filter((w) => desc.includes(w.toLowerCase()));
+  const distinctiveHits = hitTokens.length;
+  // RULE D — geography may corroborate a match, never carry one. Both production
+  // false positives were built ENTIRELY from place tokens.
+  const { workHits, locationHits } = splitEvidenceHits(hitTokens, noticePlaceTokens);
   const awardPsc = awardPscCode(row['PSC']) || awardPscCode(row.psc_code);
   const pscMatch = !!(oppPsc && awardPsc && awardPsc.toUpperCase().startsWith(String(oppPsc).toUpperCase().slice(0, 4)));
   if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) {
-    return { score: 0, distinctiveHits, pscMatch };
+    return { score: 0, distinctiveHits, workHits, locationHits, pscMatch };
   }
 
-  score += distinctiveHits * 30;
-  if (distinctiveHits >= 2) score += 25;
-  if (distinctiveHits >= 3) score += 15;
+  // The ladder is driven by WORK evidence. Location earns a small, capped
+  // corroboration bonus and can never reach a tier by itself.
+  score += workHits * 30;
+  if (workHits >= 2) score += 25;
+  if (workHits >= 3) score += 15;
+  score += Math.min(locationHits, 3) * 5;
   if (pscMatch) score += 45;
 
   for (const w of titleWords) {
@@ -459,7 +475,7 @@ export function scoreAwardEvidence(
   }
   const amt = Number(row['Award Amount'] || 0);
   score += Math.min(5, Math.log10(Math.max(amt, 1)));
-  return { score, distinctiveHits, pscMatch };
+  return { score, distinctiveHits, workHits, locationHits, pscMatch };
 }
 
 async function searchUsasPendingAwards(opts: {
@@ -519,6 +535,39 @@ async function searchUsasPendingAwards(opts: {
 }
 
 /**
+ * RULE D — the notice's OWN place vocabulary, from SAM's pop_city / pop_state.
+ *
+ * ⚠️ THE BUYER'S NAME IS NOT GEOGRAPHY. This deliberately does NOT read
+ * `agency` / `department`. Folding the buyer name in treated every word of it as a
+ * place, which destroys the work evidence of the agencies whose NAME IS THE WORK:
+ *
+ *   FOREST SERVICE          -> `forest`      (forest thinning, 709 live titles)
+ *   BUREAU OF RECLAMATION   -> `reclamation` (the work itself)
+ *   ARMY CORPS OF ENGINEERS -> `engineers`   (engineering services)
+ *
+ * A Forest Service thinning recompete would have had its single best token
+ * reclassified as scenery. Buyer-name evidence is still removed — by
+ * NONDISTINCTIVE, which holds the generic organisational vocabulary
+ * (`department`, `agency`, `bureau`, `office`, `command`, `federal`, `national`,
+ * `guard`, `army`, `navy`…) and is applied BEFORE this rule — and the buyer is
+ * separately scored on its own axis (the +15 agency-match bonus). Neither path
+ * needs to call the buyer a location.
+ *
+ * Exported so the rule is testable at its own boundary rather than only through a
+ * live fan-out. It deliberately RECEIVES `agency`/`department` and ignores them —
+ * taking the whole notice makes "the buyer is not a place" an asserted contract
+ * instead of an accident of what the caller happened to pass.
+ */
+export function noticePlaceVocabulary(input: {
+  family_places?: string[] | null;
+  agency?: string | null;
+  department?: string | null;
+}): Set<string> {
+  // `input.agency` / `input.department` are intentionally unread.
+  return locationTokens(...(input.family_places ?? []));
+}
+
+/**
  * The shared incumbent/predecessor MATCHER — the single scoring engine behind both
  * the solicitation-number flow (findPriorAwardsForNotice) and the generic
  * opportunity flow (find-predecessor.ts `findPredecessorAward`, which used to have
@@ -532,6 +581,8 @@ export async function findLikelyPriorAwards(input: {
   psc_code?: string | null;   // the solicitation's PSC — a same-PSC award is a strong same-product signal
   agency?: string | null;
   department?: string | null;
+  /** This notice's place-of-performance values across the family (Rule D evidence). */
+  family_places?: string[];
 }): Promise<PriorAwardHit[]> {
   const keywords = titleKeywordCandidates(input.title);
   if (keywords.length === 0 && !input.naics_code) return [];
@@ -547,6 +598,8 @@ export async function findLikelyPriorAwards(input: {
     input.agency ||
     null;
 
+  const noticePlaceTokens = noticePlaceVocabulary(input);
+
   const rows = await searchUsasPendingAwards({
     keywords: keywords.length ? keywords : [input.title || ''].filter(Boolean),
     // Prefer keyword-first discovery; NAICS alone over-selects huge facility awards.
@@ -559,7 +612,7 @@ export async function findLikelyPriorAwards(input: {
   const ranked = rows
     .map((r) => ({
       row: r,
-      evidence: scoreAwardEvidence(r as never, titleWords, agencyHint, input.psc_code ?? null),
+      evidence: scoreAwardEvidence(r as never, titleWords, agencyHint, input.psc_code ?? null, noticePlaceTokens),
     }))
     .filter((x) => x.evidence.score >= 40)
     .sort((a, b) => b.evidence.score - a.evidence.score || Number(b.row['Award Amount'] || 0) - Number(a.row['Award Amount'] || 0))
@@ -600,6 +653,8 @@ export async function findLikelyPriorAwards(input: {
       );
       const grounding = groundIncumbent({
         distinctiveHits: evidence.distinctiveHits,
+        workHits: evidence.workHits,
+        locationHits: evidence.locationHits,
         pscMatch: evidence.pscMatch,
         naicsMatch,
         matchConfidence,
@@ -615,6 +670,8 @@ export async function findLikelyPriorAwards(input: {
         matchConfidence,
         matchScore: evidence.score,
         distinctiveHits: evidence.distinctiveHits,
+        workHits: evidence.workHits,
+        locationHits: evidence.locationHits,
         pscMatch: evidence.pscMatch,
         naicsMatch,
         noticeSector,

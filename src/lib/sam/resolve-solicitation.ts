@@ -21,7 +21,7 @@ import {
 } from '@/lib/sam/notice-identity';
 
 export const SOLICITATION_RESOLVE_COLS =
-  'notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link';
+  'notice_id,solicitation_number,title,department,sub_tier,office,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,archive_date,active,description,ui_link,pop_city,pop_state';
 
 const FAMILY_CAP = 50;
 const DESCRIPTION_HIT_CAP = 25;
@@ -46,6 +46,18 @@ export interface SolicitationVersionRow {
   active: boolean | null;
   description: string | null;
   ui_link: string | null;
+  /**
+   * Place of performance as SAM recorded it. EVIDENCE, never identity — consumed
+   * only by the incumbent location guardrail (Rule D) to recognise THIS notice's
+   * own place tokens. It never selects a version, forms an alias, decides family
+   * membership or filters a record out.
+   *
+   * Optional because it is sparse in SAM (~36% on pop_state) and several readers
+   * of this row select only the identity columns they need; requiring it would
+   * make their existing casts lie about a field their code path never consults.
+   */
+  pop_city?: string | null;
+  pop_state?: string | null;
 }
 
 export interface CanonicalSolicitation {
@@ -63,6 +75,13 @@ export interface CanonicalSolicitation {
   deadline_conflict_reasons: DeadlineConflictReason[];
   lot_deadlines: LotDeadline[];
   notice_ids: string[];
+  /**
+   * Every distinct place value ANY version of this family recorded. SAM populates
+   * pop_* on only some versions, so the canonical record alone under-reports where
+   * the work happens. Rule D evidence only — its sparseness can under-guard, never
+   * delete a record.
+   */
+  family_places: string[];
   versions: Array<{
     notice_id: string;
     posted_date: string | null;
@@ -242,6 +261,11 @@ export function resolveFromCandidateRows(
     deadline_conflict_reasons,
     lot_deadlines,
     notice_ids: versions.map((v) => v.notice_id),
+    family_places: Array.from(new Set(
+      withId.flatMap((r) => [r.pop_city, r.pop_state])
+        .map((v) => String(v ?? '').trim())
+        .filter((v) => v.length >= 2),
+    )),
     versions,
   };
 }
@@ -390,6 +414,7 @@ export function toResolvedNoticeFields(canonical: CanonicalSolicitation): {
   deadline_conflict_reasons: DeadlineConflictReason[];
   lot_deadlines: LotDeadline[];
   notice_ids: string[];
+  family_places: string[];
 } {
   const n = canonical.notice;
   return {
@@ -415,5 +440,6 @@ export function toResolvedNoticeFields(canonical: CanonicalSolicitation): {
     deadline_conflict_reasons: canonical.deadline_conflict_reasons,
     lot_deadlines: canonical.lot_deadlines,
     notice_ids: canonical.notice_ids,
+    family_places: canonical.family_places,
   };
 }

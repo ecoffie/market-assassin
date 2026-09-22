@@ -428,7 +428,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:22px 0 8px; align-items:start; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
   .stat-v { font-size:20px; font-weight:800; color:var(--navy); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* secondary line under a KPI value (e.g. the PSC name) — clamped to 2 lines so it never blows up. */
   .stat-sub { font-size:11.5px; font-weight:600; color:var(--ink,#334155); line-height:1.35; margin-top:3px;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .stat-l { font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:6px; }
@@ -446,7 +445,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   td:not(.lead) { font-variant-numeric:tabular-nums; white-space:nowrap; }
   .muted { color:var(--muted); font-weight:400; }
   .empty { color:var(--muted); font-size:13px; font-style:italic; }
-  /* The measurement bridge — the reported tier is emphasised, its derivation legible. */
   .tier-tag { font-weight:400; color:var(--muted); font-size:.85em; }
   .tier-terms { color:var(--muted); margin-top:4px; font-size:.9em; }
   .tier-note { margin-top:4px; font-size:.92em; }

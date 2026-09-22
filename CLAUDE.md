@@ -110,6 +110,55 @@ dashboards unless something is **materially broken**.
 
 ---
 
+## 🧭 Incumbent identity: location is corroboration, never identity (FROZEN 2026-09-22)
+
+The sector/taxonomy guardrails in `incumbent-evidence.ts` reject a candidate whose NAICS
+sector disagrees. They cannot see what actually produced both RC-3 false positives: the
+distinctive-token overlap behind "high confidence" was **entirely geography**.
+
+| Solicitation | Named | The whole evidence |
+|---|---|---|
+| `36C24226Q0857` VA demolition/abatement | AT&T (517110) | `East`, `Orange`, `Lyons` — the two VA campuses |
+| `SPE60525R0222` DLA fuel (324110) | Lockheed PAC-3 (336414) | literally `United` and `States` |
+
+A **same-sector** candidate can be built the same way, so taxonomy is a floor, not a cure.
+**RULE D** (`src/lib/usaspending/incumbent-location-evidence.ts`): hits split into
+`workHits`/`locationHits`; the ladder runs on work hits, location earns a capped +5 and can
+never reach a tier; zero non-locational hits with no PSC match is never grounded.
+
+⚠️ **The lexicon must never contain a word that can NAME THE WORK.** Federal agencies buy
+roads, highways, forests and grounds — measured live in work sectors (23x/56x/115x):
+`road` 740 · `forest` 709 · `park` 705 · `grounds` 433 · `bridge` 306 · `harbor` 263 ·
+`highway` 24. Calling those geography deletes the strongest evidence a road or grounds
+recompete has. ⚠️ **Never word-split a multi-word state name** — it leaked `island`, `new`,
+`carolina`, `york` into the geography set, and `island` is a work object ("BAR ISLAND DAM
+RECONSTRUCTION"). ⚠️ **The BUYER'S NAME is not geography.** The vocabulary is built from pop_* ONLY — never `agency`/`department`. Folding the buyer in made every word of it a place, which deletes the work evidence of the agencies whose name IS the work (FOREST SERVICE→`forest`, BUREAU OF RECLAMATION→`reclamation`, ARMY CORPS OF ENGINEERS→`engineers`). `noticePlaceVocabulary()` deliberately RECEIVES the buyer and ignores it, so the contract is asserted rather than accidental. Buyer-name evidence is still removed by NONDISTINCTIVE (applied first) and the buyer keeps its own +15 scoring axis. A SPECIFIC place arrives from the notice's own `pop_city`/`pop_state`
+(threaded as `family_places`): "East Orange" is excluded because SAM records it for that
+notice, never because it was typed into the file. `building`/`site`/`area`/`district` — and also `park`/`port`/`harbor`/`river`/`lake`/`island`/`coast` — are
+already dropped upstream by `NONDISTINCTIVE` and are deliberately absent from the lexicon. Keeping
+them out of the geo set is correct, but it does NOT make them usable work evidence: a "Harbor
+Breakwater Repair" recompete still cannot score on `harbor`. Recorded as a known bound, not fixed here.
+
+**RULE PRECEDENCE — decided, not implied** (`incumbent-rule-precedence.unit.test.ts`):
+a **sector conflict beats PSC agreement**. Only independently verified identity (a
+predecessor named on the notice, a shared PIID/UEI) overrides it — never taxonomy or token
+overlap. So "a NAICS mismatch with real PSC evidence still grounds" is true **only within a
+sector**. Stated cost: a building-repair notice (23) whose true predecessor went to an A&E
+firm (54) under the same PSC is refused. We accept a missed incumbent over a fabricated one
+— a withheld incumbent is visibly absent in `prior_awards`, a wrong one gets acted on.
+
+**RULE C** — `get_incumbent_financials` requires `>= medium` AND `supported`, asserted at the
+`build_pursuit_dossier` call site so a false incumbent cannot cascade into a named company's
+SEC filings.
+
+**A withheld report must withhold the ARTIFACT, not just the link.** The gate withheld
+`deliverable.url` and persistence while still rendering the branded HTML — the thing a
+customer forwards to their client. `deliverable.html` is now gated on the same verdict.
+⚠️ Nothing engineering-facing may appear in generated client HTML; rationale goes in
+TypeScript comments (stripped at build), never inside the template literal.
+
+---
+
 ## 🔗 Record links vs market links — READ before emitting any per-record URL
 
 **`docs/engineering/record-links-vs-market-links.md`** is the frozen rule (Eric, 2026-09-12):
