@@ -690,6 +690,13 @@ export async function codeMarketSize(opts: {
   naics?: string;
   signal?: AbortSignal;
   perFetchMs?: number;
+  /**
+   * Throw when the query for the measured basis FAILS (HTTP error, network error,
+   * malformed body) instead of returning null. null then means only "measured, no
+   * awards". For callers that treat this as REQUIRED evidence (the market report),
+   * where an unreachable upstream must not read as an empty market.
+   */
+  strict?: boolean;
 }): Promise<{
   totalMarket: number;
   topPsc: { code: string; name: string } | null;
@@ -718,6 +725,12 @@ export async function codeMarketSize(opts: {
   else filters.naics_codes = [naics];
 
   const covOpts: KeywordCoverageOptions = { signal: opts.signal, perFetchMs: opts.perFetchMs };
+  // In strict mode only the BASIS category is required evidence; the other one is
+  // enrichment (topPsc / leadName) and keeps the lenient [] on failure.
+  const failOn = (cat: 'psc' | 'naics', why: string): never | [] => {
+    if (opts.strict && cat === basis) throw new Error(`codeMarketSize ${cat} query failed: ${why}`);
+    return [];
+  };
   const fetchCat = async (cat: 'psc' | 'naics') => {
     try {
       assertNotAborted(opts.signal);
@@ -726,8 +739,9 @@ export async function codeMarketSize(opts: {
         body: JSON.stringify({ filters, category: cat, limit: 100 }),
         signal: fetchSignal(covOpts),
       });
-      if (!res.ok) return [];
+      if (!res.ok) return failOn(cat, `HTTP ${res.status}`);
       const j = await res.json();
+      if (!Array.isArray(j?.results)) return failOn(cat, 'malformed body (no results array)');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (j.results || []).filter((r: any) => r.code && (r.amount || 0) > 0)
         .sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
@@ -736,6 +750,7 @@ export async function codeMarketSize(opts: {
       if (opts.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
         throw new CoverageDeadlineError();
       }
+      if (opts.strict && cat === basis) throw err;
       return [];
     }
   };
@@ -768,6 +783,7 @@ export async function codeMarketSize(opts: {
     if (opts.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
       throw new CoverageDeadlineError();
     }
+    if (opts.strict) throw err;
     return null;
   }
 }

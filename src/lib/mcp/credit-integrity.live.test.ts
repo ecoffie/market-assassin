@@ -51,6 +51,12 @@ const ctx = { userEmail: ACCOUNT, apiKeyId: null };
 
 // Terminal-state shapes, as the real tools emit them (see the hermetic suite).
 const DOSSIER_OK = { subject: 'x', _meta: { grounded: true, degraded: false } };
+const DOSSIER_NO_MATCH = { _meta: { grounded: false, degraded: false } };
+// Hosted gold master (2026-09-22): a genuinely empty market, zero sections grounded.
+const REPORT_EMPTY_MARKET = {
+  deliverable: { url: null },
+  _meta: { grounded: false, degraded: false, sections_failed: [], publication_state: 'insufficient_evidence', billing_outcome: 'billable_no_result' },
+};
 const DOSSIER_ANCHOR_FAILED = { _meta: { grounded: false, degraded: true, billing_outcome: 'nonbillable_system_failure' } };
 const REPORT = (state: string, extra: Record<string, unknown> = {}) => ({
   deliverable: { url: state === 'publish' ? 'https://getmindy.ai/reports/x' : null },
@@ -73,7 +79,7 @@ async function callsSince(t0: string) {
 describe.skipIf(!LIVE)('Credit Integrity — real ledger', () => {
   let t0 = '';
   let b0 = 0;
-  const GRANT = 700;
+  const GRANT = 900;
 
   beforeAll(async () => {
     t0 = new Date(Date.now() - 1000).toISOString();
@@ -85,9 +91,11 @@ describe.skipIf(!LIVE)('Credit Integrity — real ledger', () => {
     const steps: [string, string, Record<string, unknown>, Record<string, unknown> | null, number][] = [
       ['invalid dossier (gold master)', 'build_pursuit_dossier', { solicitation: '36C24226Q0857' }, null, 0],
       ['valid dossier', 'build_pursuit_dossier', { solicitation_number: '36C24226Q0857' }, DOSSIER_OK, 100],
+      ['dossier no-match after lookup', 'build_pursuit_dossier', { solicitation_number: 'ZZZ000' }, DOSSIER_NO_MATCH, 100],
       ['dossier anchor failed', 'build_pursuit_dossier', { solicitation_number: '36C24226Q0857' }, DOSSIER_ANCHOR_FAILED, 0],
       ['report publish', 'generate_market_report', { keyword: 'drones' }, REPORT('publish'), 100],
       ['report insufficient_evidence', 'generate_market_report', { keyword: 'x' }, REPORT('insufficient_evidence'), 100],
+      ['report empty market (zero grounded)', 'generate_market_report', { keyword: 'qzxv hovercraft ballast widget' }, REPORT_EMPTY_MARKET, 100],
       ['report measurement_failure', 'generate_market_report', { keyword: 'drones' }, REPORT('measurement_failure', { billing_outcome: 'nonbillable_system_failure' }), 0],
       ['replay 1', 'generate_market_report', { keyword: 'drones' }, REPORT('measurement_failure', { billing_outcome: 'nonbillable_system_failure' }), 0],
       ['replay 2', 'generate_market_report', { keyword: 'drones' }, REPORT('measurement_failure', { billing_outcome: 'nonbillable_system_failure' }), 0],
@@ -103,22 +111,24 @@ describe.skipIf(!LIVE)('Credit Integrity — real ledger', () => {
       expect(before - after, label).toBe(cost);
     }
     console.error(`[credit-integrity live] b0=${b0}\n  ${trace.join('\n  ')}`);
-    expect(vi.mocked(runMcpTool)).toHaveBeenCalledTimes(7); // the invalid call never executed
+    expect(vi.mocked(runMcpTool)).toHaveBeenCalledTimes(9); // the invalid call never executed
 
     const rows = await ledgerSince(t0);
     expect(rows.filter((r) => r.delta > 0)).toEqual([expect.objectContaining({ delta: GRANT, reason: 'admin_grant' })]);
     const debits = rows.filter((r) => r.delta < 0);
     expect(debits.map((r) => [r.delta, r.reason, r.tool_name])).toEqual([
       [-100, 'tool_call', 'build_pursuit_dossier'],
+      [-100, 'tool_call', 'build_pursuit_dossier'],
+      [-100, 'tool_call', 'generate_market_report'],
       [-100, 'tool_call', 'generate_market_report'],
       [-100, 'tool_call', 'generate_market_report'],
     ]);
-    expect(await getBalance(ACCOUNT)).toBe(b0 + GRANT - 300);
+    expect(await getBalance(ACCOUNT)).toBe(b0 + GRANT - 500);
 
     const calls = await callsSince(t0);
     expect(calls.map((c) => [c.status, c.credits_charged])).toEqual([
-      ['rejected_invalid_input', 0], ['success', 100], ['uncharged', 0], ['success', 100],
-      ['success', 100], ['uncharged', 0], ['uncharged', 0], ['uncharged', 0],
+      ['rejected_invalid_input', 0], ['success', 100], ['success', 100], ['uncharged', 0], ['success', 100],
+      ['success', 100], ['success', 100], ['uncharged', 0], ['uncharged', 0], ['uncharged', 0],
     ]);
   }, 120_000);
 

@@ -76,7 +76,10 @@ vi.mock('./tool-registry', async (orig) => {
 // ── Upstream injection for the two real tools ────────────────────────────────
 const up = vi.hoisted(() => ({
   coverage: 'ok' as 'ok' | 'thin' | 'fail',
-  anchor: 'found' as 'found' | 'missing' | 'throws',
+  codeSize: 'ok' as 'ok' | 'empty' | 'fail',
+  codeSizeStrict: [] as (boolean | undefined)[],
+  expiring: 'grounded' as 'grounded' | 'empty',
+  anchor: 'found' as 'found' | 'missing' | 'throws' | 'reports_degraded',
 }));
 
 vi.mock('@/lib/market/keyword-coverage', () => ({
@@ -91,7 +94,13 @@ vi.mock('@/lib/market/keyword-coverage', () => ({
       windowLabel: 'FY2025', identityResolvedVia: [],
     };
   }),
-  codeMarketSize: vi.fn(async () => null),
+  codeMarketSize: vi.fn(async (o: { strict?: boolean }) => {
+    up.codeSizeStrict.push(o?.strict);
+    if (up.codeSize === 'fail') throw new Error('codeMarketSize naics query failed: HTTP 500');
+    if (up.codeSize === 'empty') return null;
+    return { totalMarket: 5_000_000, topPsc: null, basis: 'naics', windowKind: 'latest_complete_fy_live_api',
+      windowLabel: 'FY2025', questionKind: 'code_pinned_fy_category_total', fiscalYear: 2025 };
+  }),
   marketKeywords: vi.fn((k: string) => [k]),
 }));
 vi.mock('@/lib/market/undercount-signal', () => ({ detectUndercount: vi.fn(async () => null) }));
@@ -102,7 +111,7 @@ vi.mock('@/lib/market/spend-query', () => ({
   })),
   filtersForScope: vi.fn(() => ({ keywords: ['drones'] })),
   buildSpendingFilters: vi.fn(() => ({})),
-  fetchSpendingCategory: vi.fn(async () => [
+  fetchSpendingCategory: vi.fn(async () => up.expiring === 'empty' ? [] : [
     { name: 'DEPARTMENT OF DEFENSE', amount: 150_000_000 },
     { name: 'DEPARTMENT OF THE INTERIOR', amount: 40_000_000 },
   ]),
@@ -110,7 +119,9 @@ vi.mock('@/lib/market/spend-query', () => ({
 vi.mock('@/mcp/tools/expiring-contracts', () => ({
   // An OPTIONAL section that grounds even when the required measurement fails —
   // this is what made `_meta.grounded=true` and slipped past DEFECT-7.
-  expiringContracts: vi.fn(async () => ({
+  expiringContracts: vi.fn(async () => up.expiring === 'empty'
+    ? { contracts: [], _meta: { grounded: false, degraded: false, count: 0, total: 0 } }
+    : {
     contracts: [{
       contract_id: 'A', piid: 'FA500425F0093', incumbent_name: 'X', awarding_agency: 'DoD',
       awarding_sub_agency: 'USAF', naics_code: '336411', description: 'UAS', potential_total_value: 5e5,
@@ -118,7 +129,7 @@ vi.mock('@/mcp/tools/expiring-contracts', () => ({
       lead_time_months: 12, recompete_likelihood: 'medium',
     }],
     _meta: { grounded: true, degraded: false, count: 1, total: 1 },
-  })),
+  }),
 }));
 vi.mock('@/mcp/tools/forecasts', () => ({
   agencyForecasts: vi.fn(async () => ({ queried: {}, forecasts: [], _meta: { grounded: false, degraded: false, count: 0, total: 0 } })),
@@ -135,7 +146,9 @@ vi.mock('@/lib/market/report-store', () => ({
 vi.mock('@/mcp/tools/solicitation-incumbent', () => ({
   getSolicitationIncumbent: vi.fn(async () => {
     if (up.anchor === 'throws') throw new Error('upstream 503');
-    if (up.anchor === 'missing') return { notice: null, incumbent: null, _meta: { grounded_incumbent: false } };
+    if (up.anchor === 'missing') return { notice: null, incumbent: null, _meta: { grounded_incumbent: false, degraded: false } };
+    // The anchor catches SAM/cache failure itself and REPORTS it instead of throwing.
+    if (up.anchor === 'reports_degraded') return { notice: null, incumbent: null, _meta: { grounded_incumbent: false, degraded: true } };
     return {
       notice: { notice_id: 'n1', naics: '561720', agency: 'VETERANS AFFAIRS, DEPARTMENT OF' },
       incumbent: null,
@@ -164,6 +177,9 @@ beforeEach(() => {
   ledger.calls = [];
   store.saved = 0;
   up.coverage = 'ok';
+  up.codeSize = 'ok';
+  up.codeSizeStrict = [];
+  up.expiring = 'grounded';
   up.anchor = 'found';
   vi.mocked(runMcpTool).mockClear();
 });
@@ -300,6 +316,61 @@ describe('LEDGER — final balance reconciles with terminal outcomes', () => {
     expect(ledger.calls.map((c) => c.status)).toEqual([
       'rejected_invalid_input', 'success', 'success', 'success', 'uncharged',
     ]);
+  });
+});
+
+describe('EMPTY IS KNOWLEDGE, FAILURE IS UNKNOWN (follow-up to #1631)', () => {
+  it('hosted gold master: a genuinely empty market with ZERO grounded sections → insufficient_evidence, no URL, billable', async () => {
+    // Production 2026-09-22: keyword "qzxv hovercraft ballast widget" → insufficient_evidence,
+    // sections_failed=[], charged 0 — coverage=null was counted as `degraded`.
+    up.coverage = 'thin';
+    up.expiring = 'empty';
+    const r = await runMeteredTool(REPORT, { keyword: 'qzxv hovercraft ballast widget' }, ctx);
+    const meta = r.ok ? (r.result._meta as Record<string, unknown>) : {};
+    expect(meta.publication_state).toBe('insufficient_evidence');
+    expect(meta.grounded).toBe(false);
+    expect(meta.degraded).toBe(false); // a successful zero is not an upstream failure
+    expect(meta.sections_failed).toEqual([]);
+    expect(meta.billing_outcome).toBe('billable_no_result');
+    expect(r.ok && (r.result.deliverable as { url: string | null }).url).toBeNull();
+    expect(r.creditsCharged).toBe(100);
+    expect(store.saved).toBe(0);
+  });
+
+  it('the same zero-grounded report with the REQUIRED measurement failed stays nonbillable', async () => {
+    up.coverage = 'fail';
+    up.expiring = 'empty';
+    const r = await runMeteredTool(REPORT, { keyword: 'drones' }, ctx);
+    const meta = r.ok ? (r.result._meta as Record<string, unknown>) : {};
+    expect(meta.publication_state).toBe('measurement_failure');
+    expect(meta.degraded).toBe(true);
+    expect(r.creditsCharged).toBe(0);
+    expect(store.saved).toBe(0);
+  });
+
+  it('NAICS axis: the required measurement runs STRICT, so an upstream error is measurement_failure (0), not empty', async () => {
+    up.codeSize = 'fail';
+    const r = await runMeteredTool(REPORT, { naics: '336411' }, ctx);
+    expect(up.codeSizeStrict[0]).toBe(true);
+    expect(pub(r)).toBe('measurement_failure');
+    expect(r.creditsCharged).toBe(0);
+  });
+
+  it('NAICS axis: a measured-empty code is insufficient_evidence and billable', async () => {
+    up.codeSize = 'empty';
+    up.expiring = 'empty';
+    const r = await runMeteredTool(REPORT, { naics: '999990' }, ctx);
+    expect(pub(r)).toBe('insufficient_evidence');
+    expect(r.creditsCharged).toBe(100);
+  });
+
+  it('dossier: an anchor that REPORTS its lookup degraded is a failure (0), not "no such notice"', async () => {
+    up.anchor = 'reports_degraded';
+    const r = await runMeteredTool(DOSSIER, { solicitation_number: '36C24226Q0857' }, ctx);
+    const meta = r.ok ? (r.result._meta as Record<string, unknown>) : {};
+    expect(meta.billing_outcome).toBe('nonbillable_system_failure');
+    expect(meta.degraded).toBe(true);
+    expect(r.creditsCharged).toBe(0);
   });
 });
 
