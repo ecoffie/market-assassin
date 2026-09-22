@@ -22,7 +22,14 @@
  * everything else is in `withheld` with a reason. `requirement` is Mindy's reading;
  * `source_quote` is the source's words — the two are never blended.
  */
-import { extractComplianceMatrixFromText, type ComplianceRequirement } from '@/lib/proposal/compliance-matrix';
+import {
+  extractComplianceMatrixFromPackage,
+  type ComplianceRequirement,
+  type DocumentPlan,
+  type PackageDocument,
+  type WindowOutcome,
+} from '@/lib/proposal/compliance-matrix';
+import { mergeVerifiedByEvidence, type MergeSummary } from '@/lib/proposal/matrix-merge';
 import {
   verifyComplianceMatrix,
   type InterpretedRow,
@@ -44,14 +51,41 @@ export interface ComplianceMatrixInput {
   userEmail?: string | null;
 }
 
-/** Per-document share of stored text the extractor actually read. */
+/**
+ * What the extractor actually did with the package. Every readable document has a
+ * disposition; every requirement-bearing document is split into windows, and every
+ * character NOT processed is listed in uncovered_ranges with the reason.
+ */
 export interface ExtractionCoverage {
-  /** Chars of source text Mindy holds vs chars sent to the extraction model. */
+  /** Chars of stored text across every document in the package. */
   source_chars: number;
+  /** Chars in documents classified requirement-bearing (disposition 'extract'). */
+  relevant_chars: number;
+  /** Chars of requirement-bearing text a model call successfully processed. */
   chars_read: number;
-  /** True only when the model saw every character of every document. */
+  /** True only when every requirement-bearing document was processed in full. */
   complete: boolean;
-  documents: Array<{ filename: string; document_id: string; chars: number; chars_read: number; fully_read: boolean }>;
+  documents_total: number;
+  /** Requirement-bearing documents processed in full. */
+  documents_processed: number;
+  windows_planned: number;
+  windows_succeeded: number;
+  windows_failed: number;
+  /** Requirement-bearing text that was NOT processed — requirements there are UNKNOWN. */
+  uncovered_ranges: Array<{ document_id: string; filename: string; char_start: number; char_end: number; reason: WindowOutcome['status'] }>;
+  documents: Array<{
+    filename: string;
+    document_id: string;
+    chars: number;
+    chars_read: number;
+    fully_read: boolean;
+    disposition: DocumentPlan['disposition'];
+    reason?: string;
+    windows: number;
+    /** Chars classified (not sent to the model) inside an extracted document, and why. */
+    reference_chars?: number;
+    reference_reason?: string;
+  }>;
 }
 
 export interface ComplianceMatrixResult {
@@ -76,7 +110,11 @@ export interface ComplianceMatrixResult {
      * named source specs (LOA, flight deck, SCIF, berthing, magazine) are in
      * the source and missing from the matrix. Row count is not coverage.
      */
-    extraction_completeness: 'unproven' | 'source_text';
+    extraction_completeness: 'unproven' | 'source_text' | 'partial' | 'unavailable';
+    /** Why the matrix is not (or is) a complete read — each reason names what is missing. */
+    completeness_reasons?: string[];
+    /** Overlap duplicates collapsed + rows withheld for evidence outside their window. */
+    merge?: MergeSummary;
     source_spec_coverage?: SourceSpecCoverage;
     /** Spec ids recovered from source after the LLM missed them (e.g. SCIF). */
     recovered_source_specs?: string[];
@@ -104,31 +142,72 @@ const TRUTH_CONTRACT =
 
 const AMENDMENT_RE = /\b(amend(ment)?|amd|sf[\s_+-]*30|modification|mod\s*\d)/i;
 
-/** Map each source document to the character range it occupies in the assembled text. */
-function extractionCoverage(
-  assembled: string,
-  docs: MatrixSourceDoc[],
-  windowRanges: Array<[number, number]>,
-): ExtractionCoverage {
-  const read = (a: number, b: number) =>
-    windowRanges.reduce((n, [s, e]) => n + Math.max(0, Math.min(b, e) - Math.max(a, s)), 0);
-  const out: ExtractionCoverage['documents'] = [];
-  let cursor = 0;
-  for (const d of docs) {
-    const body = d.text.trim();
-    if (!body) continue;
-    const at = assembled.indexOf(body, d.role === 'attachment' ? assembled.indexOf(`--- ${d.filename} ---`, cursor) : cursor);
-    if (at < 0) {
-      out.push({ filename: d.filename, document_id: d.document_id, chars: body.length, chars_read: 0, fully_read: false });
-      continue;
-    }
-    cursor = at + body.length;
-    const r = read(at, at + body.length);
-    out.push({ filename: d.filename, document_id: d.document_id, chars: body.length, chars_read: r, fully_read: r >= body.length });
+/** Union length of [start,end) ranges. */
+function unionLength(ranges: Array<[number, number]>): number {
+  const r = [...ranges].sort((a, b) => a[0] - b[0]);
+  let n = 0;
+  let cur: [number, number] | null = null;
+  for (const [a, b] of r) {
+    if (!cur || a > cur[1]) { if (cur) n += cur[1] - cur[0]; cur = [a, b]; } else cur[1] = Math.max(cur[1], b);
   }
-  const source_chars = assembled.length;
-  const chars_read = read(0, source_chars);
-  return { source_chars, chars_read, complete: chars_read >= source_chars && out.every((d) => d.fully_read), documents: out };
+  if (cur) n += cur[1] - cur[0];
+  return n;
+}
+
+/** Package coverage from the plan + the outcome of every window. */
+export function packageCoverage(
+  docs: PackageDocument[],
+  plan: DocumentPlan[],
+  windows: WindowOutcome[],
+): ExtractionCoverage {
+  const documents: ExtractionCoverage['documents'] = [];
+  const uncovered: ExtractionCoverage['uncovered_ranges'] = [];
+  let source = 0; let relevant = 0; let read = 0; let processed = 0;
+  for (const p of plan) {
+    const len = docs.find((d) => d.document_id === p.document_id)?.text.length ?? 0;
+    source += len;
+    const mine = windows.filter((w) => w.document_id === p.document_id);
+    const ok = mine.filter((w) => w.status === 'ok').flatMap((w) => w.segments ?? [[w.char_start, w.char_end] as [number, number]]);
+    const refs = p.reference_ranges ?? [];
+    const r = p.disposition === 'extract' ? unionLength(ok) : 0;
+    // Classified ranges (bid-schedule line items) are CONSIDERED, not unread.
+    const considered = [...ok, ...refs];
+    const full = p.disposition === 'extract' && unionLength(considered) >= len;
+    if (p.disposition === 'extract') {
+      relevant += len - unionLength(refs); read += r; if (full) processed++;
+      // Complement of what was processed or classified, attributed to the window that failed there.
+      let at = 0;
+      for (const [a, b] of [...considered].sort((x, y) => x[0] - y[0])) {
+        if (a > at) {
+          const culprit = mine.find((w) => w.status !== 'ok' && w.char_start < a && w.char_end > at);
+          uncovered.push({ document_id: p.document_id, filename: p.filename, char_start: at, char_end: a, reason: culprit?.status ?? 'failed' });
+        }
+        at = Math.max(at, b);
+      }
+      if (at < len) {
+        const culprit = mine.find((w) => w.status !== 'ok' && w.char_end > at);
+        uncovered.push({ document_id: p.document_id, filename: p.filename, char_start: at, char_end: len, reason: culprit?.status ?? 'failed' });
+      }
+    }
+    documents.push({
+      filename: p.filename, document_id: p.document_id, chars: len, chars_read: r, fully_read: full,
+      disposition: p.disposition, ...(p.reason ? { reason: p.reason } : {}), windows: p.windows,
+      ...(refs.length ? { reference_chars: unionLength(refs), reference_reason: p.reference_reason } : {}),
+    });
+  }
+  return {
+    source_chars: source,
+    relevant_chars: relevant,
+    chars_read: read,
+    complete: uncovered.length === 0 && plan.some((p) => p.disposition === 'extract'),
+    documents_total: plan.length,
+    documents_processed: processed,
+    windows_planned: windows.length,
+    windows_succeeded: windows.filter((w) => w.status === 'ok').length,
+    windows_failed: windows.filter((w) => w.status !== 'ok').length,
+    uncovered_ranges: uncovered,
+    documents,
+  };
 }
 
 /** Build the source text for a notice: SOW + notice body + each attachment's extracted
@@ -136,6 +215,9 @@ function extractionCoverage(
 async function textFromNotice(noticeId: string): Promise<{
   text: string;
   docs: MatrixSourceDoc[];
+  /** The same documents (same text, same order) + doc_kind, for the package extractor. */
+  packageDocs: PackageDocument[];
+  solicitationNumber: string | null;
   amendments: string[];
   degraded: boolean;
   truncated_attachments: number;
@@ -154,6 +236,7 @@ async function textFromNotice(noticeId: string): Promise<{
     // Document identity survives into verification: each quote is located in a
     // named document, never in the flattened blob.
     const sourceDocs: MatrixSourceDoc[] = [];
+    const kinds = new Map<string, string | null>([['notice_sow', 'notice'], ['notice_description', 'notice']]);
     for (const [id, body] of [['notice_sow', docs.sow_text], ['notice_description', docs.description]] as const) {
       const t = (body || '').trim();
       if (t && !/^https?:\/\//i.test(t)) {
@@ -163,11 +246,14 @@ async function textFromNotice(noticeId: string): Promise<{
     for (const d of docs.documents) {
       if ((d.extracted_text || '').trim()) {
         sourceDocs.push({ document_id: d.document_id, filename: d.filename, text: d.extracted_text, role: 'attachment' });
+        kinds.set(d.document_id, d.doc_kind ?? null);
       }
     }
     return {
       text,
       docs: sourceDocs,
+      packageDocs: sourceDocs.map((d) => ({ document_id: d.document_id, filename: d.filename, text: d.text, doc_kind: kinds.get(d.document_id) ?? null })),
+      solicitationNumber: docs.solicitation_number ?? null,
       amendments: docs.documents
         .filter((d) => d.doc_kind === 'amendment' || AMENDMENT_RE.test(d.filename))
         .map((d) => d.filename),
@@ -178,11 +264,20 @@ async function textFromNotice(noticeId: string): Promise<{
     };
   } catch (err) {
     console.error('[compliance-matrix] notice fetch failed', noticeId, err);
-    return { text: '', docs: [], amendments: [], degraded: true, truncated_attachments: 0, coverage: null };
+    return { text: '', docs: [], packageDocs: [], solicitationNumber: null, amendments: [], degraded: true, truncated_attachments: 0, coverage: null };
   }
 }
 
+/**
+ * Whole-tool wall-clock budget. The hosted MCP route's maxDuration is 60s; the package
+ * fetch (a cold notice is downloaded + extracted on demand) and the post-extraction
+ * gate/merge share it, so the extraction deadline is what is LEFT of this budget.
+ */
+const TOOL_BUDGET_MS = 50_000;
+const MIN_EXTRACTION_MS = 12_000;
+
 export async function extractComplianceMatrix(input: ComplianceMatrixInput): Promise<ComplianceMatrixResult> {
+  const startedAt = Date.now();
   const noticeId = (input.notice_id || '').trim();
   let sourceText = (input.rfp_text || '').trim();
   let source: 'notice_id' | 'text' | 'none' = sourceText ? 'text' : 'none';
@@ -194,6 +289,8 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
   let sourceDocs: MatrixSourceDoc[] = sourceText
     ? [{ document_id: 'rfp_text', filename: 'Provided rfp_text', text: sourceText, role: 'rfp_text' }]
     : [];
+  let packageDocs: PackageDocument[] = sourceDocs.map((d) => ({ document_id: d.document_id, filename: d.filename, text: d.text, doc_kind: null }));
+  let solicitationNumber: string | null = null;
 
   // notice_id path: fetch the solicitation text server-side (only when no explicit text).
   if (!sourceText && noticeId) {
@@ -204,6 +301,8 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
     sourceCoverage = fetched.coverage;
     resolvedNoticeId = fetched.resolved_notice_id;
     sourceDocs = fetched.docs;
+    packageDocs = fetched.packageDocs;
+    solicitationNumber = fetched.solicitationNumber;
     amendments = fetched.amendments;
     source = 'notice_id';
   }
@@ -223,7 +322,8 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         count: 0,
         truncated: false,
         truncated_attachments: truncatedAttachments,
-        extraction_completeness: 'unproven',
+        extraction_completeness: 'unavailable',
+        completeness_reasons: [fetchDegraded ? 'the solicitation package could not be fetched' : 'no readable solicitation text'],
         source_spec_coverage: { present_in_source: [], extracted: [], missing_from_matrix: [] },
         model: '',
       },
@@ -243,16 +343,55 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
     return result;
   }
 
-  const ex = await extractComplianceMatrixFromText(sourceText, { userEmail: input.userEmail ?? null });
-  // The gate: only rows provable against the source Mindy holds reach `requirements`.
+  // PACKAGE → DISPOSITION → WINDOWS → EXTRACT: every requirement-bearing document is
+  // read in full; each candidate carries the window (document + range) that produced it.
+  const ex = await extractComplianceMatrixFromPackage(packageDocs, {
+    userEmail: input.userEmail ?? null,
+    solicitationNumber,
+    deadlineMs: Math.max(MIN_EXTRACTION_MS, TOOL_BUDGET_MS - (Date.now() - startedAt)),
+  });
+  // The gate (frozen): only rows provable against the source Mindy holds reach `requirements`.
+  // source_doc on every windowed candidate is the window's own document, so the gate's
+  // source_mismatch check also proves the quote came from the document being read.
   const sourceIncomplete = !!sourceCoverage && !sourceCoverage.complete;
-  const verified = verifyComplianceMatrix(ex.requirements, sourceDocs, { sourceIncomplete });
+  const gated = verifyComplianceMatrix([...ex.candidates, ...ex.recovered], sourceDocs, { sourceIncomplete });
+  // MERGE after the gate: identity is verified evidence, never model text or model ids.
+  const changeDocs = new Set(packageDocs.filter((d) => d.doc_kind === 'amendment' || d.doc_kind === 'qa').map((d) => d.document_id));
+  const verified = mergeVerifiedByEvidence(gated, packageDocs.map((d) => d.document_id), changeDocs);
+  const summary = {
+    ...gated.summary,
+    requirements_verified: verified.requirements.length,
+    interpretations: verified.interpretations.length,
+    candidates_withheld: verified.withheld.length,
+    withheld_by_reason: verified.withheld.reduce<Record<string, number>>((m, w) => {
+      m[w.withheld_reason] = (m[w.withheld_reason] ?? 0) + 1; return m;
+    }, {}),
+  };
   const grounded = verified.requirements.length > 0;
-  const coverage = auditSourceSpecCoverage(sourceText, verified.requirements);
-  const extraction = extractionCoverage(sourceText, sourceDocs, ex.windowRanges);
-  const completenessUnproven =
-    ex.truncated || truncatedAttachments > 0 || coverage.missing_from_matrix.length > 0 ||
-    !extraction.complete || sourceIncomplete || verified.withheld.length > 0 || verified.interpretations.length > 0;
+  const extractedText = packageDocs.filter((d) => ex.documents.find((p) => p.document_id === d.document_id)?.disposition === 'extract').map((d) => d.text).join('\n\n');
+  const coverage = auditSourceSpecCoverage(extractedText || sourceText, verified.requirements);
+  const extraction = packageCoverage(packageDocs, ex.documents, ex.windows);
+
+  // Completeness is a claim about coverage AND verification, never about row count.
+  const reasons: string[] = [];
+  const notOk = ex.windows.filter((w) => w.status !== 'ok');
+  if (notOk.length) {
+    const files = [...new Set(extraction.uncovered_ranges.map((u) => u.filename))];
+    reasons.push(`${notOk.length} of ${ex.windows.length} extraction windows did not complete (${[...new Set(notOk.map((w) => w.status))].join('/')}) — requirements in ${files.join(', ')} ${extraction.uncovered_ranges.map((u) => `chars ${u.char_start}–${u.char_end}`).join('; ')} are UNKNOWN, not absent`);
+  }
+  if (sourceIncomplete) reasons.push('some package documents were unreadable or partially read');
+  if (truncatedAttachments > 0) reasons.push(`${truncatedAttachments} attachment(s) truncated at the source`);
+  if (coverage.missing_from_matrix.length) reasons.push(`named source specs missing from the matrix: ${coverage.missing_from_matrix.join(', ')}`);
+  if (verified.withheld.length) reasons.push(`${verified.withheld.length} candidate(s) withheld — what they point at could not be verified`);
+  if (verified.interpretations.length) reasons.push(`${verified.interpretations.length} row(s) are interpretations, not verified quotes`);
+  const completeness: ComplianceMatrixResult['_meta']['extraction_completeness'] = !ex.ok
+    ? 'unavailable'
+    : notOk.length || !extraction.complete
+    ? 'partial'
+    : reasons.length
+    ? 'unproven'
+    : 'source_text';
+  if (!ex.ok) reasons.unshift('the extraction model was unavailable on every window');
 
   const result: ComplianceMatrixResult = {
     requirements: verified.requirements,
@@ -260,22 +399,28 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
     withheld: verified.withheld,
     _meta: {
       grounded,
-      degraded: !ex.ok, // every chunk failed → provider down, distinct from empty
+      // Every window failed → provider down. Nothing verified AND a window failed → the
+      // missing rows may be in the failed range: a system failure, never "no requirements"
+      // (Credit Integrity then classifies it non-billable, unchanged).
+      degraded: !ex.ok || (!grounded && notOk.length > 0),
       source,
       notice_id: source === 'notice_id' ? (resolvedNoticeId || noticeId) : undefined,
       resolved_notice_id: resolvedNoticeId,
       count: verified.requirements.length,
-      truncated: ex.truncated || truncatedAttachments > 0,
+      truncated: !extraction.complete || truncatedAttachments > 0,
       truncated_attachments: truncatedAttachments,
-      extraction_completeness: completenessUnproven ? 'unproven' : 'source_text',
+      extraction_completeness: completeness,
+      completeness_reasons: reasons,
+      merge: verified.summary,
       source_spec_coverage: coverage,
       ...(ex.recovered_source_specs?.length
         ? { recovered_source_specs: ex.recovered_source_specs }
         : {}),
-      model: ex.model,
+      // The models that ACTUALLY answered (the provider chain can fall through).
+      model: ex.models.join(', '),
       ...(sourceCoverage ? { source_coverage: sourceCoverage } : {}),
       extraction_coverage: extraction,
-      verification: verified.summary,
+      verification: summary,
       amendments_detected: amendments,
       truth_contract: TRUTH_CONTRACT,
     },
@@ -287,7 +432,7 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         ? 'The extraction model was unavailable on every chunk — treat as temporarily unavailable, not as "no requirements". Retry shortly.'
         : !grounded
         ? 'No explicit requirements were found in the provided text — it may be a synopsis or cover page rather than the Section L/M/C body. Supply the full solicitation.'
-        : `${verified.requirements.length} requirement(s) verified against the source; ${verified.withheld.length} candidate(s) withheld because their source language could not be verified${verified.interpretations.length ? `; ${verified.interpretations.length} returned as interpretations with the real source sentence` : ''}. The extractor read ${extraction.chars_read.toLocaleString()} of ${extraction.source_chars.toLocaleString()} source characters${ex.truncated ? ' — this is NOT the solicitation\'s complete requirement set' : ''}.${
+        : `${verified.requirements.length} requirement(s) verified against the source; ${verified.withheld.length} candidate(s) withheld because their source language could not be verified${verified.interpretations.length ? `; ${verified.interpretations.length} returned as interpretations with the real source sentence` : ''}. Mindy processed ${extraction.documents_processed} of ${extraction.documents.filter((d) => d.disposition === 'extract').length} requirement-bearing document(s) (${extraction.chars_read.toLocaleString()} of ${extraction.relevant_chars.toLocaleString()} relevant characters)${extraction.complete ? '' : ' — this is NOT the solicitation\'s complete requirement set'}.${extraction.documents.some((d) => d.disposition !== 'extract' && d.disposition !== 'empty') ? ` Not extracted by design: ${extraction.documents.filter((d) => d.disposition !== 'extract' && d.disposition !== 'empty').map((d) => `${d.filename} (${d.disposition})`).join(', ')}.` : ''}${
             sourceCoverage && !sourceCoverage.complete
               ? ` PARTIAL SOURCE: ${sourceCoverage.documents_partial} document(s) partially read, ${sourceCoverage.documents_unreadable} unreadable — this is not the solicitation's complete requirement set.`
               : ''
@@ -303,7 +448,7 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         ...(amendments.length
           ? [`AMENDMENTS PRESENT (${amendments.join(', ')}): rows keep their source_doc, but superseded base language is NOT resolved — a base row and its amendment may both appear. Check each against the latest amendment.`]
           : ['No amendment documents were in the package Mindy holds.']),
-        'The model reads at most 50K chars per call — see _meta.extraction_coverage for which documents were read; requirements in unread text are UNKNOWN, not absent.',
+        'Every requirement-bearing document is read in overlapping windows; _meta.extraction_coverage.uncovered_ranges lists any text that was NOT processed — requirements there are UNKNOWN, not absent. extraction_completeness=source_text is the only complete state.',
       ],
     };
   }

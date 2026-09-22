@@ -1,0 +1,143 @@
+{
+  "notice": "36C24226Q0857",
+  "built": "2026-09-22",
+  "method": "Hand-selected from the stored package text, NOT from any model output. Each sentence is an exact substring of the named document; its character range is recomputed at run time (a drifting anchor fails the suite). An anchor is RECOVERED when a trusted row's verified evidence (verification.found_in) overlaps the anchor's range in that document. The set is a coverage benchmark, not an exhaustive list of every obligation.",
+  "anchors": [
+    {
+      "id": "A01",
+      "region": "base / beginning (inside old 50K window)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "admin",
+      "sentence": "Offerors must submit their annual Vets4212 Report."
+    },
+    {
+      "id": "A02",
+      "region": "base / beginning (inside old 50K window)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "submission",
+      "sentence": "Quotes shall be emailed to Michael Spivack at\n\nMichael.Spivack@va.gov."
+    },
+    {
+      "id": "A03",
+      "region": "base / submittal requirements (inside old window)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "submission",
+      "sentence": "Each submittal shall include project title, location, project number,  date, subcontractor name (if applicable), specification section, product identification, and revision history."
+    },
+    {
+      "id": "A04",
+      "region": "base / middle — C.6 insurance (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "admin",
+      "sentence": "Employer's liability coverage of at least $100,000 is required, except in States with exclusive or monopolistic funds that do not permit workers' compensation to be written by private carriers."
+    },
+    {
+      "id": "A05",
+      "region": "base / middle — C.6 insurance (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "submission",
+      "sentence": "The successful bidder must present to the Contracting Officer, prior to award, evidence of general liability insurance without any exclusionary clauses for asbestos that would void the general liability coverage."
+    },
+    {
+      "id": "A06",
+      "region": "base / middle — C.9 limitations on subcontracting (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "admin",
+      "sentence": "In the case of a contract for general construction, the contractor will not pay more than 85% of the amount paid by the government to it to firms that are not certified SDVOSBs"
+    },
+    {
+      "id": "A07",
+      "region": "base / late — Section E 52.212-1 instructions (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "submission",
+      "sentence": "Submit signed and dated offers to the office specified in this solicitation at or before the exact time specified in this solicitation."
+    },
+    {
+      "id": "A08",
+      "region": "base / late — Section E 52.212-2 Factor 1 (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "evaluation",
+      "sentence": "A Technical Capability Statement (maximum of five (5) pages) demonstrating the vendors ability to meet all requirements of the Statement of Work without additional cost to the Government in manpower or resources."
+    },
+    {
+      "id": "A09",
+      "region": "base / late — Section E 52.212-2 Factor 1 license list (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "evaluation",
+      "sentence": "Active New Jersey Department of Labor Asbestos Abatement Contractor License."
+    },
+    {
+      "id": "A10",
+      "region": "base / late — Section E 52.212-2 Factor 1 license list (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "evaluation",
+      "sentence": "Proof of current Workers' Compensation Insurance and Commercial General Liability Insurance."
+    },
+    {
+      "id": "A11",
+      "region": "base / late — Section E 52.212-2 Factor 1 (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "evaluation",
+      "sentence": "A statement confirming the Contractor's ability to meet the emergency response times specified in the Statement of Work."
+    },
+    {
+      "id": "A12",
+      "region": "base / late — Section E 52.212-2 Factor 1 (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "evaluation",
+      "sentence": "A staffing plan describing how demolition and asbestos abatement services to include emergency will be provided on an as-needed basis."
+    },
+    {
+      "id": "A13",
+      "region": "base / late — Section E 52.212-2 Factor 1 (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "evaluation",
+      "sentence": "A waste transportation and disposal plan for asbestos-containing materials that complies with all applicable New Jersey and Federal regulations."
+    },
+    {
+      "id": "A14",
+      "region": "base / late — Section E 52.212-2 Factor 2 (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "past_performance",
+      "sentence": "The Government will evaluate the Offeror's past performance based on quality of workmanship, reliability of service, compliance with contract requirements, timeliness of performance, and customer satisfaction."
+    },
+    {
+      "id": "A15",
+      "region": "base / late — Section E 52.212-2 Factor 3 price (beyond 50K)",
+      "document_id": "1f7ff76547504ed68313baf2f328341f",
+      "category": "pricing",
+      "sentence": "Vendor shall complete the unit price column of line-item table in the attached price evaluation sheet."
+    },
+    {
+      "id": "A16",
+      "region": "attachment — pricing sheet note (table; unread before)",
+      "document_id": "505e25069e344f1cad02839555d23308",
+      "category": "technical",
+      "sentence": "GENERAL DEMOLITION ACTIVITIES ARE REQUIRED TO MEET INFECTION CONTROL RISK ASSESSMENT (ICRA) LEVEL 4 FOR WORK INSIDE OF THE HOSPITAL"
+    },
+    {
+      "id": "A17",
+      "region": "attachment — Exhibit C past performance questionnaire (unread before)",
+      "document_id": "316211ef1ed14da18cc6ec152ee74caf",
+      "category": "past_performance",
+      "sentence": "Send an electronic or hard copy print of the form to each of your reference contacts, asking them to please complete the form and submit it according to the instructions, below."
+    }
+  ],
+  "must_not_trust": [
+    {
+      "id": "N01",
+      "document_id": "2a29173125b143c4b97a32bbf7faf0ee",
+      "why": "misfiled: a Determination & Findings for a DIFFERENT contract (36C24226C0084); never names this solicitation"
+    },
+    {
+      "id": "N02",
+      "document_id": "627b20a75c7642debca558fc6b0dc562",
+      "why": "wage determination rate tables — reference data, not matrix rows"
+    },
+    {
+      "id": "N03",
+      "document_id": "bb1d7a206ebd4369b4a92060e5563ee8",
+      "why": "byte-identical duplicate of WD Essex"
+    }
+  ]
+}

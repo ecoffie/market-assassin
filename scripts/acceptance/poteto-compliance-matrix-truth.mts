@@ -111,8 +111,13 @@ if (process.argv.includes('--fresh')) {
   chk('FRESH grounded, not degraded', m.grounded === true && m.degraded === false, `${r.requirements.length} verified`);
   chk('FRESH reports verified vs withheld', m.verification?.requirements_verified === r.requirements.length &&
     m.verification?.candidates_withheld === r.withheld.length, JSON.stringify(m.verification?.withheld_by_reason));
-  chk('FRESH does not claim completeness from a partial read', m.extraction_coverage.complete === false &&
-    m.extraction_completeness === 'unproven', `${m.extraction_coverage.chars_read}/${m.extraction_coverage.source_chars} chars read`);
+  // Restated by Poteto "Compliance Matrix Completeness" (2026-09-22): the package is now read in
+  // full, so the old literal `complete === false` described the 50K window, not the principle.
+  // The principle is unchanged — never claim completeness the coverage + verification cannot prove.
+  chk('FRESH does not claim completeness it cannot prove', m.extraction_completeness === 'source_text'
+    ? m.extraction_coverage.complete === true && r.withheld.length === 0 && r.interpretations.length === 0
+    : m.extraction_completeness !== 'source_text',
+    `${m.extraction_completeness} · ${m.extraction_coverage.chars_read}/${m.extraction_coverage.relevant_chars} relevant chars read`);
   chk('FRESH truncated_attachments = 0 on a fully-complete package', m.truncated_attachments === 0);
   independentAudit('FRESH', r.requirements);
 }

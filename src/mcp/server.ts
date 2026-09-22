@@ -1366,7 +1366,8 @@ server.registerTool(
       'evaluation factors). Pass ONE of: notice_id OR rfp_text. requirements[] = rows whose source_quote was found in ' +
       'source_doc; section only when printed in the document. interpretations[] = paraphrases with the real source ' +
       'sentence; withheld[] = unverifiable candidates (never present them as requirements). _meta.extraction_coverage ' +
-      'says what was read. grounded=false = nothing verified — do NOT invent requirements.',
+      'says what was read and what was excluded; extraction_completeness=source_text is the only complete state. ' +
+      'grounded=false = nothing verified — do NOT invent requirements.',
     inputSchema: {
       notice_id: z.string().optional().describe('SAM notice id (UUID) or solicitation number — fetches the doc text server-side.'),
       rfp_text: z.string().optional().describe('The solicitation text directly (use when you already have it).'),

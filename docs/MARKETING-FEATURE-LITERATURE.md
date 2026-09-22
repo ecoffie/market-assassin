@@ -7293,3 +7293,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** Federal RFP compliance matrix / verified solicitation requirements / Section L and M shredding / FAR 52.212-1 instructions to offerors / source-cited proposal requirements.
 
 **Proof.** Gold master VA `36C24226Q0857` (7 SAM documents, 257,724 characters, stored package). Before: 68 unverified rows in production, including 13 submittal items paired with an unrelated sentence, 39 rows with section labels the document doesn't print, and a reproduced run citing "Section L" 4 times in a package that has no Section L (its instructions are FAR 52.212-1 in Section E). After: every trusted row re-verifies against the stored source text through an independent checker (`scripts/acceptance/poteto-compliance-matrix-truth.mts`, 24/24). The matrix now also discloses that the extractor reads 50,000 of 257,724 characters, so it never presents a partial read as the complete requirement set.
+
+## POTETO — Compliance Matrix Completeness (2026-09-22)
+
+**What.** Mindy's compliance matrix now reads the whole solicitation package, not the first 50,000 characters of it. Every document is accounted for: requirement-bearing documents are read in full; data payloads (wage-rate tables), exact duplicates and a document uploaded for a different contract are set aside with the reason stated. Every row still carries the solicitation's own words at an exact location, and the matrix says plainly whether it is complete, partial, or unproven — and why.
+
+**Why.** "Read the entire usable solicitation package, find the requirements wherever they appear, and tell me honestly whether the matrix is complete." On a real VA package the evaluation factors — the 5-page Technical Capability Statement limit, seven license and insurance submissions, the staffing and waste-disposal plans — sat past the point Mindy used to stop reading. A matrix that misses how you will be scored is not a compliance matrix.
+
+**SEO.** Full solicitation compliance matrix / RFP shredding across all attachments / FAR 52.212-2 evaluation factors extraction / Section E instructions to offerors / verified proposal requirements.
+
+**Proof.** Gold master VA `36C24226Q0857` (SAM package, 7 attachments, 257,724 characters). Before (production): 50,000 characters read, 60 verified rows, 2 of 17 hand-built recall anchors recovered. After (same day, same model): every requirement-bearing character read (159,939 of 159,939), 186 verified rows, 15 of 17 anchors recovered, each of the 186 quotes independently re-found in its named document, zero invented Section L citations, zero unsupported figures, 20 seconds. Price unchanged (20 credits). Not yet in production at time of writing.
