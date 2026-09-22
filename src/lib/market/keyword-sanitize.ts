@@ -84,7 +84,7 @@ const GEO_TERMS = new Set([
 // with noise (Blue Heron: 5 generic words → 443 matches → a "Worldwide PM" card).
 // A single generic word is allowed as a WEAK signal (kept in search) but never a
 // STRONG/distinctive match. See isDistinctiveKeyword.
-const GENERIC_SINGLE_WORDS = new Set([
+export const GENERIC_SINGLE_WORDS: ReadonlySet<string> = new Set([
   'program', 'management', 'manage', 'managed', 'technical', 'technology', 'tech',
   'acquisition', 'writing', 'services', 'service', 'support', 'solution', 'solutions',
   'system', 'systems', 'engineering', 'engineer', 'operations', 'operational',
@@ -263,7 +263,7 @@ export function keywordCandidates(input: string, max = 4): string[] {
 
 // A "word" with no vowels or absurd consonant runs is keyboard mash (zxcvbnm,
 // asdfqwer), not a real industry term. Cheap heuristic to keep gibberish out.
-function looksLikeRealWord(w: string): boolean {
+export function looksLikeRealWord(w: string): boolean {
   if (/[aeiouy]/.test(w) === false) return false;          // no vowel → mash
   if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) return false;   // 5+ consonants in a row
   return true;

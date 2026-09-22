@@ -37,7 +37,7 @@ export interface QueryIntent {
 // Longest/most-specific phrases first so "edwosb" / "economically disadvantaged women" beats "wosb",
 // and "service disabled veteran" beats "veteran". Matching is done on a normalized (lowercased,
 // punctuation-stripped) query, so "8(a)", "8a", "8 a" all collapse to "8a".
-const SET_ASIDE_SYNONYMS: { key: SetAsideKey; phrases: string[] }[] = [
+export const SET_ASIDE_SYNONYMS: { key: SetAsideKey; phrases: string[] }[] = [
   { key: 'edwosb', phrases: ['edwosb', 'economically disadvantaged women owned', 'economically disadvantaged woman owned', 'ed wosb'] },
   { key: 'wosb',   phrases: ['wosb', 'women owned', 'woman owned', 'women owned small business', 'women-owned', 'wo sb'] },
   { key: 'sdvosb', phrases: ['sdvosb', 'service disabled veteran owned', 'service disabled veteran', 'service-disabled', 'sdvo sb', 'disabled veteran'] },

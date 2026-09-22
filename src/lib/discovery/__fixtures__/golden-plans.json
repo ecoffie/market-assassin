@@ -1,0 +1,4095 @@
+{
+  "5413": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "5413",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [
+        "5413"
+      ],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [
+      "5413"
+    ],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "naics_code.like.5413%"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.like.5413%"
+          }
+        ],
+        "naics": [
+          "5413"
+        ]
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "naics_code.like.5413%"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "541320": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "541320",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [
+        "541320"
+      ],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [
+      "541320"
+    ],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "naics_code.eq.541320"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.541320"
+          }
+        ],
+        "naics": [
+          "541320"
+        ]
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "naics_code.eq.541320"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "pam": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "pam",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "pam",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "pam",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "pam",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "pam"
+              ],
+              "aliases": [],
+              "inflect": "plural",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "pam"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mpams?\\\\M\",description.imatch.\"\\\\mpams?\\\\M\",sow_text.imatch.\"\\\\mpams?\\\\M\",department.imatch.\"\\\\mpams?\\\\M\",solicitation_number.imatch.\"\\\\mpams?\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "incumbent_name.imatch.\"\\\\mpams?\\\\M\",naics_description.imatch.\"\\\\mpams?\\\\M\",awarding_agency.imatch.\"\\\\mpams?\\\\M\",awarding_sub_agency.imatch.\"\\\\mpams?\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mpams?\\\\M\",naics_description.imatch.\"\\\\mpams?\\\\M\",department.imatch.\"\\\\mpams?\\\\M\",description.imatch.\"\\\\mpams?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "ai governance": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "ai governance",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "ai governance",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "ai governance",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "artificial intelligence",
+              "cls": "distinctive",
+              "basis": "recognized_concept",
+              "forms": [
+                "artificial intelligence",
+                "ai"
+              ],
+              "aliases": [],
+              "inflect": "none",
+              "weight": 1
+            },
+            {
+              "label": "governance",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "governance"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "ai governance"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",sow_text.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",solicitation_number.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(incumbent_name.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "artificial intelligence governance": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "artificial intelligence governance",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "artificial intelligence governance",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "artificial intelligence governance",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "artificial intelligence",
+              "cls": "distinctive",
+              "basis": "recognized_concept",
+              "forms": [
+                "artificial intelligence",
+                "ai"
+              ],
+              "aliases": [],
+              "inflect": "none",
+              "weight": 1
+            },
+            {
+              "label": "governance",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "governance"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "artificial intelligence governance"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",sow_text.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",solicitation_number.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(incumbent_name.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "cybersecurity": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "cybersecurity",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "cybersecurity",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "cybersecurity",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "cybersecurity",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "cybersecurity"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "cyber_with_related_it",
+      "direct": {
+        "naics": [
+          "518210"
+        ],
+        "psc": [
+          "DJ01",
+          "DJ10"
+        ],
+        "terms": [
+          "Cybersecurity",
+          "cyber",
+          "information security",
+          "network security",
+          "infosec",
+          "zero trust",
+          "SIEM"
+        ]
+      },
+      "related": {
+        "naics": [
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ],
+        "psc": []
+      },
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.518210,naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519,psc_code.eq.DJ01,psc_code.eq.DJ10,incumbent_name.imatch.\"\\\\mcybersecurity\\\\M\",naics_description.imatch.\"\\\\mcybersecurity\\\\M\",description.imatch.\"\\\\mcybersecurity\\\\M\",incumbent_name.imatch.\"\\\\mcyber\\\\M\",naics_description.imatch.\"\\\\mcyber\\\\M\",description.imatch.\"\\\\mcyber\\\\M\",incumbent_name.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\minfosec\\\\M\",naics_description.imatch.\"\\\\minfosec\\\\M\",description.imatch.\"\\\\minfosec\\\\M\",incumbent_name.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",naics_description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",incumbent_name.imatch.\"\\\\msiem\\\\M\",naics_description.imatch.\"\\\\msiem\\\\M\",description.imatch.\"\\\\msiem\\\\M\""
+          }
+        ],
+        "naics": [
+          "518210",
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "janitorial": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "janitorial",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "janitorial",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "janitorial",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "janitorial",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "janitorial"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "industry_preset",
+      "direct": {
+        "naics": [
+          "561210",
+          "561720",
+          "561730"
+        ],
+        "psc": [],
+        "terms": [
+          "Facilities & Maintenance",
+          "janitorial"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+          }
+        ],
+        "naics": [
+          "561210",
+          "561720",
+          "561730"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "market research": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "market research",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "market research",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "market research",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "market",
+              "cls": "qualifier",
+              "basis": "discovery_qualifier",
+              "forms": [
+                "market"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.35
+            },
+            {
+              "label": "research",
+              "cls": "qualifier",
+              "basis": "platform_generic_word",
+              "forms": [
+                "research"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.35
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "market research"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(incumbent_name.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\"),or(incumbent_name.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\"))"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "zzzxxyyqqq": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "zzzxxyyqqq",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "zzzxxyyqqq",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "zzzxxyyqqq",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "zzzxxyyqqq",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "zzzxxyyqqq"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1,
+              "unrecognized": true
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "zzzxxyyqqq"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "incumbent_name.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "veterans affairs": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "veterans affairs",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [
+        {
+          "mention": "veterans affairs",
+          "resolveAs": "VA"
+        }
+      ],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "VA",
+        "canonical": "Department of Veterans Affairs",
+        "kind": "normalization",
+        "needles": [
+          "VA",
+          "Department of Veterans Affairs",
+          "VETERANS",
+          "VET"
+        ],
+        "identity": [
+          [
+            "va"
+          ],
+          [
+            "veterans",
+            "affairs"
+          ],
+          [
+            "veterans"
+          ],
+          [
+            "vet"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": "VA",
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "agency=VA janitorial": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "janitorial",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "janitorial",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "janitorial",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "janitorial",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "janitorial"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "industry_preset",
+      "direct": {
+        "naics": [
+          "561210",
+          "561720",
+          "561730"
+        ],
+        "psc": [],
+        "terms": [
+          "Facilities & Maintenance",
+          "janitorial"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "VA",
+        "canonical": "Department of Veterans Affairs",
+        "kind": "normalization",
+        "needles": [
+          "VA",
+          "Department of Veterans Affairs",
+          "VETERANS",
+          "VET"
+        ],
+        "identity": [
+          [
+            "va"
+          ],
+          [
+            "veterans",
+            "affairs"
+          ],
+          [
+            "veterans"
+          ],
+          [
+            "vet"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+          },
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
+          }
+        ],
+        "naics": [
+          "561210",
+          "561720",
+          "561730"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": "VA",
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "management": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "management",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "management",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "management",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "management",
+              "cls": "qualifier",
+              "basis": "corpus_common_term",
+              "forms": [
+                "management"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.4
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "management"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "incumbent_name.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "drones": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "drones",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "drones",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "drones",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "drones",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "drones"
+              ],
+              "aliases": [
+                "drone",
+                "unmanned aircraft",
+                "unmanned aerial",
+                "uas",
+                "uav",
+                "suas"
+              ],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "drones"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": [
+        "336411",
+        "336413",
+        "334511"
+      ]
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",description.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",sow_text.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",department.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",solicitation_number.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "term_of_art",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.336411,naics_code.eq.336413,naics_code.eq.334511"
+          }
+        ],
+        "naics": [
+          "336411",
+          "336413",
+          "334511"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",naics_description.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",department.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\",description.imatch.\"\\\\m((drones(s|es|ing|ed)?|drone(s|es|ing|ed)?|dron(ing|ed)|dron(s|es|ing|ed)?)|(drone(s|es|ing|ed)?|dron(ing|ed))|unmanned[-\\\\s]+aircraft(s|es|ing|ed)?|unmanned[-\\\\s]+aerial(s|es|ing|ed)?|uas(s|es|ing|ed)?|uav(s|es|ing|ed)?|(suas(s|es|ing|ed)?|sua(s|es|ing|ed)?))\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "\"ai governance\"": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "\"ai governance\"",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "\"ai governance\"",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "exact_phrase",
+      "normalized": "ai governance",
+      "phrase": "ai governance",
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "\"ai governance\""
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",sow_text.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",department.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",solicitation_number.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "incumbent_name.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",naics_description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",awarding_agency.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",awarding_sub_agency.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",naics_description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",department.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "8a": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "8a",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [
+        "8a"
+      ],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [
+      "8a"
+    ],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "set_aside_code.ilike.%8A%,set_aside_code.ilike.%8AN%,set_aside_description.ilike.%8_A_%,set_aside_description.ilike.%8A COMP%,set_aside_description.ilike.%8A SOLE%"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "set_aside_type.ilike.%8_A_%,set_aside_type.ilike.%8A COMP%,set_aside_type.ilike.%8A SOLE%"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "set_aside_type.ilike.%8_A_%,set_aside_type.ilike.%8A COMP%,set_aside_type.ilike.%8A SOLE%"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "follow-on support": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "follow-on support",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "follow-on support",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "follow-on support",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "follow on",
+              "cls": "distinctive",
+              "basis": "hyphenated_compound",
+              "forms": [
+                "follow on"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "follow-on support"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "incumbent_name.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "Show me USDA opportunities": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "Show me USDA opportunities",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [
+        {
+          "mention": "usda",
+          "resolveAs": "USDA"
+        }
+      ],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [
+        "show me",
+        "opportunities"
+      ],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "USDA",
+        "canonical": "Department of Agriculture",
+        "kind": "normalization",
+        "needles": [
+          "USDA",
+          "Department of Agriculture",
+          "AG",
+          "AGRICULTURE"
+        ],
+        "identity": [
+          [
+            "usda"
+          ],
+          [
+            "agriculture"
+          ],
+          [
+            "ag"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\musda\\\\M\",sub_tier.imatch.\"\\\\musda\\\\M\",department.imatch.\"\\\\magriculture\\\\M\",sub_tier.imatch.\"\\\\magriculture\\\\M\",department.imatch.\"\\\\mag\\\\M\",sub_tier.imatch.\"\\\\mag\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\musda\\\\M\",awarding_sub_agency.imatch.\"\\\\musda\\\\M\",awarding_agency.imatch.\"\\\\magriculture\\\\M\",awarding_sub_agency.imatch.\"\\\\magriculture\\\\M\",awarding_agency.imatch.\"\\\\mag\\\\M\",awarding_sub_agency.imatch.\"\\\\mag\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": "USDA",
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": [
+      "stripped: show me, opportunities"
+    ]
+  },
+  "SDVOSB cybersecurity opportunities in Virginia": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "SDVOSB cybersecurity opportunities in Virginia",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [
+        "VA"
+      ],
+      "setAsides": [
+        "sdvosb"
+      ],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [
+        "opportunities"
+      ],
+      "residual": "cybersecurity",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "cybersecurity",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "cybersecurity",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "cybersecurity"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "cyber_with_related_it",
+      "direct": {
+        "naics": [
+          "518210"
+        ],
+        "psc": [
+          "DJ01",
+          "DJ10"
+        ],
+        "terms": [
+          "Cybersecurity",
+          "cyber",
+          "information security",
+          "network security",
+          "infosec",
+          "zero trust",
+          "SIEM"
+        ]
+      },
+      "related": {
+        "naics": [
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ],
+        "psc": []
+      },
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [
+      "VA"
+    ],
+    "setAsides": [
+      "sdvosb"
+    ],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active",
+          "state": "VA"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+          },
+          {
+            "op": "or",
+            "expr": "set_aside_code.ilike.%SDVOSBC%,set_aside_code.ilike.%SDVOSBS%,set_aside_description.ilike.%SERVICE-DISABLED VETERAN%,set_aside_description.ilike.%SERVICE DISABLED VETERAN%,set_aside_description.ilike.%SDVOSB%"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.518210,naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519,psc_code.eq.DJ01,psc_code.eq.DJ10,incumbent_name.imatch.\"\\\\mcybersecurity\\\\M\",naics_description.imatch.\"\\\\mcybersecurity\\\\M\",description.imatch.\"\\\\mcybersecurity\\\\M\",incumbent_name.imatch.\"\\\\mcyber\\\\M\",naics_description.imatch.\"\\\\mcyber\\\\M\",description.imatch.\"\\\\mcyber\\\\M\",incumbent_name.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\minfosec\\\\M\",naics_description.imatch.\"\\\\minfosec\\\\M\",description.imatch.\"\\\\minfosec\\\\M\",incumbent_name.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",naics_description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",incumbent_name.imatch.\"\\\\msiem\\\\M\",naics_description.imatch.\"\\\\msiem\\\\M\",description.imatch.\"\\\\msiem\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "set_aside_type.ilike.%SERVICE-DISABLED VETERAN%,set_aside_type.ilike.%SERVICE DISABLED VETERAN%,set_aside_type.ilike.%SDVOSB%"
+          },
+          {
+            "op": "or",
+            "expr": "place_of_performance_state.eq.VA"
+          }
+        ],
+        "naics": [
+          "518210",
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": "VA"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "set_aside_type.ilike.%SERVICE-DISABLED VETERAN%,set_aside_type.ilike.%SERVICE DISABLED VETERAN%,set_aside_type.ilike.%SDVOSB%"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": [
+      "stripped: opportunities"
+    ]
+  },
+  "cyber cloud compliance network server": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "cyber cloud compliance network server",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "cyber cloud compliance network server",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "cyber cloud compliance network server",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "capability_list",
+          "eligibility": "any",
+          "eligible": [
+            {
+              "label": "cyber",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "cyber"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            },
+            {
+              "label": "cloud",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "cloud"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            },
+            {
+              "label": "server",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "server"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": [
+            {
+              "label": "compliance",
+              "cls": "qualifier",
+              "basis": "corpus_common_term",
+              "forms": [
+                "compliance"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.35
+            },
+            {
+              "label": "network",
+              "cls": "qualifier",
+              "basis": "corpus_common_term",
+              "forms": [
+                "network"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.5
+            }
+          ]
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "cyber_with_related_it",
+      "direct": {
+        "naics": [
+          "518210"
+        ],
+        "psc": [
+          "DJ01",
+          "DJ10"
+        ],
+        "terms": [
+          "Cybersecurity",
+          "cyber",
+          "information security",
+          "network security",
+          "infosec",
+          "zero trust",
+          "SIEM"
+        ]
+      },
+      "related": {
+        "naics": [
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ],
+        "psc": []
+      },
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.518210,naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519,psc_code.eq.DJ01,psc_code.eq.DJ10,incumbent_name.imatch.\"\\\\mcybersecurity\\\\M\",naics_description.imatch.\"\\\\mcybersecurity\\\\M\",description.imatch.\"\\\\mcybersecurity\\\\M\",incumbent_name.imatch.\"\\\\mcyber\\\\M\",naics_description.imatch.\"\\\\mcyber\\\\M\",description.imatch.\"\\\\mcyber\\\\M\",incumbent_name.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\minfosec\\\\M\",naics_description.imatch.\"\\\\minfosec\\\\M\",description.imatch.\"\\\\minfosec\\\\M\",incumbent_name.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",naics_description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",incumbent_name.imatch.\"\\\\msiem\\\\M\",naics_description.imatch.\"\\\\msiem\\\\M\",description.imatch.\"\\\\msiem\\\\M\""
+          }
+        ],
+        "naics": [
+          "518210",
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": [
+      "capability_list: any distinctive concept admits; generic concepts rank only"
+    ]
+  },
+  "cyber, cloud": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "cyber, cloud",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "cyber, cloud",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "cyber cloud",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "cyber",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "cyber"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        },
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "cloud",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "cloud"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "cyber_with_related_it",
+      "direct": {
+        "naics": [
+          "518210"
+        ],
+        "psc": [
+          "DJ01",
+          "DJ10"
+        ],
+        "terms": [
+          "Cybersecurity",
+          "cyber",
+          "information security",
+          "network security",
+          "infosec",
+          "zero trust",
+          "SIEM"
+        ]
+      },
+      "related": {
+        "naics": [
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ],
+        "psc": []
+      },
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.518210,naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519,psc_code.eq.DJ01,psc_code.eq.DJ10,incumbent_name.imatch.\"\\\\mcybersecurity\\\\M\",naics_description.imatch.\"\\\\mcybersecurity\\\\M\",description.imatch.\"\\\\mcybersecurity\\\\M\",incumbent_name.imatch.\"\\\\mcyber\\\\M\",naics_description.imatch.\"\\\\mcyber\\\\M\",description.imatch.\"\\\\mcyber\\\\M\",incumbent_name.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\minfosec\\\\M\",naics_description.imatch.\"\\\\minfosec\\\\M\",description.imatch.\"\\\\minfosec\\\\M\",incumbent_name.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",naics_description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",incumbent_name.imatch.\"\\\\msiem\\\\M\",naics_description.imatch.\"\\\\msiem\\\\M\",description.imatch.\"\\\\msiem\\\\M\""
+          }
+        ],
+        "naics": [
+          "518210",
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "Pro Audio": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "Pro Audio",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "pro audio",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "pro audio",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "audio",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "audio"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": [
+            {
+              "label": "pro",
+              "cls": "supporting",
+              "basis": "discovery_supporting",
+              "forms": [
+                "pro"
+              ],
+              "aliases": [],
+              "inflect": "plural",
+              "weight": 0.3
+            }
+          ]
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "pro audio"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "incumbent_name.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "541512 -computers": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "541512 -computers",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [
+        "541512"
+      ],
+      "psc": [],
+      "exclusions": [
+        {
+          "term": "computers"
+        }
+      ],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": [
+        {
+          "label": "computers",
+          "cls": "distinctive",
+          "basis": "not_in_generic_lists",
+          "forms": [
+            "computers"
+          ],
+          "aliases": [],
+          "inflect": "full",
+          "weight": 1
+        }
+      ]
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [
+      "541512"
+    ],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "naics_code.eq.541512"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(title.is.null,title.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(description.is.null,description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(sow_text.is.null,sow_text.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(department.is.null,department.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(solicitation_number.is.null,solicitation_number.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.541512"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(incumbent_name.is.null,incumbent_name.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(naics_description.is.null,naics_description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(awarding_agency.is.null,awarding_agency.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(awarding_sub_agency.is.null,awarding_sub_agency.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"))"
+          }
+        ],
+        "naics": [
+          "541512"
+        ]
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "naics_code.eq.541512"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(title.is.null,title.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(naics_description.is.null,naics_description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(department.is.null,department.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(description.is.null,description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "-computers": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "-computers",
+    "status": "needs_positive_scope",
+    "refinement": "\"-computers\" only says what to leave out. Add what you do sell (a capability, NAICS, agency or state) — excluding one word from the whole federal market is not a search.",
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [
+        {
+          "term": "computers"
+        }
+      ],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": [
+        {
+          "label": "computers",
+          "cls": "distinctive",
+          "basis": "not_in_generic_lists",
+          "forms": [
+            "computers"
+          ],
+          "aliases": [],
+          "inflect": "full",
+          "weight": 1
+        }
+      ]
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "needs_positive_scope",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "is",
+            "col": "notice_id",
+            "val": null
+          }
+        ]
+      },
+      "recompete": {
+        "via": "needs_positive_scope",
+        "ops": [
+          {
+            "op": "is",
+            "col": "contract_id",
+            "val": null
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "needs_positive_scope",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "is",
+            "col": "id",
+            "val": null
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "agency=USDA": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "USDA",
+        "canonical": "Department of Agriculture",
+        "kind": "normalization",
+        "needles": [
+          "USDA",
+          "Department of Agriculture",
+          "AG",
+          "AGRICULTURE"
+        ],
+        "identity": [
+          [
+            "usda"
+          ],
+          [
+            "agriculture"
+          ],
+          [
+            "ag"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\musda\\\\M\",sub_tier.imatch.\"\\\\musda\\\\M\",department.imatch.\"\\\\magriculture\\\\M\",sub_tier.imatch.\"\\\\magriculture\\\\M\",department.imatch.\"\\\\mag\\\\M\",sub_tier.imatch.\"\\\\mag\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\musda\\\\M\",awarding_sub_agency.imatch.\"\\\\musda\\\\M\",awarding_agency.imatch.\"\\\\magriculture\\\\M\",awarding_sub_agency.imatch.\"\\\\magriculture\\\\M\",awarding_agency.imatch.\"\\\\mag\\\\M\",awarding_sub_agency.imatch.\"\\\\mag\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": "USDA",
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "agency=VA": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "VA",
+        "canonical": "Department of Veterans Affairs",
+        "kind": "normalization",
+        "needles": [
+          "VA",
+          "Department of Veterans Affairs",
+          "VETERANS",
+          "VET"
+        ],
+        "identity": [
+          [
+            "va"
+          ],
+          [
+            "veterans",
+            "affairs"
+          ],
+          [
+            "veterans"
+          ],
+          [
+            "vet"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "structured_only",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": "VA",
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "Naval facilities in Nevada": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "Naval facilities in Nevada",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [
+        "NV"
+      ],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "naval facilities",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "naval facilities",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "naval",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "naval"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            },
+            {
+              "label": "facilities",
+              "cls": "qualifier",
+              "basis": "platform_generic_word",
+              "forms": [
+                "facilities"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.35
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "naval facilities"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [
+      "NV"
+    ],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active",
+          "state": "NV"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "and(or(incumbent_name.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\"),or(incumbent_name.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",awarding_agency.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "place_of_performance_state.eq.NV"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": "NV"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "and(or(title.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  }
+}

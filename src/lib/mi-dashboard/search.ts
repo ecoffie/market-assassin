@@ -101,7 +101,7 @@ export function queryWords(search: string): string[] {
  * query and must count for LESS than `cloud`/`server`/`cyber`. df ≥ ~5% of the corpus ⇒ common.
  * (Only the genuinely-common ones are listed; everything else defaults to the full weight of 1.)
  */
-const COMMON_TERM_WEIGHT: Record<string, number> = {
+export const COMMON_TERM_WEIGHT: Readonly<Record<string, number>> = {
   compliance: 0.35, network: 0.5, security: 0.5, management: 0.4, system: 0.4,
   systems: 0.4, program: 0.4, information: 0.45, technical: 0.4, data: 0.5,
   contract: 0.3, federal: 0.3, government: 0.3, general: 0.35, professional: 0.4,
