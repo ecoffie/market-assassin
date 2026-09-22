@@ -10,7 +10,7 @@
  * (notice d441cf3c3ee048548057c9fd52499db9), 2026-09-22.
  */
 import { describe, it, expect } from 'vitest';
-import { classifyExtraction, isPdfPortfolioStub, isMojibake, readableRatio } from './extraction-quality';
+import { classifyExtraction, isPdfPortfolioStub, isMojibake, readableRatio, MIN_READABLE_RATIO } from './extraction-quality';
 
 // Attachment C - DLA Energy CQAP.pdf: 1,796,570 bytes on disk → 128 chars.
 const PORTFOLIO_STUB =
@@ -34,16 +34,29 @@ describe('container stubs', () => {
 
 describe('unreadable encoding', () => {
   it('font-subset mojibake is detected', () => {
-    expect(readableRatio(MOJIBAKE)).toBeLessThan(0.6);
+    expect(readableRatio(MOJIBAKE)).toBeLessThan(MIN_READABLE_RATIO);
     expect(isMojibake(MOJIBAKE)).toBe(true);
     expect(classifyExtraction(MOJIBAKE)).toBe('unreadable_encoding');
+  });
+
+  it('a box-drawing CLIN table is NOT mojibake (the false-positive guard)', () => {
+    // An allow-list metric scored this 0.583 against a 0.6 threshold, which would
+    // have reported a real extracted priced schedule as "no usable text".
+    const table = '│ CLIN │ Qty │ Unit Price │\n├──────┼─────┼────────────┤\n│ 0001 │ 100 │ $1,234.00  │\n'.repeat(20);
+    expect(readableRatio(table)).toBeGreaterThan(MIN_READABLE_RATIO);
+    expect(classifyExtraction(table)).toBe('ok');
+  });
+
+  it('typographic and accented text is never flagged', () => {
+    const fancy = '• Deliverable A — due 30 days “per spec”; climatización requerida.\n'.repeat(20);
+    expect(classifyExtraction(fancy)).toBe('ok');
   });
 
   it('genuine solicitation prose is never flagged', () => {
     const prose =
       'Solicitation No. SPE60525R0222. The Contractor shall provide insurance in ' +
       'accordance with FAR 52.228-5. Evaluation will be conducted under FAR 52.212-2. '.repeat(10);
-    expect(readableRatio(prose)).toBeGreaterThan(0.95);
+    expect(readableRatio(prose)).toBeGreaterThan(MIN_READABLE_RATIO);
     expect(classifyExtraction(prose)).toBe('ok');
   });
 
