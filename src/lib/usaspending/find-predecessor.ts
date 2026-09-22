@@ -11,7 +11,7 @@
  * Honest: a best-match inference, not a certified link. Caller labels it "likely."
  */
 import { type AwardDetail } from './award-detail';
-import { findLikelyPriorAwards } from './solicitation-incumbent';
+import { findLikelyPriorAwards, type PriorAwardHit } from './solicitation-incumbent';
 
 /**
  * Returns the full detail of the likely-incumbent award for an opportunity, or
@@ -29,7 +29,7 @@ export async function findPredecessorAward(opts: {
   pscCode?: string;     // the opportunity PSC — a same-PSC award is a strong same-product signal (Eric 2026-08-03)
   agencyName?: string;
   keyword?: string;     // the opportunity title — sharpens the match when present
-}): Promise<(AwardDetail & { matchConfidence: 'high' | 'medium' | 'low' }) | null> {
+}): Promise<PriorAwardHit | null> {
   const hits = await findLikelyPriorAwards({
     title: opts.keyword ?? null,
     naics_code: opts.naicsCode ?? null,
@@ -37,7 +37,15 @@ export async function findPredecessorAward(opts: {
     agency: opts.agencyName ?? null,
     department: opts.agencyName ?? null,
   });
-  return hits[0] ?? null;
+  const top = hits[0] ?? null;
+  // Selection stays conservative. This entry point never ran groundIncumbent, so
+  // it presented AT&T "GUEST WIFI" (sector 51) as the "Likely incumbent … [match:
+  // high]" for a demolition notice (sector 23) — and bid/no-bid, the M-Estimate
+  // anchor and the "Who holds this now?" card all consumed it. A candidate whose
+  // own structured evidence says it is a different KIND of work is never
+  // returned as the likely incumbent. (Poteto: Incumbent Evidence Truth.)
+  if (top && top.confidenceConstraint === 'sector_conflict') return null;
+  return top;
 }
 
 /** A short, human-readable summary for prompts/UI ("displace X's $63M contract…"). */

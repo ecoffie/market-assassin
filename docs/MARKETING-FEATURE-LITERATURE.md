@@ -7261,3 +7261,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** Federal market report / market sizing methodology / recompete capture date / agency forecast set-aside / NAICS market reconciliation.
 
 **Proof.** Live gold masters (`scripts/acceptance/poteto-market-report-presentation.mts`): construction grounds 2/7 with 2 `ok` (was 2/7 beside 4 `ok`); the drones two-tier insight holds (336411 = 64% of 17 codes); MA/236220 removes 4 cross-listed forecast copies (Acquisition Gateway listing `7799` ingested as `7799` and `GW-L:7799` — 3,311 such twins in `agency_forecasts`); recompete KPIs read 24,661 / 5,517 / 65 found with 15 shown. Hermetic regressions fail when each fix is reverted.
+
+## POTETO — Incumbent Evidence Truth (2026-09-22)
+
+**What.** When Mindy lists prior-award candidates for a solicitation, each candidate's confidence now agrees with its own evidence. A candidate in a different NAICS sector (construction vs telecom) is labelled low confidence; a candidate that matches neither the notice's NAICS nor its PSC can no longer be labelled high. `find_predecessor_award` no longer presents a different-kind-of-work award as the "likely incumbent". Product Service Code matches are now actually recognised — before this fix they never registered.
+
+**Why.** A contractor asking "who is the incumbent, and how sure are you?" deserves a label that means what it says. Production showed AT&T's guest-WiFi task order marked "high confidence" beside a demolition/asbestos solicitation, on nothing but shared place names (East Orange, Lyons) — and one tool still named AT&T as the likely incumbent.
+
+**SEO.** Federal incumbent contractor lookup / predecessor contract / recompete incumbent / solicitation incumbent confidence / PSC match.
+
+**Proof.** Live gold masters (`scripts/acceptance/poteto-incumbent-evidence.mts`, USAspending + SAM cache): VA `36C24226Q0857` — all 5 candidates now `low` with `sector_conflict`, no incumbent named on either tool; real recompetes still identified with high confidence and matching PSC — Palm Beach Harbor dredging → Weeks Marine (Z1KF), NRS St Paul janitorial → Americlean (S201), WV grounds maintenance → Joliva (S208). Hermetic regressions fail when each fix is reverted.

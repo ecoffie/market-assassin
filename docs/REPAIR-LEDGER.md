@@ -1099,3 +1099,23 @@ source text**, sha256 `8699e0330a1aa2e1…` identical on both sides. Cold fetch 
 return identical text. DLA package completeness deliberately **not** claimed (portfolio
 stubs + font-subset amendments detected, not recovered —
 `tasks/FOLLOWUP-dla-container-ocr-2026-09-22.md`).
+
+## 2026-09-22 — POTETO Incumbent Evidence Truth: confidence contradicted the candidate's own evidence
+
+Production (hosted MCP) for VA demolition `36C24226Q0857` (NAICS 236220): all five
+`prior_awards` — AT&T "EAST ORANGE & LYONS NJ GUEST WIFI" (517110), a boiler inspection, a
+temperature-sensor contract, pharmacy inventory — carried `matchConfidence:"high"` /
+`matchScore≈105` with `naicsMatch:false`, `pscMatch:false` and a sector conflict. Worse,
+`find_predecessor_award` for the same notice returned AT&T as **"Likely incumbent … [match:
+high]", `grounded:true`** — that entry point never ran `groundIncumbent`, and bid/no-bid, the
+M-Estimate anchor and the "Who holds this now?" card all consume it. DLA `SPE60525R0222`
+(Lockheed PAC-3) did **not** reproduce: 0 candidates on current data.
+
+Two root causes. (1) `matchConfidence` came from the textual score alone; NAICS/PSC/sector
+reached only the separate selection guard. (2) USASpending returns `PSC` as `{code,
+description}` and the scorer did `String(row['PSC'])` → `"[object Object]"`, so **`pscMatch`
+was false on every live candidate** (a real same-PSC predecessor could never earn its evidence).
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-22 | Incumbent matcher | Structured evidence constrains confidence: sector conflict → `low`; no NAICS/PSC agreement → at most `medium` (`reconcileMatchConfidence`). PSC read from `{code}`. `findPredecessorAward` refuses a sector-conflicted top candidate. Selection guard unchanged. | `reconcileMatchConfidence` → `src/lib/usaspending/incumbent-evidence.ts` | `incumbent-evidence-truth.unit.test.ts` (13; each of the 3 fixes goes red when reverted) + live `scripts/acceptance/poteto-incumbent-evidence.mts` (25/25: VA+DLA negatives, Weeks Marine / Americlean / Joliva positives survive, dossier financials stay off). P0/P1/P2/Dossier/Market-Report locks green. | IN REVIEW |

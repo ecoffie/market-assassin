@@ -25,7 +25,13 @@ import {
   type SolicitationStatus,
 } from '@/lib/sam/resolve-solicitation';
 import { isNoticeUuid, normalizeNoticeUuid } from '@/lib/sam/notice-identity';
-import { groundIncumbent, namedIncumbent, type IncumbentCertainty } from '@/lib/usaspending/incumbent-evidence';
+import {
+  groundIncumbent,
+  namedIncumbent,
+  reconcileMatchConfidence,
+  type ConfidenceConstraint,
+  type IncumbentCertainty,
+} from '@/lib/usaspending/incumbent-evidence';
 
 const SAM_SEARCH = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_PUBLIC = 'https://sam.gov/api/prod/sgs/v1/search/';
@@ -79,6 +85,8 @@ export interface PriorAwardHit extends AwardDetail {
   naicsMatch?: boolean;
   noticeSector?: string | null;
   awardSector?: string | null;
+  /** Why structured evidence lowered the textual confidence (null = it did not). */
+  confidenceConstraint?: ConfidenceConstraint | null;
   incumbent_certainty?: IncumbentCertainty;
 }
 
@@ -403,8 +411,19 @@ const NONDISTINCTIVE = new Set([
   'island', 'islands', 'port', 'harbor', 'river', 'lake', 'mountain', 'park',
 ]);
 
-function scoreAwardEvidence(
-  row: { Description?: string; 'Recipient Name'?: string; 'Award Amount'?: number; 'Awarding Agency'?: string; 'Awarding Sub Agency'?: string; 'PSC'?: string; psc_code?: string },
+/**
+ * USASpending `spending_by_award` returns `PSC` as `{ code, description }`, not a
+ * string. `String(obj)` is "[object Object]", so pscMatch was structurally FALSE
+ * on every live candidate — a real same-PSC predecessor could never earn its PSC
+ * evidence, and every candidate looked like a NAICS+PSC dual mismatch.
+ */
+export function awardPscCode(v: unknown): string {
+  if (v && typeof v === 'object') return String((v as { code?: unknown }).code ?? '');
+  return v == null ? '' : String(v);
+}
+
+export function scoreAwardEvidence(
+  row: { Description?: string; 'Recipient Name'?: string; 'Award Amount'?: number; 'Awarding Agency'?: string; 'Awarding Sub Agency'?: string; 'PSC'?: string | { code?: string | null } | null; psc_code?: string },
   titleWords: string[],
   agencyHint: string | null,
   oppPsc?: string | null,
@@ -414,7 +433,8 @@ function scoreAwardEvidence(
 
   const distinctive = titleWords.filter((w) => w.length >= 3 && !NONDISTINCTIVE.has(w.toLowerCase()));
   const distinctiveHits = distinctive.filter((w) => desc.includes(w.toLowerCase())).length;
-  const pscMatch = !!(oppPsc && (String(row['PSC'] || row.psc_code || '')).toUpperCase().startsWith(String(oppPsc).toUpperCase().slice(0, 4)));
+  const awardPsc = awardPscCode(row['PSC']) || awardPscCode(row.psc_code);
+  const pscMatch = !!(oppPsc && awardPsc && awardPsc.toUpperCase().startsWith(String(oppPsc).toUpperCase().slice(0, 4)));
   if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) {
     return { score: 0, distinctiveHits, pscMatch };
   }
@@ -564,14 +584,20 @@ export async function findLikelyPriorAwards(input: {
       const naicsMatch = !!(input.naics_code && detail.naicsCode && String(detail.naicsCode).slice(0, 6) === String(input.naics_code).slice(0, 6));
       // NAICS is a recorded signal, never a correctness gate. Do not add it to the score
       // that drives "high" — that is how a same-code unrelated IDV used to look grounded.
-      let matchConfidence: 'high' | 'medium' | 'low' =
+      let textualConfidence: 'high' | 'medium' | 'low' =
         confScore >= 90 ? 'high' : confScore >= 65 ? 'medium' : 'low';
-      if (recencyCap === 'low') matchConfidence = 'low';
-      else if (recencyCap === 'medium' && matchConfidence === 'high') matchConfidence = 'medium';
+      if (recencyCap === 'low') textualConfidence = 'low';
+      else if (recencyCap === 'medium' && textualConfidence === 'high') textualConfidence = 'medium';
       // 2-digit sector, when BOTH sides are known. A missing code yields null,
       // which means "cannot compare" — never a silent pass.
       const noticeSector = input.naics_code ? String(input.naics_code).slice(0, 2) : null;
       const awardSector = detail.naicsCode ? String(detail.naicsCode).slice(0, 2) : null;
+      // Confidence must agree with the structured evidence (sector conflict /
+      // no taxonomy agreement) — not just the textual score.
+      const { matchConfidence, constraint: confidenceConstraint } = reconcileMatchConfidence(
+        textualConfidence,
+        { naicsMatch, pscMatch: evidence.pscMatch, noticeSector, awardSector, verifiedIdentity: false },
+      );
       const grounding = groundIncumbent({
         distinctiveHits: evidence.distinctiveHits,
         pscMatch: evidence.pscMatch,
@@ -593,6 +619,7 @@ export async function findLikelyPriorAwards(input: {
         naicsMatch,
         noticeSector,
         awardSector,
+        confidenceConstraint,
         incumbent_certainty: grounding.certainty,
       });
     } catch {
