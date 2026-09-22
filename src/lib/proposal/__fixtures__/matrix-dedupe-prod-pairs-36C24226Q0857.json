@@ -1,0 +1,301 @@
+{
+  "source": "hosted extract_compliance_matrix, VA 36C24226Q0857, production merge 954e901b, 2026-09-22T22:39Z — rows copied verbatim by jq, no edits",
+  "rows": [
+    {
+      "id": "REQ-001",
+      "requirement": "Perform work within the VA New Jersey Health Care System at specified locations.",
+      "category": "technical",
+      "source_quote": "Work performed under this scope shall be for and conducted within the VA New Jersey Health Care System (VANJHCS) at the East Orange VA Medical Center, located at 385 Tremont Ave, East Orange, NJ 07018, and Lyons VA Medical Center, located at 151 Knollcroft Rd, Lyons NJ 07939.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "notice_description#w1",
+        "document_id": "notice_description",
+        "char_start": 0,
+        "char_end": 2103
+      },
+      "section": "2.1",
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "notice_description",
+            "filename": "Notice description",
+            "role": "notice_description",
+            "char_start": 35,
+            "char_end": 311
+          },
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 12634,
+            "char_end": 12910
+          }
+        ],
+        "section_status": "verified",
+        "support_overlap": 0.86,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-025",
+      "requirement": "Work shall be performed at the East Orange VA Medical Center and the Lyons VA Medical Center.",
+      "category": "technical",
+      "source_quote": "Work performed under this scope shall be for and conducted within the VA New Jersey Health Care System (VANJHCS) at the East Orange VA Medical Center, located at 385 Tremont Ave, East Orange, NJ 07018, and Lyons VA Medical Center, located at 151 Knollcroft Rd, Lyons NJ 07939.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w1",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 0,
+        "char_end": 13794
+      },
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "notice_description",
+            "filename": "Notice description",
+            "role": "notice_description",
+            "char_start": 35,
+            "char_end": 311
+          },
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 12634,
+            "char_end": 12910
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 1,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-082",
+      "requirement": "Provide automobile liability coverage of $200,000 per person and $500,000 per occurrence.",
+      "category": "technical",
+      "source_quote": "Automobile liability: $200,000.00 per person; $500,000.00 per occurrence and $20,000.00 property damage.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w6",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 59015,
+        "char_end": 72925
+      },
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 71135,
+            "char_end": 71239
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 0.75,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-083",
+      "requirement": "Maintain automobile liability insurance of $200,000.00 per person; $500,000.00 per occurrence and $20,000.00 property damage.",
+      "category": "technical",
+      "source_quote": "Automobile liability: $200,000.00 per person; $500,000.00 per occurrence and $20,000.00 property damage.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w7",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 70925,
+        "char_end": 84726
+      },
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 71135,
+            "char_end": 71239
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 0.83,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-084",
+      "requirement": "Provide evidence of general liability insurance prior to award.",
+      "category": "admin",
+      "source_quote": "The successful bidder must present to the Contracting Officer, prior to award, evidence of general liability insurance without any exclusionary clauses for asbestos that would void the general liability coverage.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w6",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 59015,
+        "char_end": 72925
+      },
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 71248,
+            "char_end": 71460
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 1,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-085",
+      "requirement": "Provide evidence of general liability insurance without any exclusionary clauses for asbestos.",
+      "category": "submission",
+      "source_quote": "The successful bidder must present to the Contracting Officer, prior to award, evidence of general liability insurance without any exclusionary clauses for asbestos that would void the general liability coverage.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w7",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 70925,
+        "char_end": 84726
+      },
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 71248,
+            "char_end": 71460
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 1,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-105",
+      "requirement": "The Contractor shall review SAM at least once every three months for covered articles subject to FASCSA order(s).",
+      "category": "technical",
+      "source_quote": "During contract performance, the Contractor shall review SAM at least once every three months, or as advised by the Contracting Officer, to check for covered articles subject to FASCSA order(s), or for products or services produced by a source subject to FASCSA order(s) not currently identified under paragraph (e) of this clause.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w8",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 82726,
+        "char_end": 96447
+      },
+      "verification": {
+        "quote_status": "verified_exact",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 95638,
+            "char_end": 95969
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 1,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-106",
+      "requirement": "Review SAM at least once every three months during contract performance.",
+      "category": "technical",
+      "source_quote": "the Contractor shall review SAM at least once every three months, or as advised by the Contracting Officer.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w9",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 94447,
+        "char_end": 108215
+      },
+      "verification": {
+        "quote_status": "verified_normalized",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 95667,
+            "char_end": 95773
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 0.86,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-117",
+      "requirement": "For services contracts, not pay more than 50% to non-certified firms.",
+      "category": "pricing",
+      "source_quote": "the contractor will not pay more than 50% of the amount paid by the government to it to firms that are not certified SDVOSBs.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w9",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 94447,
+        "char_end": 108215
+      },
+      "verification": {
+        "quote_status": "verified_normalized",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 106349,
+            "char_end": 106473
+          }
+        ],
+        "section_status": "not_claimed",
+        "support_overlap": 0.6,
+        "page": null
+      }
+    },
+    {
+      "id": "REQ-118",
+      "requirement": "Ensure that no more than 50% of the amount paid by the government is paid to non-certified SDVOSBs for service contracts.",
+      "category": "pricing",
+      "source_quote": "the contractor will not pay more than 50% of the amount paid by the government to it to firms that are not certified SDVOSBs.",
+      "source_doc": "36C24226Q0857_1.docx",
+      "extraction_window": {
+        "window_id": "1f7ff76547504ed68313baf2f328341f#w10",
+        "document_id": "1f7ff76547504ed68313baf2f328341f",
+        "char_start": 106215,
+        "char_end": 120215
+      },
+      "verification": {
+        "quote_status": "verified_normalized",
+        "found_in": [
+          {
+            "document_id": "1f7ff76547504ed68313baf2f328341f",
+            "filename": "36C24226Q0857_1.docx",
+            "role": "attachment",
+            "char_start": 106349,
+            "char_end": 106473
+          }
+        ],
+        "section_status": "withheld_unverified",
+        "section_claimed": "2.15",
+        "support_overlap": 0.67,
+        "page": null
+      }
+    }
+  ]
+}
