@@ -66,3 +66,37 @@ describe('market report — the measurement bridge', () => {
     expect(html).toContain('battle management');
   });
 });
+
+/**
+ * RC-5 (2026-09-22) — engineering comments must not ship in customer HTML.
+ *
+ * Two CSS comments inside the <style> block reached every rendered report:
+ *   "Print = the PDF path (server-side HTML→PDF needs Chromium, which isn't in
+ *    the lambda)."
+ *   "align-items:start so one tall card … (Eric 2026-08-02)."
+ * A client opening a Mindy-branded report and finding our lambda constraints and
+ * a developer's name in the source is an internal detail we published by accident.
+ *
+ * ⚠️ TS comments ABOVE the template are fine — only what lands inside the emitted
+ * string matters, which is why this asserts against RENDERED output.
+ */
+describe('RC-5: no internal implementation detail in rendered HTML', () => {
+  const INTERNAL_SIGNATURES = [
+    'Chromium', 'lambda', 'puppeteer', 'devDependency',
+    'Eric 2026', 'TODO', 'FIXME', 'HACK', 'XXX',
+    '@/lib/', 'src/lib/', 'node_modules',
+  ];
+
+  it('the rendered report contains no internal-comment signature', () => {
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never);
+    for (const sig of INTERNAL_SIGNATURES) {
+      expect(html, `rendered HTML leaked internal signature "${sig}"`).not.toContain(sig);
+    }
+  });
+
+  it('the rendered report contains no HTML comments at all', () => {
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never);
+    expect(html.match(/<!--[\s\S]*?-->/g) ?? []).toHaveLength(0);
+  });
+});
+
