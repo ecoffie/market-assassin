@@ -106,17 +106,22 @@ describe('local registry fallback keeps identity available during a SAM outage',
 });
 
 describe('billing — a degraded, empty paid call is not charged', () => {
+  // Credit Integrity (2026-09-22) moved the rule into credit-integrity.ts's classifier;
+  // metered.ts must still gate the debit on it. Both halves are locked.
+  const rule = () => code(read('src/lib/mcp/credit-integrity.ts'));
+  const metered = () => code(read('src/lib/mcp/metered.ts'));
+
   it('metered.ts skips the debit when degraded && !grounded', () => {
-    const c = code(read('src/lib/mcp/metered.ts'));
-    expect(c).toMatch(/meta\?\.degraded === true && meta\?\.grounded !== true/);
-    expect(c).toContain("status: 'uncharged'");
+    expect(rule()).toMatch(/meta\?\.degraded === true && meta\?\.grounded !== true\) return 'nonbillable_system_failure'/);
+    expect(metered()).toMatch(/if \(!isBillable\(classifyBillingOutcome\(result\)\)\) \{[\s\S]{0,80}status: 'uncharged'/);
   });
 
   it('a GENUINE no-match still bills (that is a real answer)', () => {
     // The guard is deliberately narrow: degraded=false + grounded=false must fall through to
     // the normal debit, because "this company is not registered" is useful and cost a live call.
-    const c = code(read('src/lib/mcp/metered.ts'));
+    const c = rule() + metered();
     expect(c).toMatch(/degraded === true && meta\?\.grounded !== true/);
+    expect(rule()).toMatch(/meta\?\.grounded === false \? 'billable_no_result'/);
     expect(c).not.toMatch(/meta\?\.grounded !== true\)\s*\{[\s\S]{0,40}debitCredits/);
   });
 });

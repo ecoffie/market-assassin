@@ -7271,3 +7271,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** Federal incumbent contractor lookup / predecessor contract / recompete incumbent / solicitation incumbent confidence / PSC match.
 
 **Proof.** Live gold masters (`scripts/acceptance/poteto-incumbent-evidence.mts`, USAspending + SAM cache): VA `36C24226Q0857` — all 5 candidates now `low` with `sector_conflict`, no incumbent named on either tool; real recompetes still identified with high confidence and matching PSC — Palm Beach Harbor dredging → Weeks Marine (Z1KF), NRS St Paul janitorial → Americlean (S201), WV grounds maintenance → Joliva (S208). Hermetic regressions fail when each fix is reverted.
+
+## POTETO — Credit Integrity (2026-09-22)
+
+**What.** Mindy's MCP credits are now charged only when Mindy actually does the research. A request missing its required input (for example, a pursuit dossier with no solicitation number) is refused before it runs and costs nothing, with a message naming the argument to send. A market report whose required market measurement did not complete is withheld and costs nothing. Legitimate answers still cost the normal price — including "we measured this market and there isn't enough evidence to publish."
+
+**Why.** "Charge me when Mindy successfully performs the requested research." Production showed a 100-credit charge for an empty pursuit dossier returned in 1 ms because the request used an argument name the tool doesn't accept.
+
+**SEO.** Pay-per-result GovCon research API / MCP credits billing / fair usage-based pricing / no charge for failed requests.
+
+**Proof.** Production ledger before the fix: −100 credits at 2026-09-22T17:04:56Z on a 1 ms `build_pursuit_dossier` call (the only such charge across 55 charged dossier calls). After: a hermetic suite drives the real dossier and market-report tools through the real metering path (13 tests; the gold-master tests fail when the fix is reverted), and a live test against the real credit ledger reconciles exactly — 3 billable outcomes debited, invalid input / measurement failure / replays debited 0. Tool prices are unchanged.

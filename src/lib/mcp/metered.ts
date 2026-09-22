@@ -16,6 +16,7 @@ import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
+import { classifyBillingOutcome, isBillable, preflightPaidInput } from './credit-integrity';
 import { recordPaywallAttempt, paywallMessage, RESUME_BASE } from './paywall';
 import {
   buildInsufficientCreditsRefusal,
@@ -52,6 +53,14 @@ export async function runMeteredTool(
   }
 
   const cost = creditsFor(name);
+
+  // Credit integrity — refuse a call that cannot perform its paid job BEFORE anything
+  // else (tier gate, paywall capture, payer lookup): an invalid request is not a sale.
+  const rejection = preflightPaidInput(name, args);
+  if (rejection) {
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_invalid_input', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+    return { ok: false, error: { code: rejection.code, message: rejection.message }, creditsCharged: 0 };
+  }
 
   // 0) Tier gate — Pro-only tools require a Pro subscription. Flag-gated (off by
   // default → zero behavior change). A denied call is NOT charged and does NOT throw:
@@ -230,8 +239,12 @@ export async function runMeteredTool(
   // "this company is not registered" is a real, useful answer that cost us a live call.
   // Logged as 'uncharged' — the existing CallStatus for exactly this (ran, deliberately not
   // billed), rather than inventing a new status the dashboards do not know how to read.
-  const meta = result?._meta as { degraded?: boolean; grounded?: boolean } | undefined;
-  if (meta?.degraded === true && meta?.grounded !== true) {
+  // Credit integrity: the billing decision reads a STRUCTURED terminal state
+  // (credit-integrity.ts) — DEFECT-7's degraded+ungrounded rule, plus a tool's explicit
+  // `_meta.billing_outcome` (e.g. market-report `measurement_failure`, which can be
+  // grounded on optional sections while the REQUIRED measurement failed). Nothing has
+  // been debited yet, so a non-billable outcome is simply never charged — no refund.
+  if (!isBillable(classifyBillingOutcome(result))) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
     return { ok: true, result, creditsCharged: 0, balance: await getBalance(ctx.userEmail), needsRecharge: false };
   }

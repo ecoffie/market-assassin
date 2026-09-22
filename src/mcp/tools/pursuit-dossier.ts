@@ -71,6 +71,8 @@ export interface PursuitDossierResult {
     elapsed_ms: number;
     omitted: PursuitDossierOmitted | null;
     note?: string;
+    /** Credit integrity — set only on a miss that performed no billable research. */
+    billing_outcome?: 'nonbillable_invalid_input' | 'nonbillable_system_failure';
   };
 }
 
@@ -139,20 +141,26 @@ function slimDocuments(docs: unknown): { slimmed: unknown; charsReturned: number
   };
 }
 
-function miss(note: string, sol: string | null, started: number): PursuitDossierResult {
+function miss(
+  note: string,
+  sol: string | null,
+  started: number,
+  billing?: { degraded: boolean; outcome: 'nonbillable_invalid_input' | 'nonbillable_system_failure' },
+): PursuitDossierResult {
   return {
     subject: 'this opportunity',
     opportunity: null, incumbent: null, incumbent_financials: null, prior_awards: [],
     competition: null, price_to_win: null, buying_office_contacts: [], documents: null,
     next_step: 'Confirm the solicitation number or paste the SAM title, then re-run.',
     _meta: {
-      grounded: false, degraded: false, solicitation: sol, naics: null, agency: null,
+      grounded: false, degraded: billing?.degraded ?? false, solicitation: sol, naics: null, agency: null,
       incumbent_name: null,
       grounded_incumbent: false,
       sections: { docs: false, competition: false, pricing: false, contacts: 0, financials: false },
       elapsed_ms: Date.now() - started,
       omitted: null,
       note,
+      ...(billing ? { billing_outcome: billing.outcome } : {}),
     },
   };
 }
@@ -160,7 +168,12 @@ function miss(note: string, sol: string | null, started: number): PursuitDossier
 export async function buildPursuitDossier(input: PursuitDossierInput): Promise<PursuitDossierResult> {
   const started = Date.now();
   const sol = String(input.solicitation_number || input.notice_id || '').trim() || null;
-  if (!sol) return miss('No solicitation number or notice_id provided.', null, started);
+  // No identity → no research was possible. Non-billable (the metering preflight
+  // normally refuses this before the tool runs; this is the defense in depth).
+  if (!sol) {
+    return miss('No solicitation number or notice_id provided.', null, started,
+      { degraded: false, outcome: 'nonbillable_invalid_input' });
+  }
 
   // 1) Anchor — resolve the notice + likely incumbent (+ NAICS / agency / office).
   const anchor = await guarded(getSolicitationIncumbent({ solicitation_number: sol, notice_id: sol }));
@@ -169,6 +182,12 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   const incumbent = a?.incumbent ?? null;
   const groundedIncumbent = a?._meta?.grounded_incumbent === true;
   if (!notice) {
+    // The anchor THREW → Mindy could not perform the lookup (non-billable). A clean
+    // anchor that found nothing is a real "no such notice" answer and stays billable.
+    if (anchor.degraded) {
+      return miss('The solicitation lookup did not complete (upstream error). Retry — this is not evidence the notice does not exist.',
+        sol, started, { degraded: true, outcome: 'nonbillable_system_failure' });
+    }
     return miss('Solicitation identifier did not resolve to a stored notice.', sol, started);
   }
 

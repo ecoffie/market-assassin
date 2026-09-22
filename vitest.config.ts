@@ -24,6 +24,8 @@ export default defineConfig({
     include: [
       'src/**/*.unit.test.{ts,tsx}',
       'src/lib/sam/lookup-solicitation.live.test.ts',
+      // Opt-in (CREDIT_INTEGRITY_LIVE=1): writes to ONE synthetic account's ledger.
+      'src/lib/mcp/credit-integrity.live.test.ts',
       'src/lib/agent-tasks/**/*.e2e.test.ts',
       'src/lib/agent-tasks/**/*.concurrent.test.ts',
       'src/lib/agent-tasks/**/*.race.test.ts',

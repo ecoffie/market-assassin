@@ -78,6 +78,7 @@ export type CallStatus =
   | 'success'
   | 'failed'
   | 'rejected_no_credits'
+  | 'rejected_invalid_input' // credit integrity: required input absent → tool never ran
   | 'uncharged'
   | 'gated'
   // Extraction guard (Layers A+B). Enforced blocks:
