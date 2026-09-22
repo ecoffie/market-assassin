@@ -1,0 +1,477 @@
+{
+"_note": "Pre-fix extractor output (old prompt, no gate), local run 2026-09-22 \u2014 reproduces 4 rows citing section \"l\" and unverifiable quotes.",
+"requirements": [
+{
+"id": "REQ-001",
+"requirement": "Provide demolition and abatement services on an as needed basis for a five-year term.",
+"category": "technical",
+"section": "2.2",
+"source_quote": "These services shall be provided on an as needed basis, for a five-year term."
+},
+{
+"id": "REQ-002",
+"requirement": "Perform all demolition and abatement tasks as specified in the contract Line Items.",
+"category": "technical",
+"section": "2.3",
+"source_quote": "A description of all individual demolition and abatement tasks covered under this IDC contract can be found in the contract Line Items."
+},
+{
+"id": "REQ-003",
+"requirement": "Provide all labor, materials, equipment, tools, transportation, supervision, safety, quality control and management necessary for task orders.",
+"category": "technical",
+"section": "2.3",
+"source_quote": "The contractor shall provide all labor, materials, equipment, tools, transportation, supervision, safety, quality control and management necessary to fulfill the requirements of task orders."
+},
+{
+"id": "REQ-004",
+"requirement": "Ensure all work complies with applicable Infection Control requirements.",
+"category": "technical",
+"section": "2.3",
+"source_quote": "All work completed under this contract shall comply with applicable Infection Control requirements."
+},
+{
+"id": "REQ-005",
+"requirement": "Comply with NJAC 5:23-8 and NJAC 12:120 governing asbestos abatement.",
+"category": "technical",
+"section": "2.3",
+"source_quote": "All work completed under this contract shall comply with... NJAC 5:23-8, Asbestos Hazard Abatement Subcode, and NJAC 12:120 governing asbestos abatement."
+},
+{
+"id": "REQ-006",
+"requirement": "Obtain written authorization from the Contracting Officer for any work outside the defined SOW.",
+"category": "technical",
+"section": "2.3",
+"source_quote": "No work outside the defined Statement of Work (SOW) shall be performed without written authorization from the Contracting Officer."
+},
+{
+"id": "REQ-007",
+"requirement": "Perform all work in a safe, compliant, and professional manner.",
+"category": "technical",
+"section": "2.3",
+"source_quote": "The Contractor shall be responsible for all means and methods and shall ensure all work is performed in a safe, compliant, and professional manner."
+},
+{
+"id": "REQ-008",
+"requirement": "Submit proposals by October 16th, 2026 at 10:00 EST.",
+"category": "submission",
+"section": "13",
+"source_quote": "All proposals are due October 16th, 2026 at 10:00 EST."
+},
+{
+"id": "REQ-009",
+"requirement": "Email quotes to Michael Spivack at Michael.Spivack@va.gov.",
+"category": "submission",
+"section": "13",
+"source_quote": "Quotes shall be emailed to Michael Spivack at Michael.Spivack@va.gov."
+},
+{
+"id": "REQ-010",
+"requirement": "Register in the System for Award Management (www.sam.gov) at the close of the solicitation.",
+"category": "admin",
+"section": "13",
+"source_quote": "Offerors shall be registered in the System for Award Management (www.sam.gov) at the close of the solicitation."
+},
+{
+"id": "REQ-011",
+"requirement": "Submit annual Vets4212 Report.",
+"category": "admin",
+"section": "13",
+"source_quote": "Offerors must submit their annual Vets4212 Report."
+},
+{
+"id": "REQ-012",
+"requirement": "Provide performance and payment bonds for projects over $35,000.00 at the time of acceptance of the task order.",
+"category": "pricing",
+"section": "13",
+"source_quote": "Performance bonds shall be required for projects over $35,000.00 at the time of acceptance of the task order."
+},
+{
+"id": "REQ-013",
+"requirement": "Submit invoices electronically in accordance with VAAR Clause 852.232-72.",
+"category": "admin",
+"section": "B.1",
+"source_quote": "All Invoices from the contractor shall be submitted electronically in accordance with VAAR Clause 852.232-72."
+},
+{
+"id": "REQ-014",
+"requirement": "Begin performance within specified calendar days after receiving award.",
+"category": "technical",
+"section": "13",
+"source_quote": "The Contractor shall begin performance within ____________ calendar days and complete it within ____________ calendar days after receiving award."
+},
+{
+"id": "REQ-015",
+"requirement": "Complete performance within specified calendar days after receiving notice to proceed.",
+"category": "technical",
+"section": "13",
+"source_quote": "The Contractor shall begin performance within ____________ calendar days and complete it within ____________ calendar days after receiving notice to proceed."
+},
+{
+"id": "REQ-016",
+"requirement": "All work must comply with applicable Infection Control requirements.",
+"category": "technical",
+"section": "C.1",
+"source_quote": "All work completed under this contract shall comply with applicable Infection Control requirements."
+},
+{
+"id": "REQ-017",
+"requirement": "Contractor must comply with NJAC 5:23-8 and NJAC 12:120 governing asbestos abatement.",
+"category": "technical",
+"section": "C.1",
+"source_quote": "All work completed under this contract shall comply with... NJAC 5:23-8, Asbestos Hazard Abatement Subcode, and NJAC 12:120."
+},
+{
+"id": "REQ-018",
+"requirement": "Contractor shall perform a site visit with the COR prior to providing a quote.",
+"category": "technical",
+"section": "C.2.3.1",
+"source_quote": "The contractor shall perform a site visit with the Contracting Officer\u2019s Representative (COR) to check existing conditions."
+},
+{
+"id": "REQ-019",
+"requirement": "Contractor shall provide a Quality Assurance/Quality Control (QA/QC) Plan.",
+"category": "technical",
+"section": "C.2.3.2",
+"source_quote": "The Contractor shall provide the Government with a Quality Assurance/Quality Control (QA/QC) Plan."
+},
+{
+"id": "REQ-020",
+"requirement": "QA/QC Plan must include verification of all required licenses and certifications.",
+"category": "technical",
+"section": "C.2.3.2",
+"source_quote": "The Contractor\u2019s QA/QC Plan shall include verification of all required licenses, certifications, and insurance."
+},
+{
+"id": "REQ-021",
+"requirement": "Contractor shall stop work and notify the COR if hazardous materials are identified.",
+"category": "technical",
+"section": "C.2.3.3",
+"source_quote": "If hazardous materials are identified beyond the established scope, the Contractor shall immediately stop working and notify the COR."
+},
+{
+"id": "REQ-022",
+"requirement": "Lead-based paint activities must comply with OSHA, EPA, HUD, and State regulations.",
+"category": "technical",
+"section": "C.2.3.3",
+"source_quote": "Any lead-based paint disturbance... shall comply with all applicable OSHA, EPA, HUD, and State of New Jersey regulations."
+},
+{
+"id": "REQ-023",
+"requirement": "Contractor shall provide documentation for lead-containing materials handling.",
+"category": "technical",
+"section": "C.2.3.3",
+"source_quote": "Contractors shall provide documentation of worker certifications, exposure protection procedures, waste handling procedures."
+},
+{
+"id": "REQ-024",
+"requirement": "Contractor shall provide PPE necessary to perform services under this contract.",
+"category": "technical",
+"section": "C.2.3.4",
+"source_quote": "The Contractor shall be responsible for obtaining/providing, inspecting, and maintaining any required Personal Protective Equipment (PPE)."
+},
+{
+"id": "REQ-025",
+"requirement": "Contractor shall submit all work plans and schedules for review and approval by the COR.",
+"category": "submission",
+"section": "C.2.4",
+"source_quote": "The contractor shall then submit all work plans, schedules, and supporting documents for review and approval by the COR."
+},
+{
+"id": "REQ-026",
+"requirement": "Contractor shall provide a percentage rate increase for services performed outside regular business hours.",
+"category": "pricing",
+"section": "C.2.6",
+"source_quote": "The contractor shall provide a percentage rate increase for all services provided in this contract that need to be done outside of regular business hours."
+},
+{
+"id": "REQ-027",
+"requirement": "Contractor shall maintain the capability to respond to emergency calls 24/7.",
+"category": "technical",
+"section": "C.2.7",
+"source_quote": "The Contractor shall maintain the capability to respond to emergency calls 24/7."
+},
+{
+"id": "REQ-028",
+"requirement": "Contractor personnel must attend site-specific safety training prior to commencement of work.",
+"category": "technical",
+"section": "C.2.7",
+"source_quote": "Participation in this class is mandatory and must be done prior to the commencement of work on-site."
+},
+{
+"id": "REQ-029",
+"requirement": "Contractor shall submit all required submittals and shop drawings for review prior to start of work.",
+"category": "submission",
+"section": "C.2.15",
+"source_quote": "The contractor shall submit all required submittals and shop drawings for review and approval prior to the start of work."
+},
+{
+"id": "REQ-030",
+"requirement": "Submittals must include project title, location, project number, and other specified details.",
+"category": "submission",
+"section": "C.2.15",
+"source_quote": "Each submittal shall include project title, location, project number, date, subcontractor name (if applicable), specification section, product identification, and revision history."
+},
+{
+"id": "REQ-031",
+"requirement": "Submit Fire Safety Plan as per Section 1.5.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Fire Safety Plan"
+},
+{
+"id": "REQ-032",
+"requirement": "Submit Debris Management Plan as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Debris Management Plan"
+},
+{
+"id": "REQ-033",
+"requirement": "Submit Asbestos Hazard Abatement Plan (AHAP) as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Asbestos Hazard Abatement Plan (AHAP)"
+},
+{
+"id": "REQ-034",
+"requirement": "Submit Detailed Work Schedule as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Detailed Work Schedule"
+},
+{
+"id": "REQ-035",
+"requirement": "Submit Staff Organization Chart as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Staff Organization Chart"
+},
+{
+"id": "REQ-036",
+"requirement": "Submit Landfill Information as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Landfill Information"
+},
+{
+"id": "REQ-037",
+"requirement": "Submit Required Notifications with Regulatory Agencies as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Required Notifications with Regulatory Agencies"
+},
+{
+"id": "REQ-038",
+"requirement": "Submit State Abatement License Info as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "State Abatement License Info"
+},
+{
+"id": "REQ-039",
+"requirement": "Submit Encapsulant Data/SDS as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Encapsulant Data/SDS"
+},
+{
+"id": "REQ-040",
+"requirement": "Submit Design/Layout of Regulated Work Area & Neg. Air Machines as per Section 2.4.A.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Design/Layout of Regulated Work Area & Neg. Air Machines"
+},
+{
+"id": "REQ-041",
+"requirement": "Submit Abatement Daily Logs as per Section 2.4.B.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Abatement Daily Logs"
+},
+{
+"id": "REQ-042",
+"requirement": "Submit Inspection of Regulated Work Area of Active Abatement Area as per Section 2.4.B.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Inspection of Regulated Work Area of Active Abatement Area"
+},
+{
+"id": "REQ-043",
+"requirement": "Submit Final Abatement Project Completion Report as per Section 2.4.C.",
+"category": "submission",
+"section": "C.1",
+"source_quote": "Final Abatement Project Completion Report"
+},
+{
+"id": "REQ-044",
+"requirement": "Provide proof of NJ DOLWD licensing and current asbestos supervisor and worker permits.",
+"category": "submission",
+"source_quote": "Contractors performing asbestos abatement work shall provide proof of NJ DOLWD licensing"
+},
+{
+"id": "REQ-045",
+"requirement": "Submit all required 10-day notifications to applicable regulatory agencies prior to commencement of work.",
+"category": "submission",
+"source_quote": "Contractors shall submit all required 10-day notifications"
+},
+{
+"id": "REQ-046",
+"requirement": "Maintain current USDOT hazardous materials transportation training for personnel signing asbestos waste shipping papers.",
+"category": "submission",
+"source_quote": "Personnel signing asbestos waste shipping papers shall maintain current USDOT hazardous materials transportation training"
+},
+{
+"id": "REQ-047",
+"requirement": "Submit copies of original and final waste manifests documenting shipment and final disposal of asbestos-containing materials within 35 days.",
+"category": "submission",
+"source_quote": "Contractors shall submit copies of original and final waste manifests"
+},
+{
+"id": "REQ-048",
+"requirement": "Respond in writing to findings identified during inspections and provide evidential proof of compliance.",
+"category": "submission",
+"source_quote": "The Contractor shall respond in writing and provide evidential proof of compliance"
+},
+{
+"id": "REQ-049",
+"requirement": "Ensure all records are maintained IAW federal record retention requirements.",
+"category": "submission",
+"source_quote": "Contractor shall ensure all records are maintained IAW federal record retention requirements"
+},
+{
+"id": "REQ-050",
+"requirement": "Utilize VISN 2 Autodesk Build Construction management platform for all project communications.",
+"category": "submission",
+"source_quote": "The Contractor shall utilize VISN 2 Autodesk Build Construction management platform"
+},
+{
+"id": "REQ-051",
+"requirement": "Request access to ACC platform within 14 days of contract award.",
+"category": "submission",
+"source_quote": "Request access to ACC platform within 14 days of contract award"
+},
+{
+"id": "REQ-052",
+"requirement": "Complete ACC training and provide certificates of completion to COR within 12 Calendar days of access being granted.",
+"category": "submission",
+"source_quote": "Contractor staff granted access to the ACC platform shall complete ACC training"
+},
+{
+"id": "REQ-053",
+"requirement": "Inform the COR of any staff changes within 2 business days.",
+"category": "submission",
+"source_quote": "Contractor shall inform the COR of any staff changes within 2 business days"
+},
+{
+"id": "REQ-054",
+"requirement": "Obtain the Contracting Officer\u2019s approval prior to engaging in any contractual relationship requiring disclosure of information.",
+"category": "submission",
+"source_quote": "Contractor is required to obtain the Contracting Officer\u2019s approval prior to engaging in any contractual relationship"
+},
+{
+"id": "REQ-055",
+"requirement": "Notify the Contracting Officer in writing of the causes of delay within 10 days from the beginning of the delay.",
+"category": "other",
+"section": "m.3",
+"source_quote": "To obtain relief, the Contractor must notify the Contracting Officer in writing of the causes of delay within 10 days from the beginning of the delay."
+},
+{
+"id": "REQ-056",
+"requirement": "Identify the same due date as the original demand for payment in the final decision.",
+"category": "other",
+"section": "A(iv)",
+"source_quote": "The demand for payment included in the final decision shall identify the same due date as the original demand for payment."
+},
+{
+"id": "REQ-057",
+"requirement": "Compute the interest charge for the actual number of calendar days involved beginning on the due date.",
+"category": "other",
+"section": "B(vi)",
+"source_quote": "The interest charge shall be computed for the actual number of calendar days involved beginning on the due date."
+},
+{
+"id": "REQ-058",
+"requirement": "Deliver supplies to a carrier if transportation is f.o.b. origin.",
+"category": "other",
+"section": "j(1)",
+"source_quote": "Risk of loss or damage to the supplies provided under this contract shall remain with the Contractor until... Delivery of the supplies to a carrier, if transportation is f.o.b. origin."
+},
+{
+"id": "REQ-059",
+"requirement": "Deliver supplies to the Government at the destination specified in the contract if transportation is f.o.b. destination.",
+"category": "other",
+"section": "j(2)",
+"source_quote": "Risk of loss or damage to the supplies provided under this contract shall remain with the Contractor until... Delivery of the supplies to the Government at the destination specified in the contract, if transportation is f.o.b. destination."
+},
+{
+"id": "REQ-060",
+"requirement": "Include all applicable Federal, State, and local taxes and duties in the contract price.",
+"category": "pricing",
+"section": "k",
+"source_quote": "The contract price includes all applicable Federal, State, and local taxes and duties."
+},
+{
+"id": "REQ-061",
+"requirement": "Stop all work immediately upon termination for the Government\u2019s convenience.",
+"category": "other",
+"section": "l",
+"source_quote": "In the event of such termination, the Contractor shall immediately stop all work."
+},
+{
+"id": "REQ-062",
+"requirement": "Cause any and all suppliers and subcontractors to cease work immediately upon termination for the Government\u2019s convenience.",
+"category": "other",
+"section": "l",
+"source_quote": "The Contractor shall immediately cause any and all of its suppliers and subcontractors to cease work."
+},
+{
+"id": "REQ-063",
+"requirement": "Be paid a percentage of the contract price reflecting the percentage of the work performed prior to the notice of termination.",
+"category": "pricing",
+"section": "l",
+"source_quote": "The Contractor shall be paid a percentage of the contract price reflecting the percentage of the work performed prior to the notice of termination."
+},
+{
+"id": "REQ-064",
+"requirement": "Demonstrate reasonable charges resulting from termination to the satisfaction of the Government.",
+"category": "pricing",
+"section": "l",
+"source_quote": "The Contractor shall be paid... plus reasonable charges the Contractor can demonstrate to the satisfaction of the Government."
+},
+{
+"id": "REQ-065",
+"requirement": "Notify the Contracting Officer in writing of any default to avoid termination for cause.",
+"category": "other",
+"section": "m(1)",
+"source_quote": "If the Contractor refuses or fails to prosecute the work... the Government may, by written notice, terminate the Contractor\u2019s right to proceed."
+},
+{
+"id": "REQ-066",
+"requirement": "Be liable for any damages to the Government resulting from the Contractor\u2019s refusal or failure to complete the work.",
+"category": "other",
+"section": "m(2)",
+"source_quote": "The Contractor and its sureties shall be liable for any damages to the Government resulting from the Contractor\u2019s refusal or failure to complete the work."
+},
+{
+"id": "REQ-067",
+"requirement": "Provide evidence of excusable delays to avoid termination.",
+"category": "other",
+"section": "m(3)",
+"source_quote": "The Contractor\u2019s right to proceed shall not be terminated nor charged with damages under this clause if the delay arises from unforeseeable causes."
+},
+{
+"id": "REQ-068",
+"requirement": "Provide documentation of any increased costs incurred by the Government in completing the work.",
+"category": "other",
+"section": "m(2)",
+"source_quote": "This liability includes any increased costs incurred by the Government in completing the work."
+},
+{
+"id": "REQ-069",
+"requirement": "Ensure that the termination for cause is treated as a termination for convenience if the Government determines the Contractor was not in default.",
+"category": "other",
+"section": "m(4)",
+"source_quote": "If... the Government determines that the Contractor was not in default... the termination shall be treated as a termination for the convenience of the Government."
+}
+]
+}

@@ -1548,14 +1548,16 @@ const COMPLIANCE_MATRIX_TOOL_DEF = {
   function: {
     name: 'extract_compliance_matrix',
     description:
-      'Harvest EVERY explicit requirement from a federal solicitation into a structured compliance matrix — the ' +
-      'shall/must/required obligations plus Section L (instructions), M (evaluation factors), and C (SOW/PWS). The ' +
-      'foundation of a proposal: build the outline from it and check nothing is missed. Pass ONE of: notice_id (fetches ' +
-      "the notice's SOW + body + attachment text server-side — pairs with search_sam_opportunities) OR rfp_text (the " +
-      'solicitation text directly). Each row: {requirement, category (submission/evaluation/technical/past_performance/' +
-      'pricing/admin/other), section, source_quote (verbatim)}. grounded=false = nothing extractable (a synopsis, not ' +
-      'the L/M/C body, or a fetch miss) — do NOT invent requirements. Single-doc only: it does not merge amendments over ' +
-      'the base; pass amendment text too if dates/specs were revised.',
+      'Extract a SOURCE-VERIFIED compliance matrix from a federal solicitation: the shall/must/required obligations, ' +
+      'instructions to offerors and evaluation factors, wherever the solicitation places them. Pass ONE of: notice_id ' +
+      "(fetches the notice's body + attachment text server-side — pairs with search_sam_opportunities) OR rfp_text. " +
+      'Every candidate row is checked against the source text Mindy holds: requirements[] = trusted rows whose ' +
+      'source_quote was found in source_doc (verification.found_in gives the character range); section appears only ' +
+      'when the document prints it. interpretations[] = paraphrases carrying the real source sentence; withheld[] = ' +
+      'candidates that could not be verified (never present them as requirements). _meta.extraction_coverage says ' +
+      'which documents were actually read — a partial read is NOT the complete requirement set. grounded=false = ' +
+      'nothing verified; degraded=true = the source or model failed, not "no requirements". Amendments keep their ' +
+      'own source_doc but superseded language is not resolved.',
     parameters: {
       type: 'object',
       properties: {

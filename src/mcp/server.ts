@@ -1362,11 +1362,11 @@ server.registerTool(
     title: 'Extract Compliance Matrix (RFP requirements)',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'Harvest EVERY explicit requirement from a federal solicitation into a structured compliance matrix — the ' +
-      'shall/must/required obligations plus Section L (instructions), M (evaluation factors), and C (SOW/PWS). Pass ONE ' +
-      'of: notice_id (fetches the SOW + body + attachment text server-side) OR rfp_text (the solicitation text directly). ' +
-      'Each row: {requirement, category, section, source_quote (verbatim)}. grounded=false = nothing extractable — do ' +
-      'NOT invent requirements. Single-doc only: it does not merge amendments over the base.',
+      'Extract a SOURCE-VERIFIED compliance matrix from a federal solicitation (obligations, instructions to offerors, ' +
+      'evaluation factors). Pass ONE of: notice_id OR rfp_text. requirements[] = rows whose source_quote was found in ' +
+      'source_doc; section only when printed in the document. interpretations[] = paraphrases with the real source ' +
+      'sentence; withheld[] = unverifiable candidates (never present them as requirements). _meta.extraction_coverage ' +
+      'says what was read. grounded=false = nothing verified — do NOT invent requirements.',
     inputSchema: {
       notice_id: z.string().optional().describe('SAM notice id (UUID) or solicitation number — fetches the doc text server-side.'),
       rfp_text: z.string().optional().describe('The solicitation text directly (use when you already have it).'),
