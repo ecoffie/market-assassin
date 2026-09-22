@@ -1,9 +1,9 @@
 /** VA 36C24226Q0857 — primary acceptance case. */
 import { createClient } from '@supabase/supabase-js';
-import { createHash } from 'node:crypto';
 import { fetchNoticeResources } from '../../src/lib/sam/fetch-notice-resources';
 import { getRotatedSAMKey } from '../../src/lib/sam/utils';
 import { solicitationDocuments } from '../../src/mcp/tools/solicitation-documents';
+import { generateCacheKey } from '../../src/lib/mcp/external-cache';
 
 const NID = '2d232f3ce1f04085be52cbfe43a0e463';
 let pass = true;
@@ -15,11 +15,11 @@ const app = await fetchNoticeResources(NID, key) ?? [];
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 // Evict ONLY this notice's cache row so the run re-extracts. The earlier form
 // deleted every solicitation_docs row for EVERY notice — an unscoped prod
-// delete inside a script presented as read-only acceptance. Key derivation
-// mirrors external-cache.ts: md5(`${apiType}:${sortedParamsJson}`).
-const cacheKey = createHash('md5')
-  .update(`solicitation_docs:${JSON.stringify({ noticeId: NID })}`)
-  .digest('hex');
+// delete inside a script presented as read-only acceptance. Import the real
+// derivation rather than re-deriving it: a hand-copied md5 happens to match
+// only while the params object has ONE key, and would diverge silently the
+// moment a param is added, leaving this script testing a stale cache.
+const cacheKey = generateCacheKey('solicitation_docs', { noticeId: NID });
 await sb.from('mcp_external_cache').delete().eq('cache_key', cacheKey);
 const mcp: any = await solicitationDocuments({ notice_id: NID, text_limit: 120_000 });
 const appIds = new Set(app.map(a=>a.fileId!)); const mcpIds = new Set<string>(mcp.documents.map((d:any)=>d.document_id));

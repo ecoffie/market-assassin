@@ -6300,10 +6300,13 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 
 **What.** `get_solicitation_documents` now returns a *window* of each document
 with an explicit continuation. A response carries `coverage.complete` and a
-ready-made `next_page`; an agent pages until coverage is complete and can then
+ready-made `next_page`; an agent pages until `next_page` is null and can then
 say it read the package — or say precisely how much it did not. Each document
 reports **why** its text is or isn't present: `complete`, `partial`,
-`extraction_failed`, `file_unavailable`, or `extraction_capped`. Coverage is
+`extraction_failed`, `file_unavailable`, `extraction_capped`, `container_stub`
+(a PDF Portfolio cover sheet whose real files are nested inside) or
+`unreadable_encoding` (a font-subset PDF whose glyphs carry no text map).
+Coverage is
 counted in **characters**, never converted to pages.
 
 **Why.** Text was capped at 20,000 characters per document with no way to reach

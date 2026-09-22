@@ -52,6 +52,19 @@ describe('unreadable encoding', () => {
     expect(classifyExtraction(fancy)).toBe('ok');
   });
 
+  it('a Wingdings checkbox page (Section K reps-and-certs) is NOT mojibake', () => {
+    // Word maps checkbox glyphs into the Symbol/Wingdings PUA sub-range, so a
+    // near-pure certifications page scored 0.82 before that range was excluded.
+    const checkboxes = '\uF0A8 Yes \uF0A8 No \uF0A8 N/A\n'.repeat(200);
+    expect(readableRatio(checkboxes)).toBeGreaterThan(MIN_READABLE_RATIO);
+    expect(classifyExtraction(checkboxes)).toBe('ok');
+  });
+
+  it('a font subset outside the symbol range is STILL flagged', () => {
+    // The exclusion must not blind the detector to real PUA font failures.
+    expect(classifyExtraction('\uE001\uE002\uE003\uE004\uE005'.repeat(80))).toBe('unreadable_encoding');
+  });
+
   it('genuine solicitation prose is never flagged', () => {
     const prose =
       'Solicitation No. SPE60525R0222. The Contractor shall provide insurance in ' +

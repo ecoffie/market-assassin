@@ -43,7 +43,12 @@ export interface SolicitationDocumentsToolResult {
   sow_text: string;
   sow_text_truncated: boolean;
   documents: SolicitationDocument[];
-  /** Notice-level completeness. `complete:false` means KEEP PAGING. */
+  /**
+   * Completeness of THIS response (see the note on `summarize`). It is NOT a
+   * paging terminator: `next_page === null` is. A scoped continuation covers
+   * part of the notice, so `complete` is false there even when nothing is left
+   * unread — check `next_page`, and `scoped` to see which kind of answer it is.
+   */
   coverage: SolicitationDocumentsResult['coverage'];
   /**
    * Ready-to-send continuation call, or null when nothing is left to read.

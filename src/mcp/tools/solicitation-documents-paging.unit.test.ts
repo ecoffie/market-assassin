@@ -234,6 +234,37 @@ describe('get_solicitation_documents — full-document access', () => {
     expect(scoped.coverage.complete).toBe(false);
   });
 
+  it('next_page carries the window the caller ACTUALLY used, not the 20k default', async () => {
+    // Unguarded until now: reverting this fix to `input.text_limit ?? 20_000`
+    // left all 13 tests green, so a 120k reader could silently drop to 20k on
+    // its own continuation (a 3-call read becoming 15) with nothing failing.
+    const byRequestDefault = await solicitationDocuments({ notice_id: NOTICE, text_limit: 120_000 });
+    expect(byRequestDefault.next_page!.documents[0].limit).toBe(120_000);
+
+    // Per-document spec wins over the request default...
+    const perDoc = await solicitationDocuments({
+      notice_id: NOTICE,
+      text_limit: 120_000,
+      documents: [{ document_id: 'file-solicitation', offset: 0, limit: 90_000 }],
+    });
+    expect(perDoc.next_page!.documents[0].limit).toBe(90_000);
+
+    // ...and a wildcard spec (no document_id) applies when there is no per-doc one.
+    const wildcard = await solicitationDocuments({
+      notice_id: NOTICE,
+      documents: [{ offset: 0, limit: 50_000 }],
+    });
+    expect(wildcard.next_page!.documents[0].limit).toBe(50_000);
+
+    // The continuation must then really deliver that window, not just report it.
+    const continued = await solicitationDocuments({
+      notice_id: NOTICE,
+      document_ids: byRequestDefault.next_page!.document_ids,
+      documents: byRequestDefault.next_page!.documents,
+    });
+    expect(continued.documents[0].text_window.returned_chars).toBe(TOTAL - 120_000);
+  });
+
   it('documents are addressed by stable document_id, not array position', async () => {
     const res = await solicitationDocuments({
       notice_id: NOTICE,

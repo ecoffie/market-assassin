@@ -38,9 +38,17 @@ export function isPdfPortfolioStub(text: string): boolean {
  */
 export function readableRatio(text: string): number {
   if (!text) return 0;
-  // C0 controls except tab/newline/CR, DEL, private use areas, replacement char.
+  // C0 controls except tab/newline/CR, DEL, private-use area, replacement char.
+  //
+  // U+F020–U+F0FF is deliberately EXCLUDED from "unreadable": Word maps Symbol
+  // and Wingdings glyphs there, so a Section K reps-and-certs / SF1449 checkbox
+  // page ("☐ Yes ☐ No ☐ N/A") is mostly those codepoints. Counting them scored
+  // such a page 0.82 and would have suppressed a real certifications page as
+  // unusable — the same false-suppression this metric was rewritten to stop.
+  // Genuine font-subset failures are unaffected: they sit in C0 or the rest of
+  // the PUA and still measure 0.00–0.09.
   const unreadable = text.match(
-    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uE000-\uF8FF\uFFFD]/g,
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uE000-\uF01F\uF100-\uF8FF\uFFFD]/g,
   );
   return 1 - (unreadable ? unreadable.length : 0) / text.length;
 }
