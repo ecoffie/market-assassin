@@ -1053,3 +1053,48 @@ $900M GPS III). A check that cannot fail is not a check.
 **Final state:** 6/6 surfaces clean · 111/111 `contract_pattern` rows retained with
 `source_url` · 3 GAO titles containing "Congressional" preserved · 53,809 opportunities
 still carrying legitimate priorities. No broad string deletion.
+
+---
+
+## 2026-09-22 — SAM solicitation documents: the remainder past 20,000 chars was unreachable, not paginated
+
+`get_solicitation_documents` returned the first 20,000 chars of each document with **no
+continuation**, so the rest was inaccessible. On a federal solicitation the dropped part is
+the decisive part — instructions to offerors, evaluation factors, insurance, subcontracting
+limitations, the clause list all sit at the back. Measured across two live packages:
+751,916 real chars, 160,000 returned (**21.3%**).
+
+Two compounding losses beneath it. **Extraction** stopped at 200,000 chars before anything
+the caller could see, so `char_count` itself understated the document (a 274-page priced
+schedule extracts to 573,558 — 373,558 discarded, unreachable by any paging). And
+**extractions that succeed mechanically but return unusable text** (PDF Portfolio cover
+stubs at 128 chars; font-subset PDFs at 0.35 readable ratio) reported as clean complete
+reads — the shape that lets a downstream matrix cite a section the solicitation never had.
+
+**Fix:** per-document window + `next_page` continuation (`next_page === null` is the
+terminator, not `coverage.complete` — the call is stateless). `text_availability` across 7
+states. `CACHE_TEXT_CAP` 40,000 → the extraction ceiling. Downstream tools carry
+`_meta.source_coverage` so a derived artifact discloses what its source was missing.
+`main`'s `textMode:'full'` preserved for internal consumers.
+
+**Five defects were found in this work by review, not by me.** A scoped read reporting
+`complete: true`; then my fix making `complete` *unreachable* on multi-document notices
+(invisible to the suite — both assertions used a single-document fixture); a mojibake
+detector falsely suppressing box-drawing CLIN tables at 0.583; a correct limit
+carry-forward with **zero** test coverage (reverting it left 13/13 green); and a
+caller-reachable `MAX_SAFE_INTEGER` sentinel escaping the per-document bound (measured:
+900,000 chars returned). Each is now pinned by a regression proven to fail on reinstatement.
+
+⚠️ **Incident:** an unscoped `DELETE FROM mcp_external_cache WHERE
+api_type='solicitation_docs'` executed ≥3× from a script labelled read-only acceptance.
+Row count **not recoverable**. Impact bounded — self-healing cache, other `api_type`s
+intact. The script now performs no writes at all; all three write paths (cache, description
+persistence, Storage upload) are gated behind flags that are inert unless set.
+
+Proof: 522 tests; tsc clean; supabase-errors / rank-then-filter / tool-catalog gates green;
+production build passes; CI `verify` green. VA `36C24226Q0857` acceptance 13/13 — app vs
+MCP inventory 7/7 by file id, and **255,564/255,564 chars (100%) byte-verified against
+source text**, sha256 `8699e0330a1aa2e1…` identical on both sides. Cold fetch → cached read
+return identical text. DLA package completeness deliberately **not** claimed (portfolio
+stubs + font-subset amendments detected, not recovered —
+`tasks/FOLLOWUP-dla-container-ocr-2026-09-22.md`).
