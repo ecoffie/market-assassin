@@ -52,7 +52,7 @@ if bash tests/pre-push-worktree-selection.test.sh > /tmp/mindy-prepush-selection
   echo -e "      ${GREEN}✓ gate validates the pushed checkout (worktree-safe)${NC}"
 else
   echo -e "      ${RED}✗ checkout-selection regression — push blocked${NC}"
-  grep -E "✗|FAIL" /tmp/mindy-prepush-selection.log | head -8 | sed 's/^/        /'
+  grep -aE "✗|FAIL" /tmp/mindy-prepush-selection.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 

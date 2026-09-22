@@ -19,6 +19,19 @@
 
 set -uo pipefail
 
+# ⚠️ HERMETIC FIXTURES. `git -c key=value push` exports GIT_CONFIG_PARAMETERS to
+# every child process, so a `-c core.hooksPath=...` used to publish THIS fix
+# leaked into the fixture repos below and made them run the REAL 13-step gate
+# instead of their stub hook. (Caught 2026-09-22: the fixture push failed with
+# "could not establish which checkout is being pushed" — the real resolver
+# correctly refusing a temp repo that is not market-assassin.) Clear every
+# channel git uses to inject config, and pin global/system config to nothing,
+# so these fixtures answer only to the config the test itself sets.
+unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+i=0; while [ $i -lt 64 ]; do unset "GIT_CONFIG_KEY_$i" "GIT_CONFIG_VALUE_$i"; i=$((i+1)); done
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+export GIT_TERMINAL_PROMPT=0
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESOLVER="$REPO_ROOT/.githooks/resolve-checkout.sh"
 # ⚠️ PHYSICAL path. On macOS /var is a symlink to /private/var, and
@@ -36,13 +49,48 @@ bad()  { echo "  ✗ FAIL: $1"; [ $# -gt 1 ] && echo "      $2"; fail=$((fail+1)
 [ -x "$RESOLVER" ] || { echo "✗ missing/!executable: $RESOLVER"; exit 2; }
 
 # ── fixture: bare remote + primary checkout + linked worktree ──────────────
+# ⚠️ CONTAINMENT. This test creates repositories and MUST never touch a real
+# one. It already did once (2026-09-22): running from inside the pre-push hook,
+# it inherited GIT_DIR, so `git init --bare <path>` re-initialised the REAL
+# repository as bare (core.bare=true, breaking the primary checkout), and a
+# `cd` into a fixture that had not been created silently left the following
+# git commands running in the source tree — which committed "seed"/"w" onto the
+# branch under test and registered a stray worktree and `feature` branch.
+#
+# Three rules, all enforced below:
+#   1. the env is scrubbed at the top of this file (GIT_DIR and friends),
+#   2. every `cd` is `|| die`, because `set -e` is deliberately not in use here,
+#   3. every path is asserted to live under $TMP BEFORE git is pointed at it,
+#      and every repo git creates is asserted to have come out under $TMP.
+die_hard() { echo "  ✗ CONTAINMENT: $*" >&2; exit 2; }
+
+under_tmp() {
+  case "$(cd "$(dirname "$1")" 2>/dev/null && pwd -P)/$(basename "$1")" in
+    "$TMP"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+assert_fixture_repo() {
+  local dir="$1"
+  under_tmp "$dir" || die_hard "refusing to use $dir — outside $TMP"
+  local top
+  top="$(cd "$dir" && git rev-parse --show-toplevel 2>/dev/null)" \
+    || die_hard "no repo at $dir"
+  case "$top" in "$TMP"/*) : ;; *) die_hard "repo at $dir resolves to $top, outside $TMP" ;; esac
+}
+
 setup_fixture() {
   local base="$1"
-  mkdir -p "$base"
-  git init --bare -q "$base/remote.git"
-  git init -q "$base/primary"
+  under_tmp "$base" || die_hard "fixture base $base is outside $TMP"
+  mkdir -p "$base" || die_hard "mkdir $base"
+  under_tmp "$base/remote.git" || die_hard "remote path escapes $TMP"
+  git init --bare -q "$base/remote.git" || die_hard "git init --bare failed"
+  [ -d "$base/remote.git" ] || die_hard "bare remote was not created at $base/remote.git"
+  git init -q "$base/primary" || die_hard "git init primary failed"
+  assert_fixture_repo "$base/primary"
   (
-    cd "$base/primary"
+    cd "$base/primary" || die_hard "cd $base/primary"
     git config user.email t@t.t; git config user.name t
     git config commit.gpgsign false
     # Same marker the resolver checks for.
@@ -53,7 +101,8 @@ setup_fixture() {
     git push -q origin HEAD:refs/heads/main
     git branch -q -f main HEAD 2>/dev/null || true
     git worktree add -q -b feature "$base/worktree" HEAD
-  )
+  ) || die_hard "fixture setup subshell failed for $base"
+  assert_fixture_repo "$base/worktree"
   # A linked worktree gets its own copy of the tracked files, including
   # package.json — confirm, because the resolver depends on it.
   [ -f "$base/worktree/package.json" ] || { echo "fixture broken: worktree has no package.json"; exit 2; }
@@ -87,7 +136,7 @@ A="$TMP/case-a"; setup_fixture "$A"
 touch "$A/primary/FAIL"                       # primary is broken
 rm -f "$A/worktree/FAIL"                      # worktree is fine
 (
-  cd "$A/worktree"
+  cd "$A/worktree" || die_hard "cd $A/worktree"
   echo change > w.txt && git add -A && git commit -qm w
 ) >/dev/null 2>&1
 out_a="$(cd "$A/worktree" && git push origin feature 2>&1)"; rc_a=$?
@@ -112,7 +161,7 @@ B="$TMP/case-b"; setup_fixture "$B"
 rm -f "$B/primary/FAIL"                       # primary is fine
 touch "$B/worktree/FAIL"                      # worktree is broken
 (
-  cd "$B/worktree"
+  cd "$B/worktree" || die_hard "cd $B/worktree"
   echo change > w.txt && git add -A && git commit -qm w
 ) >/dev/null 2>&1
 out_b="$(cd "$B/worktree" && git push origin feature 2>&1)"; rc_b=$?
@@ -136,7 +185,7 @@ exit 0
 HOOK
 chmod +x "$C/primary/.githooks/pre-push"
 rm -f "$C/primary/FAIL"; touch "$C/worktree/FAIL"
-( cd "$C/worktree"; echo c > c.txt; git add -A; git commit -qm c ) >/dev/null 2>&1
+( cd "$C/worktree" || die_hard "cd $C/worktree"; echo c > c.txt; git add -A; git commit -qm c ) >/dev/null 2>&1
 out_c="$(cd "$C/worktree" && git push origin feature 2>&1)"; rc_c=$?
 if [ $rc_c -eq 0 ]; then
   ok "control: the ORIGINAL resolution lets a failing worktree through (bug reproduced)"
@@ -152,7 +201,7 @@ else
   bad "resolver succeeded outside a repository" "$out_d"
 fi
 notrepo="$TMP/notours"; mkdir -p "$notrepo"
-( cd "$notrepo" && git init -q && git config user.email t@t.t && git config user.name t \
+( cd "$notrepo" || die_hard "cd $notrepo"; git init -q && git config user.email t@t.t && git config user.name t \
   && printf '{"name":"some-other-project"}\n' > package.json ) >/dev/null 2>&1
 out_e="$(cd "$notrepo" && bash "$RESOLVER" 2>&1)"; rc_e=$?
 if [ $rc_e -ne 0 ]; then
