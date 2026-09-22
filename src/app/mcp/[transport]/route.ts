@@ -39,6 +39,8 @@ import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { mcpToolResultFromMeteredError } from '@/lib/mcp/commercial-refusal';
+import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
 // client (neither runs on Edge). force-dynamic: never cache an MCP response.
@@ -70,7 +72,7 @@ const SERVER_INFO: Implementation = {
   name: 'Mindy',
   version: '1.0.0',
   description:
-    'Federal contracting intelligence — SAM opportunities, incumbents, pricing, and win playbooks.',
+    'Federal contracting intelligence — SAM opportunities, incumbents, pricing, win playbooks, and market watches (schedule / monitor searches).',
   websiteUrl: 'https://getmindy.ai/mcp',
   icons: [{ src: 'https://getmindy.ai/icon.png', mimeType: 'image/png', sizes: ['512x512'] }],
 };
@@ -156,10 +158,11 @@ const baseHandler = createMcpHandler(
             { userEmail: identity.userEmail, apiKeyId: identity.keyId ?? null },
           );
           if (!outcome.ok) {
-            return {
-              isError: true,
-              content: [{ type: 'text', text: `${outcome.error.code}: ${outcome.error.message}` }],
-            };
+            // Commercial refusals (insufficient credits / requires Pro) MUST NOT set
+            // isError. Claude treats isError as a transport/tool crash and invents
+            // "server isn't responding — let me retry" — measured 2026-09-15 when a
+            // user had 45 credits and capability_market_match needed 50.
+            return mcpToolResultFromMeteredError(outcome.error);
           }
           // Balance-in-chat (like Higgsfield): surface the remaining balance right
           // in the conversation. `outcome.balance` is the post-debit balance
@@ -219,6 +222,8 @@ const baseHandler = createMcpHandler(
     // verbatim — `new McpServer(serverInfo, mcpServerOptions)` (dist/index.js:323).
     // The cast bypasses a stale type, not a missing capability.
     serverInfo: SERVER_INFO as { name: string; version: string },
+    // Shared connector guidance — clients surface this on initialize (same text as stdio).
+    instructions: MCP_CONNECTOR_INSTRUCTIONS,
     capabilities: {
       tools: {},
     },
@@ -301,4 +306,36 @@ const handler = withMcpAuth(
   },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+/**
+ * Map the Next App Router file path onto the mcp-handler pathname match.
+ *
+ * On mcp.getmindy.ai the client posts to `/mcp` and next.config rewrites the
+ * *destination* to `/mcp/mcp` without changing `request.url` — so the handler
+ * correctly sees `/mcp`.
+ *
+ * On preview / apex (`*.vercel.app/mcp/mcp`, `getmindy.ai/mcp/mcp`) the client
+ * posts straight at the file route, so `request.url` is `/mcp/mcp` and the
+ * strict `/mcp` match 404s after auth. Rewrite those direct paths here so
+ * preview MCP proof (and any lingering apex clients) work without breaking
+ * the canonical subdomain.
+ */
+function acceptDirectTransportPath(
+  h: (req: Request) => Response | Promise<Response>,
+): (req: Request) => Promise<Response> {
+  return async (req) => {
+    const url = new URL(req.url);
+    const map: Record<string, string> = {
+      '/mcp/mcp': '/mcp',
+      '/mcp/sse': '/sse',
+      '/mcp/message': '/message',
+    };
+    const mapped = map[url.pathname];
+    if (!mapped) return h(req);
+    url.pathname = mapped;
+    return h(new Request(url.toString(), req));
+  };
+}
+
+export const GET = acceptDirectTransportPath(handler);
+export const POST = acceptDirectTransportPath(handler);
+export const DELETE = acceptDirectTransportPath(handler);

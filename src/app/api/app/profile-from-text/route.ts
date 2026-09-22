@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
   }
 
   const profile = await buildProfileFromText(text);
-  if (!profile || !profile.naics.length) {
+  // Success = we labeled the work and/or measured coverage candidates.
+  // Company NAICS identity stays empty on the text-only path (coverage ≠ identity).
+  if (!profile || (!profile.industryPhrase && !profile.coverageCandidates.length)) {
     return NextResponse.json({ success: false, error: `Couldn't find a federal market from that. Try naming the service + where you work (e.g. "IT staffing in Texas").` }, { status: 422 });
   }
 

@@ -22,7 +22,7 @@
  * chips, "Should I bid?" — meaningless for a person.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { isUsableContactCard } from './contact-quality';
+import { isUsableContactCard, placeholderNameFilter, displayContactName } from './contact-quality';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { resolveBuyerLocation } from '@/lib/geo/city-geocode';
@@ -92,7 +92,11 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
   // 1. The buyer's own contact row — name / title / agency / office / email / phone.
   const { data: rows, error: rowErr } = await db
     .from('federal_contacts')
-    .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number')
+    .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, contact_kind, solicitation_number')
+    // ⚠️ Direct-by-id retrieval — the one query with no scope of its own. Every LISTING surface
+    // is contact_kind-scoped, so no product path hands out a vendor id today, but "today's
+    // callers happen to be safe" is not a guarantee. Require the kind here too.
+    .eq('contact_kind', 'government_buyer')
     .eq('id', id)
     .limit(1);
   if (rowErr) throw rowErr;
@@ -101,7 +105,12 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
     | undefined;
   if (!me || !isUsableContactCard(me as Record<string, unknown>)) return null;
 
-  const name = me.contact_fullname || 'Contact';
+  // `nameRaw` = the STORED value, used for the DB match below (federal_contacts holds the
+  // polluted string, so matching on a cleaned name would find nothing). `name` = what the
+  // drawer shows, with SAM's appended phone/DSN/email stripped by the shared contract.
+  // Same raw-vs-display split as `agency` / `agencyDisplay` immediately below.
+  const nameRaw = me.contact_fullname || '';
+  const name = displayContactName(nameRaw) || 'Contact';
   // `agency` = the RAW stored value (used to JOIN the roster + agency intel by
   // department_ind_agency). `agencyDisplay` = the human-readable name shown in the drawer
   // header ("STATE, DEPARTMENT OF" → "Department of State"), never used for a DB match.
@@ -117,7 +126,7 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
   const { data: mine, error: mineErr } = await db
     .from('federal_contacts')
     .select('solicitation_number')
-    .eq('contact_fullname', name)
+    .eq('contact_fullname', nameRaw)
     .eq('department_ind_agency', agency)
     .not('solicitation_number', 'is', null)
     .limit(400);
@@ -183,22 +192,20 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
   //    usable cards, excluding the buyer themselves.
   const roster: BuyerRosterContact[] = [];
   if (agency) {
-    const { data: rmates, error: rErr } = await db
+    const { data: rmates, error: rErr } = await placeholderNameFilter(db
       .from('federal_contacts')
-      .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, solicitation_number')
+      .select('id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, contact_kind, solicitation_number')
+      .eq('contact_kind', 'government_buyer')
       .eq('department_ind_agency', agency)
       .neq('id', id)
-      .not('contact_fullname', 'is', null)
-      .not('contact_fullname', 'ilike', 'telephone:%')
-      .not('contact_fullname', 'ilike', 'phone:%')
-      .not('contact_fullname', 'ilike', 'fax:%')
-      .not('contact_fullname', 'ilike', 'tel:%')
+      .not('contact_fullname', 'is', null))
       .limit(120);
     if (rErr) throw rErr;
     const seen = new Set<string>([name.toLowerCase()]);
     for (const c of (rmates || []) as Array<Record<string, unknown>>) {
       if (!isUsableContactCard(c)) continue;
-      const nm = String(c.contact_fullname || '');
+      const nm = displayContactName(c.contact_fullname as string | null) || '';
+      if (!nm) continue;
       const key = nm.toLowerCase();
       if (!nm || seen.has(key)) continue;
       seen.add(key);

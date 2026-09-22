@@ -14,11 +14,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockHistory = vi.fn();
 const mockEstablish = vi.fn();
+const mockByUei = vi.fn();
+const mockResolveName = vi.fn();
 vi.mock('@/lib/contractor-sales-history', () => ({
   getContractorSalesHistory: (o: unknown) => mockHistory(o),
+  slugifyContractorName: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
 }));
 vi.mock('@/lib/contractor/award-history-existence', () => ({
   establishAwardHistory: (c: string, u: string | null) => mockEstablish(c, u),
+}));
+vi.mock('@/lib/contractor/history-by-uei', () => ({
+  getContractorHistoryByUei: (o: unknown) => mockByUei(o),
+}));
+vi.mock('@/lib/contractor/name-resolution', () => ({
+  resolveAwardCorpusByName: (q: string) => mockResolveName(q),
 }));
 
 const { contractorAwardHistory } = await import('./contractor-award-history');
@@ -26,8 +35,10 @@ const { contractorAwardHistory } = await import('./contractor-award-history');
 const EMPTY_HISTORY = { summary: { awardCount: 0 }, source: 'cache', awards: [] };
 
 beforeEach(() => {
-  mockHistory.mockReset(); mockEstablish.mockReset();
+  mockHistory.mockReset(); mockEstablish.mockReset(); mockByUei.mockReset(); mockResolveName.mockReset();
   mockEstablish.mockResolvedValue({ hasFederalAwardHistory: false, degraded: false, sources: [], uei: null, recipientName: null });
+  mockByUei.mockResolvedValue({ resolution: 'not_found', history: null });
+  mockResolveName.mockResolvedValue({ status: 'none', searched: '' });
 });
 
 describe('CHAIN-2 — existence may not be contradicted', () => {
@@ -80,6 +91,70 @@ describe('CHAIN-2 — existence may not be contradicted', () => {
     mockEstablish.mockRejectedValue(new Error('db down'));
     const r = await contractorAwardHistory({ company: 'FLUIDYNE CORPORATION' });
     expect(r._meta.degraded).toBe(true);
+  });
+
+  it('a unique award-index name is loaded by UEI, not by the recompete slice', async () => {
+    mockResolveName.mockResolvedValue({
+      status: 'unique',
+      uei: 'UM53UXL5QNF5',
+      name: 'TANAQ SUPPORT SERVICES, LLC',
+      total_obligated: 261_903_825.7,
+      award_count: 54,
+      match: 'exact_stem',
+    });
+    mockByUei.mockResolvedValue({
+      resolution: 'found',
+      history: {
+        summary: { awardCount: 54, totalObligations: 261_903_825.7, topAgency: 'DoD', latestFiscalYear: 2026 },
+        source: 'bigquery_normalized',
+        contractor: { company: 'TANAQ SUPPORT SERVICES, LLC' },
+        match: { method: 'recipient_name', confidence: 'high', name: 'TANAQ SUPPORT SERVICES, LLC' },
+      },
+      source: 'bigquery',
+      asOf: '2026-09-01',
+    });
+    const r = await contractorAwardHistory({ company: 'TANAQ SUPPORT SERVICES, LLC' });
+    expect(r.history?.source).toBe('bigquery_normalized');
+    expect(r._meta.award_count).toBe(54);
+    expect(r._meta.name_resolution).toBe('award_corpus_name_to_uei');
+    expect(r._meta.coverage?.not_equivalent_to).toBe('recipients_rollup.total_obligated');
+    expect(r._meta.note).toMatch(/match\.method recipient_name/);
+    expect(mockHistory).not.toHaveBeenCalled();
+    expect(mockEstablish).not.toHaveBeenCalled();
+  });
+
+  it('several name matches are returned as candidates and never auto-picked', async () => {
+    mockResolveName.mockResolvedValue({
+      status: 'ambiguous',
+      match_count: 13,
+      truncated: false,
+      candidates: [
+        { name: 'TANAQ SUPPORT SERVICES, LLC', uei: 'UM53UXL5QNF5', total_obligated: 261_903_825.7, award_count: 54 },
+      ],
+      note: '13 award-holding recipients match "Tanaq". This tool will not pick one.',
+    });
+    const r = await contractorAwardHistory({ company: 'Tanaq' });
+    expect(r._meta.resolution).toBe('ambiguous');
+    expect(r._meta.match_count).toBe(13);
+    expect(r.history).toBeNull();
+    expect(r.candidates?.[0].uei).toBe('UM53UXL5QNF5');
+    expect(mockByUei).not.toHaveBeenCalled();
+    expect(r._meta.note).not.toMatch(/couldn't find|no federal past performance/i);
+  });
+
+  it('a miss with no comma still runs the existence check', async () => {
+    mockHistory.mockResolvedValue(EMPTY_HISTORY);
+    mockResolveName.mockResolvedValue({ status: 'none', searched: 'TANAQ SUPPORT SERVICES LLC' });
+    mockEstablish.mockResolvedValue({
+      hasFederalAwardHistory: true, degraded: false, uei: null, recipientName: null,
+      sources: [{ source: 'recompete_mirror', found: true, awardCount: 12 }],
+    });
+    const r = await contractorAwardHistory({ company: 'TANAQ SUPPORT SERVICES LLC' });
+    expect(mockEstablish).toHaveBeenCalledWith('TANAQ SUPPORT SERVICES LLC', null);
+    expect(r._meta.award_history_elsewhere).toBe(true);
+    expect(r._meta.grounded).toBe(true);
+    expect(r.history?.summary?.awardCount ?? 0).toBe(0);
+    expect(r.history?.source).not.toBe('recompete_mirror');
   });
 
   it('when its own cache HAS awards, no second lookup is needed', async () => {

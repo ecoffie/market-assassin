@@ -33,6 +33,7 @@
  */
 import { NextResponse } from 'next/server';
 import { MAPS_HOME_URL, MAPS_HOME_PATH, MAPS_HOME_IS_APEX } from '@/lib/mindy/maps-home';
+import { siteFooterHtml } from '@/lib/seo/site-links';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities, featuredLens, withLens } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
 import { estMoneyServer } from '@/lib/opportunities/map-data';
@@ -375,6 +376,26 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .tfoot{border-top:1px solid var(--line);margin-top:72px;padding:26px 0;text-align:center;font:400 12px Inter,system-ui,sans-serif;color:var(--faint)}
   .tfoot .warn{display:block;margin-top:5px;color:#b54708}
 
+  /* ── SITE FOOTER — the crawl entry point into the public content surface. ─────────────
+     Added 2026-09-21. When the homepage cut over from /mindy-landing to /today (#1315) the
+     root stopped linking to /contractors, /agencies, /naics, /glossary, /blog, /compare and
+     /research. The old landing page linked all of them. Measured consequence: the root is
+     the ONLY page on the domain Google reliably indexes, and it passed zero internal link
+     equity into the 34,163-URL content surface, which Google then parked under
+     "Crawled - currently not indexed" (URL Inspection API, 2026-09-21: 15 of 21 sampled
+     URLs, including /pricing and /compare/govwin). Sitemap-only discovery is not discovery.
+     These MUST stay real <a href> elements in the server-rendered HTML. */
+  .sfoot{border-top:1px solid var(--line);margin-top:8px;padding:34px 0 48px}
+  .sfoot-g{display:grid;gap:26px 34px;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));max-width:1100px;margin:0 auto}
+  .sfoot h3{font:600 11px Inter,system-ui,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--sub);margin:0 0 11px}
+  .sfoot ul{list-style:none;margin:0;padding:0}
+  .sfoot li{margin:0 0 7px}
+  .sfoot a{font:400 13.5px/1.45 Inter,system-ui,sans-serif;color:var(--body);text-decoration:none}
+  .sfoot a:hover{color:var(--seal);text-decoration:underline}
+  .sfoot-b{max-width:1100px;margin:30px auto 0;padding-top:18px;border-top:1px solid var(--hair);
+    font:400 12px Inter,system-ui,sans-serif;color:var(--faint)}
+
   /* ── THE STATEFUL BOTTOM HALF (docs/today-page-states.md) ────────────────────────────────
      Discovery (anonymous) · Momentum (authenticated) · Recovery (expired). Server-renders
      the discovery tiles so the page is NEVER empty before hydration; JS swaps in the
@@ -427,7 +448,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
-    <a href="/opportunity-map?mode=buyers">Players</a>
+    <a href="/opportunity-map?mode=companies">Players</a>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
@@ -547,6 +568,8 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
     Every number on this page is a live query against SAM.gov, USASpending and agency forecast data — nothing is estimated.
     ${intel.degraded ? '<span class="warn">Some sections are unavailable right now and have been omitted rather than shown as zero.</span>' : ''}
   </div>
+
+  ${siteFooterHtml()}
 </div></div>
 ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapping it again
      produced <script><script>, which parses as a stray `<` and threw

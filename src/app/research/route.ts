@@ -167,6 +167,7 @@ ${sections}
 }
 
 const HTML = govPage({
+  canonical: 'https://getmindy.ai/research',
   title: 'The Mindy Institute — Research on the Federal Procurement Market',
   description:
     'The Mindy Institute publishes grounded research on how the public procurement market actually behaves — benchmarks, white papers, and an annual report, each derived from live federal data.',

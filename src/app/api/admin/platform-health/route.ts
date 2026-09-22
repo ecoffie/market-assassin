@@ -6,6 +6,7 @@
  * outcome, and a check that throws surfaces as `unknown`, never as green.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { collectCreditHealth } from '@/lib/mcp/credit-health';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getPlatformHealth } from '@/lib/analytics/platform-health';
@@ -84,10 +85,22 @@ export async function GET(request: NextRequest) {
   }
   try {
     const health = await getPlatformHealth();
+    // SPONSORED-CREDIT HEALTH. Exhaustion used to be invisible: an account hit zero and
+    // generated rejection rows for days with nobody watching (rochbuf@gmail.com, 59 rows
+    // over 4 days, 2026-09-11→15 — we found out from an email). The rows were always
+    // there; the watch was missing. Read-only detection; notification is gated separately.
+    const creditHealth = await collectCreditHealth().catch((e) => ({
+      checkedAt: new Date().toISOString(),
+      lowBalance: [], exhausted: [], sponsoredAccounts: null,
+      errors: [`collectCreditHealth threw: ${e instanceof Error ? e.message : String(e)}`],
+    }));
     return NextResponse.json({
       ok: true,
       ...health,
       truncationDebt: truncationDebt(),
+      // sponsoredAccounts is NULL (not 0) when the source could not be read — "unknown"
+      // and "none" must stay distinguishable.
+      sponsoredCreditHealth: creditHealth,
       // The at-a-glance status block. Fed the gate's own finding count so the two can
       // never disagree; -1 (baseline unreadable) surfaces as 'unknown', not a guess.
       decisionMetricsIntegrity: getIntegrityStatusBlock(truncationDebt().known, truncationRisk()),

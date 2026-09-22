@@ -18,6 +18,8 @@ import { decodeFSC, extractNSNs, type FSCDecode } from '@/lib/codes/fsc';
 import { longDate as fmtOppDate } from '@/lib/utils/opp-date';
 import { getNsnReference } from '@/lib/nsn/reference';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
+import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
+import { resolveFamilyForQuery } from '@/lib/sam/solicitation-family';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -157,10 +159,15 @@ export async function GET(request: NextRequest) {
   if (!id) return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
 
   const db = sb();
-  // Match on notice_id first, then solicitation_number (cards may carry either).
+  // Record UUID stays exact (#1557). Solicitation identifiers resolve to the
+  // latest stored version. Family sidecar below adds current-truth without
+  // rewriting the worked-from record.
   let { data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('notice_id', id).limit(1).maybeSingle();
-  if (!data && !error) {
-    ({ data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('solicitation_number', id).limit(1).maybeSingle());
+  if (!data && !error && !isNoticeUuid(id)) {
+    const canonical = await resolveCanonicalSolicitation(id, { client: db });
+    if (canonical) {
+      ({ data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('notice_id', canonical.notice.notice_id).limit(1).maybeSingle());
+    }
   }
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
@@ -397,5 +404,14 @@ export async function GET(request: NextRequest) {
     }
   } catch { /* fail-soft — viewCount stays null */ }
 
-  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount, savedCount, viewCount });
+  // Family current truth — sidecar. The record (`opp`) stays the requested
+  // notice when the caller passed a UUID. History/documents are not overwritten.
+  let family: Awaited<ReturnType<typeof resolveFamilyForQuery>> = null;
+  try {
+    family = await resolveFamilyForQuery(id, { client: db });
+  } catch (e) {
+    console.warn('[opportunity-detail] family sidecar failed:', e instanceof Error ? e.message : e);
+  }
+
+  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount, savedCount, viewCount, family });
 }

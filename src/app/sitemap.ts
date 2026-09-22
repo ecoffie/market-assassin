@@ -24,6 +24,7 @@ import {
   recipientSlug,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
+import { getServeableSlugs } from '@/lib/seo/served-slugs';
 import { getServedContractsUeis } from '@/lib/awards-serving';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
@@ -58,9 +59,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const topLevel: MetadataRoute.Sitemap = [
     { url: SITE_URL,                            lastModified: now, changeFrequency: 'daily',   priority: 1.0 },
     { url: `${SITE_URL}/contractors`,           lastModified: now, changeFrequency: 'daily',   priority: 0.9 },
-    { url: `${SITE_URL}/market-intelligence`,   lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    // /market-intelligence — the page body is a client-side Stripe upgrade widget
+    // (64 chars of server-rendered text, no h1, as measured 2026-09-21). Its layout
+    // now server-renders the H1, the copy, JSON-LD and the cluster links, so the URL
+    // is worth asserting again. Reservation on file in that layout: copy wrapped
+    // around a checkout widget may still not earn indexation on its own merits.
+    { url: `${SITE_URL}/market-intelligence`,   lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${SITE_URL}/opportunity-hunter`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
-    { url: `${SITE_URL}/expiring-contracts`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    // /expiring-contracts stays OUT: it 308-redirects to `/` (retired product,
+    // next.config.ts). Google reported it "Page with redirect", canonical `/`.
+    //
+    // /forecasts is back IN, because it is now a real page. It 404'd for as long
+    // as it was advertised here, while `agency_forecasts` held 35,912 rows in
+    // Supabase with no public surface at all. The route now renders those counts
+    // as server HTML, and noindexes itself if the read fails.
     { url: `${SITE_URL}/forecasts`,             lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     // Comparison pages — target high-volume "alternative" keywords.
     // Priority 0.8 puts them in the top tier just below the homepage
@@ -76,7 +88,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // /pricing — primary conversion surface. Mirrors the SoftwareApplication
     // offers in JSON-LD so Google can surface price in rich snippets.
     { url: `${SITE_URL}/pricing`,               lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${SITE_URL}/bd-assist`,             lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // /bd-assist removed 2026-09-21 — it 307-redirects to /briefings (an app route).
     // Glossary index — definition-intent SEO surface. Per-term pages
     // are emitted below as their own block so Google sees the full
     // vocabulary, not just the landing page.
@@ -111,6 +123,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // discoverable via the landing page's tables and ISR-render
     // on first crawl.
     { url: `${SITE_URL}/awards`,                lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    // /spending and /discover were LIVE, server-rendered and indexable but absent
+    // from this file until 2026-09-21 — so the only way in was a link we did not have
+    // either. /spending in particular is one of the strongest public pages on the
+    // domain: 9,499 chars of server-rendered text, ItemList + GovernmentService
+    // JSON-LD, and 42 internal links out to /awards/[id] detail pages.
+    { url: `${SITE_URL}/spending`,              lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    { url: `${SITE_URL}/discover`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // /recompete — server-rendered content added to its layout 2026-09-21 (it was a
+    // 387-char client shell). It is the live destination for the "expiring contracts"
+    // intent now that /expiring-contracts is a retired product 308-ing to `/`.
+    { url: `${SITE_URL}/recompete`,             lastModified: now, changeFrequency: 'daily',   priority: 0.7 },
     { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
@@ -143,6 +166,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // recipientSlug() must match getRecipientBySlug()'s in-DB slug logic
   // exactly, or these URLs would 404 the same way.
   const recipients = await getTopRecipientsForSitemap();
+
+  // VERIFIED-SERVEABLE GATE (2026-09-21). Advertise a contractor only if the
+  // public renderer can actually serve it — i.e. its per-slug profile cache is
+  // populated. Until now the sitemap's eligibility (top-N rollup list) and the
+  // page's eligibility (per-slug KV cache) were different populations that
+  // nothing reconciled, and 861 indexed URLs 404'd in the gap.
+  // KV reads only; fails closed (an unverified slug is omitted).
+  const candidateSlugs = recipients
+    .map((c) => (c.recipient_name ? recipientSlug(c.recipient_name) : ''))
+    .filter(Boolean);
+  const serveable = await getServeableSlugs(candidateSlugs);
   const seenSlugs = new Set<string>();
   const contractorEntries: MetadataRoute.Sitemap = [];
 
@@ -169,6 +203,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // waste the SUBPAGE_MIN_ROWS gate below avoids for sub-pages). Skip the
     // whole contractor — overview + every sub-tab.
     if ((c.total_obligated || 0) < 25000 || (c.award_count || 0) < 2) continue;
+
+    // Not serveable from cache → not advertised. Returns on a later build once
+    // the bounded warm job has materialized it.
+    if (!serveable.has(slug)) continue;
 
     // Priority graded by spend tier. Google's "priority" field is
     // a hint relative to OTHER URLs in the sitemap, not absolute.

@@ -12,9 +12,9 @@ import { assembleMrr, type AssembleResult } from './assemble';
 import { writeAppendix, type AppendixInput } from './appendix';
 import {
   PROTOTYPE_BANNER,
-  TEMPLATE_PATH,
   getDocumentXml,
   readDocxParts,
+  resolveMrrTemplatePath,
   sha256File,
   writeDocx,
 } from './docx-fill';
@@ -89,7 +89,7 @@ const DEFAULT_DEPENDENCIES: Phase1Dependencies = {
   buildSection15,
   assembleMrr,
   writeAppendix,
-  templateSha256: () => sha256File(TEMPLATE_PATH),
+  templateSha256: () => sha256File(resolveMrrTemplatePath()),
   applyWorkspaceBanner: applyWorkspacePrototypeBanner,
 };
 
@@ -151,6 +151,7 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
     generatedAt: result.generatedAt,
     prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
     requirement: result.requirement.normalized,
+    marketScope: s9.scope,
     normalizationNotes: result.requirement.notes,
     templateSha256,
     cells: result.cells.map((cell) => ({
@@ -194,6 +195,8 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
         ruleOfTwoEligible: supplier.family.ruleOfTwoEligible,
         memberUeis: supplier.family.memberUeis,
       })),
+      scopeLabel: s11.scopeLabel,
+      evidenceClass: s11.evidenceClass,
     },
     ruleOfTwo: {
       determination: s12.determination,
@@ -211,6 +214,39 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
       sbFootprint: s15.sbFootprint,
     },
     limitations: result.limitations,
+    retrievalManifests: [
+      ...(s5.retrievalManifests ?? []),
+      ...(s9.retrievalManifests ?? []),
+      ...(s11.retrievalManifests ?? []),
+      ...(s12.retrievalManifests ?? []),
+      ...(s15.retrievalManifests ?? []),
+    ],
+    scopeExpansions: s9.expansions ?? [],
+    history: {
+      awardsFinding: s9.awardsFinding,
+      awards: (s9.awards ?? []).map((row) => ({
+        contractNumber: row.contractNumber.state === 'value' ? row.contractNumber.value : null,
+        recipient: row.recipient.state === 'value' ? row.recipient.value : null,
+        awardingAgency: row.awardingAgency.state === 'value' ? row.awardingAgency.value : null,
+        awardingOffice: row.awardingOffice ?? null,
+        title:
+          row.awardType.state === 'value'
+            ? row.awardType.value
+            : null,
+        amountLabel: row.amount.state === 'value' ? row.amount.value.label : null,
+        period: row.periodOfPerformance.state === 'value' ? row.periodOfPerformance.value : null,
+        awardType: row.awardType.state === 'value' ? row.awardType.value : null,
+        evidenceClass: row.evidenceClass,
+      })),
+      predecessorStatus: s9.predecessorStatus,
+      predecessorEvidenceClass: s9.predecessorEvidenceClass ?? null,
+      predecessorId:
+        s9.predecessorCandidate && typeof s9.predecessorCandidate === 'object'
+          ? (s9.predecessorCandidate as { awardId?: unknown; piid?: unknown }).awardId
+            ?? (s9.predecessorCandidate as { piid?: unknown }).piid
+            ?? null
+          : null,
+    },
   };
 }
 

@@ -16,6 +16,7 @@ import { resolveSetupWrite, type SetupAction } from '@/lib/profile/company-setup
 import { resolveSetupInput, type CertificationAnswer } from '@/lib/profile/company-setup-input';
 import { resolvePostSignupDestination } from '@/lib/mindy/post-signup-destination';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 const ACTIONS: SetupAction[] = ['confirm', 'accept_all', 'skip'];
 
@@ -52,6 +53,15 @@ export async function POST(request: NextRequest) {
 
     // Screen 2 outcome — the locked semantics. Skip yields `{}`.
     const outcome = resolveSetupWrite(action, body.selection || {});
+    if (outcome.profile.naics_codes || outcome.profile.psc_codes) {
+      const codesCheck = validateMarketCodesInput(
+        outcome.profile.naics_codes,
+        outcome.profile.psc_codes,
+      );
+      if (!codesCheck.ok) {
+        return NextResponse.json({ success: false, error: codesCheck.error, path: destination.path }, { status: 400 });
+      }
+    }
 
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 

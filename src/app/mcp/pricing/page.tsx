@@ -71,11 +71,19 @@ const FALLBACK_THEME: PlanTheme = PLAN_THEME.entry;
  * deferred, GOS #015). Live Stripe price ids + payment links (created 2026-07-19).
  */
 const PLANS_FALLBACK: SubPlan[] = [
-  { id: 'entry',  label: 'Entry',  creditsPerMonth: 500,  monthly: { priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG', usd: 99,  credits: 500,  checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD', usd: 990,  usdPerMonth: 83,  credits: 6000,  checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12' } },
-  { id: 'mid',    label: 'Mid',    creditsPerMonth: 1500, monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 1500, checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be', usd: 2490, usdPerMonth: 208, credits: 18000, checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13' } },
-  { id: 'agency', label: 'Agency', creditsPerMonth: 8000, monthly: { priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH', usd: 999, credits: 8000, checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10' }, annual: { priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J', usd: 9990, usdPerMonth: 833, credits: 96000, checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14' } },
+  { id: 'entry',  label: 'Entry',  creditsPerMonth: 500,   monthly: { priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG', usd: 99,  credits: 500,   checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD', usd: 990,  usdPerMonth: 83,  credits: 6000,   checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12' } },
+  { id: 'mid',    label: 'Mid',    creditsPerMonth: 2000,  monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 2000,  checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be', usd: 2490, usdPerMonth: 208, credits: 24000,  checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13' } },
+  { id: 'growth', label: 'Growth', creditsPerMonth: 3500,  monthly: { priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV', usd: 399, credits: 3500,  checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16' }, annual: { priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP', usd: 3990, usdPerMonth: 333, credits: 42000,  checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17' } },
+  { id: 'agency', label: 'Agency', creditsPerMonth: 10000, monthly: { priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH', usd: 999, credits: 10000, checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10' }, annual: { priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J', usd: 9990, usdPerMonth: 833, credits: 120000, checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14' } },
 ];
-const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' };
+
+/** Allowance from packages.ts — never hardcode a credit figure in copy (it goes stale). */
+function planCredits(id: string): string {
+  const p = PLANS_FALLBACK.find((x) => x.id === id);
+  return p ? p.creditsPerMonth.toLocaleString() : '—';
+}
+
+const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits', checkoutUrl: 'https://buy.stripe.com/28EfZi5Ey97cgVL3OEfnO15' };
 
 /**
  * Mindy's un-copyable layer — the curated + proprietary tools no public API has.
@@ -102,10 +110,10 @@ const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[]
 
 const FAQ: { q: string; a: string }[] = [
   { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are debited only when a call succeeds; a failed or empty call costs nothing, and repeat/cached reads are free.' },
-  { q: 'Entry, Mid, or Agency — which do I need?', a: 'Entry ($99, 500 credits/mo) suits project or occasional use. Mid ($249, 1,500/mo) is the daily driver for an agent working opportunities every day. Agency ($999, 8,000/mo) is for a shop running many pursuits at once. Every plan has the SAME tools — the tiers differ only in monthly credit allowance. Use the plan finder below to size it against your real workflow.' },
+  { q: 'Entry, Mid, Growth or Agency — which do I need?', a: `Entry ($99, ${planCredits('entry')} credits/mo) suits project or occasional use. Mid ($249, ${planCredits('mid')}/mo) is the daily driver for an agent working opportunities every day. Growth ($399, ${planCredits('growth')}/mo) is for working several markets at once. Agency ($999, ${planCredits('agency')}/mo) is for a shop running many pursuits. Every plan has the SAME tools — the tiers differ only in monthly credit allowance. Use the plan finder below to size it against your real workflow.` },
   { q: 'What makes Mindy different from a public-data wrapper?', a: 'Beyond the public-data tools (SAM, USASpending, EDGAR, GSA, Grants, Federal Register), Mindy adds an un-copyable layer no public API has: curated SBLO + OSBP teaming/small-business contacts, agency intel and angles, podcast lessons, and a full proposal pipeline (compliance matrix → drafted sections → an independent compliance referee → a submittable .docx). You pay per successful call in credits — nothing is locked behind a tier; the plans just set how many credits you get each month.' },
   { q: 'I already pay for the Mindy app (Pro or Team). Do I get MCP credits?', a: `Yes — Pro ($149/mo) includes ${PRO_APP_CREDITS} MCP credits every month and Team ($499/mo) includes ${TEAM_APP_CREDITS}, at no extra cost. Connect with the same account and they’re already there. It’s a taste — if your agent runs heavier, add one of the credit plans on this page.` },
-  { q: 'What is the one-time top-up for?', a: `The top-up (500 credits / $119) is the “ran out mid-month” valve — a one-time refill that doesn’t change your plan. It’s also the pack auto-recharge draws from if you switch that on. It’s priced per-credit above the subscriptions on purpose, so subscribing is always the better deal for steady use.` },
+  { q: 'What is the one-time top-up for?', a: `The top-up (1,000 credits / $119) is the “ran out mid-month” valve — a one-time refill that doesn’t change your plan. It’s also the pack auto-recharge draws from if you switch that on. Top-up credits never expire and carry over when your plan renews.` },
   { q: 'Do you have an Enterprise / API option?', a: 'Yes — for primes, agencies, funds, lenders, and partners who need a data/feed license, high-volume programmatic API access, SSO/SAML, a dedicated success manager, or an SLA. Pricing is bespoke (volume-based, annual invoicing). Email hello@getmindy.ai and we’ll scope it with you.' },
   { q: 'Do I need a credit card to start?', a: 'No. You get signup credits free on your first connect — sign in through your browser, point your MCP client at Mindy, and start calling tools. Add a plan only when you want more.' },
   { q: 'What happens when I run out of credits?', a: 'The next tool call is declined with a top-up message before it runs — you are never charged into a negative balance. Add a top-up, upgrade your plan, or wait for your renewal.' },
@@ -191,7 +199,18 @@ export default function McpPricing() {
       const biggest = plans[plans.length - 1];
       return { tier: 'Enterprise / API', cap: null, cta: 'Contact sales', href: ENTERPRISE_MAILTO, accent: 'amber', sub: `At ~${monthlyNeed.toLocaleString()} credits/mo you’re past the ${biggest.label} plan (${biggest.creditsPerMonth.toLocaleString()}/mo) — a custom pool is the right fit.` };
     }
-    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta: `Get ${plan.label} — $${plan.monthly.usd}/mo`, href: plan.monthly.checkoutUrl, accent: 'emerald', sub: `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month — every tool, charged on success.` };
+    // Honour the billing toggle: recommending a plan but linking to the MONTHLY checkout
+    // while the page shows annual prices sends the buyer somewhere other than what they
+    // were reading. Annual also grants its credits UPFRONT, which the copy must say.
+    const useAnnual = annual && !!plan.annual;
+    const href = useAnnual && plan.annual ? plan.annual.checkoutUrl : plan.monthly.checkoutUrl;
+    const cta = useAnnual && plan.annual
+      ? `Get ${plan.label} — $${plan.annual.usd.toLocaleString()}/yr`
+      : `Get ${plan.label} — $${plan.monthly.usd}/mo`;
+    const sub = useAnnual && plan.annual
+      ? `$${plan.annual.usd.toLocaleString()}/yr — ${plan.annual.credits.toLocaleString()} credits granted up front — every tool, charged on success.`
+      : `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month — every tool, charged on success.`;
+    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta, href, accent: 'emerald', sub };
   })();
   const usePct = rec && rec.cap ? Math.min(100, Math.round((monthlyNeed / rec.cap) * 100)) : 0;
 
@@ -427,7 +446,7 @@ export default function McpPricing() {
                 </tr>
               </thead>
               <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
-                <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry="500/mo" mid="1,500/mo" agency="8,000/mo" ent="custom" />
+                <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry={`${planCredits('entry')}/mo`} mid={`${planCredits('mid')}/mo`} growth={`${planCredits('growth')}/mo`} agency={`${planCredits('agency')}/mo`} ent="custom" />
                 {/*
                   Tool count is INTERPOLATED from the live catalog, never typed. This row once
                   hardcoded "52", then drifted; the replacement counted only credit-charging
@@ -435,12 +454,12 @@ export default function McpPricing() {
                   `tools.length` — the same number /mcp/tools shows, from the same endpoint.
                   Never type a count into copy here.
                 */}
-                <CompareRow label={`All ${toolCount} tools (public data + curated contacts · angles · lessons · proposal pipeline)`} free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
-                <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
-                <CompareRow label="One-time top-ups · auto-recharge" free="no" entry="yes" mid="yes" agency="yes" ent="yes" />
-                <CompareRow label="Data feed / high-volume API" free="no" entry="no" mid="no" agency="no" ent="yes" />
-                <CompareRow label="SSO / SAML · dedicated CSM · SLA" free="no" entry="no" mid="no" agency="no" ent="yes" />
-                <CompareRow label="Best for" free="try it" entry="project / occasional" mid="daily BD" agency="high volume" ent="primes · funds · partners" />
+                <CompareRow label={`All ${toolCount} tools (public data + curated contacts · angles · lessons · proposal pipeline)`} free="yes" entry="yes" mid="yes" growth="yes" agency="yes" ent="yes" />
+                <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" growth="yes" agency="yes" ent="yes" />
+                <CompareRow label="One-time top-ups · auto-recharge" free="no" entry="yes" mid="yes" growth="yes" agency="yes" ent="yes" />
+                <CompareRow label="Data feed / high-volume API" free="no" entry="no" mid="no" growth="no" agency="no" ent="yes" />
+                <CompareRow label="SSO / SAML · dedicated CSM · SLA" free="no" entry="no" mid="no" growth="no" agency="no" ent="yes" />
+                <CompareRow label="Best for" free="try it" entry="project / occasional" mid="daily BD" growth="several markets" agency="high volume" ent="primes · funds · partners" />
               </tbody>
             </table>
           </div>
@@ -477,7 +496,7 @@ export default function McpPricing() {
 }
 
 /** One row of the compare matrix. Semantic cells: yes → colored check, no/— → muted, text → verbatim. */
-function CompareRow({ label, free, entry, mid, agency, ent }: { label: string; free: string; entry: string; mid: string; agency: string; ent: string }) {
+function CompareRow({ label, free, entry, mid, growth, agency, ent }: { label: string; free: string; entry: string; mid: string; growth: string; agency: string; ent: string }) {
   const cell = (v: string, accent: 'slate' | 'emerald' | 'amber') => {
     if (v === 'yes') return <span className={accent === 'amber' ? 'text-amber-300' : accent === 'slate' ? 'text-slate-300' : 'text-emerald-400'}>✓</span>;
     if (v === 'no') return <span className="text-slate-600">–</span>;
@@ -489,6 +508,7 @@ function CompareRow({ label, free, entry, mid, agency, ent }: { label: string; f
       <td>{cell(free, 'slate')}</td>
       <td>{cell(entry, 'emerald')}</td>
       <td>{cell(mid, 'emerald')}</td>
+      <td>{cell(growth, 'emerald')}</td>
       <td>{cell(agency, 'emerald')}</td>
       <td>{cell(ent, 'amber')}</td>
     </tr>

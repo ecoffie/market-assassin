@@ -17,7 +17,9 @@ import {
   categorizePainPoints,
 } from '@/lib/utils/pain-points';
 import { getBudgetForAgency } from '@/lib/utils/budget-authority';
+import { getAgencyLegacyClaimsSync, DISPLAY_DISCLOSURE } from '@/lib/strategic-intel/strategic-claims';
 import agencyAliasesData from '@/data/agency-aliases.json';
+import budgetDataJson from '@/data/agency-budget-data.json';
 import type { AgencyContext } from './types';
 
 // ---- Agency name resolver -------------------------------------------
@@ -196,14 +198,16 @@ export function buildAgencyContext(rfpText: string, explicitAgency?: string | nu
 
   // Try canonical first; fall back to raw if canonical found nothing
   // (in case the raw name was already a direct database key).
-  let allPainPoints = getPainPointsForAgency(canonical);
-  let allPriorities = getPrioritiesForAgency(canonical);
-  if (allPainPoints.length === 0 && canonical !== rawAgency) {
-    allPainPoints = getPainPointsForAgency(rawAgency);
+  // Read through the strategic-claim boundary, NOT the raw corpus. It applies the
+  // #1577 unsourced-dollar sanitizer (which the raw `getPainPointsForAgency` path
+  // does not) and types every claim, so a generated proposal cannot turn an
+  // uncited "$6.2B allocated for hypersonic weapons" into a factual assertion.
+  let claims = getAgencyLegacyClaimsSync(canonical);
+  if (claims.painPoints.length === 0 && claims.priorities.length === 0 && canonical !== rawAgency) {
+    claims = getAgencyLegacyClaimsSync(rawAgency);
   }
-  if (allPriorities.length === 0 && canonical !== rawAgency) {
-    allPriorities = getPrioritiesForAgency(rawAgency);
-  }
+  const allPainPoints = claims.painPoints.map((c) => c.claim);
+  const allPriorities = claims.priorities.map((c) => c.claim);
   const budget = getBudgetForAgency(canonical) || getBudgetForAgency(rawAgency);
 
   // For display, prefer the more specific raw name if it contains
@@ -243,22 +247,45 @@ export function formatAgencyContextForPrompt(ctx: AgencyContext): string {
   parts.push(`### Agency context: ${ctx.agency}`);
   parts.push('(Use these to ground the draft in what THIS agency actually struggles with — not generic federal-speak)');
 
+  // ⚠️ WORDING IS PART OF THE CLAIM.
+  // These headings used to read "Current pain points the agency is solving for"
+  // and "Stated strategic priorities" — both assert that the agency said it, and
+  // that it is current. They were applied to the ENTIRE legacy corpus: 2,500
+  // priorities, 0 with a source URL. The drafting model then wrote that assertion
+  // into a customer's proposal. The content is still useful as THEMES; only the
+  // false attribution is removed.
   if (ctx.painPoints.length > 0) {
-    parts.push('\n**Current pain points the agency is solving for:**');
+    parts.push('\n**Likely agency challenges (unsourced context — do NOT cite as agency statements):**');
     for (const pp of ctx.painPoints) {
       parts.push(`- ${pp}`);
     }
   }
 
   if (ctx.priorities.length > 0) {
-    parts.push('\n**Stated strategic priorities:**');
+    parts.push('\n**Likely investment themes (unsourced context — do NOT cite as agency statements):**');
     for (const p of ctx.priorities) {
       parts.push(`- ${p}`);
     }
   }
 
+  if (ctx.painPoints.length > 0 || ctx.priorities.length > 0) {
+    parts.push(
+      `\n_${DISPLAY_DISCLOSURE.LEGACY_MANUAL} Use them to aim the narrative; never write them as facts the agency published, and never attach a dollar figure to them._`,
+    );
+  }
+
   if (ctx.budgetTrend) {
+    // The budget figures DO have real provenance (unlike the claim corpus above):
+    // OMB's FY2026 Discretionary Budget Request + agency CBJs. Cite it, so the one
+    // numeric claim in this prompt is the one the model may safely attribute.
+    const meta = budgetDataJson as { source?: string; sourceUrl?: string; lastUpdated?: string };
+    const cite = [
+      meta.source ? meta.source.split('.')[0] : null,
+      meta.sourceUrl,
+      meta.lastUpdated ? `as of ${meta.lastUpdated.slice(0, 10)}` : null,
+    ].filter(Boolean).join(' · ');
     parts.push(`\n**Budget trend:** ${ctx.budgetTrend}`);
+    if (cite) parts.push(`_Source: ${cite}_`);
   }
 
   return parts.join('\n');

@@ -10,12 +10,25 @@
  * Each function caches independently — top NAICS for Lockheed
  * doesn't have to recompute when only the awards list changed.
  */
-import { BQ_TABLES } from './client';
+import { BQ_TABLES, bqQuery } from './client';
 import { queryCached } from './cache';
 import { bqUnavailable } from './cache';
 import { readServedPage } from '../awards-serving';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
+import {
+  buildCountingBases,
+  dateRangeValidFlag,
+  assessDateRange,
+  deriveActivityFromSeries,
+  describeCoverageTimestamp,
+  isModificationAction,
+  classifyModNumber,
+  classifyAgencyYearObligations,
+  summarizeHistoricalSetAsides,
+  SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
+} from '@/lib/contractor/award-history-shape';
+import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 
 // Queries that scan the full `awards` table filtered by recipient_uei
 // can exceed the BQ client's 5 GiB default maximumBytesBilled for
@@ -111,7 +124,9 @@ export interface RollupProfile {
 // Shared SQL fragment: the computed-slug expression mirrors recipientSlug()
 // exactly (lowercase, & → " and ", non-alphanum → "-", trim, 120 cap). Used
 // by both the rollup slug lookup and the sibling-redirect resolver.
-const COMPUTED_SLUG_SQL = (col: string) => `
+// Exported so batch warmers derive slugs with the EXACT same SQL the readers use.
+// A warmer that reimplements this drifts, and a drifted slug warms a key nothing reads.
+export const COMPUTED_SLUG_SQL = (col: string) => `
   SUBSTR(
     REGEXP_REPLACE(
       REGEXP_REPLACE(
@@ -163,11 +178,13 @@ export function normalizeCompanyName(slugOrName: string): string {
  */
 // liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
 // callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
-export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
-  const rows = await queryCached<RollupProfile>({
-    cacheOnly: !liveBq,
-    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
-    query: `
+/**
+ * ONE query for a contractor profile by slug, shared by the page reader and the
+ * batch warmer. Parameterised on an ARRAY so the batch form is the same SQL,
+ * not a second implementation of it (see CANONICAL_SLUG_SQL for why that rule
+ * exists — a forked copy silently dropped an arm and left 49 URLs 404).
+ */
+export const ROLLUP_BY_SLUG_SQL = `
       WITH slugged AS (
         SELECT
           *,
@@ -187,13 +204,43 @@ export async function getRollupBySlug(slug: string, liveBq = false): Promise<Rol
         CAST(last_action_date AS STRING) AS last_action_date,
         distinct_agency_count, distinct_naics_count
       FROM slugged
-      WHERE computed_slug = @slug
-      ORDER BY total_obligated DESC
-      LIMIT 1
-    `,
-    params: { slug },
+      WHERE computed_slug IN UNNEST(@slugs)
+      -- One row per slug, highest spend wins.
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY computed_slug ORDER BY total_obligated DESC
+      ) = 1
+    `;
+
+// liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
+// callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
+export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
+  const rows = await queryCached<RollupProfile>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
+    query: ROLLUP_BY_SLUG_SQL,
+    params: { slugs: [slug] },
   });
   return rows[0] ?? null;
+}
+
+/**
+ * Batch form of getRollupBySlug — ONE scan for N slugs, same SQL.
+ *
+ * For warmers only: it neither reads nor writes the per-slug cache, because the
+ * caller decides what to prime and under which key. `maximumBytesBilled` is
+ * required, not optional — a warmer without a ceiling is the outage this whole
+ * subsystem exists to prevent.
+ */
+export async function getRollupsBySlugBatch(
+  slugs: string[],
+  maximumBytesBilled: string,
+): Promise<RollupProfile[]> {
+  if (slugs.length === 0) return [];
+  return bqQuery<RollupProfile>({
+    query: ROLLUP_BY_SLUG_SQL,
+    params: { slugs },
+    maximumBytesBilled,
+  });
 }
 
 /**
@@ -248,16 +295,55 @@ export async function getRollupOrSingleBySlug(
  * this maps any child UEI's name-slug to the parent's canonical slug so old
  * inbound links land on the live parent page instead of a 404.
  */
-export async function resolveCanonicalSlug(slug: string): Promise<string | null> {
-  // Normalized (suffix-stripped) form of the requested slug, for the name-merge
-  // arm — catches pre-merge ROLLUP-name variants (e.g. the slug
-  // "general-dynamics-corporation" whose rollup got merged into
-  // "general-dynamics-corp"; that variant is no longer a rollup name nor an
-  // exact child recipient_name, so only the normalized form finds it).
-  const normSlug = normalizeCompanyName(slug);
-  const rows = await queryCached<{ canonical_slug: string }>({
-    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
-    query: `
+/**
+ * ONE query, three arms, used by BOTH the single-slug resolver and the batch
+ * warmer. Do not fork it.
+ *
+ * It was forked once, on 2026-09-21, by a warm script that re-implemented the
+ * "direct" and "child_match" arms in batched form and silently dropped
+ * "norm_match". The result: 49 slugs stayed 404 after a warm that reported
+ * success, among them general-dynamics-corporation — the exact example the
+ * norm_match comment below is written about. A second implementation of this
+ * resolution is a second set of bugs.
+ *
+ * @slugs / @normSlugs are PARALLEL arrays (index i of one pairs with index i of
+ * the other), zipped back together in the `requested` CTE so the normalized arm
+ * can report which slug was actually asked for.
+ */
+/**
+ * The three resolution arms, defined ONCE, emitted with either a scalar
+ * predicate (single slug) or an array predicate (batch).
+ *
+ * WHY NOT LITERALLY ONE STRING
+ * ----------------------------
+ * A single array-parameterised query looks cleaner and is 40× too slow. Measured
+ * 2026-09-21: rewriting the scalar `WHERE ${slugExpr} = @slug` as a JOIN against
+ * an UNNEST(@slugs) CTE defeated BigQuery's filter pushdown, so the
+ * recipients × rollups UNNEST(child_ueis) join ran BEFORE filtering. The result
+ * was 9,106 CPU seconds against 27 MB scanned — over the on-demand
+ * CPU-to-bytes ratio, so the query is REFUSED, not merely slow:
+ *
+ *   "This query used 9106 CPU seconds but would charge only 27M Analysis bytes.
+ *    This exceeds the ratio supported by the on-demand pricing model."
+ *
+ * Note what that means for cost estimation: a dry run reports BYTES, and this
+ * query's failure mode is CPU. Bytes alone will not catch it.
+ *
+ * So the arms — direct, child_match, norm_match — live in one builder (forking
+ * them is what silently dropped norm_match and left 49 URLs 404), while the
+ * PREDICATE differs so each shape keeps its pushdown.
+ */
+function canonicalSlugSql(mode: 'single' | 'batch'): string {
+  // single: scalar equality, pushed down into the scan.
+  // batch:  array membership, still a filter (not a join), so it pushes down too.
+  const slugPred = (expr: string) =>
+    mode === 'single' ? `${expr} = @slug` : `${expr} IN UNNEST(@slugs)`;
+  const normPred = (expr: string) =>
+    mode === 'single' ? `${expr} = @normSlug` : `${expr} IN UNNEST(@normSlugs)`;
+  // What to report back as "the slug that was asked for".
+  const requested = (expr: string) => (mode === 'single' ? '@slug' : expr);
+
+  return `
       WITH rollups AS (
         SELECT
           ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug,
@@ -268,42 +354,108 @@ export async function resolveCanonicalSlug(slug: string): Promise<string | null>
       ),
       -- Direct hit: the slug matches a rollup name. Canonical = highest-spend.
       direct AS (
-        SELECT canonical_slug, total_obligated, 0 AS tiebreak
+        SELECT ${requested('canonical_slug')} AS requested_slug,
+               canonical_slug, total_obligated, 0 AS tiebreak
         FROM rollups
-        WHERE canonical_slug = @slug
+        WHERE ${slugPred('canonical_slug')}
       ),
       -- Indirect hit: the slug matches a CHILD UEI's recipient name. Map to
       -- the rollup that contains that child.
       child_match AS (
-        SELECT r.canonical_slug, r.total_obligated, 1 AS tiebreak
+        SELECT ${requested(COMPUTED_SLUG_SQL('c.recipient_name'))} AS requested_slug,
+               r.canonical_slug, r.total_obligated, 1 AS tiebreak
         FROM ${BQ_TABLES.recipients} c
         JOIN rollups r ON c.recipient_uei IN UNNEST(r.child_ueis)
         WHERE c.recipient_name IS NOT NULL
-          AND ${COMPUTED_SLUG_SQL('c.recipient_name')} = @slug
+          AND ${slugPred(COMPUTED_SLUG_SQL('c.recipient_name'))}
       ),
       -- Name-merge hit: the slug's normalized (suffix-stripped) form matches a
-      -- merged rollup's normalized name. Catches legal-suffix variants that the
-      -- merge collapsed (corp vs corporation). Lowest priority so an exact slug
-      -- always wins over a normalized match.
+      -- merged rollup's normalized name. Catches legal-suffix variants the merge
+      -- collapsed (corp vs corporation). Lowest priority so an exact slug wins.
       norm_match AS (
-        SELECT canonical_slug, total_obligated, 2 AS tiebreak
+        SELECT ${mode === 'single' ? '@slug' : 'norm_name'} AS requested_slug,
+               canonical_slug, total_obligated, 2 AS tiebreak
         FROM rollups
-        WHERE norm_name = @normSlug AND norm_name != ''
+        WHERE ${normPred('norm_name')} AND norm_name != ''
       )
-      SELECT canonical_slug
+      SELECT requested_slug, canonical_slug
       FROM (
         SELECT * FROM direct
         UNION ALL SELECT * FROM child_match
         UNION ALL SELECT * FROM norm_match
       )
-      ORDER BY tiebreak ASC, total_obligated DESC
-      LIMIT 1
-    `,
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY requested_slug ORDER BY tiebreak ASC, total_obligated DESC
+      ) = 1
+    `;
+}
+
+/** Single-slug form — what the public page and the MCP tools resolve through. */
+export const CANONICAL_SLUG_SQL = canonicalSlugSql('single');
+/** Batch form — warmers only. */
+export const CANONICAL_SLUG_BATCH_SQL = canonicalSlugSql('batch');
+
+export async function resolveCanonicalSlug(
+  slug: string,
+  liveBq = false,
+): Promise<string | null> {
+  const normSlug = normalizeCompanyName(slug);
+  const rows = await queryCached<{ requested_slug: string; canonical_slug: string }>({
+    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
+    query: CANONICAL_SLUG_SQL,
     params: { slug, normSlug },
+    // Default cache-ONLY, and deliberately so. This query joins the full
+    // recipients table against the rollup table through UNNEST(child_ueis) —
+    // it is not cheap, and it fires on exactly the traffic pattern that
+    // drained the BigQuery daily quota: a crawler walking slugs that match no
+    // rollup name.
+    //
+    // But cache-only had a cost nobody had measured. This resolver is the ONLY
+    // thing standing between a retired slug and notFound(), and its cache key
+    // had no warmer at all — so it always missed, always returned null, and
+    // always fell through to a 404. Measured 2026-09-21:
+    // /contractors/caci-inc-federal 404s while the rollup that absorbed it
+    // serves 200 and sits in the sitemap. Google reported the old URL a soft 404.
+    // 861 previously-indexed URLs were in that state.
+    //
+    // The repair is a WARM PATH, not an open door: `npm run seo:warm-slugs`
+    // passes liveBq=true for a bounded, known list of slugs, populating this
+    // key so the redirect works on the next crawl. The crawler path itself is
+    // unchanged and still cannot trigger a scan.
+    cacheOnly: !liveBq,
   });
   const canonical = rows[0]?.canonical_slug ?? null;
   // null when unknown slug; null when already canonical (no redirect needed).
   return canonical && canonical !== slug ? canonical : null;
+}
+
+/**
+ * Batch form of resolveCanonicalSlug — ONE scan for N slugs, same SQL.
+ *
+ * For warmers only. It deliberately does NOT read or write the per-slug cache;
+ * the caller decides what to prime, because the reader's key encodes the
+ * REQUESTED slug while this returns (requested → canonical) pairs.
+ *
+ * Returns only genuine redirects: a slug that resolves to itself is already
+ * canonical and is omitted, matching what the single-slug reader returns.
+ */
+export async function resolveCanonicalSlugsBatch(
+  slugs: string[],
+  maximumBytesBilled: string,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (slugs.length === 0) return out;
+  const rows = await bqQuery<{ requested_slug: string; canonical_slug: string }>({
+    query: CANONICAL_SLUG_BATCH_SQL,
+    params: { slugs, normSlugs: slugs.map(normalizeCompanyName) },
+    maximumBytesBilled,
+  });
+  for (const r of rows) {
+    if (r.canonical_slug && r.canonical_slug !== r.requested_slug) {
+      out.set(r.requested_slug, r.canonical_slug);
+    }
+  }
+  return out;
 }
 
 /**
@@ -525,6 +677,8 @@ export async function getTopNaicsForRecipient(
 export interface RecentAwardRow {
   award_id: string;
   piid: string | null;
+  /** Modification number from FPDS/USASpending — empty/0 = base action. */
+  mod_number: string | null;
   awarding_agency: string | null;
   awarding_office: string | null;
   naics_code: string | null;
@@ -548,13 +702,17 @@ export async function getRecentAwardsForRecipient(
   // instead of BigQuery's wrapper objects ({value: 'YYYY-MM-DD'}) which
   // break our formatDate(). Also filter to dollar-bearing transactions —
   // $0 modifications dominate the recent timeline but tell users nothing.
+  // Grain = obligation ACTIONS (often mods). Same award_id can appear more
+  // than once; do NOT treat this list as unique awards. mod_number is the
+  // modification signal — never PIID repetition alone.
   return queryCached<RecentAwardRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v3-m`,
+    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v4-m`,
     query: `
       SELECT
         award_id,
         piid,
+        CAST(mod_number AS STRING) AS mod_number,
         awarding_agency,
         awarding_office,
         naics_code,
@@ -579,7 +737,13 @@ export async function getRecentAwardsForRecipient(
 
 export interface YearlyTotalRow {
   fiscal_year: number;
+  /** Net obligations (positive + negative). Not revenue. */
   total_obligated: number;
+  /** Sum of obligation_amount where amount > 0. */
+  positive_obligations: number;
+  /** Sum of obligation_amount where amount < 0 (negative number). */
+  deobligations: number;
+  /** Distinct award_id with any action in this FY — not additive across years. */
   award_count: number;
 }
 
@@ -590,16 +754,90 @@ export async function getYearlyTotalsForRecipient(
 ): Promise<YearlyTotalRow[]> {
   return queryCached<YearlyTotalRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:yearly-totals:v2-m`,
+    cacheKey: `rollup:${rollupUei}:yearly-totals:v3-m`,
     query: `
       SELECT
         fiscal_year,
         SUM(obligation_amount) AS total_obligated,
+        SUM(IF(obligation_amount > 0, obligation_amount, 0)) AS positive_obligations,
+        SUM(IF(obligation_amount < 0, obligation_amount, 0)) AS deobligations,
         COUNT(DISTINCT award_id) AS award_count
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei IN UNNEST(@ueis)
       GROUP BY fiscal_year
       ORDER BY fiscal_year ASC
+    `,
+    params: { ueis },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
+export interface SetAsideSupportingActionRow {
+  uei: string | null;
+  award_id: string | null;
+  fiscal_year: number | null;
+  obligation_amount: number | null;
+  action_date: string | null;
+}
+
+export interface SetAsideHistoryRow {
+  set_aside: string;
+  award_count: number;
+  /**
+   * Latest fiscal_year on ANY warehouse action carrying this set-aside code
+   * (includes later deobligations). Not award origin and not certification.
+   */
+  last_action_fy: number | null;
+  /**
+   * Earliest fiscal_year with a positive obligation under this set-aside.
+   * A later positive modification can land years after award creation — this is
+   * NOT award origin. Null when no positive-obligation action exists.
+   */
+  first_observed_positive_action_fy: number | null;
+  total_obligated: number;
+  /** Distinct UEIs that contributed actions under this label (rollup may be many). */
+  contributing_ueis: string[] | null;
+  /** Sample supporting actions (ordered by |obligation|; not a full census). */
+  supporting_actions: SetAsideSupportingActionRow[] | null;
+}
+
+export async function getSetAsideHistoryForRecipient(
+  ueis: string[],
+  rollupUei: string,
+  liveBq = false,
+): Promise<SetAsideHistoryRow[]> {
+  // v4: v3 FY semantics + contributing UEIs + supporting action sample.
+  // Positive-obligation MIN is not award origin. Award origin stays unknown
+  // unless a dedicated origin signal exists. Null first-positive ≠ all deobligations.
+  return queryCached<SetAsideHistoryRow>({
+    cacheOnly: !liveBq,
+    cacheKey: `rollup:${rollupUei}:set-aside-history:v4-m`,
+    query: `
+      SELECT
+        set_aside,
+        COUNT(DISTINCT award_id) AS award_count,
+        MAX(fiscal_year) AS last_action_fy,
+        MIN(IF(obligation_amount > 0, fiscal_year, NULL)) AS first_observed_positive_action_fy,
+        SUM(obligation_amount) AS total_obligated,
+        ARRAY_AGG(DISTINCT recipient_uei IGNORE NULLS LIMIT 20) AS contributing_ueis,
+        ARRAY_AGG(
+          STRUCT(
+            recipient_uei AS uei,
+            award_id,
+            fiscal_year,
+            obligation_amount,
+            CAST(action_date AS STRING) AS action_date
+          )
+          ORDER BY ABS(IFNULL(obligation_amount, 0)) DESC
+          LIMIT 5
+        ) AS supporting_actions
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND set_aside IS NOT NULL
+        AND set_aside != ''
+        AND NOT STARTS_WITH(UPPER(set_aside), 'NO SET ASIDE')
+      GROUP BY set_aside
+      ORDER BY award_count DESC
     `,
     params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
@@ -1090,12 +1328,18 @@ export async function getTopRecipientsForSitemap(
       LIMIT @limit
     `,
     params: { limit },
-    // Self-warm on a cold key. queryCached defaults cacheOnly:true (returns []
-    // on a miss to block cost spikes), but the sitemap has no other warmer — so
-    // a fresh cacheKey (e.g. the :v5 bump) would leave the contractor block
-    // permanently empty. This query is a single 0.016 GB scan gated to once/day
-    // by the route's `revalidate = 86400`, so a live cold-load is safe here.
-    cacheOnly: false,
+    // ⚠️ CACHE-ONLY. This used to be `cacheOnly: false` — sitemap generation
+    // could cold-scan BigQuery. The scan is small (~0.016 GB, once/day), but the
+    // SHAPE is the one that is banned: a public, crawler-reachable route wired to
+    // the warehouse. getmindy.ai and the authenticated product share one GCP
+    // project quota, and when that quota goes the product goes with it.
+    //
+    // The contractor block is now fed by the bounded warm job
+    // (`npm run seo:warm-slugs`), which materializes this key deliberately and
+    // under hard limits. If the key is cold the block is EMPTY and the sitemap
+    // simply omits contractors — fail closed. An omitted URL returns on the next
+    // warm; a drained quota is a day-long product outage.
+    cacheOnly: true,
   });
 }
 
@@ -1459,35 +1703,71 @@ export async function getBqContractorHistory(opts: {
   // collide with the page's full-child-set result. Prefix keeps them separate.
   const cacheKey = `single:${uei}`;
 
-  const [yearly, agencies, naics, recent, yearlyByAgency] = await Promise.all([
-    getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
-    getTopAgenciesForRecipient(ueiSet, cacheKey, 8, liveBq),
-    getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
-    getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
-    getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
-  ]);
+  const TOP_AGENCIES_LIMIT = 8;
+  const [yearly, agencies, naics, recent, yearlyByAgency, setAsideHist, warehouseCoverage] =
+    await Promise.all([
+      getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
+      getTopAgenciesForRecipient(ueiSet, cacheKey, TOP_AGENCIES_LIMIT, liveBq),
+      getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
+      getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
+      getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
+      getSetAsideHistoryForRecipient(ueiSet, cacheKey, liveBq),
+      loadAwardsWarehouseCoverage().catch(() => null),
+    ]);
 
   const awardCount = Number(profile.award_count || 0);
   // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
   // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
   // empty arrays mean "not retrieved", not "none exist".
+  const setAsideKey = `rollup:${cacheKey}:set-aside-history:v4-m`;
+  const setAsideUnavailable =
+    awardCount > 0 && bqUnavailable(setAsideKey, setAsideHist.length);
   const detailIncomplete =
     awardCount > 0 &&
-    (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v2-m`, yearly.length) ||
-      bqUnavailable(`rollup:${cacheKey}:top-agencies:8:v4-m`, agencies.length) ||
+    (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v3-m`, yearly.length) ||
+      bqUnavailable(`rollup:${cacheKey}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`, agencies.length) ||
       bqUnavailable(`rollup:${cacheKey}:top-naics:8:v2-m`, naics.length) ||
-      bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v3-m`, recent.length) ||
-      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length));
+      bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v4-m`, recent.length) ||
+      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length) ||
+      setAsideUnavailable);
   const enrichmentStatus: 'complete' | 'budget_limited' = detailIncomplete
     ? 'budget_limited'
     : 'complete';
 
   // Group the per-(year,agency) rows so each fiscal year carries its agency
   // breakdown — this is what the chart's click-to-drill-down renders.
-  const byYear = new Map<number, Array<{ agency: string; amount: number; count: number }>>();
+  // Zero-dollar cells keep vehicle_usage=not_established (never boolean false-as-caveat).
+  const byYear = new Map<
+    number,
+    Array<{
+      agency: string;
+      amount: number;
+      /** @deprecated Prefer distinct_award_count — same value, grain=distinct_awards. */
+      count: number;
+      distinct_award_count: number;
+      count_grain: 'distinct_awards';
+      classification: ReturnType<typeof classifyAgencyYearObligations>['classification'];
+      unused_vehicle: null;
+      vehicle_usage: 'not_established';
+      classification_note: string | null;
+    }>
+  >();
   for (const r of yearlyByAgency) {
+    const amount = Number(r.total_amount || 0);
+    const count = Number(r.award_count || 0);
+    const classified = classifyAgencyYearObligations({ amount, count });
     const arr = byYear.get(r.fiscal_year) || [];
-    arr.push({ agency: r.awarding_agency, amount: Number(r.total_amount || 0), count: Number(r.award_count || 0) });
+    arr.push({
+      agency: r.awarding_agency,
+      amount,
+      count: classified.distinct_award_count,
+      distinct_award_count: classified.distinct_award_count,
+      count_grain: classified.count_grain,
+      classification: classified.classification,
+      unused_vehicle: classified.unused_vehicle,
+      vehicle_usage: classified.vehicle_usage,
+      classification_note: classified.note,
+    });
     byYear.set(r.fiscal_year, arr);
   }
 
@@ -1496,18 +1776,76 @@ export async function getBqContractorHistory(opts: {
   .map(y => ({
     fiscalYear: y.fiscal_year,
     totalObligations: Number(y.total_obligated || 0),
+    // Pass through only when the v3 query field is present — never invent from net.
+    positiveObligations:
+      y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+    deobligations:
+      y.deobligations == null ? undefined : Number(y.deobligations),
     awardCount: Number(y.award_count || 0),
     agencyBreakdown: byYear.get(y.fiscal_year) || [],
   }));
   const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
   const topAgency = agencies[0]?.awarding_agency || null;
   const totalObligations = Number(profile.total_obligated || 0);
+  const activity = deriveActivityFromSeries(series);
+  const counting = buildCountingBases({
+    uniqueAwards: awardCount,
+    series,
+    recentActions: recent.map((r) => ({ awardId: r.award_id })),
+  });
+  const coverageTs = describeCoverageTimestamp({
+    lastRecipientActionDate: profile.last_action_date || null,
+    warehouseMaxActionDate: warehouseCoverage?.clocks?.sourceActionMax ?? null,
+    ingest: warehouseCoverage
+      ? {
+          last_built: warehouseCoverage.lastBuilt,
+          acquired_at: warehouseCoverage.clocks?.acquiredAt ?? null,
+          merged_at: warehouseCoverage.clocks?.mergedAt ?? null,
+          recipients_rebuilt_at: warehouseCoverage.clocks?.recipientsRebuiltAt ?? null,
+          freshness: warehouseCoverage.freshness,
+        }
+      : null,
+  });
+  const historicalSetAsides = summarizeHistoricalSetAsides(
+    setAsideUnavailable
+      ? []
+      : setAsideHist.map((r) => ({
+          setAside: r.set_aside,
+          lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
+          firstObservedPositiveActionFy:
+            r.first_observed_positive_action_fy == null
+              ? null
+              : Number(r.first_observed_positive_action_fy),
+          // Preserve null — never substitute the queried UEI.
+          contributingUeis: r.contributing_ueis,
+          supportingActions: (r.supporting_actions ?? []).map((a) => ({
+            uei: a?.uei ?? null,
+            award_id: a?.award_id ?? null,
+            fiscal_year: a?.fiscal_year == null ? null : Number(a.fiscal_year),
+            obligation_amount:
+              a?.obligation_amount == null ? null : Number(a.obligation_amount),
+            action_date: a?.action_date ?? null,
+          })),
+        })),
+    {
+      coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+      scope: { kind: 'history_single_uei', uei_count: 1 },
+      contributingUeiSampleLimit: SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
+      scopeNote:
+        'Aggregated across warehouse award actions for this UEI (not a capped recent-action sample). Award origin is not established by this query.',
+    },
+  );
+  const agenciesServed = Number(profile.distinct_agency_count || agencies.length);
+  const topAgenciesCapped = agenciesServed > agencies.length;
 
   return {
     success: true,
     source: 'bigquery_normalized',
     coverage: enrichmentStatus === 'budget_limited' ? 'limited' : 'cached',
+    // lastUpdated remains for compatibility — it is the recipient's last action,
+    // NOT warehouse ingest freshness (see coverage_timestamp).
     lastUpdated: profile.last_action_date || null,
+    coverage_timestamp: coverageTs,
     contractor: {
       company: profile.recipient_name,
       slug: recipientSlug(profile.recipient_name),
@@ -1517,36 +1855,76 @@ export async function getBqContractorHistory(opts: {
       contractCount: awardCount,
       hasContact: false, hasEmail: false, hasPhone: false,
     },
-    match: { method: 'recipient_name', confidence: 'high', name: profile.recipient_name },
+    match: {
+      method: 'recipient_uei',
+      confidence: 'high',
+      name: profile.recipient_name,
+      // Shared vocabulary across MCP tools (profile resolution / SAM lookup_status / history).
+      match_status: 'unique',
+    },
     summary: {
       totalObligations, awardCount, latestFiscalYear, topAgency,
       averageAwardSize: awardCount > 0 ? totalObligations / awardCount : 0,
+      last_positive_obligation_fy: activity.last_positive_obligation_fy,
+      activity_status: activity.activity_status,
+      activity_note: activity.activity_note,
+      activity_observation_period: activity.observation_period,
+      // Federal obligations ≠ company revenue.
+      obligations_are_not_revenue: true,
     },
+    counting_bases: counting,
     series,
-    // count: 0 here is a sentinel — the BQ top-agencies query intentionally
-    // doesn't return per-agency award_count (cost). We surface `share`
-    // (pct_of_total, 0-1) instead; renderers fall back to count only when
-    // share is undefined (i.e. the static-contractor path).
+    // Per-agency award_count is intentionally not queried here (scan cost).
+    // count=null means unavailable — never fabricate 0. share can be ≤0 for
+    // deobligation-only agencies (still a real relationship).
     topAgencies: agencies.map(a => ({
       agency: a.awarding_agency,
       amount: Number(a.total_amount || 0),
-      count: 0,
+      count: null as number | null,
+      count_unavailable: true,
       share: Number(a.pct_of_total || 0),
     })),
+    top_agencies_returned: agencies.length,
+    top_agencies_limit: TOP_AGENCIES_LIMIT,
+    agencies_served: agenciesServed,
+    top_agencies_capped: topAgenciesCapped,
+    top_agencies_note: topAgenciesCapped
+      ? `Showing top ${agencies.length} of ${agenciesServed} agencies by net obligations (includes $0 and negative nets). Cap is explicit — omitted agencies are not "no relationship".`
+      : 'Agency list includes $0 and negative net totals when present; negative net is deobligation evidence, not proof the agency was filtered out.',
     topNaics: naics.map(n => ({ naics: n.naics_code, description: n.naics_description || null, amount: Number(n.total_amount || 0), count: Number(n.award_count || 0) })),
-    recentAwards: recent.map(r => ({
-      id: r.award_id,
-      title: (r.description || r.piid || r.award_id || '').slice(0, 160),
-      agency: r.awarding_agency || '—',
-      subAgency: r.awarding_office || null,
-      naics: r.naics_code || null,
-      naicsDescription: r.naics_description || null,
-      amount: Number(r.obligation_amount || 0),
-      startDate: r.pop_start_date || null,
-      endDate: r.pop_end_date || null,
-      state: r.pop_state || null,
-      url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
-    })),
+    recentAwards: recent.map(r => {
+      const startDate = r.pop_start_date || null;
+      const endDate = r.pop_end_date || null;
+      const range = assessDateRange(startDate, endDate);
+      const modNumber = r.mod_number ?? null;
+      return {
+        id: r.award_id,
+        piid: r.piid || null,
+        modNumber,
+        modClassification: classifyModNumber(modNumber),
+        isModification: isModificationAction(modNumber),
+        title: (r.description || r.piid || r.award_id || '').slice(0, 160),
+        agency: r.awarding_agency || '—',
+        subAgency: r.awarding_office || null,
+        naics: r.naics_code || null,
+        naicsDescription: r.naics_description || null,
+        amount: Number(r.obligation_amount || 0),
+        actionDate: r.action_date || null,
+        startDate,
+        endDate,
+        dateRangeAssessment: range.assessment,
+        dateRangeValid: dateRangeValidFlag(startDate, endDate),
+        dateRangeIssue: range.issue,
+        state: r.pop_state || null,
+        setAside: r.set_aside || null,
+        url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
+        grain: 'obligation_action' as const,
+      };
+    }),
+    recent_awards_note:
+      'recentAwards are dollar-bearing obligation actions (often modifications of the same award_id). ' +
+      'Use counting_bases.recent_unique_awards for distinct awards in this sample.',
+    historical_set_asides: historicalSetAsides,
     gated: { fullHistory: false, contacts: false, workflowActions: false, exports: false },
     enrichment_status: enrichmentStatus,
     ...(enrichmentStatus === 'budget_limited'

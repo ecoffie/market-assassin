@@ -122,28 +122,10 @@
       "limit": 20000
     },
     {
-      "fingerprint": "788e9d37bc51d50a",
-      "file": "src/app/api/market-overview/route.ts",
-      "table": "agency_forecasts",
-      "limit": 5000
-    },
-    {
-      "fingerprint": "7f9a68e3b924e9a9",
-      "file": "src/app/api/app/contacts-map/route.ts",
-      "table": "federal_contacts",
-      "limit": 4000
-    },
-    {
       "fingerprint": "8849139036efad5b",
       "file": "scripts/clean-generic-keywords.ts",
       "table": "user_notification_settings",
       "limit": 5000
-    },
-    {
-      "fingerprint": "886259965d3874f9",
-      "file": "src/app/api/market-overview/route.ts",
-      "table": "recompete_opportunities",
-      "limit": 3000
     },
     {
       "fingerprint": "8c52d776fb3314f5",
@@ -252,6 +234,12 @@
       "file": "src/app/api/admin/access-split/route.ts",
       "table": "user_profiles",
       "limit": 2000
+    },
+    {
+      "fingerprint": "e94d85f31d784305",
+      "file": "src/app/api/app/contacts-map/route.ts",
+      "table": "federal_contacts",
+      "limit": 4000
     },
     {
       "fingerprint": "fa32d7627f41788d",

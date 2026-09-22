@@ -11,6 +11,7 @@
 import type { EvidenceRef, GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, unknown, unknownFromError, value } from './grounding';
+import { marketScopeFromRequirement, retrievalManifest, type RetrievalManifest } from './market-scope';
 
 const SUPPORTING_NOT_IGE = 'supporting data, not the Government estimate';
 
@@ -26,6 +27,7 @@ export interface Section15 {
   pricingIsIge: false;
   calls: ToolCall[];
   limitations: string[];
+  retrievalManifests: RetrievalManifest[];
 }
 
 type CoverageShare = { code: string; pct: number; name?: string };
@@ -461,6 +463,9 @@ function buildLimitations(
   estimates.push(
     '§15 does not auto-fill commerciality (§15b) — that determination remains Phase 2 / KO-owned',
   );
+  estimates.push(
+    '§15 market-dollar figures reuse §5 keyword-coverage (phrase market), not a census of the entire primary-NAICS market',
+  );
 
   return [
     `Measured facts: ${measured.length ? measured.join('; ') : 'none established in this build'}.`,
@@ -503,6 +508,45 @@ export async function buildSection15(
     marketDiversity,
   );
 
+  const scope = marketScopeFromRequirement(primaryNaics ? { ...req, naics: primaryNaics } : req);
+  const asOf = pricingCall?.evidence.retrievedAt ?? new Date().toISOString();
+  const retrievalManifests: RetrievalManifest[] = [
+    retrievalManifest({
+      section: '15',
+      tool: 'get_keyword_coverage',
+      requested: scope,
+      consumed: { phrase: req.keyword },
+      unsupported: {
+        ...(scope.department ? { department: '§15 market $ reuses phrase coverage, not department history' } : {}),
+        ...(scope.contractingOffice || scope.contractingOfficeCode
+          ? { contracting_office: '§15 market $ is not office-scoped' }
+          : {}),
+        ...(scope.installation ? { installation: '§15 market $ is not installation-scoped' } : {}),
+      },
+      resultCount: totalMarket.state === 'value' ? 1 : totalMarket.state === 'true_zero' ? 0 : null,
+      grounded: totalMarket.state === 'value' || totalMarket.state === 'true_zero',
+      source: 'MRR §5 keyword coverage (reused)',
+      asOf,
+      evidenceClass: 'contextual',
+    }),
+    retrievalManifest({
+      section: '15',
+      tool: 'get_pricing_intel',
+      requested: scope,
+      consumed: primaryNaics ? { naics: primaryNaics } : {},
+      unsupported: {
+        ...(scope.contractingOffice || scope.contractingOfficeCode
+          ? { contracting_office: 'GSA CALC rates are NAICS-scoped, not office-scoped' }
+          : {}),
+      },
+      resultCount: pricingEvidence.state === 'value' ? 1 : null,
+      grounded: pricingEvidence.state === 'value',
+      source: pricingCall?.evidence.source ?? 'get_pricing_intel (not called)',
+      asOf,
+      evidenceClass: 'contextual',
+    }),
+  ];
+
   return {
     totalMarket,
     marketBasis,
@@ -514,5 +558,6 @@ export async function buildSection15(
     pricingIsIge: false,
     calls,
     limitations,
+    retrievalManifests,
   };
 }

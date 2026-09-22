@@ -17,6 +17,7 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES } from './packages';
+import { insufficientCreditsLead } from './commercial-refusal';
 
 /** Stripe payment links, mirroring src/app/mcp/pricing/page.tsx. */
 const CHECKOUT_ENTRY = 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y';
@@ -32,7 +33,13 @@ export const RESUME_BASE = 'https://getmindy.ai/mcp/continue';
  * and the answer is unrecoverable after the fact, because the row does not remember what
  * it showed. Stamped at write time on every attempt.
  */
-export const PAYWALL_OFFER_VERSION = 'v2';
+// v4 (2026-09-15): the offer no longer carries Stripe links — it routes to /mcp/continue
+// so checkout can be created server-side WITH attempt attribution. This is a STRUCTURAL
+// change to the funnel (one more click), not just copy, so v3 rates are not comparable.
+// v3 was the 1,000-credit repricing at the same $119.
+// v5 (2026-09-15): lead with exact need/have credits + explicit "not a server error / do not
+// retry" so agents stop inventing timeout language for commercial refusals.
+export const PAYWALL_OFFER_VERSION = 'v5';
 
 export type PaywallReason = 'insufficient_credits' | 'requires_pro';
 
@@ -144,9 +151,23 @@ function checkoutLink(base: string, email?: string | null, attemptId?: string | 
  */
 function offerLines(email?: string | null, attemptId?: string | null): string {
   const perRun = Math.floor(ENTRY_PLAN.creditsPerMonth / 100);
+  // ⚠️ THESE LINK TO /mcp/continue, NOT TO STRIPE (Eric, 2026-09-15).
+  //
+  // An MCP error payload is text: it cannot POST, so a direct Stripe link here would have
+  // to be a static payment LINK — and payment links do not forward `?attempt=`, so the
+  // purchase could never be tied to the blocked REQUEST. Routing through the resume page
+  // keeps one path: the page POSTs /api/mcp/checkout, which sets client_reference_id AND
+  // metadata.attempt server-side, so the saved request can resume after payment.
+  //
+  // Without an attempt id there is nothing to resume, so fall back to the plain entry
+  // checkout rather than inventing a resume URL that cannot work.
+  const page = attemptId ? `${RESUME_BASE}?attempt=${attemptId}` : CHECKOUT_ENTRY;
   return [
-    `→ ${ENTRY_PLAN.label} · $${ENTRY_PLAN.monthly.usd}/mo — ${ENTRY_PLAN.creditsPerMonth.toLocaleString()} credits/month (about ${perRun} more runs): ${checkoutLink(ENTRY_PLAN.monthly.checkoutUrl, email, attemptId)}`,
-    `→ One-time · $${TOPUP.usd} — ${TOPUP.credits.toLocaleString()} credits, no subscription: ${checkoutLink(TOPUP.checkoutUrl, email, attemptId)}`,
+    `→ ${ENTRY_PLAN.label} · $${ENTRY_PLAN.monthly.usd}/mo — ${ENTRY_PLAN.creditsPerMonth.toLocaleString()} credits/month (about ${perRun} more runs)`,
+    `→ One-time · $${TOPUP.usd} — ${TOPUP.credits.toLocaleString()} credits, no subscription`,
+    // The closing line of the message already carries this URL, so don't repeat it here —
+    // the same link twice in one chat turn reads like two different destinations.
+    `Pick either on the page below and your saved request runs straight after.`,
   ].join('\n');
 }
 
@@ -187,29 +208,103 @@ export function paywallMessage(opts: {
     return [
       `Ready to run another ${label}?`,
       offer ? offer.unlocks : `${opts.toolName} is part of Mindy Pro.`,
+      'This is not a temporary server error — do not retry until the account is upgraded.',
       offers,
       `Already upgraded, or want to see the saved request first? ${link}`,
     ].join('\n\n');
   }
 
+  // Insufficient credits: lead with exact need/have. Never "server unavailable" / "retry".
+  const lead =
+    typeof opts.creditsRequired === 'number'
+      ? insufficientCreditsLead(opts.creditsRequired, opts.balance)
+      : 'You do not have enough credits to run this analysis.';
   return [
-    `Ready to analyze another market?`,
+    lead,
+    'This is not a temporary server error — do not retry until credits are added.',
     offer
       ? `${offer.got} ${offer.unlocks}`
       : `You have used your free credits. Upgrade to keep researching your market.`,
-    [price, offers].filter(Boolean).join('\n'),
+    // priceLine is redundant when the lead already states both numbers; keep when
+    // balance was unknown so the cost still appears once.
+    typeof opts.balance === 'number' ? offers : [price, offers].filter(Boolean).join('\n'),
     `We saved exactly what you asked for — it runs the moment your credits land. ${link}`,
   ].join('\n\n');
 }
 
-/** Mark that the user reached checkout from a saved attempt. */
-export async function markCheckoutStarted(attemptId: string): Promise<void> {
+/**
+ * Mark that the OFFER PAGE was opened (/mcp/continue). This is NOT Stripe checkout.
+ *
+ * Renamed from markCheckoutStarted 2026-09-15: the old name said "checkout" while the
+ * call site stamped a page view, and reading the column as its name misplaced the funnel
+ * drop-off three separate times in one investigation. Use markCheckoutClicked for a real
+ * buy-link click.
+ */
+export async function markOfferPageOpened(attemptId: string): Promise<void> {
+  const now = new Date().toISOString();
+  try {
+    const { error } = await getWriteClient()
+      .from('mcp_paywall_attempts')
+      .update({ offer_page_opened_at: now, updated_at: now })
+      .eq('id', attemptId)
+      .is('offer_page_opened_at', null);
+    if (!error) return;
+    // ⚠️ SCHEMA/CODE SKEW FALLBACK. A column rename in the DB lands before the code that
+    // uses it reaches production, so for the length of that window the deployed build
+    // writes a column that no longer exists. The old call site swallowed the failure
+    // entirely (bare try/catch) and the offer page still returned 200 — so the stamp was
+    // lost SILENTLY and the funnel under-counted with no error anywhere. Measured live
+    // 2026-09-15: an offer page opened and offer_page_opened_at stayed null.
+    // Falling back to the legacy column keeps the event rather than dropping it.
+    const fallback = await getWriteClient()
+      .from('mcp_paywall_attempts')
+      .update({ checkout_started_at: now, updated_at: now })
+      .eq('id', attemptId)
+      .is('checkout_started_at', null);
+    if (fallback.error) {
+      // BOTH writers failed — the event is genuinely lost. Say so loudly. A swallowed
+      // write here is what made the 2026-09-15 outage invisible: the page returned 200
+      // while the funnel silently under-counted. Never fatal to the user's page, but it
+      // must never again be silent to us.
+      console.error(
+        `[paywall] offer-page stamp LOST for attempt ${attemptId}: ` +
+        `new=${error.message} legacy=${fallback.error.message}`,
+      );
+    }
+  } catch (e) {
+    console.error(`[paywall] offer-page stamp threw for attempt ${attemptId}:`, e);
+  }
+}
+
+/**
+ * Compatibility alias for builds deployed BEFORE the funnel-stage rename. Keeping the old
+ * exported name means a deployed bundle calling markCheckoutStarted still stamps the
+ * event through the fallback above instead of throwing on a missing import.
+ * @deprecated use markOfferPageOpened — this records a page view, never Stripe checkout.
+ */
+export const markCheckoutStarted = markOfferPageOpened;
+
+/**
+ * Stamp a purchase-intent stage. Each is a DIFFERENT fact and they must not be conflated:
+ *   'checkout_clicked'  the customer clicked a buy link — deliberate intent
+ *   'stripe_session'    a Checkout Session was created. NOT proof they saw Stripe's page
+ *   'payment_confirmed' a SIGNED webhook confirmed payment
+ *   'credits_applied'   credits actually landed (paying != receiving)
+ */
+export async function markFunnelStage(
+  attemptId: string,
+  stage: 'checkout_clicked' | 'stripe_session' | 'payment_confirmed' | 'credits_applied',
+  extra?: { stripeSessionId?: string },
+): Promise<void> {
+  const col = `${stage}_at`;
+  const patch: Record<string, string> = { [col]: new Date().toISOString(), updated_at: new Date().toISOString() };
+  if (extra?.stripeSessionId) patch.stripe_session_id = extra.stripeSessionId;
   try {
     await getWriteClient()
       .from('mcp_paywall_attempts')
-      .update({ checkout_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', attemptId)
-      .is('checkout_started_at', null);
+      .is(col, null); // first observation wins; a retry must not move the timestamp
   } catch {
     /* best-effort */
   }

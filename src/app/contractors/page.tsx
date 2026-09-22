@@ -160,8 +160,37 @@ export default function ContractorsIndexPage() {
     0
   );
 
+  /* JSON-LD. The hub shipped with none while every sibling index (/agencies,
+     /naics, /glossary, /top) carried it — measured live 2026-09-21, when Google's
+     URL Inspection API also reported this page "Crawled - currently not indexed"
+     at average position 44.1 over 673 impressions. */
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': 'https://getmindy.ai/contractors#page',
+        name: 'Federal Contractor Database',
+        description:
+          'Federal contractor profiles with USASpending award history — obligations, awarding agencies, NAICS activity and contract records.',
+        url: 'https://getmindy.ai/contractors',
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://getmindy.ai' },
+          { '@type': 'ListItem', position: 2, name: 'Contractors', item: 'https://getmindy.ai/contractors' },
+        ],
+      },
+    ],
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-200">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <BackToAppHeader />
       <MeetMindyStrip variant="banner" />
       <div className="mx-auto max-w-6xl px-6 py-12">

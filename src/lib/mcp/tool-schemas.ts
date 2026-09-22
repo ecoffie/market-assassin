@@ -13,6 +13,7 @@
  */
 import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
 import { listMcpTools } from './tool-registry';
+import { SCHEDULE_MARKET_SEARCH_TITLE } from './schedule-discovery';
 
 interface JsonSchemaProp {
   type?: string;
@@ -115,10 +116,10 @@ const READ_ONLY_ANNOTATIONS: McpToolAnnotations = {
 type ToolMeta = { title: string; write?: 'destructive' | 'additive' };
 const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   add_contacts_to_crm: { title: 'Add Contacts to CRM (one-shot)', write: 'destructive' },
-  schedule_market_search: { title: 'Schedule Market Search (saved search + alerts)', write: 'additive' },
-  list_market_schedules: { title: 'List Market Schedules' },
-  update_market_schedule: { title: 'Update Market Schedule', write: 'additive' },
-  delete_market_schedule: { title: 'Delete Market Schedule', write: 'destructive' },
+  schedule_market_search: { title: SCHEDULE_MARKET_SEARCH_TITLE, write: 'additive' },
+  list_market_schedules: { title: 'List Market Watches / Schedules' },
+  update_market_schedule: { title: 'Update Market Watch / Schedule', write: 'additive' },
+  delete_market_schedule: { title: 'Delete Market Watch / Schedule', write: 'destructive' },
   assess_market_depth: { title: 'Assess Market Depth (Rule of Two)' },
   build_proposal_structure: { title: 'Build Proposal Structure (outline from compliance matrix)' },
   capability_market_match: { title: 'Capability-to-Market Match (your addressable market)' },
@@ -168,7 +169,12 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_idv_contracts: { title: 'Search IDV Contracts' },
   search_past_contracts: { title: 'Search Past Contracts' },
   search_podcast_lessons: { title: 'Search Podcast Lessons' },
-  search_sam_opportunities: { title: 'Search SAM Opportunities' },
+  search_sam_opportunities: { title: 'Search SAM Opportunities (Open only)' },
+  find_opportunities: { title: 'Find Opportunities (Open · Coming back · Coming soon)' },
+  lookup_solicitation: { title: 'Look Up Solicitation (historical · known id)' },
+  get_current_acquisition_intelligence: { title: 'Current Acquisition Intelligence (what changed · what to do)' },
+  match_company_to_pathways: { title: 'Pathway Fit (doors your company can walk through)' },
+  understand_customer: { title: 'Understand This Customer (Opportunity · Agency · Emphasize)' },
   search_sbir: { title: 'Search SBIR' },
 };
 

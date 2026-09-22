@@ -5,7 +5,15 @@
  * small-business door. getCommandInfo now aliases them to a real parent command (verified present).
  */
 import { describe, it, expect } from 'vitest';
-import { getCommandInfo } from './command-info';
+import commandInfoData from '@/data/dod-command-info.json';
+import {
+  getCommandInfo,
+  getCommandsByParentAgency,
+  OSBP_PARENT_ALIASES,
+  type CommandInfo,
+} from './command-info';
+
+const COMMANDS = commandInfoData.commands as Record<string, CommandInfo>;
 
 describe('OSBP alias resolution (FM-06) — field activity / PEO → parent command OSBP', () => {
   it('the exact FM-06 misses now resolve to a real parent command', () => {
@@ -46,5 +54,41 @@ describe('OSBP alias resolution (FM-06) — field activity / PEO → parent comm
   });
   it('an unknown agency still returns null (never fabricates a parent)', () => {
     expect(getCommandInfo('totally made up command xyz')).toBeNull();
+  });
+
+  it('every alias parent is a known directory key whose service matches parentAgency', () => {
+    expect(OSBP_PARENT_ALIASES.length).toBeGreaterThan(0);
+    for (const { parent, service } of OSBP_PARENT_ALIASES) {
+      const resolved = COMMANDS[parent];
+      expect(resolved, parent).toBeTruthy();
+      expect(
+        resolved.parentAgency.toUpperCase().includes(service.toUpperCase())
+        || resolved.fullName.toUpperCase().includes(service.toUpperCase()),
+        `${parent} service=${service} parentAgency=${resolved.parentAgency}`,
+      ).toBe(true);
+    }
+  });
+
+  it('word boundaries: a token substring is not an alias hit', () => {
+    expect(getCommandInfo('cranberry')).toBeNull();
+    expect(getCommandInfo('indianhead')).toBeNull();
+    expect(getCommandInfo('picatinnyx')).toBeNull();
+  });
+
+  it('aliases do not capture parent or toptier identity queries', () => {
+    expect(getCommandInfo('Navy')).toBeNull();
+    expect(getCommandInfo('Department of Homeland Security')?.abbreviation).toBe('DHS');
+    expect(getCommandInfo('United States Coast Guard')?.abbreviation).toBe('USCG');
+  });
+
+  it('Indian Head is NAVSEA, not whichever Navy child appears first', () => {
+    const firstNavyChild = getCommandsByParentAgency('Navy')[0];
+    expect(firstNavyChild).toBeTruthy();
+    const indianHead = getCommandInfo('Indian Head');
+    expect(indianHead?.abbreviation).toBe('NAVSEA');
+    expect(indianHead?.fullName).toBe(COMMANDS.NAVSEA.fullName);
+    if (firstNavyChild.abbreviation !== 'NAVSEA') {
+      expect(indianHead?.abbreviation).not.toBe(firstNavyChild.abbreviation);
+    }
   });
 });

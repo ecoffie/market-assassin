@@ -22,6 +22,13 @@ import type { Section11 } from './section-11-suppliers';
 import { callTool, metaDegraded, type ToolCall } from './mindy-client';
 import { degraded, evidence, trueZero, unknown, value } from './grounding';
 import { countEligibleFamilies } from './corporate-family';
+import {
+  marketCapacityLabel,
+  marketScopeFromRequirement,
+  retrievalManifest,
+  type RetrievalManifest,
+  type ScopeDimension,
+} from './market-scope';
 
 export interface Section12 {
   determination: GroundedField<RuleOfTwoDetermination>;
@@ -34,6 +41,9 @@ export interface Section12 {
   matchingCoverage: GroundedField<number>;
   calls: ToolCall[];
   limitations: string[];
+  observedDimensions: ScopeDimension[];
+  scopeLabel: string;
+  retrievalManifests: RetrievalManifest[];
 }
 
 const SOCIO_DESIGNATIONS: SocioDesignation[] = [
@@ -743,9 +753,25 @@ export async function buildSection12(
     });
   limitations.push(...detLimits);
 
-  // If depth failed/degraded, force recommendation onto Insufficient evidence
-  // even when family selection produced a count from stale s11 rows.
-  // (buildDeterminationAndRecommendation already handles this.)
+  const scope = marketScopeFromRequirement(primaryNaics ? { ...req, naics: primaryNaics } : req);
+  const observedDimensions: ScopeDimension[] = s11.observedDimensions ?? [
+    ...((primaryNaics || req.naics) ? ['naics' as const] : []),
+    ...(req.place_of_performance_state ? ['geography' as const] : []),
+  ];
+  const scopeLabel = s11.scopeLabel ?? marketCapacityLabel(scope, primaryNaics ?? req.naics);
+  const framedRecommendation =
+    recommendation.state === 'value'
+      ? value(
+          `${recommendation.value} Scope of this evidence: ${scopeLabel} (contextual market-capacity; observed dimensions: ${observedDimensions.join(', ') || 'none'}` +
+            `${scope.contractingOfficeCode ? `; contracting office ${scope.contractingOfficeCode} was NOT consumed by the supplier query` : ''}` +
+            ').',
+          recommendation.evidence,
+        )
+      : recommendation;
+  limitations.push(
+    `Rule-of-Two evidence dimensions actually observed: ${observedDimensions.join(', ') || 'none'}. ` +
+      `This determination does not claim buyer/office-specific supply unless contracting_office was consumed.`,
+  );
 
   const socioCounts = buildSocioCounts(counted, sectionEv);
   const goalingContext = formatGoaling(goalingCall);
@@ -759,7 +785,7 @@ export async function buildSection12(
 
   return {
     determination,
-    recommendation,
+    recommendation: framedRecommendation,
     capableFamilyCount,
     countedFamilies,
     excluded,
@@ -768,5 +794,35 @@ export async function buildSection12(
     matchingCoverage,
     calls,
     limitations,
+    observedDimensions,
+    scopeLabel,
+    retrievalManifests: [
+      ...(s11.retrievalManifests ?? []),
+      retrievalManifest({
+        section: '12',
+        tool: 'assess_market_depth',
+        requested: scope,
+        consumed: Object.fromEntries(
+          observedDimensions.map((d) => [
+            d,
+            d === 'naics' ? (primaryNaics ?? req.naics ?? '') : (req.place_of_performance_state ?? ''),
+          ]),
+        ),
+        unsupported: {
+          ...(scope.department ? { department: 'Rule-of-Two sample did not consume department' } : {}),
+          ...(scope.service ? { service: 'Rule-of-Two sample did not consume service' } : {}),
+          ...(scope.contractingOffice || scope.contractingOfficeCode
+            ? { contracting_office: 'Rule-of-Two sample did not consume contracting office' }
+            : {}),
+          ...(scope.installation ? { installation: 'Rule-of-Two sample did not consume installation' } : {}),
+          ...(scope.phrase ? { phrase: 'Rule-of-Two sample did not consume requirement phrase' } : {}),
+        },
+        resultCount: n,
+        grounded: determination.state === 'value' || determination.state === 'true_zero',
+        source: sectionEv.source,
+        asOf: sectionEv.retrievedAt,
+        evidenceClass: 'contextual',
+      }),
+    ],
   };
 }

@@ -26,7 +26,9 @@ export interface AnnualObligationsToolResult {
   /** WHO these numbers are for — never assume the query matched what you meant. */
   resolved: ResolvedRecipient | null;
   years: FiscalYearObligation[];
-  total: number;
+  /** Null when spending data is unavailable — never a fabricated $0. */
+  total: number | null;
+  amount_status: 'unavailable' | 'zero' | 'positive' | 'unresolved';
   /** What the numbers ARE. An unlabelled figure invites "your data is wrong". */
   basis: {
     measure: string;
@@ -41,6 +43,7 @@ export interface AnnualObligationsToolResult {
     degraded: boolean;
     years_returned: number;
     rolled_up_to_parent: boolean;
+    amount_status: 'unavailable' | 'zero' | 'positive' | 'unresolved';
   };
 }
 
@@ -75,6 +78,7 @@ export async function getAnnualObligations(
     resolved: res.resolved,
     years: res.years,
     total: res.total,
+    amount_status: res.amount_status,
     basis: {
       measure: 'Obligations recorded WITHIN each federal fiscal year (Oct 1 – Sep 30). A flow, not a ceiling.',
       scope: isParent
@@ -90,6 +94,7 @@ export async function getAnnualObligations(
       degraded: res.degraded,
       years_returned: res.years.length,
       rolled_up_to_parent: isParent,
+      amount_status: res.amount_status,
     },
   };
 
@@ -97,9 +102,11 @@ export async function getAnnualObligations(
     const series = res.years.map((y) => `${y.label} $${Math.round(y.obligated).toLocaleString()}`).join(', ');
     result._ai_hint = {
       summary: res.degraded
-        ? 'USASpending errored — retry. Do NOT report a partial series as complete, and do not state the company has no federal work.'
+        ? 'USASpending errored — spending data is UNAVAILABLE, not $0. Do NOT report a partial series as complete, and do not state the company has no federal work.'
         : !res.resolved
         ? `No USASpending recipient matched "${res.query}". Try the exact legal entity name or the UEI before concluding there is no federal work — do not report $0.`
+        : res.amount_status === 'zero'
+        ? `${res.resolved.name} resolved, but no prime obligations in the requested years (measured $0, not a missing source).`
         : grounded
         ? `${res.resolved.name}${isParent ? ' (parent, consolidated)' : ' (no parent record — this entity only)'}: ${series}.`
         : `${res.resolved.name} resolved, but no prime obligations in the requested years.`,

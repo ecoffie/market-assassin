@@ -245,7 +245,7 @@ export default async function OpportunityPage({
             </Link>
           )}
           <Link href="/opportunity-hunter" className="text-purple-600 hover:underline">Browse all opportunities →</Link>
-          <Link href="/forecasts" className="text-purple-600 hover:underline">Upcoming forecasts →</Link>
+          <Link href="/forecasts" className="text-purple-600 hover:underline">Agency forecasts →</Link>
         </nav>
       </div>
     </main>

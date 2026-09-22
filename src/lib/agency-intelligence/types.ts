@@ -19,6 +19,12 @@ export interface AgencyIntelligence {
   verified_at?: string;
   verification_source?: string;
   verification_notes?: string;
+  /**
+   * Attribution evidence class, present only when read through
+   * `agency_intelligence_agency_safe`. NULL/absent for non-GAO rows, which the
+   * attribution view does not classify. Never used to assert a corrected agency.
+   */
+  attribution_evidence?: 'corroborated_by_title' | 'no_title_evidence' | 'unsupported_by_title' | 'artifact_agency' | null;
   created_at?: string;
   updated_at?: string;
 }

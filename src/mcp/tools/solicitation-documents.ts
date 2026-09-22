@@ -16,6 +16,7 @@
 import {
   getSolicitationDocuments,
   type SolicitationDocument,
+  type ListedAttachment,
   type SolicitationDocumentsResult,
   type DocTextRequest,
 } from '@/lib/sam/solicitation-documents';
@@ -43,19 +44,11 @@ export interface SolicitationDocumentsToolResult {
   sow_text: string;
   sow_text_truncated: boolean;
   documents: SolicitationDocument[];
-  /**
-   * Completeness of THIS response (see the note on `summarize`). It is NOT a
-   * paging terminator: `next_page === null` is. A scoped continuation covers
-   * part of the notice, so `complete` is false there even when nothing is left
-   * unread — check `next_page`, and `scoped` to see which kind of answer it is.
-   */
+  /** Completeness of THIS response. `next_page === null` is the terminator. */
   coverage: SolicitationDocumentsResult['coverage'];
-  /**
-   * Ready-to-send continuation call, or null when nothing is left to read.
-   * SCOPED: `document_ids` restricts the next response to the documents that
-   * actually have more text, so completed documents are not re-sent.
-   */
+  /** Ready-to-send continuation, scoped to the docs that still have text. */
   next_page: { notice_id: string; document_ids: string[]; documents: DocTextRequest[] } | null;
+  listed_attachments: ListedAttachment[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -65,9 +58,14 @@ export interface SolicitationDocumentsToolResult {
     signed_url_ttl_seconds: number;
     /** Chars delivered in this response across all documents. */
     returned_chars: number;
-    /** True stored chars across all documents (null where unknown). */
+    /** True stored chars across all documents; null where any is unknown. */
     total_chars: number | null;
     coverage_complete: boolean;
+    attachments_listed: number;
+    attachments_with_text: number;
+    piee: boolean;
+    piee_links: string[];
+    retrieval_limitation: string | null;
   };
 }
 
@@ -126,6 +124,7 @@ export async function solicitationDocuments(
     documents: res.documents,
     coverage: res.coverage,
     next_page: nextPage,
+    listed_attachments: res.listed_attachments,
     _meta: {
       grounded,
       degraded: res.degraded,
@@ -133,12 +132,16 @@ export async function solicitationDocuments(
       source: res.source,
       signed_url_ttl_seconds: 3600,
       returned_chars: res.documents.reduce((n, d) => n + d.text_window.returned_chars, 0),
-      // Sum only where the length is KNOWN. If any document's length is unknown
-      // the total is unknown too — a partial sum would read as a real total.
+      // null if ANY document's length is unknown — a partial sum would read as a total.
       total_chars: res.documents.some((d) => d.text_window.total_chars === null)
         ? null
         : res.documents.reduce((n, d) => n + (d.text_window.total_chars || 0), 0),
       coverage_complete: res.coverage.complete,
+      attachments_listed: res.attachments_listed,
+      attachments_with_text: res.attachments_with_text,
+      piee: res.piee,
+      piee_links: res.piee_links,
+      retrieval_limitation: res.retrieval_limitation,
     },
   };
 
@@ -163,7 +166,9 @@ export async function solicitationDocuments(
         'text_availability="extraction_capped" means the end of the FILE was never extracted; paging cannot recover it, the raw download can.',
         'Coverage is measured in CHARACTERS. Do NOT convert it to pages — no char→page mapping is stored, so "N of M pages" would be invented.',
         'download_url expires (~1h) — re-call the tool to mint a fresh link.',
+        'extracted_text is truncated for inline delivery; the full text is in the downloadable file (char_count is the true length). Check location_note — a SAM.gov URL is an external attachment, not a Mindy-stored copy.',
         'Not every notice has attachments — an empty documents list can be legitimate (e.g. a Sources Sought with only body text).',
+        ...(res.retrieval_limitation ? [res.retrieval_limitation] : []),
       ],
     };
   }

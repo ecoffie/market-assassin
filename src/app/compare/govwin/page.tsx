@@ -548,16 +548,16 @@ export default function GovWinComparePage() {
               Mindy vs SAM.gov →
             </Link>
             <Link
-              href="/expiring-contracts"
+              href="/recompete"
               className="text-slate-400 hover:text-purple-300 transition"
             >
-              See expiring contracts →
+              See contracts up for recompete →
             </Link>
             <Link
               href="/forecasts"
               className="text-slate-400 hover:text-purple-300 transition"
             >
-              Browse 33,000+ forecasts →
+              Browse agency forecasts →
             </Link>
           </div>
         </div>

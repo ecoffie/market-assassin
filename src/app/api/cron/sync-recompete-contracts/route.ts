@@ -37,6 +37,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchExpiringForNaics, type SyncedContract } from '@/lib/recompete/usaspending-sync';
 import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete/change-log';
 import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
+import { preserveRicherEnrichment, type EnrichmentFields } from '@/lib/recompete/preserve-enrichment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,21 +71,23 @@ const WRITE_CHUNK = 500;
  */
 const READ_CHUNK = 100;
 
-/** Fetch stored copies of the contracts we're about to overwrite, for the diff. */
+type ExistingSyncRow = ExistingRow & EnrichmentFields;
+
+/** Fetch stored copies of the contracts we're about to overwrite, for the diff + enrichment preserve. */
 async function loadExisting(
   supabase: ReturnType<typeof sb>,
   contractIds: string[],
-): Promise<ExistingRow[]> {
-  const rows: ExistingRow[] = [];
+): Promise<ExistingSyncRow[]> {
+  const rows: ExistingSyncRow[] = [];
   for (let i = 0; i < contractIds.length; i += READ_CHUNK) {
     const { data, error } = await supabase
       .from('recompete_opportunities')
-      .select(['contract_id', ...TRACKED_FIELDS].join(','))
+      .select(['contract_id', ...TRACKED_FIELDS, 'psc_code', 'description', 'psc_description'].join(','))
       .in('contract_id', contractIds.slice(i, i + READ_CHUNK));
     // A failed read here means we cannot tell what changed. Throw rather than
     // diff against a partial "before" and silently log phantom transitions.
     if (error) throw new Error(`existing-row read failed: ${error.message}`);
-    rows.push(...((data ?? []) as unknown as ExistingRow[]));
+    rows.push(...((data ?? []) as unknown as ExistingSyncRow[]));
   }
   return rows;
 }
@@ -219,8 +222,12 @@ export async function GET(request: NextRequest) {
         // Diff BEFORE the upsert -- afterwards the old values are gone for good.
         const existing = await loadExisting(supabase, contracts.map((c) => c.contract_id));
         const changes = diffContracts(existing, contracts, new Date().toISOString());
+        const existingById = new Map(existing.map((row) => [row.contract_id, row]));
+        // MINDY-007: spending_by_award returns PSC/description NULL. A less-complete
+        // search payload must not erase richer detail/BQ enrichment already stored.
+        const toWrite = contracts.map((c) => preserveRicherEnrichment(c, existingById.get(c.contract_id)));
 
-        await upsertContracts(supabase, contracts);
+        await upsertContracts(supabase, toWrite);
 
         if (changes.length) {
           // Log AFTER the upsert succeeds: a change record for a write that

@@ -14,7 +14,9 @@
  * parallel). tier: metered, credits: 20. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { extractComplianceMatrixFromText, type ComplianceRequirement } from '@/lib/proposal/compliance-matrix';
+import { auditSourceSpecCoverage, type SourceSpecCoverage } from '@/lib/proposal/matrix-source-coverage';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
+import { assembleNoticeSourceText } from '@/lib/sam/notice-identity';
 import { summarizeSourceCoverage, coverageCaveat, type SourceCoverage } from '@/lib/sam/source-coverage';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -35,6 +37,18 @@ export interface ComplianceMatrixResult {
     notice_id?: string;
     count: number;
     truncated: boolean;
+    truncated_attachments?: number;
+    /**
+     * A non-zero count proves retrieval/extraction ran. Completeness vs the RFP
+     * is unproven whenever attachments or source text were truncated, OR when
+     * named source specs (LOA, flight deck, SCIF, berthing, magazine) are in
+     * the source and missing from the matrix. Row count is not coverage.
+     */
+    extraction_completeness: 'unproven' | 'source_text';
+    source_spec_coverage?: SourceSpecCoverage;
+    /** Spec ids recovered from source after the LLM missed them (e.g. SCIF). */
+    recovered_source_specs?: string[];
+    resolved_notice_id?: string;
     model: string;
     /** What the SOURCE text was missing (distinct from `truncated`, the LLM cap). */
     source_coverage?: SourceCoverage;
@@ -43,25 +57,32 @@ export interface ComplianceMatrixResult {
 
 /** Build the source text for a notice: SOW + notice body + each attachment's extracted
  *  text, so the extractor sees the requirements wherever they live. */
-async function textFromNotice(
-  noticeId: string,
-): Promise<{ text: string; degraded: boolean; coverage: SourceCoverage | null }> {
+async function textFromNotice(noticeId: string): Promise<{
+  text: string;
+  degraded: boolean;
+  truncated_attachments: number;
+  resolved_notice_id?: string;
+  coverage: SourceCoverage | null;
+}> {
   try {
-    // Read a full window per document, not the 20k inline default: the
-    // extractor accepts MAX_INPUT_CHARS (50k) and reports its own truncation,
-    // so starving it here hid late clauses (insurance, limitations on
-    // subcontracting) that live past page 40 of a long solicitation.
-    const docs = await getSolicitationDocuments({ noticeId, textLimit: 120_000 });
-    const parts: string[] = [];
-    if (docs.sow_text) parts.push(docs.sow_text);
-    if (docs.description) parts.push(docs.description);
-    for (const d of docs.documents) {
-      if (d.extracted_text) parts.push(`--- ${d.filename || 'attachment'} ---\n${d.extracted_text}`);
-    }
-    return { text: parts.join('\n\n').trim(), degraded: false, coverage: summarizeSourceCoverage(docs) };
+    const docs = await getSolicitationDocuments({ noticeId, textMode: 'full' });
+    const srcCoverage = summarizeSourceCoverage(docs);
+    const assembled = assembleNoticeSourceText({
+      sow_text: docs.source_text ? null : docs.sow_text,
+      description: docs.source_text ? null : docs.description,
+      documents: docs.source_text ? [] : docs.documents,
+    });
+    const text = (docs.source_text || assembled.text).trim();
+    return {
+      text,
+      degraded: docs.degraded,
+      truncated_attachments: docs.truncated_attachments ?? assembled.truncated_attachments,
+      resolved_notice_id: docs.notice_id,
+      coverage: srcCoverage,
+    };
   } catch (err) {
     console.error('[compliance-matrix] notice fetch failed', noticeId, err);
-    return { text: '', degraded: true, coverage: null };
+    return { text: '', degraded: true, truncated_attachments: 0, coverage: null };
   }
 }
 
@@ -70,14 +91,18 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
   let sourceText = (input.rfp_text || '').trim();
   let source: 'notice_id' | 'text' | 'none' = sourceText ? 'text' : 'none';
   let fetchDegraded = false;
+  let truncatedAttachments = 0;
   let sourceCoverage: SourceCoverage | null = null;
+  let resolvedNoticeId: string | undefined;
 
   // notice_id path: fetch the solicitation text server-side (only when no explicit text).
   if (!sourceText && noticeId) {
     const fetched = await textFromNotice(noticeId);
     sourceText = fetched.text;
     fetchDegraded = fetched.degraded;
+    truncatedAttachments = fetched.truncated_attachments;
     sourceCoverage = fetched.coverage;
+    resolvedNoticeId = fetched.resolved_notice_id;
     source = 'notice_id';
   }
 
@@ -90,8 +115,12 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         degraded: fetchDegraded,
         source: noticeId ? 'notice_id' : 'none',
         notice_id: noticeId || undefined,
+        resolved_notice_id: resolvedNoticeId,
         count: 0,
         truncated: false,
+        truncated_attachments: truncatedAttachments,
+        extraction_completeness: 'unproven',
+        source_spec_coverage: { present_in_source: [], extracted: [], missing_from_matrix: [] },
         model: '',
       },
     };
@@ -112,6 +141,9 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
 
   const ex = await extractComplianceMatrixFromText(sourceText, { userEmail: input.userEmail ?? null });
   const grounded = ex.requirements.length > 0;
+  const coverage = auditSourceSpecCoverage(sourceText, ex.requirements);
+  const completenessUnproven =
+    ex.truncated || truncatedAttachments > 0 || coverage.missing_from_matrix.length > 0;
 
   const result: ComplianceMatrixResult = {
     requirements: ex.requirements,
@@ -119,9 +151,16 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
       grounded,
       degraded: !ex.ok, // every chunk failed → provider down, distinct from empty
       source,
-      notice_id: source === 'notice_id' ? noticeId : undefined,
+      notice_id: source === 'notice_id' ? (resolvedNoticeId || noticeId) : undefined,
+      resolved_notice_id: resolvedNoticeId,
       count: ex.requirements.length,
-      truncated: ex.truncated,
+      truncated: ex.truncated || truncatedAttachments > 0,
+      truncated_attachments: truncatedAttachments,
+      extraction_completeness: completenessUnproven ? 'unproven' : 'source_text',
+      source_spec_coverage: coverage,
+      ...(ex.recovered_source_specs?.length
+        ? { recovered_source_specs: ex.recovered_source_specs }
+        : {}),
       model: ex.model,
       ...(sourceCoverage ? { source_coverage: sourceCoverage } : {}),
     },
@@ -145,8 +184,9 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         // read as the solicitation's full requirement set.
         ...(sourceCoverage && coverageCaveat(sourceCoverage) ? [coverageCaveat(sourceCoverage) as string] : []),
         'Every requirement is derived from the provided solicitation text; when a source_quote is present it is verbatim. Do not add requirements the RFP does not state.',
+        'Completeness is source-spec coverage (LOA, flight deck, SCIF, berthing, magazine when those strings are in the source), not the row count. missing_from_matrix means those specs were in the RFP and not extracted.',
         'Single-doc extraction: it does NOT merge amendments over the base RFP. Pass the amendment text too (or the full package) if closing dates/specs were revised.',
-        'Truncated at 50K chars per call — for a very long RFP, extract Section L, M, and C separately for full coverage.',
+        'Truncated at 50K chars per call — Section 3.0 is windowed in when it would otherwise fall off the front of the file.',
       ],
     };
   }

@@ -4,7 +4,7 @@
  * clean schema, arg validation.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from './tier1-tools';
+import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, pickNarrowerTokenHits, type Tier1Db } from './tier1-tools';
 
 // Mock the vocabulary lib.
 const vocabCalls: string[][] = [];
@@ -65,9 +65,10 @@ describe('search_sam_opportunities', () => {
     expect(names.some((n) => n === 'textSearch:search_tsv')).toBe(true); // FTS, not ILIKE
   });
 
-  // We read the LOCAL sam_opportunities cache, not the rate-limited SAM API, so
-  // the old hardcoded 8 served no cost purpose. Default returns the full match set.
-  it('defaults to 100 results and clamps a caller-supplied limit to [1, 200]', async () => {
+  // We read the LOCAL sam_opportunities cache. Default is a compact page of 10
+  // (plus one lookahead so has_more is honest). Ask for a larger limit or offset
+  // to page. Ceiling is a context guard, not a data-cost guard.
+  it('defaults to a compact page of 10 and clamps a caller-supplied limit to [1, 50]', async () => {
     const limitFor = async (limit: unknown) => {
       const captured = { calls: [] as Array<[string, unknown]> };
       const tools = makeTier1Tools(stubDb([], captured));
@@ -75,11 +76,11 @@ describe('search_sam_opportunities', () => {
       const found = captured.calls.find(([n]) => n === 'limit');
       return found?.[1];
     };
-    expect(await limitFor(undefined)).toBe(100); // default — was a hardcoded 8
-    expect(await limitFor(40)).toBe(40);         // honored within range
-    expect(await limitFor(999)).toBe(200);       // clamped to the ceiling
-    expect(await limitFor(0)).toBe(1);           // floored to at least 1
-    expect(await limitFor('nope')).toBe(100);    // invalid → default
+    expect(await limitFor(undefined)).toBe(11); // default 10 + 1 lookahead for has_more
+    expect(await limitFor(40)).toBe(41);         // honored within range
+    expect(await limitFor(999)).toBe(51);        // clamped to 50 + 1
+    expect(await limitFor(0)).toBe(2);           // floored to 1 + 1
+    expect(await limitFor('nope')).toBe(11);     // invalid → default
   });
 
   it('applies optional naics + set_aside filters when given', async () => {
@@ -153,12 +154,33 @@ describe('search_sam_opportunities', () => {
     expect(String(res.note)).toMatch(/no open sam/i);
   });
 
-  it('maps rows to the citable shape (agency/deadline/link)', async () => {
-    const rows = [{ title: 'Cyber Support', department: 'DHS', naics_code: '541512', response_deadline: '2026-08-01', ui_link: 'https://sam.gov/x' }];
+  it('phrase miss keeps the narrower token, not the union', () => {
+    const best = pickNarrowerTokenHits([
+      { token: 'remediation', rows: [1, 2, 3, 4, 5, 6, 7] },
+      { token: 'PFAS', rows: [1, 2, 3, 4] },
+    ]);
+    expect(best?.token).toBe('PFAS');
+    expect(best?.rows).toHaveLength(4);
+    expect(pickNarrowerTokenHits([{ token: 'x', rows: [] }])).toBeNull();
+  });
+
+  it('maps rows to the citable shape (notice_id/agency/deadline/link) and paginates', async () => {
+    const rows = [{
+      notice_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      title: 'Cyber Support', department: 'DHS', naics_code: '541512',
+      response_deadline: '2026-08-01', ui_link: 'https://sam.gov/x',
+    }];
     const tools = makeTier1Tools(stubDb(rows, { calls: [] }));
-    const res = await tools.execute('search_sam_opportunities', { keyword: 'cyber' }) as { count: number; items: Array<Record<string, unknown>> };
+    const res = await tools.execute('search_sam_opportunities', { keyword: 'cyber' }) as {
+      count: number; has_more: boolean; offset: number; limit: number; items: Array<Record<string, unknown>>;
+    };
     expect(res.count).toBe(1);
-    expect(res.items[0]).toMatchObject({ title: 'Cyber Support', agency: 'DHS', naics: '541512', link: 'https://sam.gov/x' });
+    expect(res.has_more).toBe(false);
+    expect(res.limit).toBe(10);
+    expect(res.items[0]).toMatchObject({
+      notice_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      title: 'Cyber Support', agency: 'DHS', naics: '541512', link: 'https://sam.gov/x',
+    });
   });
 });
 

@@ -1,17 +1,17 @@
 /**
  * MCP tool: get_agency_spending_detail — "who inside this department buys, and can a
  * small business actually win here." Complements get_agency_intel (identity + top NAICS)
- * with the sub-agency (component) spending breakdown + the set-aside distribution (Small
- * Business / 8(a) / SDVOSB / WOSB / HUBZone shares) — the small-business "easy entry"
- * read. All figures are live USASpending contract obligations for a fiscal year.
+ * with the sub-agency (component) spending breakdown + the set-aside distribution.
  *
- * Wraps the pure src/lib/usaspending/agency-spending-detail.ts (USASpending only, no LLM).
- * grounded=false = no toptier agency matched (do NOT invent figures); degraded=true = the
- * USASpending total call errored (temporarily unavailable, not $0). tier: metered,
- * credits: 10 (multiple USASpending aggregates). `_meta` always ships; `_ai_hint` OFF.
+ * SYSCOM queries (NAVSEA) stay SYSCOMs: total_obligated is null; spending.scope is
+ * PARENT_SERVICE with the military department's dollars. Navy $176.6B is not NAVSEA.
+ *
+ * small_business_share is SET-ASIDE-CODE share. recipient_small_business_share is
+ * who won. Neither is the SBA 23% goaling figure.
  */
 import { getAgencySpendingDetail, type SubAgencySlice, type SetAsideSlice } from '@/lib/usaspending/agency-spending-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
+import type { CommandSpendingStatus, RequestedIdentity, SpendingScope } from '@/lib/gov-contacts/agency-identity';
 
 export interface AgencySpendingDetailToolInput {
   /** Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA". */
@@ -24,17 +24,24 @@ export interface AgencySpendingDetailToolResult {
   agency: string | null;
   toptier_code: string | null;
   fiscal_year: number;
-  total_obligated: number;
+  total_obligated: number | null;
   sub_agencies: SubAgencySlice[];
   set_aside_breakdown: SetAsideSlice[];
-  small_business_share: number;
+  small_business_share: number | null;
+  set_aside_share: number | null;
+  recipient_small_business_amount: number | null;
+  recipient_small_business_share: number | null;
+  requested_identity: RequestedIdentity;
+  spending: { scope: SpendingScope; scope_name: string | null; total: number | null };
+  command_spending: { status: CommandSpendingStatus };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
     degraded: boolean;
     fiscal_year: number;
     sub_agency_count: number;
-    small_business_share: number;
+    small_business_share: number | null;
+    spending_scope: SpendingScope;
   };
 }
 
@@ -45,7 +52,8 @@ function usd(n: number): string {
 export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToolInput): Promise<AgencySpendingDetailToolResult> {
   const res = await getAgencySpendingDetail({ agency: input.agency, fiscalYear: input.fiscal_year });
 
-  const grounded = !res.degraded && res.agency !== null && res.total_obligated > 0;
+  const requestedDollars = typeof res.total_obligated === 'number' && res.total_obligated > 0;
+  const grounded = !res.degraded && res.agency !== null && (requestedDollars || res.spending.scope === 'PARENT_SERVICE');
 
   const result: AgencySpendingDetailToolResult = {
     agency: res.agency,
@@ -55,12 +63,19 @@ export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToo
     sub_agencies: res.sub_agencies,
     set_aside_breakdown: res.set_aside_breakdown,
     small_business_share: res.small_business_share,
+    set_aside_share: res.set_aside_share,
+    recipient_small_business_amount: res.recipient_small_business_amount,
+    recipient_small_business_share: res.recipient_small_business_share,
+    requested_identity: res.requested_identity,
+    spending: res.spending,
+    command_spending: res.command_spending,
     _meta: {
       grounded,
       degraded: res.degraded,
       fiscal_year: res.fiscal_year,
       sub_agency_count: res.sub_agencies.length,
       small_business_share: res.small_business_share,
+      spending_scope: res.spending.scope,
     },
   };
 
@@ -70,14 +85,17 @@ export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToo
     result._ai_hint = {
       summary: res.degraded
         ? 'USASpending errored on the total — treat as temporarily unavailable, not $0.'
-        : !grounded
-        ? `No toptier agency matched "${input.agency}". Try the full department name (e.g. "Department of Defense") — do NOT invent figures.`
-        : `${res.agency} FY${res.fiscal_year}: ${usd(res.total_obligated)} in contract obligations, ${res.small_business_share}% via small-business set-asides.${topSub ? ` Top component: ${topSub.name} (${topSub.pct_of_total}%).` : ''}${topSetAside && topSetAside.amount > 0 ? ` Biggest set-aside lane: ${topSetAside.label} (${usd(topSetAside.amount)}).` : ''}`,
+        : res.spending.scope === 'PARENT_SERVICE'
+        ? `${res.agency} identity is established. Command-level spending is NOT_ESTABLISHED. Parent-service (${res.spending.scope_name}) obligated ${typeof res.spending.total === 'number' ? usd(res.spending.total) : 'an unmeasured total'} — do not attribute that to ${res.agency}.`
+        : !requestedDollars
+        ? `No toptier agency matched "${input.agency}" (or spend is not established). Do NOT invent figures.`
+        : `${res.agency} FY${res.fiscal_year}: ${usd(res.total_obligated!)} in contract obligations (toptier_code ${res.toptier_code} is the USASpending parent). Set-aside share ${res.set_aside_share}% · small-business recipients ${res.recipient_small_business_share}%. Neither is the SBA 23% goaling figure.${topSub ? ` Top component: ${topSub.name} (${topSub.pct_of_total}%).` : ''}${topSetAside && topSetAside.amount > 0 ? ` Biggest set-aside lane: ${topSetAside.label} (${usd(topSetAside.amount)}).` : ''}`,
       how_to_use:
-        'The set-aside breakdown is the "can a small business win here" read — a high 8(a)/SDVOSB/WOSB share means real small-business lanes. The sub-agency breakdown says which COMPONENT to target (pair with search_federal_contacts / search_agency_opps_by_office for that component). Pair with get_agency_intel for top NAICS + pain points.',
+        'Use spending.scope. REQUESTED dollars are this entity. PARENT_SERVICE dollars are the military department, not the SYSCOM. Set-aside share ≠ recipient small-business share ≠ 23% statutory goal.',
       key_caveats: [
-        'Contract obligations only (award types A/B/C/D) for the fiscal year — NOT total agency budget (which includes grants, mandatory spending, payroll).',
-        'Set-aside buckets are mutually exclusive by code; small_business_share is their sum ÷ total. An agency with a large sub-agency list (DoD) is a department — target the component, not "DoD".',
+        'Contract obligations only (award types A/B/C/D) for the fiscal year — NOT total agency budget.',
+        'toptier_code 097 on a Navy row is DoD, the USASpending parent of the Navy subtier — not a claim these dollars are all of DoD.',
+        'set_aside_share sums set-aside competition codes. recipient_small_business_share uses recipient_type_names=small_business. SBA goaling uses a third eligible-dollar base.',
       ],
     };
   }

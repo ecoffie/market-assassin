@@ -19,6 +19,67 @@
 
 ---
 
+## ⚠️ Sharing `.env.local` into a worktree — use the helper, never raw `ln -sfn`
+
+```bash
+npm run env:link-worktree -- .claude/worktrees/<name>
+```
+
+**Never run `ln -sfn "<MAIN>/.env.local" .env.local` by hand.** That command is
+correct from a worktree and **destroys the file** from the main repo: source and
+destination become the same path, `ln -sfn` replaces the real `.env.local` with a
+link to itself, and every later read fails with ELOOP. dotenv does **not** throw on
+an unreadable path — callers silently run with **zero variables**. It has happened
+twice (2026-09-05, 2026-09-13), the second time mid-way through a five-stage
+database migration's pre-flight.
+
+**The destination must be an explicit argument.** Do not assume the shell cwd
+persisted between tool calls — an agent's cwd can be reset back to the main repo
+between commands, so a `cd <worktree> && ln -sfn …` whose `cd` did not stick runs
+in the main repo. The helper takes the worktree path explicitly and never infers it
+from `process.cwd()`.
+
+**If the helper refuses, diagnose the topology — do not bypass it.** The contract,
+enforced by BOTH the helper and `npm run verify:env`:
+
+| where | valid | invalid |
+|---|---|---|
+| **main** worktree | a REGULAR file | any symlink |
+| **linked** worktree | a regular file, or a symlink to THAT repo's main `.env.local` | self-link · another repo's env · an old backup · any other readable file |
+
+**Readability is not sufficient.** A link to a DIFFERENT repository's `.env.local`
+can be readable, populated and carry every required variable family while being
+catastrophically wrong — runners load real-looking credentials for the wrong
+project. Family validation cannot see that; only topology can. Repair a stale
+worktree by deleting the bad link and running the helper — never by repointing it
+by hand.
+
+---
+
+## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first
+
+`vercel --prod` uploads the directory that owns the nearest `.vercel/project.json`,
+not "the branch your shell is on." A fresh worktree under `.claude/worktrees/<slug>`
+does **not** inherit the main checkout's `.vercel/`. Without a local link, the CLI
+walks up to the parent checkout, builds **that** tree (often stale `main`), aliases
+production, and reports READY while the feature branch never shipped. Measured
+2026-09-14 on the Ralph confirm-path ship (PR #1514): two green prod deploys served
+the old Confirm UI until `.vercel/` was copied into the worktree and redeployed.
+
+**Worktree bootstrap (after `git worktree add`):**
+
+```bash
+npm run env:link-worktree -- .claude/worktrees/<slug>
+cp -R .vercel .claude/worktrees/<slug>/.vercel   # from the main checkout
+# or, from inside the worktree: vercel link --yes --project market-assassin
+```
+
+**Before every worktree deploy:** `test -f .vercel/project.json` in the worktree
+cwd. A green READY is not proof — grep the live URL for a string that exists only
+on the feature branch. Full rule: `.cursor/rules/ship-after-fix.mdc`.
+
+---
+
 ## 🎯 Current priority order — READ BEFORE PICKING UP WORK
 
 **Set by Eric, 2026-08-23. This is the ONE place the roadmap lives** — permanent docs
@@ -78,6 +139,137 @@ deletion risk, not a narrowing* (measure fill rate before filtering on it). And 
 renders then empties, diagnose from a **state timeline**, never the final URL.
 
 ---
+
+## 🔁 Return continuity — the Map remembers the MARKET, not just the viewport (2026-09-21)
+
+**Two localStorage keys, two different jobs. Do not merge them.**
+
+| key | holds | written by | read by |
+|---|---|---|---|
+| `mi_map_last_view` | lat/lng/zoom (30d, US-only, z≥4) | map `moveend` → `window.__saveMapView` | the map constructor in `template.html`, **synchronously** |
+| `mi_map_last_search` | `{mode, filters, t}` — **no bbox** | `fetchView()` → `window.__rememberMapState` (debounced 1.2s) | the boot restorer in `BOOT_VIEW_JS` → `window.__applySavedSearch` |
+
+⚠️ **`mi_map_last_search` must never carry a bbox.** The viewport already has an owner that is
+strictly fresher (moveend, not filter-change) and applies *before* boot. A second writer moving
+the map after boot is the `?naics=&state=` race that took the map **5,416 → 0**.
+
+⚠️ **Never remember a filter `__applySavedSearch` cannot give back.** `window.__mapStateMeaningful`
+is the allowlist and it is a SUBSET of that restorer's `FILT` reset (+`q`), guarded by
+`return-continuity.unit.test.ts`. `strategy` is deliberately absent — `_mapState` stores it
+comma-JOINED while the restorer copies only keys on its `FILT` literal, so it would be silently
+dropped and the "Picked up where you left off" pill would be lying. `fsc` likewise (it lives on
+`window.__fscFilter`). `companies`/`buyers`/`dla` modes are not stored at all: the first two would
+greet a returning anonymous visitor with the `__playersGate` modal, and dla's FSC filter is not in
+the shape. **A half-restore is worse than none.**
+
+⚠️ **An empty default map is not a session.** The meaningfulness check runs on BOTH the write and
+the read side. On the write side it is what stops the boot `fetchView` — which runs with the empty
+default *before* any restore lands — from overwriting a real memory with nothing.
+
+⚠️ **The memory never fights the URL.** Any record link (`?opp= ?company= ?buyer= ?recompete=
+?forecast=`) or market link (`?ss= ?agency= ?naics= ?state= ?strategy= ?q= ?mode= …`) or `?embed=`
+stands the restore down. The URL is the more recent instruction.
+
+Event: `returning_session_restored` (`tool_use`, `event_source='opportunity_map'`) with
+`age_hours` + `returning` (age > 30 min) — a reload seconds later is restored but is **not** a
+return, and counting it as one would inflate the one number this exists to move.
+
+**Also fixed here: the anonymous save was UNREACHABLE.** #1601 put it on `window.savePursuit`,
+which has **zero call sites** — measured on the serving production page, it appears exactly twice
+(its own definition and its own sign-in retry callback). Every live button calls
+`window.saveCurrentOpp` (13 occurrences), which had no anonymous branch; production confirmed it
+with **0 rows in `anonymous_shortlist` and 0 `shortlist_saved` events, ever**. The branch now lives
+in `saveCurrentOpp`, restricted to a SAM drawer with a canonical 32-hex `notice_id`
+(`!CUR.kind && !CUR.isDla && /^[a-f0-9]{32}$/`), and callers passing a `done` callback
+(`openProposalWorkspace`, `startCapture`) are excluded so their signed-in destinations still work.
+**A save is still not a pursuit** — the label says "Saved", never "Tracked"/"In pursuits".
+⚠️ `window.__claimAnonWatches` (W1/#1600) still calls a bare `_uemail()` from SAVE_JS and therefore
+throws — **separate, unfixed, out of scope here.**
+
+---
+
+## 🔤 A MATCH IS A CLAIM — READ before touching /try, the match engine, or SEO page generation
+
+**`docs/engineering/try-relevance-regression.md`** is the record; the frozen set is
+`src/lib/beginner/__fixtures__/try-relevance-cases.ts`.
+
+> **Only the business ACTIVITY may establish a match. Words that describe the company,
+> the customer or the act of contracting — person, company, government, contracts,
+> small, help — can never put an opportunity in "Matches what you described".**
+
+**Why it is a rule.** On 2026-09-21 prod answered *"can a 2 person garbage company do
+government contracts"* with 13 results, none about garbage: a DoD personnel-security
+platform, a PERSONAL alert device, PERSONAL services contractors. Two causes, both
+measured: the searched keyword was the literal word **`person`** (out of "2 person"),
+because `keywordCandidates()` ranks by POSITION — true of expert phrasing, false of
+beginner prose, which leads with who you ARE; and the gate was `title.includes(token)`
+with **no word boundary**, so `person` ⊂ `personnel` ⊂ `personal`. Same class as the
+earlier "Dale Carnegie *Building*" match. Measured heads before the fix: `small` for IT
+support, `install` for roofing, `physical` for security guard, `agency` for staffing.
+
+- **`src/lib/beginner/activity.ts` is the only place that decides what we search.** A
+  ladder, not a score (summing per-token scores prefers LONGER phrases, which then match
+  no SAM title at all — "clean office" 0 rows vs "clean" 40): distinctive single activity
+  noun → anchored phrase → a typed-but-generic word → **ask a question**.
+- **`src/lib/beginner/relevance.ts` decides what qualifies**, in three tiers —
+  `direct` (activity term, word-boundary, in the title) · `broader` (a shortened form, a
+  broader-search term, or a code overlap) · `reject`. **Expanding the user's word is safe
+  (`cater`→`Catering`); shortening it is not (`trucking`→`Trucks`)** — an object is not
+  the service.
+- ⚠️ **/try resolves NO NAICS.** It passes `skipUsaSpendingCoverage`, so `naicsCodes` is
+  always empty and `classification` is always `keyword_fallback`. A gate of the form
+  "NAICS/PSC must intersect the resolved set" returns ZERO for every /try query. Codes
+  corroborate or demote; they never admit. A NULL NAICS never deletes a title match.
+- ⚠️ **Absent ≠ unrestricted.** `classifySetAside(null)` is `not_stated`, not `open`.
+  **4,261 of 9,030 active open notices (47.2%)** carry no set-aside at all and every one
+  used to render *"Who it's for: Any business that can do the work"*. A FILTER may assume
+  NULL means Full & Open; a SENTENCE ON A CARD may not.
+- ⚠️ **An RFI is not a bid.** Every card carries a `stage` (`open_bid` /
+  `market_research` / `upcoming` / …) and the count carries its own mix. The original 13
+  were 8 market-research + 1 pre-sol + 4 biddable under one "13 current opportunities".
+- **Rejected with evidence, do not re-propose:** ranking activity words by
+  `naics_vocabulary` (`physical` w1481 beats `guard` w1206; `window`→agriculture), and
+  expanding the market from the direct hits' NAICS (the one live "garbage" hit is 562998,
+  whose mined vocabulary is *grease trap cleaning*).
+- **Gates:** `src/lib/beginner/try-relevance.unit.test.ts` (hermetic, drives the frozen
+  set) + `npm run verify:beginner-try` (live cache; 11 pinned + 800 sampled searches).
+- **SEO page generation stays blocked on this set passing** — every programmatic page
+  inherits this matcher.
+- **Adversarial round (same day) found the same class twice more, both now pinned:**
+  ownership self-description (`woman owned small business that does catering` searched
+  **`owned`** → nine Government-Owned fuel-depot contracts) and verbs that are also nouns
+  (`we drive trucks` → **`drive`** → DISK DRIVE / AC DRIVE, 26 cards, zero trucking). A
+  verb that IS the service also emits the compound the buyer writes — `crane rental`,
+  `vehicle towing`, `alarm monitoring` — but **never for install/repair/replace/remove/
+  clean**, where the object already names the work ("we install windows" narrowed from 36
+  live notices to 1 before that was fixed).
+- ⚠️ **PLURAL IS NOT DERIVATION, and the SQL keyword must be SINGULAR.** "we build fences"
+  printed *"Mindy found 0 current opportunities"* above three live fence cards — 14 open
+  fence notices existed. SAM's title search is an ILIKE substring, so `%fences%` cannot
+  match "Fence". Measured after: fences 0→11, roofs 3→24, windows 2→24.
+- ⚠️ **AN EXACT-TOKEN MISS IS NOT MARKET ABSENCE.** `/try` matches the words in a
+  listing's TITLE. Zero open titles contain "lawn" or "mowing", while ~18 open
+  grounds-maintenance notices (NAICS 561730) are exactly that business. No copy may say
+  *"nothing matching is open"* or *"the open market is small"* — both shipped, and the
+  second was live on the garbage case (1 title match reported as a small market beside
+  ~20 open refuse/solid-waste notices). Say which words were searched and that the limit
+  is the SEARCH. Guarded by the live oracle's `no_market_absence_claim` pin.
+- ⛔ **There is NO body-text rescue, and the one that was built is RETRACTED.** A
+  `detail-evidence.ts` fallback read the notice's description on an empty result and quoted
+  the line; independent review measured **~19 of 26 hits (73%) wrong** — submission
+  boilerplate, a table of contents, FAR clause text, a scope EXCLUSION quoted as proof.
+  Removed 2026-09-21. Its own "multi-word terms must be a PHRASE within 40 chars" guard was
+  **order-free proximity and did not work** (`"the staffing plan shall address medical
+  surveillance requirements"` matched `"medical staffing"`). Evidence + the bar a
+  replacement must clear: `src/lib/beginner/__fixtures__/body-relevance-cases.ts` and
+  `tasks/body-relevance-followup-2026-09-21.md`. **Do not substitute another heuristic
+  without clearing that bar**, and do not re-propose a word→code→market hop — three are now
+  measured and rejected (`physical` outranks `guard`; 562998 → "grease trap"; `lawn` →
+  333112 lawn-mower manufacturing).
+- **`verify:beginner-try --sample` is a RECALL FLOOR, not a precision score** — nouns are
+  harvested from live titles, and it only asserts not-empty / not-follow-up. A build
+  returning the whole corpus would score 1000/1000. Precision lives in the frozen set and
+  the pinned oracles.
 
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 
@@ -170,8 +362,71 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
+### Solicitation identity sequence — FROZEN 2026-09-20
+Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Historical discovery ✓ → targeted family backfill later → PAE later.**
+- **#1557 Solicitation Truth** — merged, production-proven.
+- **#1558 Family v1** — merged. Empty migration applied. Production canary 2026-09-19 PASS: one MASA family (`c870f3c7-dea2-46ef-9943-3018d566afc9`), four versions, current=Amd 0003, customer RFP alias `N0017426R1003` present, Original pursuit (`ce85c48d…` / `hello@icrestiq.com`) kept its `notice_id`. The other MASA pursuit (`kurtgraham@achieversmgt.com`) remains `family_id=null` — proof there was no hidden fleet backfill.
+- **#1560 Historical Solicitation Discovery** — merged `0faeef07` 2026-09-20. Production host acceptance: lookup-first on the Indian Head MASA prompt; FIND-first on VA IT; OPEN control `70RTAC26R00000007` stays open / `not_biddable=false`. **Do not reopen #1560.** Future production verification: the serving SHA **contains** the accepted feature SHA (`git merge-base --is-ancestor 0faeef07 <serving-sha>`) **and** live behavior still passes. Do **not** require the production alias to remain on the exact historical SHA.
+- **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** write the 44,560-family fleet backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Lazy Family v1 only — persist on known-id / pursuit save / confirmed identity, never a fleet write.
+- **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
+
+### Potato v1 — ✅ SHIPPED → CLOSED 2026-09-17
+Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.”
+- Journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → TALENT THIN → POSITION → ACT → MONITOR. Then STOP.
+- Product production: merge SHA **`8cab32a2`** on `getmindy.ai` (Vercel project `market-assassin`). Docs merge `919dbcb5` is the completion record, not a product deploy.
+- 12/13 acceptance PASS; positioning-claims PARTIAL is **v2 debt**, not a v1 reopen.
+- Reopen v1 only for billing, security/privacy, fabricated evidence, or a genuinely broken customer journey.
+- Any next build is a **separately named track** with its own goal and acceptance gate (not “Potato v1.1”). Candidates on the debt list are not automatically next.
+
+### Potato P2 — VALUE BEFORE QUALIFICATION (awaiting merge)
+Track: first-turn sequencing only. Do **not** reopen Potato v1 evidence engines.
+- Principle: broad “I sell X to Y / help me” → one `find_opportunities` → present Open / Coming back / Coming soon → one plain-English refine → WAIT.
+- Controls: `P2_FIRST_TURN_INSTRUCTIONS` (MCP initialize) + FIND `presentation.host_rules` (CAI/PATHWAY pattern).
+- Company identity moves to PATHWAY FIT. Clearance only when evidence makes it decision-changing. No first-turn deliverable menu.
+- Branch: `feat/potato-p2-value-first`. Do not start another P2 issue. No server-side FIND debit guard unless a live host still triple-calls FIND after this ships.
+
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
+
+### Current Acquisition Intelligence v0 — ✅ FROZEN COMPLETE 2026-09-15
+Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
+`get_current_acquisition_intelligence` (8 credits). Journey:
+**FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY**.
+- Shipped PR #1539 + language guardrails (unavailable ≠ zero; historical evidence ≠ future certainty;
+  empty `do_differently` when unearned). Host SOCOM cyber re-run PASS.
+- **Production acceptance (only this counts):** worktree relinked to Vercel project **`market-assassin`** →
+  `vercel --prod` → **getmindy.ai** verified **61 tools**, CAI @ **8cr**, catalog description includes
+  unavailable-horizon / future-certainty guardrail language.
+- **Not acceptance evidence:** a successful deploy to the accidental Vercel project
+  `cai-language-guardrails` (green build, wrong project — do not cite).
+- **⛔ No more CAI polishing.** Do not reopen compose, host_rules, or pathway classifiers unless a
+  production defect breaks the killer rule or invents pathways. PATHWAY FIT and Potato v1 are
+  **CLOSED** — see `docs/POTATO-V1-COMPLETION.md`. Do not treat CAI follow-ups as “continue Potato.”
+  (Process debt: worktree→wrong Vercel project has now bitten twice — assert
+  `.vercel/project.json` → `market-assassin` before `--prod`; build an abort guard only if it
+  happens again. Do not divert PATHWAY/TALENT for that guard.)
+
+### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
+Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching
+`federal_contacts` ingest; don't re-derive.
+- `federal_contacts` is now the registered source **`decision_makers_sam_contacts`** (dataset
+  `decision_makers`) with a durable checkpoint in `decision_makers_sync_state` and its own
+  `cron_jobs` row `sync-decision-makers` (`0 */2 * * *`). It previously had **no schedule at
+  all** — only an unawaited `fetch()` from `sync-sam-opportunities`, sweeping an ~11-day rolling
+  window while 50.8% of rows went 90+ days untouched.
+- ⚠️ **The cursor is `sam_opportunities.created_at`, never `posted_date`.** 34,906 notices
+  (16.8%) are created >2 days after they were posted (worst 30 days), so a posted_date cursor
+  silently skips every backdated arrival. Do not "improve" this.
+- ⚠️ **Registered + enabled + firing on time ≠ working.** The first scheduled fire **401'd**:
+  the dispatcher sends `authorization: Bearer $CRON_SECRET` + `x-cron-dispatch: 1` and **never**
+  `x-vercel-cron`. Any `cron_jobs` route must accept that bearer — and verification means reading
+  `cron_job_runs.http_status`, not `cron_jobs.last_run_at`.
+- ⚠️ **`source` / `source_table` on `federal_contacts` are column DEFAULTS**, not provenance. The
+  82,017 `sam_entities_pocs` rows are VENDOR POCs yet inherit `source='sam_opportunities_poc'`.
+- Unchanged rows are never re-upserted, so `last_data_advance` moves only on real mutations and
+  `updated_at` means "content changed", not "a sweep passed over it".
+- **NOT done (next passes, in order):** person identity (~21K people behind 247K rows; 2,321
+  emails with conflicting names), then vendor-POC provenance + the two frozen importers.
 
 ### Specialty feeds (DIBBS · Grants · SBIR) — ⏸️ PARKED 2026-09-13
 Full record: **`docs/data-core-reliability-dibbs-grants-sbir.md`** (PR #1458). Read it; do NOT re-audit.
@@ -1447,7 +1702,8 @@ comp/testimonial 2026-07-19 and **back to advocate 2026-08-28**; he stays in
 `campaign-exclusions.ts` too, which is additive (that list suppresses campaigns, this one
 grants comp Pro).
 
-**They exhaust the 250/mo `PRO_MONTHLY_CREDITS` allowance inside a single demo session** —
+**They exhaust the `PRO_MONTHLY_CREDITS` allowance inside a single demo session** (it was
+250/mo at the time; 1,500/mo as of 2026-09-14 — read `packages.ts`, not this line) —
 all four were topped up by hand in the week of 2026-08-24. Advocates doing live demos are
 comped by design; the wall is not a conversion signal for them.
 
@@ -2529,12 +2785,14 @@ round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code
   ≈ $49/mo) · **Pro $149/mo** · **Team $499/mo** · Founders $4,997 lifetime.
   - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` /
     `TEAM_MONTHLY_CREDITS`; they are NOT sold through `SUBSCRIPTION_PLANS`.
-    **⚠️ CORRECTED 2026-09-08: this said Pro was 6,000/mo. It is not, and was not.**
-    Verified two ways — `packages.ts` defaults to **Pro 250 / Team 1,000**, and live
-    `GET getmindy.ai/api/mcp/catalog` returns `tierCredits.pro.credits = 250`,
+    **⚠️ This number has now gone stale TWICE in this doc** — it said 6,000/mo (corrected
+    2026-09-08 to 250), and 250 was itself stale by 2026-09-14. Verified two ways on
+    2026-09-14: `packages.ts` defaults to **Pro 1,500 / Team 1,000**, and live
+    `GET getmindy.ai/api/mcp/catalog` returns `tierCredits.pro.credits = 1500`,
     `.teams.credits = 1000`. **Read `packages.ts` or the live catalog; never this doc**
-    for an allowance number. (A hardcoded `?? 1000` Pro fallback in `mcp/tools/page.tsx`
-    had drifted the same way and is fixed in the same pass.)
+    for an allowance number — that instruction is the only durable part of this bullet.
+    (Hardcoded Pro fallbacks drifted the same way twice: `mcp/tools/page.tsx` → 0 on
+    2026-09-08, `mcp/page.tsx` `?? 1000` → 0 on 2026-09-14.)
   - The **$19 'Plus' subscription was RETIRED** (0 subs ever → nothing to grandfather).
 - **One-time top-ups** (`CREDIT_PACKAGES`): Plus 2,000 cr / $49 · Scale 5,000 cr / $99.
 - **Flagship credit sink:** a full proposal run ≈ ~100 cr (`draft_proposal`=50 + matrix/SOW/
@@ -2699,6 +2957,7 @@ looking for it. **If you add or remove one, update this table in the same commit
 | `npm run verify:beginner-try` | script | SAM-cache oracle for `/try`. Never calls USASpending. Pinned regressions (lidar sentence, fix doors, janitorial, HVAC≠Dale Carnegie, vague follow-up, garbage empty) plus a reverse sample: distinctive nouns taken from live `sam_opportunities` titles, wrapped in beginner sentences. If the cache has the noun, `/try` must not return empty/follow-up. `-- --sample 250` (default) · `-- --pinned` · `-- --json`. |
 | `npm run verify:oracles` | script | ORACLE test for the high-stakes NON-search surfaces where a confident-but-wrong output changes a BID decision (and a green build + unit tests would miss it — the search 1000-row-cap bug passed 11 unit tests + a green build). **scope**: a state-scoped contractor search returns firms genuinely IN that state, not the national top-N-by-$ (the map "national whales only" starvation — proven: drop the state scope → 15/15 off-state leaks). **report**: `generate_market_report`'s agency table uses the canonical 3-FY `MARKET_SPEND_WINDOW`, not a 1-FY window (proven: 1-FY shows $28.6B vs the correct 3-FY $86.0B for 541512 — the "your data is wrong" gap). **contacts**: a known DoDAAC (W912PL → LA District) returns THAT office's real `@usace.army.mil` roster, not a dept-wide `osd.osbp` fallback. **alert**: `normalizeNAICSForPersist` keeps a 6-digit code EXACT — never fans 541512 into the whole 51-code 541 family (the cross-industry alert flood). **pricing**: `get_pricing_intel` keeps grounded/degraded DISTINCT — a real NAICS is grounded=true, a no-input call is an honest empty (grounded=false, degraded=false, validation_error), and an ERRORED CALC is degraded=true — so the documented 429-swallow trap ("no rates exist" when CALC merely throttled) can't return. **mwin**: a PARTIAL win-prob match (same NAICS+agency, wrong set-aside, no capability) keeps its earned NAICS+agency credit (≥40) and lands strictly between the no-profile floor (30) and a strong match (98) — the GRADIENT guard that `verify:m-scale`'s strong-total(98)+fallback checks don't cover (proven: drift the real agency weight 15→0 → partial drops to 37 < 40 → FAIL). **filters**: every Filters-tab filter (NAICS/PSC, set-aside group, Full & Open, notice type, state, closing window, agency) runs through the SHARED `applyMapFilters` (used by BOTH the viewport API and saved-search alerts) against the LIVE corpus and must (a) genuinely NARROW (count < baseline) and (b) return rows that ALL satisfy the predicate — the existing unit test only asserts the PostgREST expression SHAPE (a stub query), so it can't catch a filter that matches the wrong column or narrows nothing (proven: point NAICS at psc_code → 0 rows → FAIL). This is the check that CAUGHT the Agency-"Navy" bug: the Agency field's own placeholder is "e.g. Navy" but Navy lives in `sub_tier`, not `department`, so a dept-only match returned 0 of ~2,043 active Navy opps — fixed to match department OR sub_tier. **freshness**: the 63M-row BQ `usaspending.awards` table (backs /awards, contractor DB, Past Awards horizon) is fed by the WEEKLY ingest (`scripts/ingest-usaspending-awards.ts` → `npm run ingest:awards:apply`); the check asserts `MAX(action_date)` is within 21 days of the government (proven: budget 21→1d → 2-days-behind FAILS). This is the guard that makes a STALLED ingest fail loudly instead of silently serving stale awards (it got to ~101 days behind before this existed). Two independent guards: this oracle + the `check-data-freshness` cron reminder (a `data_sources[bq_awards]` weekly row; the ingest auto-stamps `last_built` on a successful `--apply`, so a real run clears the nag). **recompete-count** (2026-08-04): the Expiring-Contracts headline count. A NARROW filter (541512/6mo) returns an EXACT vehicle count that reconciles ±5% with a direct DB count and is NOT capped; a BROAD filter (no NAICS, 60mo → whole 130k-row table) hits the `GROUP_FETCH_CAP=6000` FLOOR so `capped` is true and the UI MUST render "6,000+" — the guard against the documented "9,450 total in database" cap-as-a-hard-total lie (proven: compare to a wrong-NAICS DB count → delta 100% FAIL; shrink the broad window so total<6000 → FLOOR FAIL). **forecast-match** (2026-08-04): the Upcoming-Buys NAICS filter over `agency_forecasts`. A real 6-digit NAICS returns forecasts that ALL carry exactly that code (route uses `.eq` for 6-digit — no sibling-code leak); a bogus NAICS (999999) returns 0 (honest miss, never fabricated) (proven: swap `.eq` for a 3-digit prefix `.ilike` → allExact=false FAIL; point "bogus" at a real code → 677 rows FAIL). Each check is proven by inject→red→revert→green. `-- --only <scope\|report\|contacts\|alert\|pricing\|mwin\|filters\|freshness\|recompete-count\|forecast-match>` runs one; `-- --json` machine-readable. |
 | `npm run verify:m-scale` | script | Proves the two branded Mindy numbers are GROUNDED, like verify:live for a route. **M-Estimate™**: the `opp_value_range` RPC's low/median/high must EQUAL the real 25th/50th/75th percentiles of `recompete_opportunities` re-derived from raw amounts (no drift/stale RPC), + the honest-miss gate (bogus NAICS < 8 comparables → null, never a fabricated band). **M-Win**: a fixed profile+opp must produce the EXACT documented factor total (25+25+15+15+10+8=98), so a weight change can't silently move the score. `-- --naics <code>` to check another market; `-- --json` machine-readable. Exits non-zero on any mismatch. |
+| `npm run verify:maps-account` | script | Required Maps chrome regression. Source greps HMAC `b64json(parts[0])`, never-`?` initials, Players=`companies`. `-- --live` curls the **currently serving** host (before merge that can be the previous good build). `-- --live --expect-sha <release>` waits until production's `maps-account-build` stamp matches, then fails if it does not. Missing HMAC secrets → **NOT TESTED**; a configured secret that gets HTTP 401 → **FAIL**. Does not Google-login or paint the avatar — browser acceptance stays required. `-- --self-test` pins the 401/SHA reporting. |
 | `npm run tidy:branches` | script | Prunes LOCAL branches already fully merged into origin/main — the residue GitHub's `delete_branch_on_merge` can NEVER clear (it deletes its copy of the branch, not yours; verified 2026-08-17 that the setting was already ON and working — 0 merged branches on origin — while the local list had reached 516). **Dry-run by default; `-- --go` deletes.** Refuses to touch main, the current branch, any branch checked out in a WORKTREE (~25 live here), and anything with ≥1 unmerged commit. Uses `git branch -d`, never `-D`: the safe form refuses a branch whose UPSTREAM has commits the local ref lacks, and that refusal is information. ⚠️ "Remote is gone" is NOT evidence the work landed — a SQUASH merge rewrites the commit so the original ref never looks merged; measured, 39 of 44 gone-remote branches still held unmerged commits. Only the commit count decides. A `post-merge` hook REPORTS the count on main (never deletes on its own). |
 | `/ui-fix` | command | Render fixes — only after the data is proven right |
 | `/check-access` `/kv` `/admin-endpoint` `/email-template` `/stripe-handler` `/product-page` `/test-sam-api` | commands | Repo-specific recipes (`.claude/commands/`) |

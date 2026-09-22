@@ -28,7 +28,11 @@ type Row = {
   tool_name: string;
   offer_version: string;
   rejected_at: string;
-  checkout_started_at: string | null;
+  offer_page_opened_at: string | null;
+  checkout_clicked_at: string | null;
+  stripe_session_at: string | null;
+  payment_confirmed_at: string | null;
+  credits_applied_at: string | null;
   purchased_at: string | null;
   resumed_at: string | null;
   completed_at: string | null;
@@ -52,7 +56,7 @@ async function main() {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db
       .from('mcp_paywall_attempts')
-      .select('user_email,tool_name,offer_version,rejected_at,checkout_started_at,purchased_at,resumed_at,completed_at')
+      .select('user_email,tool_name,offer_version,rejected_at,offer_page_opened_at,checkout_clicked_at,stripe_session_at,payment_confirmed_at,credits_applied_at,purchased_at,resumed_at,completed_at')
       .order('rejected_at', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(error.message);
@@ -72,16 +76,24 @@ async function main() {
   for (const v of versions) {
     const vr = rows.filter((r) => r.offer_version === v);
     const rejected = vr.length;
-    const checkout = vr.filter((r) => r.checkout_started_at).length;
+    const offerOpened = vr.filter((r) => r.offer_page_opened_at).length;
+    const clicked = vr.filter((r) => r.checkout_clicked_at).length;
+    const session = vr.filter((r) => r.stripe_session_at).length;
+    const confirmed = vr.filter((r) => r.payment_confirmed_at).length;
+    const credited = vr.filter((r) => r.credits_applied_at).length;
     const purchased = vr.filter((r) => r.purchased_at).length;
     const resumed = vr.filter((r) => r.resumed_at).length;
     const completed = vr.filter((r) => r.completed_at).length;
 
     console.log(`\n=== offer ${v} · ${rejected} attempts · from ${vr[0].rejected_at.slice(0, 10)} ===\n`);
     console.log('  STAGE                    COUNT   OF REJECTED');
-    line('rejected', rejected, rejected);
-    line('checkout started', checkout, rejected);
-    line('purchased', purchased, rejected);
+    line('paywall responses', rejected, rejected);
+    line('offer page opened', offerOpened, rejected);
+    line('checkout link clicked', clicked, rejected);
+    line('stripe session created', session, rejected);
+    line('payment confirmed', confirmed, rejected);
+    line('credits applied', credited, rejected);
+    line('purchased (legacy)', purchased, rejected);
     line('resumed', resumed, rejected);
     line('completed', completed, rejected);
 

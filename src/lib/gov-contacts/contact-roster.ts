@@ -16,12 +16,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
-import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
+import { deriveSubAgencyEvidence } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
-import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
+import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
-import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
+import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 
 // ── Lifted route-local classifiers (faithful copies of federal-contacts/route.ts) ──
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -250,6 +251,9 @@ export interface FederalContact {
   role_category_label: string | null; // classified bucket (Contracting Officer, Small Business, …)
   poc_label: string | null;
   sub_agency: string | null;
+  /** How sub_agency was derived. Email-only or a prefix/email conflict is uncertain. */
+  sub_agency_evidence?: 'solicitation_prefix' | 'email_domain' | 'both_agree' | 'conflict' | 'none';
+  sub_agency_uncertain?: boolean;
   derived_office: string | null;
   dodaac: string | null;
   is_osbp?: boolean;
@@ -308,7 +312,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
 
   // Build a fresh query each call so we can retry without sub_tier narrowing.
   const buildQuery = (applySubTier: boolean) => {
-    let q = sb
+    let q = placeholderNameFilter(sb
       .from('federal_contacts')
       .select(
         'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
@@ -319,16 +323,14 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // in sub_tier, NO federal agency, and ZERO with an email). They leaked into
       // a bare text search here (name surnames + junk); the app route already
       // excludes them. A real POC always has a department.
-      .not('department_ind_agency', 'is', null)
-      // Ghost-card guard (2026-07-26): mirror the app route — ~3,912 rows carry a
-      // real email/agency but contact_fullname is a literal SAM placeholder
-      // ("Telephone: 7175503112"); no real name exists upstream. Excluded at the
-      // query so the roster's `total`/`emailableCount` stay honest; the
-      // isUsableContactCard filter below is the belt-and-suspenders.
-      .not('contact_fullname', 'ilike', 'telephone:%')
-      .not('contact_fullname', 'ilike', 'phone:%')
-      .not('contact_fullname', 'ilike', 'fax:%')
-      .not('contact_fullname', 'ilike', 'tel:%');
+      .not('department_ind_agency', 'is', null));
+    // Government buyers ONLY — the authoritative contact_kind contract. Applied as its own
+    // statement: nesting it inside the other wrappers exceeded TS's generic instantiation depth
+    // on the Supabase builder type.
+    q = governmentBuyersOnly(q);
+    // Ghost-card guard: rows with a real email/agency whose contact_fullname is a SAM
+    // placeholder. Excluded at the query by placeholderNameFilter so the roster's
+    // `total`/`emailableCount` stay honest; isUsableContactCard below is the belt-and-braces.
     if (search) {
       // Mirror the app route's agency-aware search: name/title PLUS agency + the
       // sub_tier (bureau) column, so "forest" finds sub_tier "FOREST SERVICE" (the
@@ -387,7 +389,11 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
   let contacts: FederalContact[] = rows
     .filter((r) => {
       const hay = `${r.office || ''} ${r.sub_tier || ''} ${r.contact_email || ''}`;
-      if (FOREIGN_OFFICE_RE.test(hay)) return false;
+      // Named DoDAAC = that office, including overseas. The foreign filter
+      // exists to stop department-wide Navy lists filling with Yokosuka, not
+      // to empty an office the caller asked for by code (N40084 NAVFAC Far East
+      // carries the measured @state.gov Navy POCs).
+      if (!validDodaac && FOREIGN_OFFICE_RE.test(hay)) return false;
       // Belt-and-suspenders (see the query-level ILIKE exclusion above): drop a
       // card too incomplete to be useful — a placeholder/garbage name, or a
       // name with no org and no contactable field.
@@ -410,8 +416,11 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // role — so a buying-office POC ("Primary Contact", role_category="contracting") reads as
       // "Contracting" instead of null. The title-derived bucket still WINS when present (more specific).
       const roleCatLabel = roleCategory || roleCategoryLabel(r.role_category);
+      const sub = deriveSubAgencyEvidence(r.contact_email, r.solicitation_number);
       return {
-        contact_fullname: r.contact_fullname,
+        // Display value: SAM's appended phone/DSN/email stripped. The raw observation in
+        // federal_contacts is untouched — this is presentation only.
+        contact_fullname: displayContactName(r.contact_fullname) ?? r.contact_fullname,
         contact_title: r.contact_title,
         contact_email: r.contact_email,
         contact_phone: r.contact_phone,
@@ -419,13 +428,16 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         role: normRole,
         role_category_label: roleCatLabel,
         poc_label: pocLabel,
-        sub_agency: deriveSubAgency(r.contact_email, r.solicitation_number),
+        sub_agency: sub.label,
+        sub_agency_evidence: sub.evidence,
+        sub_agency_uncertain: sub.uncertain,
         derived_office: officeName,
         dodaac: dod?.dodaac || null,
       } as FederalContact;
     })
-    // second-pass foreign filter on the DECODED office name
-    .filter((c) => !FOREIGN_OFFICE_RE.test(c.derived_office || ''));
+    // second-pass foreign filter on the DECODED office name — skipped when
+    // the caller named the office by DoDAAC.
+    .filter((c) => validDodaac || !FOREIGN_OFFICE_RE.test(c.derived_office || ''));
 
   // Soft role filter: prefer contacts whose title matches the requested role (by bucket
   // or title substring), but NEVER return empty on a role miss — fall back to the full
@@ -448,16 +460,13 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     }
   }
 
-  // Prepend the OSBP small-business contact for the agency (the front door).
+  // Prepend the OSBP small-business contact only when agency identity is established
+  // and the directory row is not a different agency (STATE ⊂ UNITED STATES COAST GUARD).
   const includeOsbp = input.includeOsbp ?? !!agency;
   if (includeOsbp && agency) {
     try {
-      const osbp = getEnhancedAgencyInfo(agency, agency, agency).smallBusinessContact;
-      // Skip the GENERIC SBA fallback (email gcbd@sba.gov, reached when NOTHING matched)
-      // — otherwise a nonsense agency looks "grounded" with a boilerplate SBA mailbox.
-      // Real agency OSBPs carry their own agency email (VA osdbu@va.gov, NAVFAC …).
-      const isGenericFallback = (osbp?.email || '').toLowerCase() === 'gcbd@sba.gov';
-      if (!isGenericFallback && (osbp?.director || osbp?.email)) {
+      const { contact: osbp, reason, emailDomainFlag } = osbpContactForAgency(agency);
+      if (reason === 'established' && osbp && (osbp.director || osbp.email)) {
         contacts.unshift({
           contact_fullname: osbp.director || null,
           contact_title: 'Office of Small Business Programs',
@@ -473,6 +482,11 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
           is_osbp: true,
           director_verified: osbp.directorVerified || null,
         });
+        if (emailDomainFlag) {
+          trace.push('osbp email domain flags a different directory mailbox (not excluded)');
+        }
+      } else if (reason !== 'established') {
+        trace.push(`osbp prepend skipped (${reason})`);
       }
     } catch { /* OSBP prepend is best-effort */ }
   }

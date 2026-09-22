@@ -140,6 +140,7 @@ export function normalizeRequirement(input: Record<string, unknown>): Normalized
     description: description!,
     ...(normText(input.sub_agency) ? { sub_agency: normText(input.sub_agency)! } : {}),
     ...(normText(input.office) ? { office: normText(input.office)! } : {}),
+    ...(normText(input.installation) ? { installation: normText(input.installation)! } : {}),
     ...(naics.value ? { naics: naics.value } : {}),
     ...(psc.value ? { psc: psc.value } : {}),
     ...(estValue !== undefined ? { est_value: estValue } : {}),

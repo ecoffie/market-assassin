@@ -26,6 +26,7 @@ import { extractPdf, extractDocx, extractTxt, extractXlsx } from './pdf-extract'
 import { classifyDoc } from '@/lib/proposal/classify-doc';
 import { parseSamAttachment } from '@/lib/sam/attachment-metadata';
 import { fetchNoticeResources } from '@/lib/sam/fetch-notice-resources';
+import { isNoticeUuid, normalizeNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
 
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_FILE_URL_PREFIX = 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/';
@@ -164,26 +165,36 @@ async function resolveFromCache(
   noticeIdOrSolicitation: string,
 ): Promise<{ uuid: string; attachments: string[] } | null> {
   const id = noticeIdOrSolicitation.trim();
-  const isUuid = /^[a-f0-9]{32}$/i.test(id);
+  const isUuid = isNoticeUuid(id);
 
-  // Try notice_id (UUID) first, then solicitation_number.
+  // Try notice_id (UUID) first — record identity stays exact.
   let row: { notice_id: string | null; attachments: unknown } | null = null;
   if (isUuid) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('sam_opportunities')
       .select('notice_id, attachments')
-      .eq('notice_id', id)
+      .eq('notice_id', normalizeNoticeUuid(id))
       .maybeSingle();
+    if (error) {
+      console.error('[fetch-pursuit-docs] resolveFromCache notice_id', error.message);
+      return null;
+    }
     row = data || null;
   }
-  if (!row) {
-    const { data } = await supabase
-      .from('sam_opportunities')
-      .select('notice_id, attachments')
-      .ilike('solicitation_number', id)
-      .limit(1)
-      .maybeSingle();
-    row = data || null;
+  if (!row && !isUuid) {
+    const canonical = await resolveCanonicalSolicitation(id, { client: supabase });
+    if (canonical) {
+      const { data, error } = await supabase
+        .from('sam_opportunities')
+        .select('notice_id, attachments')
+        .eq('notice_id', canonical.notice.notice_id)
+        .maybeSingle();
+      if (error) {
+        console.error('[fetch-pursuit-docs] resolveFromCache canonical', error.message);
+        return null;
+      }
+      row = data || null;
+    }
   }
   if (!row?.notice_id) return null;
 
@@ -460,7 +471,7 @@ export async function fetchPursuitDocs(opts: {
   // this notice_id. First saver pays the cost once; everyone after hits
   // this cache. This also means the common path makes ZERO live calls,
   // which is why "stuck fetching" effectively goes away.
-  const { data: cachedDocs } = await supabase
+  const { data: cachedDocs, error: cachedDocsError } = await supabase
     .from('pursuit_documents')
     .select('sam_file_id, sam_url, filename, mime_type, size_bytes, page_count, char_count, extracted_text, extraction_error')
     .eq('notice_id', noticeId)
@@ -471,6 +482,10 @@ export async function fetchPursuitDocs(opts: {
     .not('extracted_text', 'is', null)
     .neq('pipeline_id', pipelineId)
     .order('char_count', { ascending: false });
+
+  if (cachedDocsError) {
+    console.error('[fetch-pursuit-docs] notice-level doc cache', cachedDocsError.message);
+  }
 
   if (cachedDocs && cachedDocs.length > 0) {
     // Copy the cached docs onto this pursuit. Dedup by sam_file_id so a

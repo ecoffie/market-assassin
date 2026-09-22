@@ -17,6 +17,14 @@ import { join } from 'node:path';
 
 const map = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 const api = readFileSync(join(__dirname, '../api/pipeline/route.ts'), 'utf8');
+// The pursuit WRITE contract (duplicate handling, unknown-column retry) moved
+// into the shared canonical writer that /api/pipeline POST delegates to, so
+// both it and the anonymous-shortlist claim create the same pursuit. The
+// invariants below are unchanged — they are asserted where the code now is.
+const route = api;
+const writer = readFileSync(join(__dirname, '../../lib/pipeline/create-pursuit.ts'), 'utf8');
+const pursuitWrite = api + '\n' + writer;
+
 const appPage = readFileSync(join(__dirname, '../app/page.tsx'), 'utf8');
 
 function fnBody(s: string, name: string): string {
@@ -52,7 +60,12 @@ describe('tracking a buy actually saves', () => {
   it('never posts solicitation_number — user_pipeline has no such column', () => {
     // Both call sites (popup save + drawer save) posted it. The column list is
     // notice_id/title/agency/naics_code/response_deadline/... — verified against the live table.
-    expect(map).not.toContain('solicitation_number');
+    // Assert on CODE, not prose: the map now carries comments that NAME
+    // solicitation_number while explaining why it must never be posted (and why
+    // nid != sol). Flagging those is a false positive — the same "strip comments
+    // first" trap the repo's audit gates document.
+    const mapCode = map.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(mapCode).not.toContain('solicitation_number');
     // notice_id IS the key and must survive.
     expect(map).toContain('notice_id:CUR.id');
     expect(map).toContain('notice_id:o.sol');
@@ -61,11 +74,13 @@ describe('tracking a buy actually saves', () => {
   it('the API drops an unknown column instead of 500ing the save', () => {
     // A save is the wrong place to be strict: losing a user's pursuit because a field name
     // drifted is worse than ignoring the field. Covers BOTH error shapes.
-    expect(api).toContain("error.code === '42703' || error.code === 'PGRST204'");
-    expect(api).toContain('delete (body as unknown as Record<string, unknown>)[col]');
+    expect(pursuitWrite).toContain("error.code === '42703' || error.code === 'PGRST204'");
+    expect(pursuitWrite).toContain('delete body[col]');
     // Bounded, and it can only ever REMOVE keys — it cannot widen what gets written.
-    expect(api).toContain('attempt < 5');
-    expect(api).toContain('if (!col || !(col in body)) break;');
+    expect(pursuitWrite).toContain('attempt < 5');
+    expect(pursuitWrite).toContain('if (!col || !(col in body)) break;');
+    // …and the route must actually reach the writer that holds this logic.
+    expect(route).toContain('createCanonicalPursuit(');
   });
 });
 

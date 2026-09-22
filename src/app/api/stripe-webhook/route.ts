@@ -24,6 +24,7 @@ import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profi
 import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
+import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
 
 // Webhook secrets
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -107,6 +108,30 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabase();
 
   console.log(`Stripe webhook: ${event.type} (test: ${isTestMode})`);
+
+  // ── ASYNC PAYMENT SETTLED. A delayed payment method (ACH, bank debit, some wallets)
+  // completes the checkout session with payment_status 'unpaid' and settles LATER.
+  // handleMcpCreditTopup correctly refuses to grant on that unpaid event — which would
+  // STRAND a customer who genuinely pays if this follow-up were not wired. Stripe sends
+  // async_payment_succeeded when the money actually arrives; routing it through the SAME
+  // handler grants exactly once, because applyCreditOnce is keyed on session.id.
+  // Removing this handler without also removing the unpaid refusal loses real payments.
+  if (event.type === 'checkout.session.async_payment_succeeded') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const mcpTopup = await handleMcpCreditTopup(session);
+    if (mcpTopup.handled) {
+      console.log(`[stripe-webhook] async payment settled for ${session.id}:`, mcpTopup);
+      return NextResponse.json({ received: true, mcp_topup: mcpTopup, via: 'async_payment_succeeded' });
+    }
+  }
+
+  // An async payment that FAILED grants nothing — logged so a customer who believes they
+  // paid can be told what actually happened rather than being met with silence.
+  if (event.type === 'checkout.session.async_payment_failed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    console.error(`[stripe-webhook] async payment FAILED for session ${session.id} — no credits granted.`);
+    return NextResponse.json({ received: true, async_payment_failed: session.id });
+  }
 
   // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
@@ -273,6 +298,16 @@ export async function POST(request: NextRequest) {
           } else if (enroll.outcome === 'created') {
             console.log(`[stripe-webhook] duplicate session, but settings row was MISSING — created for ${email}`);
           }
+          const classified = await grantPaidBriefingClassification(supabase, {
+            email,
+            productName: lineItemDescription,
+            amountCents: session.amount_total ?? 0,
+            stripeCustomerId,
+            hasActiveSubscription: session.mode === 'subscription',
+          });
+          if (classified.outcome === 'failed') {
+            console.error(`[stripe-webhook] duplicate-path classification FAILED for ${email}: ${classified.reason}`);
+          }
         }
         console.log('Session already processed, skipping');
         return NextResponse.json({ received: true, duplicate: true });
@@ -385,6 +420,14 @@ export async function POST(request: NextRequest) {
     // Auto-update access flags (always update, user_id is optional)
     const accessUpdates = await updateAccessFlags(email, tier, bundle);
 
+    // Keep KV in sync with paid briefings entitlement so /briefings access works immediately.
+    // Record the grant AFTER the KV write so wrote_kv reflects what actually landed
+    // (Adam's 2026-09-08 row stored wrote_kv=false while KV was true).
+    let wroteKv = false;
+    if (accessUpdates.access_briefings) {
+      wroteKv = await grantBriefingsAccess(email);
+    }
+
     // Audit the AUTOMATIC grant. This is the baseline that makes admin_manual rows
     // interpretable: a paid session with a stripe_webhook row here and an admin_manual row
     // minutes later is a provisioning failure caught by hand. A session with NO row here at
@@ -405,6 +448,7 @@ export async function POST(request: NextRequest) {
       // false. Success is now an actual verified flag change, never object
       // truthiness. (TASK-STRIPE-DUP-004 scope item 7.)
       wroteProfile: Object.keys(accessUpdates).length > 0,
+      wroteKv,
       stripeSessionId: session.id,
       metadata: { event_id: event.id, amount_total: session.amount_total, bundle: bundle || null },
     });
@@ -423,11 +467,6 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('[stripe-webhook] coach-addon flag write failed (non-fatal):', e);
       }
-    }
-
-    // Keep KV in sync with paid briefings entitlement so /briefings access works immediately.
-    if (accessUpdates.access_briefings) {
-      await grantBriefingsAccess(email);
     }
 
     // Team purchase: provision the team workspace + migrate the buyer's
@@ -467,6 +506,18 @@ export async function POST(request: NextRequest) {
         console.error(`[stripe-webhook] AUTO-ENROLL FAILED for ${email}: ${enroll.error}`);
       } else {
         console.log(`✅ Auto-enrolled purchaser in alerts: ${email} (${enroll.outcome}${enroll.needsTargeting ? ', NEEDS TARGETING' : ''})`);
+      }
+      const classified = await grantPaidBriefingClassification(supabase, {
+        email,
+        productName: lineItemDescription || productName,
+        amountCents: session.amount_total ?? 0,
+        stripeCustomerId,
+        hasActiveSubscription: session.mode === 'subscription',
+      });
+      if (classified.outcome === 'failed') {
+        console.error(`[stripe-webhook] briefing classification FAILED for ${email}: ${classified.reason}`);
+      } else if (classified.outcome === 'upserted') {
+        console.log(`[stripe-webhook] briefing classification ${classified.access} for ${email}`);
       }
     }
 

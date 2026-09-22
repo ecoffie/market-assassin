@@ -112,16 +112,40 @@ export function gwDate(v: string | undefined): string | undefined {
   return undefined;
 }
 
-/** Header → canonical key. Matched by NAME; the export renames columns between
- *  releases and appends "Content: " prefixes to some. */
+/**
+ * Header → canonical key. Matched by NAME; the export renames columns between releases and appends
+ * "Content: " prefixes to some.
+ *
+ * ⚠️ THE RENAME ALREADY HAPPENED AND WENT UNNOTICED (measured 2026-09-14 against a live export).
+ * The Gateway renamed its organisational columns:
+ *     `Agency`        → `Funding Department / Ind. Agency`
+ *     `Organization`  → `Funding Organization`
+ *                     + `Funding Office` (new)
+ * Because the old names were matched with `===`, all three silently returned null and the
+ * DEPARTMENT, BUREAU and OFFICE were dropped on every ingest. That is why the held canonical
+ * `bureau` column holds a CONSTANT (the department's own name) instead of a real bureau — and why
+ * the FAS/PBS/FWS/NPS/Forest-Service subagency identities can only anchor on the retired duplicate
+ * `api` rows. Both spellings are accepted below so old exports on disk still parse.
+ *
+ * `assertGatewayHeaders()` now fails loudly when a critical column stops matching. A silent
+ * `return null` is how this cost us twice.
+ */
 export function gwFieldFor(header: string): string | null {
   const h = header.toLowerCase().replace(/^content:\s*/, '').replace(/[^a-z0-9 ()]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!h) return null;
   if (h === 'listing id') return 'listingId';
   if (h === 'title') return 'title';
   if (h === 'description') return 'description';
-  if (h === 'agency') return 'agency';
-  if (h === 'organization') return 'organization';
+  // DEPARTMENT — old `Agency`, current `Funding Department / Ind. Agency`.
+  if (h === 'agency' || h.startsWith('funding department')) return 'agency';
+  // BUREAU — old `Organization`, current `Funding Organization`. Anchors subagency identity.
+  if (h === 'organization' || h === 'funding organization') return 'organization';
+  // OFFICE — new column; the buying office within the bureau.
+  if (h === 'funding office' || h === 'contracting office organization') return 'office';
+  // SOURCE WATERMARK — the row's own last-changed date. Never a Mindy timestamp.
+  if (h === 'changeddate' || h === 'changed date') return 'changedDate';
+  if (h === 'createddate' || h === 'created date') return 'createdDate';
+  if (h.includes('solicitation link')) return 'sourceUrl';
   if (h.startsWith('naics')) return 'naics';
   if (h.includes('place of performance city')) return 'popCity';
   if (h.includes('place of performance state')) return 'popState';
@@ -274,4 +298,40 @@ export function normalizeGatewayState(raw: string | undefined): string | undefin
   const code = /\b([A-Z]{2})\b\s*\)?$/.exec(s);
   if (code && USPS.has(code[1])) return code[1];
   return undefined;
+}
+
+
+/**
+ * Columns the canonical Gateway ingest CANNOT lose. Each is either identity, an anchor for
+ * subagency resolution, or the source's own currentness marker.
+ */
+export const GATEWAY_CRITICAL_FIELDS = [
+  'listingId', 'title', 'agency', 'organization', 'naics', 'pocEmail', 'changedDate',
+] as const;
+
+export interface GatewayHeaderCheck {
+  ok: boolean;
+  mapped: Record<string, string>;   // canonical key -> the header that satisfied it
+  missing: string[];                // critical keys no header mapped to
+  unmapped: string[];               // headers we ignored (informational)
+}
+
+/**
+ * Fail-loud header-drift guard. Run this BEFORE ingesting any Gateway export.
+ *
+ * The Gateway renames columns between releases. When it did, `gwFieldFor` returned null and the
+ * ingest carried on writing rows with the department, bureau, office and source timestamp missing —
+ * no error, no warning, just quietly poorer data for months. An ingest that cannot find a critical
+ * column must STOP, not degrade.
+ */
+export function assertGatewayHeaders(headers: string[]): GatewayHeaderCheck {
+  const mapped: Record<string, string> = {};
+  const unmapped: string[] = [];
+  for (const h of headers) {
+    const f = gwFieldFor(h);
+    if (f) { if (!mapped[f]) mapped[f] = h; }
+    else unmapped.push(h);
+  }
+  const missing = GATEWAY_CRITICAL_FIELDS.filter((f) => !mapped[f]);
+  return { ok: missing.length === 0, mapped, missing, unmapped };
 }

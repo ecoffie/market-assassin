@@ -33,6 +33,11 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
+import { lookupSolicitationTool } from '@/mcp/tools/lookup-solicitation';
+import { currentAcquisitionIntelligenceTool } from '@/mcp/tools/current-acquisition-intelligence';
+import { matchCompanyToPathwaysTool } from '@/mcp/tools/match-company-to-pathways';
+import { understandCustomerTool } from '@/mcp/tools/understand-customer';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
@@ -50,6 +55,7 @@ import {
   updateMarketSchedule,
   deleteMarketSchedule,
 } from '@/mcp/tools/schedule-market-search';
+import { SCHEDULE_MARKET_SEARCH_DESCRIPTION } from '@/lib/mcp/schedule-discovery';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
@@ -98,9 +104,16 @@ export interface McpToolContext {
 export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   // 5 — Scan: search & lookup (top-of-funnel retrieval)
   search_sam_opportunities: 5,
+  lookup_solicitation: 5,
   search_agency_opps_by_office: 5,
   get_agency_forecasts: 5,
   get_expiring_contracts: 5,
+  // 10 — Unified Opportunity Map FIND (Open + Coming back + Coming soon). One composed debit.
+  find_opportunities: 10,
+  // 8 — CURRENT INTELLIGENCE: what changed + what to do differently (LIVE compose, journey slot after FIND).
+  get_current_acquisition_intelligence: 8,
+  // 8 — PATHWAY FIT: two-sided match of CAI doors to company public record.
+  match_company_to_pathways: 8,
   search_grants: 5,
   search_sbir: 5,
   search_idv_contracts: 5,
@@ -118,6 +131,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   derive_company_keywords: 5,
   evaluate_bid_decision: 5,
   get_agency_intel: 5,
+  understand_customer: 5,
   // 10 — Profile: synthesized read on a competitor / market / agency + no-AI proposal utilities
   search_contractors: 10,
   get_contractor_profile: 10,
@@ -345,16 +359,17 @@ const PREDECESSOR_AWARD_TOOL_DEF = {
   },
 };
 
-/** Sol # / notice UUID → open notice + likely prior award (Chat "who held this?" path). */
+/** Sol # / notice UUID → stored notice (latest version) + likely prior award (Chat "who held this?" path). */
 const SOLICITATION_INCUMBENT_TOOL_DEF = {
   type: 'function' as const,
   function: {
     name: 'get_solicitation_incumbent',
     description:
       'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
-      'and asks who won the prior work, what it cost, or "was this awarded before." Resolves the OPEN ' +
-      'solicitation on SAM, then finds the LIKELY prior award on USASpending (recipient, PIID, ceiling, ' +
-      'expiry). Do NOT call get_award_detail with an RFQ/solicitation number — those are not award PIIDs. ' +
+      'and asks who won the prior work, what it cost, or "was this awarded before." Resolves the stored ' +
+      'solicitation on SAM (latest version; status derived from active + deadline — never assumed open), ' +
+      'then finds the LIKELY prior award on USASpending (recipient, PIID, ceiling, expiry). Do NOT call ' +
+      'get_award_detail with an RFQ/solicitation number — those are not award PIIDs. ' +
       'grounded_notice=false = sol# not found; grounded_incumbent=false = notice found but no clear prior award.',
     parameters: {
       type: 'object',
@@ -483,7 +498,7 @@ const FORECASTS_TOOL_DEF = {
       type: 'object',
       properties: {
         naics: { type: 'string', description: 'NAICS code(s), comma-separated; ≤4 digits = prefix.' },
-        agency: { type: 'string', description: 'Source agency, case-insensitive partial.' },
+        agency: { type: 'string', description: 'Agency identity — abbreviation, full name, or alias ("DoD", "Department of the Navy", "Army Corps of Engineers"). Resolved to exact source agencies, so a parent rolls up to the components we hold (DoD -> Navy/ONR/NRL/USACE; Army is represented through USACE only). SUBAGENCIES are also resolvable and return ONLY their own rows, never the parent\u2019s: USCG, CBP, FEMA, TSA, USSS (DHS) · CMS, NIH (HHS) · Fish and Wildlife Service, National Park Service (DOI) · Forest Service (USDA) · Federal Acquisition Service, Public Buildings Service (GSA) · NAVFAC, NAVAIR, NAVSEA (Navy, matched on buying-office code — partial coverage, some offices are unmapped). National Park Service holds only 14 forecast rows; treat it as thin, not comprehensive. A known agency we hold no forecasts for returns an honest empty result rather than a loose text match.' },
         state: { type: 'string', description: 'Place-of-performance state (full name matches best).' },
         set_aside: { type: 'string', description: 'Set-aside type, e.g. "8(a)", "SDVOSB".' },
         fiscal_year: { type: 'string', description: 'Fiscal year, "FY2026" or "2026".' },
@@ -516,6 +531,195 @@ const SBIR_TOOL_DEF = {
   },
 };
 
+const FIND_OPPORTUNITIES_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'find_opportunities',
+    description:
+      'PRIMARY market FIND — the Opportunity Map mental model. Finds work across THREE horizons in one call: ' +
+      'OPEN NOW (live SAM solicitations), COMING BACK (contracts likely to recompete), COMING SOON (agency ' +
+      'forecasts / planned demand). Use this when the user says "find opportunities", "what\'s available", ' +
+      '"cybersecurity in Florida", or any market hunt — they should NOT need to know SAM / recompete / ' +
+      'forecast vocabulary. Accepts plain-English query + optional location / agency / timeframe / set-aside. ' +
+      'Each horizon reports independently (grounded | empty | unavailable) — an empty Open result is NOT a ' +
+      'market-wide zero if Coming back or Coming soon hit. Does NOT invent a solicitation for recompetes or ' +
+      'forecasts. Watch/email coverage today is Open + Coming soon only (Coming back not emailed yet). ' +
+      'First-turn: ONE call using the user\'s words, then present presentation.host_rules — do not parallel-variant or requery before showing the result. ' +
+      'For SAM-only / Open-only advanced search use search_sam_opportunities. Credits: 10 (one compose).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Plain-English description of what to find (what they sell / keyword), e.g. "cybersecurity", "commercial cleaning".',
+        },
+        location: {
+          type: 'string',
+          description: 'Optional geography — state name or 2-letter code ("Florida" / "FL"). Semantics differ by horizon (documented in result).',
+        },
+        agency: {
+          type: 'string',
+          description: 'Optional buying agency / customer ("Navy", "VA", "Department of Defense").',
+        },
+        set_aside: {
+          type: 'string',
+          description: 'Optional set-aside program ("8(a)", "SDVOSB", "WOSB", …).',
+        },
+        timeframe: {
+          type: 'object',
+          description: 'Optional timing knobs per horizon.',
+          properties: {
+            open_closing_days: { type: 'number', description: 'Open now: only notices closing within N days.' },
+            recompete_months: { type: 'number', description: 'Coming back: expiration window in months (default 18).' },
+            forecast_include_past: { type: 'boolean', description: 'Coming soon: include past fiscal years (default false).' },
+          },
+        },
+        horizons: {
+          type: 'object',
+          description: 'Optional horizon toggles (default all true).',
+          properties: {
+            open_now: { type: 'boolean' },
+            coming_back: { type: 'boolean' },
+            coming_soon: { type: 'boolean' },
+          },
+        },
+        limit_per_horizon: {
+          type: 'number',
+          description: 'Max items returned per horizon (default 5, max 25). Not a cross-horizon merge.',
+        },
+        advanced: {
+          type: 'object',
+          description: 'Optional power-user codes. Prefer plain query for customers.',
+          properties: {
+            naics: { type: 'string', description: 'Comma-separated NAICS codes.' },
+            psc: { type: 'string', description: 'PSC code (Open applies directly; other horizons crosswalk or skip).' },
+            keyword_exact: { type: 'string', description: 'Bypass search-brain free-text path when needed.' },
+          },
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+const LOOKUP_SOLICITATION_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup_solicitation',
+    description:
+      'Look up a specific solicitation by known id OR historical context — closed/archived notices included. ' +
+      'Use when the user submitted/bid/proposed, asks "what happened with …", names a past program, or pastes a ' +
+      'solicitation number / notice UUID. Closed ≠ gone. Closed is not awarded. Returns RESOLVED_SOLICITATION ' +
+      'only when identity is established (known id or user confirm); otherwise MATCHED_CANDIDATE — never treat ' +
+      'the top hit as identity. Collapses amendments to the latest stored version. Does NOT find a current ' +
+      'market (use find_opportunities). Does NOT accept a user email argument. Credits: 5.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            'Plain-English recall ("Navy manufacturing bid at Indian Head") OR a solicitation number / notice UUID.',
+        },
+        confirm_notice_id: {
+          type: 'string',
+          description:
+            'After the user confirms a MATCHED_CANDIDATE ("yes, that\'s the one"), pass that notice_id to upgrade to current truth.',
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+const CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_current_acquisition_intelligence',
+    description:
+      'CURRENT INTELLIGENCE — after FIND, answers what CHANGED about how this buyer is buying for a capability ' +
+      'and what to do differently (cited OBSERVED_CHANGE + CURRENT_STATE only). Composes LIVE reads from ' +
+      'recompete_changes, recompete_opportunities, sam_opportunities, agency_forecasts, and sam_events. ' +
+      'Never invents CSO/OT/consortium/rapid/PAE pathways without observed evidence; exposes gaps in ' +
+      'not_yet_measurable. Empty what_changed is honest. Observed pathways are record evidence only — not ' +
+      'future-acquisition certainty; never treat an unavailable horizon as zero. Journey: FIND → CURRENT ' +
+      'INTELLIGENCE → PATHWAY. Credits: 8.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Buying organization (required unless notice/contract anchors resolve it).' },
+        office: { type: 'string', description: 'Optional buying office label.' },
+        dodaac: { type: 'string', description: 'Optional 6-char DoDAAC to narrow office scope.' },
+        capability: { type: 'string', description: 'Capability / market scope in plain language (discovery key).' },
+        keywords: { type: 'array', items: { type: 'string' }, description: 'Optional keyword list.' },
+        naics: { type: 'array', items: { type: 'string' }, description: 'Optional NAICS codes (6-digit preferred).' },
+        psc: { type: 'array', items: { type: 'string' }, description: 'Optional PSC codes.' },
+        notice_ids: { type: 'array', items: { type: 'string' }, description: 'Optional SAM notice anchors from FIND.' },
+        contract_ids: { type: 'array', items: { type: 'string' }, description: 'Optional recompete contract_id anchors.' },
+        piids: { type: 'array', items: { type: 'string' }, description: 'Optional PIID anchors.' },
+        window_days: { type: 'number', description: 'Lookback for OBSERVED_CHANGE (default 90, max 365).' },
+      },
+    },
+  },
+};
+
+const MATCH_COMPANY_TO_PATHWAYS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'match_company_to_pathways',
+    description:
+      'PATHWAY FIT — after CURRENT INTELLIGENCE, match a company’s stranger-verifiable public record ' +
+      '(UEI awards + SAM certs) to buyer-side acquisition doors from the CAI package. Returns ' +
+      'SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED / NOT_APPLICABLE with two-sided evidence. ' +
+      'Empty / no_proven_door is success. Never invents vehicle portfolios, Talent outcomes, or ' +
+      'promotes CAI NOT_YET_MEASURABLE doors. Never set-aside-first. Pass cai package + uei. Credits: 8.',
+    parameters: {
+      type: 'object',
+      properties: {
+        uei: { type: 'string', description: '12-char UEI (preferred).' },
+        company_name: { type: 'string', description: 'Fallback name if UEI unknown — identity must still resolve.' },
+        cage: { type: 'string', description: 'Optional CAGE.' },
+        cai: {
+          type: 'object',
+          description:
+            'Slim or full get_current_acquisition_intelligence result (required). Must include pathways.observed / potential_not_established and scope.',
+        },
+        include_owner_asserted: {
+          type: 'boolean',
+          description: 'If true, show vault-style owner assertions separately — never upgrades fit.',
+        },
+      },
+    },
+  },
+};
+
+const UNDERSTAND_CUSTOMER_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'understand_customer',
+    description:
+      'UNDERSTAND journey after a specific FIND hit. Returns three provenance-labeled sections: ' +
+      '(1) What we can verify from this opportunity/buyer (SAM), (2) What broader Mindy research indicates ' +
+      '(curated — not "what they actually care about"), (3) What that suggests you emphasize (suggestion, not buyer fact). ' +
+      'Pass notice_id from find_opportunities. Ends with a capability/door ask — NOT set-aside-first. ' +
+      'Does NOT draft capability statements, emails, responses, or meeting briefs. Credits: 5. ' +
+      'For agency-only lookup without a notice use get_agency_intel.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: {
+          type: 'string',
+          description: 'SAM notice UUID from find_opportunities open_now.items[].notice_id (preferred).',
+        },
+        agency: {
+          type: 'string',
+          description: 'Buying agency if known (also read from the notice when present).',
+        },
+      },
+    },
+  },
+};
+
 const EXPIRING_CONTRACTS_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -525,7 +729,8 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
       'pursue it"). Filter by NAICS / agency / state / expiration window (months) / value / recompete-likelihood. ' +
       'Returns incumbent, agency, NAICS, obligated + ceiling value, period-of-performance end, recompete date, ' +
       'likelihood — soonest-expiring first. A multiple-award IDIQ appears as several rows (one per holder). ' +
-      'grounded=false when nothing matches — widen months_window.',
+      'grounded=false when nothing matches — widen months_window. For customer-facing market FIND across Open + ' +
+      'Recompete + Forecast, prefer find_opportunities.',
     parameters: {
       type: 'object',
       properties: {
@@ -533,6 +738,7 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
         agency: { type: 'string', description: 'Agency name, case-insensitive partial.' },
         state: { type: 'string', description: '2-letter place-of-performance state.' },
         months_window: { type: 'number', description: 'Expiration window in months (default 18, max 60).' },
+        months_min: { type: 'number', description: 'Skip contracts ending sooner than this many months (capture window). Example: months_min=6 with months_window=18. Omit to include the soonest expirations.' },
         min_value: { type: 'number', description: 'Minimum obligated dollars.' },
         max_value: { type: 'number', description: 'Maximum obligated dollars.' },
         likelihood: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Recompete-likelihood filter.' },
@@ -547,15 +753,16 @@ const KEYWORD_COVERAGE_TOOL_DEF = {
   function: {
     name: 'get_keyword_coverage',
     description:
-      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones", "demolition"). Returns the TOTAL federal ' +
-      'market ($), EVERY NAICS that bought it (ranked), the smallest NAICS set covering ~90%, and the top PSCs ' +
-      '("what was actually bought"). The lesson: a single obvious NAICS is often only ~28% of the market — search ' +
-      'it alone and you MISS the rest. Use this to derive the RIGHT NAICS set for alerts/searches. grounded=false ' +
-      'when no spending matches the keyword.',
+      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones", "demolition"). Measures BigQuery ' +
+      'usaspending.awards in the latest complete FY: description match (not NAICS/PSC titles), ' +
+      'SUM(obligation_amount) at transaction grain. Returns TOTAL federal market ($), ranked NAICS, the smallest ' +
+      'NAICS set covering ~90%, and top PSCs. Ranked NAICS shares are a measured distribution, not market identity — ' +
+      'do not collapse the keyword to the lead NAICS. grounded=false + degraded=true means NOT ESTABLISHED (not $0). ' +
+      'grounded=false + degraded=false means no description matches.',
     parameters: {
       type: 'object',
       properties: {
-        keyword: { type: 'string', description: 'Product/service term. Single significant words match best (USASpending keyword search is exact-phrase).' },
+        keyword: { type: 'string', description: 'Product/service phrase. Matched as a word-boundary phrase against award descriptions. Not expanded into synonyms.' },
         coverage_target: { type: 'number', description: 'Fraction of the market the returned NAICS set should cover (0.5–0.99, default 0.9).' },
       },
       required: ['keyword'],
@@ -710,7 +917,7 @@ const PURSUIT_DOSSIER_TOOL_DEF = {
     name: 'build_pursuit_dossier',
     description:
       "COMBINATION — the capture package on ONE opportunity. Paste a solicitation number or notice_id and this " +
-      "assembles a full should-I-bid + how-to-win dossier in one call: the open notice, the LIKELY incumbent + " +
+      "assembles a full should-I-bid + how-to-win dossier in one call: the stored notice (latest version), the LIKELY incumbent + " +
       "their prior award and financial health, how crowded the market is (Rule of Two), the price-to-win labor " +
       "rates, and the named buying-office contacts (COs / specialists) — plus the solicitation documents. A " +
       "capture manager's day of research in one deliverable. grounded=false only when the solicitation number " +
@@ -796,7 +1003,7 @@ const VERIFY_M_SCALE_TOOL_DEF = {
 const SAVED_SEARCH_FILTER_SCHEMA = {
   type: 'object',
   description:
-    'Opportunity Map filter snapshot (same keys as Save search on the map). At least one narrowing field is required.',
+    'Opportunity Map filter snapshot (same keys as Save search on the map). At least one narrowing field is required. Unknown keys are rejected — never silently dropped.',
   properties: {
     q: { type: 'string', description: 'Keyword search (exact phrase in title/description).' },
     naics: { type: 'string', description: 'NAICS code(s), comma-separated.' },
@@ -836,12 +1043,8 @@ const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
   type: 'function' as const,
   function: {
     name: 'schedule_market_search',
-    description:
-      'Schedule recurring Opportunity Map alerts for a saved market filter set — the SAME saved_searches rows ' +
-      'the Map uses (daily/weekly cadence). Alerts email NEW matches to the authenticated Mindy account only; ' +
-      'do NOT pass a recipient email. Returns schedule_id, cadence, canonical filters, map_url (?ss=), and ' +
-      'alert_destination=account_email. grounded=false when filters are too broad, identity is missing, or ' +
-      'scheduling is unavailable. Idempotent: an identical filter+cadence returns the existing schedule.',
+    // Shared discovery copy — see schedule-discovery.ts (must stay in sync with stdio + TOOL_META).
+    description: SCHEDULE_MARKET_SEARCH_DESCRIPTION,
     parameters: {
       type: 'object',
       properties: {
@@ -851,9 +1054,10 @@ const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
         alert_frequency: {
           type: 'string',
           enum: ['daily', 'weekly', 'paused'],
-          description: 'Alert cadence preset. Default daily.',
+          description:
+            'Cadence preset only: daily | weekly | paused. No clock times. If the user asked for an exact time, explain these options and confirm before calling.',
         },
-        alerts_enabled: { type: 'boolean', description: 'Whether alerts are active. Default true.' },
+        alerts_enabled: { type: 'boolean', description: 'Whether the watch emails new matches. Default true.' },
         bbox: {
           type: 'object',
           description: 'Optional viewport {w,s,e,n} at save time for map restoration.',
@@ -870,7 +1074,8 @@ const LIST_MARKET_SCHEDULES_TOOL_DEF = {
   function: {
     name: 'list_market_schedules',
     description:
-      "List the authenticated user's saved market search schedules (same rows as the Map Watchlist). " +
+      "List the authenticated user's market watches / scheduled searches (same rows as the Map Watchlist). " +
+      'Use after schedule_market_search or when the user asks what is being monitored. ' +
       'Free read — returns schedule_id, cadence, filters, and map_url per row.',
     parameters: { type: 'object', properties: {} },
   },
@@ -881,15 +1086,20 @@ const UPDATE_MARKET_SCHEDULE_TOOL_DEF = {
   function: {
     name: 'update_market_schedule',
     description:
-      'Update cadence, pause/resume, or rename an existing saved market schedule. ' +
+      'Update cadence, pause/resume, or rename an existing market watch / schedule. ' +
+      'Cadence presets only: daily | weekly | paused (explain exact-time requests before saving). ' +
       'Only schedules owned by the authenticated account can be updated.',
     parameters: {
       type: 'object',
       properties: {
         schedule_id: { type: 'string', description: 'UUID from schedule_market_search or list_market_schedules.' },
         name: { type: 'string' },
-        alert_frequency: { type: 'string', enum: ['daily', 'weekly', 'paused'] },
-        alerts_enabled: { type: 'boolean', description: 'false = pause alerts (same as Watchlist Off).' },
+        alert_frequency: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'paused'],
+          description: 'Cadence preset only — no clock times.',
+        },
+        alerts_enabled: { type: 'boolean', description: 'false = pause the watch (same as Watchlist Off).' },
       },
       required: ['schedule_id'],
     },
@@ -901,7 +1111,7 @@ const DELETE_MARKET_SCHEDULE_TOOL_DEF = {
   function: {
     name: 'delete_market_schedule',
     description:
-      'Permanently delete a saved market schedule (destructive). Prefer update_market_schedule with alerts_enabled=false to pause. ' +
+      'Permanently delete a market watch / schedule (destructive). Prefer update_market_schedule with alerts_enabled=false to pause. ' +
       'Requires confirm=true. Missing or already-deleted schedules are uncharged no-ops.',
     parameters: {
       type: 'object',
@@ -960,9 +1170,7 @@ const CONTRACTOR_AWARD_HISTORY_TOOL_DEF = {
   function: {
     name: 'get_contractor_award_history',
     description:
-      "A contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
-      'agencies, top NAICS, and recent awards. Prefer uei when known (same BigQuery warehouse path as the Map ' +
-      'company drawer). Name matching is fuzzy — always check match.confidence. grounded=false when unresolved.',
+      "A contractor's federal prime-award history. Prefer uei. A company name is resolved against the award-warehouse name index: one match is loaded by that UEI; several matches return candidates and are not picked; zero matches is none_in_award_corpus, not a claim of no federal awards. grounded=false on ambiguous and on a dataset miss. Do not read match.method on a UEI payload as the company-parameter match.",
     parameters: {
       type: 'object',
       properties: {
@@ -1634,6 +1842,11 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     GRANTS_TOOL_DEF,
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
+    FIND_OPPORTUNITIES_TOOL_DEF,
+    LOOKUP_SOLICITATION_TOOL_DEF,
+    CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF,
+    MATCH_COMPANY_TO_PATHWAYS_TOOL_DEF,
+    UNDERSTAND_CUSTOMER_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
@@ -1697,6 +1910,11 @@ export function isMcpTool(name: string): boolean {
     name === 'search_grants' ||
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
+    name === 'find_opportunities' ||
+    name === 'lookup_solicitation' ||
+    name === 'get_current_acquisition_intelligence' ||
+    name === 'match_company_to_pathways' ||
+    name === 'understand_customer' ||
     name === 'get_expiring_contracts' ||
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
@@ -1908,12 +2126,108 @@ export async function runMcpTool(
     return { result, credits };
   }
 
+
+  if (name === 'understand_customer') {
+    const result = (await understandCustomerTool({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'find_opportunities') {
+    const timeframe =
+      args.timeframe && typeof args.timeframe === 'object' && !Array.isArray(args.timeframe)
+        ? (args.timeframe as Record<string, unknown>)
+        : undefined;
+    const horizons =
+      args.horizons && typeof args.horizons === 'object' && !Array.isArray(args.horizons)
+        ? (args.horizons as Record<string, unknown>)
+        : undefined;
+    const advanced =
+      args.advanced && typeof args.advanced === 'object' && !Array.isArray(args.advanced)
+        ? (args.advanced as Record<string, unknown>)
+        : undefined;
+    const result = (await findOpportunitiesTool({
+      query: typeof args.query === 'string' ? args.query : '',
+      location: typeof args.location === 'string' ? args.location : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      timeframe: timeframe
+        ? {
+            open_closing_days: typeof timeframe.open_closing_days === 'number' ? timeframe.open_closing_days : undefined,
+            recompete_months: typeof timeframe.recompete_months === 'number' ? timeframe.recompete_months : undefined,
+            forecast_include_past: typeof timeframe.forecast_include_past === 'boolean' ? timeframe.forecast_include_past : undefined,
+          }
+        : undefined,
+      horizons: horizons
+        ? {
+            open_now: typeof horizons.open_now === 'boolean' ? horizons.open_now : undefined,
+            coming_back: typeof horizons.coming_back === 'boolean' ? horizons.coming_back : undefined,
+            coming_soon: typeof horizons.coming_soon === 'boolean' ? horizons.coming_soon : undefined,
+          }
+        : undefined,
+      limit_per_horizon: typeof args.limit_per_horizon === 'number' ? args.limit_per_horizon : undefined,
+      advanced: advanced
+        ? {
+            naics: typeof advanced.naics === 'string' ? advanced.naics : undefined,
+            psc: typeof advanced.psc === 'string' ? advanced.psc : undefined,
+            keyword_exact: typeof advanced.keyword_exact === 'string' ? advanced.keyword_exact : undefined,
+          }
+        : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'lookup_solicitation') {
+    const result = (await lookupSolicitationTool(
+      {
+        query: typeof args.query === 'string' ? args.query : '',
+        confirm_notice_id: typeof args.confirm_notice_id === 'string' ? args.confirm_notice_id : undefined,
+      },
+      { userEmail: ctx.userEmail },
+    )) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_current_acquisition_intelligence') {
+    const strArr = (v: unknown): string[] | undefined =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined;
+    const result = (await currentAcquisitionIntelligenceTool({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      office: typeof args.office === 'string' ? args.office : undefined,
+      dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
+      capability: typeof args.capability === 'string' ? args.capability : undefined,
+      keywords: strArr(args.keywords),
+      naics: strArr(args.naics),
+      psc: strArr(args.psc),
+      notice_ids: strArr(args.notice_ids),
+      contract_ids: strArr(args.contract_ids),
+      piids: strArr(args.piids),
+      window_days: typeof args.window_days === 'number' ? args.window_days : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'match_company_to_pathways') {
+    const result = (await matchCompanyToPathwaysTool({
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
+      company_name: typeof args.company_name === 'string' ? args.company_name : undefined,
+      cage: typeof args.cage === 'string' ? args.cage : undefined,
+      cai: args.cai,
+      include_owner_asserted: args.include_owner_asserted === true,
+      actor: typeof ctx?.userEmail === 'string' ? ctx.userEmail : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
   if (name === 'get_expiring_contracts') {
     const result = (await expiringContracts({
       naics: typeof args.naics === 'string' ? args.naics : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
       months_window: typeof args.months_window === 'number' ? args.months_window : undefined,
+      months_min: typeof args.months_min === 'number' ? args.months_min : undefined,
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
@@ -2055,6 +2369,8 @@ export async function runMcpTool(
   }
 
   if (name === 'schedule_market_search') {
+    // Pass cadence strings through — scheduleMarketSearch / createSavedSearch reject
+    // unsupported values explicitly (never silently default to daily).
     const result = (await scheduleMarketSearch({
       userEmail: ctx.userEmail,
       name: typeof args.name === 'string' ? args.name : '',
@@ -2063,10 +2379,7 @@ export async function runMcpTool(
           ? (args.filters as Record<string, unknown>)
           : {},
       mode: args.mode === 'recompete' ? 'recompete' : args.mode === 'open' ? 'open' : undefined,
-      alert_frequency:
-        args.alert_frequency === 'daily' || args.alert_frequency === 'weekly' || args.alert_frequency === 'paused'
-          ? args.alert_frequency
-          : undefined,
+      alert_frequency: typeof args.alert_frequency === 'string' ? args.alert_frequency : undefined,
       alerts_enabled: typeof args.alerts_enabled === 'boolean' ? args.alerts_enabled : undefined,
       bbox:
         args.bbox && typeof args.bbox === 'object' && !Array.isArray(args.bbox)
@@ -2086,10 +2399,7 @@ export async function runMcpTool(
       userEmail: ctx.userEmail,
       schedule_id: typeof args.schedule_id === 'string' ? args.schedule_id : '',
       name: typeof args.name === 'string' ? args.name : undefined,
-      alert_frequency:
-        args.alert_frequency === 'daily' || args.alert_frequency === 'weekly' || args.alert_frequency === 'paused'
-          ? args.alert_frequency
-          : undefined,
+      alert_frequency: typeof args.alert_frequency === 'string' ? args.alert_frequency : undefined,
       alerts_enabled: typeof args.alerts_enabled === 'boolean' ? args.alerts_enabled : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };

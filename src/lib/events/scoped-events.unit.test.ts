@@ -173,10 +173,16 @@ describe('the engagement graph — relationships, not records (Eric 2026-08-15)'
   });
 
   it('dedupes people and drops SAM placeholder rows', () => {
-    // federal_contacts repeats a person across every notice they are named on, and carries ~3.9k
-    // literal "Telephone: 717…" placeholder names.
+    // federal_contacts repeats a person across every notice they are named on, and carries
+    // ~3.9k literal "Telephone: 717…" placeholder names.
     expect(fn).toMatch(/seen\.has\(k\)/);
-    expect(fn).toMatch(/telephone\|phone\|fax\|tel/);
+    // This used to assert a LOCAL copy of the placeholder regex living in this file. That copy
+    // was one of six divergent implementations and never learned about `facsimile`,
+    // "ELECTRONIC MAIL:" or bare role labels, so this surface showed junk the app route hid.
+    // The decision now comes from the one shared contract — asserting the local regex again
+    // would be re-pinning the duplication this replaced.
+    expect(fn).toMatch(/displayContactName\(/);
+    expect(fn).toMatch(/if \(!display\) continue;/);
   });
 
   it('a missing event is an honest null, not an empty shell', () => {

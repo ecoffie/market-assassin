@@ -11,6 +11,13 @@
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { CURATED_EXACT_CODES } from '@/lib/utils/naics-expansion';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import {
+  filterMarketToSavedIndustry,
+  keywordIncludeTerms,
+  preferDistinctiveInOpenMarket,
+  scoreContractDKeywords,
+  type OpenKeywordOutcome,
+} from '@/lib/alerts/open-contract-d';
 // Aliased: this file already has a LOCAL classifyNoticeType (summary buckets).
 // This is the authoritative RESPONDABILITY classifier ('bid'|'response'|'none').
 import { classifyNoticeType as classifyRespondability } from '@/lib/utils/notice-type';
@@ -81,6 +88,8 @@ interface SAMSearchParams {
   noticeTypes?: string[];
   state?: string; // Single state code (legacy)
   states?: string[]; // Multiple state codes for expanded search
+  /** Saved NAICS market. PSC recall cannot escape this set. */
+  savedNaics?: string[];
 }
 
 const DESCRIPTION_STOP_WORDS = new Set([
@@ -105,7 +114,9 @@ function extractDescriptionTerms(description?: string | null): string[] {
 interface SAMSearchResult {
   opportunities: SAMOpportunity[];
   totalRecords: number;
-  keywordMatchCount?: number; // How many opportunities matched keywords (0 means fallback to NAICS-only)
+  keywordMatchCount?: number;
+  distinctiveMatchCount?: number;
+  openKeywordOutcome?: OpenKeywordOutcome;
   fetchedAt: string;
 }
 
@@ -620,18 +631,14 @@ export function scoreOpportunity(
     score += 30;
   }
 
-  // Keyword match in title/description
-  const oppText = `${opportunity.title} ${opportunity.description}`.toLowerCase();
-  const keywordMatches = userProfile.keywords.filter(k =>
-    oppText.includes(k.toLowerCase())
-  ).length;
-  score += keywordMatches * 10;
+  const oppText = `${opportunity.title} ${opportunity.description}`;
+  score += scoreContractDKeywords(oppText, userProfile.keywords);
 
   // Business description semantic-lite ranking.
   // Structured filters still decide inclusion; this only nudges ordering.
   const descriptionTerms = extractDescriptionTerms(userProfile.business_description);
   if (descriptionTerms.length > 0) {
-    const descriptionMatches = descriptionTerms.filter(term => oppText.includes(term)).length;
+    const descriptionMatches = descriptionTerms.filter(term => oppText.toLowerCase().includes(term)).length;
     score += Math.min(descriptionMatches * 3, 15);
   }
 
@@ -891,6 +898,7 @@ export async function fetchSamOpportunitiesFromCache(
     pscCodes = [],
     keywords = [],
     limit = 100,
+    savedNaics,
   } = params;
 
   if (!supabase) {
@@ -974,35 +982,33 @@ export async function fetchSamOpportunitiesFromCache(
       return classifyRespondability(opp.noticeType).respondability !== 'none';
     });
 
-    // Soft keyword filter: If keywords provided, try to filter. If no matches, fall back to NAICS-only results.
-    // This prevents users with overly-specific keywords from receiving 0 opportunities.
-    let filtered = runwayGated;
-    let keywordMatchCount = 0;
+    const marketBoundary = savedNaics && savedNaics.length > 0 ? savedNaics : naicsCodes;
+    const industry = filterMarketToSavedIndustry(
+      runwayGated,
+      marketBoundary,
+      (opp) => opp.naicsCode,
+    );
+    if (industry.droppedOffIndustry > 0) {
+      console.log(`[SAM Cache] dropped ${industry.droppedOffIndustry} off-saved-market rows (PSC/NAICS expansion)`);
+    }
 
-    if (keywords.length > 0) {
-      const keywordLower = keywords.map(k => k.toLowerCase());
-      // Filter over the runway-gated set (NOT the raw `opportunities`) so a
-      // keyword match can't re-introduce a non-respondable null-deadline row.
-      const keywordFiltered = runwayGated.filter(opp => {
-        const text = `${opp.title} ${opp.description}`.toLowerCase();
-        return keywordLower.some(k => text.includes(k));
-      });
-
-      keywordMatchCount = keywordFiltered.length;
-
-      // Only apply keyword filter if it returns results; otherwise fall back to NAICS-only
-      if (keywordFiltered.length > 0) {
-        filtered = keywordFiltered;
-        console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} of ${runwayGated.length} opportunities`);
-      } else {
-        console.log(`[SAM Cache] Keyword filter returned 0 results - falling back to NAICS-only (${runwayGated.length} opportunities)`);
-      }
+    const preferred = preferDistinctiveInOpenMarket(
+      industry.rows,
+      keywords,
+      (opp) => `${opp.title} ${opp.description}`,
+    );
+    if (preferred.outcome === 'distinctive_hits') {
+      console.log(`[SAM Cache] Contract D distinctive prefer ${preferred.distinctiveMatchCount} of ${industry.rows.length}`);
+    } else if (preferred.outcome === 'open_market_no_keyword_hits') {
+      console.log(`[SAM Cache] Contract D no distinctive hits in Open market — keeping ${industry.rows.length} NAICS/PSC rows`);
     }
 
     return {
-      opportunities: filtered.slice(0, limit),
-      totalRecords: filtered.length,
-      keywordMatchCount, // Track how many matched keywords for analytics
+      opportunities: preferred.rows.slice(0, limit),
+      totalRecords: preferred.rows.length,
+      keywordMatchCount: preferred.distinctiveMatchCount,
+      distinctiveMatchCount: preferred.distinctiveMatchCount,
+      openKeywordOutcome: preferred.outcome,
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
@@ -1047,14 +1053,9 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
     filteredQuery = filteredQuery.lte('posted_date', postedTo);
   }
 
-  // "WHAT" filter — NAICS, PSC, and KEYWORDS combined as a SINGLE OR clause.
-  // CRITICAL FIX (Eric, the "drone problem"): chaining separate .or() calls
-  // ANDs them in PostgREST, and keywords were never applied at all — so search
-  // was NAICS-only AND a drone opp filed under an unlisted NAICS was excluded
-  // even though "drone" is in its title. Now an opp matches if it's in the
-  // user's NAICS/PSC *OR* mentions their keywords (title/description). Keywords
-  // catch the misclassified / "they-call-it-something-else" opps across all the
-  // 70+ NAICS a term like "drone" or "environmental" spans.
+  // Contract D: NAICS/PSC is the market. Distinctive keywords prefer AFTER
+  // fetch. Generic singles never expand this clause. Keywords enter the
+  // query only when the profile has no NAICS and no PSC.
   const keywords = (params.keywords || []).filter(k => k && k.trim().length >= 3).slice(0, 15);
   const whatClauses: string[] = [];
 
@@ -1096,9 +1097,8 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   if (pscCodes.length > 0) {
     for (const psc of pscCodes) whatClauses.push(`psc_code.like.${psc}%`);
   }
-  // SANITIZED keywords (#61) — drop short/ambiguous abbrevs that produce noise.
-  const safeKeywords = sanitizeKeywords(keywords);
-  if (safeKeywords.length > 0) {
+  const includeKeywords = keywordIncludeTerms(keywords, naicsCodes, pscCodes);
+  if (includeKeywords.length > 0) {
     // Keyword matching: leading-wildcard ILIKE (`title.ilike.%kw%`) can't use an
     // index → SEQ SCAN of the ~88k-row table on EVERY keyword search, per user,
     // in daily-alerts + snapshots (the burst-IO exhaustion Supabase support
@@ -1110,7 +1110,7 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
     // feeds daily-alerts, snapshots, briefings, AND the live market dashboard).
     // Default OFF = current ILIKE behavior; flip on only after the column exists.
     const useFts = process.env.SAM_FTS_KEYWORDS === 'on';
-    for (const kw of safeKeywords) {
+    for (const kw of includeKeywords) {
       const safe = kw.trim().replace(/[(),]/g, ' ').replace(/\s+/g, ' ');
       if (useFts) {
         // fts(english) = to_tsquery full-text search on the tsvector GIN index.
@@ -1130,7 +1130,7 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   }
   if (whatClauses.length > 0) {
     filteredQuery = filteredQuery.or(whatClauses.join(','));
-    console.log(`[SAM Cache] WHAT filter (NAICS OR PSC OR keywords): ${whatClauses.length} clauses, ${keywords.length} keywords`);
+    console.log(`[SAM Cache] WHAT filter (NAICS/PSC market; keyword-include ${includeKeywords.length}): ${whatClauses.length} clauses`);
   }
 
   if (setAsides.length > 0) {
@@ -1214,7 +1214,6 @@ export async function fetchSamOpportunityNoticeSummaryFromCache(
     other: 0,
   };
 
-  const keywordLower = (params.keywords || []).map(keyword => keyword.toLowerCase());
   const pageSize = 1000;
 
   try {
@@ -1240,13 +1239,6 @@ export async function fetchSamOpportunityNoticeSummaryFromCache(
       }
 
       for (const row of rows) {
-        if (keywordLower.length > 0) {
-          const text = `${row.title || ''} ${row.description || ''}`.toLowerCase();
-          if (!keywordLower.some(keyword => text.includes(keyword))) {
-            continue;
-          }
-        }
-
         summary.totalMatched++;
         summary[classifyNoticeType(row.notice_type)]++;
       }

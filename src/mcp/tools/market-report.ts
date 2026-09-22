@@ -27,6 +27,7 @@ import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
@@ -353,22 +354,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
    * (measured on "roofing": a $578M keyword total above a "Who is buying" table
    * summing past $1.1B — all of 238160).
    *
-   * They are now reconciled by SCOPE rather than by re-basing the headline. A dominant
-   * keyword resolves to a 'keyword_naics' filter (keyword AND lead code), so the
-   * sections stay inside the keyword market and `coverage.totalMarket` — the
-   * keyword-scoped number — is already the right headline.
-   *
-   * This re-measure remains ONLY for the legacy fall-through where the scope carries a
-   * bare NAICS list and no market filter (no lead code to pin). `scope.naicsCodes` is
-   * empty on the keyword_naics path, so this evaluates to null there.
+   * They are now reconciled by SCOPE rather than by re-basing the headline.
+   * Coverage lead NAICS % is measurement, not identity — keyword scopes stay
+   * keyword-ranked (`rankedByDominantNaics` is false). This re-measure remains
+   * ONLY for an explicit NAICS list with no market filter.
    */
   const dominantSize = scope?.rankedByDominantNaics && scope.naicsCodes[0]
     ? (await guard(codeMarketSize({ naics: scope.naicsCodes[0] }))).value
     : null;
 
-  // The forecasts section is single-NAICS-keyed; use the market's lead code (the
-  // semantically-right code after promotion — NOT necessarily the biggest).
-  const primaryNaics = naicsCodes[0] || coverage?.allNaics?.[0]?.code || coverage?.coverageCodes?.[0] || undefined;
+  // Forecasts/recompetes may use an operator-supplied NAICS list. Coverage dollar-lead
+  // is measurement, not identity — do not pin those sections to allNaics[0].
+  const primaryNaics = naicsCodes[0] || undefined;
 
   // The FULL scoped filter set (NAICS union + agency + set-aside + state) — shared by the
   // agencies AND contractors sections so their dollars reconcile (same filters, same
@@ -442,13 +439,11 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     const people = (roster?.contacts ?? [])
       .filter((c) => (c.contact_email || '').includes('@'))
       .map((c) => ({
-        // The roster occasionally appends phone/DSN junk to the name (data quirk):
-        // "Stephen Weaver6142923131", "Joseph WerstakDSN(...". Strip a trailing run of
-        // digits/DSN and cut at the first digit or a bare "DSN".
-        name: (c.contact_fullname || '')
-          .replace(/\s*DSN.*$/i, '')
-          .replace(/\d[\d\s().-]*$/, '')
-          .trim(),
+        // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
+        // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
+        // here, so the report showed clean names while every other surface showed the raw
+        // pollution. It is now the shared contract.
+        name: displayContactName(c.contact_fullname) || '',
         role: c.role_category_label || c.contact_title || c.role || '',
         email: c.contact_email || '',
         office: c.derived_office || c.sub_agency || null,
@@ -478,8 +473,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const sizeTiers: MarketSizeTier[] | null = await (async () => {
     if (!keyword || !coverage) return null;
     const expanded = marketKeywords(keyword);
-    const leadCode = coverage.allNaics?.[0]?.code || null;
-    const codeTotal = leadCode ? (await guard(codeMarketSize({ naics: leadCode }))).value : null;
+    // Do not treat coverage.allNaics[0] as the surrounding industry. That is Senses /
+    // identity. Size tiers stay on the keyword measurements.
 
     /**
      * Both keyword tiers MUST be measured the same way or the ladder is nonsense.
@@ -522,16 +517,6 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       });
     }
 
-    if (codeTotal && leadCode) {
-      const codeName = coverage.allNaics?.[0]?.name || leadCode;
-      tiers.push({
-        basis: 'code_total',
-        label: `All of NAICS ${leadCode}`,
-        amount: codeTotal.totalMarket ?? null,
-        method: `Everything bought under ${codeName} — the surrounding industry, of which this market is a slice. A CEILING for context, NOT the market size.`,
-        inputs: [leadCode],
-      });
-    }
     return tiers;
   })();
 
@@ -539,7 +524,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // literal total is a floor. Names the words buyers DO use, which is both the reader's
   // context and the curation shortlist.
   const undercount = keyword
-    ? await detectUndercount(keyword, coverage?.allNaics?.[0]?.code || null).catch(() => null)
+    ? await detectUndercount(keyword, null).catch(() => null)
     : null;
   const undercountNote = undercount?.undercounts
     ? `Contracts in this market rarely use the word "${keyword}" — its lead code's vocabulary reads: ${undercount.marketVocabulary.slice(0, 6).join(', ')}. Treat the total as a floor and search these terms too.`

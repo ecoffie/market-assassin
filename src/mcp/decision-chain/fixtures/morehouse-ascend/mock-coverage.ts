@@ -41,6 +41,18 @@ function cov(
     topPscPct: partial.topPscList?.[0]?.pct ?? 0,
     topPscList: partial.topPscList ?? [],
     pinnedPscCodes: partial.pinnedPscCodes ?? null,
+    transactionCount: 10,
+    uniqueAwardCount: 8,
+    fiscalYear: 2025,
+    windowKind: 'latest_complete_fy',
+    windowLabel: 'FY2025 (1 complete fiscal year · description match)',
+    questionKind: 'description_matched_fy_distribution',
+    source: 'bigquery_usaspending_awards',
+    sourceMaxActionDate: '2025-09-30',
+    allAgencies: [],
+    primarySense: 'work_text',
+    evidenceStatus: 'MARKET_EVIDENCE_FOUND',
+    naicsIdentityStatus: 'NOT_ESTABLISHED',
   };
 }
 

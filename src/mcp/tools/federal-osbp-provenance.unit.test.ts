@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lookupFederalOsbp } from './federal-osbp';
+import { lookupFederalOsbp, classifyOsbpCoverage } from './federal-osbp';
 
 /**
  * A named human's stale email is the highest-consequence staleness in the repo:
@@ -35,10 +35,46 @@ describe('OSBP contact provenance is always in the payload', () => {
     expect(r._meta.director_verified).toBe(true);
   });
 
-  it('an unmatched agency reports zero of both rather than a misleading default', () => {
+  it('an unmatched agency reports not_in_directory, not "no OSBP office"', () => {
     const r = lookupFederalOsbp({ agency: 'Department of Nonexistent Things' });
     expect(r._meta.grounded).toBe(false);
+    expect(r._meta.coverage).toBe('not_in_directory');
     expect(r._meta.directors_verified).toBe(0);
     expect(r._meta.directors_unverified).toBe(0);
+  });
+
+  it('empty query is empty_query, distinct from a coverage miss', () => {
+    const r = lookupFederalOsbp({ agency: '' });
+    expect(r._meta.coverage).toBe('empty_query');
+  });
+
+  it('a known command is a directory hit, not a coverage gap', () => {
+    const r = lookupFederalOsbp({ agency: 'NAVFAC' });
+    expect(r._meta.coverage).toBe('hit');
+    expect(r._meta.grounded).toBe(true);
+  });
+
+  it('United States Coast Guard is a directory hit (issue-log #6 original payload)', () => {
+    const r = lookupFederalOsbp({ agency: 'United States Coast Guard' });
+    expect(r._meta.match).toBe('command');
+    expect(r._meta.coverage).toBe('hit');
+    expect(r._meta.grounded).toBe(true);
+    expect(r._meta.office_count).toBeGreaterThan(0);
+    expect(r.office?.email).toMatch(/uscg\.mil$/i);
+    expect(r.office?.osbp_director).toMatch(/Kersey-Robinson/i);
+    expect(r.office?.director_verified).toBe('2026-06');
+  });
+});
+
+describe('OSBP coverage classification', () => {
+  it('missing directory coverage is not "no OSBP office"', () => {
+    expect(classifyOsbpCoverage({
+      query: 'GSA', commandMatched: false, officeHasOsbp: false, relatedCount: 0,
+    })).toBe('not_in_directory');
+  });
+  it('a listed command with no OSBP row is no_osbp_listed', () => {
+    expect(classifyOsbpCoverage({
+      query: 'Some Command', commandMatched: true, officeHasOsbp: false, relatedCount: 0,
+    })).toBe('no_osbp_listed');
   });
 });

@@ -101,6 +101,15 @@ const nextConfig: NextConfig = {
     // needing a browser must be listed HERE; externalizing the package does not
     // carry the binary across routes.
     '/api/gov-buyer/market-research/export/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Ralph Phase 1 MRR assembler reads a vendored .docx by absolute cwd path.
+    // Nothing `require()`s the binary, so NFT never sees it → ENOENT on Vercel
+    // at assembling_documents (job.error: open '.../mrr-rfo-may-2026-prototype.docx').
+    '/api/app/market-research': [
+      './src/lib/mrr/templates/mrr-rfo-may-2026-prototype.docx',
+    ],
+    '/api/app/market-research/**/*': [
+      './src/lib/mrr/templates/mrr-rfo-may-2026-prototype.docx',
+    ],
   },
   // Download streams bound artifacts only. The previous `/api/**/*` pdfjs
   // include and dynamic cwd tracing cannot be reached from this route.

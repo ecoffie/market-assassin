@@ -9,9 +9,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  deployment_status:
 
 jobs:
   verify:
+    if: github.event_name != 'deployment_status'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,12 +27,36 @@ jobs:
         run: npx tsc --noEmit
 
       # Seam layer: real product code, data boundary stubbed. Deterministic, no network.
-      # Live tests are excluded here by design — they run nightly and before closing a defect.
+      # Decision-chain LIVE tests stay excluded (nightly). Maps account chrome source
+      # is the merge gate. `--live` here is CURRENT production, not this PR — a
+      # 401 with credentials fails; missing credentials are NOT TESTED.
       - name: Decision-chain (seam)
         run: npm run test:chain
 
       - name: Unit suite
         run: npm run test:unit
+
+      - name: Maps account chrome (source)
+        run: npm run verify:maps-account
+
+      - name: Maps account chrome (live current host)
+        run: npm run verify:maps-account -- --live
+
+  # After Vercel marks Production Ready, pin the serving SHA to that deploy.
+  maps-account-prod:
+    if: github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && contains(github.event.deployment_status.environment, 'Production')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Maps account chrome (this production SHA)
+        run: npm run verify:maps-account -- --live --expect-sha ${{ github.event.deployment.sha }}
 
   # The PRD's "confirmed live signal". Not a merge gate — a truth gate.
   # A defect closes on this, never on a green PR.

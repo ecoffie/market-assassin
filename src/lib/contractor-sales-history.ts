@@ -5,6 +5,7 @@ import {
   type Contractor,
 } from '@/lib/contractor-database';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import { dateRangeValidFlag, assessDateRange } from '@/lib/contractor/award-history-shape';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -55,9 +56,10 @@ export interface ContractorSalesHistory {
    * - usaspending_cache / contractor_database — legacy JSON + sample-table path
    * - bigquery_normalized — BigQuery warehouse via queryCached / KV
    * - local_registry — SAM mirror identity with no warehouse awards
+   * - recompete_mirror — expiring-contract rows for a name the warehouse cache missed
    * - unavailable — source error
    */
-  source: 'usaspending_cache' | 'contractor_database' | 'bigquery_normalized' | 'local_registry' | 'unavailable';
+  source: 'usaspending_cache' | 'contractor_database' | 'bigquery_normalized' | 'local_registry' | 'recompete_mirror' | 'unavailable';
   coverage: 'cached' | 'limited' | 'none' | 'unavailable';
   lastUpdated: string | null;
   contractor: {
@@ -72,9 +74,11 @@ export interface ContractorSalesHistory {
     hasPhone: boolean;
   };
   match: {
-    method: 'recipient_name' | 'contractor_database';
+    method: 'recipient_name' | 'contractor_database' | 'recipient_uei';
     confidence: 'high' | 'medium' | 'low' | 'none';
     name: string;
+    /** Shared cross-tool vocabulary: unique | ambiguous | found | none | high-confidence aliases. */
+    match_status?: string;
   };
   summary: {
     totalObligations: number;
@@ -82,20 +86,45 @@ export interface ContractorSalesHistory {
     latestFiscalYear: number | null;
     topAgency: string | null;
     averageAwardSize: number;
+    last_positive_obligation_fy?: number | null;
+    activity_status?: 'active' | 'dormant' | 'deobligating' | 'unknown';
+    activity_note?: string;
+    activity_observation_period?: {
+      reference_fy: number;
+      lookback_years: number;
+      window_start_fy: number;
+      window_end_fy: number;
+      series_coverage: 'adequate' | 'partial' | 'missing';
+      years_present: number[];
+      years_missing: number[];
+    };
+    obligations_are_not_revenue?: boolean;
   };
   series: Array<{
     fiscalYear: number;
     totalObligations: number;
+    /** Present on BigQuery path — sum of positive obligation actions. */
+    positiveObligations?: number;
+    /** Present on BigQuery path — sum of negative obligation actions (≤ 0). */
+    deobligations?: number;
     awardCount: number;
     agencyBreakdown: Array<{ agency: string; amount: number; count: number }>;
   }>;
   // share is the agency's % of total obligations (0-1). The BQ path
   // (getBqContractorHistory) sets this and skips count because the cheap
   // top-agencies query deliberately doesn't return per-agency award counts
-  // (COUNT(DISTINCT award_id) doubled the BQ scan). The static path
-  // populates count from real per-row tallies. Renderers prefer share when
-  // present and fall back to count for the static-contractor path.
-  topAgencies: Array<{ agency: string; amount: number; count: number; share?: number }>;
+  // (COUNT(DISTINCT award_id) doubled the BQ scan). count=null +
+  // count_unavailable means "not fetched" — never treat as zero awards.
+  // The static path populates count from real per-row tallies. Renderers
+  // prefer share when present (including ≤0) and fall back to count only
+  // when share is undefined.
+  topAgencies: Array<{
+    agency: string;
+    amount: number;
+    count: number | null;
+    share?: number;
+    count_unavailable?: boolean;
+  }>;
   topNaics: Array<{ naics: string; description: string | null; amount: number; count: number }>;
   recentAwards: Array<{
     id: string;
@@ -109,6 +138,16 @@ export interface ContractorSalesHistory {
     endDate: string | null;
     state: string | null;
     url: string | null;
+    piid?: string | null;
+    modNumber?: string | null;
+    isModification?: boolean | null;
+    modClassification?: 'base' | 'modification' | 'unknown';
+    actionDate?: string | null;
+    dateRangeValid?: boolean | null;
+    dateRangeAssessment?: 'valid' | 'invalid' | 'unassessable';
+    dateRangeIssue?: 'end_before_start' | null;
+    setAside?: string | null;
+    grain?: 'obligation_action' | 'award';
   }>;
   gated: {
     fullHistory: boolean;
@@ -420,19 +459,28 @@ function buildHistory(
     .sort((a, b) => b.amount - a.amount)
     .slice(0, publicView ? 3 : 10);
 
-  const recentAwards = sortedAwards.slice(0, awardLimit).map((award) => ({
-    id: award.award_id,
-    title: award.description || award.contract_type || 'Federal award',
-    agency: award.awarding_agency || 'Unknown agency',
-    subAgency: award.awarding_sub_agency,
-    naics: award.naics_code,
-    naicsDescription: award.naics_description,
-    amount: amountToNumber(award.award_amount),
-    startDate: award.start_date,
-    endDate: award.end_date,
-    state: award.pop_state,
-    url: award.usaspending_id ? `https://www.usaspending.gov/award/${award.usaspending_id}` : null,
-  }));
+  const recentAwards = sortedAwards.slice(0, awardLimit).map((award) => {
+    const startDate = award.start_date;
+    const endDate = award.end_date;
+    const range = assessDateRange(startDate, endDate);
+    return {
+      id: award.award_id,
+      title: award.description || award.contract_type || 'Federal award',
+      agency: award.awarding_agency || 'Unknown agency',
+      subAgency: award.awarding_sub_agency,
+      naics: award.naics_code,
+      naicsDescription: award.naics_description,
+      amount: amountToNumber(award.award_amount),
+      startDate,
+      endDate,
+      dateRangeAssessment: range.assessment,
+      dateRangeValid: dateRangeValidFlag(startDate, endDate),
+      dateRangeIssue: range.issue,
+      state: award.pop_state,
+      url: award.usaspending_id ? `https://www.usaspending.gov/award/${award.usaspending_id}` : null,
+      grain: 'award' as const,
+    };
+  });
 
   const topAgency = topAgencies[0]?.agency || null;
   const latestSeries = series.length ? series[series.length - 1] : null;

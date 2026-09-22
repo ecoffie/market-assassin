@@ -14,12 +14,41 @@
  */
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { callLLM } from '@/lib/llm/call-llm';
+import { recoverMissingSourceSpecs } from '@/lib/proposal/matrix-source-coverage';
 
 export const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 /** Cap source text per extraction. 50K chars ~ 12K tokens, well under llama 3.3's
  *  window and enough coverage without rate-limit pain. */
 export const MAX_INPUT_CHARS = 50000;
+
+/**
+ * If the RFP is longer than the cap, keep the front matter AND a window
+ * around Section 3.0 / SOW / PWS. Truncating the first 50K chars dropped
+ * the named technical specs (LOA, flight deck, SCIF, berthing, magazine)
+ * while the pasted full text still produced them.
+ */
+export function prioritizeExtractionWindows(text: string, maxChars = MAX_INPUT_CHARS): {
+  text: string;
+  truncated: boolean;
+  kept_section_3: boolean;
+} {
+  const sectionRe = /(?:^|\n)\s*(?:section\s*)?3\.0\b|statement of work|performance work statement/i;
+  const idx = text.search(sectionRe);
+  const hasSection = idx >= 0;
+  if (text.length <= maxChars) {
+    return { text, truncated: false, kept_section_3: hasSection };
+  }
+  if (!hasSection || idx < maxChars) {
+    return { text: text.slice(0, maxChars), truncated: true, kept_section_3: hasSection && idx < maxChars };
+  }
+  const marker = '\n\n--- SECTION 3.0 WINDOW ---\n\n';
+  const specBudget = Math.max(8_000, maxChars - Math.floor(maxChars * 0.5) - marker.length);
+  const headBudget = maxChars - specBudget - marker.length;
+  const head = text.slice(0, headBudget);
+  const spec = text.slice(idx, idx + specBudget);
+  return { text: `${head}${marker}${spec}`, truncated: true, kept_section_3: true };
+}
 
 export interface ComplianceRequirement {
   id: string;
@@ -40,6 +69,7 @@ Look for:
 - Required certifications, representations, reps & certs
 - Past performance volume, technical volume, price volume requirements
 - Evaluation factors and their relative weights
+- Section C / 3.0 technical specifications when present: dimensions and envelopes (LOA, beam, draft), facilities (flight deck, SCIF, berthing, magazine, fuel storage), performance, and each named spec as its own technical row. Do not skip a named technical spec because an admin shall already filled the 15-row floor.
 
 Return ONLY valid JSON in this exact shape, no prose, no markdown fences:
 {
@@ -55,6 +85,7 @@ Return ONLY valid JSON in this exact shape, no prose, no markdown fences:
 }
 
 Rules:
+- Extract every named technical specification in Section C / 3.0 as its own row. Coverage of those specs is the completeness test — not the row count.
 - Aim for 15-50 requirements. Skip vague or aspirational language.
 - One requirement per row. Split compound "shall" sentences into separate rows.
 - Use stable ids REQ-001, REQ-002, ... in document order.
@@ -146,6 +177,8 @@ export interface MatrixExtraction {
   inputChars: number;
   originalChars: number;
   truncated: boolean;
+  /** Named source-spec anchors recovered deterministically after the LLM pass. */
+  recovered_source_specs?: string[];
 }
 
 /**
@@ -160,8 +193,9 @@ export async function extractComplianceMatrixFromText(
   opts: { fileName?: string; userEmail?: string | null } = {},
 ): Promise<MatrixExtraction> {
   const originalChars = text.length;
-  const truncated = originalChars > MAX_INPUT_CHARS;
-  const inputText = truncated ? text.slice(0, MAX_INPUT_CHARS) : text;
+  const windowed = prioritizeExtractionWindows(text);
+  const truncated = windowed.truncated;
+  const inputText = windowed.text;
 
   const chunks = chunkText(inputText, 14000).slice(0, 48);
   const chunkResults = await mapPool(chunks, 6, (chunk) => extractChunk(opts.fileName, chunk, false, opts.userEmail ?? null));
@@ -176,18 +210,38 @@ export async function extractComplianceMatrixFromText(
   // our 7-way enum (the model often echoes the doc's own headings, which breaks
   // downstream alignment — Eric QC).
   const seen = new Set<string>();
-  const requirements = merged
+  const llmRequirements = merged
     .filter((r) => {
       const k = (r.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
       if (!k || seen.has(k)) return false;
       seen.add(k);
       return true;
     })
-    .map((r, i) => ({
+    .map((r) => ({
       ...r,
-      id: `REQ-${String(i + 1).padStart(3, '0')}`,
       category: normalizeCategory(r.category as string | undefined, r.requirement),
     }));
 
-  return { requirements, ok, model: GROQ_MODEL, inputChars: inputText.length, originalChars, truncated };
+  // Named Section 3.0 specs (LOA, flight deck, SCIF, …) often appear as capability
+  // lines without shall/must — the LLM skips them. Recover from the source sentence
+  // so completeness is not luck-dependent (SCIF on notice 6552b25b…).
+  const recovered = recoverMissingSourceSpecs(text, llmRequirements);
+  const requirements = recovered.requirements.map((r, i) => ({
+    ...r,
+    id: `REQ-${String(i + 1).padStart(3, '0')}`,
+    category: normalizeCategory(
+      (r as ComplianceRequirement).category as string | undefined,
+      (r as ComplianceRequirement).requirement,
+    ),
+  })) as ComplianceRequirement[];
+
+  return {
+    requirements,
+    ok,
+    model: GROQ_MODEL,
+    inputChars: inputText.length,
+    originalChars,
+    truncated,
+    recovered_source_specs: recovered.recovered_ids,
+  };
 }

@@ -2,10 +2,11 @@
  * /api/cron/grant-mcp-pro-credits — monthly MCP-credit grant for PAYING subscribers + comp.
  *
  * GOS Decision #019 (2026-07-20): recurring credits require a recurring payment.
- *   • Active Pro sub ($149/mo)   → PRO_MONTHLY_CREDITS  (250)
+ *   • Active Pro sub ($149/mo)   → PRO_MONTHLY_CREDITS  (1,500 — read packages.ts, not this line)
  *   • Active Team sub ($499/mo)  → TEAM_MONTHLY_CREDITS  (1,000 — the header said 750, stale; corrected 2026-09-08)
  *   • Internal team (comp)       → INTERNAL_MONTHLY_CREDITS (25,000)
- *   • Advocates (comp)           → PRO_MONTHLY_CREDITS (250)
+ *   • Advocates (comp)           → PRO_MONTHLY_CREDITS (same as Pro)
+ *   • Sponsored (comp, sponsor-funded) → per-entitlement allowance, TOP-UP not add
  *
  * ⚠️ The subscriber audience is enumerated from ACTIVE Stripe subscriptions (classified by
  * price amount), NOT the KV `briefings:*` access gate — 716 have access but only ~49 pay, so
@@ -24,6 +25,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
+import { activeSponsorEntitlements, topUpToCeiling } from '@/lib/mcp/sponsor-entitlements';
+import { collectCreditHealth, claimAlertOnce } from '@/lib/mcp/credit-health';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
@@ -44,17 +47,26 @@ const INTERNAL_TEAM = Array.from(new Set(
 const ADVOCATES = Array.from(new Set(ADVOCATE_ACCOUNTS.map((a) => a.email.toLowerCase().trim())))
   .filter((e) => !INTERNAL_TEAM.includes(e));
 
-type Group = 'internal' | 'advocate' | 'pro-sub' | 'team-sub';
+type Group = 'internal' | 'advocate' | 'pro-sub' | 'team-sub' | 'sponsored';
 
-type Target = { email: string; amount: number; group: Group };
+// `mode` decides HOW the amount is applied, and the two are not interchangeable:
+//   'add'    — grant the full amount on top of whatever is there (paid/comp allowances)
+//   'topup'  — raise the balance TO the amount, granting only the shortfall (sponsored)
+// A sponsored top-up must never reduce a balance, so a large existing balance simply
+// means nothing is owed this month.
+type Target = { email: string; amount: number; group: Group; mode: 'add' | 'topup' };
+
+// A candidate before resolution — `mode` is assigned by consider() when it lands in the
+// final map, so sources that only ever 'add' (Stripe subs) need not spell it out.
+type Candidate = { email: string; amount: number; group: Group };
 
 /** Enumerate ACTIVE Stripe subscriptions → paying Pro/Team subscribers. Surfaces (never swallows)
  *  a Stripe failure so a monthly run that couldn't read subs is flagged, not silently a no-op. */
-async function activeSubscribers(): Promise<{ subs: Target[]; error: string | null }> {
+async function activeSubscribers(): Promise<{ subs: Candidate[]; error: string | null }> {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return { subs: [], error: 'STRIPE_SECRET_KEY missing' };
   const stripe = new Stripe(key);
-  const subs: Target[] = [];
+  const subs: Candidate[] = [];
   try {
     for await (const s of stripe.subscriptions.list({ status: 'active', limit: 100, expand: ['data.customer'] })) {
       const amt = s.items.data[0]?.price?.unit_amount ?? 0;
@@ -76,18 +88,26 @@ async function activeSubscribers(): Promise<{ subs: Target[]; error: string | nu
 }
 
 /** Resolve final per-email targets (dedupe; keep the highest amount when an email matches twice). */
-async function buildTargets(): Promise<{ targets: Target[]; subError: string | null }> {
+async function buildTargets(): Promise<{ targets: Target[]; subError: string | null; sponsorError: string | null }> {
   const byEmail = new Map<string, Target>();
-  const consider = (email: string, amount: number, group: Group) => {
+  // NO STACKING (policy, Eric 2026-09-15): one grant per account per month, the HIGHEST
+  // applicable allowance across every source. This dedupe IS the rule — adding a source
+  // here inherits it, whereas a second cron granting under its own idempotency key would
+  // stack, because each key would legitimately be unclaimed.
+  const consider = (email: string, amount: number, group: Group, mode: 'add' | 'topup' = 'add') => {
     const e = email.toLowerCase().trim();
     const prev = byEmail.get(e);
-    if (!prev || amount > prev.amount) byEmail.set(e, { email: e, amount, group });
+    if (!prev || amount > prev.amount) byEmail.set(e, { email: e, amount, group, mode });
   };
   for (const email of INTERNAL_TEAM) consider(email, INTERNAL_MONTHLY_CREDITS, 'internal');
   for (const email of ADVOCATES) consider(email, PRO_MONTHLY_CREDITS, 'advocate');
   const { subs, error } = await activeSubscribers();
   for (const s of subs) consider(s.email, s.amount, s.group);
-  return { targets: [...byEmail.values()], subError: error };
+  // Sponsored accounts. A smaller paid plan must not reduce a sponsored benefit, and the
+  // sponsorship stands until its own expiry — both follow from taking the higher amount.
+  const { entitlements, error: sponsorError } = await activeSponsorEntitlements();
+  for (const ent of entitlements) consider(ent.userEmail, ent.monthlyAllowance, 'sponsored', 'topup');
+  return { targets: [...byEmail.values()], subError: error, sponsorError };
 }
 
 export async function GET(request: NextRequest) {
@@ -105,24 +125,35 @@ export async function GET(request: NextRequest) {
   // granted). On any other day it is the DAILY SELF-HEAL pass: idempotent by the
   // same pro:<email>:<YYYY-MM> key, so it grants only whoever upstream missed.
   const isMonthStart = now.getUTCDate() === 1;
-  const { targets, subError } = await buildTargets();
+  const { targets, subError, sponsorError } = await buildTargets();
   const byGroup = targets.reduce<Record<string, number>>((a, t) => { a[t.group] = (a[t.group] || 0) + 1; return a; }, {});
 
   if (preview) {
     return NextResponse.json({
-      success: true, preview: true, month, audience: targets.length, byGroup, subError,
+      success: true, preview: true, month, audience: targets.length, byGroup, subError, sponsorError,
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
-      targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group })),
+      targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group, mode: t.mode })),
     });
   }
 
   let granted = 0, alreadyHad = 0;
   const errors: string[] = [];
   const healed: string[] = [];
-  for (const { email, amount, group } of targets) {
+  // Sponsored top-ups that needed nothing (balance already above the ceiling). Counted
+  // separately because 'granted 0' here is HEALTHY, not a miss.
+  let sponsoredSatisfied = 0;
+  for (const { email, amount, group, mode } of targets) {
     if (amount <= 0) continue;
     try {
-      const { applied } = await applyCreditOnce(`pro:${email}:${month}`, email, amount, 'pro_monthly');
+      // ONE key per account per month regardless of source — the no-stacking rule
+      // enforced at the write, not just in the resolver above.
+      const key = `pro:${email}:${month}`;
+      const { applied, grantedAmount } = mode === 'topup'
+        ? await topUpToCeiling(key, email, amount, 'sponsor_monthly')
+            .then((r) => ({ applied: r.applied, grantedAmount: r.granted }))
+        : await applyCreditOnce(key, email, amount, 'pro_monthly')
+            .then((r) => ({ applied: r.applied, grantedAmount: amount }));
+      if (applied && mode === 'topup' && grantedAmount === 0) sponsoredSatisfied++;
       if (applied) {
         granted++;
         // SELF-HEAL SIGNAL: on the 1st-of-month run every paying sub is expected to
@@ -145,10 +176,13 @@ export async function GET(request: NextRequest) {
   // alerting on it would page every single day.
   const nothingHappened = isMonthStart && granted === 0 && alreadyHad === 0;
   const tooSmall = targets.length < INTERNAL_TEAM.length;
-  const anomaly = Boolean(subError) || errors.length > 0 || nothingHappened || tooSmall;
+  // A failed sponsor read is an anomaly for the same reason a failed Stripe read is: it
+  // silently drops a whole audience from the grant while the run still reports success.
+  const anomaly = Boolean(subError) || Boolean(sponsorError) || errors.length > 0 || nothingHappened || tooSmall;
 
   const summary = {
-    month, audience: targets.length, byGroup, granted, alreadyHad, subError,
+    month, audience: targets.length, byGroup, granted, alreadyHad, subError, sponsorError,
+    sponsoredSatisfied,
     errors: errors.slice(0, 10),
     mode: isMonthStart ? 'monthly-grant' : 'daily-self-heal',
     healed: healed.slice(0, 20),
@@ -201,6 +235,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, anomaly: true, ...summary, healAlertDelivered: healAlert?.ok ?? null, healAlertError: healAlert?.error ?? null }, { status: 500 });
   }
 
+  // ── SPONSORED-CREDIT WATCH. Detection runs ALWAYS and is always reported; only the
+  // outbound notification is gated. MCP_CREDIT_ALERTS defaults OFF (Eric, 2026-09-15 —
+  // notifications stay off pending review), so today this records findings in the
+  // response and the log and sends nothing. Flip the flag after reviewing what it
+  // WOULD have sent — the same log-only rollout the extraction guard used.
+  //
+  // Why this lives here: exhaustion was invisible for four days on a real account while
+  // 59 rejection rows accumulated. The data existed; nothing looked at it.
+  const creditHealth = await collectCreditHealth().catch((e) => ({
+    checkedAt: new Date().toISOString(), lowBalance: [], exhausted: [],
+    sponsoredAccounts: null as number | null,
+    errors: [`collectCreditHealth threw: ${e instanceof Error ? e.message : String(e)}`],
+  }));
+  const alertsEnabled = process.env.MCP_CREDIT_ALERTS === 'true';
+  const today = new Date().toISOString().slice(0, 10);
+  const wouldAlert: string[] = [];
+  const sentAlerts: string[] = [];
+  for (const f of [...creditHealth.exhausted, ...creditHealth.lowBalance]) {
+    // Dedupe per account PER TYPE PER DAY — 59 rejections must yield one alert, not 59.
+    const claimed = await claimAlertOnce(f.kind, f.userEmail, today).catch(() => true);
+    if (!claimed) continue;
+    wouldAlert.push(`${f.kind}:${f.userEmail}`);
+    if (!alertsEnabled) continue;
+    const r = await sendOpsAlert({
+      subject: `Sponsored account ${f.kind === 'exhausted' ? 'OUT OF CREDITS' : 'low on credits'} — ${f.userEmail}`,
+      html: `<p>${f.detail}</p><p><b>Sponsor:</b> ${f.sponsorName ?? 'unknown'}</p>`,
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    // Capture the delivery result — sendOpsAlert RESOLVES ok:false on a Slack rejection,
+    // it does not throw, so a dropped alert otherwise looks identical to a delivered one.
+    if (r.ok) sentAlerts.push(f.userEmail);
+    else console.error(`[mcp-grant] credit alert NOT delivered for ${f.userEmail}: ${r.error}`);
+  }
+  if (wouldAlert.length > 0 && !alertsEnabled) {
+    console.warn(`[mcp-grant] credit alerts DETECTED but suppressed (MCP_CREDIT_ALERTS off): ${wouldAlert.join(', ')}`);
+  }
+
   // healAlertDelivered: true = Slack accepted it · false = dropped (see
   // healAlertError) · null = nothing to alert about. Distinguishing "no alert
   // needed" from "alert failed" is the whole point.
@@ -209,5 +279,13 @@ export async function GET(request: NextRequest) {
     ...summary,
     healAlertDelivered: healAlert?.ok ?? null,
     healAlertError: healAlert?.error ?? null,
+    // The watch reports even when it sends nothing — a suppressed alert must still be
+    // visible, or "notifications off" silently becomes "detection off".
+    creditHealth: {
+      ...creditHealth,
+      alertsEnabled,
+      alertsDetected: wouldAlert,
+      alertsSent: sentAlerts,
+    },
   });
 }

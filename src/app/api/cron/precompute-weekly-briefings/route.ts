@@ -19,6 +19,7 @@ import { getReadClient } from '@/lib/supabase/server-clients';
 import { expandNaicsForBriefing as expandNaicsCodes } from '@/lib/briefings/naics-briefing-expansion';
 import { fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { generateWeeklyDeepDiveFromContracts } from '@/lib/briefings/delivery/weekly-briefing-generator';
+import { fetchContractsForProfile } from '@/lib/briefings/weekly-contracts';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { hashNaicsProfile, naicsProfileKey } from '@/lib/briefings/naics-profile-hash';
 
@@ -42,21 +43,6 @@ interface EnhancedNaicsProfile extends NaicsProfile {
   aggregated_psc_codes: string[];
   aggregated_keywords: string[];
   aggregated_agencies: string[];
-}
-
-interface ContractForBriefing {
-  contractNumber: string;
-  contractName: string;
-  agency: string;
-  incumbent: string;
-  value: number;
-  naicsCode: string;
-  expirationDate: string;
-  daysUntilExpiration: number;
-  setAside: string;
-  description: string;
-  numberOfBids?: number;
-  competitionLevel?: string;
 }
 
 function getWeekOfDate(): string {
@@ -142,10 +128,7 @@ function getSupabase() {
     // (briefing_templates) stay on getSupabase() (primary).
     const { data: users, error: usersError } = await getReadClient()
       .from('user_notification_settings')
-      // truncation-ok: predicate is briefings_enabled=true — measured 2026-08-23 at 187 rows
-      // (table 10,669). Templates are per-NAICS-PROFILE, so this stays far under the cap.
-      // Revisit if briefings adoption approaches ~1,000 users.
-      .select('user_email, naics_codes, keywords, agencies')
+      .select('user_email, naics_codes, keywords, agencies') // truncation-ok: briefings_enabled=true; measured 2026-08-23 at 187 rows (table 10,669). Templates are per-NAICS-PROFILE. Revisit if adoption approaches ~1,000 users.
       .eq('briefings_enabled', true);
 
     if (usersError) {
@@ -254,30 +237,35 @@ function getSupabase() {
 
         // Fetch USASpending data using expanded criteria (NAICS + PSC + keywords)
         const expandedNaics = expandNaicsCodes(profile.naics_codes);
-        const contracts = await fetchContractsForProfile(
+        const contracts = await fetchContractsForProfile({
+          savedNaics: profile.naics_codes,
           expandedNaics,
-          profile.aggregated_psc_codes.slice(0, 10), // Limit to top 10 PSC codes
-          profile.aggregated_keywords.slice(0, 20),   // Limit to top 20 keywords
-          profile.aggregated_agencies.slice(0, 10)    // Limit to top 10 agencies
-        );
+          pscCodes: profile.aggregated_psc_codes.slice(0, 10),
+          keywords: profile.aggregated_keywords.slice(0, 20),
+          agencies: profile.aggregated_agencies.slice(0, 10),
+        });
 
         if (contracts.length === 0) {
-          console.log(`[PrecomputeWeekly] No contracts found for profile, skipping`);
+          console.log(`[PrecomputeWeekly] No in-market contracts found for profile, skipping`);
           continue;
         }
 
-        // Generate AI analysis
         const noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
           naicsCodes: expandedNaics,
           pscCodes: profile.aggregated_psc_codes.slice(0, 10),
           keywords: profile.aggregated_keywords.slice(0, 20),
         });
 
-
         const briefing = await generateWeeklyDeepDiveFromContracts(contracts, noticeSummary, {
           naicsProfileHash: profile.naics_profile_hash,
+          savedNaics: profile.naics_codes,
         });
         briefing.processingTimeMs = Date.now() - profileStartTime;
+
+        if (briefing.opportunities.length === 0) {
+          console.log(`[PrecomputeWeekly] No source-grounded opportunities for profile, skipping`);
+          continue;
+        }
 
         // Store template
         const { error: insertError } = await getSupabase().from('briefing_templates').upsert({
@@ -343,311 +331,4 @@ function getSupabase() {
       elapsed: Date.now() - startTime,
     }, { status: 500 });
   }
-}
-
-// Scored contract interface for ranking
-interface ScoredContract extends ContractForBriefing {
-  relevanceScore: number;
-  matchFactors: string[];
-}
-
-/**
- * Two-Stage Opportunity Fetch + Score
- * Stage 1: Cast wide net using NAICS + PSC + keywords + agencies
- * Stage 2: Score and rank each opportunity
- */
-async function fetchContractsForProfile(
-  naicsCodes: string[],
-  pscCodes: string[],
-  keywords: string[],
-  agencies: string[]
-): Promise<ContractForBriefing[]> {
-  const rawContracts: ContractForBriefing[] = [];
-  const seenIds = new Set<string>();
-
-  console.log(`[PrecomputeWeekly] Fetching with wide net: ${naicsCodes.length} NAICS, ${pscCodes.length} PSC, ${keywords.length} keywords, ${agencies.length} agencies`);
-
-  // Stage 1A: Fetch by NAICS codes (primary)
-  for (const naics of naicsCodes.slice(0, 5)) {
-    try {
-      const contracts = await fetchUSASpendingContracts({ naics_code: naics });
-      for (const c of contracts) {
-        if (!seenIds.has(c.contractNumber)) {
-          seenIds.add(c.contractNumber);
-          rawContracts.push(c);
-        }
-      }
-    } catch {
-      // Continue on error
-    }
-  }
-
-  // Stage 1B: Fetch by PSC codes (secondary - different contracts)
-  for (const psc of pscCodes.slice(0, 3)) {
-    try {
-      const contracts = await fetchUSASpendingContracts({ psc_code: psc });
-      for (const c of contracts) {
-        if (!seenIds.has(c.contractNumber)) {
-          seenIds.add(c.contractNumber);
-          rawContracts.push(c);
-        }
-      }
-    } catch {
-      // Continue on error
-    }
-  }
-
-  // Stage 1C: Fetch by keywords (catch mislabeled opportunities)
-  for (const keyword of keywords.slice(0, 5)) {
-    if (keyword.length < 3) continue; // Skip short keywords
-    try {
-      const contracts = await fetchUSASpendingContracts({ keyword });
-      for (const c of contracts) {
-        if (!seenIds.has(c.contractNumber)) {
-          seenIds.add(c.contractNumber);
-          rawContracts.push(c);
-        }
-      }
-    } catch {
-      // Continue on error
-    }
-  }
-
-  console.log(`[PrecomputeWeekly] Stage 1 complete: ${rawContracts.length} unique contracts fetched`);
-
-  // Stage 2: Score each contract
-  const scoredContracts: ScoredContract[] = rawContracts.map(contract => {
-    let score = 0;
-    const matchFactors: string[] = [];
-
-    // NAICS match (+25 points)
-    if (naicsCodes.some(n => contract.naicsCode?.startsWith(n) || n.startsWith(contract.naicsCode || ''))) {
-      score += 25;
-      matchFactors.push('NAICS');
-    }
-
-    // PSC match (+15 points) - check description for PSC mentions
-    const descLower = (contract.description || '').toLowerCase();
-    if (pscCodes.some(psc => descLower.includes(psc.toLowerCase()))) {
-      score += 15;
-      matchFactors.push('PSC');
-    }
-
-    // Keyword in title (+20 points) or description (+10 points)
-    const titleLower = (contract.contractName || '').toLowerCase();
-    for (const kw of keywords) {
-      const kwLower = kw.toLowerCase();
-      if (titleLower.includes(kwLower)) {
-        score += 20;
-        matchFactors.push(`Keyword:${kw}`);
-        break; // Only count once
-      } else if (descLower.includes(kwLower)) {
-        score += 10;
-        matchFactors.push(`KeywordDesc:${kw}`);
-        break;
-      }
-    }
-
-    // Target agency match (+15 points)
-    const agencyLower = (contract.agency || '').toLowerCase();
-    if (agencies.some(a => agencyLower.includes(a.toLowerCase()) || a.toLowerCase().includes(agencyLower))) {
-      score += 15;
-      matchFactors.push('Agency');
-    }
-
-    // Expiring soon bonus (+10 points for <180 days, +5 for <365 days)
-    if (contract.daysUntilExpiration < 180) {
-      score += 10;
-      matchFactors.push('Expiring<6mo');
-    } else if (contract.daysUntilExpiration < 365) {
-      score += 5;
-      matchFactors.push('Expiring<1yr');
-    }
-
-    // Low competition bonus (+15 points for 1-2 bids)
-    if (contract.numberOfBids && contract.numberOfBids <= 2) {
-      score += 15;
-      matchFactors.push('LowBids');
-    }
-
-    // High value bonus (+5 points for $1M+, +10 for $10M+)
-    if (contract.value >= 10000000) {
-      score += 10;
-      matchFactors.push('Value$10M+');
-    } else if (contract.value >= 1000000) {
-      score += 5;
-      matchFactors.push('Value$1M+');
-    }
-
-    return {
-      ...contract,
-      relevanceScore: score,
-      matchFactors,
-    };
-  });
-
-  // Sort by score descending, then by value
-  scoredContracts.sort((a, b) => {
-    if (b.relevanceScore !== a.relevanceScore) {
-      return b.relevanceScore - a.relevanceScore;
-    }
-    return b.value - a.value;
-  });
-
-  console.log(`[PrecomputeWeekly] Stage 2 complete: Top scores: ${scoredContracts.slice(0, 5).map(c => c.relevanceScore).join(', ')}`);
-
-  // Return top 15 (strips relevanceScore/matchFactors for clean interface)
-  return scoredContracts.slice(0, 15).map(({ relevanceScore, matchFactors, ...contract }) => contract);
-}
-
-/**
- * Unified USASpending fetch helper
- */
-async function fetchUSASpendingContracts(params: {
-  naics_code?: string;
-  psc_code?: string;
-  keyword?: string;
-}): Promise<ContractForBriefing[]> {
-  const contracts: ContractForBriefing[] = [];
-
-  // Build filters
-  const filters: Record<string, unknown> = {
-    time_period: [{ start_date: '2022-01-01', end_date: '2027-12-31' }],
-    award_type_codes: ['A', 'B', 'C', 'D'],
-  };
-
-  if (params.naics_code) {
-    filters.naics_codes = { require: [params.naics_code] };
-  }
-  if (params.psc_code) {
-    // FLAT array — { require: [...] } 422s on spending_by_award (FM-05 bug class, 2026-07-28); this
-    // silently broke PSC matching in weekly-briefing opportunity fetches.
-    filters.psc_codes = [params.psc_code];
-  }
-  if (params.keyword) {
-    filters.keywords = [params.keyword];
-  }
-
-  try {
-    const response = await fetch(`https://api.usaspending.gov/api/v2/search/spending_by_award/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filters,
-        fields: ['Award ID', 'Recipient Name', 'Start Date', 'End Date', 'Award Amount', 'Awarding Agency', 'generated_internal_id'],
-        page: 1,
-        limit: 8,
-        sort: 'Award Amount',
-        order: 'desc',
-      }),
-    });
-
-    if (!response.ok) return contracts;
-
-    const data = await response.json();
-    const awards = data.results || [];
-
-    for (const award of awards.slice(0, 4)) {
-      const awardId = award.generated_internal_id || award['Award ID'];
-      try {
-        const detailRes = await fetch(`https://api.usaspending.gov/api/v2/awards/${awardId}/`);
-        if (detailRes.ok) {
-          const detail = await detailRes.json();
-          const contractData = detail.latest_transaction_contract_data || {};
-          const periodPerf = detail.period_of_performance || {};
-          const endDate = periodPerf.end_date || award['End Date'] || '';
-          const daysUntil = endDate ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 180;
-          const numberOfBids = parseInt(contractData.number_of_offers_received || '0', 10) || 0;
-
-          contracts.push({
-            contractNumber: detail.piid || award['Award ID'],
-            contractName: detail.description || 'Contract',
-            agency: detail.awarding_agency?.toptier_agency?.name || award['Awarding Agency'] || '',
-            incumbent: detail.recipient?.recipient_name || award['Recipient Name'] || '',
-            value: detail.total_obligation || Number(award['Award Amount']) || 0,
-            naicsCode: detail.latest_transaction_contract_data?.naics || params.naics_code || '',
-            expirationDate: endDate,
-            daysUntilExpiration: daysUntil,
-            setAside: contractData.extent_competed_description || 'Full & Open',
-            description: detail.description || '',
-            numberOfBids,
-            competitionLevel: numberOfBids <= 2 ? 'low' : numberOfBids <= 5 ? 'medium' : 'high',
-          });
-        }
-      } catch {
-        // Skip individual award errors
-      }
-    }
-  } catch {
-    // Skip fetch errors
-  }
-
-  return contracts;
-}
-
-// Legacy function kept for compatibility
-async function fetchContractsForNaics(naicsCodes: string[]): Promise<ContractForBriefing[]> {
-  const allContracts: ContractForBriefing[] = [];
-
-  for (const naics of naicsCodes.slice(0, 3)) {
-    try {
-      const response = await fetch(`https://api.usaspending.gov/api/v2/search/spending_by_award/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filters: {
-            time_period: [{ start_date: '2022-01-01', end_date: '2027-12-31' }],
-            award_type_codes: ['A', 'B', 'C', 'D'],
-            naics_codes: { require: [naics] },
-          },
-          fields: ['Award ID', 'Recipient Name', 'Start Date', 'End Date', 'Award Amount', 'Awarding Agency', 'generated_internal_id'],
-          page: 1,
-          limit: 10,
-          sort: 'Award Amount',
-          order: 'desc',
-        }),
-      });
-
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      const awards = data.results || [];
-
-      for (const award of awards.slice(0, 3)) {
-        const awardId = award.generated_internal_id || award['Award ID'];
-        try {
-          const detailRes = await fetch(`https://api.usaspending.gov/api/v2/awards/${awardId}/`);
-          if (detailRes.ok) {
-            const detail = await detailRes.json();
-            const contractData = detail.latest_transaction_contract_data || {};
-            const periodPerf = detail.period_of_performance || {};
-            const endDate = periodPerf.end_date || award['End Date'] || '';
-            const daysUntil = endDate ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 180;
-            const numberOfBids = parseInt(contractData.number_of_offers_received || '0', 10) || 0;
-
-            allContracts.push({
-              contractNumber: detail.piid || award['Award ID'],
-              contractName: detail.description || `${naics} Contract`,
-              agency: detail.awarding_agency?.toptier_agency?.name || award['Awarding Agency'] || '',
-              incumbent: detail.recipient?.recipient_name || award['Recipient Name'] || '',
-              value: detail.total_obligation || Number(award['Award Amount']) || 0,
-              naicsCode: naics,
-              expirationDate: endDate,
-              daysUntilExpiration: daysUntil,
-              setAside: contractData.extent_competed_description || 'Full & Open',
-              description: detail.description || '',
-              numberOfBids,
-              competitionLevel: numberOfBids <= 2 ? 'low' : numberOfBids <= 5 ? 'medium' : 'high',
-            });
-          }
-        } catch {
-          // Skip individual award errors
-        }
-      }
-    } catch {
-      // Skip NAICS errors
-    }
-  }
-
-  return allContracts.sort((a, b) => b.value - a.value).slice(0, 10);
 }

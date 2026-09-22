@@ -50,8 +50,10 @@ export default async function NaicsStatePage({ params }: { params: Promise<{ cod
       crossLinks={[
         { href: `/naics/${code}`, label: `All NAICS ${code} opportunities →` },
         { href: '/opportunity-hunter', label: 'Browse all opportunities →' },
-        { href: '/forecasts', label: 'Upcoming forecasts →' },
+        { href: '/forecasts', label: 'Agency forecasts →' },
       ]}
+      canonicalPath={`/naics/${code}/${state.toLowerCase()}`}
+      breadcrumb={{ name: `NAICS ${code}`, href: `/naics/${code}` }}
     />
   );
 }

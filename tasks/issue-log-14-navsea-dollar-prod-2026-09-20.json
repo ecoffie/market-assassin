@@ -1,0 +1,33 @@
+{
+  "label": "POST_RELEASE_PUBLIC_DOMAIN_DOLLAR_SUPPRESSION",
+  "checked_at": "2026-09-20T22:10:02.800Z",
+  "serving": {
+    "getmindy_maps_account_build": "297e3136e18c08fb4f651297b9e58b409d401486",
+    "merge_sha": "297e3136",
+    "pr_tip": "dbdf664c",
+    "deploy": "market-assassin-a1n55a7ea"
+  },
+  "agency": "Naval Sea Systems Command",
+  "priority_count": 10,
+  "pain_point_count": 10,
+  "priorities_with_dollar_amount": [],
+  "pain_points_with_dollar_amount": [],
+  "legacy_citation_count": 20,
+  "source_fact_citation_count": 0,
+  "legacy_citations_with_dollar": [],
+  "source_fact_citations_with_dollar": [],
+  "qualitative_priority_samples": [
+    "Columbia-class submarine program (FY2025) — design and construction support opportunities for shipbuilding contractors. Dollar amounts omitted until sourced.",
+    "Virginia-class submarine Block V production (FY2025-2026) — opportunities for suppliers and subsystem integrators in upcoming solicitations. Dollar amounts omitted until sourced.",
+    "DDG-51 Arleigh Burke-class destroyer modernization (FY2025) — combat systems upgrades and shipyard services. Dollar amounts omitted until sourced."
+  ],
+  "checks": {
+    "no_unsourced_legacy_dollar_in_priorities": true,
+    "no_unsourced_legacy_dollar_in_pain_points": true,
+    "no_legacy_citation_dollars": true,
+    "qualitative_priorities_remain": true,
+    "source_fact_dollars_preserved_or_absent": true
+  },
+  "spending_parent_service_total": 176557193879.18,
+  "note": "PARENT_SERVICE Navy total is sourced spend grain, not a LEGACY_MANUAL priority claim."
+}

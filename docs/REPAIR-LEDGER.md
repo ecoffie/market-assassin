@@ -26,6 +26,104 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## getmindy.ai SEO — indexation recovery (Phase A)
+
+| 2026-09-21 | **`de5cdd37` — the four review blockers at `bcedf465`. Three of them were the same mistake: a control that reads as safety but does not measure the risk.** (1) `scripts/seo-mcp-parity-report.ts` resolved with `liveBq=true` unconditionally, so merely running the diagnostic spent BigQuery — and did, twice. Now cache-only by default; both resolver calls take the flag and `--live-bq` is required. Its verdict column no longer prints "source data (honest 404)" cache-only, because a cache miss cannot distinguish "absent from the warehouse" from "never warmed" — it prints `unknown (cache-only)`. (2) The warmer's alias DRY RUN estimated `CANONICAL_SLUG_SQL` (the SCALAR form, bound on `@slug`/`@normSlug`) while execution ran `CANONICAL_SLUG_BATCH_SQL` with ARRAY params — an estimate of a query that was never going to run, and one that could not even bind. Introduced when the single/batch SQL was split; the split was right, the estimate was not updated. One `params` object now feeds both. (3) That batch is **execution-disabled**: a dry run reports BYTES, and this query's failure mode is CPU — measured **9,106 CPU seconds against 27 MB scanned**, REFUSED by BigQuery for exceeding the on-demand CPU-to-bytes ratio (ceiling 6,900). Every guard the warmer has (`maxBytesPerScan`/`maxBytesPerRun`/`dailyScanBudgetBytes`) is denominated in bytes and is therefore blind to the one failure that has actually occurred, so no dry run authorizes it; re-enabling needs a separately authorized bounded runtime probe. Profile warming (`ROLLUP_BY_SLUG_SQL`, single-table filter, no UNNEST join) still executes. Unresolved slugs are reported `status UNKNOWN`, never "genuinely gone". (4) `/forecasts` transferred the WHOLE `agency_forecasts` table on the request path — ~36,000 rows over ~36 round-trips per ISR regeneration, and AGAIN for `generateMetadata`. PostgREST aggregates are disabled on this project ("Use of aggregate functions is not allowed"), so grouping cannot be pushed into the DB from the client; replaced with a compact materialized summary (measured **6.3 kB** for 35,912 rows), `total` from an authoritative COUNT rather than rows transferred, `truncated` set when transfer and count disagree, one KV read shared between metadata and body via React `cache()`. | `--live-bq` → `scripts/seo-mcp-parity-report.ts`; `ALIAS_EXECUTION_DISABLED_REASON` → `scripts/warm-contractor-slugs.ts`; `evaluateSummary` → `src/lib/seo/forecasts-summary.ts`; `authoritative total` → `scripts/build-forecast-summary.ts` | `seo-hardening.unit.test.ts` — 25 tests, one block per defect; behavioural where behaviour exists (all six fail-closed branches of `evaluateSummary`: missing / wrong-version / malformed / zero-total / truncated / stale), source-asserted where the property is code shape, comments stripped first because these files document the defects they fix. Full suite 605 files / **6,699 passed, 0 failures, 0 unhandled errors**; `next build` exit 0, typecheck clean. Deployed PREVIEW proves fail-closed: `/forecasts` → 200 with `noindex` + "temporarily unavailable" and **no zero leaked**, because the summary is deliberately NOT materialized. | VERIFIED IN PRODUCTION 2026-09-21 |
+
+| 2026-09-21 | **`bcedf465` — one H1 per page on `/recompete`.** The layout added for crawlability carried the page's `<h1>` while the client component still had its own, so the document shipped two competing top-level headings. Caught on the Vercel PREVIEW, not locally — the local checks read source, the preview reads what a crawler actually gets. | `Every federal contract ends` → `src/app/recompete/layout.tsx` | Preview `/recompete`: `<h1>` count exactly 1. | VERIFIED IN PRODUCTION 2026-09-21 |
+
+| 2026-09-21 | **`7eac2b22` — the Aug-24 homepage cutover cut the content library off from Google; impressions fell 97%.** #1315 rewrote `/` from `/mindy-landing` to `/today`. The old page linked `/contractors`, `/naics`, `/top`, `/discover`, `/research`; the new one linked **none** — 0 occurrences in the raw HTML, RSC flight payload included. The only page Google reliably indexes passed zero equity into 34,163 content URLs, leaving them discoverable by sitemap alone: **15 of 21 sampled URLs "Crawled – currently not indexed"** (Google URL Inspection API), now including `/pricing` and `/compare/govwin`. Measured 6-month GSC: 13,976 impressions, **32 clicks, 28 of them the branded query `getmindy.ai`** — 4 non-branded clicks in six months, ranking pos 1.8 on PIID lookups that never convert. Separately, **861 contractor slugs Google had indexed returned 404** (measured across all 1,468 de-sitemapped slugs, not extrapolated): the sitemap's eligibility (top-N rollup list) and the page's eligibility (per-slug KV cache) were different populations nothing reconciled. And `/forecasts` had **no route at all** — 404, yet advertised in `sitemap.xml` and linked from ~1,300 public pages, while `agency_forecasts` held 35,912 Supabase rows with no public surface. Fixes: server-rendered site footer on `/today` linking every hub; contractor pages link out to `/agencies/[slug]` + `/naics/[code]` (they had 5 internal links, all self-referential); sitemap gated on `getServeableSlugs()` (KV presence, fails closed) so the two populations cannot diverge again; **sitemap generation flipped from `cacheOnly:false` to cache-only** — it was a public route wired to the warehouse; a public cache miss now records the slug for a bounded warm instead of querying; `/forecasts` built as ONE consolidated page (not 35,912 URLs); `/market-intelligence` (64 chars SSR, no h1) and `/recompete` (387 chars) server-render real content; removed `/expiring-contracts` (308→`/`, retired) and `/bd-assist` (307) from the sitemap, added `/spending` + `/discover` which were live and advertised nowhere; 9 public pages carried `\| GovCon Giants` titles incl. `/about` and `/opportunity-hunter`; dropped two unverified figures — "$77T+ in potential value" on `/recompete` (federal obligations run ~$750B/yr) and "Browse 33,000+ forecasts". `ROLLUP_BY_SLUG_SQL` + `canonicalSlugSql()` defined ONCE and shared by the single-slug reader (public page + MCP tools) and the batch warmer — an earlier forked copy silently dropped the `norm_match` arm and left 49 slugs 404, `general-dynamics-corporation` among them. | `siteFooterHtml` → `src/lib/seo/site-links.ts`; `getServeableSlugs` → `src/app/sitemap.ts`; `recordWarmMiss` → `src/app/contractors/[slug]/page.tsx`; `CANONICAL_SLUG_SQL` → `src/lib/bigquery/recipients.ts` | `seo-mcp-parity.unit.test.ts` — 17 tests encoding the architecture (one resolver, no forked SQL, all three arms present, no crawler path to BigQuery, sitemap gated on verified cache). Deployed PREVIEW with JS disabled: `/today` raw HTML contains a crawlable `<a href>` to all 15 hubs; `/forecasts` 200 titled "35,912 Upcoming Requirements"; `/market-intelligence` 64→1,399 chars; `/recompete` 387→1,883; `/psc/R425` gained CollectionPage+ItemList; sitemap 11,770 contractor roots retained through the serveable gate. **Production state re-measured after ISR regeneration: of the 861 dead URLs, 562 now 200, 250 now 308 to canonical, 49 still 404** — the 49 are exactly the slugs the forked alias SQL could not resolve. | VERIFIED IN PRODUCTION 2026-09-21 |
+
+### Production verification — Phase A closure
+
+**Merge commits:** `2eaf42288ffae5810db12e1329bed59c5a63f386` (#1609, Phase A) and
+`13213ea393e4bd30f0a662a5fc5ff8db93e65ee8` (#1615, the canonical + dead-alias hotfix).
+**Serving identity:** `x-vercel-id: iad1::9mm8d-1790000831120-f571a1116637`.
+**Verified:** 2026-09-21T14:27:11Z (UTC), against live production.
+
+All twelve acceptance checks pass:
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `/` 200, every content hub a crawlable `<a href>` with JS never executed | 16/16 |
+| 2 | `/forecasts` 200, reconciled real summary, indexable | 35,912; `noindex` 0; self-canonical; `x-vercel-cache: HIT` `age: 4` = freshly rendered |
+| 3 | `/market-intelligence` + `/recompete` SSR, one H1, canonical | 1,399 / 1,883 chars, 1 H1 each |
+| 4 | No public title contains "GovCon Giants" | 0 of 38 routes |
+| 5 | **Every sitemap URL a direct canonical 200, zero redirect hops** | **36,065 / 36,065, 0 failures** |
+| 6 | Canonical contractor cache coverage | 11,770 / 11,770 |
+| 7 | The 562 repaired contractor URLs | 562 / 562 → 200 |
+| 8 | The 250 aliases | 243 single-hop 308 + 7 direct 404; 170/170 targets 200 |
+| 9 | The 49 unresolved aliases | 49/49 honest 404, 0 in sitemap |
+| 10 | `ENABLE_SEO_LIVE_BQ` | not set in production — OFF |
+| 11 | Public routes / sitemap generation / default parity make zero BigQuery calls | 0 `[bq-miss]` |
+| 12 | MCP / Maps / Today's Intel / authenticated contractor data | all healthy |
+
+**Sitemap count 36,070 → 36,065 reconciled.** `sitemap.xml` 35,348 + `sitemap-opportunities.xml`
+717 = 36,065 exactly; opportunities was constant across both crawls. Between the two crawl
+windows 6 URLs left and 2 arrived, every one an opportunity-derived facet
+(`/naics/<code>/<state>`, `/psc/<code>`, `/set-aside/<type>/<naics>`) — those clusters are
+generated from ACTIVE `sam_opportunities`, so the set churns as solicitations close and post.
+**Zero contractor URLs and zero marketing/static routes moved.** Across the wider window that
+straddles the Phase A deploy, five further changes were this work's own intended edits:
+`/bd-assist` and `/expiring-contracts` removed (they 307/308), `/spending`, `/discover` and
+`/recompete` added (live and advertised nowhere). No route was silently dropped.
+
+One measurement artifact, classified rather than waved away: check 7 first reported one `000`,
+which is a **client-side curl connection failure, not a site response** — it appeared once at
+10-way concurrency and disappeared at 6-way, with the URL returning 200 on both re-runs.
+
+**Still open after closure** (holds intact — no alias CPU probe, no batch resolver, no live
+BigQuery, no backfill, no Phase C): the 7 dead alias targets and the 49 unresolved slugs return
+honest 404s and are absent from the sitemap; they need an authorized bounded runtime probe before
+the alias batch can resolve them. Phase B remains a planning artifact
+(`tasks/seo-phase-b-query-taxonomy.md`). The `search_contractors` `search`-parameter defect is
+tracked separately and is NOT attributable to either merge.
+
+### BigQuery activity disclosed for this work
+
+Two BigQuery executions happened **before** the "no live BigQuery" constraint was issued, and are recorded here rather than left implicit: a 5,133-slug contractor warm (**4 queries, ≈0.17 GiB total**, each under the 5 GiB `RUNTIME_MAX_BYTES` cap) which primed 4,828 profile + 256 redirect KV keys; and the parity report's MCP column, whose canonical-slug queries hit the CPU-to-bytes refusal described above. Both read/wrote production. **Nothing else ran.** No backfill, no `--go`, no `--live-bq`, no `ENABLE_SEO_LIVE_BQ` enablement, no production deployment and no merge. The forecast summary is deliberately **not materialized**, so `/forecasts` renders its unavailable state and `noindex` until `npm run seo:build-forecast-summary --go` is authorized.
+
+## Email record CTAs (distribution -> exact destination)
+
+| 2026-09-21 | **A record CTA lands on the record, not on a market it is somewhere inside.** The frozen record-vs-market-link rule was enforced on the daily ALERT (#1441) and nowhere else. `mapHrefFor()` in the daily BRIEFING emitted `?naics=&subAgency=&state=` with NO id from "See it on the map ->" (one ranked card) and from every "Deadlines this week" row; measured on prod 30d, **1,613 of 1,984 daily_briefing clicks (81.3%) went through it and 0 carried a record id**, click-weighted mean destination **68 open rows** to find by eye the listing the card had already named. **457 of those (28.3%)** carried a comma-bearing sub-agency, which `multiVal()` splits into an OR — "VETERANS AFFAIRS, DEPARTMENT OF" -> 3,598 rows vs 2,849 correct, and "HOMELAND SECURITY, DEPARTMENT OF" -> THE SAME 3,598, 0 of them DHS. A market link is also `active=true`-filtered, so the deadline CTA (705 clicks, by construction the one clicked latest) shows a market with the record removed. Separately the WEEKLY ALERT's only per-opportunity link went to **sam.gov** (176 of 1,526 clicks) — the highest-intent click in that email, spent leaving the product. Both now emit `?opp=<notice_id>` **alone**, so the map's scope IIFE early-returns and no late writer races the drawer open; SAM stays reachable from an explicit meta-line link. The id-less fallback keeps its market link but runs the sub-agency through `firstScopeSegment`. | `firstScopeSegment` -> `src/lib/briefings/delivery/sam-green-email-template.ts`; `const oppHref =` -> `src/app/api/cron/weekly-alerts/route.ts` | `briefing-opp-deeplink.unit.test.ts` renders the REAL email and asserts on the unwrapped `/api/track` destination. Proven to fail: remove the `?opp=` short-circuit -> 5 red; re-add `&naics=` beside `?opp=` -> 1 red (the scope-param assertion); reverted -> 10 green. Cold tsc clean; 1049/1049 across briefings/alerts/map/daily-alerts. | IN REVIEW |
+## Journey Analytics — SAVED / WATCHING / PURSUING are three states
+
+| 2026-09-21 | **The discovery "Saved" step WAS the execution "Pursuit started" step.** Both were declared with the same three tokens, so production returned byte-identical numbers (58 users / 108 events each) and the endpoint whose Principle 01 is "a pursuit is far rarer than a save" defined them as one event — its "Saved" card rendered the pursuit count under a save label. The tokens that record a real save (`shortlist_saved`/`shortlist_attached` → `anonymous_shortlist`) or watch (`watch_created`/`watch_claimed` → `saved_searches`) were emitted by the Map and read by NOTHING, and the SIGNED-IN save-search emitted nothing at all though **62 of 62** saved_searches in 30 days (34 distinct users) came through it — so WATCHING, the most-used keep action, measured 0. Step definition extracted to ONE module (it was declared in the route, hand-copied into the `savedUsers` counter 180 lines below, and mirrored a third time in the test — that mirror had drifted so far it no longer held the `saved` step). `saved` now counts real saves → a strict SUPERSET of `pursuit_started`, never a copy; new `watching` discovery step; signed-in path emits `watch_created{anonymous:false}` so the step reports a measured number, not a false 0. `/api/pipeline` + `createCanonicalPursuit` untouched. | `SAVE_TOKENS` → `src/lib/analytics/journey-steps.ts`; `watch_created',{anonymous:false` → `src/app/opportunity-map/route.ts`; `SAVED_STEP_TOKENS` → `src/app/api/admin/map-funnel/route.ts` | Prod read-only: `/api/admin/map-funnel` saved 58/108 == pursuit_started 58/108; token tally over 105,205 `user_engagement` rows shows all four save/watch tokens ABSENT; `saved_searches` 62 rows/30d, 0 anon. Guards proven inject→red→revert→green in `state-separation.unit.test.ts` (imports the REAL constant, not a mirror) + `anon-watch-path.unit.test.ts`. Cold `tsc --noEmit` clean; 1,053 tests pass. | IN REVIEW |
+
+## NAVSEA / Monarch / matrix completeness / Navy spend grain
+
+| 2026-09-20 | **Original-tool honesty (#8/#9/#11/#12).** Stop stamping filter NAICS/PSC into award `naicsCode`/`pscCode` (carry `queriedNaics`/`queriedPsc` + `_meta.field_status`; `popState` ≠ recipient HQ). Dossier `_meta.omitted` names capped competition firms + truncated doc text. SOW/docs surface PIEE external links + `retrieval_limitation` so "no SOW heading" ≠ unread attachment absent. `get_solicitation_documents` on-demand resolves noticedesc when the description column is empty/URL so sol# and UUID return the same body. | `queriedNaics` → `src/lib/usaspending/awards-search.ts`; `pieeRetrievalLimitation` → `src/lib/sam/notice-identity.ts`; `listed_attachments` → `src/lib/sam/solicitation-documents.ts`; `_meta.omitted` → `src/mcp/tools/pursuit-dossier.ts` | awards-search-map + notice-identity unit tests; live MCP retest of `build_pursuit_dossier` / `search_past_contracts` / `extract_statement_of_work` / `get_solicitation_documents` (sol# + UUID). | IN REVIEW |
+
+| 2026-09-20 | **Lot due-dates + withhold ungrounded incumbent + PIEE.** `deadline_conflict` was sibling-notice calendar only, so N00024-26-R-2200 (Lot 1 13 Aug 2026 vs Lot 2 / SAM 31 Aug 2026) stayed `false`. Now extracts lot due-dates from the synopsis. `incumbent` is null unless `groundIncumbent` is true — Mazak stays in `prior_awards` only. PIEE/WAWF is `_meta.piee` on SOW extraction even when no SOW heading exists. MCP market-depth lists cap at 15 firms. | `extractLotDeadlines` → `src/lib/sam/notice-identity.ts`; `namedIncumbent` → `src/lib/usaspending/incumbent-evidence.ts` | notice-identity + resolve-solicitation + incumbent-evidence unit tests. | IN REVIEW |
+
+| 2026-09-20 | **NAVSEA identity + Navy spend grain + DBA uniqueness + matrix source-spec coverage.** `get_agency_intel("Naval Sea Systems Command")` was `agency:null`. Directory-first resolve + PARENT_SERVICE grain: command spending stays NOT_ESTABLISHED; Navy $176.56B is labeled parent-service, never NAVSEA `total_obligated`. toptier_code 097 is DoD parent of the Navy subtier, not all of DoD. Set-aside share ≠ recipient small-business share ≠ 23% SBA goaling. `lookup_sam_entity("Monarch Yachts")` unique-picks an exact DBA stem among many Monarch* legal names. Matrix completeness is named source-spec coverage (LOA, flight deck, SCIF, berthing, magazine), not row count; Section 3.0 is windowed in when truncation would drop it. Past-contracts previously stamped filter NAICS (SUPERSEDED by honesty row above). | `resolveIdentitySpendingGrain` → `src/lib/gov-contacts/agency-identity.ts`; `auditSourceSpecCoverage` → `src/lib/proposal/matrix-source-coverage.ts`; `exact_dba_stem` → `src/lib/contractor/name-resolution.ts` | Grain + DBA + matrix coverage + OSBP USCG + awards-search-map unit tests. Live: Navy subtier FY2025 $176.56B vs DoD $491.77B; recipient SB $22.13B (12.5%). USCG OSBP original payload → Maria L. Kersey-Robinson / uscg-smallbusiness@uscg.mil. | IN REVIEW |
+
+## OSBP / federal-contact agency identity
+
+| 2026-09-20 | **OSBP promotion matches agency identity, not substring containment.** `STATE` inside `UNITED STATES COAST GUARD` prepended Gail Clark / `sdbupolicy@state.gov`. Shared matcher: unique identity or parent roster or not established. Parent queries do not first-win a child. Email domains flag, they do not override. Unknown report agencies are labeled `Generic fallback`, not an asserted directory OSBP. | `GENERIC_OSBP_FALLBACK_LABEL` → `src/lib/utils/command-info.ts` | 79 unit tests (identity, alias, provenance, roster, no-fabrication). Collision audit is a tested-query-set before/after, not a production population. Stop before merge. | IN REVIEW |
+
+## Contractor name resolution
+
+| 2026-09-16 | **Company name now resolves to the UEI history path; a multi-match is not "not found".** `get_contractor_award_history` company path was null for every name form because it never called the warehouse UEI loader. A unique slug (same suffix sweep as profile) or a unique award-index hit now loads by UEI and is not guessed from the largest substring. Several hits return `resolution: ambiguous` and candidates. Zero rows in the award index is `none_in_award_corpus`, distinct from `lookup_failed`. The existence flag still runs on a miss, including a no-comma variant. Profile and history dollars are not the same field: measured 2026-09-16, UEI UM53UXL5QNF5, same 54 awards, child_count 1 — recipients_rollup $259,934,761.21 as-of 2026-08-28 vs recipients $261,903,825.70 as-of 2026-09-09. | `award_corpus_name_to_uei` → `src/mcp/tools/contractor-award-history.ts` | name-resolution.unit.test.ts refuses to pick the first of 13. Live BQ: "Tanaq Support Services" and the no-comma form → UM53UXL5QNF5; "Tanaq" ambiguous 13, not picked; "Tanaq Global Solutions LLC" and a garbage control → none. | IN REVIEW |
+
+## Forecast agency identity
+
+| 2026-09-14 | **FCO roster watch is now OPERATIONAL — the monitoring path is finished.** The census/watch logic shipped earlier was never scheduled: no cron route, no `cron_jobs` row, so the blind spot that let Department of State join unnoticed for 3.5 weeks was still open. Added `/api/cron/fco-roster-watch` following the EXISTING manual-source pattern (same `sendOpsAlert` + `shouldSendAlert`/`ops_alert_state` stack as Navy — no bespoke Slack logic). Writes ONLY `data_source_instances` machine fields; a test asserts no insert/upsert/delete anywhere and that the single `.update()` targets the control-plane row. Clocks: `last_poll` every attempt · `last_successful_check` only on a COMPLETE enumeration · `last_source_advance` = upstream MAX(changed) · `last_verified_ingest`/`last_data_advance` never touched by a watch · `held_population` the verified canonical count, never aspirational · behind-upstream records `content_stale`, never `current`. `?dry=1` is proven zero-write (clocks, alert send AND dedup state all gated). ⚠️ Also fixed a cron-killer: the sequential census took ~7min against a 300s ceiling — parallelised to pool 6 (measured 214.5s, 372 pages, 0 failures) plus a 240s SOFT BUDGET so an over-run reports INCOMPLETE and alerts rather than being silently killed. | `runFcoWatch` → `src/lib/forecasts/fco-watch-run.ts` | 13 runner tests + 21 census/watch tests. Live: census complete=true, 9,225 rows / 9,216 ids / 9 departments / MAX(changed) observed, 0 failed pages, 214.5s. | IN REVIEW |
+
+| 2026-09-14 | **Forecast bureau provenance — a blanked source must not erase source truth.** FCO REMOVED organisational attribution from rows that still exist upstream: Fish & Wildlife 710, Forest Service 639, PBS 28, NPS 14 — all still present, all with `Funding Organization` now blank; FAS renamed. A canonical refresh writing the current NULL over held values would destroy evidence that cannot be re-acquired. `bureau_provenance` ('current' \| 'last_known' \| NULL, CHECK-constrained) + `bureau_observed_at` make the distinction explicit ON the canonical row, so Maps/MCP/API/alerts keep reading ONE table and never join the retired duplicate `api` rows. Current source always wins (FAS takes the new spelling; NPS is not frozen at 14). `bureau_observed_at` is a SOURCE observation time only — the duplicate rows carry no raw_data and only a Mindy write stamp, so carry-forward leaves it NULL rather than fabricating one. Migration is additive/nullable with NO data rewrite. ⚠️ 79 rows of attribution remain trapped in duplicate rows with no current upstream counterpart — untouched, pending a separate archival design. | `resolveBureau` → `src/lib/forecasts/bureau-provenance.ts` | 16 unit tests (current-wins, blank preserves last_known, department-name is not attribution, no now() fallback, ledger records, no duplicate-path query, migration shape). Live: columns + CHECK verified on the DB; constraint rejects a bogus value (23514) and accepts all three states; 35,751 rows, 0 rewritten. | IN REVIEW |
+
+| 2026-09-14 | **FCO census read `listing.total` as a number; the source sends a STRING.** `typeof payload.listing.total === 'number'` never matched, so `reportedTotal` stayed 0 and EVERY census declared itself incomplete — the check built to detect the source growing could not read the source's own size. Coerced with `Number()` + finite/positive guard. Found by running the new export validator end-to-end rather than trusting the module. | `Number(payload.listing.total)` → `src/lib/forecasts/fco-census.ts` | fco-roster-watch.unit.test.ts asserts the typeof-number guard is gone. Live: census now returns 9,225 rows / 9,216 unique ids / 9 departments / MAX(changed). | IN REVIEW |
+| 2026-09-14 | **`verify:gateway-exports` — prove a manual FCO export packet is COMPLETE before anyone ingests it.** The supported export is capped (~2,942 of 9,225) and returns a most-recently-changed window, so one unfiltered download is not the source. Read-only: per-file manifest (sha256, rows, unique/dup ids, department + FY distribution, bureau/office/POC/URL/NAICS coverage, parser rejects), cross-file overlap detection, and an id-level reconciliation against a live API census that EXITS NON-ZERO unless every department is complete. Proven on the real export: State 396/396 COMPLETE, every other department INCOMPLETE → ingest blocked. | `verify-gateway-exports` → `scripts/verify-gateway-exports.ts` | Run against the live 2,942-row export: manifest correct, overlap 0, reconciliation blocks with exit 1. | IN REVIEW |
+
+| 2026-09-14 | **GSA Gateway export renamed its columns and our parser silently dropped them.** `gwFieldFor` matched `Agency`/`Organization` with `===`; the live export now ships `Funding Department / Ind. Agency`, `Funding Organization` and a new `Funding Office` — so DEPARTMENT, BUREAU, OFFICE and `ChangedDate` returned null and were dropped on every ingest, with no error. That is why held canonical `bureau` holds a CONSTANT (the department's own name) and why the FAS/PBS/FWS/NPS/Forest-Service child identities can only anchor on the RETIRED duplicate `api` rows — they would return 0 the moment those duplicates are pruned. Both spellings now map, `Funding Office`/`Solicitation Link`/`ChangedDate` are captured, and `assertGatewayHeaders()` fails LOUDLY when a critical column drifts again. | `assertGatewayHeaders` → `src/lib/forecasts/gateway-forecast.ts` | gateway-header-drift.unit.test.ts — maps the real 47-column live export; simulated re-rename fails the guard. | IN REVIEW |
+| 2026-09-14 | **FCO roster watch — a new department can no longer join the source silently.** Department of State joined FCO on 2026-08-19/20 (396 rows in two days) and nothing noticed for 3.5 weeks: the only enumerator (`import-forecasts-live.js`, the retired duplicate API writer) stops at page 320 × 25 = 8,000 rows against 9,225 upstream, so it could not see the tail even in principle. New read-only `fco-census.ts` enumerates by exhaustion + the source's own reported total, treats a failed page as INCOMPLETE rather than empty, and de-dupes on `nid` (the API keys rows by page position 0..24 — keying on that collapses the corpus to 25 rows). `fco-roster-watch.ts` derives events + clocks purely, with `last_successful_check` withheld on any partial census and a standing `held_behind_upstream` warning so a green run never implies current data. Air Force / Space Force / DoD appearance is a dedicated P0 event. Neither module can write `agency_forecasts`. | `evaluateFcoWatch` → `src/lib/forecasts/fco-roster-watch.ts` | fco-roster-watch.unit.test.ts — 19 tests incl. State-recurrence, DoD P0, partial-census-never-claims-disappearance, clock withholding, dedup, and a source-text proof that neither module can mutate. | IN REVIEW |
+
+| 2026-09-14 | **Subagency (child) forecast identity — 15 children anchored on STRUCTURED source evidence.** `NAVFAC`/`NAVAIR`/`NAVSEA` each returned ALL 8,881 Navy rows (21,961 false-positive row-returns) because the alias fell through to the Navy parent; `USCG`/`CBP`/`FEMA`/`TSA`/`USSS`/`CMS`/`NIH`/`FWS`/`NPS`/`Forest Service`/`FAS`/`PBS` returned 0 (3,004 owned rows unreachable). An alias now resolves an IDENTITY; a structured ANCHOR selects the rows — `bureau` component path (DHS APFS "USCG/CG-SHORE"), exact `bureau` value (HHS/DOI/USDA/GSA), or an exact DoDAAC set resolved through `dodaac_directory` (Navy). Child is always scoped `source_agency.eq.<parent>` first, so it can never inherit the parent. Emitted as `and(...)` nested inside the existing single `.or()`, so all four surfaces' call sites are unchanged. NPS ships its THIN true set (14 rows, not the 221 a keyword pass claimed by matching the word "park"); NAVFAC ships 2,278 — Phase-5 check found directory maps Northwest to `N44255` (0 forecast rows) while `N44225` has 119 rows but is absent from the directory, so `N44225` is EXCLUDED (not tuned to the old 2,402). NAVSUP deliberately NOT shipped (largest office is free text; also removed from Navy aliases so it no longer dumps the parent corpus). | `FORECAST_CHILD_IDENTITIES` → `src/lib/forecasts/agency-identity.ts` | Child + department + parity unit tests. Live: `npm run verify:forecast-agency` — all 15 children equal their audited count AND are a strict subset of their parent; pairwise sibling overlap 0 across NAVY/DHS/HHS/DOI/GSA. | IN REVIEW |
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-14 | **Forecast agency identity — ONE resolver across Maps, MCP and saved-search alerts.** Forecast agency matching was raw substring ILIKE, implemented FOUR times. It failed both ways at once: 9 of 16 map Agency presets returned ZERO forecasts (DoD 11,789 rows, HHS 5,504, DHS 1,644, DOE 1,301, DOJ 619, NASA 189, EPA 50 — only 7,672 of 35,751 rows, 21.5%, reachable by agency), while `agency=EPA` returned 7,246 rows against a real corpus of 50 because "d-EPA-rtment" contains "EPA", and `agency=SEC` returned 170 "Social SECurity" rows. `source_agency` is a CLOSED 20-value vocabulary, 100% populated, so identity now resolves to exact `source_agency.in.(…)`; unresolved long-tail needles fall back to a word-boundary `\m…\M` regex, never a substring. Rollup is parent→child ONLY (DoD → Navy/ONR/NRL/USACE; Army → USACE, explicitly PARTIAL); a child never inherits its parent's department rows. Agency-reachable corpus 21.5% → **100%**. | `forecastAgencyOrExpr` → `src/lib/forecasts/agency-identity.ts` | 53 unit tests (agency-identity.unit.test.ts) + 14 parity/no-drift tests (forecast-agency-filter.unit.test.ts, proven by injecting the old ilike → fails, reverting → passes). Live: `npm run verify:forecast-agency` — all 30 identities resolver==truth, DOD==NAVY+USACE exactly, 35,751/35,751 reachable. | IN REVIEW |
+
 ## Beginner translation
 
 | 2026-09-13 | **/try falls back to BQ task orders when nothing is open.** SAM Award Notices are only awards posted to SAM. Real task/delivery orders live in BigQuery `usaspending.awards` (`parent_piid` set). When open SAM is empty, search that warehouse (FY ≥ current-1, 3 GiB cap, 7d cache) in parallel with SAM Award Notices; merge BQ first. Not the USASpending HTTP API. Skip BQ when any open listing matches. | `searchBqTaskOrders` → `src/lib/beginner/task-orders-bq.ts` | task-orders-bq.unit.test.ts (mapper). hidden-market.unit.test.ts (BQ-only fill; BQ-then-SAM merge; HVAC open hit skips BQ). Live POST `/api/beginner/search` "I do window washing" includes a usaspending.gov/award task-order card. | IN REVIEW |
@@ -40,10 +138,22 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 | 2026-09-08 | **Instant-aha beginner landing.** `/try` takes one plain-English description, calls Fix #1 `searchBeginnerOpportunities`, and shows a grounded market reveal plus 3–5 beginner cards and a signup CTA. No NAICS/PSC/dollar invention: coverage dollars are omitted (1 FY ≠ the canonical 3-FY market); failed search is unavailable, not zero. Public JSON strips `raw` and codes. | `LANDING_CARD_LIMIT = 5` → `src/lib/beginner/landing.ts` | landing.unit.test.ts (reveal, empty≠0, unavailable, follow-up, card cap, no $ / NAICS in public view). Page `/try`. | IN REVIEW |
 | 2026-09-08 | **Plain-English translation seam for beginners.** `searchBeginnerOpportunities("I clean office buildings")` resolves through existing `derive_company_keywords` + `get_keyword_coverage` + `search_sam_opportunities` into a beginner card (notice / set-aside / due / next step / SAM link) with NAICS/PSC/raw codes hidden. Diffuse coverage (`naicsCount >= 400`) is not treated as a market — "clean office buildings" had been grounding Offices of Physicians. A description never claims "you qualify." Empty search, failed query, and upstream outage are three different messages. | `DIFFUSE_COVERAGE_NAICS = 400` → `src/lib/beginner/resolve-business.ts` | 29 unit tests (set-aside, notice, dates, zero-vs-missing amount, PSC omit, eligibility, diffuse skip). Live: cleaning → NAICS 561720; lawn care RFQ W912LR26QA045 SAM URL; 12 beginner cards with https sam.gov links. | IN REVIEW |
 
+## Data Core — source reliability (Phase II)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-13 | Manual sources | **A manual source must not rot in silence, and acknowledging is not fixing.** Source state (moved only by new DATA) and intervention state (moved only by HUMAN action) are separate fields — collapsed into one status, a source either "looks handled" (hiding stale data) or "looks broken" (nagging someone already working). `resolveIntervention` refuses to clear without evidence the held edition advanced, so closing a ticket cannot disarm the alarm on a still-stale source. | `resolveIntervention` → `src/lib/data-core/manual-source-ops.ts` | manual-source-ops.unit.test.ts (20 tests). Inject → red (test 6) → revert → green. Live: ack leaves Navy `content_stale`. | IN REVIEW |
+| 2026-09-13 | Navy LRAE | **A matching revision is NOT a current source.** Navy publishes revision 02.2026 and Mindy holds 02.2026 — identical strings — while upstream carries 9,922 rows against 8,821 held. Revision-only comparison reported the source healthy forever. Population is now part of the state; a half-measured pair yields `unmeasured`, never `current`. | `deriveNavySourceState` → `src/lib/forecasts/navy-watch.ts` | navy-watch.unit.test.ts (6); manual-source-ops.unit.test.ts tests 16-20. Live watch vs secnav.navy.mil → `content_stale`, 9922 vs 8821. | IN REVIEW |
+| 2026-09-13 | Forecast registry | **`data_sources.record_count` was a hand-typed 7,764 while the corpus held 33,687** (4.3× understated) and its notes named the abandoned `forecast_sources` as health authority. Fixed at the READER with an exact head count — replacing it with a fresher hand-typed number rots identically. Stored value kept as advisory. | `measureDatasetPopulation` → `src/lib/data-sources/measured-population.ts` | Live: `agency_forecasts` = 33,687 vs stored 7,764. Unknown returns null, never 0. | IN REVIEW |
+
 ## Opportunity Map
 
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
+| 2026-09-14 | Opportunity Map | **Maps regression reporting: 401 is a fail, SHA must match the intended release.** Missing HMAC secrets report NOT TESTED. A configured authenticated /api/app/me that returns 401 fails. `--live` inspects the currently serving host; `--expect-sha` waits for Ready and requires `maps-account-build` to match. Source greps do not OAuth-login or paint the avatar. | `hmacMeStatus` → `scripts/verify-maps-account.mjs` | `node scripts/verify-maps-account.mjs --self-test`. 401 with a secret is fail; no secret is not_tested. `--live --expect-sha deadbeef` fails against a host that is not that SHA. | IN REVIEW |
+| 2026-09-14 | Opportunity Map | **Required regression check for Maps account chrome and Players.** HMAC sessions and OAuth logins must still show the account (photo or initials, never a question mark) on the homepage and opportunity map; Markets Players must still display Players. Source is the merge gate; live curls getmindy.ai. | `verify:maps-account` → `package.json` | `npm run verify:maps-account` (source). `npm run verify:maps-account -- --live` against getmindy.ai. Inject removing `b64json(parts[0])` exits 1; restore exits 0. CI decision-chain verify job. | IN REVIEW |
+| 2026-09-14 | Opportunity Map | **Markets to Players left the dataset dropdown blank.** Sibling chrome linked `?mode=buyers`. `#fltDataset` only has companies (labeled Players), so `setMapMode('buyers')` wrote an absent option and the pill rendered empty. Canonicalize buyers to companies at the gate and in setMapMode; sibling hrefs now emit companies. Old bookmarks still work. | `if(mode==='buyers')mode='companies'` → `src/app/opportunity-map/route.ts` | network-drawer-dispatch.unit.test.ts (remap before dsel.value). players-gate-simulated-auth.unit.test.ts (live token gate('buyers') calls setMapMode('companies')). map-rail-inventory.unit.test.ts (sibling hrefs). | IN REVIEW |
+| 2026-09-14 | **Signed-in Maps / Today header painted a purple "?" instead of the account photo or initial.** MI sessions are HMAC payload.sig (email in split(".")[0]). The shared account-menu treated them as JWTs and read [1] (the signature), so tokEmail() was empty, /api/app/me?email= 401'd ("Email required"), and initials("","") returned "?". Identity was not lost — the decoder was looking in the wrong slot. Repair: HMAC-then-JWT decode, /api/app/me reads requireMIAuthSession from the existing x-mi-auth-token header (no new auth flow), picture from user_metadata then identities identity_data, photo 404 falls back to initials, never "?". | `b64json(parts[0])` → `src/app/opportunity-map/account-menu.ts` | account-avatar.unit.test.ts (HMAC decode, identities picture, never "?"). account-menu-avatar.unit.test.ts (onerror → paintInitial). me/route.unit.test.ts (header, no ?email=). | IN REVIEW |
 | 2026-09-09 | **saved-search-alerts cron failed 10 consecutive days** (profile_query_failed=6, email_send_rejected=12-30), paging the dispatcher watchdog. Two independent bugs, both measured: (1) scope=profile selected user_profiles.location_states, a column that does not exist (PostgREST 42703) — all 6 profile-scoped watches failed every run. Gold master is opportunity-map loadProfile, which reads user_notification_settings by user_email. (2) saved_search_alert was subject to the 3/day cap; daily_alert (cap-exempt, still counted) fires in the same 11:00 UTC window and filled it first — 13/34 owners already at cap before this cron, 0 suppressions. Also: a rejected send still stamped last_seen_notice_ids, so blocked matches were never retried. | `'saved_search_alert'` → `src/lib/send-email.ts` | unit: cap-exempt includes saved_search_alert; cron reads user_notification_settings not user_profiles; last_seen stamp is after email_send_rejected return. Live: 6 profile-scoped rows all have NAICS on user_notification_settings; user_profiles.location_states 42703. | IN REVIEW |
 | 2026-09-07 | **Shared `?recompete=` URLs restored the award drawer but left the rail on the mixed 128k Opportunities universe.** `setMapMode('recompete')` did not turn off Open/Forecast; `fetchView()` still merged `window.__horizons` default `{open,recompete,forecast:true}` and requested opportunity-map + forecast-map. Measured: rail "Opportunities — 128,093" with Chalk Rock Link Trail (OPEN NOW) on the Charlie share. Fix: `__isolateHorizon` (the live toggleHorizon loop a human uses) + init-time `{open:false,recompete:true,forecast:false}` before first fetchView. Drawer path unchanged. | `__isolateHorizon('recompete')` → `src/app/opportunity-map/route.ts` | unit: boot isolates Open/Forecast off; generic handler still does not grab recompete; Share still emits ?recompete=. Live: share landing rail is Awarded-only (no open-opp card). | IN REVIEW |
 | 2026-09-07 | **Shared recompete map URLs failed to restore the award.** A generic SHARED-LINK opener collapsed the typed recompete param into openOppDrawer(id, force=true), which fetched opportunity-detail (SAM/DIBBS only) for a USASpending contract id and 404'd with Couldn't load this opportunity. The dedicated handler then treated drawer .show as success and stopped. openRecompeteDrawer only scanned in-memory pins (bbox-capped at 1,000), so a VA Decatur award outside the default viewport never loaded and the rail stayed on 128k open Opportunities. Fix: typed boot handlers (one owner per param); GET /api/app/recompete-row by contract_id then piid; fetch fallback injects a shared toPin() row; success is __recompeteOpenedId, not .show. URL format unchanged. | `recompete-row?id=` → `src/app/api/app/recompete-row/route.ts` | unit: generic handler no longer grabs recompete; by-id 200/404/400/500; Charlie fixture id extracted; Share still emits the recompete param. Live: curl by-id for CONT_AWD_36C24721F0485_3600_GS07F0168T_4730 returns a non-empty pin. | LIVE-PENDING |
@@ -651,3 +761,295 @@ Proof: tsc clean; 18 lib tests (3 new + 15 existing); `verify-m88-psc.mjs` corre
 | 2026-08-24 | **Certification dates PARSED AND PERSISTED — expired certs are now distinguishable from current ones, with `unknown` kept as a real third state.** Same pattern as naicsException: persist faithfully, reinterpret nothing in the same change. ⚠️ **ERIC'S CAUTION WAS RIGHT — date-bearing behaviour DIFFERS BY PROGRAM, measured not assumed:** A6 8(a) **ALWAYS** dated (1,509/1,521, range 1997-12-15..2034-08-14) · JT 8(a)-JV **ALWAYS** (231/231) · XX HUBZone **MIXED, only 11% dated — 1,234 of 1,390 carry NO date** · A9/A0 carry dates but are NOT documented SBA-certified programs, so mapping them would invent a certification the source never asserted (deliberately ignored). So an undated HUBZone is the COMMON case, and `unknown` must never be upgraded to `current`. **Stored per Eric's shape:** `certification_type`, `certification_expires_on`, `certification_status` (current|expired|unknown), `source_code`. `hasCurrentCertification()` returns false for BOTH expired and unknown — an unknown currency is not evidence of currency — while `certificationLabels()` preserves the has/had answer. `certifications[]` is UNCHANGED as the compatibility field. **ACCEPTANCE ON THE TWO SHARP REAL CASES, end-to-end over 250K lines:** KILIUDA CONSULTING (8(a), expires 2023-01-11) and ALASKA PROFESSIONAL CONSTRUCTION (HUBZone, expires 2024-03-19) both come back `labels=["8(a)"]/["HUBZone"]` with **currentlyValid=false** — historically identifiable, not counted as current. At scale: 1,382 current / 512 expired / 1,246 unknown. ⚠️ **RECOVERED A STRANDED MIGRATION.** `db:check` showed `purpose_of_registration` did NOT exist. Traced it: the SQL was committed to `feat/sam-purpose-of-registration` but **no PR was ever opened for that branch**, so it never reached main — and my later branches, cut from main, did not carry it. My earlier claim that it was merely awaiting the clipboard command was half the story. Recovered onto this branch; both migrations are now pending together. ❌ NOT APPLIED — `migrate --go` is blocked by the sandbox, not by approval. | `hasCurrentCertification` → `src/lib/sam/certification-dates.ts` | tsc 0; FULL production build green; suite **346 files / 3220 tests** (12 new). Both migrations additive (`ADD COLUMN IF NOT EXISTS` + partial/GIN index); `certifications[]` untouched; nothing wired into eligibility. | LIVE-PENDING |
 | 2026-08-24 | **Orphaned-branch guard — "a push is not a landing".** Eric's rule after the failure recurred: *work is not complete because it is committed or pushed; it is complete only when its commit is reachable from origin/main, or an open PR explicitly owns it.* The cost was real — the `purpose_of_registration` migration was written, committed, pushed and reported as done, but **no PR was ever opened**, so it never reached main, every later branch cut from main silently lacked it, and `db:check` found the column did not exist. New `scripts/check-orphaned-branch.mjs` returns MERGED / IN REVIEW / **ORPHANED (exit 1)** and prints the SIZE of the stranded work (commits + files), because a bare label invites ignoring it. ⚠️ **THE TRAP THAT MADE v1 USELESS, caught by disbelieving my own output:** the naive `merge-base --is-ancestor` check reported **490 of 537 local branches as ORPHANED — including `feat/sam-cert-date-preservation`, merged minutes earlier as PR #1328**. Cause: a SQUASH merge REWRITES the commit (branch HEAD `d2d67c32` landed on main as `ededa644`), so the SHA is genuinely not an ancestor while the CONTENT is merged. `scripts/tidy-branches.mjs` already documents this same hazard. A guard with that false-positive rate would be disabled on first run, so it now also accepts a MERGED PR as authoritative evidence. **After the fix it isolates the real case:** re-checking this session's branches, `chore/apex-verification` #1316, `chore/final-journeys` #1314, `feat/sam-jv-structure` #1324 and `feat/sam-cert-dates` #1326 all correctly read MERGED, and the ONLY genuine orphan is **`feat/sam-purpose-of-registration`** — precisely the branch that stranded the migration. | `mergedPrFor` → `scripts/check-orphaned-branch.mjs` | tsc 0; FULL production build green; suite **347 files / 3227 tests** (7 new). Verified against real branches in both directions: a squash-merged branch reads MERGED, and the genuinely-unmerged one reads ORPHANED with its commit/file count. | LIVE-PENDING |
 | 2026-08-25 | **8(a) current-eligibility wired — 1,444 firms (26.2%) with LAPSED 8(a) no longer count as currently eligible, and NO Rule-of-Two determination flips.** `certifications[]` records that a program was ASSERTED; it does not prove the certification is CURRENTLY VALID. Measured: of 5,957 firms the set-aside filter returned as 8(a), **1,542 hold an EXPIRED 8(a)**, and 1,541 of those have an ACTIVE SAM registration so nothing else flags them (KILIUDA CONSULTING: Active, `["8(a)"]`, expired 2023-01-11). Recommending a lapsed firm for a set-aside is a compliance error, not a ranking nuisance. **Both filter sites in `market-research.ts` now require `certification_records` status=current for 8(a)** — the pool query AND the count query, using the identical predicate, because if they disagree `eligible_population` describes a different population than the firms returned (the exact defect class P0-3 already fixed once here; a test asserts the predicate appears exactly twice). ⚠️ **8(a) ONLY, and that restraint is the point.** Date coverage differs by program, measured not assumed: 8(a) tokens (`A6`/`JT`) are dated **1,740 of 1,752**, so requiring currency genuinely improves truth. **HUBZone is the opposite — only 408 of 4,843 carry a date and 4,198 are UNKNOWN**, so the same rule would drop **90%** of the population and convert *we don't know* into *not eligible*. WOSB/SDVOSB/VOSB are SELF-identified and carry no SBA expiry at all. All three paths are deliberately untouched, with a test asserting no other program reaches the current-cert branch. **LIVE EFFECT, measured against the backfilled mirror:** 8(a) pool 5,510 → 4,066 (Active, not excluded) = **1,444 removed (26.2%)**, matching the 26% predicted from source. **30 real NAICS+state pools checked across 541330/541512/541611/561720/236220/541519 × VA/MD/CA/TX/FL — ZERO Rule-of-Two determinations flip**, so this removes false eligibility without collapsing any set-aside decision. KILIUDA verified: **0** in the current-only filter, still **1** in `certifications[]` — excluded from current, historically identifiable. | `currentCertFilter` → `src/lib/gov-buyer/market-research.ts` | tsc 0; FULL production build green; suite **353 files / 3280 tests** (6 new). `certifications[]` never written or narrowed. | LIVE-PENDING |
+| 2026-09-14 | **SSA dedupe read was un-ranged — it silently caps at 1,000 and would re-import duplicates.** `import-ssa-forecasts.js` read the existing `external_id` set with a bare `.select('external_id').eq('source_agency','SSA')` and no bound error. That set IS the dedupe key: past 1,000 rows PostgREST truncates it, existing rows look ABSENT, and the importer re-inserts them. SSA is already at 170 physical rows and grows every edition, so this was a live fuse, not a hypothetical. Now counts exact, pages with `.range()`, binds every error, and asserts the read is complete — a failed read throws instead of reading as "no existing rows". Same session also fixed the raw_data serialization defect (`JSON.stringify(row)` into a jsonb column -> ~258 single-character keys on all 60 rows). | `existingCount` -> `scripts/import-ssa-forecasts.js` | audit-unranged-selects green (283 scripts, 0 NEW); 13 SSA tests; tsc 0. |
+
+## 2026-09-15 — Decision Makers becomes a measured source (`decision_makers_sam_contacts`)
+
+**Defect.** The canonical producer for `federal_contacts` had no schedule (0 of 99 `cron_jobs`
+rows, no `vercel.json` entry) and ran only from an **unawaited `fetch()`** inside
+`sync-sam-opportunities`. Its sweep reset `offset` to 0 every run, giving an ~11-day rolling
+window over 207,986 notices: 9,904 rows touched in 24h from 7,248 notices, while **125,515 rows
+(50.8%) had not been touched in 90+ days**. No control-plane row, no clocks.
+
+**Proof anchors** (re-grep these; a revert breaks them):
+- `src/lib/gov-contacts/buyer-contact-source.ts` — `export const DM_SOURCE_KEY`
+- `src/lib/gov-contacts/buyer-contact-run.ts` — `.order('created_at', { ascending: true })`
+- `src/lib/gov-contacts/buyer-contact-run.ts` — `if (advanced) clocks.last_data_advance`
+- `src/app/api/cron/sync-sam-opportunities/route.ts` — `sync-gov-buyer-data?pull=entities`
+- `src/app/api/cron/check-data-freshness/route.ts` — `sendOpsAlert(`
+
+**Why `created_at` and not `posted_date`:** 34,906 notices (16.8%) are created >2 days after
+their posted_date (worst 30 days), so a posted_date cursor would silently skip every backdated
+arrival. Measured 2026-09-14.
+
+**Measured on a dry run against production:** refresh lane 1,000 notices → 1,096 contacts,
+**0 mutations** (recent window already current); backfill lane 1,500 oldest notices → 686
+inserts + 528 updates. Every update was the SAME field — `sub_tier`, held NULL — which is
+**100% NULL on all 30,439 frozen `sam_opportunities_pointOfContact` rows** and 12.3% of the
+live bucket. `sub_tier` is a live search key in `/api/app/federal-contacts`, so those rows were
+unreachable by bureau name.
+
+---
+
+## 2026-09-15 — Sponsored credit allowance: the month-key blocked the entitlement it granted
+
+**Defect.** Recurring comp credits could only be expressed as a hardcoded email list in the
+grant cron, which records WHO but not why, who pays, or when it ends — a lapsed arrangement
+grants forever. Building the entitlement exposed a second, sharper defect: the grant guard
+claimed one key per account per MONTH (`pro:<email>:<YYYY-MM>`). That stops a duplicate, but
+it also stops a legitimate INCREASE. Measured against live Postgres before any fix:
+
+- paid 1,500 granted on the 3rd → sponsorship (8,000) resolves later that month → key already
+  claimed → account sits at **1,500, short 6,500, for the rest of the month**
+- mid-month upgrade 1,500 → 8,000 → **granted 0**, same cause
+
+"No stacking" means never 1,500 AND 8,000 (9,500). It does NOT mean capped at whatever landed
+first. The guard now claims a **(month, ceiling) pair**: a higher ceiling is a new claim for
+the DIFFERENCE, a repeat at the same ceiling is a no-op, a lower ceiling never grants.
+
+**The atomicity trap.** `applyCreditOnce` is idempotent on its KEY, not on the balance the
+amount was computed from. Reading the balance in app code and passing a constant is a
+read-then-write race — the key blocks a duplicate while the AMOUNT is still derived from a
+stale value. `mcp_topup_to_ceiling` therefore computes `max(0, ceiling - balance)` inside the
+same `FOR UPDATE`-locked statement that writes it.
+
+**The eligible increase is measured against what the month ALREADY GRANTED, not the live
+balance.** Using the balance would let spending re-open the grant, turning a monthly allowance
+into a daily refill — the daily cron is a self-heal for missed processing, not a replenisher.
+
+**Proof anchors** (re-grep these; a revert breaks them):
+- `supabase/migrations/20260915_sponsor_entitlement_ceiling.sql` — `v_claim_key := p_key || ':c' || p_ceiling::TEXT`
+- `supabase/migrations/20260915_sponsor_entitlement_ceiling.sql` — `FOR UPDATE`
+- `supabase/migrations/20260915_sponsor_entitlements.sql` — `CREATE OR REPLACE VIEW sponsor_active_entitlements`
+- `src/lib/mcp/sponsor-entitlements.ts` — `export async function topUpToCeiling`
+- `src/lib/mcp/credit-health.ts` — `export const LOW_BALANCE_THRESHOLD`
+- `src/app/api/cron/grant-mcp-pro-credits/route.ts` — `mode === 'topup'`
+
+**Measured live (10/10 grant cases, 12/12 detection cases):** 20 concurrent grants on one key →
+1 applied, 1 ledger row, balance 8,000 (not 160,000) · paid-then-sponsored → 8,000 not 9,500 ·
+upgrade grants exactly 6,500 · spend-down to 200 → 0 (no refill) · lower ceiling → 0 ·
+**25,000 balance vs 8,000 ceiling → 0 granted, 25,000 preserved** · expiry inactive after
+2027-03-15.
+
+**Detection found a real event while being tested:** 38 `rejected_no_credits` rows in 24h for
+`rochbuf@gmail.com` — the account had been hard-blocked for four days generating 59 rejections
+that nobody saw. The rows always existed; the WATCH did not. Alert SENDING is gated
+`MCP_CREDIT_ALERTS` (default off, unset in prod); detection and reporting always run, because
+"notifications off" must not silently become "detection off".
+
+---
+
+## 2026-09-15 — Funnel tracking outage: a rename applied ahead of its code
+
+**Defect (self-inflicted).** `20260915_paywall_funnel_stages.sql` renamed
+`checkout_started_at` → `offer_page_opened_at` in the PRODUCTION database at **09:47:24 UTC**
+while the deployed build still wrote the OLD name. The write failed; the call site swallowed
+it in a bare try/catch; `/api/mcp/continue` still returned HTTP 200 with correct data. So
+funnel stamps vanished with **no error on any surface**.
+
+**Tracking-incomplete window: 2026-09-15 09:47:24 → 09:58:10 UTC (~10m46s).** Any offer-page
+open in that window was NOT recorded and is **unrecoverable** — the event was never written
+anywhere. It is recorded here as incomplete rather than reconstructed; inventing the missing
+rows would be fabrication (0 attempts were created in the window, but an open against an
+older attempt would have been lost).
+
+**Why the code fix was insufficient.** A source-level re-export (`markCheckoutStarted` →
+alias) only helps a build that has been DEPLOYED. The bundle running in production cannot be
+changed by editing source, so the transition had to be supported by the DATABASE. Restoring
+the column + a BEFORE INSERT OR UPDATE trigger that mirrors the two names means an old writer
+and a new writer both land the same event. Eric caught this; my first repair would have left
+production broken until the next deploy.
+
+**Verified live, from the database and not from the route's response:** opened a real offer
+page on prod against the OLD deployed build → `offer_page_opened_at` and `checkout_started_at`
+both `2026-09-15T09:58:22.61Z`, `updated_at` moved. Before the repair the same call left both
+NULL.
+
+**Proof anchors** (re-grep these; a revert breaks them):
+- `supabase/migrations/20260915_paywall_dual_write_compat.sql` — `mcp_paywall_mirror_offer_open`
+- `supabase/migrations/20260915_paywall_dual_write_compat.sql` — `BEFORE INSERT OR UPDATE ON mcp_paywall_attempts`
+- `src/lib/mcp/paywall.ts` — `SCHEMA/CODE SKEW FALLBACK`
+
+**The rule this earns:** a migration that renames or drops a column must ship a transition
+that supports BOTH writers, and it must land before or with the code — never ahead of it.
+A bare try/catch around a write turns that skew window into silent data loss. The legacy
+column is deliberately NOT dropped here; removing it before the new build is live everywhere
+would recreate the outage.
+
+## 2026-09-15 — Decision Makers placeholder names: ONE name-quality contract
+
+**Defect.** `PLACEHOLDER_NAME_RE` matched only `telephone|phone|fax|tel`, so customers saw
+`ELECTRONIC MAIL: AUSTIN.SHATTO@DLA.MIL` (873 rows), `Facsimile: 0000000000` (26) and bare role
+labels like `CONTRACTING OFFICER` (382) rendered as a buyer's NAME. Separately, 28,010 rows
+(13.6%) displayed a phone glued to the name (`Stephen Weaver6142923131`).
+
+**The real defect was architectural:** the same decision existed in SIX divergent places —
+contact-quality's regex, four hand-copied PostgREST prefix lists, and an inline copy in
+`events/query.ts` — plus a private name cleaner in `market-report.ts` that no other surface had,
+and `relationships/route.ts` with no guard at all. MCP showed a cleaned name, Maps showed raw
+pollution, the CRM directory emitted the placeholder verbatim.
+
+**Proof anchors** (re-grep; a revert breaks them):
+- `src/lib/gov-contacts/contact-quality.ts` — `export function displayContactName`
+- `src/lib/gov-contacts/contact-quality.ts` — `export function placeholderNameFilter`
+- `src/lib/gov-contacts/contact-quality.ts` — `function stripAddress`
+- `src/lib/gov-contacts/buyer-detail.ts` — `.eq('contact_fullname', nameRaw)`
+- `src/lib/gov-contacts/contact-name-parity.unit.test.ts` — the six-copy regression gate
+
+**Measured on the live corpus (205,354 government rows), before → after:**
+displayed 201,433 → 199,797 · newly suppressed 1,636 (873 ELECTRONIC_MAIL + 382 role label +
+355 cleaned-to-nothing + 26 facsimile) · newly cleaned 28,010 · rejected by both 3,921 ·
+residual suspicious 743 (office/unit designators — deliberately NOT suppressed).
+
+**Two bugs in the fix itself were caught by running it over production data, not by tests:**
+an unconditional trailing-punct trim turned `HYONTONG YANG (Rio)` into `HYONTONG YANG (Rio`, and
+a naive address strip turned `Tamara Feist-Hatfield@va.gov` into `Tamara` — eating a real
+surname fused to its domain. Both are now fixtures.
+
+**The raw observation is never rewritten** — presentation only, so the source evidence survives
+for the person-identity work.
+
+## 2026-09-16 — Decision Makers: explicit contact_kind provenance typing
+
+**Defect.** Government-vs-vendor was never stated anywhere. `source` and `role_category` are
+column DEFAULTS no producer sets — uniform across all 287,534 rows and factually WRONG on the
+82,017 vendor entity POCs. `source_table` is a GENERATION label, not a source identity: two of
+its three values are the SAME upstream source (94.7% of `sam_opportunities_pointOfContact` has
+been re-adopted in place by the live drain). Exclusion of vendor rows from customer surfaces
+relied entirely on incidental query predicates.
+
+**Proof anchors** (re-grep; a revert breaks them):
+- `src/lib/gov-contacts/contact-kind.ts` — `export function classifyContactKind`
+- `src/lib/gov-contacts/buyer-contact-source.ts` — `contact_kind: CONTACT_KIND_GOVERNMENT`
+- `src/lib/gov-contacts/buyer-contact-run.ts` — `contact_kind` inside `HELD_COLUMNS`
+- `scripts/populate-contracting-officers.js` — `WRITES_ENABLED = LEGACY_REPLAY && ACKNOWLEDGED`
+
+**Measured before mutation:** vendor 82,017 · government 205,517 · overlap **0** · unresolved
+**0**. The two rules are mutually exclusive by construction (vendor needs
+`department_ind_agency IS NULL`, government needs `IS NOT NULL`), which is *why* the overlap is 0.
+
+The six rows keyed `No longer available::<role>` are proven vendor — SAM's literal for a delisted
+entity — so the rule keys on the raw_data payload, not the key shape.
+
+**`role_category` was NOT changed:** it is product-authoritative (drives `roleCategoryLabelFromDb`
+and a live `.eq('role_category', role)` filter). `federal_contacts.source` has zero consumers and
+is documented as dead.
+
+**Backfill executed 2026-09-15T16:0x** — one transaction, measured inside it: government 205,517
+(11,952 already typed by a scheduled run, 193,565 updated) · vendor 82,017 · unclassified **0** ·
+overlap **0**. `updated_at` newest stayed at the 16:00 scheduled run — the backfill bumped no
+writer clock, so the drain's change semantics are intact. Both control-plane instances derive
+`held_population` from `contact_kind`: active 205,517, frozen vendor 82,017.
+
+---
+
+## 2026-09-20 — Strategic Intelligence: a government-wide constant served as 111 agencies' own budget evidence
+
+**Proof anchor:** `src/lib/strategic-intel/unsupported-budget-claim.ts` ·
+`describeAgencySpending` in `src/lib/agency-intelligence/fetchers/usaspending.ts`
+
+**The defect.** `fetchAgencySpendingPatterns` read USASpending
+`/api/v2/references/toptier_agencies/` and emitted, per agency:
+
+```
+Total obligated: $<budget_authority_amount>B. Congressional justification outlay: $<current_total_budget_authority_amount>B
+```
+
+`current_total_budget_authority_amount` is a **GOVERNMENT-WIDE CONSTANT** — the denominator
+behind `percentage_of_total_budget_authority`. Measured live 2026-09-20 against the API:
+**exactly ONE distinct value across all 111 agencies** ($15,495,311,418,794.12). It is not
+agency-specific and it is not an outlay. `budget_authority_amount` is not obligations either —
+the real `obligated_amount` sat unused in the same payload.
+
+So NASA was shown *"Total obligated: $43.3B. Congressional justification outlay: $13541.1B"*
+against a real obligated figure of **$20.6B**. A $13.5-trillion "outlay" attributed to a ~$25B
+agency, on a live biddable opportunity.
+
+**Why two vintages.** The constant drifts each fiscal quarter, so ingests at different times
+captured different values: $13,541.1B and $16,047.1B were both in production, and **521
+opportunities carried BOTH at once** — one drawer asserting two contradictory trillion-dollar
+figures for the same agency.
+
+**Six surfaces, not one.** The audit found two; the repair found six:
+
+| Surface | Contamination |
+|---|---|
+| `src/lib/.../usaspending.ts` | the producer |
+| `agency_intelligence.description` | 111 rows |
+| `sam_opportunities.intel_agency` | 549 opportunities (174 active), 33 labeled |
+| `src/data/agency-pain-points.json` | **158 claims across 111 agencies** — the corpus 23 modules import directly |
+| `src/data/agencies-seo.ts` | 4 agencies on **public, sitemap-indexed** `/agencies/*` pages |
+| proposal drafting (`lib/proposal/agency-context.ts`) | consumed the corpus as *"Stated strategic priorities"* |
+
+**The category error that carried it.** `getUnifiedAgencyIntelligence` promoted a
+`contract_pattern` **spending observation** into `priorities` — a *stated agency priority*.
+That promotion is what put a spending number into the opportunity drawer as strategy. Spending
+now stays in `spendingPatterns` and never becomes a priority claim.
+
+**The guard is structural, not a blocklist.** Blocking the two known numbers would let the next
+vintage through. `isUnsupportedBudgetClaim` rejects the derivation at any magnitude AND any
+per-agency figure ≥ `PLAUSIBLE_AGENCY_CEILING_B` ($5,000B) — comfortably above the largest real
+entry (DoD ≈ $2,575B), far below the government-wide total. Proven: it rejects $15,495.3B, a
+value it had never seen.
+
+**No claim, not a better number.** There is no agency-specific source for the figure, so the
+repair DELETES it everywhere rather than recomputing one. 51 agencies now have an empty
+priorities list — the correct outcome. `stripUnsupportedBudgetClaims` removed 158 of 2,658
+priorities and **0 of 3,043 pain points**; the `agency-pain-points.json` diff was proven to be a
+pure deletion (60 comma reflows + 51 `"priorities": []` collapses, zero new content).
+
+**Defense in depth.** `lib/utils/pain-points.ts` sanitizes the corpus **once at module load**, so
+every raw-JSON consumer — proposal drafting included — inherits the guard even if a stale corpus
+ships. Demonstrated: with the corpus deliberately re-poisoned, the corpus test went red while the
+NASA read-path test stayed green.
+
+**Provenance.** opp-intel previously DROPPED the `painPointCitations` the shared reader handed it
+— which is why 516 of 549 contaminated blobs carried no label. It now carries them through, and
+omits them rather than inventing one when none is supplied.
+
+### Phase-12 production closeout — 2026-09-20
+
+**Serving build pinned, not inferred.** Production was still serving `5cc700d7` (the
+pre-merge commit) for three minutes AFTER the GitHub merge. Proven by the
+`maps-account-build` stamp on the live `/opportunity-map` bundle, which flipped to
+`8f37c5bb…` at **19:34:37Z**. A merge is not a deploy.
+
+**Regenerated contamination before the final pass: 0.** No `precompute-opp-intel` run
+occurred between the data repair (~19:20Z) and the deploy (19:34Z) — the 19:00Z run
+predated it — so the old bundle never got a chance to re-stamp. The repair re-ran
+clean (0 rows, 0 blobs), proving idempotency.
+
+**One real scheduled run held through.** The 20:00Z `precompute-opp-intel` fired
+against the NEW bundle and re-stamped **34 opportunities**:
+
+| | |
+|---|---|
+| recurrence of the claim | **0** |
+| either legacy vintage | **0** |
+| any per-agency figure ≥ $5,000B | **0** |
+| blobs carrying `citations` | **34 / 34** |
+
+⚠️ `precompute-opp-intel` records `status='dispatched'`, `http_status=NULL` and never
+resolves — the same unresolved-outcome pattern flagged for `institute-legislation-sync`.
+Its job row cannot prove success, so the run was proven by its EFFECT
+(`intel_computed_at` advancing), never by the job row. Left as backlog, not fixed here.
+
+**Provenance now survives, and only where earned.** A newly stamped DoD blob carries a
+`SOURCE_FACT` citation — `GAO-26-107781`, `gao.gov/products/gao-26-107781`, published
+2026-09-03, with its `institute_source_id` — beside a `LEGACY_MANUAL` priority that
+keeps its honest inline label and received **no invented citation**.
+
+**NASA, the fixture.** Its public page no longer renders the "FY26 funding priorities"
+section AT ALL — that agency's only priority was the fabrication, so the correct
+outcome is no section rather than a substitute number. `Total obligated` appears 0 times.
+
+**A verification that was vacuously passing.** The first harness checked the runtime
+static-corpus read path via `/api/pain-points`, which returns **401** — so "no claim in
+the response" was true only because the response was an auth error. Replaced with
+`/api/agency-sources` (unauthenticated, HTTP 200), which reads the same corpus and
+returns clean output while still carrying legitimate priorities ($1.5B SDA Tranche 2,
+$900M GPS III). A check that cannot fail is not a check.
+
+**Final state:** 6/6 surfaces clean · 111/111 `contract_pattern` rows retained with
+`source_url` · 3 GAO titles containing "Congressional" preserved · 53,809 opportunities
+still carrying legitimate priorities. No broad string deletion.

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
+import { commitNaicsFromTypedInput, invalidNaicsCodes } from '@/lib/codes/validate-market-codes';
 
 const BUSINESS_TYPES = [
   { value: '', label: 'Any business type' },
@@ -33,6 +34,7 @@ interface PreferencesResponse {
     email: string;
     businessDescription?: string | null;
     naicsCodes?: string[];
+    invalidNaics?: string[];
     keywords?: string[];
     businessType?: string | null;
     targetAgencies?: string[];
@@ -65,6 +67,8 @@ function AlertPreferencesContent() {
   const [businessDescription, setBusinessDescription] = useState('');
   const [showDescriptionPrompt, setShowDescriptionPrompt] = useState(false);
   const [naicsInput, setNaicsInput] = useState('');
+  const [storedNaics, setStoredNaics] = useState<string[]>([]);
+  const [invalidNote, setInvalidNote] = useState<string | null>(null);
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [agenciesInput, setAgenciesInput] = useState('');
@@ -107,7 +111,10 @@ function AlertPreferencesContent() {
         const description = data.data.businessDescription || '';
         setBusinessDescription(description);
         setShowDescriptionPrompt(!description);
-        setNaicsInput((data.data.naicsCodes || []).join(', '));
+        const loaded = data.data.naicsCodes || [];
+        setStoredNaics(loaded);
+        setNaicsInput(loaded.join(', '));
+        setInvalidNote(null);
         setKeywordsInput((data.data.keywords || []).join(', '));
         setBusinessType(data.data.businessType || '');
         setAgenciesInput((data.data.targetAgencies || []).join(', '));
@@ -144,10 +151,17 @@ function AlertPreferencesContent() {
     setError('');
     setMessage('');
 
-    const naicsCodes = naicsInput
+    const typed = naicsInput
       .split(/[,\s]+/)
       .map(code => code.trim())
       .filter(code => /^\d+$/.test(code));
+    const { persist: naicsCodes, blockedAdds } = commitNaicsFromTypedInput(typed, storedNaics);
+    if (blockedAdds.length > 0) {
+      setInvalidNote(`${blockedAdds.join(', ')} — Invalid NAICS code`);
+      setNaicsInput(naicsCodes.join(', '));
+    } else {
+      setInvalidNote(null);
+    }
 
     const keywords = parseList(keywordsInput);
 
@@ -185,8 +199,6 @@ function AlertPreferencesContent() {
           timezone,
           frequency,
           alertsEnabled: frequency !== 'paused',
-          isActive: frequency !== 'paused',
-          briefingsEnabled: false,
         }),
       });
       const data = await res.json();
@@ -196,6 +208,7 @@ function AlertPreferencesContent() {
         return;
       }
 
+      setStoredNaics(naicsCodes);
       setMessage(
         isQuickSetup
           ? 'Done — your alerts now search by keywords, not just NAICS. Tomorrow\'s email should match more of your market.'
@@ -364,6 +377,33 @@ function AlertPreferencesContent() {
                       ? 'Already on your profile — edit only if these are wrong.'
                       : 'Use commas or spaces. Short prefixes like 236 match the whole category.'}
                   </p>
+                  {invalidNaicsCodes(
+                    naicsInput.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
+                  ).map((code) => (
+                    <div
+                      key={code}
+                      className="mt-2 flex items-center justify-between rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+                    >
+                      <span className="text-sm text-amber-100">{code} — Invalid NAICS code</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = naicsInput
+                            .split(/[,\s]+/)
+                            .map((c) => c.trim())
+                            .filter((c) => c && c !== code);
+                          setNaicsInput(next.join(', '));
+                          setInvalidNote(null);
+                        }}
+                        className="text-sm text-amber-200 underline underline-offset-2 hover:text-white"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {invalidNote && (
+                    <p className="mt-2 text-sm text-amber-200">{invalidNote}</p>
+                  )}
                 </div>
 
                 {isQuickSetup ? (

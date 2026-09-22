@@ -5,6 +5,7 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { getVocabulary } from '@/lib/market/vocabulary';
+import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -125,7 +126,12 @@ export async function GET(request: NextRequest) {
         .select('contracting_office, program_office, source_agency, naics_code, estimated_value_max, fiscal_year, pop_state')
         .not('contracting_office', 'is', null)
         .neq('contracting_office', '');
-      if (agency) q = q.ilike('source_agency', `%${agency.split(',')[0].trim()}%`);
+      if (agency) {
+        // Same shared identity resolver as the list filter below — the office rollup must not
+        // answer a different question than the list it rolls up.
+        const officeAgencyExpr = forecastAgencyOrExpr(resolveForecastAgencies(agency));
+        if (officeAgencyExpr) q = q.or(officeAgencyExpr);
+      }
       if (naics) {
         const codes = naics.split(',').map(c => c.trim()).filter(Boolean);
         if (codes.length) {
@@ -303,12 +309,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (agency) {
-      const agencyTerms = agency.split(',').map(term => term.trim()).filter(Boolean);
-      if (agencyTerms.length > 1) {
-        query = query.or(agencyTerms.map(term => `source_agency.ilike.%${term}%`).join(','));
-      } else if (agencyTerms[0]) {
-        query = query.ilike('source_agency', `%${agencyTerms[0]}%`);
-      }
+      // Shared forecast agency identity (audit 2026-09-14) — exact `source_agency.in.(…)`, never a
+      // substring. Same resolver as the map, MCP and the saved-search alerts, so "DoD"/"Army"
+      // resolve here too and "EPA" can no longer match "d-EPA-rtment".
+      const agencyExpr = forecastAgencyOrExpr(resolveForecastAgencies(agency));
+      if (agencyExpr) query = query.or(agencyExpr);
     }
 
     // OFFICE filter — the grain that actually matches how buying works (Eric).

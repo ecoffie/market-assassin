@@ -27,14 +27,33 @@ import {
   resolveCanonicalSlug,
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
+  getYearlyTotalsForRecipient,
+  getSetAsideHistoryForRecipient,
+  getRecipientByUei,
   findCapableSmallBusinesses,
   recipientSlug,
   type RollupProfile,
+  type RecipientProfile,
 } from '@/lib/bigquery/recipients';
+import { resolveAwardCorpusByName } from '@/lib/contractor/name-resolution';
 import {
   allowColdBqLookup,
   type ColdBqTurnState,
 } from '@/lib/bigquery/cold-budget';
+import { bqUnavailable } from '@/lib/bigquery/cache';
+import {
+  assessDateRange,
+  buildCountingBases,
+  classifyModNumber,
+  dateRangeValidFlag,
+  deriveActivityFromSeries,
+  describeCoverageTimestamp,
+  isModificationAction,
+  SHORT_TOTALS_NOTE,
+  summarizeHistoricalSetAsides,
+  SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
+} from '@/lib/contractor/award-history-shape';
+import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 
 /** Clamp a caller-supplied result limit to [1, max], defaulting when absent/invalid. */
 function resolveLimit(raw: unknown, def: number, max: number): number {
@@ -49,7 +68,7 @@ export const TIER2_TOOL_DEFS = [
     function: {
       name: 'get_contractor_profile',
       description:
-        "Look up a specific federal contractor by company name and return who they are, their total federal awards, top buying agencies, and recent contracts. Call this when the user asks about a specific company — an incumbent, a competitor, or a potential teaming partner ('who is X', 'what has X won', 'who's the incumbent').",
+        "Look up one federal contractor by company name. A unique award-warehouse match returns that firm's rollup totals, top agencies, and recent awards. Several matches return resolution=ambiguous and candidates — this tool does not pick one, and that is not 'no contractor found'. Zero rows in the award index is resolution=none_in_award_corpus (this dataset only, not proof of no federal awards and not a certification finding). A failed lookup is resolution=lookup_failed, distinct from both.",
       parameters: {
         type: 'object',
         properties: {
@@ -143,14 +162,105 @@ export function makeTier2Tools(email: string) {
     return { profile, resolvedCold, rateLimited: false };
   }
 
+  function rollupFromRecipient(recipient: RecipientProfile): RollupProfile {
+    return {
+      rollup_uei: recipient.recipient_uei,
+      rollup_name: recipient.recipient_name,
+      canonical_slug: recipientSlug(recipient.recipient_name),
+      child_ueis: [recipient.recipient_uei],
+      child_count: 1,
+      cage_code: recipient.cage_code,
+      address: recipient.address,
+      city: recipient.city,
+      state: recipient.state,
+      zip: recipient.zip,
+      country: recipient.country,
+      total_obligated: Number(recipient.total_obligated || 0),
+      award_count: Number(recipient.award_count || 0),
+      transaction_count: Number(recipient.transaction_count || 0),
+      first_action_date: recipient.first_action_date,
+      last_action_date: recipient.last_action_date,
+      distinct_agency_count: Number(recipient.distinct_agency_count || 0),
+      distinct_naics_count: Number(recipient.distinct_naics_count || 0),
+    };
+  }
+
   async function getContractorProfile(args: { company_name?: unknown }): Promise<Record<string, unknown>> {
     const name = typeof args?.company_name === 'string' ? args.company_name.trim() : '';
     if (!name) return { ok: false, error: 'company_name_required' };
 
-    const { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
-    if (rateLimited) return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
+    let { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
+    let totalsScope: 'parent_rollup' | 'single_uei' = 'parent_rollup';
     if (!profile) {
-      return { ok: true, found: false, note: `I couldn't find a federal contractor matching "${name}".` };
+      // A spent cold budget is a failed lookup, not an empty corpus.
+      if (rateLimited) {
+        return { ok: false, found: false, resolution: 'lookup_failed', error: 'rate_limited', note: OVER_LIMIT_NOTE };
+      }
+      const named = await resolveAwardCorpusByName(name);
+      if (named.status === 'degraded') {
+        return {
+          ok: false,
+          found: false,
+          resolution: 'lookup_failed',
+          error: 'lookup_failed',
+          note: 'The award-warehouse name search failed. Do not treat this as a miss and do not claim the contractor has no federal presence.',
+        };
+      }
+      if (named.status === 'ambiguous') {
+        return {
+          ok: true,
+          found: false,
+          resolution: 'ambiguous',
+          match_count: named.match_count,
+          source: 'recipients',
+          candidates: named.candidates,
+          note: named.note,
+        };
+      }
+      if (named.status === 'unique') {
+        const recipient = await getRecipientByUei(named.uei, true).catch(() => null);
+        if (recipient) {
+          profile = rollupFromRecipient(recipient);
+          totalsScope = 'single_uei';
+          resolvedCold = true;
+        } else {
+          return {
+            ok: true,
+            found: true,
+            resolution: 'unique',
+            source: 'recipients',
+            coverage: {
+              dataset: 'recipients',
+              measure: 'total_obligated',
+              scope: 'single_uei',
+              as_of: null,
+              not_equivalent_to: 'recipients_rollup.total_obligated',
+            },
+            company: {
+              name: named.name,
+              uei: named.uei,
+              total_obligated: named.total_obligated,
+              award_count: named.award_count,
+            },
+            top_agencies: [],
+            recent_awards: [],
+            enrichment_status: 'budget_limited',
+            partial: true,
+            note: 'One award-warehouse recipient matched. Detail rows were not loaded. Empty top_agencies/recent_awards means not retrieved, not none exist.',
+          };
+        }
+      } else {
+        return {
+          ok: true,
+          found: false,
+          resolution: 'none_in_award_corpus',
+          source: 'recipients',
+          note:
+            `No award-holding recipient in the warehouse name index matches "${name}". ` +
+            'That is this dataset only — it does not prove the firm has no federal awards, and it says nothing about SAM registration or certifications. ' +
+            'Use lookup_sam_entity for registration. A missing has8a flag is not a finding that the firm is uncertified.',
+        };
+      }
     }
 
     // Enrich with recent awards + top agencies (rolled up across child UEIs,
@@ -178,60 +288,232 @@ export function makeTier2Tools(email: string) {
     //   2. cold + budget ok    -> one live BQ scan, result cached for everyone after
     //   3. cold + budget spent -> profile + explicit partial/degraded state, never false-empty
     const childUeis = profile.child_ueis?.length ? profile.child_ueis : [profile.rollup_uei];
+    const TOP_AGENCIES_LIMIT = 5;
+    const RECENT_LIMIT = 5;
+    const awardsCacheKey = `rollup:${profile.rollup_uei}:recent-awards:${RECENT_LIMIT}:v4-m`;
+    const agenciesCacheKey = `rollup:${profile.rollup_uei}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`;
+    const yearlyCacheKey = `rollup:${profile.rollup_uei}:yearly-totals:v3-m`;
+    const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v4-m`;
 
     // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
-    let [awards, agencies] = await Promise.all([
-      getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
-      getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
+    let [awards, agencies, yearly, setAsideHist, warehouseCoverage] = await Promise.all([
+      getRecentAwardsForRecipient(childUeis, profile.rollup_uei, RECENT_LIMIT, false).catch(() => []),
+      getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, false).catch(() => []),
+      getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
+      getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
+      loadAwardsWarehouseCoverage().catch(() => null),
     ]);
 
-    // Pass 2 — only if warm missed AND the company actually HAS awards (award_count comes
-    // from the free recipients row, so a genuinely award-less company never costs a scan).
-    // Budget is consumed only here, on a real miss — allowColdLookup() increments a counter,
-    // so it must never be called speculatively.
+    // Pass 2 — per-surface cold fill only when the cache marks a MISS/FAILURE.
+    // A successfully cached empty [] is confirmed emptiness (bqResultState='empty')
+    // and must NOT consume cold budget or become budget_limited when permission is denied.
+    // Cyrus: warm agencies + unavailable recent-awards:5 still fills awards alone.
     let enrichmentStatus: 'complete' | 'budget_limited' = 'complete';
-    const enrichmentMissed = awards.length === 0 && agencies.length === 0;
     const hasAwards = (profile.award_count ?? 0) > 0;
-    if (enrichmentMissed && hasAwards) {
+    const needAwards = hasAwards && bqUnavailable(awardsCacheKey, awards.length);
+    const needAgencies = hasAwards && bqUnavailable(agenciesCacheKey, agencies.length);
+    const needYearly = hasAwards && bqUnavailable(yearlyCacheKey, yearly.length);
+    const needSetAside = hasAwards && bqUnavailable(setAsideCacheKey, setAsideHist.length);
+    if (needAwards || needAgencies || needYearly || needSetAside) {
       if (resolvedCold || (await allowColdLookup())) {
-        // resolvedCold: we already spent a unit resolving THIS company this turn — the
-        // enrichment is the same company, so no extra unit is consumed.
-        [awards, agencies] = await Promise.all([
-          getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
-          getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
+        const [a2, g2, y2, s2] = await Promise.all([
+          needAwards
+            ? getRecentAwardsForRecipient(childUeis, profile.rollup_uei, RECENT_LIMIT, true).catch(() => [])
+            : Promise.resolve(awards),
+          needAgencies
+            ? getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, true).catch(() => [])
+            : Promise.resolve(agencies),
+          needYearly
+            ? getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, true).catch(() => [])
+            : Promise.resolve(yearly),
+          needSetAside
+            ? getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, true).catch(() => [])
+            : Promise.resolve(setAsideHist),
         ]);
+        awards = a2;
+        agencies = g2;
+        yearly = y2;
+        setAsideHist = s2;
       } else {
-        // Budget denied. We did NOT look, so we must not claim there is nothing to find.
         enrichmentStatus = 'budget_limited';
-        // Measured, not guessed: if authenticated users hit this often, allowColdLookup()
-        // limits are too tight for a metered tool's promise and should be tuned SEPARATELY.
-        // Do not "fix" a high rate here by bypassing the guard — that reopens the June 2026
-        // BQ cost incident.
         console.warn('[p0-2] enrichment budget_limited', JSON.stringify({
           tool: 'get_contractor_profile', rollup_uei: profile.rollup_uei,
           award_count: profile.award_count,
+          need: { awards: needAwards, agencies: needAgencies, yearly: needYearly, setAside: needSetAside },
         }));
       }
     }
 
+    // Still-unavailable after attempt → not a genuine zero.
+    if (
+      hasAwards &&
+      (bqUnavailable(awardsCacheKey, awards.length) ||
+        bqUnavailable(agenciesCacheKey, agencies.length) ||
+        bqUnavailable(yearlyCacheKey, yearly.length) ||
+        bqUnavailable(setAsideCacheKey, setAsideHist.length))
+    ) {
+      enrichmentStatus = 'budget_limited';
+    }
+
+    const setAsideUnavailable =
+      hasAwards && bqUnavailable(setAsideCacheKey, setAsideHist.length);
+
+    const series = yearly.map((y) => ({
+      fiscalYear: y.fiscal_year,
+      totalObligations: Number(y.total_obligated || 0),
+      // Pass through only when present — never invent from net.
+      positiveObligations:
+        y.positive_obligations == null ? undefined : Number(y.positive_obligations),
+      deobligations: y.deobligations == null ? undefined : Number(y.deobligations),
+      awardCount: Number(y.award_count || 0),
+    }));
+    const activity = deriveActivityFromSeries(series);
+    const counting = buildCountingBases({
+      uniqueAwards: profile.award_count ?? 0,
+      series,
+      recentActions: awards.map((a) => ({ awardId: a.award_id })),
+    });
+    const coverageTs = describeCoverageTimestamp({
+      lastRecipientActionDate: profile.last_action_date ?? null,
+      warehouseMaxActionDate: warehouseCoverage?.clocks?.sourceActionMax ?? null,
+      ingest: warehouseCoverage
+        ? {
+            last_built: warehouseCoverage.lastBuilt,
+            acquired_at: warehouseCoverage.clocks?.acquiredAt ?? null,
+            merged_at: warehouseCoverage.clocks?.mergedAt ?? null,
+            recipients_rebuilt_at: warehouseCoverage.clocks?.recipientsRebuiltAt ?? null,
+            freshness: warehouseCoverage.freshness,
+          }
+        : null,
+    });
+    const agenciesServed = profile.distinct_agency_count ?? agencies.length;
+    // Reuse warehouse set-aside aggregation (same query as award-history drawer).
+    // Do NOT invent "complete" from a capped recent-action sample.
+    const historicalSetAsides = summarizeHistoricalSetAsides(
+      setAsideUnavailable
+        ? []
+        : setAsideHist.map((r) => ({
+            setAside: r.set_aside,
+            lastActionFy: r.last_action_fy == null ? null : Number(r.last_action_fy),
+            firstObservedPositiveActionFy:
+              r.first_observed_positive_action_fy == null
+                ? null
+                : Number(r.first_observed_positive_action_fy),
+            // Preserve null — never substitute the queried UEI set (childUeis).
+            contributingUeis: r.contributing_ueis,
+            supportingActions: (r.supporting_actions ?? []).map((a) => ({
+              uei: a?.uei ?? null,
+              award_id: a?.award_id ?? null,
+              fiscal_year: a?.fiscal_year == null ? null : Number(a.fiscal_year),
+              obligation_amount:
+                a?.obligation_amount == null ? null : Number(a.obligation_amount),
+              action_date: a?.action_date ?? null,
+            })),
+          })),
+      {
+        coverage: setAsideUnavailable ? 'unavailable' : 'complete',
+        scope: { kind: 'profile_rollup', uei_count: childUeis.length },
+        contributingUeiSampleLimit: SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
+        scopeNote:
+          childUeis.length > 1
+            ? `Aggregated across warehouse award actions for this profile's UEI set (${childUeis.length} UEIs on the rollup; not derived from the capped recent_awards sample). Award origin is not established by this query.`
+            : `Aggregated across warehouse award actions for this profile's UEI set (not derived from the capped recent_awards sample). Award origin is not established by this query.`,
+      },
+    );
+
+    const shapedAgencies = agencies.map((a) => ({
+      awarding_agency: a.awarding_agency,
+      total_amount: a.total_amount,
+      pct_of_total: a.pct_of_total,
+      // Never fabricate zero award counts when the query does not return them.
+      count: null as number | null,
+      count_unavailable: true,
+    }));
+
+    const shapedAwards = awards.map((r) => {
+      const range = assessDateRange(r.pop_start_date, r.pop_end_date);
+      const modNumber = r.mod_number ?? null;
+      return {
+        award_id: r.award_id,
+        piid: r.piid,
+        mod_number: modNumber,
+        mod_classification: classifyModNumber(modNumber),
+        is_modification: isModificationAction(modNumber),
+        awarding_agency: r.awarding_agency,
+        awarding_office: r.awarding_office,
+        naics_code: r.naics_code,
+        naics_description: r.naics_description,
+        description: r.description,
+        obligation_amount: r.obligation_amount,
+        action_date: r.action_date,
+        pop_start_date: r.pop_start_date,
+        pop_end_date: r.pop_end_date,
+        date_range_assessment: range.assessment,
+        date_range_valid: dateRangeValidFlag(r.pop_start_date, r.pop_end_date),
+        date_range_issue: range.issue,
+        pop_state: r.pop_state,
+        set_aside: r.set_aside,
+        grain: 'obligation_action' as const,
+      };
+    });
+
     return {
       ok: true,
       found: true,
+      resolution: 'unique',
+      match_status: 'unique',
+      source: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
+      coverage: {
+        dataset: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
+        measure: 'total_obligated',
+        scope: totalsScope,
+        // Recipient last action — NOT warehouse max and NOT ingest freshness.
+        as_of: profile.last_action_date ?? null,
+        as_of_meaning: coverageTs.last_recipient_action_meaning,
+        warehouse_max_action_date: coverageTs.warehouse_max_action_date,
+        ingest: coverageTs.ingest,
+        freshness_evidence_available: coverageTs.freshness_evidence_available,
+        coverage_completeness: coverageTs.coverage_completeness,
+        coverage_complete_established: coverageTs.coverage_complete_established,
+        coverage_complete_established_meaning: coverageTs.coverage_complete_established_meaning,
+        freshness_note: coverageTs.freshness_note,
+        coverage_timestamp: coverageTs,
+        not_equivalent_to: totalsScope === 'single_uei'
+          ? 'recipients_rollup.total_obligated'
+          : 'recipients.total_obligated',
+      },
       company: {
         name: profile.rollup_name,
         uei: profile.rollup_uei,
         location: [profile.city, profile.state].filter(Boolean).join(', ') || null,
         total_obligated: profile.total_obligated,
         award_count: profile.award_count,
-        agencies_served: profile.distinct_agency_count,
+        agencies_served: agenciesServed,
         first_award: profile.first_action_date,
         last_award: profile.last_action_date,
+        last_positive_obligation_fy: activity.last_positive_obligation_fy,
+        activity_status: activity.activity_status,
+        activity_note: activity.activity_note,
+        activity_observation_period: activity.observation_period,
+        obligations_are_not_revenue: true,
       },
-      top_agencies: agencies,
-      recent_awards: awards,
+      counting_bases: counting,
+      top_agencies: shapedAgencies,
+      top_agencies_returned: shapedAgencies.length,
+      top_agencies_limit: TOP_AGENCIES_LIMIT,
+      top_agencies_capped: agenciesServed > shapedAgencies.length,
+      top_agencies_note:
+        agenciesServed > shapedAgencies.length
+          ? `Showing top ${shapedAgencies.length} of ${agenciesServed} agencies by net obligations (includes $0/negative nets). Cap is explicit.`
+          : 'Agency list includes $0 and negative net totals when present.',
+      recent_awards: shapedAwards,
+      recent_awards_note:
+        'recent_awards are dollar-bearing obligation actions (often modifications). See counting_bases for unique awards in this sample.',
+      historical_set_asides: historicalSetAsides,
       // P0-2 invariant: when award_count > 0 and enrichment was not actually queried,
       // empty arrays must NEVER be presented as complete data.
       enrichment_status: enrichmentStatus,
+      totals_note: SHORT_TOTALS_NOTE,
       ...(enrichmentStatus === 'budget_limited'
         ? {
             partial: true,

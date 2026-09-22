@@ -83,7 +83,7 @@ function scoreOpp(opp: OppRow, p: ViewerProfile): { matchScore: number; rankScor
   const naics = opp.naics_code ? String(opp.naics_code).trim() : '';
   const psc = opp.psc_code ? String(opp.psc_code).trim().toUpperCase() : '';
 
-  const distinctiveHits = p.keywords.filter((k) => isDistinctiveKeyword(k) && title.includes(k));
+  const distinctiveHits = p.keywords.filter((k) => isDistinctiveKeyword(k, p.keywords) && title.includes(k.toLowerCase()));
   const anyKwHit = p.keywords.some((k) => title.includes(k));
   const naicsHit = !!naics && p.naics.some((c) => c === naics || c.slice(0, 4) === naics.slice(0, 4));
   const pscHit = !!psc && p.psc.some((c) => c === psc || c.slice(0, 2) === psc.slice(0, 2));
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
     const nowIso = new Date().toISOString();
     const naicsPrefixes = naicsSubsectorPrefixes(profile.naics);
     const naicsFilters = naicsPrefixes.map((c) => `naics_code.like.${c}%`);
-    const distinctive = profile.keywords.filter((k) => isDistinctiveKeyword(k));
+    const distinctive = profile.keywords.filter((k) => isDistinctiveKeyword(k, profile.keywords));
     const kwFilters = distinctive.map((k) => `title.ilike.%${k.replace(/[(),*]/g, ' ').trim()}%`);
     const orFilter = [...naicsFilters, ...kwFilters].filter(Boolean).join(',');
     if (!orFilter) {

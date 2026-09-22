@@ -19,8 +19,9 @@ import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
-import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
-import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
+import { osbpContactForAgency } from '@/lib/utils/command-info';
+import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 
 export const dynamic = 'force-dynamic';
 
@@ -339,7 +340,7 @@ export async function GET(request: NextRequest) {
       const roleCategoryLabel = roleCategory || roleCategoryLabelFromDb(r.role_category);
       const list = byOffice.get(office) || [];
       list.push({
-        contact_fullname: r.contact_fullname, contact_email: r.contact_email,
+        contact_fullname: displayContactName(r.contact_fullname) ?? r.contact_fullname, contact_email: r.contact_email,
         contact_phone: r.contact_phone, role, pocLabel, roleCategory: roleCategoryLabel,
         dodaac: dod?.dodaac || null,
       });
@@ -420,7 +421,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let q = sb
+  let q = governmentBuyersOnly(placeholderNameFilter(sb
     .from('federal_contacts')
     .select(
       'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
@@ -432,17 +433,12 @@ export async function GET(request: NextRequest) {
     // like "DIANE FOREST → ASMPT NEXX, INC" on a name search. A real POC always
     // has a department; requiring one drops the junk and loses no reachable
     // contact.
-    .not('department_ind_agency', 'is', null)
-    // Ghost-card guard (2026-07-26): ~3,912 rows (source_table AllSamContacts /
-    // sam_opportunities_pointOfContact) carry a real email + agency but
-    // contact_fullname is a literal SAM placeholder ("Telephone: 7175503112") —
-    // no real name exists upstream, so filter the shape out rather than show a
-    // phone number as the card's "name". isUsableContactCard below is the
-    // belt-and-suspenders for any row this ILIKE shape misses.
-    .not('contact_fullname', 'ilike', 'telephone:%')
-    .not('contact_fullname', 'ilike', 'phone:%')
-    .not('contact_fullname', 'ilike', 'fax:%')
-    .not('contact_fullname', 'ilike', 'tel:%');
+    .not('department_ind_agency', 'is', null)));
+  // Ghost-card guard: rows carrying a real email + agency whose contact_fullname is a SAM
+  // placeholder ("Telephone: 7175503112", "ELECTRONIC MAIL: x@y.gov", "Facsimile: 000...").
+  // Excluded IN THE QUERY by placeholderNameFilter above so `count` stays honest for the
+  // "N of M" label; isUsableContactCard below is the belt-and-suspenders for shapes the
+  // prefix match cannot express (bare role labels, unlabelled digit strings).
 
   if (search) {
     // Strip PostgREST .or() metacharacters so a stray comma/paren can't break the
@@ -623,8 +619,8 @@ export async function GET(request: NextRequest) {
   // command-info directory, NOT federal_contacts). Prepend the agency's
   // small-business contact so the user gets the OSBP person, not just KOs.
   if (agency) {
-    const osbp = getEnhancedAgencyInfo(agency, agency, agency).smallBusinessContact;
-    if (osbp?.director && osbp.director !== `${agency} OSBP Director`) {
+    const { contact: osbp, reason } = osbpContactForAgency(agency);
+    if (reason === 'established' && osbp?.director && osbp.director !== `${agency} OSBP Director`) {
       // Hybrid freshness: the office + mailbox is always the starting point; a
       // named director that was verified against an official source carries a
       // "verified <Mon YYYY>" stamp so the user knows how much to trust the name.

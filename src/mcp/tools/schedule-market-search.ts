@@ -27,7 +27,7 @@ export type ScheduleMarketSearchInput = {
   name: string;
   filters: Record<string, unknown>;
   mode?: SavedSearchMode;
-  alert_frequency?: SavedSearchAlertFrequency;
+  alert_frequency?: SavedSearchAlertFrequency | string;
   alerts_enabled?: boolean;
   bbox?: { w: number; s: number; e: number; n: number } | null;
 };
@@ -277,7 +277,7 @@ export type UpdateMarketScheduleInput = {
   userEmail: string;
   schedule_id: string;
   name?: string;
-  alert_frequency?: SavedSearchAlertFrequency;
+  alert_frequency?: SavedSearchAlertFrequency | string;
   alerts_enabled?: boolean;
 };
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
@@ -364,7 +365,9 @@ async function queryImportedOpenGovContacts(search: string, agency: string) {
     const candidate: RelationshipCandidate = {
       id: `opengov-contact:${row.id}`,
       contact_type: 'government_buyer',
-      full_name: row.contact_fullname || row.contact_email || 'Government point of contact',
+      // This directory had NO name guard at all, so it emitted the raw SAM placeholder
+      // ("Telephone: 7175503112", "ELECTRONIC MAIL: x@y.gov") as a CRM candidate's name.
+      full_name: displayContactName(row.contact_fullname) || row.contact_email || 'Government point of contact',
       title: row.contact_title || 'Government point of contact',
       email: row.contact_email || '',
       phone: row.contact_phone || '',
@@ -459,7 +462,7 @@ function mapOSBPCandidates(search: string, agency: string) {
 
   for (const agencyName of commonAgencies) {
     const enhanced = getEnhancedAgencyInfo(agencyName, agencyName, agencyName);
-    if (!enhanced.smallBusinessContact) continue;
+    if (enhanced.osbpSource !== 'directory' || !enhanced.smallBusinessContact) continue;
 
     const candidate = mapOSBPContact(
       enhanced.smallBusinessContact,

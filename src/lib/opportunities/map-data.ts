@@ -5,7 +5,7 @@
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from './map-filters';
-import { multiAgency, agencyOrExpr } from './agency-match';
+import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 // CITY_COORDS is the shared board-wide table (also backs contacts-map + recompete-map via
@@ -511,16 +511,21 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
     const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
     if (codes.length) query = query.or(naicsMatchConds(codes).join(','));
   }
-  // Agency multi-select (pipe-joined; both word orders) → forecast's `department` column.
-  // Match on BOTH columns. `department` is NULL for over half the corpus — NAVY
-  // (8,821), HHS (3,643) and USACE (2,908) all store the agency in
-  // `source_agency` only — so filtering on `department` alone silently returned
-  // ZERO for those sources, on the map and in alerts alike. Found 2026-08-02
-  // while wiring forecast alerts: a saved search for HHS forecasts matched
-  // nothing at all.
-  const needles = multiAgency(filters?.agency || '');
-  const agencyExpr = [agencyOrExpr('department', needles), agencyOrExpr('source_agency', needles)]
-    .filter(Boolean).join(',');
+  // ── AGENCY IDENTITY — resolved, never a substring (audit 2026-09-14) ───────────────────
+  // WAS: `agencyOrExpr('department', needles)` OR `agencyOrExpr('source_agency', needles)` — raw
+  // substring ILIKE on both columns. That failed in BOTH directions at once, measured on prod:
+  //   • FALSE NEGATIVE — the map's own Agency presets send SAM-shaped needles ("DEFENSE",
+  //     "HEALTH AND HUMAN SERVICES"), but forecasts store an abbreviation in `source_agency` and
+  //     `department` is NULL for 78% of rows. 9 of 16 presets returned ZERO: DoD 11,789 rows,
+  //     HHS 5,504, DHS 1,644, DOE 1,301, DOJ 619, NASA 189, EPA 50 — all unreachable by agency.
+  //   • FALSE POSITIVE — `agency=EPA` returned 7,246 rows against a real corpus of 50, because
+  //     "d-EPA-rtment" contains "EPA". `agency=SEC` returned 170 "Social SEC-urity" rows.
+  // NOW: resolveForecastAgencies() maps the needle to EXACT `source_agency` codes (a closed
+  // 20-value vocabulary, 100% populated) and filters with `.in(…)`. Unresolved long-tail needles
+  // fall back to a WORD-BOUNDARY regex, never a bare substring. The SAME resolver backs the MCP
+  // tool and this function's other caller, the saved-search ALERT evaluator — so the map, an
+  // agent, and an email can no longer disagree about what "Navy" means.
+  const agencyExpr = forecastAgencyOrExpr(resolveForecastAgencies(filters?.agency ?? ''));
   if (agencyExpr) query = query.or(agencyExpr);
   // State multi-select. TWO bugs fixed here (both measured live 2026-09-12):
   //  1. NOT NORMALIZED — this did `.eq('pop_state', state.toUpperCase())`, so a full name from

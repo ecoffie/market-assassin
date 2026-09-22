@@ -20,6 +20,13 @@ export interface CreditPackage {
   label: string;
   /** Stripe payment-link URL — the dashboard Buy button appends ?client_reference_id=<email>. */
   checkoutUrl: string;
+  /**
+   * Stripe PRICE id. Required for server-created Checkout Sessions, which are the only
+   * way a purchase can carry attempt attribution (payment LINKS do not forward query
+   * params, so `?attempt=` never reaches the webhook). Its absence is why /api/mcp/checkout
+   * returned 400 for `refill` while working for subscription plans.
+   */
+  priceId?: string;
 }
 
 /**
@@ -33,8 +40,28 @@ export interface CreditPackage {
  * created live 2026-07-19; the 4 legacy top-ups ($79/300, $149/700, $99/5,000, $49/2,000)
  * were ARCHIVED in Stripe the same pass (prices + payment links deactivated).
  */
+/**
+ * ⚠️ PHASE 3 DECISION (Eric, 2026-09-15) — NOT YET IMPLEMENTED. Do not apply early.
+ *
+ * The $119 pack becomes **1,000 credits** (from 500), **non-expiring**, and **preserved
+ * through renewal** — a balance must survive a subscription renewal rather than being
+ * reset or replaced by the monthly allowance.
+ *
+ * Until that release the current 500-credit pack stays EXACTLY as is. Prices unchanged.
+ *
+ * Context that makes the current shape worth fixing, measured 2026-09-15 against live
+ * Stripe: the paywall's PRIMARY offer to a blocked user is Entry at $99/mo — a RECURRING
+ * subscription — while the "one-time" $119 pack is the only true one-off and costs MORE
+ * for the same 500 credits. Phase 3 resolves that product structure; changing credit
+ * quantities before then would make the comparison worse, not better.
+ */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' },
+  // PHASE 3 (Eric, 2026-09-15): $119 buys 1,000 credits. Price UNCHANGED; the pack
+  // doubled. Credits are non-expiring and preserved through renewal — enforced by the
+  // purchased/allowance pool split, not by copy.
+  { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits',
+    priceId: 'price_1UFvuQK5zyiZ50PBga7mejqu',
+    checkoutUrl: 'https://buy.stripe.com/28EfZi5Ey97cgVL3OEfnO15' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
@@ -43,6 +70,21 @@ const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
  * Credits for a package id, or null if unknown. Returning null (not a default) is the
  * tamper guard: an unrecognized/forged `package` grants NOTHING.
  */
+/**
+ * Credits for a HISTORICAL price id. Fulfilment resolves by the price the customer
+ * actually bought, so a session created against the old 500-credit price still grants
+ * 500 after the pack becomes 1,000. Resolving by the current package config instead
+ * would retroactively re-price completed purchases.
+ */
+const CREDITS_BY_PRICE_ID: Readonly<Record<string, number>> = {
+  price_1TuxArK5zyiZ50PB6WvZ7ZT2: 500,   // retired 2026-09-15; old sessions still fulfil
+  price_1UFvuQK5zyiZ50PBga7mejqu: 1000,  // Phase 3 — $119 / 1,000 credits
+};
+
+export function creditsForPriceId(priceId: string | null | undefined): number | null {
+  return priceId && priceId in CREDITS_BY_PRICE_ID ? CREDITS_BY_PRICE_ID[priceId] : null;
+}
+
 export function creditsForPackage(packageId: string | null | undefined): number | null {
   const p = packageId ? BY_ID.get(packageId) : undefined;
   return p ? p.credits : null;
@@ -203,36 +245,64 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
   {
     id: 'mid',
     label: 'Mid',
-    creditsPerMonth: 1500,
+    // 1,500 -> 2,000 (Eric, 2026-09-15). At 1,500 Mid had no defensible buyer: app Pro
+    // gives the same 1,500 for $149 WITH the whole application, so a $249 credit-only
+    // plan at equal capacity was dominated. 2,000 is the smallest quantity that clears it.
+    creditsPerMonth: 2000,
     monthly: {
       priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG',
       usd: 249,
-      credits: 1500,
+      credits: 2000,
       checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z',
     },
     annual: {
       priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be',
       usd: 2490, // 2 months free vs $249/mo
       usdPerMonth: 208,
-      credits: 18000, // 12× upfront
+      credits: 24000, // 12× upfront (2,000/mo)
       checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13',
+    },
+  },
+  {
+    // NEW 2026-09-15 (Eric). The missing middle: nothing existed between Mid ($208/mo
+    // annual equivalent) and Agency ($833). A buyer needing ~3,500/mo had to overbuy
+    // Agency at 2.5x the price. Sized so the step UP matches the step IN: +1,500 credits
+    // for +$150 at both rungs, so upgrading never buys a worse deal.
+    id: 'growth',
+    label: 'Growth',
+    creditsPerMonth: 3500,
+    monthly: {
+      priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV',
+      usd: 399,
+      credits: 3500,
+      checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16',
+    },
+    annual: {
+      priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP',
+      usd: 3990, // 2 months free vs $399/mo
+      usdPerMonth: 333,
+      credits: 42000, // 12× upfront (3,500/mo)
+      checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17',
     },
   },
   {
     id: 'agency',
     label: 'Agency',
-    creditsPerMonth: 8000,
+    // 8,000 -> 10,000 (Eric, 2026-09-15). At 8,000 Agency sat at 12.49c/credit — a WORSE
+    // rate than the tier below it, so the top of the ladder had the second-worst price per
+    // credit. 10,000 puts it at 9.99c so the highest-volume tier earns the best rate.
+    creditsPerMonth: 10000,
     monthly: {
       priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH',
       usd: 999,
-      credits: 8000,
+      credits: 10000,
       checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10',
     },
     annual: {
       priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J',
       usd: 9990, // 2 months free vs $999/mo
       usdPerMonth: 833,
-      credits: 96000, // 12× upfront
+      credits: 120000, // 12× upfront (10,000/mo)
       checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14',
     },
   },

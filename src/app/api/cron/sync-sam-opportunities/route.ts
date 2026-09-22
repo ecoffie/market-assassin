@@ -713,20 +713,25 @@ export async function GET(request: NextRequest) {
       console.log('[sync-sam] Skipping stale cleanup due to incomplete sync');
     }
 
-    // CHAINED: kick the gov-buyer data sync (entities + gov-POC contacts).
-    // It has no Vercel cron slot of its own — the platform caps crons at
-    // 100 and we're at the limit (long-term fix: the cron-dispatcher PRD,
-    // docs/PRD-cron-dispatcher.md). We chain it here because this daily
-    // 'full' run produces the opportunity POC data the contacts pull reads,
-    // so ordering is natural. Fire-and-forget: never blocks or fails the
-    // opportunities sync.
+    // CHAINED: kick the SB-ENTITY half of the gov-buyer sync only (`pull=entities`).
+    //
+    // ⚠️ This used to send `pull=both`, which made an UNAWAITED fetch the only production
+    // schedule for the Decision Makers contacts pull — no cron_jobs row, no Vercel slot, and
+    // a silent failure here was invisible. The contacts pull is now the registered source
+    // `decision_makers_sam_contacts` with its OWN cron_jobs row and a durable checkpoint, so
+    // it MUST NOT also be advanced from here: two independent schedules moving one cursor is
+    // exactly the double-advancement this design forbids. Entities keep their own separate
+    // checkpoint (sam_entities_sync_state) and are unaffected.
+    //
+    // Fire-and-forget is still acceptable for entities: it is non-authoritative convenience,
+    // never blocks or fails the opportunities sync.
     if (!dryRun && syncType === 'full') {
       try {
         const origin = new URL(request.url).origin;
         const pw = process.env.ADMIN_PASSWORD;
         // Don't await — let it run independently; log only.
-        fetch(`${origin}/api/cron/sync-gov-buyer-data?pull=both&password=${pw}`)
-          .then(r => console.log(`[sync-sam] chained gov-buyer sync -> ${r.status}`))
+        fetch(`${origin}/api/cron/sync-gov-buyer-data?pull=entities&password=${pw}`)
+          .then(r => console.log(`[sync-sam] chained gov-buyer ENTITY sync -> ${r.status}`))
           .catch(e => console.log('[sync-sam] chained gov-buyer sync error:', e?.message));
       } catch (e) {
         console.log('[sync-sam] could not chain gov-buyer sync:', (e as Error)?.message);

@@ -49,6 +49,18 @@ export interface PastContractsToolResult {
     /** True when the default 'pop' scope returned 0 and we auto-retried the widest scope (FM-05). */
     auto_widened?: boolean;
     requests_fired: number;
+    /**
+     * Field honesty for USASpending gaps. naicsCode/pscCode are SOURCE only;
+     * queried_* carry the filter. recipientState is HQ — popState is place of
+     * performance and does not establish recipient HQ when HQ is empty.
+     */
+    field_status: {
+      naics: 'source_or_empty';
+      psc: 'source_or_empty';
+      recipient_state: 'source_or_empty';
+      pop_state: 'place_of_performance_not_recipient_hq';
+      note: string;
+    };
   };
 }
 
@@ -112,6 +124,14 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
       state_scope: scope,
       ...(autoWidened ? { auto_widened: true } : {}),
       requests_fired: res.requestsFired,
+      field_status: {
+        naics: 'source_or_empty',
+        psc: 'source_or_empty',
+        recipient_state: 'source_or_empty',
+        pop_state: 'place_of_performance_not_recipient_hq',
+        note:
+          'naicsCode/pscCode/recipientState are USASpending source fields (empty when the API returns null). queriedNaics/queriedPsc are the filter you sent — not award evidence. popState is place of performance only; it does not establish recipient HQ.',
+      },
     },
   };
 

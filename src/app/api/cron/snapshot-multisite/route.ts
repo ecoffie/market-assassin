@@ -45,6 +45,7 @@ import type {
   ScrapeLogEntry,
   SourceId,
 } from '@/lib/scrapers/types';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 // ============================================================================
 // CONFIGURATION
@@ -67,15 +68,28 @@ function getSupabase() {
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
-  // Verify cron secret OR admin password
+  // ── Auth ────────────────────────────────────────────────────────────────
+  // This route previously accepted ONLY `x-vercel-cron-secret` or `?password=`.
+  // The dispatcher (`api/cron/dispatch`) sends `Authorization: Bearer
+  // $CRON_SECRET`, which matched NEITHER — so the scheduled job could not
+  // authenticate, and the admin password was pasted into the stored
+  // `cron_jobs.route` value as a workaround. That put a live credential in a
+  // database row, in every dispatcher log line, and in any query of that table.
+  //
+  // Accepting the dispatcher's own mechanism removes the reason the secret was
+  // ever inlined. The other two paths are kept for Vercel-native cron and manual
+  // admin invocation.
   const headersList = await headers();
   const cronSecret = headersList.get('x-vercel-cron-secret');
   const isVercelCron = cronSecret === process.env.CRON_SECRET;
 
-  const password = request.nextUrl.searchParams.get('password');
-  const isAdmin = password === ADMIN_PASSWORD;
+  const bearer = headersList.get('authorization')?.replace('Bearer ', '');
+  const isDispatcher = Boolean(process.env.CRON_SECRET) && bearer === process.env.CRON_SECRET;
 
-  if (!isVercelCron && !isAdmin) {
+  const password = request.nextUrl.searchParams.get('password');
+  const isAdmin = Boolean(ADMIN_PASSWORD) && password === ADMIN_PASSWORD;
+
+  if (!isVercelCron && !isDispatcher && !isAdmin) {
     return NextResponse.json(
       { error: 'Unauthorized. Use Vercel cron or provide password.' },
       { status: 401 }
@@ -217,6 +231,39 @@ export async function GET(request: NextRequest) {
 
   // Return response
   const totalDurationMs = Date.now() - startTime;
+
+  // ── Long-job completion reporting ────────────────────────────────────────
+  // ONE route serves three cron_jobs rows (source is a query param), so the
+  // job name cannot be inferred from the path. Only a run scraping exactly one
+  // mapped source reports — a multi-source or unmapped run has no single job to
+  // speak for, and guessing would write a status onto the wrong job.
+  //
+  // This is where DARPA and NSF looked green for 30 straight days: the route
+  // returned 200 having scraped nothing, and nobody could tell which job that
+  // 200 belonged to. A source that found NOTHING is reported `partial`, never
+  // success — a 200 is not evidence of advancement.
+  const CRON_JOB_BY_SOURCE: Record<string, string> = {
+    nih_reporter: 'snapshot-multisite-nih',
+    nsf_sbir: 'snapshot-multisite-nsf',
+    darpa_baa: 'snapshot-multisite-darpa',
+  };
+  if (!dryRun && sourcesToScrape.length === 1) {
+    const jobName = CRON_JOB_BY_SOURCE[sourcesToScrape[0]];
+    if (jobName) {
+      const r = results[sourcesToScrape[0]] as { error?: string; totalFound?: number } | undefined;
+      if (r?.error) {
+        await reportCronOutcome(jobName, 'error', r.error).catch(() => {});
+      } else if (!r || !r.totalFound) {
+        await reportCronOutcome(
+          jobName,
+          'partial',
+          'scraped 0 records — a 200 is not evidence of advancement',
+        ).catch(() => {});
+      } else {
+        await reportCronOutcome(jobName, 'success').catch(() => {});
+      }
+    }
+  }
 
   return NextResponse.json({
     success: true,

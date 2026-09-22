@@ -44,6 +44,8 @@ export interface Requirement {
   agency: string;
   sub_agency?: string;
   office?: string;
+  /** Structured installation / place name. Never inferred from title. */
+  installation?: string;
   naics?: string;
   psc?: string;
   keyword: string;

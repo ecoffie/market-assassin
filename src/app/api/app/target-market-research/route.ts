@@ -19,8 +19,8 @@
  *      → setAsideSpending, contractCount, satSpending, microSpending,
  *        sub-agency hierarchy, office codes
  *
- *   2. Pain points — from agency_pain_points.json via pain-points-linker
- *      → painPointCount, painPointCategories
+ *   2. Pain points — shared sourced reader (living GAO first, legacy JSON fallback)
+ *      → painPointCount, painPointCategories; sourced vs legacy distinguishable
  *
  *   3. SAM opportunities — from sam_opportunities table
  *      → openOppCount (current active SAM solicitations at this agency)
@@ -51,9 +51,10 @@ import {
   getPainPointsForAgency,
   getPainPointsByNaics,
 } from '@/lib/agency-hierarchy/pain-points-linker';
+import { getAgencySourcedIntelligence } from '@/lib/strategic-intel/sourced-pain-points';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
-import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
+import { keywordCoverage, CoverageDeadlineError, KeywordCoverageNotEstablishedError, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL, setAsideMap, veteranMap } from '@/lib/utils/usaspending-helpers';
 import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
@@ -197,10 +198,13 @@ function resolveOsbp(office?: string, subAgency?: string, parentAgency?: string)
       if (entry.keys.some(k => k.length >= 3 && (officeU.includes(k) || k.includes(officeU)))) return entry.sb;
     }
   }
-  // Fall back to the agency-level OSBP (sub-agency, then parent).
-  return getEnhancedAgencyInfo(office || subAgency || parentAgency || '', subAgency || '', parentAgency || '').smallBusinessContact
-    || getEnhancedAgencyInfo(subAgency || '', subAgency || '', parentAgency || '').smallBusinessContact
-    || null;
+  // Fall back to the agency-level OSBP (sub-agency, then parent). Generic
+  // fallbacks are labeled, not asserted as that agency's OSBP.
+  const primary = getEnhancedAgencyInfo(office || subAgency || parentAgency || '', subAgency || '', parentAgency || '');
+  if (primary.osbpSource === 'directory' && primary.smallBusinessContact) return primary.smallBusinessContact;
+  const secondary = getEnhancedAgencyInfo(subAgency || '', subAgency || '', parentAgency || '');
+  if (secondary.osbpSource === 'directory' && secondary.smallBusinessContact) return secondary.smallBusinessContact;
+  return null;
 }
 
 interface FindAgenciesAgency {
@@ -373,7 +377,17 @@ export async function POST(request: NextRequest) {
       // suggest-codes chips into formData for report generation — but the agency
       // search MUST use the full 90%-coverage set from the keyword, not those
       // top-8 chips (Eric: every keyword returned the same ~96 agencies).
-      coverage = await keywordCoverage(keywordForCoverage);
+      try {
+        coverage = await keywordCoverage(keywordForCoverage);
+      } catch (err) {
+        if (err instanceof KeywordCoverageNotEstablishedError || err instanceof CoverageDeadlineError) {
+          return NextResponse.json({
+            error: 'Market coverage is not established',
+            evidence_status: 'NOT_ESTABLISHED',
+          }, { status: 503 });
+        }
+        throw err;
+      }
       if (coverage && coverage.coverageCodes.length) {
         naicsCode = coverage.coverageCodes.join(', ');
       }
@@ -431,14 +445,8 @@ export async function POST(request: NextRequest) {
     // ONCE here so it can be both returned live AND persisted to the cache — that
     // way a keyword search can be cached without the coverage vanishing on a hit
     // (the original reason keyword searches skipped the cache).
-    // A keyword search whose market concentrates in one NAICS ranks by that code
-    // (buildMarketFilter suppressed the keyword/PSC filter — DOMINANT_NAICS_SHARE).
-    // Reflect that in the lesson banner so it doesn't claim "ranks by keyword" while
-    // the chart is actually NAICS-ranked (Eric's NASA-for-236220 report, Jul 15).
-    const rankedByDominantNaics = Boolean(coverage?.keyword) && !marketFilter;
-    const dominantNaicsCode = rankedByDominantNaics
-      ? (coverage!.allNaics?.[0]?.code || coverage!.coverageCodes[0] || '')
-      : '';
+    // Coverage NAICS/PSC shares are measured distribution, not market identity.
+    // Ranking stays on the keyword (or a curated term-of-art PSC pin).
     const keywordCoveragePayload = coverage ? {
       keyword: coverage.keyword,
       total_market: coverage.totalMarket,
@@ -449,14 +457,16 @@ export async function POST(request: NextRequest) {
       psc_count: coverage.pscCount,
       top_psc: coverage.topPsc,
       top_psc_pct: Math.round(coverage.topPscPct * 100),
-      ranking_mode: marketFilter?.mode || (rankedByDominantNaics ? 'naics' : 'keyword'),
-      // Quotes leadCodePct, not topCodePct: dominantNaicsCode IS allNaics[0] (the lead),
-      // so the % must be the LEAD's share or the label misstates its own code.
-      ranking_label: marketFilter?.rankingLabel || (rankedByDominantNaics
-        ? `NAICS ${dominantNaicsCode} (${Math.round(coverage.leadCodePct * 100)}% of this market)`
-        : `keyword "${coverage.keyword}"`),
+      ranking_mode: marketFilter?.mode || 'keyword',
+      ranking_label: marketFilter?.rankingLabel || `keyword "${coverage.keyword}"`,
+      naics_identity_status: coverage.naicsIdentityStatus,
       uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
       keywords: deriveCoverageKeywords(coverage),
+      // Phase 0 semantic split — must not be read as MARKET_SPEND_WINDOW $
+      fiscal_year: coverage.fiscalYear,
+      window_kind: coverage.windowKind,
+      window_label: coverage.windowLabel,
+      question_kind: coverage.questionKind,
     } : null;
 
     // Cache schema version. Bump when the COMPUTED figures change so stale rows
@@ -472,7 +482,12 @@ export async function POST(request: NextRequest) {
     // fallback that showed State #1 at $13.5B for NAICS 236220 vs its true $2.9B,
     // and a $45.1B headline vs the real $94.4B). The compute has been correct since
     // 40fb9413 (Jul 8); this bump orphans every old entry so no stale render survives.
-    const SPEND_SCHEMA_VERSION = 'sv8';
+    // sv9 = keyword coverage no longer collapses ranking to the lead NAICS from a
+    // BQ description-match share (HVAC≠236220, drones≠336411). Stale sv8 rows that
+    // stored ranking_mode=naics for those phrases must recompute.
+    // sv10 = Phase 0 window/question labels on keyword_coverage (1-FY description
+    // match ≠ MARKET_SPEND_WINDOW 3-FY market size).
+    const SPEND_SCHEMA_VERSION = 'sv10';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different
@@ -829,6 +844,7 @@ export async function POST(request: NextRequest) {
       let oppRowsErr: { message: string } | null = null;
       try {
         oppRows = await fetchAllPaged<{ department: string | null; solicitation_number: string | null }>(() => supabase
+          // truncation-ok: fetchAllPaged drains all pages; the .select shape alone is not a population cap
           .from('sam_opportunities')
           .select('department, solicitation_number')
           .gte('response_deadline', new Date().toISOString())
@@ -1066,17 +1082,33 @@ export async function POST(request: NextRequest) {
     const isSpecificSetAside =
       effectiveBusinessType !== 'Small Business' || Boolean((veteranStatus || '').trim());
 
+    // Preload shared sourced intelligence counts (living GAO first, legacy fallback).
+    // One read per unique lookup key — not a per-row query inside the map.
+    const painCountByKey = new Map<string, number>();
+    const painKeys = [...new Set(
+      findAgencies.map((a) => a.subAgency || a.parentAgency || a.name).filter(Boolean) as string[],
+    )];
+    await Promise.all(painKeys.map(async (key) => {
+      try {
+        const bundle = await getAgencySourcedIntelligence(key, { sourcedLimit: 40, legacyLimit: 40 });
+        painCountByKey.set(
+          key,
+          bundle.meta.sourcedCount + bundle.meta.legacyCount + bundle.meta.legacyPriorityCount,
+        );
+      } catch {
+        const painData = getPainPointsForAgency(key);
+        painCountByKey.set(
+          key,
+          painData ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0) : 0,
+        );
+      }
+    }));
+
     // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
     const rows: TargetMarketResearchRow[] = findAgencies.map((a) => {
       const lookupKey = a.subAgency || a.parentAgency || a.name;
-      const painData = getPainPointsForAgency(lookupKey || '');
-      // AgencyPainPoints exposes painPoints[] + priorities[]; we
-      // surface the combined count so the UI can show one "signal
-      // strength" number per agency.
-      const painPointCount = painData
-        ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
-        : 0;
+      const painPointCount = painCountByKey.get(lookupKey || '') ?? 0;
       // Match opps/events by NORMALIZED agency key. SAM opps/events are keyed
       // by top-level DEPARTMENT, so try the row's parent department first, then
       // sub-agency / name. (This is what fixed the always-0 columns.)
@@ -1303,10 +1335,19 @@ export async function POST(request: NextRequest) {
       // match used in the findAgencies rows above: there's no specific office to
       // anchor to at this level.
       const upcomingEventCount = eventCounts[nk] || 0;
-      const painData = getPainPointsForAgency(name);
-      const painPointCount = painData
-        ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
-        : 0;
+      let painPointCount = painCountByKey.get(name);
+      if (painPointCount === undefined) {
+        try {
+          // Rare path: spend-rollup agency not in findAgencies — one shared-reader call.
+          // Synchronous fallback keeps this branch from blocking the whole response on miss.
+          const painData = getPainPointsForAgency(name);
+          painPointCount = painData
+            ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
+            : 0;
+        } catch {
+          painPointCount = 0;
+        }
+      }
       const naicsAligned = naicsAlignedPainAgencies.has(name.toLowerCase());
       loadPrimesForKey(name);
       const topPrimes = primesByAgencyKey.get(name) || [];

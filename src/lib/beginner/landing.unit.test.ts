@@ -41,6 +41,15 @@ function coverageOk(keyword: string): KeywordCoverageToolResult {
       topPscPct: 0.8,
       topPscList: [{ code: 'S201', name: 'Housekeeping and Janitorial Services', amount: 800, pct: 0.8 }],
       pinnedPscCodes: null,
+      transactionCount: 1,
+      uniqueAwardCount: 1,
+      fiscalYear: 2025,
+      source: 'bigquery_usaspending_awards',
+      sourceMaxActionDate: '2025-09-30',
+      allAgencies: [],
+      primarySense: 'work_text',
+      evidenceStatus: 'MARKET_EVIDENCE_FOUND',
+      naicsIdentityStatus: 'NOT_ESTABLISHED',
     },
     _meta: { grounded: true, degraded: false, naics_count: 2, total_market: 1_000_000_000 },
   };
@@ -122,7 +131,11 @@ describe('toBeginnerLandingView', () => {
       {
         deriveKeywords: async () => deriveOk(['janitorial services']),
         getCoverage: async ({ keyword }) => coverageMiss(keyword),
-        searchSam: async () => ({ ok: true, count: 1, items: [item()] }),
+        // Must be in the SAME market as the description: since 2026-09-21 the
+        // relevance gate needs activity evidence in the title, so an HVAC
+        // fixture under a cleaning description would (correctly) be dropped
+        // and this would stop testing the reveal copy.
+        searchSam: async () => ({ ok: true, count: 1, items: [item({ title: 'Interior Cleaning Services' })] }),
       },
     );
     const view = toBeginnerLandingView(result);

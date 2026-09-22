@@ -21,6 +21,18 @@
  *   2. Reverse sample: distinctive nouns taken FROM live titles, wrapped in
  *      beginner sentences. By construction the cache contains the noun.
  *
+ * ⚠️ WHAT THE SAMPLE DOES AND DOES NOT MEASURE.
+ * It is a RECALL floor, not a precision score. Each noun is harvested from a
+ * live open title, so a relevant listing provably exists; the only assertions
+ * are that /try does not come back EMPTY and does not ask a follow-up. It says
+ * nothing about whether the other results are any good — a run that returned
+ * the whole corpus for every input would score 1000/1000. Precision lives in
+ * the pinned regressions above and in the frozen set
+ * (src/lib/beginner/__fixtures__/try-relevance-cases.ts), which assert
+ * include/exclude per record. Two further limits: the corpus is one PostgREST
+ * page (1,000 rows), not a census, and the four frames are templates, not real
+ * user prose.
+ *
  * Run:  npm run verify:beginner-try
  *       npm run verify:beginner-try -- --sample 250
  *       npm run verify:beginner-try -- --json
@@ -47,6 +59,7 @@ const sb = createClient(url, key);
 const { beginnerDirectKeyword, searchBeginnerHiddenMarket, toHiddenMarketLandingView } =
   await import('@/lib/beginner/hidden-market');
 const { isDistinctiveKeyword } = await import('@/lib/market/keyword-sanitize');
+const { stripBuyerNames } = await import('@/lib/beginner/relevance');
 
 const todayIso = new Date().toISOString();
 const SELECT =
@@ -64,6 +77,11 @@ function escapeIlike(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
+// ⚠️ NO `notice_id` here. Harmless today (nothing reads it), but it is why the
+// removed detail-evidence fallback got ZERO coverage from this oracle while it
+// reported 13/13 — every candidate was skipped before any fetch. A future
+// body-relevance feature MUST add it, or this file will pass with that feature
+// disabled. See tasks/body-relevance-followup-2026-09-21.md.
 function toItem(row) {
   return {
     title: row.title ?? null,
@@ -141,7 +159,11 @@ const NOT_A_BUSINESS_NOUN = new Set([
 ]);
 
 function distinctiveTokensFromTitle(title) {
-  const words = String(title || '')
+  // ⚠️ Strip ORGANISATION names before harvesting. 7 of the 8 live titles
+  // containing "engineers" are "U.S. Army Corps of Engineers" — the BUYER.
+  // Mining a buyer's name as a business noun makes the harness demand results
+  // for "I do engineers", and the relevance gate is right to give none.
+  const words = stripBuyerNames(String(title || ''))
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
@@ -185,6 +207,48 @@ function distinctiveTokensFromTitle(title) {
       description: 'I do stuff',
       expect: 'need_followup',
     },
+    // ── /try relevance batch, 2026-09-21 ────────────────────────────────
+    // THE SCREENSHOT INPUT. Before the fix this searched the literal word
+    // "person" (out of "2 person") and returned 13 results: a personnel-
+    // security platform, a PERSONAL alert device and PERSONAL services
+    // contractors. It must now find waste work, or nothing.
+    {
+      description: 'can a 2 person garbage company do government contracts',
+      expect: 'results',
+      titleMust: /garbage|trash|refuse|waste|sanitation/i,
+      titleMustNot: /personnel|personal|hypersonic|warhead/i,
+    },
+    {
+      description: 'physical security guard services',
+      expect: 'results',
+      titleMust: /guard|security/i,
+      // "Coast Guard"/"National Guard" are BUYERS; a grill/cattle/snow guard
+      // is a part. None may appear as a described match.
+      titleMustNot: /coast guard|national guard|grill guard|cattle guard|snow guard|lifeguard/i,
+    },
+    {
+      description: 'I own a landscaping business',
+      expect: 'results',
+      titleMust: /landscap|grounds|mowing/i,
+    },
+    // Every content word is company/meta context — the honest answer is a
+    // question, not a confident list of unrelated contracts.
+    {
+      description: 'I help businesses',
+      expect: 'need_followup',
+    },
+    // ── EXACT-TOKEN MISS IS NOT MARKET ABSENCE (2026-09-21) ─────────────
+    // Zero open TITLES contain "lawn" or "mowing", while ~18 open
+    // grounds-maintenance notices (NAICS 561730) are exactly this business.
+    // Whatever we show, the words must never claim the market is empty.
+    {
+      description: 'we mow lawns',
+      expect: 'no_market_absence_claim',
+    },
+    {
+      description: 'staffing agency',
+      expect: 'no_market_absence_claim',
+    },
     {
       description: 'zzqwxjunkterm999xyz',
       expect: 'no_cards',
@@ -209,6 +273,18 @@ function distinctiveTokensFromTitle(title) {
         record(`pinned "${pin.description}" → follow-up`, ok, `outcome=${view.outcome} state=${result.resolution.state}`);
         continue;
       }
+      if (pin.expect === 'no_market_absence_claim') {
+        const blob = `${view.message || ''} ${view.reveal?.explanation || ''} ${(view.reveal?.limitations || []).join(' ')}`;
+        const banned = /nothing matching is open|the open market is small|0 current opportunit|no opportunities exist/i;
+        const bad = blob.match(banned);
+        const names = /not a reading of the market|not a sign that nothing is open|limit of this search/i.test(blob);
+        record(
+          `pinned "${pin.description}" → miss, not absence`,
+          !bad && names,
+          bad ? `CLAIMED ABSENCE: "${bad[0]}"` : names ? 'copy names the search limit' : 'copy does not name the search limit',
+        );
+        continue;
+      }
       if (pin.expect === 'no_cards') {
         const ok =
           (view.directCards || []).length === 0 &&
@@ -219,11 +295,17 @@ function distinctiveTokensFromTitle(title) {
       }
       const cards = [...(view.directCards || []), ...(view.uncoveredCards || [])];
       const titled = cards.filter((c) => pin.titleMust.test(c.title || ''));
-      const ok = view.outcome === 'results' && cards.length > 0 && titled.length > 0;
+      // A described match must never carry a forbidden sense of the word.
+      const leaked = pin.titleMustNot
+        ? (view.directCards || []).filter((c) => pin.titleMustNot.test(c.title || ''))
+        : [];
+      const ok =
+        view.outcome === 'results' && cards.length > 0 && titled.length > 0 && leaked.length === 0;
       record(
         `pinned "${pin.description}" → results`,
         ok,
-        `outcome=${view.outcome} keyword=${result.directKeyword} ${titled.length}/${cards.length} title-hit`,
+        `outcome=${view.outcome} keyword=${result.directKeyword} ${titled.length}/${cards.length} title-hit` +
+          (leaked.length ? ` LEAKED: ${leaked.map((c) => c.title).join(' | ')}` : ''),
       );
     } catch (e) {
       record(`pinned "${pin.description}"`, false, 'threw: ' + (e?.message || e));
@@ -323,7 +405,7 @@ if (!PINNED_ONLY) {
 
     const pass = falseEmpty === 0 && falseFollowup === 0 && combinations > 0;
     record(
-      `sample ${tokenSet.length} nouns × 4 frames = ${combinations} searches`,
+      `sample ${tokenSet.length} nouns × 4 frames = ${combinations} searches (RECALL floor only — asserts not-empty / not-follow-up, makes NO precision claim)`,
       pass,
       `ok=${okCount} false-empty=${falseEmpty} false-followup=${falseFollowup}`,
     );

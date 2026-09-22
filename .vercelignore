@@ -1,0 +1,13 @@
+# Vercel CLI uploads the working directory and does NOT honour .gitignore.
+# Without this file `vercel --prod` tried to upload .claude/worktrees/ — ~124 GB
+# of per-worktree node_modules — and failed with "Request body too large.
+# Limit: 10mb", blocking a production deploy needed to bind a new env var.
+#
+# Git-push deploys build server-side from the repo and were never affected, so
+# this only matters for a manual CLI deploy. Tracked files under .claude/
+# (agents, commands, settings) are NOT needed by the build.
+.claude/
+node_modules
+.next
+tsconfig.tsbuildinfo
+.tmp-probe/

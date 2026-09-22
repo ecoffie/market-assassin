@@ -15,6 +15,7 @@ import { fetchAgencySpendingPatterns, fetchNAICSSpending, fetchSubtierAgencies }
 import { batchVerify, quickVerify } from './verifier';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
+import { isUnsupportedBudgetClaim, stripUnsupportedBudgetClaims } from '@/lib/strategic-intel/unsupported-budget-claim';
 
 // Type for static pain points JSON
 interface AgencyPainPointsData {
@@ -89,6 +90,8 @@ export async function syncAllSources(
   // no longer resolves in DNS and it had contributed 0 records since Apr 2026.
   // See fetchers/it-dashboard.ts for the re-sourcing note.
   await runSource('USASpending', () => fetchAgencySpendingPatterns({ fiscalYear, dryRun }));
+  // GovInfo GAOREPORTS is QUARANTINED — living GAO authority is institute_gao (RSS).
+  // Default fetchGAOReports returns []. Do not re-enable without allowLegacyGovInfo.
   await runSource('GovInfo', () => fetchGAOReports({ fiscalYear, dryRun }));
 
   console.log(`[AgencyIntel] Fetched ${allIntelligence.length} total items`, bySource);
@@ -188,7 +191,8 @@ async function storeIntelligence(items: AgencyIntelligence[]): Promise<number> {
  */
 export async function getAgencyIntelligence(
   agencyName: string,
-  types?: string[]
+  types?: string[],
+  opts: { includeUnsupportedAttribution?: boolean } = {},
 ): Promise<AgencyIntelligence[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -224,8 +228,18 @@ export async function getAgencyIntelligence(
   const resolution = resolveAgency({ agencyName });
   if (!resolution.resolved || !resolution.canonicalAgency) return [];
 
+  // ⚠️ AGENCY-SPECIFIC READ → the QUARANTINED view, never the base table.
+  //
+  // Option C (approved 2026-09-20): GAO rows classified `artifact_agency` (148)
+  // or `unsupported_by_title` (64) are unreachable through an agency lookup,
+  // because that is the only context in which a wrong agency is a false claim.
+  // The 212 rows still EXIST in `agency_intelligence`; admin, data-health and
+  // historical-research surfaces read the base table and still see all 445.
+  //
+  // `opts.includeUnsupportedAttribution` is the deliberate escape hatch for a
+  // non-agency-specific caller that legitimately needs the full corpus.
   let query = supabase
-    .from('agency_intelligence')
+    .from(opts.includeUnsupportedAttribution ? 'agency_intelligence' : 'agency_intelligence_agency_safe')
     .select('*')
     .eq('agency_name', resolution.canonicalAgency)
     .order('updated_at', { ascending: false });
@@ -270,8 +284,10 @@ export async function getIntelligenceForBriefing(
   )];
   if (canonical.length === 0) return [];
 
+  // Agency-specific by construction (it takes a list of agencies), so it reads
+  // the quarantined view for the same reason as getAgencyIntelligence.
   const { data, error } = await supabase
-    .from('agency_intelligence')
+    .from('agency_intelligence_agency_safe')
     .select('*')
     .in('agency_name', canonical)
     .gte('fiscal_year', new Date().getFullYear() - 1)
@@ -307,20 +323,34 @@ export async function recordSyncRun(run: SyncRun): Promise<void> {
  */
 export interface UnifiedAgencyIntel {
   agencyName: string;
+  /** Display strings — sourced first, legacy labeled. Prefer painPointCitations. */
   painPoints: string[];
   priorities: string[];
-  gaoReports: string[];       // From database (gao_high_risk type)
+  gaoReports: string[];       // From database (gao_high_risk type) — LEGACY GovInfo path
   spendingPatterns: string[]; // From database (contract_pattern type)
-  sources: ('static' | 'database')[];
+  sources: ('static' | 'database' | 'institute_gao')[];
+  /** Structured citations from the shared sourced reader. */
+  painPointCitations?: Array<{
+    claim: string;
+    provenance: 'SOURCE_FACT' | 'MINDY_INTERPRETATION' | 'LEGACY_MANUAL';
+    source_url: string | null;
+    document_number: string | null;
+    published_at: string | null;
+    institute_source_id: string | null;
+  }>;
+  hasSourcedIntelligence?: boolean;
 }
 
 /**
  * Get unified intelligence for a specific agency
- * Combines static JSON with database records
+ * Living sourced GAO first via shared reader; legacy JSON / agency_intelligence second.
  */
 export async function getUnifiedAgencyIntelligence(
   agencyName: string
 ): Promise<UnifiedAgencyIntel | null> {
+  const { getAgencySourcedIntelligence, formatPainPointForDisplay, toCitation } =
+    await import('@/lib/strategic-intel/sourced-pain-points');
+
   const result: UnifiedAgencyIntel = {
     agencyName,
     painPoints: [],
@@ -330,15 +360,38 @@ export async function getUnifiedAgencyIntelligence(
     sources: [],
   };
 
-  // 1. Check static JSON (exact match first, then partial)
-  const staticAgency = findStaticAgency(agencyName);
-  if (staticAgency) {
-    result.painPoints.push(...staticAgency.painPoints);
-    result.priorities.push(...staticAgency.priorities);
-    result.sources.push('static');
+  // 1. Shared sourced-first reader (institute_sources + agency_pain_points_db + legacy JSON)
+  try {
+    const bundle = await getAgencySourcedIntelligence(agencyName);
+    if (bundle.painPoints.length > 0 || bundle.priorities.length > 0) {
+      result.painPoints = bundle.painPoints.map(formatPainPointForDisplay);
+      result.priorities = bundle.priorities.map(formatPainPointForDisplay);
+      result.painPointCitations = bundle.painPoints.map(toCitation);
+      result.hasSourcedIntelligence = bundle.meta.sourcedCount > 0;
+      if (bundle.meta.sourcedCount > 0) result.sources.push('institute_gao');
+      if (bundle.meta.legacyCount > 0) result.sources.push('static');
+    }
+  } catch (err) {
+    console.error('[getUnifiedAgencyIntelligence] sourced reader failed:', err);
   }
 
-  // 2. Check database
+  // 2. Fallback: static JSON alone if reader returned nothing
+  if (result.painPoints.length === 0) {
+    const staticAgency = findStaticAgency(agencyName);
+    if (staticAgency) {
+      result.painPoints.push(
+        ...staticAgency.painPoints.map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`),
+      );
+      result.priorities.push(
+        ...stripUnsupportedBudgetClaims(staticAgency.priorities).map(
+          (p) => `${p} [LEGACY_MANUAL — provenance unavailable]`,
+        ),
+      );
+      result.sources.push('static');
+    }
+  }
+
+  // 3. Legacy agency_intelligence table (GovInfo GAOREPORTS etc.) — labeled, not authoritative
   const dbRecords = await getAgencyIntelligence(agencyName);
   if (dbRecords.length > 0) {
     result.sources.push('database');
@@ -347,33 +400,40 @@ export async function getUnifiedAgencyIntelligence(
       if (record.intelligence_type === 'gao_high_risk') {
         const gaoEntry = `${record.title}`;
         if (!result.gaoReports.includes(gaoEntry)) {
-          result.gaoReports.push(gaoEntry);
-          // Also add to pain points if not already there
-          const shortText = record.title.slice(0, 50);
-          if (!result.painPoints.some(p => p.includes(shortText))) {
-            result.painPoints.push(`${record.title} (Source: GAO)`);
-          }
+          // Rows reaching here already passed the attribution quarantine, but
+          // `no_title_evidence` (211 of 445) means the title could not adjudicate
+          // the agency EITHER WAY. It must never read as corroborated — labelling
+          // it identically to a corroborated row would assert what we do not know.
+          const evidence = (record as { attribution_evidence?: string | null }).attribution_evidence;
+          const attributionNote =
+            evidence === 'no_title_evidence'
+              ? ' [agency attribution UNRESOLVED — not corroborated by the report title]'
+              : '';
+          result.gaoReports.push(
+            `${gaoEntry} [LEGACY_GOVINFO — not living Institute]${attributionNote}`,
+          );
         }
       } else if (record.intelligence_type === 'contract_pattern') {
-        const spendingEntry = record.description || record.title;
-        if (!result.spendingPatterns.includes(spendingEntry)) {
+        // A spending OBSERVATION is not a stated agency PRIORITY. Promoting it to
+        // `priorities` is what carried the fabricated government-wide
+        // "Congressional justification outlay" figure into opp-intel and onto 549
+        // customer-visible opportunities. Spending stays in `spendingPatterns`;
+        // it never becomes a priority claim again.
+        const spendingEntry = record.description;
+        if (spendingEntry && !isUnsupportedBudgetClaim(spendingEntry)
+            && !result.spendingPatterns.includes(spendingEntry)) {
           result.spendingPatterns.push(spendingEntry);
-          // Also add to priorities if not already there
-          const shortText = spendingEntry.slice(0, 50);
-          if (!result.priorities.some(p => p.includes(shortText))) {
-            result.priorities.push(spendingEntry);
-          }
         }
       } else if (record.intelligence_type === 'budget_priority') {
         const priority = record.description || record.title;
-        if (!result.priorities.some(p => p.includes(priority.slice(0, 50)))) {
-          result.priorities.push(priority);
+        if (!isUnsupportedBudgetClaim(priority)
+            && !result.priorities.some(p => p.includes(priority.slice(0, 50)))) {
+          result.priorities.push(`${priority} [LEGACY_MANUAL — provenance unavailable]`);
         }
       }
     }
   }
 
-  // Return null if no data found
   if (result.sources.length === 0) {
     return null;
   }

@@ -114,6 +114,21 @@ describe('map rail — Vault and Reports stay OUT (all 9 copies)', () => {
     expect(src).not.toContain('<a href="/opportunity-map/reports">Reports</a>');
   });
 
+  it('sibling top-nav Players links to the canonical companies mode, not buyers', () => {
+    // In-map Players nav already called __playersGate('companies'). Sibling pages (Markets,
+    // Today, Vault, …) emitted ?mode=buyers, and the dataset pill has no buyers option, so
+    // the dropdown went blank. Gold master = the in-map nav.
+    const siblings = RAIL_PAGES.filter((p) => p !== 'route.ts');
+    for (const page of siblings) {
+      const src = read(page);
+      expect(src, `${page} still emits ?mode=buyers`).not.toContain('href="/opportunity-map?mode=buyers"');
+      expect(src, `${page} Players nav must land on companies`).toContain('href="/opportunity-map?mode=companies"');
+    }
+    const today = readFileSync(join(process.cwd(), 'src/app/today/route.ts'), 'utf8');
+    expect(today).not.toContain('href="/opportunity-map?mode=buyers"');
+    expect(today).toContain('href="/opportunity-map?mode=companies"');
+  });
+
   it('/today matches — it renders the same rail and must not drift', () => {
     // /today is a ROUTE HANDLER now (PR #1127), so it carries its own copy of this rail. It used
     // to be MindyChrome.tsx; that component became dead code the moment the reframe landed and

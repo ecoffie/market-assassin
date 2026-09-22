@@ -24,7 +24,12 @@
  * AT MOST ONE canonical agency, or to none.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { resolveAgency, type AgencyResolution } from '@/lib/strategic-intel/agency-resolver';
+import type { AgencyResolution } from '@/lib/strategic-intel/agency-resolver';
+import {
+  resolveDocumentAgencyWithPhrases,
+  classifyDocumentAgency,
+  type DocumentAgencyAudit,
+} from './document-agency';
 
 /** A government-authored document, normalized. Source-type agnostic on purpose. */
 export interface InstituteDocument {
@@ -36,12 +41,24 @@ export interface InstituteDocument {
   publicationDate: string | null;
   abstract: string | null;
   sourceWatermark?: string | null;
+  /**
+   * Optional structured provenance, stored verbatim in institute_sources.raw.
+   * GAO documents carry none; legislative documents carry congress / chamber /
+   * bill number / legislative version / action dates / retrievedAt, which is the
+   * difference between a citation and a guess. Collectors that omit it keep the
+   * previous minimal shape.
+   */
+  raw?: Record<string, unknown>;
 }
 
 export interface IngestResult {
   documentNumber: string;
   instituteSourceId: string | null;
   inserted: boolean;                 // false = already in the corpus (idempotent)
+  /** true only on the repair path: an existing row's attribution was refreshed. */
+  updated?: boolean;
+  /** true when the identity exists and NOTHING source-derived changed (genuine no-op). */
+  unchanged?: boolean;
   resolution: AgencyResolution;
   error?: string;
 }
@@ -97,21 +114,87 @@ export async function fetchGaoReports(fetchImpl: typeof fetch = fetch): Promise<
  *
  * A GAO title reads "Subject: Finding"; the agency is usually named in the subject or
  * the opening line of the abstract ("a component within the Department of Homeland
- * Security"). We match a canonical agency NAME as a whole, word-bounded phrase.
+ * Security"). Matching uses canonical toptier names PLUS curated high-confidence
+ * phrases (FAA→DOT, NPS→Interior, …) — see document-agency.ts.
  *
  * TWO REFUSALS, both deliberate:
  *   • zero names found   -> unresolved
  *   • two or more names  -> unresolved (ambiguous is NOT a coin flip, and it is
  *                          exactly how one report ended up under four agencies)
+ *
+ * MULTI_AGENCY candidates are preserved on the audit path; they are NEVER coerced
+ * into a single department.
  */
 export function resolveDocumentAgency(doc: InstituteDocument, canonicalNames: string[]): AgencyResolution {
-  const haystack = `${doc.title}\n${doc.abstract ?? ''}`;
-  const hits = new Set<string>();
-  for (const name of canonicalNames) {
-    const re = new RegExp(`(?:^|[^A-Za-z])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[^A-Za-z]|$)`, 'i');
-    if (re.test(haystack)) hits.add(name);
+  return resolveDocumentAgencyWithPhrases(doc, canonicalNames);
+}
+
+export function auditDocumentAgency(doc: InstituteDocument, canonicalNames: string[]): DocumentAgencyAudit {
+  return classifyDocumentAgency(doc, canonicalNames);
+}
+
+/**
+ * Fields inside `raw` that are OPERATIONAL, not source-derived: they change on every
+ * poll regardless of whether the government changed anything.
+ *
+ * ⚠️ COMPARING THESE DEFEATS THE WHOLE POINT. `retrievedAt` is stamped at fetch time,
+ * so including it makes every unchanged artifact look modified — which is exactly the
+ * `evidenceUpdated: 29`-every-run churn this change removes.
+ */
+const OPERATIONAL_RAW_KEYS = new Set(['retrievedAt']);
+
+/** Stable, order-independent projection of `raw` limited to source-derived facts. */
+function sourceDerivedRaw(raw: unknown): string {
+  if (raw === null || raw === undefined) return 'null';
+  if (Array.isArray(raw)) return JSON.stringify(raw.map((v) => JSON.parse(sourceDerivedRaw(v))));
+  if (typeof raw !== 'object') return JSON.stringify(raw);
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(raw as Record<string, unknown>).sort()) {
+    if (OPERATIONAL_RAW_KEYS.has(k)) continue;
+    const v = (raw as Record<string, unknown>)[k];
+    out[k] = v !== null && typeof v === 'object' ? JSON.parse(sourceDerivedRaw(v)) : v;
   }
-  return resolveAgency({ agencyName: hits.size === 1 ? [...hits][0] : '' });
+  return JSON.stringify(out);
+}
+
+/** The persisted columns a re-ingest may legitimately change. */
+export interface PersistedSourceFields {
+  title: string;
+  source_url: string;
+  publication_date: string | null;
+  canonical_agency: string | null;
+  toptier_code: string | null;
+  resolution_method: string | null;
+  resolution_confidence: string | null;
+  source_watermark: string | null;
+  abstract: string | null;
+  raw: unknown;
+}
+
+/**
+ * Has anything SOURCE-DERIVED actually changed?
+ *
+ * Identity columns (source_type, document_number) are excluded by construction — they
+ * are the key, not a payload. `updated_at` is never compared: it is a consequence of
+ * writing, so comparing it would make every row look changed forever.
+ *
+ * A real change (a new latest action, a corrected date, a newly grounded agency) MUST
+ * still produce an UPDATE. This only suppresses writes that would change nothing.
+ */
+export function hasSourceFieldChanges(
+  existing: Partial<PersistedSourceFields> | null | undefined,
+  incoming: PersistedSourceFields,
+): boolean {
+  if (!existing) return true;
+  const scalars: Array<keyof PersistedSourceFields> = [
+    'title', 'source_url', 'publication_date', 'canonical_agency',
+    'toptier_code', 'resolution_method', 'resolution_confidence',
+    'source_watermark', 'abstract',
+  ];
+  for (const k of scalars) {
+    if ((existing[k] ?? null) !== (incoming[k] ?? null)) return true;
+  }
+  return sourceDerivedRaw(existing.raw) !== sourceDerivedRaw(incoming.raw);
 }
 
 /**
@@ -120,21 +203,110 @@ export function resolveDocumentAgency(doc: InstituteDocument, canonicalNames: st
  *
  * The record is kept REGARDLESS of whether any intelligence is later derived from it.
  */
+/**
+ * Options for collectors whose agency identity is established BEFORE ingestion.
+ *
+ * ⚠️ WHY THIS EXISTS (production defect, Gate 3, 2026-09-20). The legislative route
+ * resolved each NDAA document to Department of Defense correctly
+ * (`resolveLegislationAgency`, method `exact_name`), then threw that result away and
+ * passed only a NAME LIST here — so this function re-resolved from the title with the
+ * GAO matcher. An NDAA title reads "National Defense Authorization Act" and never
+ * contains the literal string "Department of Defense", so 28 of 29 rows persisted
+ * with `canonical_agency = null`.
+ *
+ * The fix is to CARRY the grounded resolution through, not to loosen matching:
+ * `agencyResolution` is used VERBATIM when supplied, and the title matcher is not
+ * consulted at all. Nothing is guessed, nothing is hardcoded, and a collector that
+ * supplies no resolution keeps the previous behaviour exactly (GAO is untouched).
+ */
+export interface IngestOptions {
+  /**
+   * A resolution the CALLER already established from authoritative structure
+   * (e.g. a bill's own subject), not from fuzzy title text. Used as-is.
+   * An unresolved resolution stays unresolved — this never upgrades a null.
+   */
+  agencyResolution?: AgencyResolution;
+  /**
+   * Re-apply provenance + attribution to a row that already exists, keyed on the
+   * SAME (source_type, document_number). Never changes identity, never inserts a
+   * second row. Off by default so existing callers keep insert-or-noop semantics.
+   */
+  updateExisting?: boolean;
+}
+
 export async function ingestInstituteDocument(
   db: SupabaseClient,
   doc: InstituteDocument,
   canonicalNames: string[],
+  options: IngestOptions = {},
 ): Promise<IngestResult> {
-  const resolution = resolveDocumentAgency(doc, canonicalNames);
+  const audit = auditDocumentAgency(doc, canonicalNames);
+  // A caller-supplied resolution WINS. It was derived from the document's own
+  // structure; re-deriving it from the title here is what lost it.
+  const resolution = options.agencyResolution ?? audit.resolution;
 
-  const { data: existing } = await db
+  const rawPayload = {
+    ...(doc.raw ?? { title: doc.title, url: doc.url, publicationDate: doc.publicationDate }),
+    agencyClassification: audit.classification,
+    agencyCandidates: audit.candidates,
+    agencyNote: audit.note,
+  };
+
+  const { data: existing, error: lookupError } = await db
     .from('institute_sources')
     // unranged-ok: single row by the unique (source_type, document_number) key.
-    .select('id')
+    // Selects the comparison columns so an unchanged artifact can be a genuine no-op.
+    .select('id, title, source_url, publication_date, canonical_agency, toptier_code, resolution_method, resolution_confidence, source_watermark, abstract, raw')
     .eq('source_type', doc.sourceType).eq('document_number', doc.documentNumber).maybeSingle();
 
+  // ⚠️ A FAILED LOOKUP IS NOT "NO SUCH ROW". Treating it as absence would fall through
+  // to the insert path and attempt a DUPLICATE of an identity we already hold — the
+  // unique key would reject it, but the run would report a spurious failure and, on a
+  // table without that key, would genuinely duplicate. Surface it instead.
+  if (lookupError) {
+    return { documentNumber: doc.documentNumber, instituteSourceId: null, inserted: false, resolution, error: lookupError.message };
+  }
+
   if (existing?.id) {
-    return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, resolution };
+    if (!options.updateExisting) {
+      return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, resolution };
+    }
+
+    const incoming: PersistedSourceFields = {
+      title: doc.title,
+      source_url: doc.url,
+      publication_date: doc.publicationDate,
+      canonical_agency: resolution.canonicalAgency,
+      toptier_code: resolution.toptierCode,
+      resolution_method: resolution.method,
+      resolution_confidence: resolution.confidence,
+      source_watermark: doc.sourceWatermark ?? doc.publicationDate,
+      abstract: doc.abstract,
+      raw: rawPayload,
+    };
+
+    // ⚠️ CHANGE-AWARE. An artifact the government has not touched must be a genuine
+    // no-op: no UPDATE, no updated_at churn. Before this, a steady-state cron
+    // rewrote all 29 rows every cycle and reported evidenceUpdated:29 forever, which
+    // makes a REAL change indistinguishable from routine noise.
+    if (!hasSourceFieldChanges(existing as Partial<PersistedSourceFields>, incoming)) {
+      return { documentNumber: doc.documentNumber, instituteSourceId: existing.id as string, inserted: false, updated: false, unchanged: true, resolution };
+    }
+
+    // Something source-derived really changed -> write it. Identity is never touched.
+    const { error: updErr } = await db.from('institute_sources').update({
+      ...incoming,
+      updated_at: new Date().toISOString(),
+    }).eq('id', existing.id);
+
+    return {
+      documentNumber: doc.documentNumber,
+      instituteSourceId: existing.id as string,
+      inserted: false,
+      updated: !updErr,
+      resolution,
+      ...(updErr ? { error: updErr.message } : {}),
+    };
   }
 
   const { data, error } = await db.from('institute_sources').insert({
@@ -150,7 +322,9 @@ export async function ingestInstituteDocument(
     resolution_confidence: resolution.confidence,
     source_watermark: doc.sourceWatermark ?? doc.publicationDate,
     abstract: doc.abstract,
-    raw: { title: doc.title, url: doc.url, publicationDate: doc.publicationDate },
+    // The agency-classification audit ALWAYS travels with the row, merged over any
+    // collector-supplied provenance payload (congress, chamber, version, dates).
+    raw: rawPayload,
   }).select('id').maybeSingle();
 
   if (error) {
@@ -163,4 +337,99 @@ export async function ingestInstituteDocument(
   }
 
   return { documentNumber: doc.documentNumber, instituteSourceId: (data?.id as string) ?? null, inserted: true, resolution };
+}
+
+export interface ReconcileAgencyResult {
+  scanned: number;
+  newlyResolved: number;
+  stillUnresolved: number;
+  multiAgency: number;
+  noAgency: number;
+  details: Array<{
+    documentNumber: string;
+    classification: string;
+    canonicalAgency: string | null;
+    candidates: string[];
+  }>;
+}
+
+/**
+ * Re-run agency resolution on held unresolved GAO rows. Only WRITES when evidence
+ * newly supports a single canonical agency — never force-maps MULTI/NO/UNKNOWN.
+ *
+ * Existing rows were frozen at insert-time resolution; improving the phrase map
+ * would otherwise leave them stuck. Idempotent.
+ */
+export async function reconcileUnresolvedGaoAgencies(
+  db: SupabaseClient,
+  canonicalNames: string[],
+): Promise<ReconcileAgencyResult> {
+  const { data: rows, error } = await db
+    .from('institute_sources')
+    .select('id,document_number,title,abstract,source_url,publication_date,raw,resolution_method')
+    .eq('source_type', 'gao_report')
+    .or('canonical_agency.is.null,resolution_method.eq.unresolved');
+  if (error) throw new Error(`reconcileUnresolvedGaoAgencies: ${error.message}`);
+
+  const result: ReconcileAgencyResult = {
+    scanned: rows?.length ?? 0,
+    newlyResolved: 0,
+    stillUnresolved: 0,
+    multiAgency: 0,
+    noAgency: 0,
+    details: [],
+  };
+
+  for (const row of rows ?? []) {
+    const doc: InstituteDocument = {
+      sourceOrg: 'GAO',
+      sourceType: 'gao_report',
+      documentNumber: row.document_number as string,
+      title: row.title as string,
+      url: (row.source_url as string) || '',
+      publicationDate: (row.publication_date as string) || null,
+      abstract: (row.abstract as string) || null,
+    };
+    const audit = auditDocumentAgency(doc, canonicalNames);
+    result.details.push({
+      documentNumber: doc.documentNumber,
+      classification: audit.classification,
+      canonicalAgency: audit.resolution.canonicalAgency,
+      candidates: audit.candidates,
+    });
+
+    if (audit.classification === 'MULTI_AGENCY') { result.multiAgency++; result.stillUnresolved++; continue; }
+    if (audit.classification === 'NO_AGENCY') { result.noAgency++; result.stillUnresolved++; 
+      // Persist classification provenance without inventing an agency.
+      const priorRaw = (row.raw && typeof row.raw === 'object') ? row.raw as Record<string, unknown> : {};
+      await db.from('institute_sources').update({
+        raw: { ...priorRaw, agencyClassification: audit.classification, agencyCandidates: audit.candidates, agencyNote: audit.note },
+        updated_at: new Date().toISOString(),
+      }).eq('id', row.id);
+      continue;
+    }
+    if (!audit.resolution.resolved || !audit.resolution.canonicalAgency) {
+      result.stillUnresolved++;
+      continue;
+    }
+
+    const priorRaw = (row.raw && typeof row.raw === 'object') ? row.raw as Record<string, unknown> : {};
+    const { error: upErr } = await db.from('institute_sources').update({
+      canonical_agency: audit.resolution.canonicalAgency,
+      toptier_code: audit.resolution.toptierCode,
+      resolution_method: audit.resolution.method,
+      resolution_confidence: audit.resolution.confidence,
+      raw: {
+        ...priorRaw,
+        agencyClassification: audit.classification,
+        agencyCandidates: audit.candidates,
+        agencyNote: audit.note,
+      },
+      updated_at: new Date().toISOString(),
+    }).eq('id', row.id);
+    if (upErr) throw new Error(`reconcile update ${doc.documentNumber}: ${upErr.message}`);
+    result.newlyResolved++;
+  }
+
+  return result;
 }

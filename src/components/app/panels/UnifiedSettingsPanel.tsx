@@ -7,7 +7,17 @@ import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
+import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
+import { suggestedCodesToReview } from '@/lib/alerts/coming-back-to-market';
+import { prioritiesFromAggregated, type NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
+import {
+  FOCUSED_REQUIRES_DISTINCTIVE,
+  alertModeFromAggregated,
+  canSelectFocused,
+  type AlertMode,
+} from '@/lib/alerts/alert-mode';
 import { getPsc } from '@/lib/codes/lookup';
+import { commitNaicsFromTypedInput } from '@/lib/codes/validate-market-codes';
 import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
 
@@ -31,6 +41,8 @@ interface SettingsForm {
   // Coach Mode only: the client's real inbox for daily/weekly alerts (else they
   // send to the synthetic {workspaceId}@clients.getmindy.ai address and bounce).
   alert_recipient_email: string;
+  naics_priorities: Record<string, NaicsPriorityRole>;
+  alert_mode: AlertMode;
 }
 
 export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPanelProps) {
@@ -46,6 +58,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     onboarding_completed: false,
     location_states: [],
     alert_recipient_email: '',
+    naics_priorities: {},
+    alert_mode: 'market_discovery',
   });
   // True when these Settings are for a coach-managed CLIENT (synthetic
   // @clients.getmindy.ai profile) — gates the "Client alert email" field.
@@ -94,6 +108,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingRefreshKey, setTargetingRefreshKey] = useState(0);
+  const [storedNaics, setStoredNaics] = useState<string[]>([]);
   // Count of saved BD targets (user_target_list) — used so "Agencies selected" in
   // setup progress reflects the My Target List, not just the alert-agencies field
   // (Eric QC 2026-06-17: had 23 targets but the checkmark was blank — they live in
@@ -191,7 +206,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         // surfaced via the alerts preferences endpoint.
         location_states: realLocationStates.map((s) => String(s || '').toUpperCase()),
         alert_recipient_email: prefs?.data?.alertRecipientEmail || '',
+        naics_priorities: prioritiesFromAggregated(notif.aggregated_profile) || prefs?.data?.naicsPriorities || {},
+        alert_mode: prefs?.data?.alertMode || alertModeFromAggregated(notif.aggregated_profile),
       });
+      setStoredNaics((notif.naics_codes || []).map(String));
     } catch (err) {
       console.error('Failed to load settings:', err);
       setError('Failed to load settings');
@@ -414,6 +432,14 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setSaving(true);
     setError(null);
     setMessage(null);
+    const { persist: naicsPersist, blockedAdds } = commitNaicsFromTypedInput(
+      parseList(form.naics_codes),
+      storedNaics,
+    );
+    if (blockedAdds.length > 0) {
+      setForm((f) => ({ ...f, naics_codes: naicsPersist.join(', ') }));
+      setError(`${blockedAdds.join(', ')} — Invalid NAICS code`);
+    }
 
     try {
       // TARGETING (naics/keywords/agencies/states/frequency) MUST land in
@@ -472,8 +498,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             frequency: form.email_frequency,
             locationStates: form.location_states,
             keywords: parseList(form.keywords),
+            alertMode: form.alert_mode,
             // Authoritative targeting write → user_notification_settings.
-            naicsCodes: parseList(form.naics_codes),
+            naicsCodes: naicsPersist,
+            naicsPriorities: form.naics_priorities,
             pscCodes: parseList(form.psc_codes),
             targetAgencies: parseList(form.target_agencies),
             // Coach Mode: only send when editing a client profile, so normal saves
@@ -515,6 +543,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       });
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
+      setStoredNaics(naicsPersist);
       setTargetingRefreshKey(prev => prev + 1);
       // Notify any OTHER open surface (the dashboard TargetingCard, the top drawer)
       // that targeting changed so it re-fetches without a tab-away/back — keeps all
@@ -569,6 +598,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         body: JSON.stringify({
           email,
           naicsCodes: [], pscCodes: [], keywords: [], targetAgencies: [], locationStates: [],
+          alertMode: 'market_discovery',
         }),
       });
       if (!res.ok) {
@@ -812,6 +842,44 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               </p>
             </div>
 
+            <div className="rounded-xl border border-hairline bg-ground-deep/30 p-4 space-y-2">
+              <p className="text-sm font-medium text-white">Alert mode</p>
+              <p className="text-xs text-faint">
+                Market Discovery sends your NAICS/PSC Open market and prefers distinctive keywords.
+                Focused omits Open when those keywords have no in-market hits.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, alert_mode: 'market_discovery' })}
+                  className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                    form.alert_mode === 'market_discovery'
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
+                      : 'border-hairline text-slate-200 hover:bg-input'
+                  }`}
+                >
+                  Market Discovery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canSelectFocused(parseList(form.keywords)).ok) return;
+                    setForm({ ...form, alert_mode: 'focused' });
+                  }}
+                  className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                    form.alert_mode === 'focused'
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
+                      : 'border-hairline text-slate-200 hover:bg-input'
+                  } ${!canSelectFocused(parseList(form.keywords)).ok ? 'opacity-50' : ''}`}
+                >
+                  Focused
+                </button>
+              </div>
+              {!canSelectFocused(parseList(form.keywords)).ok && (
+                <p className="text-xs text-amber-200">{FOCUSED_REQUIRES_DISTINCTIVE}</p>
+              )}
+            </div>
+
             {/* UNIFIED describe → codes. One box; Mindy finds the NAICS + PSC so
                 users never have to know which is which. (Manual fields below.) */}
             <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
@@ -900,6 +968,32 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
             {/* Manual fine-tune — collapsed by default so most users just use the
                 describe box above. Power users expand to paste/edit codes directly. */}
+            {(parseList(form.naics_codes).length > 0 ||
+              suggestedCodesToReview({
+                storedNaics: parseList(form.naics_codes),
+                keywords: parseList(form.keywords),
+              }).length > 0) && (
+              <NaicsCodeRoles
+                codes={parseList(form.naics_codes)}
+                priorities={form.naics_priorities}
+                suggestions={suggestedCodesToReview({
+                  storedNaics: parseList(form.naics_codes),
+                  keywords: parseList(form.keywords),
+                })}
+                onChange={(naics_priorities) => setForm({ ...form, naics_priorities })}
+                onRemove={(code) => {
+                  const next = parseList(form.naics_codes).filter((c) => c !== code);
+                  const priorities = { ...form.naics_priorities };
+                  delete priorities[code];
+                  setForm({ ...form, naics_codes: next.join(', '), naics_priorities: priorities });
+                }}
+                onAddSuggested={(code) => {
+                  const next = [...parseList(form.naics_codes), code];
+                  setForm({ ...form, naics_codes: next.join(', ') });
+                }}
+              />
+            )}
+
             <button
               onClick={() => setShowManualCodes((v) => !v)}
               className="flex items-center gap-1.5 text-sm text-muted hover:text-slate-200"
@@ -917,7 +1011,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               <label className="block text-sm font-medium text-ink-soft mb-1">NAICS Codes</label>
               <NaicsPicker
                 value={parseList(form.naics_codes)}
-                onChange={(codes) => setForm({ ...form, naics_codes: codes.join(', ') })}
+                onChange={(codes) => {
+                  const keep = new Set(codes);
+                  const naics_priorities = Object.fromEntries(
+                    Object.entries(form.naics_priorities).filter(([code]) => keep.has(code)),
+                  );
+                  setForm({ ...form, naics_codes: codes.join(', '), naics_priorities });
+                }}
                 placeholder='Search by description (e.g. "consulting") or paste a code'
               />
             </div>
@@ -994,7 +1094,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 placeholder="e.g. drone repair, cybersecurity, base operations"
               />
               <p className="mt-1 text-xs text-faint">
-                What Mindy searches for in the opportunity TEXT — catches the work your NAICS codes miss.
+                What Mindy can prefer inside your NAICS/PSC market. In Market Discovery they are not required filters.
                 Comma-separated. Tip: run a <span className="text-purple-300">Market Research</span> and click
                 &ldquo;Save this market to my profile&rdquo; to fill these automatically.
               </p>

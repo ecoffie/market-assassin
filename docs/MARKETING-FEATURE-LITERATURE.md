@@ -19,6 +19,34 @@ tool, federal market research.*
 
 ---
 
+## Owned evidence Phase 0–1 — market window honesty + CAI compose contract (Sep 2026)
+
+**What:** Market coverage totals are labeled as one-FY description-match
+distribution — never interchangeable with 3-FY Relevant spending. Current
+Acquisition Intelligence compose contract is locked in code against owned living
+corpora only (no FR/pain as “what changed”).
+
+**Why:** Twin market definitions and ungrounded “policy change” claims destroy
+trust in bid decisions.
+
+**SEO / content hooks:** GovCon market research honesty · acquisition
+intelligence provenance · SAM recompete change detection.
+
+**Proof:** `MARKET_SPEND_WINDOW_LABEL` vs `keywordCoverageWindowLabel`;
+`src/lib/cai/compose-contract.ts` killer rule + routing tests.
+
+---
+
+**What:** Past-contract rows no longer pretend a NAICS filter is award source data. Place-of-performance state is labeled separately from recipient HQ. Pursuit dossiers name omitted competition firms and truncated document text. When the Combined Synopsis lives on PIEE, SOW/document tools say so — “no SOW heading” is not “no SOW exists.” Solicitation number and UUID both resolve the same notice body (on-demand noticedesc when the cache column is empty).
+
+**Why:** Agents were treating filter-stamped NAICS and empty document lists as evidence. That changes bid decisions.
+
+**SEO / content hooks:** GovCon MCP honesty · SAM PIEE attachments · USASpending field provenance · pursuit dossier size.
+
+**Proof:** Exact inputs `search_past_contracts` naics `336612`; `extract_statement_of_work` / `build_pursuit_dossier` `N00024-26-R-2200`; `get_solicitation_documents` `N00024-26-R-4160` + UUID `85a62e9a3f4f4f54b0ade7aa855fcc89`. Tracker: `docs/issue-log-14-tracker.md`.
+
+---
+
 ## 1. Market Research "Sport Mode" — research ANY federal market on demand
 
 **What it does (plain English):** Type what you do in plain words ("drones",
@@ -6293,50 +6321,933 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+## Account avatar is the signed-in person, never "?" (2026-09-14)
+
+**What.** The Maps / Today header chip shows the Google photo when we have
+one, otherwise the user's name or email initial. A signed-out visitor sees
+Log In. A photo that 404s falls back to the initial.
+
+**Why.** Signed-in users on getmindy.ai/ and /opportunity-map were looking at
+a purple "?" that read as help. MI sessions are HMAC payload.sig, not JWTs.
+The header decoder read the signature slot, sent an empty email to
+`/api/app/me`, and painted "?". Identity was sitting in the token the whole
+time.
+
+**SEO.** Government contracting software account / SAM.gov alternative login.
+
+**Proof.** `decodeMiTokenEmail` + `profileFromAuthUser` in
+`src/lib/mindy/account-avatar.ts`. Live chip on `/` and `/opportunity-map`
+after deploy. Unit tests fail if initials return "?" or HMAC email is read
+from split(".")[1].
+
+## Markets → Players names the dataset "Players" (2026-09-14)
+
+**What.** Clicking Players from Markets (or Today, Vault, Watchlist, Saved,
+Pursuits) lands on the Players map with the dataset dropdown labeled
+**Players**. Old `?mode=buyers` bookmarks still work; they resolve to the
+same map.
+
+**Why.** The in-map Players tab already used the companies dataset (Companies
++ Gov Buyers on one map). Sibling pages linked `?mode=buyers`, a value the
+dropdown does not offer, so the control went blank.
+
+**SEO.** Federal contractor map / government buyer contacts / SAM.gov
+alternative.
+
+**Proof.** `if(mode==='buyers')mode='companies'` in
+`src/app/opportunity-map/route.ts` `setMapMode` and `__playersGate`. Sibling
+nav hrefs are `?mode=companies`. Tests:
+`network-drawer-dispatch.unit.test.ts`,
+`players-gate-simulated-auth.unit.test.ts`,
+`map-rail-inventory.unit.test.ts`.
+
+## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
+
+**What.** The Maps / Today header chip shows the Google photo when we have
+one, otherwise the user's name or email initial. A signed-out visitor sees
+Log In. A photo that 404s falls back to the initial.
+
+**Why.** Signed-in users on getmindy.ai/ and /opportunity-map were looking at
+a purple "?" that read as help. MI sessions are HMAC payload.sig, not JWTs.
+The header decoder read the signature slot, sent an empty email to
+`/api/app/me`, and painted "?". Identity was sitting in the token the whole
+time.
+
+**SEO.** Government contracting software account / SAM.gov alternative login.
+
+**Proof.** `decodeMiTokenEmail` + `profileFromAuthUser` in
+`src/lib/mindy/account-avatar.ts`. Live chip on `/` and `/opportunity-map`
+after deploy. Unit tests fail if initials return "?" or HMAC email is read
+from split(".")[1].
+
+## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
+
+**What.** Daily Alert Open SAM now treats NAICS/PSC as the market. Distinctive
+keywords prefer inside that set. Generic singles (`repair`, `installation`,
+`delivery`) rank only and never expand the query. If those keywords miss, the
+email still sends the Open NAICS/PSC set and says so: "No keyword hits in your
+market. Showing open opportunities in your NAICS/PSC codes."
+
+**Why.** The old matcher ORed keywords into the market, then silently fell back
+to NAICS when the 200-row pull had no keyword hits. Generic words pulled milk,
+bread, DLA repair, and UPS rental into a facilities firm's alert. A miss is not
+an empty market. Recompetes are a later section, not a substitute for Open.
+
+**SEO.** Daily government contract alerts by NAICS / SAM.gov opportunity email
+that matches your market.
+
+**Proof.** Live replay 2026-09-13T13:41Z for `info@lwppropertysolutions.com`
+(NAICS 561210 / 561720 / 561730 / 561790 / 238990). Old OR pull top titles:
+cubicle upgrade, UPS rental, shaft/tube/switch assembly, FLIR repair. Contract
+D: 30 distinctive hits inside the Open market — janitorial, grounds, facility
+management; no milk/bread/DLA. Zero-distinctive probe (`quantum computing` +
+`satellite communications`) kept 200 Open NAICS/PSC rows and used the say-so
+line; it did not mention recompetes. Tests:
+`src/lib/alerts/open-contract-d.unit.test.ts`.
+
+## Daily Alert Coming Back to Market — recompetes as a second section (2026-09-13)
+
+**What.** Daily Alert now has a separate **Coming Back to Market** block under
+Open SAM. It lists up to five existing contracts in the user's NAICS market
+that expire in 6–18 months (nearer expirations can follow, but do not lead).
+Each row shows incumbent, agency, NAICS/PSC, obligated value, and period-of-
+performance end. The section says these are not confirmed solicitations.
+
+**Why.** Advanced users said a SAM-only alert is not the whole market.
+Recompetes are capture work, not "bid today." They must not replace Open when
+keywords miss, and they must not wait for an empty Open list.
+
+**SEO.** Federal contract recompete alerts / contracts coming back to market /
+incumbent expiration email.
+
+**Proof.** `queryExpiringContracts` on `recompete_opportunities` (`quality_flag`
+IS NULL, 18-month horizon). Keywords are not applied — so "interior" cannot
+collapse a construction list to Department of the Interior. Failed or
+unknown-count queries omit the section; they never print "0 recompetes."
+Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`. Live six-user
+reconstruction in the 2026-09-13 ship report. Open D matcher unchanged.
+
+## Daily Alert Coming Back targeting — relevance over dollars (2026-09-13)
+
+**What.** Coming Back still lists up to five contracts approaching expiration.
+It now ranks customer-relevant NAICS first, then the 6–18 month window, then
+size-fit, then dollars. DOE/NNSA nuclear M&O vehicles are labeled teaming
+unless the profile shows nuclear or laboratory capability. Value is labeled
+**Potential value (ceiling)** or **Obligated**, never as the amount that will
+be recompeted.
+
+**Why.** A lone 561210 on an IT or default profile was ranking Sandia / CNS /
+SRNS as the "best" recompetes for every user who inherited that code. Facilities
+firms still see 561210. Software firms do not get nuclear M&O as their top five.
+
+**SEO.** Federal contract recompete alerts sized to your NAICS / teaming vs
+prime on expiring contracts.
+
+**Proof.** Live matcher replay 2026-09-13. LWP (user_confirmed facilities,
+Small Business) leads with Readiness Management Support $26.3M and R&R
+Janitorial $23.3M, not Sandia $43.2B. Radus and Kkurka no longer share that
+DOE list. Open D unchanged. Tests in
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert Coming Back — exact-code relevance (2026-09-13)
+
+**What.** Coming Back now ranks each stored six-digit NAICS on its own:
+`primary_confirmed`, `secondary_confirmed`, `inferred`, or `system_default`.
+Exact code matches outrank three-digit-family similarity. Profiles that hold
+only system defaults still get discovery rows, labeled **Based on your starter
+market**, with a link to confirm the market.
+
+**Why.** Treating the majority 541 family as "core" ranked Booz Allen 541611
+management consulting as equal to IT codes 541511/541512. Family similarity
+is not confirmation. A code is confirmed only when that exact code has
+company evidence.
+
+**SEO.** Federal recompete alerts matched to your NAICS codes / confirm your
+government contracting market.
+
+**Proof.** Live matcher replay 2026-09-13. Radus
+(`john.simmons@radussoftware.com`, keyword `programming`): Peraton 541511
+leads; Booz Allen 541611 $211.8M is fifth and `inferred`. Kkurka
+(`kkurka@mac.com`) is `system_default` on every code — starter-market label.
+541611 still wins when the profile has management-consulting evidence. Open D
+7/7. Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert Coming Back — Census-direct evidence (2026-09-13)
+
+**What.** Coming Back maps a capability phrase to one Census 2022 six-digit
+code. Keyword matches are `evidence_supported`, not confirmation.
+`primary_confirmed` / `secondary_confirmed` are persisted user choices on
+`aggregated_profile.naics_priorities`. Settings and onboarding let a user mark
+each stored code primary, secondary, or remove it. Starter-market emails link
+to `/app?panel=settings`.
+
+**Why.** “Carpentry” had been attached to 238990 All Other Specialty Trade,
+and “architectural” to 541330 Engineering Services. Those titles are 238350
+Finish Carpentry and 541310 Architectural Services. Adjacent meaning is not
+evidence.
+
+**SEO.** Confirm your NAICS codes / federal recompete alerts by exact industry
+code.
+
+**Proof.** Live matcher replay 2026-09-13. LWP 238990 is `inferred` (carpentry
+does not explain it). Tryon 541330 is Engineering Services from “engineering”,
+not architecture. Radus programming supports 541511 only; 541512 stays
+`inferred`. Open D 7/7. Tests:
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert Coming Back — suggested codes to review (2026-09-13)
+
+**What.** Confirm-your-market Settings now lists Suggested codes to review
+when capability text maps directly to a Census six-digit that is not stored.
+Add is optional. Coming Back still queries stored codes only.
+
+**Why.** LWP mentions carpentry but had no 238350 Finish Carpentry
+Contractors. Tryon mentions architecture but had no 541310 Architectural
+Services. Those gaps were invisible, so users could not confirm the right
+market.
+
+**SEO.** Confirm missing NAICS codes from your capability statement.
+
+**Proof.** Reconstruction fixtures: LWP carpentry → 238350 shown, not added.
+Tryon architectural → 541310 shown, not added. Tests:
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert shared mode contract (2026-09-13)
+
+**What.** Every daily-alert user has an `alert_mode` on
+`aggregated_profile`: `market_discovery` or `focused`. Legacy rows with no
+value stay on Market Discovery. Focused requires at least one distinctive
+keyword. New users who configure distinctive keywords start on Focused.
+Existing users do not flip when they edit keywords. Invalid NAICS/PSC codes
+are rejected on save (400) and shown in Confirm your market — they are never
+silently deleted. Coming Back stays a separate section and never fills an
+omitted Open list.
+
+**Why.** Keywords were documented as required filters while Market Discovery
+still sent the NAICS/PSC Open market. Focused is the opt-in that omits Open
+when distinctive keywords miss. One shared matcher. No customer-specific
+branches.
+
+**SEO.** Federal opportunity alerts by market discovery vs focused keywords.
+
+**Proof.** Alert-enabled targeting population: 721 distinctive / 28
+generic-only / 7 sanitize-emptied / 945 no-keyword-with-NAICS. Focused
+eligible 721; would-send Open 439; would-omit 282. Tests:
+`src/lib/alerts/alert-mode.unit.test.ts`.
+
+## Shared Census NAICS write guard (2026-09-13)
+
+**What.** Every profile NAICS write uses the Census 2022 table. A newly typed
+unknown code cannot be added. Manage preferences and Settings show
+`618210 — Invalid NAICS code` with a direct Remove. Remaining unsaved
+edits stay. Legacy invalids stay on the row until the customer removes
+them. Open and Coming Back expand only known codes. PSC/FSC writes accept
+the official 4-character shape, including product classes `6520`, `8405`,
+and `8905`. `AQ93` stays stored. `user_confirmed` is list-level only.
+
+**Why.** A stored typo such as `618210` was still expanded into daily-alert
+matching. Hard-400 on the whole list also blocked keyword saves. The
+smaller PSC spend table is not the product catalog.
+
+**SEO.** Valid NAICS codes for federal contract alerts / Census 2022 NAICS
+validation.
+
+**Proof.** Fixture reconstruction (no profile write): Jonathan's list still
+stores `618210` and `518210`. Matching drops `618210` and keeps `611420`,
+`611430`, `611710`. No `518210` suggestion. Tests:
+`src/lib/codes/validate-market-codes.unit.test.ts`,
+`src/lib/codes/naics-write-paths.unit.test.ts`,
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Paid checkout writes the briefing send-path (2026-09-13)
+
+**What.** A Mindy Ai checkout now writes `customer_classifications.briefings_access`
+on Path A (`/api/stripe-webhook`), the same gate daily/weekly AI briefings
+actually read. App-tier Pro/Team credit grants (`app_tier_pro` /
+`app_tier_team`) count as paid standing for proprietary MCP tools. An
+unsubscribe stays paused when the customer later saves targeting. Paid
+briefings use the same Open + saved-industry matcher as daily alerts, and
+weekly calendars drop invented past years.
+
+**Why.** Checkout granted KV + `access_briefings` while the send cron keyed
+on classification — a $149 subscriber could wait a day-plus for an admin
+bulk grant. Saving NAICS after Unsubscribe turned daily mail back on.
+Weekly templates invented 2023 calendar dates. None of that is the product
+a paying contractor bought.
+
+**SEO.** Mindy Pro briefing access after Stripe checkout / unsubscribe
+preferences that stay paused.
+
+**Proof.** No-send reconstruction for the verified Gmail case: current Open
+daily + paid briefing both land on in-market NAICS `541512`; the weekly
+template is an exact hash match and 6/6 calendar dates are dropped as
+invented. Population at reconstruction: 18 `access_briefings` rows without
+an entitled classification; 4 app-tier ledger emails missing the old paid
+reasons; 50 Mindy Ai purchases with null `stripe_session_id`. Tests:
+`src/lib/billing/grant-briefing-classification.unit.test.ts`,
+`src/lib/alerts/paused-delivery.unit.test.ts`,
+`src/lib/mcp/extraction-guard.unit.test.ts`,
+`src/lib/briefings/calendar-sanitize.unit.test.ts`. No customer writes,
+refunds, identity merges, or credit adjustments.
+
+## Weekly calendar dates are source records, not LLM years (2026-09-13)
+
+**What.** Weekly Deep Dive calendar entries now require a source identifier
+and a verified ISO date from the contract/award record. Cached templates
+without those fields are omitted at send. A keyword cannot pull an
+opportunity from outside the customer's saved NAICS market. Short acronyms
+such as PAM stay searchable only when the rest of the keyword list supplies
+the identity/security context.
+
+**Why.** A year-window sanitizer still accepted invented current-year dates
+and unparseable rows. Distinctive keyword hits were a route around the
+saved market via inferred PSC expansion.
+
+**SEO.** Federal weekly briefing calendar grounded in USASpending dates /
+NAICS market boundary for opportunity alerts.
+
+**Proof.** Tests: `src/lib/briefings/calendar-sanitize.unit.test.ts`,
+`src/lib/alerts/open-contract-d.unit.test.ts`,
+`src/lib/market/keyword-sanitize.unit.test.ts`. Classification gaps are
+reconciled read-only in
+`scripts/reconcile-briefing-classification-gaps.ts` — not auto-applied.
+
+## Weekly opportunities are source records, not LLM titles (2026-09-13)
+
+**What.** Weekly Deep Dive opportunities now require a source ID, the
+award's actual title, a current status from the verified period of
+performance, and a market-match reason inside the saved NAICS market.
+Generate-time builds that list from USASpending records and only overlays
+LLM analysis onto a matching source ID. Send-time drops cached rows that
+lack those four fields, so a stale template cannot bypass the gate. An
+empty calendar is kept empty when no verified event dates exist.
+
+**Why.** Removing invented calendar years fixed dates, not the ten cached
+opportunity names. Those titles were still LLM copy with no source and no
+industry reason.
+
+**SEO.** Weekly federal briefing opportunities grounded in USASpending
+awards / NAICS market-match for recompete intel.
+
+**Proof.** No-send reconstruction for Adam Sokolowski's exact hash
+`d77a03ddeebddd9e8e950706b07feb31` (week of 2026-09-14): 8 current
+USASpending awards, each with source ID, actual title, current status,
+and NAICS market-match; calendar has 6 verified future dates and no
+invented years. Cached LLM titles (ITSSC / GOES-R / CPT) are gone.
+All 12 send-week templates regenerated the same way (0 ungrounded).
+Tests: `src/lib/briefings/opportunity-sanitize.unit.test.ts`,
+`src/lib/briefings/weekly-contracts.unit.test.ts`. Reconstruct:
+`scripts/regenerate-weekly-templates.ts`. Stripe entitlement
+(read-only): `scripts/verify-stripe-entitlement.ts`.
+
+## MarketScope is an executable retrieval contract (2026-09-13)
+
+**What.** Ralph Phase 1 market-research reports now treat MarketScope as a
+retrieval contract, not descriptive metadata. Every evidence-producing
+section emits a machine-readable manifest of requested vs consumed vs
+unsupported dimensions, plus whether the evidence is in-scope, contextual,
+expanded, or unresolved. Empty strict-scope history stays empty/unknown.
+Office DoDAACs (e.g. FA4610) are queried as `awarding_office_code` in the
+awards warehouse. USASpending `search_past_contracts` is recorded as
+unable to filter awarding office — not emulated with keyword matching.
+Installation-context awards bought by another agency are classified, not
+discarded. Statewide NAICS supplier samples are labeled as state capacity,
+not as that office's supplier market.
+
+**Why.** The second Vandenberg run stored DAF / USSF / 30 CONS / FA4610
+and then silently dropped the agency on an empty history retry, never
+queried the office, and treated California 236220 suppliers as the
+Vandenberg/30 CONS market.
+
+**SEO.** Contracting-office market research / DoDAAC award history /
+FAR market-research report grounded in USASpending awarding-office codes.
+
+**Proof.** Live Vandenberg re-run: BQ `awarding_office_code=FA4610` +
+NAICS 236220 + PSC Z2JZ + CA returned 25 in-scope 30 CONS awards including
+FA461022F0114; W912PL26CA005 kept as installation-context (USACE), not
+buyer history; expansions `[]`; Rule-of-Two remains undetermined on
+California 236220 capacity evidence. Blind NAVSEA N00024 / 336611 / VA
+populated office history without widening. Blind DLA SPE4A1 / 111110 / WY
+returned strict empty (0) with no silent drop. Tests:
+`src/lib/mrr/market-scope.unit.test.ts`.
+
+## Maps account chip + Players nav stay signed-in (2026-09-14)
+
+**What.** A signed-in contractor on getmindy.ai `/` and `/opportunity-map`
+sees their Google/Microsoft photo or their initials — never a purple
+question mark. Markets → Players opens the Players map with the dropdown
+labeled Players.
+
+**Why.** HMAC sessions were decoded as JWTs, so the header asked `/api/app/me`
+with an empty email and painted `?`. Sibling chrome linked `?mode=buyers`,
+which is not an option in the dataset pill, so Players rendered blank. A
+later production deploy can overwrite the HTML even when a branch's unit
+tests still pass.
+
+**SEO.** Signed-in federal market map account / government buyers and
+contractors on the Opportunity Map.
+
+**Proof.** `npm run verify:maps-account` (source). `--live` is the currently
+serving host — before merge that can be the previous good build. After
+production is Ready, `--live --expect-sha <release>` requires the served
+`maps-account-build` stamp to match. Missing HMAC secrets report NOT
+TESTED; a configured secret that gets HTTP 401 fails. The script does not
+Google-login or paint the chip. Browser acceptance: signed-in photo or
+initials on `/` and `/opportunity-map`; Markets → Players shows Players.
+
+## Ralph demo: one question to a contracting-officer decision (2026-09-14)
+
+**What.** `/app/market-research` now starts from one plain-language question
+("What market are you researching?"). Primary CTA is "Research this market."
+Header value: "Turn a requirement into defensible market research." Safety is a
+compact Public-data research banner (Learn more expands detail). Fixture chips
+are removed from Ask; placeholder is a non-clickable Fort Belvoir example.
+Advanced / Edit research scope is **not** on Ask — after interpretation,
+Confirm offers Edit question, Edit scope, and View technical scope. Ralph
+resolves buyer, service, installation, contracting office, and requirement,
+then shows "Here's the market I'll research" before "Run research." Progress
+uses five human stages. The result leads with found / supports / does not
+support / recommended next action, in four presentation states (SUPPORTED,
+MORE RESEARCH NEEDED, CONFLICTING EVIDENCE, DATA UNAVAILABLE) — not a yes/no.
+Buyer history, installation context, and broader market capacity stay in
+separate cards. Manifests and coverage ratios stay under Evidence & methodology.
+Raw `sample_coverage` is scrubbed from Decision copy.
+
+**Why.** A contracting officer should not have to type NAICS, PSC, or a
+DoDAAC to get a defensible Phase 1 market-research decision. Internal
+diagnostics (`sample_coverage`, family keys, manifests) belong under
+Evidence & methodology. Ask must feel like a buyer product, not a test harness.
+
+**SEO.** FAR market research report / Rule of Two evidence / contracting
+office award history from a plain-language market question.
+
+**Proof.** Interpreter fixtures (tests, not UI chips): Vandenberg SABER →
+FA4610 / 30 CONS; NAVSEA HQ → N00024; DLA Aviation clarifies office then
+SPE4A1 + Wyoming + NAICS 111110. Decision renderer keeps undetermined as
+MORE RESEARCH NEEDED or DATA UNAVAILABLE. Ask polish: no fixture chips, no
+Advanced on Ask, compact public-data banner, Confirm-only Edit scope /
+View technical scope. Tests: `interpret-market.unit.test.ts`,
+`decision-brief.unit.test.ts`, `ralph-audit-artifacts.unit.test.ts`.
+
+
+## Forecast subagency identity — 15 structured children (2026-09-14)
+
+**What.** Forecast agency filters now resolve **child / subagency** identities
+(USCG, CBP, FEMA, TSA, USSS, CMS, NIH, Fish & Wildlife, NPS, Forest Service,
+FAS, PBS, NAVFAC, NAVAIR, NAVSEA) through the same shared resolver used by
+Maps, MCP, `/api/forecasts`, and saved-search alerts. An alias resolves the
+identity; a **structured anchor** selects rows (`bureau` path/exact value, or
+Navy DoDAAC set). Children are always scoped to their parent `source_agency`
+first — they never inherit the parent corpus.
+
+**Why.** Before this, NAVFAC/NAVAIR/NAVSEA each returned all 8,881 Navy rows
+(21,961 false-positive returns), while the 12 civilian children returned 0
+despite 3,004 attributable rows. Parent-generic rows (8,380) stay parent-only
+on purpose. NPS ships its thin true set (14). NAVSUP is not shipped (no
+DoDAAC anchor).
+
+**SEO.** Coast Guard forecast / NAVFAC forecast / NIH procurement forecast /
+Fish and Wildlife Service forecast — child-level, not parent dump.
+
+**Proof.** Live `npm run verify:forecast-agency`: all 15 children match audited
+counts (USCG 702 … NAVFAC 2,278 … NPS 14); sibling overlap 0; department
+identity unregressed (35,751/35,751 reachable). Unit: agency-identity +
+agency-identity-children + forecast-agency-filter parity.
+
+## MCP schedule discovery — natural language watches (2026-09-14)
+
+**What.** Claude Desktop / MCP connectors now discover market watches from everyday
+language — "schedule this," "run this search every week," "monitor this market,"
+"keep me updated," "email me new opportunities," "create a watch" — without requiring
+the word "alerts." Shared connector `instructions` plus an updated
+`schedule_market_search` title/description. Unsupported filters are rejected instead
+of silently broadening the watch. Cadence is daily/weekly/paused only; exact clock
+times are explained before save.
+
+**Why.** Customers talk about monitoring markets and getting emailed new opportunities.
+Gatekeeping discovery behind "alerts" made scheduling look unavailable even when the
+tool was listed.
+
+**SEO.** schedule SAM search / monitor federal market / watch government opportunities
+MCP / email new solicitations.
+
+**Proof.** Unit: `schedule-discovery.unit.test.ts` (all six phrases in tool description;
+instructions route to `schedule_market_search`; inspect-tools-first). Filter reject:
+`validate-filters.unit.test.ts` (unknown keys + strategy strands). Live: catalog
+description + MCP initialize `instructions` after deploy.
 
 ---
 
-## Read the whole solicitation, not the first eight pages (2026-09-22)
+## Sponsored accounts — sponsor-funded recurring access (2026-09-15)
 
-**What.** `get_solicitation_documents` now returns a *window* of each document
-with an explicit continuation. A response carries `coverage.complete` and a
-ready-made `next_page`; an agent pages until `next_page` is null and can then
-say it read the package — or say precisely how much it did not. Each document
-reports **why** its text is or isn't present: `complete`, `partial`,
-`extraction_failed`, `file_unavailable`, `extraction_capped`, `container_stub`
-(a PDF Portfolio cover sheet whose real files are nested inside) or
-`unreadable_encoding` (a font-subset PDF whose glyphs carry no text map).
-Coverage is counted in **characters**, never converted to pages.
+**What.** An organization can sponsor a contractor's Mindy access: the sponsor
+funds a recurring monthly credit allowance, the sponsored user keeps their own
+login, history, and data. The sponsorship is a first-class record — allowance,
+sponsor, start and expiry — not a name on an internal list. It ends on its own
+date without anyone remembering to switch it off.
 
-**Why.** Text was capped at 20,000 characters per document with no way to reach
-the rest, so the remainder was unreachable rather than paginated. Measured across
-two live packages: 751,916 real characters, 160,000 retrieved — 21.3%. On a
-federal solicitation the dropped part is the decisive part: instructions to
-offerors, evaluation factors, insurance limits, subcontracting limitations and
-the clause list all sit at the back. Two further losses compounded it. Extraction
-itself stopped at 200,000 characters, so DLA's 274-page priced schedule (573,558
-characters) lost 373,558 before any visible cap. And four documents extracted to
-non-empty but unusable text — two PDF Portfolio cover stubs and two font-subset
-PDFs at 35% readable characters — while reporting as clean, complete reads, which
-is how a downstream compliance matrix can cite a section the solicitation never
-had.
+**Why.** Sponsorship is how SBDCs, PTACs, primes, and funders already support
+small contractors, and previously we could only express it as a manual credit
+grant that someone had to repeat by hand each month. When that was forgotten the
+account hit a wall silently — which is exactly what happened before this shipped:
+an account sat blocked for four days generating 59 rejected calls that nobody
+saw. The allowance now renews monthly on its own, and exhaustion is detected
+rather than discovered.
 
-**SEO.** Read a full federal solicitation with AI / RFP evaluation factors
-extraction / AI proposal compliance matrix from SAM.gov attachments.
+**Honest scope.** This is account infrastructure, not a purchasable plan —
+there is no self-serve "sponsor someone" checkout (that would need a sponsor-side
+billing relationship we do not have). Sponsorships are provisioned internally
+today. Alerting is detection-and-reporting; outbound notification is deliberately
+off pending review. Retry/rate-limit protection is a separate release (coming).
 
-**Proof.** Live, 2026-09-22, accepted on VA `36C24226Q0857`: the app's
-attachment inventory and MCP's match exactly (7/7 by file id); every document
-reconstructs byte-for-byte through paging (assembled length equals the stored
-`char_count` for all 7); and `52.212-1` (instructions, p48), `52.212-2`
-(evaluation factors, p58), insurance (p29) and `VAAR 852.219-75` /
-limitations-on-subcontracting (p42) are all retrievable — the four late sections
-that had forced the bid/no-bid decision outside the product. Extraction no longer
-discards text: the ceiling that silently dropped 373,558 characters from a
-274-page priced schedule is gone. Downstream, `extract_compliance_matrix`,
-`extract_statement_of_work` and `draft_proposal` now carry a `source_coverage`
-gap list, so a matrix built from a partial read says so instead of reading as the
-solicitation's full requirement set. 21 regressions across
-`solicitation-documents-paging`, `source-coverage` and `extraction-quality`,
-proven to fail when truncation honesty is removed. Container-stub and
-font-subset PDFs are detected and disclosed, not yet recovered (see
-`tasks/FOLLOWUP-dla-container-ocr-2026-09-22.md`).
+**SEO.** Sponsored government contracting software / SBDC contractor tools /
+sponsor a small business GovCon subscription.
+
+**Proof.** First entitlement live 2026-09-15: Encore Funding → 8,000 credits/mo,
+expires 2027-03-15, enforced by `sponsor_active_entitlements`. Grant atomicity
+verified against live Postgres — 20 concurrent grants on one key produced exactly
+1 applied grant and 1 ledger row (balance 8,000, not 160,000); a 25,000 balance
+against an 8,000 ceiling granted 0 and was never reduced. Detection independently
+surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
+
+---
+
+## find_opportunities — Unified Opportunity Map FIND (MCP)
+
+**What:** One MCP tool answers "find opportunities in my market" across three horizons the Opportunity Map already shows: Open now (live SAM), Coming back (recompetes), Coming soon (forecasts). Customers do not need to know SAM / recompete / forecast vocabulary.
+
+**Why:** Host agents previously defaulted to SAM-only search (~10.6K actionable notices). The Map's actionable discovery surface spans Open + Coming back + Coming soon (~16.5× raw rows under measured definitions). FIND composes those horizons with independent envelopes so an empty Open result is not a market-wide zero.
+
+**SEO / proof:** Grounded per-horizon counts from `sam_opportunities`, `recompete_opportunities`, `agency_forecasts`. Cross-class unique procurements are not claimed. Credits: 10 per compose (not 5×3). Watch coverage disclosed as Open + Coming soon until recompete alerts ship.
+
+**As of:** 2026-09-15
+
+---
+
+## get_current_acquisition_intelligence — Current Acquisition Intelligence v0 (2026-09-15)
+
+**What.** MCP journey slot after FIND: one composed package answers what **changed** about how a buyer is buying for a capability scope, what Mindy sees **now**, supported implications, and do-differently actions — each tied to cited live rows (recompete_changes, SAM opps, recompetes, forecasts, events). Pathway claims require explicit record evidence; CSO/OT/consortium/rapid/PAE gaps are named, not invented.
+
+**Why.** Customers need "what should I do differently because of what changed" — not pain-point prose, not set-aside-first qualification, not playbook SOCOM claims.
+
+**SEO / proof.** Unit: `current-acquisition-intelligence.unit.test.ts` (killer rule, pathway classifiers, no set-aside _next). Host probes: `scripts/probe-cai-v0.mjs` (SOCOM cyber, VA IT, USACE construction). Credits: 8. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY.
+
+---
+
+## CAI language guardrails — unavailable ≠ zero; pathways ≠ future certainty (2026-09-15)
+
+**What.** Host/CAI packaging never describes a failed/unavailable horizon as zero demand; `SUPPORTED_IMPLICATION` / `DO_DIFFERENTLY` stay hedged; absolute transitions (“competition already happened,” “binding constraint is,” “whatever replaces X is where the money goes next”) are banned unless citations establish them. Observed pathways (incl. CSO) remain pathway-first record evidence with explicit “not future certainty” wording.
+
+**Why.** Host over-claim turned historical vehicle/CSO language into acquisition strategy certainty and invented do-differently when the package was empty.
+
+**SEO / proof.** Unit: absolute-claim scrub + CSO disclaimer; `MCP_CONNECTOR_INSTRUCTIONS` CAI block; host re-run `scripts/host-cai-socom-routing.mts` (SOCOM cyber).
+
+---
+
+## CAI v0 frozen — PATHWAY/TALENT is the next gate (2026-09-15)
+
+**What.** Current Acquisition Intelligence v0 marked complete. Production journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE. Next layer is PATHWAY/TALENT (Morehouse: doors first, then verifiable talent proof) — inventory existing company evidence vs CAI doors before any new tool.
+
+**Why.** Empty unearned `do_differently` is a feature; polishing CAI further would recreate generic synthesis. The product gate is matchability without set-aside-first.
+
+**SEO / proof.** Freeze: `docs/PRD-current-acquisition-intelligence-v0.md` §14 · Gate: `docs/PRD-pathway-talent-gate.md` · CLAUDE in-flight. **Prod acceptance:** `market-assassin` → getmindy.ai (61 tools, CAI 8cr + guardrail catalog language). Accidental `cai-language-guardrails` Vercel project deploy is **not** acceptance evidence.
+
+---
+
+## match_company_to_pathways — PATHWAY FIT v0 (2026-09-15)
+
+**What.** After CAI, match a company’s stranger-verifiable public record (UEI awards + SAM certs) to buyer-side acquisition doors. Determinations SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED / NOT_APPLICABLE with two-sided evidence, `proof_to_lead_with`, `proof_missing`, transparent `pf_rank_v1`, and one `_next` missing-proof question. `no_proven_door` is success.
+
+**Why.** Customers ask which doors they can walk through — without inventing Talent, vehicle portfolios, or set-aside-first strategy.
+
+**SEO / proof.** Contract: `docs/PRD-pathway-fit-v0.md`. Unit: `pathway-fit.unit.test.ts` + `pathway-fit-load.unit.test.ts` (#1548 name→UEI unique/ambiguous/none; no second resolver). Live probes: `scripts/probe-pathway-fit-live.mts`. Credits: 8. Catalog 62. **Branch `feat/pathway-fit-v0` — stop before merge.**
+
+
+## understand_customer — UNDERSTAND after FIND (2026-09-15)
+
+**What:** After a specific Opportunity Map FIND hit, Mindy can show what this customer cares about
+and what to say — a three-part grounded package: the opportunity says, broader agency research
+shows, and what that suggests you emphasize. One MCP tool (`understand_customer`, 5 credits).
+
+**Why:** FIND alone surfaces work; the next customer question is always “so what do I say to this
+buyer?” Host agents already offer that step via `_next`; this fulfills it without inventing a pitch.
+
+**SEO / discoverability:** “what does this agency care about”, “how to talk to [agency] about [RFP]”,
+GovCon capture messaging grounded in the notice + curated agency intel.
+
+**Proof:** Live notice_id + agency → sections grounded from `sam_opportunities` +
+`getUnifiedAgencyIntelligence`; emphasize bullets are token-overlap only (empty when no overlap).
+FIND specific `_next.tool === understand_customer`. Catalog 60. Capability/Response/Meeting brief
+outputs intentionally deferred.
+
+---
+
+## MCP commercial refusal contract — insufficient credits ≠ server failure (2026-09-15)
+
+**What.** When an MCP tool is refused for insufficient credits, Mindy now returns a structured `INSUFFICIENT_CREDITS` payload (required / available / shortfall, `retryable: false`, continue URL) as a normal tool result — not an MCP `isError`. Customer copy leads with exact numbers: "You need 50 credits… You currently have 45."
+
+**Why.** A real user hit `capability_market_match` with 45 credits (tool costs 50). Claude showed "Failed" and said "Mindy's server isn't responding — let me retry once" because the transport marked commercial refusals as `isError: true`. That is a commercial gate, not a timeout. The attempt remains on `/mcp/continue`.
+
+**SEO / proof.** Incident call `88c978d4-…` / paywall `59cb41f1-…`: balance 45, required 50, status `rejected_no_credits`, zero debit. Regression: `commercial-refusal.unit.test.ts` (45 vs 50 → no `runMcpTool`, structured contract, no isError).
+
+
+---
+
+## Capability-to-Market Match — deadline-aware coverage (P1 reliability)
+
+**What.** `capability_market_match` runs under a ~55s soft budget (under the 60s
+MCP `maxDuration`; measured cold coverage for the selected lead phrase ≈38s plus
+~4s keyword derivation). USASpending fetches inside `keywordCoverage` carry
+AbortSignal. Optional enrichment (competitors / forecasts / recompetes / vocabulary)
+is deadline-bounded at the caller so a hung downstream call cannot hold the tool
+to a Vercel 504. Coverage timeout → honest degraded miss (not "$0 market").
+Enrichment omitted for time → `sections_omitted` metadata; core market stays
+grounded and billable at full price.
+
+**Why.** Coverage fan-out — and then hung enrichment — could burn the full 60s MCP
+platform limit. Timed-out ≠ "no federal market." Skipping enrichment ≠ a discount.
+A 22s wall was below real coverage latency and made the happy path impossible.
+
+**Proof.** Unit tests: hanging coverage / hanging competitors / hanging forecasts
+all return inside budget; metered tests lock DEFECT-7 uncharged vs full 50-credit
+success when grounded + sections_omitted. Preview: hung paths return ≤budget with
+no 504; representative drones capability completes grounded under 55s.
+
+
+
+---
+
+## Living GAO → customer surfaces (Institute / SI Phase II)
+
+**What.** The living GAO RSS pipeline (`institute_sources` → `agency_pain_points_db`) is now registered in the control plane as `data_source_instances.institute_gao` under dataset `strategic_intelligence`, with first-class five-clock semantics. Customer surfaces (TMR, MCP `get_agency_intel`, `/api/pain-points`, agency hierarchy search, unified agency intel) read through ONE shared sourced-intelligence path: living cited GAO claims first, legacy JSON second and labeled `LEGACY_MANUAL` — never merged into an indistinguishable string list. GovInfo GAOREPORTS writer is quarantined; AI `build-pain-points` outputs are tagged `MINDY_INTERPRETATION`.
+
+**Why.** The living pipeline was healthy and current but customer-invisible; the 3,043-row JSON corpus was customer-facing but mostly unsourced. Promoting GAO end-to-end makes citations the default without deleting legacy coverage.
+
+**Proof.** Unit tests: gao-instance clocks, document-agency no-force-map, sourced-pain-points provenance, GovInfo quarantine. Cron stamps `data_source_instances`; held population from `institute_sources` only (not GovInfo / JSON).
+
+---
+
+## PATHWAY FIT honest miss is a complete answer (no research menu)
+
+**What.** When Mindy cannot prove an acquisition door (`no_proven_door`), that finding is the product: no door I can prove yet, what can be verified, what proof is missing, and what would change the answer. At most one evidence-changing question. No opportunity-search / awards / company-history menu, no FIND restart, no manufactured pathway.
+
+**Why.** An honest miss is intelligence. Offering a three-option research menu after “I cannot establish a door” treats emptiness as failure and manufactures a next step the evidence does not support.
+
+**SEO.** Pathway fit, acquisition door, no proven door, GovCon company-to-buyer match.
+
+**Proof.** Host rules + MCP connector instructions treat `no_proven_door === true` as a complete successful result. `_next` on an honest miss is empty or one vehicle/demo question — never a questionnaire. Red-team 1–7 in `pathway-fit.unit.test.ts`; connector copy in `schedule-discovery.unit.test.ts`.
+
+---
+
+## Potato v1 journey — FIND through WATCH, no new engines
+
+**What.** After PATHWAY FIT, Mindy finishes the customer conversation: verified proof + one missing-proof question (Talent thin), then capability-statement / response / meeting language from that evidence (Position), one concrete next action (Act), then “want me to watch this?” with Open-now + Coming-soon coverage only (Monitor). Naive users do not need SAM/NAICS/CSO vocabulary to advance.
+
+**Why.** The architecture was already there. Leaving the host at “here are doors” stranded customers before language, action, and watch.
+
+**SEO.** GovCon capability statement, opportunity response, customer meeting prep, SAM.gov watch.
+
+**Proof.** Connector Potato v1 journey copy; FIND `_next` continues UNDERSTAND when an open hit exists; UNDERSTAND `_next` is Current Intelligence; PATHWAY FIT talent sections; `composeActFromPathwayFit` honest-miss stop vs one grounded action. Talent/Position/Act/Monitor host rules are on MCP initialize instructions (not journey copy only). Naive SOCOM host: FIND → UNDERSTAND → CAI → PATHWAY FIT CSO/OT POSSIBLE → owner-asserted labeled → capability statement → one action → watch asked, `schedule_market_search` not called. Catalog 62.
+
+---
+
+## Potato P2 — value before qualification
+
+**What.** Broad “I sell X and want to sell to Y / help me” now gets a first market read before intake. Mindy calls `find_opportunities` once with the user’s words, presents Open now / Coming back / Coming soon (unavailable is not zero), names one evidence-supported starting point, then asks one plain-English refine. Company, clearance, certifications, and deliverable choice wait until they change the next decision.
+
+**Why.** A production naive SOCOM turn spent ~4 minutes on four qualification questions and three FIND calls (30 credits) before showing the market. The host still produced a useful artifact after the user skipped every question — proof those questions were not prerequisites for first value.
+
+**SEO.** GovCon first market read, sell to SOCOM, Army construction opportunities, VA IT services, time to first value.
+
+**Proof.** Connector `P2_FIRST_TURN_INSTRUCTIONS` leads MCP initialize. FIND results carry `presentation.host_rules` (same local-contract pattern as Current Intelligence / Pathway Fit). Naive host A/B/C: exactly 1 FIND, 10 credits, Open/Coming back/Coming soon presented, one refine, no company/clearance/deliverable before value. Ledger `eric@govcongiants.com` 2026-09-17 22:51–22:52 UTC: three `find_opportunities` success rows, `credits_charged=10` each (one per prompt). v1 horizon honesty and confirmation-gated UNDERSTAND unchanged.
+
+---
+
+## Potato P3 — market understanding (customer language in)
+
+**What.** `find_opportunities` now interprets “I sell cybersecurity to SOCOM” as a government market without asking the customer for NAICS, PSC, or legal agency names. Buyer aliases (SOCOM / USSOCOM / U.S. Special Operations Command) are spelling, not a wider department. When cyber classification is thin, Coming back can return this buyer’s IT-coded contracts as **related-market candidates** — never as confirmed cybersecurity demand. Missing forecast publishers are coverage-not-established, not a measured zero.
+
+**Why.** P2 sequenced first value correctly, then returned 0/0/0 because FIND looked for the literal word “cybersecurity” on the parent awarding-agency column. USSOCOM cyber-relevant work is stored as “U.S. Special Operations Command” on the sub-agency column and billed under IT NAICS, not the word cybersecurity.
+
+**SEO.** sell to SOCOM, USSOCOM cybersecurity contracts, federal IT recompetes, GovCon market language.
+
+**Proof.** Interpretation contract on the FIND payload (`market_interpretation`, `evidence_class` DIRECT_MATCH vs RELATED_MARKET_CANDIDATE). Customer-facing `summary.coming_back` carries `direct_match` and `related_market_candidate` separately; `comingBackHostClaim` and `summary.headline` refuse a mixed “39 cybersecurity recompetes” sentence for 8+31. Unit tests: SOCOM / USSOCOM / U.S. Special Operations Command share one canonical without DoD; generic 541511/541512/541519 is RELATED not cyber; physical security and bare “security” do not enter the related-IT family; 160th SOAR is not a SIEM/SOAR signal; SOCOM forecast identity is coverage `'none'`; `creditsFor('find_opportunities') === 10`. Live 2026-09-17: `cybersecurity`+`SOCOM` → Open empty 0 · Coming back 39 (8 direct · 31 related-market) · Coming soon unavailable (`coverage_unestablished`). Named PIIDs: H9241524F0002 DIRECT (DJ01 + “Cybersecurity Support Services”); H9223922F0028 / H9241524F0028 / H9241522F0062 RELATED (IT NAICS, no cyber claim). P2 one-FIND sequencing unchanged. Blind-market table in the P3 stop report.
+
+---
+
+## Daily Alert Coming Back rank — market, then distinctive, then lead window, then value (2026-09-17)
+
+**What.** Daily Alert keeps two sections. **Open Now** is respondable SAM. **Coming Back to Market** is expiring contracts worth positioning for — never implied as currently soliciting. Rank inside Coming Back is locked: stored NAICS/PSC market → distinctive-keyword preference inside that market → 6–18 months remaining, then 3–6, then >18 if needed to fill the cap → value. Under 3 months is excluded. Distinctive misses keep the NAICS/PSC set; generic singles never expand it. Existing $250M+ / nuclear M&O teaming stays; keyword-hit count, capture-band, and soonest-PoP are not primary sorts.
+
+**Why.** A ranking replay on five real profiles showed the useful list is the user's market, preferred by distinctive description/PSC hits, then the capture window, then dollars. Hit-count and soonest-PoP put the wrong incumbents first. Mixing Open and Recompete into one list would make a contract that is still running look bid-today.
+
+**SEO.** Federal recompete alerts, contracts coming back to market, SAM.gov daily alerts vs expiring contracts, 6–18 month capture window.
+
+**Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: 7hillstransportation@gmail.com Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); americanpatriot1872@pm.me Open Now + Coming Back Saliense $24.7M (541512); civelladante@gmail.com roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); diannewilsoncontact@gmail.com Arrow Arc $32.1M (541910); wednel.joseph@gmail.com generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.
+
+---
+
+## Potato P4 — Open FIND ranks market relevance before deadline (2026-09-17)
+
+**What.** Open now on `find_opportunities` over-fetches one `sam_opportunities` pool (cap 500), then ranks **DIRECT_MATCH → RELATED_MARKET_CANDIDATE → WEAK_NON_MARKET**, and only then sorts `response_deadline` inside each tier. Deadline is no longer the first sort. Relevance evidence is NAICS **or** PSC **or** word-boundary/phrase market text — not a 2-character substring such as “it” inside *solicitation* / *with* / *city*.
+
+**Why.** “I sell IT services and want to work with the VA” was ranking ceiling lifts and carpet cleaning first because stop-word stripping left token `it`, Open matched `%it%` across title/description/SOW, every survivor scored equal, and `response_deadline ASC` plus a visible limit of 5 hid the real IT work. Measured before: P@5 = 0.00, P@10 = 0.00, P@25 = 0.12. Actual IT notices (Enterprise QA Software, DistillerSR, C&P Help Desk) sat lower in the same result set.
+
+**SEO.** VA IT services opportunities, SAM.gov opportunity ranking, sell IT to Veterans Affairs, federal help desk RFP, relevance before urgency.
+
+**Proof.** Live 2026-09-17, same FIND compose, 10 credits, one call. VA + IT services: P@5 **0.00 → 1.00**, P@10 **0.00 → 1.00**, P@25 **0.12 → 0.76**. Rank 1 = Enterprise QA Software (541519/DA10); rank 6 = DistillerSR (513210/DA10 — PSC evidence, not NAICS-only); rank 17 = C&P Help Desk Tier 2 (541512/DA01, recovered because cap 500 covers the 357-row union; 100/200 truncated it). Construction + Army control stayed P@5/P@10/P@25 = 1.00 with deadline still ordering inside DIRECT. SOCOM + cybersecurity Open stayed honestly empty; Coming back 8 DIRECT / 31 RELATED; Coming soon unavailable, not zero. Cap 500 is the smallest of {100, 200, 500} that kept later-deadline DIRECT in the pool. Units: `open-relevance.unit.test.ts`. **Not a P4 win:** DLA janitorial 561210 Installation Support is existing Facilities taxonomy debt; ML + Air Force token/AFFAIRS buyer-needle debt is unchanged.
+
+P2 one-FIND / first-value / one-refine and P3 buyer-normalization / DIRECT vs RELATED are unchanged.
+
+---
+
+## Solicitation Family v1 — confirmed identity, not a lifecycle super-entity (2026-09-18)
+
+**What.** A known SAM solicitation becomes one family: confirmed aliases (SAM
+solicitation number + official customer RFP token), version membership, and a
+current-notice pointer. A pursuit keeps the notice the user actually worked
+from. Family-aware monitoring can say "a newer amendment posted" without
+rewriting that worked-from id. Documents stay on the version that carried them.
+
+**Why.** Known-ID truth (#1557) already picks the latest stored version for a
+solicitation number. Users still attach work to an older UUID. Without a family,
+Mindy either lies ("you worked from Amd 0003") or goes silent when a sibling
+amendment posts. Family v1 is the persistence seam. It is not FIND, not PAE,
+and not a forecast/award/recompete merge.
+
+**SEO.** Track SAM.gov amendments / current solicitation version / RFP
+N0017426R1003 / Indian Head MASA.
+
+**Proof.** MASA gold: customer RFP `N0017426R1003` and SAM token
+`N0017425RFPREQIHDMDept0002` are one family (`sol:N0017425RFPREQIHDMDEPT0002`).
+Current notice `f1aa309fa39040a4929d90a7d88fd091`, Amendment 0003, deadline
+2026-08-27, status archived. Explicit Original UUID
+`ce85c48dc296497eb902a0a73ac45680` remains that historical record. Unit:
+`solicitation-family.unit.test.ts` tests 1–20. Production known-ID proof is
+#1557 (`741ec0d3`) on getmindy.ai. Family v1 (#1558) is live as **lazy persist
+only** (production canary 2026-09-19: one MASA family, Original `notice_id`
+preserved). Targeted 3,729-family backfill and the 44,560-family fleet are
+blocked. Do not build a `--go` writer until historical discovery (#1560) shows
+persisted families are worth populating.
+
+## OSBP / federal-contact agency identity (2026-09-20)
+
+**What.** Federal contact search and OSBP lookup now share one agency-identity matcher. Substring containment is not identity: "STATE" no longer matches "UNITED STATES COAST GUARD", so Gail Clark / `sdbupolicy@state.gov` is not prepended as a Coast Guard OSBP. Coast Guard resolves to the directory USCG row (Maria L. Kersey-Robinson, `uscg-smallbusiness@uscg.mil`, `directorVerified` 2026-06). Parent queries return the parent record or a roster — never the first child. Email domains may flag a mismatch; they do not override an established office identity. Unknown report agencies get a labeled generic fallback, not an asserted OSBP.
+
+**Why.** `search_federal_contacts({ agency: "United States Coast Guard", role: "small business" })` returned a State OSDBU contact with no uncertainty flag, while `lookup_federal_osbp` correctly said the name was not in the directory. Contractors would have emailed the wrong office.
+
+**SEO.** Coast Guard OSBP / USCG small business / federal OSDBU contact / Department of Homeland Security OSBP / Navy OSBP roster.
+
+**Proof.** Units 2026-09-20: `agency-identity.unit.test.ts` Coast Guard gold + independent State/DOE/DOT/DHS/Navy identities + parent first-wins property + email flag-without-veto + before/after collision audit on the tested query set (STATE collisions > 100; ENERGY → BOEM ×2; TRANSPORTATION → TSA ×2 — counts describe that query set, not the production population). `command-info-osbp-alias.unit.test.ts` FM-06 aliases stay bounded, resolve to known directory keys, and do not capture Navy/DHS/USCG parent queries. Reports fallback: unknown agency → `osbpSource: 'generic_fallback'`, labeled, no `directorVerified`. 79 tests across identity, alias, provenance, roster, and no-fabrication. Directory provenance for USCG is June 2026 verification, not a fresh contact check. **Stop before merge** — PR only.
+
+---
+
+## Historical Solicitation Discovery — lookup_solicitation (2026-09-18)
+
+**What.** A dedicated MCP tool looks up a solicitation the customer already worked — by known id or by memory ("I submitted a Navy manufacturing bid at Indian Head recently") — including closed and archived notices. Closed is not gone. Closed is not awarded.
+
+**Why.** FIND only answers "what can I sell into now." The original MASA failure was discovery: Mindy stored the SAM family, but the host called FIND first and the archived notice never appeared. Historical lookup short-circuits that path.
+
+**SEO.** find archived SAM solicitation, lookup past bid, NSWC Indian Head MASA, closed solicitation not awarded, SAM amendment history.
+
+**Proof.** Tool `lookup_solicitation`, 5 credits, local `sam_opportunities` only (no web, no sow_text). Result kinds: `RESOLVED_SOLICITATION` vs `MATCHED_CANDIDATE`. Amendments collapse via production #1557. MASA without a number is a strong candidate, not silent identity. Open control `70RTAC26R00000007` stays OPEN / `not_biddable=false`. FIND is unchanged: "I sell IT services and want to work with the VA" still calls `find_opportunities` once at 10 credits.
+
+---
+
+## MCP decision integrity — evidence, not guesses (2026-09-18)
+
+**What.** MCP notice, contact, incumbent, spend, OSBP, and entity tools now refuse to treat a guess as a fact. A notice UUID keeps that notice's deadline; a solicitation-number family with conflicting close dates is flagged. Contacts that only match by email domain stay uncertain. An incumbent is named only when PSC or distinctive title evidence supports it. Spend that could not be fetched is unavailable, not $0. An agency missing from the OSBP directory is a coverage gap, not "no office." An entity lookup that failed is not an unregistered business; DBA names are searched without picking the first ambiguous match.
+
+**Why.** Bid decisions were being made from the wrong amendment, the wrong office, or an unsupported prior award. Empty results looked like "$0" or "not registered" when the real answer was "we don't know." Compliance-matrix extraction on a notice ID was truncating attachment text that a manual paste of the same documents extracted fully.
+
+**SEO.** SAM.gov solicitation deadline, federal incumbent identification, OSBP contact, SAM entity lookup, compliance matrix from SAM notice.
+
+**Proof.** Units 2026-09-18: `notice-identity` UUID vs solicitation-number deadline conflict + 28-shall paste vs 20k cap; `incumbent-evidence` NAICS-alone never grounds; `derive-subagency` email domain is not a verdict (`@state.gov` on Navy `N40084…` is conflict, not State; `@uscg.mil` on a Navy prefix is conflict, not Coast Guard); `resolve-solicitation` MASA UUID keeps the original close date; `annual-obligations` unavailable ≠ $0; `federal-osbp-provenance` not_in_directory ≠ no_osbp_listed; `sam-entity-empty-success` lookup_failed ≠ unregistered + DBA + Tanaq-family ambiguous; contractor-resolution punctuation / first-match / corpus-miss controls unchanged. Pricing (`packages.ts` / `TOOL_CREDITS`) untouched. A notice-ID matrix that returns 96 rows with `truncated_attachments: 5` proves retrieval and honest truncation, not extraction completeness. Named-DoDAAC contact lookups keep that office even when overseas (N40084 / May Dayday `@state.gov` is conflict + Navy, not filtered away as Far East).
+
+
+---
+
+## Mindy Institute — Federal Legislation (automatic legislative discovery)
+
+**What.** Mindy now discovers federal legislation on its own and keeps every
+legislative version as its own citable document. When a defense authorization bill
+moves — introduced, reported, engrossed, reported in the other chamber, conference,
+signed — each of those texts is a separate Institute record carrying its Congress,
+chamber, bill number, version, action date and source URL. House and Senate versions
+are never merged into one "NDAA 2027," because until conference they are competing
+texts and the provision a contractor is reading may not survive.
+
+**Why.** Legislation is the earliest demand signal in government contracting:
+authorization language precedes budget, which precedes forecast, which precedes
+solicitation. Mindy previously had no legislative watcher at all — the prior NDAA
+content was hand-merged prose from a script with a bill number hardcoded in it, so a
+new fiscal year's bill could only arrive if a human re-ran it. Discovery is now
+dynamic: the collector matches on bill TITLE across the current Congress, so next
+year's bill is found without anyone editing code.
+
+**Honest scope.** This ships the DOCUMENT layer, not section-level provision
+extraction. Mindy can tell you which version of a bill it holds and cite it exactly;
+it does not yet parse individual sections. The 45 legacy `FY2026 NDAA:` pain-point
+strings are **not** authoritative NDAA records and are explicitly excluded from this
+corpus pending separate remediation.
+
+**SEO.** FY2027 NDAA tracking / defense authorization bill status / NDAA committee
+report language / how legislation becomes a federal contract.
+
+**Proof.** Live against api.congress.gov 2026-09-18, zero hardcoded identifiers:
+discovery scanned 1,500 recently-updated bills of the 119th Congress and returned
+**H.R. 8800** (3 House versions + H. Rept. 119-698), **S. 4784** (Senate-reported +
+S. Rept. 119-127) and **S. 1071** (FY2026 NDAA, correctly typed `enacted_law` —
+Public Law 119-60). Five discovery states proven distinguishable in the same run:
+`source_unavailable` · `not_yet_introduced` · `introduced` · `diverging` · `enacted`
+— so "Mindy has nothing" can never again read the same as "nothing exists."
+
+---
+
+## Legislative discovery that can prove its own coverage (2026-09-20)
+
+**What.** Mindy's legislative watcher now does two separate jobs. *Discovery* looks for
+newly-introduced measures across a time-bounded window and checks its own work against
+the count Congress reports for that same window. *Tracking* re-polls every bill Mindy
+already knows about by name, forever. A bill does not have to stay "recently updated"
+to keep being followed.
+
+**Why.** The first version scanned a fixed slice of the most-recently-updated bills.
+That is fine the week a bill moves and silently wrong a month later: on production,
+S. 4784 had drifted to position 2,948 in the feed and simply vanished from the results
+— while the run still reported success. Raising the page count would have bought a few
+weeks and returned the same silent gap. Coverage is now a measured fact: if Mindy
+cannot finish the window, it says so and refuses to advance its cursor, rather than
+reporting an empty result as an answer.
+
+**Honest scope.** Still the document layer — no section-level provision extraction.
+
+**SEO.** NDAA bill tracking / defense authorization status / federal legislation
+monitoring for contractors.
+
+**Proof.** Live against api.congress.gov 2026-09-20: a full pass covered **18,962 of
+18,962** bills in the 119th Congress (`coverage: complete`) and found **14** NDAA-titled
+measures — including S. 4784 and S. 1071, both of which the old fixed-window scan
+missed entirely. An incremental pass covered **3,163 of 3,163** in 13 pages. The old
+6-page configuration now reports `coverage: partial` with the cursor unmoved instead of
+a confident empty result.
+
+---
+
+## NAVSEA command intel, Navy spend grain, DBA lookup, matrix source coverage (2026-09-20)
+
+**What.** Commands are what users type. `get_agency_intel("Naval Sea Systems Command")`
+now resolves NAVSEA instead of returning `agency:null`. Navy contract dollars stay
+labeled as Department of the Navy parent-service spend — never as a NAVSEA total.
+Small-business percentages are three different metrics: set-aside codes, small-business
+recipients, and the SBA 23% goaling figure. Trade-name lookup (`Monarch Yachts`) finds
+the SAM DBA. A compliance matrix is complete only when named source specs that exist
+in the RFP are in the matrix — not when the row count looks non-zero.
+
+**Why.** Round 2 of the Monarch MCP log still had NAVSEA identity null and Monarch's
+DBA as `not_found`. The matrix "fix" of 25 rows had missed LOA, flight deck, SCIF,
+berthing, and magazine from Section 3.0. Navy $176.6B with toptier 097 was being
+read as DoD-wide spend, and 3.4% set-aside was being compared to the 23% statutory
+goal as if they shared a denominator.
+
+**SEO.** NAVSEA market intelligence / Navy small-business spend / SAM DBA search /
+compliance matrix completeness / SYSCOM vs military department spending.
+
+**Proof.** Directory grain tests: NAVSEA → PARENT_SERVICE / command spend
+NOT_ESTABLISHED; Navy → REQUESTED $ at the service. Measured FY2025 USASpending
+A/B/C/D: Navy subtier **$176.56B**, DoD toptier **$491.77B**, Navy small-business
+recipients **$22.13B (12.5%)**. DBA exact-stem unique-picks Monarch Marine Works
+among live Monarch* legal names. Matrix coverage test fails a 25-row extract that
+misses the five Section 3.0 specs. Original `lookup_federal_osbp("United States
+Coast Guard")` payload → Maria L. Kersey-Robinson, uscg-smallbusiness@uscg.mil,
+director_verified 2026-06 (issue-log #6).
+
+---
+
+## Lot due-dates, ungrounded incumbents, PIEE (2026-09-20)
+
+**What.** A SAM `response_deadline` is not the only date on a multi-lot RFP.
+`lookup_solicitation` / `get_solicitation_incumbent` now surface Lot 1 vs Lot 2
+due-dates from the synopsis and flag `deadline_conflict` when they disagree with
+the SAM field. An ungrounded prior-award candidate (Mazak on SCB MAC) is no
+longer copied into `incumbent` / `incumbent_name`. PIEE/WAWF is detected from
+the synopsis even when there is no SOW heading.
+
+**Why.** Original N00024-26-R-2200 failed because Lot 1 is due 13 August 2026
+and Lot 2 / SAM is 31 August 2026 — sibling UUID days were the wrong conflict
+class. Naming Mazak while `grounded_incumbent` was false repeated the original
+unsupported-incumbent failure.
+
+**SEO.** SAM solicitation deadline conflict / incumbent evidence / PIEE proposal
+submission.
+
+**Proof.** Fixture is the SCB MAC synopsis. Unit tests: Lot 1 2026-08-13 + Lot 2
+2026-08-31 vs SAM 2026-08-31 → `lot_due_dates`; `namedIncumbent` returns null for
+a high-confidence NAICS-only Mazak hit; `detectPiee` true on the PIEE paragraph.
+
+---
+
+## Keyword coverage measures the market — it does not name it (2026-09-20)
+
+**What.** `get_keyword_coverage` now measures federal contract actions in BigQuery
+(`usaspending.awards`) for the latest complete fiscal year: word-boundary match on
+the award description, `SUM(obligation_amount)` at transaction grain. It returns
+the measured NAICS/PSC/agency distribution. It does **not** decide that the
+customer's market *is* the lead NAICS.
+
+**Why.** The old live USASpending path mixed description text with NAICS/PSC
+titles, then a 40% "dominant NAICS" gate treated the lead share as identity.
+On warehouse description-match, HVAC's dollar-lead is commercial building
+construction and drones' dollar-lead is aircraft manufacturing. Those are
+measured categories in the matched set. They are not "HVAC means 236220" or
+"drones means 336411." Ranking stays on the keyword until a later
+interpretation layer (Senses v2) exists.
+
+**Honest scope.** Warehouse failure is unknown, not $0. No live API fallback.
+`codeMarketSize()` is still the live USASpending API (candidate for a later
+warehouse cutover). Senses v2 is not built.
+
+**Not established by coverage alone (neutralized 2026-09-20):**
+- company primary NAICS / company market identity (`profile-from-text` keeps
+  `naics: []` and surfaces `coverageCandidates` for display / user confirm)
+- forecast / recompete / set-aside tile routing (`market-overview` uses
+  corroborated `?naics=` or keyword language — never `coverageCodes` alone)
+- opportunity eligibility on `/try` (coverage sector is a relevance signal;
+  dollar-peak sector is not an exclusionary identity gate)
+
+Company/market identity requires corroborating graph evidence (SAM registration,
+award history, user-confirmed codes, vault). Capability Market Match remains the
+pattern: coverage candidate + SAM/award overlap → corroborated node.
+
+**SEO.** Federal market size by keyword / NAICS is the wrong primary key /
+description-match contract spend.
+
+**Proof.** Unit tests fail if HVAC at 52% 236220, drones at 64% 336411, or
+patrol at 78.6% 336611 collapse ranking to `keyword_naics`. Live BQ FY2025
+description match: patrol ≈ $903M lead 336611 (measured shipbuilding share,
+not identity); HVAC ≈ $1.26B lead 236220 52%; drones ≈ $90M lead 336411 64%.
+V1/V2/V3 identity-boundary unit suites: profile-from-text keeps `naics: []` when
+coverage leads 236220/336411; market-overview never calls tile helpers with
+coverageCodes alone; beginner relevance admits 238220/336612 same-sector siblings
+and still drops Dale Carnegie / dirty IT slivers.
+
+
+### SCIF recovery + Monarch Yachts reconciliation (2026-09-20)
+
+**What.** Compliance-matrix extraction now deterministically recovers named Section 3.0 specs (including SCIF) when the LLM skips notional capability lines without shall/must. `lookup_sam_entity` on a genuine miss returns `_meta.reconciliation` proving live legal-name, live DBA, and local mirror were all checked.
+
+**Why.** Notice `6552b25b…` states "Notional 750 sq ft SCIF" in source but the matrix omitted it. Monarch Yachts was framed as a DBA lookup failure; current SAM + mirror return no row — the DBA classifier works on fixtures, so the honest product answer is reconciled `not_found`, not a phantom UEI.
+
+**SEO.** SCIF / compliance matrix / SAM entity DBA lookup / Monarch Yachts registration.
+
+**Proof.** Unit: SCIF recovery from the notional sentence; Monarch zero-hit reconciliation meta. Live: notice `6552b25bf0e648f39b44228275998eef` → `FULL_HAS_SCIF true`, `missing_from_matrix: []`; `lookup_sam_entity({name:"Monarch Yachts"})` → `not_found` with legal/DBA/local hits all 0.
+
+## LEGACY_MANUAL priority dollars omitted until sourced (2026-09-20)
+
+**What.** `get_agency_intel` / shared sourced-pain-points reader no longer surfaces unsourced dollar figures from LEGACY_MANUAL priority prose (NAVSEA Columbia-class / Virginia-class / SIOP / etc.). Qualitative program and opportunity framing stays, still labeled LEGACY_MANUAL. Issue-log tracker separates developer-verified, Round-PDF independently verified, agent recheck, and documented limitations (Round 3 = 6 of 6 *retestable*, not 14/14).
+
+**Why.** Round 3 correctly flagged that LEGACY_MANUAL NAVSEA lines carrying "$2.3B / $1.1B / …" read as budget fact to a skimmer even when provenance is labeled. Those amounts were curated editorial content with null source_url — not SCN/CRS-backed figures.
+
+**SEO.** NAVSEA priorities / agency intel provenance / LEGACY_MANUAL / Columbia-class / SIOP.
+
+**Proof.** Unit: `omitUnsourcedDollarAmounts` strips `$2.3B` while keeping Columbia-class; dollar-only inputs (`"$2.3B"`, `"Allocated $2.3B"`) empty and are **omitted** (never restored via `out || text`). SOURCE_FACT dollars kept. Agent recheck recorded; audit **not fully closed** (#13 unverified this pass; #12 identity passed / retrieval incomplete; public-domain dollar suppression awaits separately approved release). Tracker: `docs/issue-log-14-tracker.md`.

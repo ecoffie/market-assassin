@@ -2,15 +2,20 @@
 import { fetchNoticeResources } from '../../src/lib/sam/fetch-notice-resources';
 import { getRotatedSAMKey } from '../../src/lib/sam/utils';
 import { solicitationDocuments } from '../../src/mcp/tools/solicitation-documents';
+import { getSolicitationDocuments } from '../../src/lib/sam/solicitation-documents';
 import { createHash } from 'node:crypto';
 
 // READ-ONLY BY CONSTRUCTION. This script performs NO writes of any kind.
 // It used to DELETE the notice's cache row to force a cold extract — a
-// production write inside a script presented as read-only verification. The
-// cache is now disabled for this process instead, which forces the same cold
-// path without touching stored data. Must be set before the cache module
-// initializes its client.
-process.env.MCP_EXTERNAL_CACHE = 'off';
+// production write inside a script presented as read-only verification.
+// Three write paths exist in this code path and ALL are suppressed here:
+//   1. mcp_external_cache read/write  → MCP_EXTERNAL_CACHE=off
+//   2. sam_opportunities.description persistence → SAM_DOCS_READONLY=on
+//   3. Supabase Storage attachment upload       → SAM_DOCS_READONLY=on
+// Both flags are read at CALL time, not import time, so assignment here lands
+// before any of those paths runs.
+process.env.MCP_EXTERNAL_CACHE = 'off';  // no cache reads or writes
+process.env.SAM_DOCS_READONLY = 'on';    // no description persistence, no Storage upload
 
 const NID = '2d232f3ce1f04085be52cbfe43a0e463';
 let pass = true;
@@ -77,6 +82,44 @@ chk(
   bytesEqual,
   `${comparedChars}/${storedChars} chars (${pct}%) compared; sha256(assembled)=${sha.slice(0,16)}…`,
 );
+
+// 2c ── THE REMAINDER. The check above is bounded by MAX_WINDOW_CHARS, leaving
+// the tail of any document longer than that unverified (28,483 chars on this
+// notice). Close it by comparing the paged assembly against the SOURCE text —
+// textMode:'full', which returns the whole stored string in one call — so 100%
+// of every document is byte-verified, not 88.9%.
+const source: any = await getSolicitationDocuments({ noticeId: NID, textMode: 'full' });
+let sourceEqual = true, sourceChars = 0;
+for (const d of source.documents) {
+  const paged = acc.get(d.document_id) || '';
+  const full = d.extracted_text;
+  if (paged !== full) {
+    sourceEqual = false;
+    const at = [...full].findIndex((c, i) => paged[i] !== c);
+    console.log(`   SOURCE MISMATCH ${d.filename}: paged ${paged.length} vs source ${full.length}, first diff at ${at}`);
+  }
+  sourceChars += full.length;
+}
+const srcSha = createHash('sha256').update(source.documents.map((d:any)=>d.extracted_text).join('')).digest('hex');
+chk(
+  'byte-for-byte vs SOURCE text (the remaining 28,483 chars)',
+  sourceEqual && sourceChars === storedChars,
+  `${sourceChars}/${storedChars} chars (100%) verified; sha256(source)=${srcSha.slice(0,16)}…`,
+);
+
+// 2d ── COLD → CACHED consistency. A cold extract and a subsequent cached read
+// must return identical text. This is the failure shape that made textMode:'full'
+// correct exactly once: the cold call was full, the cached copy truncated.
+const cachedRead: any = await getSolicitationDocuments({ noticeId: NID, textMode: 'full' });
+let cacheConsistent = true;
+for (const d of source.documents) {
+  const again = cachedRead.documents.find((x: any) => x.document_id === d.document_id);
+  if (!again || again.extracted_text !== d.extracted_text) {
+    cacheConsistent = false;
+    console.log(`   COLD/CACHED DIVERGENCE ${d.filename}: ${d.extracted_text.length} then ${again ? again.extracted_text.length : 'MISSING'}`);
+  }
+}
+chk('cold fetch and cached read return identical text', cacheConsistent);
 // A single response is deliberately BOUNDED (MAX_WINDOW_CHARS), so the real
 // contract is: paging terminates, and when it does nothing is left unread.
 chk('paging terminates on the documented signal (next_page === null)', r.next_page===null);

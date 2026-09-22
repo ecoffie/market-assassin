@@ -35,7 +35,7 @@ afterEach(() => { delete process.env.ONE_CLICK_BUDGET_MS; });
 describe('one_click_proposal budget guard (FM-P03)', () => {
   it('over budget → returns the draft, SKIPS referee + export, flags partial + a follow-up note', async () => {
     process.env.ONE_CLICK_BUDGET_MS = '1'; // any real work blows this → partial path
-    const r = await oneClickProposal({ rfp_text: 'The Offeror shall do X.', userEmail: null });
+    const r = await oneClickProposal({ rfp_text: 'The Offeror shall do X.', userEmail: null, async: false });
     expect(r.draft?.sections.length).toBe(1);          // the paid work is returned
     expect(r._meta.partial).toBe(true);
     expect(refereeMock).not.toHaveBeenCalled();         // heavy follow-ups skipped
@@ -49,7 +49,7 @@ describe('one_click_proposal budget guard (FM-P03)', () => {
     process.env.ONE_CLICK_BUDGET_MS = '600000'; // generous → full path
     refereeMock.mockResolvedValue({ summary: { score: 83 } });
     exportMock.mockResolvedValue({ filename: 'p.docx', mime: 'x', docx_base64: 'AAA', byte_size: 10 });
-    const r = await oneClickProposal({ rfp_text: 'The Offeror shall do X.', userEmail: null });
+    const r = await oneClickProposal({ rfp_text: 'The Offeror shall do X.', userEmail: null, async: false });
     expect(r._meta.partial).toBe(false);
     expect(refereeMock).toHaveBeenCalledTimes(1);
     expect(exportMock).toHaveBeenCalledTimes(1);

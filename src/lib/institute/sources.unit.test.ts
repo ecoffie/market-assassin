@@ -39,8 +39,14 @@ describe('Institute ingestion — agency identity', () => {
     expect(r.method).toBe('exact_name');
   });
 
-  it('UNRESOLVED STAYS UNRESOLVED when no canonical agency is named', () => {
+  it('resolves NNSA via curated phrase → Department of Energy', () => {
     const r = resolveDocumentAgency(parseGaoRss(RSS)[1], NAMES);
+    expect(r.resolved).toBe(true);
+    expect(r.canonicalAgency).toBe('Department of Energy');
+  });
+
+  it('UNRESOLVED STAYS UNRESOLVED when no agency phrase is present', () => {
+    const r = resolveDocumentAgency(doc({ title: 'Priority Open Recommendations: Selected Topics', abstract: 'A status report.' }), NAMES);
     expect(r.resolved).toBe(false);
     expect(r.canonicalAgency).toBeNull();
   });
@@ -55,6 +61,14 @@ describe('Institute ingestion — agency identity', () => {
   it('never resolves on a substring hiding inside a word', () => {
     const d = doc({ title: 'Customer Services Review', abstract: 'Departmental oversight of services.' });
     expect(resolveDocumentAgency(d, NAMES).canonicalAgency).toBeNull();
+  });
+
+  it('resolves FAA title to Department of Transportation without force-mapping multi-agency', () => {
+    const d = doc({
+      title: 'Flight Simulators: FAA Should Take Steps to Ensure Oversight Efforts Address Increased Workload',
+      abstract: 'The Federal Aviation Administration (FAA) uses the National Simulator Program.',
+    });
+    expect(resolveDocumentAgency(d, NAMES).canonicalAgency).toBe('Department of Transportation');
   });
 });
 

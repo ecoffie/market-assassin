@@ -17,6 +17,14 @@ import { SAMNoticeSummary } from '../pipelines/sam-gov';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 import { extractAnglesFromBriefing, persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
 import { pickBriefingLenses, formatLensesForPrompt, seedFromString } from '../lenses';
+import { calendarEntriesFromSources, verifiedSourcesFromContracts, verifiedSourcesFromWeeklyData } from '../calendar-sanitize';
+import {
+  opportunitiesFromSources,
+  opportunitySourceFromContract,
+  overlayOpportunityAnalysis,
+  sanitizeWeeklyOpportunities,
+} from '../opportunity-sanitize';
+import type { WeeklyContract } from '../weekly-contracts';
 
 export interface WeeklyOpportunityAnalysis {
   rank: number;
@@ -57,6 +65,7 @@ export interface WeeklyMarketSignal {
 }
 
 export interface WeeklyCalendarItem {
+  sourceId: string;
   date: string;
   event: string;
   type: 'deadline' | 'industry_day' | 'rfi_due' | 'award_expected';
@@ -85,11 +94,16 @@ export interface PrecomputedWeeklyBriefing {
   weekOf: string;
   opportunities: Array<{
     rank: number;
+    sourceId: string;
+    title: string;
     contractName: string;
+    status: string;
+    marketMatchReason: string;
     agency: string;
     incumbent: string;
     value: number;
     window: string;
+    naicsCode?: string;
     displacementAngle: string;
     keyDates: { label: string; date: string }[];
     competitiveLandscape: string[];
@@ -97,7 +111,7 @@ export interface PrecomputedWeeklyBriefing {
   }>;
   teamingPlays: WeeklyTeamingPlay[];
   marketSignals: WeeklyMarketSignal[];
-  calendar: Array<{ date: string; event: string; type: string; priority: string }>;
+  calendar: Array<{ sourceId: string; date: string; event: string; type: string; priority: string }>;
   processingTimeMs: number;
   llmProvider?: string;
   llmModel?: string;
@@ -411,7 +425,7 @@ export async function generateWeeklyBriefing(
       opportunities: (aiResponse.opportunities || []).slice(0, maxOpps),
       teamingPlays: (aiResponse.teamingPlays || []).slice(0, maxPlays),
       marketSignals: aiResponse.marketSignals || [],
-      calendar: aiResponse.calendar || [],
+      calendar: calendarEntriesFromSources(verifiedSourcesFromWeeklyData(organizedData)),
       rawDataSummary: {
         recompetesAnalyzed: organizedData.recompetes?.length || 0,
         awardsAnalyzed: organizedData.awards?.length || 0,
@@ -478,37 +492,32 @@ Return JSON only.`;
 }
 
 export async function generateWeeklyDeepDiveFromContracts(
-  contracts: Array<{
-    contractNumber: string;
-    contractName: string;
-    agency: string;
-    incumbent: string;
-    value: number;
-    naicsCode: string;
-    expirationDate: string;
-    daysUntilExpiration: number;
-    setAside: string;
-    description: string;
-    numberOfBids?: number;
-    competitionLevel?: string;
-  }>,
+  contracts: WeeklyContract[],
   noticeSummary?: SAMNoticeSummary,
   options: {
     /** Profile hash for anti-repetition memory (Content Reaper pattern #3) */
     naicsProfileHash?: string;
+    /** Saved 6-digit NAICS for this template. Required for market-match. */
+    savedNaics?: string[];
   } = {}
 ): Promise<PrecomputedWeeklyBriefing> {
   const weekOfDate = getWeekOfDate();
+  const savedNaics = options.savedNaics || [];
+  const sources = contracts
+    .map((contract) => opportunitySourceFromContract(contract, savedNaics))
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+  const grounded = opportunitiesFromSources(sources, 10);
+  const catalogContracts = contracts.filter((contract) =>
+    sources.some((source) => source.sourceId === String(contract.contractNumber || '').trim()),
+  );
 
-  // Anti-repetition: pull recent weekly angles for this profile + inject
-  // as 'avoid repeating' guidance. Fire-and-forget on lookup failure.
   let recentAngles: string[] = [];
   if (options.naicsProfileHash) {
     try {
       recentAngles = await getRecentAngles({
         naicsProfileHash: options.naicsProfileHash,
         briefingType: 'weekly',
-        limit: 6, // weekly cadence — fewer rows but each represents a full week
+        limit: 6,
       });
     } catch (err) {
       console.warn('[WeeklyBriefingGen] recent-angles lookup failed (non-fatal):', err);
@@ -516,64 +525,111 @@ export async function generateWeeklyDeepDiveFromContracts(
   }
   const recentAnglesBlock = formatAnglesForPrompt(recentAngles);
 
-  // Pick 2 lenses deterministically per-week-per-profile
   const lensSeed = options.naicsProfileHash
     ? seedFromString(`${options.naicsProfileHash}:${weekOfDate}`)
     : undefined;
   const lenses = pickBriefingLenses(2, lensSeed);
   const lensBlock = formatLensesForPrompt(lenses);
 
-  const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
+  const identityPayload = grounded.map((row) => ({
+    sourceId: row.sourceId,
+    title: row.title,
+    agency: row.agency,
+    incumbent: row.incumbent,
+    value: row.value,
+    status: row.status,
+    marketMatchReason: row.marketMatchReason,
+    naicsCode: row.naicsCode,
+  }));
 
-${lensBlock ? lensBlock + '\n' : ''}${recentAnglesBlock ? recentAnglesBlock + '\n\n' : ''}CONTRACT DATA (REAL DATA FROM USASPENDING):
-${JSON.stringify(contracts, null, 2)}
+  let provider = 'none';
+  let model = 'source-records';
+  let teamingPlays: WeeklyTeamingPlay[] = [];
+  let llmSignals: WeeklyMarketSignal[] = [];
+  let analyzed = grounded;
 
-Generate JSON with:
-1. "opportunities" - Top 10 with FULL analysis. Each needs: rank, contractName, agency, incumbent, value (number), window, displacementAngle, keyDates (array of {label, date}), competitiveLandscape (array of 3-4 insights), recommendedApproach (string)
-2. "teamingPlays" - 3 DETAILED plays. Each: playNumber, strategyName, targetCompany, whyTarget (array), whoToContact (array), suggestedOpener, followUpMessage
-3. "marketSignals" - 4 news items. Each: headline, source, implication, actionRequired (boolean)
-4. "calendar" - 6 key dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
+  if (grounded.length > 0) {
+    const prompt = `You are a senior GovCon capture strategist. Analyze ONLY the opportunities below. Do not invent contracts, titles, dates, or a calendar.
 
-Focus on contracts with low numberOfBids (1-2 bids = vulnerable incumbent) and near-term expiration.
+${lensBlock ? lensBlock + '\n' : ''}${recentAnglesBlock ? recentAnglesBlock + '\n\n' : ''}GROUNDED OPPORTUNITIES (REAL USASPENDING RECORDS):
+${JSON.stringify(identityPayload, null, 2)}
+
+Return JSON with:
+1. "opportunities" - analysis keyed by sourceId. Each: sourceId, displacementAngle, competitiveLandscape (3-4 insights), recommendedApproach. Do not change titles.
+2. "teamingPlays" - up to 3 plays. Each: playNumber, strategyName, targetCompany, whyTarget (array), whoToContact (array), suggestedOpener, followUpMessage
+3. "marketSignals" - up to 4 news items. Each: headline, source, implication, actionRequired (boolean)
+
+Do not return a calendar. Empty teamingPlays/marketSignals is acceptable when the records do not support them.
 
 Return ONLY valid JSON.`;
 
-  const { text, provider, model } = await generateBriefingJson(
-    'weekly',
-    'You are a senior GovCon capture strategist.',
-    prompt,
-    6000
-  );
+    try {
+      const generated = await generateBriefingJson(
+        'weekly',
+        'You are a senior GovCon capture strategist.',
+        prompt,
+        6000,
+      );
+      provider = generated.provider;
+      model = generated.model;
+      const data = extractAndParseJSON<{
+        opportunities?: Array<{
+          sourceId?: string;
+          displacementAngle?: string;
+          competitiveLandscape?: string[];
+          recommendedApproach?: string;
+        }>;
+        teamingPlays?: WeeklyTeamingPlay[];
+        marketSignals?: WeeklyMarketSignal[];
+      }>(generated.text);
+      analyzed = overlayOpportunityAnalysis(
+        grounded,
+        Array.isArray(data.opportunities) ? data.opportunities : [],
+      );
+      teamingPlays = data.teamingPlays || [];
+      llmSignals = data.marketSignals || [];
+    } catch (err) {
+      console.warn('[WeeklyBriefingGen] LLM analysis failed; keeping source-grounded opportunities:', err);
+    }
+  }
 
-  const data = extractAndParseJSON<{
-    opportunities?: PrecomputedWeeklyBriefing['opportunities'];
-    teamingPlays?: WeeklyTeamingPlay[];
-    marketSignals?: WeeklyMarketSignal[];
-    calendar?: PrecomputedWeeklyBriefing['calendar'];
-  }>(text);
+  const opportunities = sanitizeWeeklyOpportunities(analyzed, sources).kept.map((row, index) => ({
+    rank: index + 1,
+    sourceId: String(row.sourceId),
+    title: String(row.title),
+    contractName: String(row.contractName || row.title),
+    status: String(row.status),
+    marketMatchReason: String(row.marketMatchReason),
+    agency: String(row.agency || ''),
+    incumbent: String(row.incumbent || ''),
+    value: Number(row.value) || 0,
+    window: String(row.window || row.status),
+    naicsCode: row.naicsCode || undefined,
+    displacementAngle: String(row.displacementAngle || ''),
+    keyDates: row.keyDates || [],
+    competitiveLandscape: row.competitiveLandscape || [],
+    recommendedApproach: String(row.recommendedApproach || ''),
+  }));
 
-  const briefing = {
+  const briefing: PrecomputedWeeklyBriefing = {
     weekOf: weekOfDate,
-    opportunities: data.opportunities || [],
-    teamingPlays: data.teamingPlays || [],
+    opportunities,
+    teamingPlays,
     marketSignals: [
       ...buildWeeklyNoticeSignals(noticeSummary),
-      ...(data.marketSignals || []),
+      ...llmSignals,
     ].slice(0, 6),
-    calendar: data.calendar || [],
+    calendar: calendarEntriesFromSources(verifiedSourcesFromContracts(catalogContracts)),
     processingTimeMs: 0,
     llmProvider: provider,
     llmModel: model,
   };
 
-  // Persist top angles for next-week anti-repetition. Fire-and-forget.
   if (options.naicsProfileHash) {
-    // We use contractName as the angle for weekly since the structure
-    // is contracts-first, not opportunities-first.
-    const angles = (briefing.opportunities || [])
+    const angles = briefing.opportunities
       .slice(0, 5)
-      .map((o) => o.contractName || '')
-      .filter(Boolean) as string[];
+      .map((o) => o.sourceId || o.title || '')
+      .filter(Boolean);
     if (angles.length > 0) {
       persistAngles({
         naicsProfileHash: options.naicsProfileHash,
@@ -582,7 +638,7 @@ Return ONLY valid JSON.`;
         angles,
       }).catch(() => { /* logged inside */ });
     }
-    void extractAnglesFromBriefing; // reserved for future shared extractor
+    void extractAnglesFromBriefing;
   }
 
   return briefing;

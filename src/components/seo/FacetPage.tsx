@@ -7,6 +7,8 @@ import Link from 'next/link';
 import MemberAwareCta from '@/components/MemberAwareCta';
 import type { FacetOpp } from '@/lib/seo/facets';
 
+const SITE_URL = 'https://getmindy.ai';
+
 function fmtDate(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -19,15 +21,76 @@ export default function FacetPage({
   total,
   opps,
   crossLinks,
+  canonicalPath,
+  breadcrumb,
 }: {
   h1: string;
   intro: string;
   total: number;
   opps: FacetOpp[];
   crossLinks: { href: string; label: string }[];
+  /** Path of THIS facet page, e.g. `/psc/r425`. Enables the JSON-LD block. */
+  canonicalPath?: string;
+  /** Intermediate crumb between Home and this page, e.g. { name: 'NAICS', href: '/naics' }. */
+  breadcrumb?: { name: string; href: string };
 }) {
+  /* Structured data. These three clusters (PSC 366 URLs, set-aside 235, NAICS×state)
+     shipped with NO JSON-LD at all while their sibling clusters (/naics/[code],
+     /agencies/[slug], /glossary) all carried it — measured live 2026-09-21. An
+     ItemList of the real, linked opportunities is the honest description of the
+     page: it lists what it lists, and only when it actually has rows. */
+  const jsonLd = canonicalPath
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'CollectionPage',
+            '@id': `${SITE_URL}${canonicalPath}#page`,
+            name: h1,
+            description: intro,
+            url: `${SITE_URL}${canonicalPath}`,
+            ...(opps.length > 0
+              ? {
+                  mainEntity: {
+                    '@type': 'ItemList',
+                    numberOfItems: opps.length,
+                    itemListElement: opps.map((o, i) => ({
+                      '@type': 'ListItem',
+                      position: i + 1,
+                      name: o.title,
+                      url: `${SITE_URL}/opportunity/${o.slug}`,
+                    })),
+                  },
+                }
+              : {}),
+          },
+          {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+              ...(breadcrumb
+                ? [{ '@type': 'ListItem', position: 2, name: breadcrumb.name, item: `${SITE_URL}${breadcrumb.href}` }]
+                : []),
+              {
+                '@type': 'ListItem',
+                position: breadcrumb ? 3 : 2,
+                name: h1,
+                item: `${SITE_URL}${canonicalPath}`,
+              },
+            ],
+          },
+        ],
+      }
+    : null;
+
   return (
     <main className="min-h-screen bg-white">
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
       <div className="max-w-4xl mx-auto px-4 py-10">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{h1}</h1>
         <p className="text-sm text-gray-500 mt-2">{intro}</p>

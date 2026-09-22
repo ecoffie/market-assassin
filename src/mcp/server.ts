@@ -32,6 +32,11 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { findOpportunitiesTool } from './tools/find-opportunities';
+import { lookupSolicitationTool } from './tools/lookup-solicitation';
+import { currentAcquisitionIntelligenceTool } from './tools/current-acquisition-intelligence';
+import { matchCompanyToPathwaysTool } from './tools/match-company-to-pathways';
+import { understandCustomerTool } from './tools/understand-customer';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
@@ -68,11 +73,21 @@ import { getFederalEventSeries } from './tools/event-series';
 import { getSbaGoalingShare } from './tools/sba-goaling';
 import { draftProposal, draftProposalSection } from './tools/draft-proposal';
 import { exportProposal } from './tools/export-proposal';
+import {
+  MCP_CONNECTOR_INSTRUCTIONS,
+  SCHEDULE_MARKET_SEARCH_DESCRIPTION,
+  SCHEDULE_MARKET_SEARCH_TITLE,
+} from '@/lib/mcp/schedule-discovery';
 
-const server = new McpServer({
-  name: 'mindy-govcon',
-  version: '0.1.0',
-});
+const server = new McpServer(
+  {
+    name: 'mindy-govcon',
+    version: '0.1.0',
+  },
+  {
+    instructions: MCP_CONNECTOR_INSTRUCTIONS,
+  },
+);
 
 server.registerTool(
   'get_winning_playbook',
@@ -328,7 +343,8 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
-      'and asks who won the prior work / what it cost. Resolves the OPEN notice, then finds the LIKELY ' +
+      'and asks who won the prior work / what it cost. Resolves the stored notice (latest version; status ' +
+      'derived from active + deadline), then finds the LIKELY ' +
       'prior award. Do NOT call get_award_detail with an RFQ number.',
     inputSchema: {
       solicitation_number: z.string().optional().describe('SAM solicitation number, e.g. "140L6226Q0013".'),
@@ -507,6 +523,153 @@ server.registerTool(
 );
 
 server.registerTool(
+  'find_opportunities',
+  {
+    title: 'Find Opportunities (Open · Coming back · Coming soon)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'PRIMARY market FIND across OPEN NOW (SAM), COMING BACK (recompetes), and COMING SOON (forecasts). ' +
+      'Use for "find opportunities in …" — customer need not know SAM/recompete/forecast. Each horizon is ' +
+      'independent (empty Open ≠ market zero). Prefer this over search_sam_opportunities for market hunts.',
+    inputSchema: {
+      query: z.string().describe('Plain-English what to find, e.g. "cybersecurity".'),
+      location: z.string().optional().describe('State name or code ("Florida" / "FL").'),
+      agency: z.string().optional().describe('Buying agency / customer.'),
+      set_aside: z.string().optional().describe('Set-aside program, e.g. "8(a)".'),
+      timeframe: z
+        .object({
+          open_closing_days: z.number().optional(),
+          recompete_months: z.number().optional(),
+          forecast_include_past: z.boolean().optional(),
+        })
+        .optional(),
+      horizons: z
+        .object({
+          open_now: z.boolean().optional(),
+          coming_back: z.boolean().optional(),
+          coming_soon: z.boolean().optional(),
+        })
+        .optional(),
+      limit_per_horizon: z.number().int().min(1).max(25).optional(),
+      advanced: z
+        .object({
+          naics: z.string().optional(),
+          psc: z.string().optional(),
+          keyword_exact: z.string().optional(),
+        })
+        .optional(),
+    },
+  },
+  async (args) => {
+    const result = await findOpportunitiesTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'lookup_solicitation',
+  {
+    title: 'Look Up Solicitation (historical · known id)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'Look up a specific solicitation by known id OR historical context — closed/archived included. ' +
+      'Closed ≠ gone. Closed is not awarded. MATCHED_CANDIDATE is not identity. Not a market FIND.',
+    inputSchema: {
+      query: z.string().describe('Recall phrase or solicitation number / notice UUID.'),
+      confirm_notice_id: z.string().optional().describe('After user confirms a candidate, that notice_id.'),
+    },
+  },
+  async (args) => {
+    const result = await lookupSolicitationTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_current_acquisition_intelligence',
+  {
+    title: 'Current Acquisition Intelligence (what changed · what to do)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'CURRENT INTELLIGENCE journey slot — what changed about how this buyer buys for a capability, and what to ' +
+      'do differently (cited live deltas only). Composes recompete_changes, recompete_opportunities, sam_opportunities, ' +
+      'agency_forecasts, sam_events. Exposes pathway gaps honestly; never set-aside-first.',
+    inputSchema: {
+      agency: z.string().optional().describe('Buying organization.'),
+      office: z.string().optional(),
+      dodaac: z.string().optional().describe('6-char DoDAAC when known.'),
+      capability: z.string().optional().describe('Capability / market scope.'),
+      keywords: z.array(z.string()).optional(),
+      naics: z.array(z.string()).optional(),
+      psc: z.array(z.string()).optional(),
+      notice_ids: z.array(z.string()).optional(),
+      contract_ids: z.array(z.string()).optional(),
+      piids: z.array(z.string()).optional(),
+      window_days: z.number().int().min(7).max(365).optional(),
+    },
+  },
+  async (args) => {
+    const result = await currentAcquisitionIntelligenceTool(args);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'match_company_to_pathways',
+  {
+    title: 'Pathway Fit (doors your company can walk through)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'PATHWAY FIT after CURRENT INTELLIGENCE — match a company’s public UEI record to CAI buyer doors. ' +
+      'Two-sided evidence required. no_proven_door is success. Never invents Talent, vehicle portfolios, or NYM doors.',
+    inputSchema: {
+      uei: z.string().optional().describe('12-char UEI (preferred).'),
+      company_name: z.string().optional(),
+      cage: z.string().optional(),
+      cai: z.record(z.string(), z.unknown()).optional().describe('CAI package / tool result (required).'),
+      include_owner_asserted: z.boolean().optional(),
+    },
+  },
+  async (args) => {
+    const result = await matchCompanyToPathwaysTool(args as Parameters<typeof matchCompanyToPathwaysTool>[0]);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'understand_customer',
+  {
+    title: 'Understand This Customer (Opportunity · Agency · Emphasize)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'UNDERSTAND after specific FIND. Three provenance-labeled sections: what we can verify from ' +
+      'this opportunity/buyer; what broader Mindy research indicates; what that suggests you emphasize. ' +
+      'Never present curated research as what they "actually care about." Ends with a capability/door ask ' +
+      '(not set-aside-first). Does not draft emails, capability statements, responses, or meeting briefs.',
+    inputSchema: {
+      notice_id: z.string().optional().describe('SAM notice UUID from find_opportunities open_now item.'),
+      agency: z.string().optional().describe('Buying agency if known.'),
+    },
+  },
+  async ({ notice_id, agency }) => {
+    const result = await understandCustomerTool({ notice_id, agency });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
   'get_expiring_contracts',
   {
     title: 'Get Expiring Contracts (Recompetes)',
@@ -514,12 +677,14 @@ server.registerTool(
     description:
       'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract"). Filter by ' +
       'NAICS / agency / state / expiration window (months) / value / recompete-likelihood; soonest-expiring first. ' +
-      'A multiple-award IDIQ appears as several rows (one per holder). grounded=false — widen months_window.',
+      'A multiple-award IDIQ appears as several rows (one per holder). grounded=false — widen months_window. ' +
+      'For market FIND across three horizons prefer find_opportunities.',
     inputSchema: {
       naics: z.string().optional().describe('NAICS code; ≤5 digits = prefix, 6 = exact.'),
       agency: z.string().optional().describe('Agency name, case-insensitive partial.'),
       state: z.string().optional().describe('2-letter place-of-performance state.'),
       months_window: z.number().int().min(1).max(60).optional().describe('Expiration window in months (default 18).'),
+      months_min: z.number().int().min(0).max(60).optional().describe('Skip contracts ending sooner than this many months. Capture window: months_min=6, months_window=18.'),
       min_value: z.number().optional().describe('Minimum obligated dollars.'),
       max_value: z.number().optional().describe('Maximum obligated dollars.'),
       likelihood: z.enum(['high', 'medium', 'low']).optional().describe('Recompete-likelihood filter.'),
@@ -530,8 +695,8 @@ server.registerTool(
       limit: z.number().int().min(1).max(200).optional().describe('Max results (default 25).'),
     },
   },
-  async ({ naics, agency, state, months_window, min_value, max_value, likelihood, eligible_set_asides, limit }) => {
-    const result = await expiringContracts({ naics, agency, state, months_window, min_value, max_value, likelihood, eligible_set_asides, limit });
+  async ({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit }) => {
+    const result = await expiringContracts({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
@@ -715,10 +880,9 @@ server.registerTool(
 server.registerTool(
   'schedule_market_search',
   {
-    title: 'Schedule Market Search (saved search + alerts)',
+    title: SCHEDULE_MARKET_SEARCH_TITLE,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    description:
-      'Schedule recurring Map alerts for a saved filter set (daily/weekly). Alerts go to the authenticated Mindy account email only.',
+    description: SCHEDULE_MARKET_SEARCH_DESCRIPTION,
     inputSchema: {
       name: z.string().describe('Display name for this saved search.'),
       filters: z.record(z.string(), z.unknown()).describe('Map filter snapshot — at least one narrowing field required.'),
@@ -738,9 +902,10 @@ server.registerTool(
 server.registerTool(
   'list_market_schedules',
   {
-    title: 'List Market Schedules',
+    title: 'List Market Watches / Schedules',
     annotations: { readOnlyHint: true, openWorldHint: true },
-    description: "List the authenticated user's saved market search schedules.",
+    description:
+      "List the authenticated user's market watches / scheduled searches. Use when asking what is being monitored.",
     inputSchema: {},
   },
   async () => {
@@ -753,10 +918,10 @@ server.registerTool(
 server.registerTool(
   'update_market_schedule',
   {
-    title: 'Update Market Schedule',
+    title: 'Update Market Watch / Schedule',
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     description:
-      'Update cadence, pause/resume, or rename a saved market schedule owned by the authenticated account.',
+      'Update cadence, pause/resume, or rename a market watch. Cadence presets only: daily | weekly | paused.',
     inputSchema: {
       schedule_id: z.string(),
       name: z.string().optional(),

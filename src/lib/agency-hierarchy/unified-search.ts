@@ -31,6 +31,16 @@ import {
 
 import contractorsData from '@/data/contractors.json';
 import agencyAliasesData from '@/data/agency-aliases.json';
+import {
+  getAgencySourcedIntelligence,
+  formatPainPointForDisplay,
+  toCitation,
+} from '@/lib/strategic-intel/sourced-pain-points';
+import {
+  directoryCommands,
+  identityEstablishedEqual,
+  resolveDirectoryIdentity,
+} from '@/lib/gov-contacts/agency-identity';
 
 // Types
 export interface UnifiedAgencyResult {
@@ -49,6 +59,17 @@ export interface UnifiedAgencyResult {
   // GovCon Intel
   painPoints: string[];
   priorities: string[];
+  /** Structured citations when living GAO rows are present (optional additive). */
+  sourcedPainPoints?: Array<{
+    claim: string;
+    provenance: 'SOURCE_FACT' | 'MINDY_INTERPRETATION' | 'LEGACY_MANUAL';
+    source_url: string | null;
+    document_number: string | null;
+    published_at: string | null;
+    institute_source_id: string | null;
+  }>;
+  /** True when at least one living sourced claim is present. */
+  hasSourcedIntelligence?: boolean;
 
   // Contacts (SBLOs at contractors who work with this agency)
   relatedContractors: Array<{
@@ -149,7 +170,7 @@ export async function searchAgencies(
 
       for (const office of hierarchyResults.offices) {
         if (!seenAgencies.has(office.name.toLowerCase())) {
-          const result = buildAgencyResultFromHierarchy(office, opts);
+          const result = await buildAgencyResultFromHierarchy(office, opts);
           results.push(result);
           seenAgencies.add(office.name.toLowerCase());
         }
@@ -173,6 +194,16 @@ export async function getAgency(
   options: UnifiedSearchOptions = {}
 ): Promise<UnifiedAgencyResult | null> {
   const opts = { ...defaultOptions, ...options };
+
+  // Directory identity first — alias/pain keys miss "Naval Sea Systems Command"
+  // (pain is keyed NAVSEA). Commands are what users type.
+  const dir = resolveDirectoryIdentity(identifier, directoryCommands());
+  if (dir.kind === 'command') {
+    return buildAgencyResultFromDirectory(dir.info, opts);
+  }
+  if (dir.kind === 'parent_roster') {
+    return buildAgencyResult(dir.parentLabel, 'exact', 100, opts);
+  }
 
   // Try CGAC code
   if (/^\d{3}$/.test(identifier)) {
@@ -198,13 +229,36 @@ export async function getAgency(
   try {
     const hierarchyResults = await searchOffices({ name: identifier, limit: 1 });
     if (hierarchyResults.offices.length > 0) {
-      return buildAgencyResultFromHierarchy(hierarchyResults.offices[0], opts);
+      return await buildAgencyResultFromHierarchy(hierarchyResults.offices[0], opts);
     }
   } catch (error) {
     console.error('[getAgency] Hierarchy lookup error:', error);
   }
 
   return null;
+}
+
+async function buildAgencyResultFromDirectory(
+  info: { fullName: string; abbreviation: string; parentAgency: string },
+  options: UnifiedSearchOptions,
+): Promise<UnifiedAgencyResult | null> {
+  const result = await buildAgencyResult(info.fullName, 'exact', 100, options);
+  if (!result) return null;
+  result.shortName = info.abbreviation;
+  result.parent = info.parentAgency;
+  result.parentPath = `${info.parentAgency} > ${info.fullName}`;
+  result.level = identityEstablishedEqual(info.fullName, info.parentAgency) ? 'department' : 'agency';
+  // Directory SYSCOMs are not USASpending toptiers — do not display a borrowed CGAC.
+  result.cgacCode = null;
+  if (result.painPoints.length === 0) {
+    const pain = getPainPointsForAgency(info.abbreviation) || getPainPointsForAgency(info.fullName);
+    if (pain?.painPoints.length) {
+      result.painPoints = pain.painPoints;
+      result.priorities = pain.priorities;
+      if (!result.sources.includes('pain_points')) result.sources.push('pain_points');
+    }
+  }
+  return result;
 }
 
 /**
@@ -258,6 +312,34 @@ async function buildAgencyResult(
   // Extract short name
   const shortName = extractShortName(agencyName);
 
+  // Shared sourced-first reader (living GAO + distinguishable legacy fallback).
+  let painPoints: string[] = agencyInfo?.painPoints || [];
+  let priorities: string[] = agencyInfo?.priorities || [];
+  let sourcedPainPoints: UnifiedAgencyResult['sourcedPainPoints'];
+  let hasSourcedIntelligence = false;
+  if (options.includePainPoints !== false) {
+    try {
+      const bundle = await getAgencySourcedIntelligence(agencyName, {
+        sourcedLimit: 30,
+        legacyLimit: 30,
+      });
+      if (bundle.painPoints.length > 0) {
+        painPoints = bundle.painPoints.map(formatPainPointForDisplay);
+        priorities = bundle.priorities.map(formatPainPointForDisplay);
+        sourcedPainPoints = bundle.painPoints.map(toCitation);
+        hasSourcedIntelligence = bundle.meta.sourcedCount > 0;
+        // Recompute sources honestly from the shared reader.
+        const nextSources = sources.filter((s) => s !== 'pain_points');
+        if (bundle.meta.sourcedCount > 0) nextSources.push('institute_gao');
+        if (bundle.meta.legacyCount > 0) nextSources.push('pain_points');
+        sources.length = 0;
+        sources.push(...nextSources);
+      }
+    } catch (err) {
+      console.error('[buildAgencyResult] sourced intel failed, legacy only:', err);
+    }
+  }
+
   return {
     name: agencyName,
     shortName,
@@ -269,8 +351,10 @@ async function buildAgencyResult(
     level,
     children,
 
-    painPoints: agencyInfo?.painPoints || [],
-    priorities: agencyInfo?.priorities || [],
+    painPoints,
+    priorities,
+    sourcedPainPoints,
+    hasSourcedIntelligence,
 
     relatedContractors,
 
@@ -283,17 +367,39 @@ async function buildAgencyResult(
 /**
  * Build result from Federal Hierarchy data
  */
-function buildAgencyResultFromHierarchy(
+async function buildAgencyResultFromHierarchy(
   org: FederalOrganization,
   options: UnifiedSearchOptions
-): UnifiedAgencyResult {
-  // Try to find pain points for this org
-  const painPoints = getPainPointsForAgency(org.name);
-
+): Promise<UnifiedAgencyResult> {
   // Get related contractors
   let relatedContractors: UnifiedAgencyResult['relatedContractors'] = [];
   if (options.includeContractors) {
     relatedContractors = findRelatedContractors(org.name);
+  }
+
+  let painPoints: string[] = [];
+  let priorities: string[] = [];
+  let sourcedPainPoints: UnifiedAgencyResult['sourcedPainPoints'];
+  let hasSourcedIntelligence = false;
+  const sources: string[] = ['hierarchy'];
+  if (options.includePainPoints !== false) {
+    try {
+      const bundle = await getAgencySourcedIntelligence(org.name, {
+        sourcedLimit: 30,
+        legacyLimit: 30,
+      });
+      painPoints = bundle.painPoints.map(formatPainPointForDisplay);
+      priorities = bundle.priorities.map(formatPainPointForDisplay);
+      sourcedPainPoints = bundle.painPoints.map(toCitation);
+      hasSourcedIntelligence = bundle.meta.sourcedCount > 0;
+      if (bundle.meta.sourcedCount > 0) sources.push('institute_gao');
+      if (bundle.meta.legacyCount > 0) sources.push('pain_points');
+    } catch {
+      const legacy = getPainPointsForAgency(org.name);
+      painPoints = legacy?.painPoints || [];
+      priorities = legacy?.priorities || [];
+      if (legacy) sources.push('pain_points');
+    }
   }
 
   return {
@@ -307,14 +413,16 @@ function buildAgencyResultFromHierarchy(
     level: org.type,
     children: [],
 
-    painPoints: painPoints?.painPoints || [],
-    priorities: painPoints?.priorities || [],
+    painPoints,
+    priorities,
+    sourcedPainPoints,
+    hasSourcedIntelligence,
 
     relatedContractors,
 
     matchType: 'hierarchy',
     matchScore: 50,
-    sources: ['hierarchy']
+    sources,
   };
 }
 

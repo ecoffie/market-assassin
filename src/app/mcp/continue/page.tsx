@@ -59,6 +59,63 @@ export default function ContinuePage() {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'running' | 'done' | 'error'>('loading');
   const [message, setMessage] = useState('');
+  const [buying, setBuying] = useState<string | null>(null);
+  const [buyError, setBuyError] = useState('');
+  /** 'retry' = transient, retrying can work. 'account' / 'done' = terminal, it cannot. */
+  const [buyErrorKind, setBuyErrorKind] = useState<'retry' | 'account' | 'done' | null>(null);
+
+  /**
+   * Buy through a SERVER-CREATED Checkout Session, not a static payment link.
+   *
+   * WHY: Stripe payment LINKS do not forward arbitrary query params, so `?attempt=` never
+   * reaches the webhook — a purchase could be tied to the ACCOUNT but never to the blocked
+   * REQUEST, and the saved request could not be resumed automatically. /api/mcp/checkout
+   * sets client_reference_id AND metadata.attempt server-side.
+   *
+   * ⚠️ NO SILENT FALLBACK TO THE STATIC LINK (Eric, 2026-09-15). A failure here can be an
+   * ownership rejection (403), a consumed attempt (409), or a TIMEOUT AFTER THE SESSION
+   * WAS ALREADY CREATED. Quietly switching to the static link would turn a refusal into an
+   * unattributed purchase and discard the guarantees this flow exists to provide. Show a
+   * retryable error instead; session creation is idempotent, so retrying reuses the open
+   * session rather than minting a second one.
+   */
+  async function buy(product: string) {
+    if (!attempt) return;
+    setBuyError('');
+    setBuyErrorKind(null);
+    setBuying(product);
+    try {
+      const res = await fetch('/api/mcp/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ attempt: attempt.id, product }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      // 403 and 409 are TERMINAL — retrying is guaranteed to fail again, so neither gets
+      // a "try again". Ownership mismatch needs an account switch; a consumed attempt is
+      // a completed request, which is good news and should read that way. Retry is
+      // reserved for genuinely transient failures (network, Stripe 5xx, timeout).
+      if (res.status === 403) {
+        setBuyErrorKind('account');
+        setBuyError('This request belongs to a different Mindy account.');
+      } else if (res.status === 409) {
+        setBuyErrorKind('done');
+        setBuyError('This request has already been run — no payment is needed.');
+      } else {
+        setBuyErrorKind('retry');
+        setBuyError(`Could not start checkout${data?.error ? ` (${data.error})` : ''}.`);
+      }
+    } catch {
+      setBuyErrorKind('retry');
+      setBuyError('Could not reach checkout.');
+    } finally {
+      setBuying(null);
+    }
+  }
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('attempt');
@@ -163,9 +220,11 @@ export default function ContinuePage() {
               </div>
 
               <div className="mt-5 space-y-3">
-                <a
-                  href={ENTRY_PLAN.monthly.checkoutUrl}
-                  className="block rounded-xl bg-emerald-500 px-5 py-4 text-[#06120c] transition hover:bg-emerald-400"
+                <button
+                  type="button"
+                  disabled={buying !== null}
+                  onClick={() => buy('entry')}
+                  className="block w-full text-left rounded-xl bg-emerald-500 px-5 py-4 text-[#06120c] transition hover:bg-emerald-400 disabled:opacity-60"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-[15px] font-bold">
@@ -179,11 +238,13 @@ export default function ContinuePage() {
                     Best value — about {Math.floor(ENTRY_PLAN.creditsPerMonth / Math.max(cost, 1))}{' '}
                     more {label.toLowerCase()}s every month.
                   </div>
-                </a>
+                </button>
 
-                <a
-                  href={TOPUP.checkoutUrl}
-                  className="block rounded-xl border border-white/15 px-5 py-4 transition hover:bg-white/5"
+                <button
+                  type="button"
+                  disabled={buying !== null}
+                  onClick={() => buy('refill')}
+                  className="block w-full text-left rounded-xl border border-white/15 px-5 py-4 transition hover:bg-white/5 disabled:opacity-60"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-[15px] font-semibold text-slate-100">
@@ -196,8 +257,33 @@ export default function ContinuePage() {
                   <div className="mt-1 text-[13px] text-slate-400">
                     No subscription. Credits do not expire.
                   </div>
-                </a>
+                </button>
               </div>
+
+              {buyError ? (
+                <div
+                  className={`mt-3 rounded-lg border px-4 py-3 text-[14px] ${
+                    buyErrorKind === 'done'
+                      ? 'border-emerald-400/30 bg-emerald-400/[0.07] text-emerald-100'
+                      : 'border-amber-400/30 bg-amber-400/[0.07] text-amber-100'
+                  }`}
+                >
+                  <p>{buyError}</p>
+                  {buyErrorKind === 'account' ? (
+                    <a href="/app" className="mt-2 inline-block font-semibold underline">
+                      Switch account →
+                    </a>
+                  ) : null}
+                  {buyErrorKind === 'done' ? (
+                    <a href="/mcp/account" className="mt-2 inline-block font-semibold underline">
+                      View your credits and results →
+                    </a>
+                  ) : null}
+                  {buyErrorKind === 'retry' ? (
+                    <p className="mt-1 opacity-80">This looks temporary — try again.</p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <p className="mt-4 text-center text-sm text-slate-500">
                 Your request stays saved — it runs the moment your credits land.

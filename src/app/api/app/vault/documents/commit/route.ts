@@ -32,6 +32,7 @@ import {
   type ParsedPP, type ParsedCap, type ParsedIdentity,
 } from '@/lib/vault/normalize';
 import { embedVaultRow } from '@/lib/vault/embed-evidence';
+import { isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -67,7 +68,7 @@ async function syncNaicsToAlerts(userEmail: string, naics: string[]): Promise<nu
       .maybeSingle();
     const current: string[] = Array.isArray(ns?.naics_codes) ? ns!.naics_codes.map(String) : [];
     const currentSet = new Set(current);
-    const missing = naics.filter((c) => !currentSet.has(c));
+    const missing = naics.filter((c) => isKnownNaicsCode(c) && !currentSet.has(c));
     if (!missing.length) return 0;
     await sb.from('user_notification_settings').upsert(
       { user_email: userEmail, naics_codes: [...current, ...missing], updated_at: new Date().toISOString() },

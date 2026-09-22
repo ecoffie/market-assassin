@@ -6,8 +6,8 @@
  *
  *   Layer A — free credits can't unlock the crown jewels. The 100-credit signup grant buys
  *             an evaluation of the PUBLIC-data tools; a proprietary call needs PAID standing
- *             (a top-up, a Pro monthly allowance, or an admin/comp grant). A drive-by scraper
- *             with only free credits gets nothing.
+ *             (a top-up, a Pro monthly allowance, an app-tier Pro/Team grant, or an
+ *             admin/comp grant). A drive-by scraper with only free credits gets nothing.
  *   Layer B — per-account rolling-window volume caps on proprietary calls. **PAID accounts skip
  *             these by default** (Eric 2026-07-29 — a real report legitimately fires many
  *             OSBP/SBLO lookups, and payers are self-limiting since every call debits credits);
@@ -21,8 +21,24 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
-/** Ledger reasons that mark an account as having PAID standing (Layer A gate). */
-const PAID_REASONS = ['stripe_topup', 'pro_monthly', 'admin_grant'] as const;
+/**
+ * Ledger reasons that mark an account as having PAID standing (Layer A gate).
+ *
+ * `app_tier_pro` / `app_tier_team` are what Path A checkout writes via
+ * handleAppTierSubscriptionInvoice — NOT `pro_monthly` (that's the MCP
+ * subscription SKU). Omitting them treated every Mindy Ai subscriber as
+ * free-standing for proprietary tools. Adam Sokolowski's live ledger is
+ * `app_tier_pro` only.
+ */
+export const PAID_LEDGER_REASONS = [
+  'stripe_topup',
+  'pro_monthly',
+  'admin_grant',
+  'app_tier_pro',
+  'app_tier_team',
+] as const;
+
+const PAID_REASONS = PAID_LEDGER_REASONS;
 
 /** Call-log statuses that count as a DELIVERED proprietary result (Layer B tally). */
 const DELIVERED_STATUSES = ['success', 'uncharged'] as const;

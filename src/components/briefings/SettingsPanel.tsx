@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import SampleOpportunitiesPicker from './SampleOpportunitiesPicker';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { commitNaicsFromTypedInput, invalidNaicsCodes } from '@/lib/codes/validate-market-codes';
 
 interface CodeSuggestion {
   code: string;
@@ -93,6 +94,8 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
 
   // Form state
   const [naicsInput, setNaicsInput] = useState('');
+  const [storedNaics, setStoredNaics] = useState<string[]>([]);
+  const [invalidNote, setInvalidNote] = useState<string | null>(null);
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [selectedSetAsides, setSelectedSetAsides] = useState<string[]>([]);
@@ -131,7 +134,9 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
         const settings: AlertSettings = data.data;
         // Load NAICS codes
         const cleanedNaics = (settings.naicsCodes || []).filter((c: string) => /^\d+$/.test(c.trim()));
+        setStoredNaics(cleanedNaics);
         setNaicsInput(cleanedNaics.join(', '));
+        setInvalidNote(null);
 
         // Load keywords
         setKeywordsInput((settings.keywords || []).join(', '));
@@ -202,10 +207,17 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
     setSuccess('');
 
     try {
-      const naicsCodes = naicsInput
+      const typed = naicsInput
         .split(/[,\s]+/)
         .map(c => c.trim())
         .filter(c => /^\d+$/.test(c));
+      const { persist: naicsCodes, blockedAdds } = commitNaicsFromTypedInput(typed, storedNaics);
+      if (blockedAdds.length > 0) {
+        setInvalidNote(`${blockedAdds.join(', ')} — Invalid NAICS code`);
+        setNaicsInput(naicsCodes.join(', '));
+      } else {
+        setInvalidNote(null);
+      }
 
       const keywords = keywordsInput
         .split(/[,]+/)
@@ -258,6 +270,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
       const data = await res.json();
 
       if (data.success) {
+        setStoredNaics(naicsCodes);
         setSuccess('Settings saved');
         onSaved?.();
         // Tell any other open surface (e.g. the dashboard TargetingCard) that
@@ -613,6 +626,33 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
               <p className="text-xs text-gray-500 mt-1">
                 Short codes (236) match entire categories
               </p>
+              {invalidNaicsCodes(
+                naicsInput.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
+              ).map((code) => (
+                <div
+                  key={code}
+                  className="mt-2 flex items-center justify-between rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+                >
+                  <span className="text-sm text-amber-100">{code} — Invalid NAICS code</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = naicsInput
+                        .split(/[,\s]+/)
+                        .map((c) => c.trim())
+                        .filter((c) => c && c !== code);
+                      setNaicsInput(next.join(', '));
+                      setInvalidNote(null);
+                    }}
+                    className="text-sm text-amber-200 underline underline-offset-2 hover:text-white"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {invalidNote && (
+                <p className="mt-2 text-sm text-amber-200">{invalidNote}</p>
+              )}
 
               {/* AI Code Assistant */}
               <button
@@ -741,7 +781,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
                 Keywords <span className="text-gray-500 font-normal">(optional)</span>
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                Catch mislabeled opportunities. We&apos;ll search titles and descriptions for these terms.
+                Optional. In Market Discovery they prefer matches inside your market — they are not required filters. Focused needs at least one distinctive phrase.
               </p>
               <textarea
                 value={keywordsInput}

@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
 
 // Helper to store business intelligence
 async function storeBusinessIntelligence(
@@ -747,7 +748,7 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
         if (existingErr) console.error('[sample-opportunities] settings query error:', existingErr.message);
         const hasNaics = Array.isArray(existing?.naics_codes) && existing!.naics_codes.length > 0;
         const hasKeywords = Array.isArray(existing?.keywords) && existing!.keywords.length > 0;
-        const seedNaics = naicsCodes.map((n) => n.code).filter((c) => /^\d+$/.test(c)).slice(0, 30);
+        const seedNaics = naicsCodes.map((n) => n.code).filter((c) => isKnownNaicsCode(c)).slice(0, 30);
         const seedKeywords = keywords.slice(0, 30);
         const patch: Record<string, unknown> = {};
         if (!hasNaics && seedNaics.length > 0) patch.naics_codes = seedNaics;

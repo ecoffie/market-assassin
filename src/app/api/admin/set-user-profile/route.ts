@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isKnownNaicsCode, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 /**
  * POST /api/admin/set-user-profile?password=...
@@ -41,7 +42,20 @@ export async function POST(request: NextRequest) {
     // Store the EXACT codes provided — do NOT prefix-expand. Expanding a precise
     // market (demolition's 8 codes) to whole 3-digit families pulls in unrelated
     // industries (332xxx metal mfg, 541xxx consulting) and dilutes the alerts.
-    update.naics_codes = body.naicsCodes.map((c) => String(c).trim()).filter(Boolean);
+    const naicsCodes = body.naicsCodes.map((c) => String(c).trim()).filter(Boolean);
+    const { data: existingRow, error: existingErr } = await supabase
+      .from('user_notification_settings')
+      .select('naics_codes')
+      .eq('user_email', email)
+      .maybeSingle();
+    if (existingErr) {
+      return NextResponse.json({ success: false, error: existingErr.message }, { status: 500 });
+    }
+    const persist = persistNaicsWrite(naicsCodes, existingRow?.naics_codes);
+    if (!persist.ok) {
+      return NextResponse.json({ success: false, error: persist.error }, { status: 400 });
+    }
+    update.naics_codes = persist.codes;
   }
   if (Array.isArray(body.keywords)) {
     update.keywords = Array.from(new Set(body.keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean))).slice(0, 30);
@@ -51,6 +65,10 @@ export async function POST(request: NextRequest) {
   let pscCodes: string[] | null = null;
   if (Array.isArray(body.pscCodes)) {
     pscCodes = body.pscCodes.map((c) => String(c).trim().toUpperCase()).filter(Boolean);
+    const pscCheck = validateMarketCodesInput(undefined, pscCodes);
+    if (!pscCheck.ok) {
+      return NextResponse.json({ success: false, error: pscCheck.error }, { status: 400 });
+    }
   }
   if (typeof body.businessType === 'string' && body.businessType.trim()) {
     update.business_type = body.businessType.trim();
@@ -65,7 +83,11 @@ export async function POST(request: NextRequest) {
     for (const k of ['uei', 'cage_code', 'legal_name', 'dba', 'one_liner', 'elevator_pitch']) {
       if (typeof v[k] === 'string' && v[k]) vaultRow[k] = v[k];
     }
-    if (Array.isArray(v.primary_naics)) vaultRow.primary_naics = (v.primary_naics as unknown[]).map(String);
+    if (Array.isArray(v.primary_naics)) {
+      vaultRow.primary_naics = (v.primary_naics as unknown[])
+        .map(String)
+        .filter((c) => isKnownNaicsCode(c));
+    }
     if (Array.isArray(v.certifications)) vaultRow.certifications = (v.certifications as unknown[]).map(String);
     await supabase.from('user_identity_profile').upsert(vaultRow, { onConflict: 'user_email' });
   }
@@ -96,11 +118,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Read back to confirm.
-  const { data: after } = await supabase
+  const { data: after, error: afterErr } = await supabase
     .from('user_notification_settings')
     .select('user_email, naics_codes, keywords, business_type')
     .eq('user_email', email)
     .maybeSingle();
+  if (afterErr) {
+    return NextResponse.json({ success: false, error: afterErr.message }, { status: 500 });
+  }
 
   return NextResponse.json({
     success: true,

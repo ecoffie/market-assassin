@@ -116,6 +116,35 @@ describe('summarizeSolicitationIncumbent', () => {
     expect(s).toMatch(/140L6226Q0013/);
     expect(s).toMatch(/MATT L KEIL/);
     expect(s).toMatch(/140L6221P0029/);
+    expect(s).not.toMatch(/^Open solicitation/);
+  });
+  it('closed latest version is never labeled Open', () => {
+    const s = summarizeSolicitationIncumbent(
+      {
+        notice_id: 'f1aa309fa39040a4929d90a7d88fd091',
+        solicitation_number: 'N0017425RFPREQIHDMDept0002',
+        title: 'MASA',
+        agency: 'NAVY',
+        department: 'DOD',
+        naics_code: '332710',
+        psc_code: '1377',
+        set_aside: null,
+        notice_type: 'Solicitation',
+        posted_date: '2026-07-29T00:00:00Z',
+        response_deadline: '2026-08-27T19:00:00Z',
+        ui_link: null,
+        source: 'cache',
+        active: false,
+        archive_date: '2026-09-11T00:00:00Z',
+        status: 'archived',
+        amendment: 'Amendment 0003',
+      },
+      null,
+    );
+    expect(s).not.toMatch(/Open solicitation/);
+    expect(s).toMatch(/Archived solicitation/);
+    expect(s).toMatch(/2026-08-27/);
+    expect(s).toMatch(/Amendment 0003/);
   });
 });
 
@@ -136,11 +165,12 @@ describe('incumbent matcher — PSC + title-derived work-words (not a hardcoded 
     expect(incSrc).toContain('const distinctive = titleWords.filter((w) => w.length >= 3 && !NONDISTINCTIVE.has(w.toLowerCase()))');
   });
   it('HARD-DISCOUNTS to 0 when no distinctive token AND no PSC match — a big same-NAICS IDV cannot win on $', () => {
-    expect(incSrc).toContain('if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) return 0');
+    expect(incSrc).toContain('if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch)');
+    expect(incSrc).toMatch(/return \{ score: 0, distinctiveHits, pscMatch \}/);
   });
-  it('a PSC match is a STRONG same-product signal (threaded through findLikelyPriorAwards → scoreAward)', () => {
+  it('a PSC match is a STRONG same-product signal (threaded through findLikelyPriorAwards → scoreAwardEvidence)', () => {
     expect(incSrc).toMatch(/psc_code\?: string \| null;/);          // the input carries PSC
-    expect(incSrc).toContain('scoreAward(r as never, titleWords, agencyHint, input.psc_code ?? null)');
+    expect(incSrc).toContain('scoreAwardEvidence(r as never, titleWords, agencyHint, input.psc_code ?? null)');
     expect(incSrc).toContain('if (pscMatch) score += 45');           // PSC match = large boost
   });
   it('the amount signal stays capped at +5 — size never buys the match', () => {

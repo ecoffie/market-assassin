@@ -43,8 +43,9 @@ export default async function PscPage({ params }: { params: Promise<{ code: stri
       crossLinks={[
         { href: '/opportunity-hunter', label: 'Browse all opportunities →' },
         { href: '/naics', label: 'Browse by NAICS →' },
-        { href: '/forecasts', label: 'Upcoming forecasts →' },
+        { href: '/forecasts', label: 'Agency forecasts →' },
       ]}
+      canonicalPath={`/psc/${code.toLowerCase()}`}
     />
   );
 }

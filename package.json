@@ -23,8 +23,10 @@
     "eval:evidence-match": "npx tsx scripts/eval-evidence-match.ts",
     "audit:api-auth": "node scripts/audit-api-auth.js",
     "launch:brief": "node scripts/generate-launch-manager-brief.js",
+    "seo:warm-slugs": "tsx scripts/warm-contractor-slugs.ts",
+    "seo:build-forecast-summary": "tsx scripts/build-forecast-summary.ts",
     "seo:contractor-candidates": "node scripts/generate-seo-contractor-candidates.js",
-    "predeploy": "npm run test:schema && npm run test:unit && npm run test:pre-deploy && npm run verify:data && npm run verify:m-scale && npm run eval:cap-parse && npm run eval:evidence-match",
+    "predeploy": "npm run test:schema && npm run test:unit && npm run test:pre-deploy && npm run verify:data && npm run verify:m-scale && npm run verify:maps-account && npm run eval:cap-parse && npm run eval:evidence-match",
     "deploy": "npm run predeploy && vercel --prod",
     "experiment:dry-run": "DRY_RUN=true npx tsx scripts/assign-experiment-cohorts.ts",
     "experiment:execute": "DRY_RUN=false npx tsx scripts/assign-experiment-cohorts.ts",
@@ -43,6 +45,7 @@
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs",
     "verify:live": "node scripts/verify-live.mjs",
+    "env:link-worktree": "node scripts/link-env-local.mjs",
     "verify:beginner": "npx tsx scripts/verify-beginner-translation.ts",
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
@@ -65,7 +68,12 @@
     "test:chain:live": "vitest run src/mcp/decision-chain/*.live.test.ts",
     "agent-task": "tsx scripts/agent-task.mts",
     "audit:claims": "node scripts/audit-data-claims.mjs",
-    "registry:reconcile": "node scripts/registry-reconciliation.mjs"
+    "registry:reconcile": "node scripts/registry-reconciliation.mjs",
+    "verify:env": "node scripts/verify-env-local.mjs",
+    "verify:forecast-agency": "npx tsx scripts/verify-forecast-agency-identity.ts",
+    "verify:maps-account": "node scripts/verify-maps-account.mjs",
+    "verify:gateway-exports": "npx tsx scripts/verify-gateway-exports.ts",
+    "retention:cohorts": "npx tsx scripts/retention-cohorts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -3,12 +3,13 @@
  *
  * Pipeline (WEEKEND.md Block 5):
  *   derive_company_keywords → select coverage keyword (DETERMINISTIC, recorded)
- *   → get_keyword_coverage → primary NAICS/PSC → SBA size standard.
+ *   → get_keyword_coverage → measured coverage set + supplied NAICS/PSC → SBA size standard.
  *
  * Two contract corrections are load-bearing here:
  *  1. `derive_company_keywords` returns KEYWORD PHRASES, not NAICS/PSC codes.
  *     The dev spec's claim that it yields candidate codes is wrong. It is used
- *     ONLY to improve search vocabulary; all code evidence comes from coverage.
+ *     ONLY to improve search vocabulary. Coverage MEASURES a NAICS/PSC distribution;
+ *     it does not establish market identity. Primary codes come from the requirement.
  *  2. Coverage is phrase-sensitive by design (USASpending keyword search is
  *     exact-phrase). Measured on the DHA notice: "medical modeling and
  *     simulation" → $1.1M/1 NAICS, but "joint medical planning" → $16.6B/288.
@@ -20,6 +21,11 @@ import type { GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, evidence, unknown, unknownFromError, value } from './grounding';
 import { formatSizeStandard, sizeStandardFor, tableCitation, type SizeStandard } from './sba-size-standards';
+import {
+  marketScopeFromRequirement,
+  retrievalManifest,
+  type RetrievalManifest,
+} from './market-scope';
 
 export interface NaicsShare { code: string; name: string; amount: number; pct: number }
 
@@ -43,6 +49,7 @@ export interface Section5 {
   sizeStandard: GroundedField<SizeStandard>;
   sizeStandardCitation: string;
   naicsBasis: GroundedField<string>;
+  retrievalManifests: RetrievalManifest[];
   calls: ToolCall[];
 }
 
@@ -101,8 +108,7 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
   let coverageSet: GroundedField<NaicsShare[]>;
   let cumulativeCoveragePct: GroundedField<number>;
   let marketTotal: GroundedField<number>;
-  let derivedNaics: NaicsShare | undefined;
-  let derivedPsc: { code: string; name: string } | undefined;
+  let measuredTopPsc: { code: string; name: string } | undefined;
 
   if (!covCall.ok) {
     const e = new Error(covCall.error ?? 'call failed');
@@ -121,9 +127,8 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     marketTotal = unknown(r, [covCall.evidence]);
   } else {
     const allNaics = Array.isArray(cov!.allNaics) ? (cov!.allNaics as NaicsShare[]) : [];
-    derivedNaics = allNaics[0];
     const psc = cov!.topPsc as { code?: string; name?: string } | null | undefined;
-    if (psc?.code) derivedPsc = { code: psc.code, name: psc.name ?? '' };
+    if (psc?.code) measuredTopPsc = { code: psc.code, name: psc.name ?? '' };
 
     coverageSet = allNaics.length
       ? value(allNaics, covCall.evidence)
@@ -143,7 +148,7 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
         : value(total, covCall.evidence);
   }
 
-  // --- 3. primary NAICS: supplied wins; else grounded top-ranked coverage ---
+  // --- 3. primary NAICS: supplied only. Coverage shares are a distribution, not identity.
   let primaryNaics: GroundedField<string>;
   let primaryNaicsOrigin: Section5['primaryNaicsOrigin'];
   let naicsTitle: GroundedField<string>;
@@ -154,32 +159,24 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     naicsTitle = match
       ? value(match.name, covCall.evidence)
       : unknown(`no title for NAICS ${req.naics} in the grounded coverage set`, [covCall.evidence]);
-  } else if (derivedNaics) {
-    primaryNaics = value(derivedNaics.code, covCall.evidence);
-    primaryNaicsOrigin = 'derived';
-    naicsTitle = value(derivedNaics.name, covCall.evidence);
   } else {
-    primaryNaics = unknown('no NAICS supplied and no grounded coverage code available', [covCall.evidence]);
+    primaryNaics = unknown('no NAICS supplied; keyword coverage does not establish market identity', [covCall.evidence]);
     primaryNaicsOrigin = 'none';
     naicsTitle = unknown('no primary NAICS established', [covCall.evidence]);
   }
 
-  // --- 4. primary PSC: supplied wins; else grounded top PSC ---
+  // --- 4. primary PSC: supplied only. Coverage top PSC is a measured share, not identity.
   let primaryPsc: GroundedField<string>;
   let primaryPscOrigin: Section5['primaryPscOrigin'];
   let pscTitle: GroundedField<string>;
   if (req.psc) {
     primaryPsc = value(req.psc, evidence('Requirement intake (operator-supplied)', { psc: req.psc }));
     primaryPscOrigin = 'supplied';
-    pscTitle = derivedPsc && derivedPsc.code === req.psc
-      ? value(derivedPsc.name, covCall.evidence)
+    pscTitle = measuredTopPsc && measuredTopPsc.code === req.psc
+      ? value(measuredTopPsc.name, covCall.evidence)
       : unknown(`no title for PSC ${req.psc} in the grounded coverage result`, [covCall.evidence]);
-  } else if (derivedPsc) {
-    primaryPsc = value(derivedPsc.code, covCall.evidence);
-    primaryPscOrigin = 'derived';
-    pscTitle = derivedPsc.name ? value(derivedPsc.name, covCall.evidence) : unknown('coverage returned a PSC code without a title', [covCall.evidence]);
   } else {
-    primaryPsc = unknown('no PSC supplied and no grounded top PSC available', [covCall.evidence]);
+    primaryPsc = unknown('no PSC supplied; keyword coverage does not establish product identity', [covCall.evidence]);
     primaryPscOrigin = 'none';
     pscTitle = unknown('no primary PSC established', [covCall.evidence]);
   }
@@ -197,19 +194,52 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     const chosen = set.find((n) => n.code === primaryNaics.value);
     const totalTxt = marketTotal.state === 'value' ? `$${(marketTotal.value / 1e6).toFixed(1)}M` : '$0';
     const sharePart = chosen
-      ? `${primaryNaics.value} represents ${(chosen.pct * 100).toFixed(1)}% of that measured market`
+      ? `${primaryNaics.value} represents ${(chosen.pct * 100).toFixed(1)}% of that PHRASE market (not the entire NAICS ${primaryNaics.value} federal market)`
       : `${primaryNaics.value} was supplied by the requiring activity and does not appear in the measured coverage set for this keyword`;
     naicsBasis = value(
-      `Measured against federal obligations matching "${req.keyword}": ${totalTxt} across ${set.length} NAICS code(s). ${sharePart}. ` +
-        // The FULL coverage set, never an elided head. This line is the documented
-        // basis for the NAICS selection; truncating it hides the codes that make the
-        // measured market what it is, and the reader cannot re-derive the omitted ones.
+      `Measured against federal obligations matching the exact phrase "${req.keyword}": ${totalTxt} across ${set.length} NAICS code(s). ${sharePart}. ` +
+        'Keyword-coverage dollars are NOT the size of the entire primary-NAICS market and MUST NOT be equated with it. ' +
+        `Coverage set (${set.length} code(s)): ${set.map((n) => n.code).join(', ')}.`,
+      covCall.evidence,
+    );
+  } else if (coverageSet.state === 'value' && marketTotal.state !== 'unknown') {
+    const set = coverageSet.value;
+    const totalTxt = marketTotal.state === 'value' ? `$${(marketTotal.value / 1e6).toFixed(1)}M` : '$0';
+    naicsBasis = value(
+      `Measured against federal obligations matching the exact phrase "${req.keyword}": ${totalTxt} across ${set.length} NAICS code(s). ` +
+        'Coverage NAICS shares are a measured distribution, not a selected market identity. ' +
         `Coverage set (${set.length} code(s)): ${set.map((n) => n.code).join(', ')}.`,
       covCall.evidence,
     );
   } else {
     naicsBasis = unknown('the measured market basis for the NAICS selection could not be established from grounded coverage', [covCall.evidence]);
   }
+
+  const scope = marketScopeFromRequirement(req);
+  const coverageCount =
+    coverageSet.state === 'value' ? coverageSet.value.length : marketTotal.state === 'true_zero' ? 0 : null;
+  const retrievalManifests: RetrievalManifest[] = [
+    retrievalManifest({
+      section: '5',
+      tool: 'get_keyword_coverage',
+      requested: scope,
+      consumed: { phrase: req.keyword },
+      unsupported: {
+        ...(scope.department ? { department: 'keyword coverage is not agency-scoped' } : {}),
+        ...(scope.service ? { service: 'keyword coverage is not service-scoped' } : {}),
+        ...(scope.contractingOffice || scope.contractingOfficeCode
+          ? { contracting_office: 'keyword coverage cannot filter contracting office' }
+          : {}),
+        ...(scope.installation ? { installation: 'keyword coverage cannot filter installation' } : {}),
+        ...(scope.geography ? { geography: 'keyword coverage is not geography-scoped' } : {}),
+      },
+      resultCount: coverageCount,
+      grounded: covCall.ok && metaGrounded(covCall.result) === true,
+      source: covCall.evidence.source,
+      asOf: covCall.evidence.retrievedAt,
+      evidenceClass: 'contextual',
+    }),
+  ];
 
   return {
     coverageKeyword,
@@ -223,13 +253,15 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     marketTotal,
     marketBasis:
       'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy get_keyword_coverage over USASpending. ' +
-      'Keyword coverage is measured over a single fiscal year and is an exact-phrase match, so it is a lower bound on the addressable market.',
+      'Keyword coverage is measured over a single fiscal year and is an exact-phrase match, so it is a lower bound on the addressable PHRASE market. ' +
+      'It is not a census of the entire primary-NAICS market and must not be silently equated with one.',
     primaryPsc,
     primaryPscOrigin,
     pscTitle,
     sizeStandard,
     sizeStandardCitation: tableCitation(),
     naicsBasis,
+    retrievalManifests,
     calls,
   };
 }

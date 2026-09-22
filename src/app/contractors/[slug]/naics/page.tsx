@@ -17,6 +17,7 @@ import {
   getAllNaicsForRecipient,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
+import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 
@@ -74,7 +75,7 @@ export default async function ContractorNaicsPage({ params }: PageProps) {
   const { slug } = await params;
   const recipient = await getRollupBySlug(slug);
   if (!recipient) {
-    const canonical = await resolveCanonicalSlug(slug);
+    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
     if (canonical) permanentRedirect(`/contractors/${canonical}/naics`);
     notFound();
   }

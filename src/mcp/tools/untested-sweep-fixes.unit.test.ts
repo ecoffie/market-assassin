@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { overlayRecompeteTiming } from '@/lib/recompete/timing';
 
 const read = (rel: string) => readFileSync(join(__dirname, rel), 'utf8');
 
@@ -53,31 +54,28 @@ describe('FM-U04 — predecessor/incumbent penalizes stale PoP + rewards NAICS m
 
 describe('FM-U05 — solicitation-documents resolves a solicitation number, not just a UUID', () => {
   const src = read('../../lib/sam/solicitation-documents.ts');
-  it('falls back to solicitation_number when the input is not UUID-shaped', () => {
-    expect(src).toContain('looksLikeUuid');
-    expect(src).toMatch(/\.eq\('solicitation_number', noticeId\)/);
+  it('falls back via canonical resolver when the input is not UUID-shaped', () => {
+    expect(src).toContain('isNoticeUuid');
+    expect(src).toContain('resolveCanonicalSolicitation');
+    expect(src).not.toMatch(/\.eq\('solicitation_number', noticeId\)/);
   });
 });
 
-describe('FM-U06 — expiring-contracts computes recompete date/lead LIVE (never a past date)', () => {
+describe('FM-U06 — expiring-contracts overlays capture date vs remaining clock (MINDY-006)', () => {
   const src = read('../../lib/recompete/query.ts');
-  it('recomputes lead_time_months from today (>=0) and clamps est date to not-past', () => {
-    expect(src).toMatch(/lead_time_months: leadMonths/);
-    expect(src).toMatch(/Math\.max\(now, end - solLead\)/);
+  it('uses overlayRecompeteTiming: PoP−12 capture date, remaining-clock lead, no run-date clamp', () => {
+    expect(src).toMatch(/overlayRecompeteTiming/);
+    expect(src).toMatch(/lead_time_months: timing\.lead_time_months/);
+    expect(src).toMatch(/estimated_recompete_date: timing\.estimated_recompete_date/);
+    expect(src).not.toMatch(/Math\.max\(now, end - solLead\)/);
+    expect(src).not.toMatch(/9 \* 30\.4375/);
   });
-  // Pure-logic mirror of the date math.
-  it('a near-term expiry never yields a past estimated_recompete_date or lead_time 0', () => {
-    const now = Date.now();
-    const MS = 30.4375 * 86_400_000;
-    const compute = (endMs: number) => ({
-      lead: Math.max(0, Math.round((endMs - now) / MS)),
-      est: Math.max(now, endMs - 9 * MS),
-    });
-    for (const months of [1, 3, 6, 15]) {
-      const r = compute(now + months * MS);
-      expect(r.lead).toBeGreaterThan(0);
-      expect(r.est).toBeGreaterThanOrEqual(now);
-    }
+  it('near-term remaining clock is at least 1; capture date may already be past', () => {
+    const now = new Date('2026-09-17T00:00:00.000Z');
+    const overlay = overlayRecompeteTiming('2026-09-18', now);
+    expect(overlay?.lead_time_months).toBe(1);
+    expect(overlay?.estimated_recompete_date).toBe('2025-09-18');
+    expect(overlay!.estimated_recompete_date < '2026-09-17').toBe(true);
   });
 });
 

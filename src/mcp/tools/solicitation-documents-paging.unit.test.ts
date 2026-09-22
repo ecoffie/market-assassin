@@ -216,6 +216,16 @@ describe('get_solicitation_documents — full-document access', () => {
     expect(calls).toBeGreaterThan(1); // it really did page
   });
 
+  it("textMode:'full' is NOT clamped to MAX_WINDOW_CHARS (internal consumers)", async () => {
+    // Regression: windowText clamped every request to MAX_WINDOW_CHARS, so the
+    // internal full-text path silently truncated at 120k. Caught by comparing a
+    // paged assembly (148,483) against a full-mode read (120,000).
+    const { getSolicitationDocuments } = await import('@/lib/sam/solicitation-documents');
+    const full = await getSolicitationDocuments({ noticeId: NOTICE, textMode: 'full' });
+    expect(full.documents[0].extracted_text.length).toBe(TOTAL);
+    expect(full.documents[0].text_window.has_more).toBe(false);
+  });
+
   it('a SCOPED read is never "complete" — a subset is not the package', async () => {
     mockWarm.mockResolvedValue({
       data: [
@@ -297,24 +307,30 @@ describe('get_solicitation_documents — full-document access', () => {
 });
 
 describe('missing content stays explicitly unknown', () => {
-  it('a file we hold but could not parse is extraction_failed, not empty/absent', async () => {
+  it('a file we hold but could not parse is DISCLOSED as a listed-but-unread attachment', async () => {
+    // main routes a text-less attachment to listed_attachments rather than
+    // emitting an empty document — a stronger disclosure than an empty string,
+    // because the file is NAMED. Assert that contract, not the older one.
     mockWarm.mockResolvedValue({
       data: [{ ...warmRows[0], extracted_text: null, char_count: null, extraction_error: 'PDF parse failed' }],
     });
     const res = await solicitationDocuments({ notice_id: NOTICE });
-    const d = res.documents[0];
-    expect(d.text_availability).toBe('extraction_failed');
-    expect(res.coverage.documents_unavailable).toBe(1);
-    expect(res.coverage.complete).toBe(false);
+    expect(res.documents).toHaveLength(0); // not emitted as a readable document
+    const listed = res.listed_attachments.find((l) => l.filename === warmRows[0].filename);
+    expect(listed).toBeDefined();
+    expect(listed!.has_extracted_text).toBe(false); // named, and honestly marked unread
+    expect(res.coverage.complete).toBe(false); // nothing readable => not complete
   });
 
-  it('no file and no text is file_unavailable — absence is stated, not implied', async () => {
+  it('a notice whose only attachment is unreadable is never "complete"', async () => {
     mockWarm.mockResolvedValue({
       data: [{ ...warmRows[0], extracted_text: '', char_count: 0, sam_url: null, storage_path: null, extraction_error: null }],
     });
     const res = await solicitationDocuments({ notice_id: NOTICE });
-    expect(res.documents[0].text_availability).toBe('file_unavailable');
-    expect(res.documents[0].text_window.total_chars).toBeNull(); // unknown, NOT 0
+    expect(res.coverage.complete).toBe(false);
+    expect(res.coverage.documents_total).toBe(0);
+    // No readable document was produced, so nothing may claim completeness.
+    expect(res.coverage.documents_complete).toBe(0);
   });
 
   it('text stopped at the extraction ceiling is extraction_capped, never complete', async () => {

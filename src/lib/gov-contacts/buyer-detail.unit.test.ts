@@ -48,14 +48,18 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://x';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'y';
   TABLES.federal_contacts = [
-    { id: 10, contact_fullname: 'Jane Buyer', contact_title: 'Contracting Officer', contact_email: 'jane@gsa.gov', contact_phone: '202-555-0100', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'Federal Acquisition Service', role_category: 'Contracting Officer', solicitation_number: 'GSA-001' },
-    { id: 11, contact_fullname: 'Jane Buyer', contact_title: 'Contracting Officer', contact_email: 'jane@gsa.gov', contact_phone: '', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'Federal Acquisition Service', role_category: 'Contracting Officer', solicitation_number: 'GSA-002' },
+    { id: 10, contact_kind: 'government_buyer', contact_fullname: 'Jane Buyer', contact_title: 'Contracting Officer', contact_email: 'jane@gsa.gov', contact_phone: '202-555-0100', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'Federal Acquisition Service', role_category: 'Contracting Officer', solicitation_number: 'GSA-001' },
+    { id: 11, contact_kind: 'government_buyer', contact_fullname: 'Jane Buyer', contact_title: 'Contracting Officer', contact_email: 'jane@gsa.gov', contact_phone: '', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'Federal Acquisition Service', role_category: 'Contracting Officer', solicitation_number: 'GSA-002' },
     // A colleague at the same agency → the roster.
-    { id: 12, contact_fullname: 'Sam Colleague', contact_title: 'Contract Specialist', contact_email: 'sam@gsa.gov', contact_phone: '', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'FAS', solicitation_number: 'GSA-003' },
+    { id: 12, contact_kind: 'government_buyer', contact_fullname: 'Sam Colleague', contact_title: 'Contract Specialist', contact_email: 'sam@gsa.gov', contact_phone: '', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'FAS', solicitation_number: 'GSA-003' },
     // A phone-as-name placeholder row (#462) — must NOT be returned as a buyer.
-    { id: 99, contact_fullname: 'Telephone: 7175503112', contact_title: '', contact_email: 'x@y.gov', contact_phone: '', department_ind_agency: 'DEPT OF X', office: '', sub_tier: '', solicitation_number: 'X-1' },
+    { id: 99, contact_kind: 'government_buyer', contact_fullname: 'Telephone: 7175503112', contact_title: '', contact_email: 'x@y.gov', contact_phone: '', department_ind_agency: 'DEPT OF X', office: '', sub_tier: '', solicitation_number: 'X-1' },
     // A State-Dept POC on an OVERSEAS notice (the "Seoul, DC" bug source).
-    { id: 20, contact_fullname: 'Jenina Dosch', contact_title: 'Management Officer', contact_email: 'dosch@state.gov', contact_phone: '', department_ind_agency: 'STATE, DEPARTMENT OF', office: '', sub_tier: '', role_category: '', solicitation_number: 'STATE-SEOUL-1' },
+    { id: 20, contact_kind: 'government_buyer', contact_fullname: 'Jenina Dosch', contact_title: 'Management Officer', contact_email: 'dosch@state.gov', contact_phone: '', department_ind_agency: 'STATE, DEPARTMENT OF', office: '', sub_tier: '', role_category: '', solicitation_number: 'STATE-SEOUL-1' },
+    // A VENDOR entity POC. Structurally it looks retrievable — it has a name and a company in
+    // sub_tier, so isUsableContactCard's hasOrg check passes — which is exactly why the by-id
+    // query must scope on contact_kind rather than trust the card guard.
+    { id: 77, contact_kind: 'vendor_entity_poc', contact_fullname: 'Dana Vendor', contact_title: 'Electronic Business POC', contact_email: null, contact_phone: null, department_ind_agency: null, office: 'HQ', sub_tier: 'ACME CORP', solicitation_number: null },
   ];
   TABLES.sam_opportunities = [
     { notice_id: 'N1', solicitation_number: 'GSA-001', title: 'Cloud services', notice_type: 'Solicitation', naics_code: '541519', set_aside_code: null, set_aside_description: null, response_deadline: '2099-01-01', posted_date: '2026-07-01', ui_link: 'http://sam/N1', active: true, pop_city: 'Washington', pop_state: 'DC', office_address: { city: 'Washington', state: 'DC' } },
@@ -122,5 +126,16 @@ describe('getBuyerDetail', () => {
     expect(b!.location).not.toContain('Seoul');
     expect(b!.location).toBe('Washington, DC');
     expect(b!.locApprox).toBe(true);
+  });
+
+  it('REJECTS a vendor entity POC fetched directly by id', async () => {
+    // The latent gap the provenance audit found: .eq('id', id) had no scope of its own, and the
+    // card guard could not save it — hasOrg passes on a vendor row because the COMPANY sits in
+    // sub_tier. No product path hands out a vendor id, but the query must not depend on that.
+    expect(await getBuyerDetail(77)).toBeNull();
+  });
+
+  it('still returns a government buyer by the same path', async () => {
+    expect(await getBuyerDetail(10)).not.toBeNull();
   });
 });

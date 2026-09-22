@@ -42,7 +42,9 @@ describe('app-tier credit allowances', () => {
   it('bundled Pro credits are now CHEAPER per credit than the standalone top-up', () => {
     // Read the real package rather than restating a price — the standalone top-up is
     // $119/500 ($0.238/cr), NOT the $99/500 the old comment claimed.
-    const entry = CREDIT_PACKAGES.find((p) => p.credits === 500);
+    // Find by ID, never by credit count — the count is a product decision that moves
+    // (500 -> 1,000 in Phase 3) and pinning it made this test fail for the wrong reason.
+    const entry = CREDIT_PACKAGES.find((p) => p.id === 'refill');
     expect(entry, 'the 500-credit standalone top-up should still exist').toBeTruthy();
     const entryRate = entry!.usd / entry!.credits;
     const proRate = 149 / PRO_MONTHLY_CREDITS;

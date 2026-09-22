@@ -25,6 +25,14 @@
  *    do NOT map them: writing a null that a reader could mistake for "no
  *    set-aside" is worse than leaving the column untouched. See issue #280.
  *
+ *    MINDY-007 (2026-09-17): 'Product or Service Code' / 'Award Description'
+ *    are the SAME class — search returns NULL even when requested, and the
+ *    hourly upsert used to write those nulls over richer detail/BQ fills.
+ *    The mapper still records whatever search returns (honest empty on insert).
+ *    Writers MUST run preserveRicherEnrichment (cron) / the
+ *    trg_recompete_preserve_enrichment BEFORE UPDATE trigger so a null/blank
+ *    search payload cannot erase a stored non-null.
+ *
  * 4. There is no period-of-performance-end filter. time_period filters on
  *    action_date; passing date_type 'period_of_performance_current_end_date'
  *    500s their server. So the end-date window is applied client-side, and we

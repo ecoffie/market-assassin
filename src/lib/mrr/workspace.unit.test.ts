@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Packer } from 'docx';
@@ -319,6 +319,30 @@ describe('workspace review DTO', () => {
 });
 
 describe('workspace run store', () => {
+  it('accepts a job when the local store root is not writable', () => {
+    const root = join(tmpdir(), `mrr-ro-accept-${Date.now()}`);
+    mkdirSync(root, { recursive: true });
+    chmodSync(root, 0o555);
+    setMrrWorkspaceStoreRootForTests(root);
+    resetMrrRunStoreForTests();
+    try {
+      const normalized = normalizeRequirement(REQUIREMENT).normalized;
+      const created = createOrGetMrrJob({
+        ownerEmail: 'ko@example.mil',
+        input: REQUIREMENT,
+        normalizedRequirement: normalized,
+      });
+      expect(created.created).toBe(true);
+      expect(created.job.status).toBe('queued');
+      expect(getMrrJob(created.job.id, 'ko@example.mil')?.id).toBe(created.job.id);
+    } finally {
+      chmodSync(root, 0o755);
+      rmSync(root, { recursive: true, force: true });
+      resetMrrRunStoreForTests();
+      setMrrWorkspaceStoreRootForTests('');
+    }
+  });
+
   it('deduplicates normalized intake for the same owner', () => {
     const normalized = normalizeRequirement(REQUIREMENT).normalized;
     const first = createOrGetMrrJob({

@@ -120,6 +120,7 @@ function buildBody(): string {
 }
 
 const HTML = govPage({
+  canonical: 'https://getmindy.ai/research/how-we-publish',
   title: 'Why Some Research Isn’t Published Yet — The Mindy Institute',
   description:
     'The Mindy Institute publishes findings only after the supporting Observatory measures reach sufficient maturity. Here is exactly what we can and cannot yet stand behind.',

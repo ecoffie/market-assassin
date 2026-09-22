@@ -1,6 +1,6 @@
 /**
- * Resolve an OPEN SAM solicitation (by sol # or notice UUID) and find the
- * LIKELY prior award (incumbent + $) behind it.
+ * Resolve a SAM solicitation (by sol #, notice UUID, or description-held
+ * identifier) and find the LIKELY prior award (incumbent + $) behind it.
  *
  * Why this exists: users paste RFQ numbers like 140L6226Q0013 into Chat / the
  * header lookup. Those are NOT USASpending PIIDs — get_award_detail fails. Chat
@@ -14,8 +14,18 @@
  * Predecessor = best-matching recent USASpending award by title keywords +
  * NAICS/agency, scored for relevance (NOT certified link — label "likely").
  */
-import { createClient } from '@supabase/supabase-js';
 import { fetchAwardDetail, type AwardDetail } from '@/lib/usaspending/award-detail';
+import {
+  deriveSolicitationStatus,
+  resolveCanonicalSolicitation,
+  selectCanonicalVersion,
+  solicitationStatusLabel,
+  toResolvedNoticeFields,
+  type SolicitationMatchBy,
+  type SolicitationStatus,
+} from '@/lib/sam/resolve-solicitation';
+import { isNoticeUuid, normalizeNoticeUuid } from '@/lib/sam/notice-identity';
+import { groundIncumbent, namedIncumbent, type IncumbentCertainty } from '@/lib/usaspending/incumbent-evidence';
 
 const SAM_SEARCH = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_PUBLIC = 'https://sam.gov/api/prod/sgs/v1/search/';
@@ -48,11 +58,26 @@ export interface ResolvedNotice {
   response_deadline: string | null;
   ui_link: string | null;
   source: 'cache' | 'sam_api' | 'sam_public';
+  active?: boolean | null;
+  archive_date?: string | null;
+  status?: SolicitationStatus;
+  amendment?: string | null;
+  matched_by?: SolicitationMatchBy;
+  version_count?: number;
+  deadline_conflict?: boolean;
+  deadline_conflict_reasons?: import('@/lib/sam/notice-identity').DeadlineConflictReason[];
+  lot_deadlines?: import('@/lib/sam/notice-identity').LotDeadline[];
+  notice_ids?: string[];
+  deadline_source?: 'responseDeadLine' | 'responseDate' | 'cache' | null;
 }
 
 export interface PriorAwardHit extends AwardDetail {
   matchConfidence: 'high' | 'medium' | 'low';
   matchScore: number;
+  distinctiveHits?: number;
+  pscMatch?: boolean;
+  naicsMatch?: boolean;
+  incumbent_certainty?: IncumbentCertainty;
 }
 
 export interface SolicitationIncumbentResult {
@@ -66,24 +91,23 @@ export interface SolicitationIncumbentResult {
     grounded_incumbent: boolean;
     degraded: boolean;
     notice_source: ResolvedNotice['source'] | null;
+    status?: SolicitationStatus | null;
+    amendment?: string | null;
+    matched_by?: SolicitationMatchBy | null;
+    version_count?: number;
+    deadline_conflict?: boolean;
+    notice_ids?: string[];
+    incumbent_certainty?: IncumbentCertainty;
+    incumbent_reason?: string;
   };
 }
 
-function supabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
 function isUuid(s: string): boolean {
-  return /^[a-f0-9]{32}$/i.test(s.trim()) ||
-    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(s.trim());
+  return isNoticeUuid(s);
 }
 
 function normalizeUuid(s: string): string {
-  const t = s.trim().replace(/-/g, '').toLowerCase();
-  return t.length === 32 ? t : s.trim();
+  return normalizeNoticeUuid(s) ?? s.trim().replace(/-/g, '').toLowerCase();
 }
 
 /** "INTERIOR, DEPARTMENT OF THE" → "Department of the Interior" */
@@ -150,48 +174,9 @@ function mmddyyyy(d: Date): string {
 }
 
 async function fromCache(q: string): Promise<ResolvedNotice | null> {
-  const sb = supabase();
-  if (!sb) return null;
-  const trimmed = q.trim();
-  const uuid = isUuid(trimmed) ? normalizeUuid(trimmed) : null;
-
-  // Exact sol # first
-  let { data } = await sb
-    .from('sam_opportunities')
-    .select('notice_id,solicitation_number,title,department,sub_tier,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,ui_link')
-    .eq('solicitation_number', trimmed)
-    .limit(1);
-  if (!data?.length && uuid) {
-    ({ data } = await sb
-      .from('sam_opportunities')
-      .select('notice_id,solicitation_number,title,department,sub_tier,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,ui_link')
-      .eq('notice_id', uuid)
-      .limit(1));
-  }
-  if (!data?.length) {
-    ({ data } = await sb
-      .from('sam_opportunities')
-      .select('notice_id,solicitation_number,title,department,sub_tier,naics_code,psc_code,set_aside_description,notice_type,posted_date,response_deadline,ui_link')
-      .ilike('solicitation_number', `%${trimmed}%`)
-      .limit(1));
-  }
-  const row = data?.[0] as Record<string, string | null> | undefined;
-  if (!row?.notice_id) return null;
-  return {
-    notice_id: String(row.notice_id),
-    solicitation_number: row.solicitation_number,
-    title: row.title,
-    agency: row.sub_tier || row.department,
-    department: row.department,
-    naics_code: row.naics_code,
-    psc_code: row.psc_code,
-    set_aside: row.set_aside_description,
-    notice_type: row.notice_type,
-    posted_date: row.posted_date,
-    response_deadline: row.response_deadline,
-    ui_link: row.ui_link || `https://sam.gov/opp/${row.notice_id}/view`,
-    source: 'cache',
-  };
+  const canonical = await resolveCanonicalSolicitation(q);
+  if (!canonical) return null;
+  return { ...toResolvedNoticeFields(canonical), source: 'cache', deadline_source: 'cache' };
 }
 
 async function fromSamApi(q: string): Promise<ResolvedNotice | null> {
@@ -205,7 +190,7 @@ async function fromSamApi(q: string): Promise<ResolvedNotice | null> {
   const trimmed = q.trim();
   const params: { param: string; value: string }[] = [];
   if (isUuid(trimmed)) params.push({ param: 'noticeid', value: normalizeUuid(trimmed) });
-  params.push({ param: 'solnum', value: trimmed });
+  else params.push({ param: 'solnum', value: trimmed });
 
   for (const { param, value } of params) {
     for (const w of windows) {
@@ -219,27 +204,56 @@ async function fromSamApi(q: string): Promise<ResolvedNotice | null> {
         const res = await fetch(url.toString(), { signal: AbortSignal.timeout(12_000) });
         if (!res.ok) continue;
         const j = await res.json();
-        const opp = (j.opportunitiesData || [])[0];
-        if (!opp) continue;
-        const noticeId = String(opp.noticeId || opp.noticeid || '').replace(/-/g, '');
-        if (!noticeId) continue;
-        const fullParent = opp.fullParentPathName || '';
-        const orgParts = String(fullParent).split('.').map((s: string) => s.trim()).filter(Boolean);
-        return {
-          notice_id: noticeId,
-          solicitation_number: opp.solicitationNumber || trimmed,
-          title: opp.title || null,
-          agency: orgParts[1] || orgParts[0] || opp.department || null,
-          department: orgParts[0] || opp.department || null,
-          naics_code: opp.naicsCode || (Array.isArray(opp.naics) ? opp.naics[0]?.code : null) || null,
-          psc_code: opp.classificationCode || null,
-          set_aside: opp.typeOfSetAsideDescription || opp.typeOfSetAside || null,
-          notice_type: opp.type || opp.typeOfNotice || null,
-          posted_date: opp.postedDate || null,
-          response_deadline: opp.responseDeadLine || opp.responseDate || null,
-          ui_link: opp.uiLink || `https://sam.gov/opp/${noticeId}/view`,
-          source: 'sam_api',
-        };
+        const mapped: ResolvedNotice[] = [];
+        for (const opp of j.opportunitiesData || []) {
+          const noticeId = String(opp.noticeId || opp.noticeid || '').replace(/-/g, '');
+          if (!noticeId) continue;
+          const fullParent = opp.fullParentPathName || '';
+          const orgParts = String(fullParent).split('.').map((s: string) => s.trim()).filter(Boolean);
+          const active = opp.active === true || opp.active === 'Yes'
+            ? true
+            : opp.active === false || opp.active === 'No'
+              ? false
+              : null;
+          const official = opp.responseDeadLine || null;
+          const fallback = opp.responseDate || null;
+          const response_deadline = official || fallback;
+          const deadline_source = official ? 'responseDeadLine' : fallback ? 'responseDate' : null;
+          mapped.push({
+            notice_id: noticeId,
+            solicitation_number: opp.solicitationNumber || trimmed,
+            title: opp.title || null,
+            agency: orgParts[1] || orgParts[0] || opp.department || null,
+            department: orgParts[0] || opp.department || null,
+            naics_code: opp.naicsCode || (Array.isArray(opp.naics) ? opp.naics[0]?.code : null) || null,
+            psc_code: opp.classificationCode || null,
+            set_aside: opp.typeOfSetAsideDescription || opp.typeOfSetAside || null,
+            notice_type: opp.type || opp.typeOfNotice || null,
+            posted_date: opp.postedDate || null,
+            response_deadline,
+            ui_link: opp.uiLink || `https://sam.gov/opp/${noticeId}/view`,
+            source: 'sam_api',
+            active,
+            archive_date: opp.archiveDate || null,
+            status: deriveSolicitationStatus({
+              active,
+              response_deadline,
+              archive_date: opp.archiveDate || null,
+            }),
+            version_count: 0,
+            deadline_source,
+          });
+        }
+        const picked = isUuid(trimmed)
+          ? mapped.find((n) => normalizeUuid(n.notice_id) === normalizeUuid(trimmed)) ?? null
+          : selectCanonicalVersion(mapped);
+        if (!picked) continue;
+        picked.version_count = mapped.length;
+        picked.notice_ids = mapped.map((n) => n.notice_id);
+        picked.deadline_conflict = !isUuid(trimmed) && mapped.some((n) =>
+          n.response_deadline && picked.response_deadline &&
+          n.response_deadline.slice(0, 10) !== String(picked.response_deadline).slice(0, 10));
+        return picked;
       } catch {
         // try next window / param
       }
@@ -259,34 +273,55 @@ async function fromSamPublic(q: string): Promise<ResolvedNotice | null> {
     const j = await res.json();
     const results = j?._embedded?.results || [];
     const want = q.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const opp = results.find((r: { solicitationNumber?: string; _id?: string }) => {
+    const matched = results.filter((r: { solicitationNumber?: string; _id?: string }) => {
       const sol = String(r.solicitationNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const id = String(r._id || '').replace(/-/g, '').toLowerCase();
       return sol === want || id === want.toLowerCase() || sol.includes(want);
-    }) || results[0];
-    if (!opp) return null;
-    const noticeId = String(opp._id || '').replace(/-/g, '');
-    if (!noticeId) return null;
-    const orgNames = (opp.organizationHierarchy || [])
-      .map((o: { name?: string; organizationName?: string }) => o.name || o.organizationName)
-      .filter(Boolean);
-    const naics = Array.isArray(opp.naics) ? opp.naics[0]?.code : opp.naics?.code;
-    const psc = Array.isArray(opp.psc) ? opp.psc[0]?.code : null;
-    return {
-      notice_id: noticeId,
-      solicitation_number: opp.solicitationNumber || null,
-      title: opp.title || null,
-      agency: orgNames[1] || orgNames[0] || null,
-      department: orgNames[0] || null,
-      naics_code: naics ? String(naics) : null,
-      psc_code: psc ? String(psc) : null,
-      set_aside: opp.solicitation?.setAside?.value || opp.solicitation?.setAside?.code || null,
-      notice_type: opp.type?.value || null,
-      posted_date: opp.publishDate || null,
-      response_deadline: opp.responseDate || opp.responseDateActual || null,
-      ui_link: `https://sam.gov/opp/${noticeId}/view`,
-      source: 'sam_public',
-    };
+    });
+    const pool = matched.length ? matched : results;
+    const mapped: ResolvedNotice[] = [];
+    for (const opp of pool) {
+      const noticeId = String(opp._id || '').replace(/-/g, '');
+      if (!noticeId) continue;
+      const orgNames = (opp.organizationHierarchy || [])
+        .map((o: { name?: string; organizationName?: string }) => o.name || o.organizationName)
+        .filter(Boolean);
+      const naics = Array.isArray(opp.naics) ? opp.naics[0]?.code : opp.naics?.code;
+      const psc = Array.isArray(opp.psc) ? opp.psc[0]?.code : null;
+      const response_deadline = opp.responseDate || opp.responseDateActual || null;
+      mapped.push({
+        notice_id: noticeId,
+        solicitation_number: opp.solicitationNumber || null,
+        title: opp.title || null,
+        agency: orgNames[1] || orgNames[0] || null,
+        department: orgNames[0] || null,
+        naics_code: naics ? String(naics) : null,
+        psc_code: psc ? String(psc) : null,
+        set_aside: opp.solicitation?.setAside?.value || opp.solicitation?.setAside?.code || null,
+        notice_type: opp.type?.value || null,
+        posted_date: opp.publishDate || null,
+        response_deadline,
+        ui_link: `https://sam.gov/opp/${noticeId}/view`,
+        source: 'sam_public',
+        status: deriveSolicitationStatus({
+          active: null,
+          response_deadline,
+          archive_date: null,
+        }),
+        deadline_source: 'responseDate',
+        version_count: 0,
+      });
+    }
+    const picked = isUuid(q)
+      ? mapped.find((n) => normalizeUuid(n.notice_id) === normalizeUuid(q)) ?? null
+      : selectCanonicalVersion(mapped);
+    if (!picked) return null;
+    picked.version_count = mapped.length;
+    picked.notice_ids = mapped.map((n) => n.notice_id);
+    picked.deadline_conflict = !isUuid(q) && mapped.some((n) =>
+      n.response_deadline && picked.response_deadline &&
+      n.response_deadline.slice(0, 10) !== String(picked.response_deadline).slice(0, 10));
+    return picked;
   } catch {
     return null;
   }
@@ -352,37 +387,27 @@ const NONDISTINCTIVE = new Set([
   'building', 'buildings', 'plant', 'depot', 'yard', 'field', 'area', 'zone', 'located', 'location',
 ]);
 
-function scoreAward(
+function scoreAwardEvidence(
   row: { Description?: string; 'Recipient Name'?: string; 'Award Amount'?: number; 'Awarding Agency'?: string; 'Awarding Sub Agency'?: string; 'PSC'?: string; psc_code?: string },
   titleWords: string[],
   agencyHint: string | null,
-  oppPsc?: string | null,   // the solicitation's PSC — a match on the award is a STRONG same-product signal
-): number {
+  oppPsc?: string | null,
+): { score: number; distinctiveHits: number; pscMatch: boolean } {
   const desc = `${row.Description || ''} ${row['Recipient Name'] || ''}`.toLowerCase();
   let score = 0;
 
-  // DISTINCTIVE work-words = the title's own significant tokens (nouns like APX, N70, RADIOS,
-  // MOTOROLA), dropping the non-distinctive procurement boilerplate every notice carries. At least
-  // ONE distinctive token MUST appear on the candidate award or it's not the same work — hard-miss
-  // to 0 so a giant same-NAICS IDV can never win on $ + a generic word alone. (Eric 2026-08-03: the
-  // $77M L3Harris IDV on a small BOP APX-radio buy.)
   const distinctive = titleWords.filter((w) => w.length >= 3 && !NONDISTINCTIVE.has(w.toLowerCase()));
   const distinctiveHits = distinctive.filter((w) => desc.includes(w.toLowerCase())).length;
   const pscMatch = !!(oppPsc && (String(row['PSC'] || row.psc_code || '')).toUpperCase().startsWith(String(oppPsc).toUpperCase().slice(0, 4)));
-  // A PSC match (same product/service class) is itself a strong same-work signal — it can satisfy
-  // the "same work" bar even if the exact title token isn't echoed in USASpending's terse Description.
-  if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) return 0; // not the same work
+  if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) {
+    return { score: 0, distinctiveHits, pscMatch };
+  }
 
-  // Reward distinctive overlap heavily; PSC match is a large independent boost.
   score += distinctiveHits * 30;
   if (distinctiveHits >= 2) score += 25;
   if (distinctiveHits >= 3) score += 15;
   if (pscMatch) score += 45;
 
-  // Legacy generic-work booster (a match on a known work verb is extra-meaningful) — but ONLY when
-  // the word is genuinely distinctive here, not a customer/place token. ("guard" is a work word for
-  // a security-guard opp, but in "National Guard" it's the CUSTOMER — NONDISTINCTIVE now drops it,
-  // so this booster must respect that or it re-admits the Sikorsky match on the +20 alone.)
   for (const w of titleWords) {
     const lw = w.toLowerCase();
     if (w.length >= 4 && GENERIC_WORK_WORDS.has(lw) && !NONDISTINCTIVE.has(lw) && desc.includes(lw)) score += 20;
@@ -396,10 +421,9 @@ function scoreAward(
       score += 20;
     }
   }
-  // Tiny amount signal only — never let a huge unrelated contract win on size (capped at +5).
   const amt = Number(row['Award Amount'] || 0);
   score += Math.min(5, Math.log10(Math.max(amt, 1)));
-  return score;
+  return { score, distinctiveHits, pscMatch };
 }
 
 async function searchUsasPendingAwards(opts: {
@@ -499,44 +523,49 @@ export async function findLikelyPriorAwards(input: {
   const ranked = rows
     .map((r) => ({
       row: r,
-      score: scoreAward(r as never, titleWords, agencyHint, input.psc_code ?? null),
+      evidence: scoreAwardEvidence(r as never, titleWords, agencyHint, input.psc_code ?? null),
     }))
-    .filter((x) => x.score >= 40) // require real title/PSC overlap — avoids the largest random NAICS award
-    .sort((a, b) => b.score - a.score || Number(b.row['Award Amount'] || 0) - Number(a.row['Award Amount'] || 0))
+    .filter((x) => x.evidence.score >= 40)
+    .sort((a, b) => b.evidence.score - a.evidence.score || Number(b.row['Award Amount'] || 0) - Number(a.row['Award Amount'] || 0))
     .slice(0, 5);
 
   const hits: PriorAwardHit[] = [];
-  for (const { row, score } of ranked) {
+  for (const { row, evidence } of ranked) {
     const gid = String(row.generated_internal_id || '');
     if (!gid) continue;
     try {
       const detail = await fetchAwardDetail(gid);
       if (!detail) continue;
 
-      // FM-U04 (Eric/QA 2026-07-29): penalize a STALE award for being the "likely incumbent" — a
-      // contract whose period of performance ended years ago is probably NOT the current holder (the
-      // work was almost certainly recompeted since). Cap confidence by PoP-end recency, and give a
-      // small boost when the award's NAICS matches the solicitation's (a real same-market signal).
-      let confScore = score;
+      let confScore = evidence.score;
       const popEnd = detail.popPotentialEnd || null;
       const yearsSinceEnd = popEnd ? (Date.now() - new Date(popEnd).getTime()) / (365.25 * 86_400_000) : null;
       let recencyCap: 'high' | 'medium' | 'low' | null = null;
       if (yearsSinceEnd !== null && yearsSinceEnd > 0) {
-        // Ended >5y ago → cannot be 'high'; >8y ago → cannot be above 'low'.
         if (yearsSinceEnd > 8) recencyCap = 'low';
         else if (yearsSinceEnd > 5) recencyCap = 'medium';
       }
-      if (input.naics_code && detail.naicsCode && String(detail.naicsCode).slice(0, 6) === String(input.naics_code).slice(0, 6)) {
-        confScore += 15; // same NAICS = same market
-      }
+      const naicsMatch = !!(input.naics_code && detail.naicsCode && String(detail.naicsCode).slice(0, 6) === String(input.naics_code).slice(0, 6));
+      // NAICS is a recorded signal, never a correctness gate. Do not add it to the score
+      // that drives "high" — that is how a same-code unrelated IDV used to look grounded.
       let matchConfidence: 'high' | 'medium' | 'low' =
         confScore >= 90 ? 'high' : confScore >= 65 ? 'medium' : 'low';
       if (recencyCap === 'low') matchConfidence = 'low';
       else if (recencyCap === 'medium' && matchConfidence === 'high') matchConfidence = 'medium';
+      const grounding = groundIncumbent({
+        distinctiveHits: evidence.distinctiveHits,
+        pscMatch: evidence.pscMatch,
+        naicsMatch,
+        matchConfidence,
+      });
       hits.push({
         ...detail,
         matchConfidence,
-        matchScore: score,
+        matchScore: evidence.score,
+        distinctiveHits: evidence.distinctiveHits,
+        pscMatch: evidence.pscMatch,
+        naicsMatch,
+        incumbent_certainty: grounding.certainty,
       });
     } catch {
       // skip
@@ -559,21 +588,31 @@ export function summarizeSolicitationIncumbent(
     n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString()}`;
   const parts: string[] = [];
   if (notice) {
+    const status = notice.status ?? deriveSolicitationStatus({
+      active: notice.active ?? null,
+      response_deadline: notice.response_deadline,
+      archive_date: notice.archive_date ?? null,
+    });
     parts.push(
-      `Open solicitation ${notice.solicitation_number || notice.notice_id}` +
+      `${solicitationStatusLabel(status)} ${notice.solicitation_number || notice.notice_id}` +
         (notice.title ? ` — "${notice.title}"` : '') +
-        (notice.agency ? ` (${notice.agency})` : ''),
+        (notice.agency ? ` (${notice.agency})` : '') +
+        (notice.response_deadline ? `. Deadline ${notice.response_deadline}` : '') +
+        (notice.amendment ? `. ${notice.amendment}` : ''),
     );
   }
   if (incumbent) {
+    const label = incumbent.incumbent_certainty === 'supported' ? 'Supported prior award' : 'Uncertain prior-award candidate';
     parts.push(
-      `Likely prior award: ${incumbent.recipientName} holds ${incumbent.awardId}` +
+      `${label}: ${incumbent.recipientName} holds ${incumbent.awardId}` +
         (incumbent.ceiling ? ` at ${fmt(incumbent.ceiling)}` : '') +
         (incumbent.popPotentialEnd ? `, expires ${incumbent.popPotentialEnd}` : '') +
-        ` [${incumbent.matchConfidence} confidence]`,
+        ` [${incumbent.matchConfidence} confidence` +
+        (incumbent.incumbent_certainty === 'supported' ? '' : '; not identified as the incumbent') +
+        ']',
     );
   } else if (notice) {
-    parts.push('No clear prior award found on USASpending for this notice.');
+    parts.push('No supported prior award found on USASpending for this notice.');
   }
   return parts.join('. ');
 }
@@ -595,17 +634,33 @@ export async function resolveSolicitationIncumbent(query: string): Promise<Solic
     }
   }
   const incumbent = prior[0] || null;
+  const grounding = groundIncumbent(incumbent ? {
+    distinctiveHits: incumbent.distinctiveHits ?? 0,
+    pscMatch: !!incumbent.pscMatch,
+    naicsMatch: !!incumbent.naicsMatch,
+    matchConfidence: incumbent.matchConfidence,
+  } : null);
+  if (incumbent) incumbent.incumbent_certainty = grounding.certainty;
+  const named = namedIncumbent(grounding, incumbent);
   return {
     queried: q,
     notice,
-    incumbent,
+    incumbent: named,
     prior_awards: prior,
-    summary: summarizeSolicitationIncumbent(notice, incumbent),
+    summary: summarizeSolicitationIncumbent(notice, named),
     _meta: {
       grounded_notice: !!notice,
-      grounded_incumbent: !!incumbent,
+      grounded_incumbent: grounding.grounded,
       degraded: noticeDegraded || predDegraded,
       notice_source: notice?.source ?? null,
+      status: notice?.status ?? null,
+      amendment: notice?.amendment ?? null,
+      matched_by: notice?.matched_by ?? null,
+      version_count: notice?.version_count,
+      deadline_conflict: notice?.deadline_conflict,
+      notice_ids: notice?.notice_ids,
+      incumbent_certainty: grounding.certainty,
+      incumbent_reason: grounding.reason,
     },
   };
 }

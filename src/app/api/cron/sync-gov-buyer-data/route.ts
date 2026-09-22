@@ -21,6 +21,15 @@
  *      in SAM POCs; role_category leaves empty buckets for them). See
  *      docs/PRD-gov-buyer-market-research.md §7.
  *
+ *      ⚠️ THE CONTACTS PULL IS NOW A REGISTERED, CHECKPOINTED SOURCE.
+ *      It is `decision_makers_sam_contacts` in `data_source_instances`, it owns a durable
+ *      cursor in `decision_makers_sync_state`, and it is scheduled by its OWN `cron_jobs`
+ *      row — NOT by being chained off sync-sam-opportunities. The implementation lives in
+ *      src/lib/gov-contacts/buyer-contact-run.ts; this route is only the HTTP edge.
+ *      It used to re-read the newest 10 pages with `offset` reset to 0 each run, which is
+ *      an ~11-day rolling window over 207,986 notices — 50.8% of held rows had not been
+ *      revisited in 90+ days. Do NOT reintroduce a head-only sweep here.
+ *
  * Modes (?pull=):
  *   - both     (default) run gov POCs + a slice of SB entities
  *   - contacts gov POC harvest only
@@ -32,9 +41,23 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+/**
+ * ⚠️ The cron_jobs row is named `sync-decision-makers` while this ROUTE is
+ * `sync-gov-buyer-data`. reportCronOutcome writes by JOB name, so the mapping is
+ * stated explicitly here rather than inferred from the path.
+ */
+const CRON_JOB_NAME = 'sync-decision-makers';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
-import { isUsableContactName } from '@/lib/gov-contacts/contact-quality';
+import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
+
+// The contacts drain runs under a soft wall-clock budget (budgetMs, default 210s). Without an
+// explicit ceiling the platform default would kill the run BEFORE the checkpoint write at the
+// end of the handler — contact rows would land but the cursor would never advance, so the drain
+// would redo the same page forever while looking like it was working.
+export const maxDuration = 300;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -70,27 +93,6 @@ function getSupabase() {
 }
 
 // ───────────────────────── helpers ─────────────────────────
-
-function normalize(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  const s = String(v).trim();
-  return s.length ? s : null;
-}
-
-// A SAM POC "fullName" is garbage when an agency (e.g. DLA) stuffs the
-// field with buyer-lookup instructions, OR when SAM itself has no real name
-// and falls back to a "Telephone: 7175503112" placeholder (measured
-// 2026-07-26: 1,348 federal_contacts rows via this exact importer carried
-// that placeholder verbatim as the contact's "name"). Mirror the filter in
-// scripts/populate-contracting-officers.js; isUsableContactName is the
-// shared placeholder/phone-shape check reused by the read side too.
-function isGarbageName(name: string | null): boolean {
-  if (!name) return true;
-  if (name.length > 80) return true;          // paragraph, not a name
-  if (/\b(see|visit|email|contact the|please)\b/i.test(name)) return true;
-  if (!isUsableContactName(name)) return true; // "Telephone: ###" / bare digits
-  return false;
-}
 
 // Map a transformed SAMEntity → sam_entities row.
 // Exported so the dry-run (scripts/dry-run-gov-buyer-entities.ts) tests
@@ -240,101 +242,67 @@ async function syncEntities() {
 }
 
 // ───────────────────────── gov POC pull ─────────────────────────
-
-async function syncContacts() {
-  const sb = getSupabase();
-  const errors: string[] = [];
-  let upserted = 0;
-  const PAGE = 1000;
-  let offset = 0;
-
-  // Sweep sam_opportunities pages, flatten points_of_contact → rows.
-  // Bounded by CONTACT_MAX_PAGES so a single run stays cheap; the unique
-  // source_row_key makes re-runs idempotent so daily passes converge.
-  const MAX_PAGES = Number(process.env.GOV_BUYER_CONTACT_PAGES_PER_RUN || 10);
-
-  for (let p = 0; p < MAX_PAGES; p++) {
-    const { data: opps, error } = await sb
-      .from('sam_opportunities')
-      .select('notice_id, solicitation_number, department, office, sub_tier, posted_date, points_of_contact')
-      .order('posted_date', { ascending: false })
-      .range(offset, offset + PAGE - 1);
-
-    if (error) { errors.push(`contacts page ${p}: ${error.message}`); break; }
-    if (!opps || opps.length === 0) break;
-
-    const rows: Record<string, unknown>[] = [];
-    for (const row of opps) {
-      const pocs = Array.isArray(row.points_of_contact) ? row.points_of_contact : [];
-      pocs.forEach((c: Record<string, unknown>, idx: number) => {
-        const fullName = normalize(c.fullName as string);
-        const email = normalize(c.email as string);
-        const phone = normalize(c.phone as string);
-        if (isGarbageName(fullName)) return;
-        if (!email && !phone) return;            // useless for outreach
-        rows.push({
-          source_row_key: `${row.notice_id}::${idx}`,
-          contact_fullname: fullName,
-          contact_title: normalize(c.title as string) ||
-            (c.type === 'primary' ? 'Primary Contact' : c.type === 'secondary' ? 'Secondary Contact' : null),
-          contact_email: email,
-          contact_phone: phone,
-          department_ind_agency: normalize(row.department),
-          office: normalize(row.office),
-          sub_tier: normalize(row.sub_tier),
-          role_category: 'contracting',          // the only role SAM POCs yield
-          solicitation_number: normalize(row.solicitation_number),
-          posted_date: normalize(row.posted_date),
-          source: 'sam_opportunities_poc',
-          raw_data: c,
-          updated_at: new Date().toISOString(),
-        });
-      });
-    }
-
-    if (rows.length) {
-      const { error: upErr } = await sb
-        .from('federal_contacts')
-        .upsert(rows, { onConflict: 'source_row_key', ignoreDuplicates: false });
-      if (upErr) errors.push(`contacts upsert page ${p}: ${upErr.message}`);
-      else upserted += rows.length;
-    }
-
-    if (opps.length < PAGE) break;
-    offset += PAGE;
-  }
-
-  return { upserted, errors };
-}
+//
+// Delegates to the registered source runner. The extraction logic, the checkpoint algebra
+// and the clock semantics are all unit-tested in src/lib/gov-contacts/buyer-contact-source.ts.
 
 // ───────────────────────── handler ─────────────────────────
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
-  // Auth: Vercel cron header OR admin password (mirrors other crons).
+  // Auth: the cron DISPATCHER's bearer, a direct Vercel cron header, or an admin password.
+  //
+  // ⚠️ The dispatcher bearer is load-bearing and was missing. This route only accepted
+  // `x-vercel-cron` / `?password=`, but the dispatcher (src/app/api/cron/dispatch) calls jobs
+  // with `authorization: Bearer $CRON_SECRET` + `x-cron-dispatch: 1` and never sets
+  // `x-vercel-cron`. So the FIRST scheduled fire of `sync-decision-makers` came back 401
+  // (2026-09-15T02:00:27Z) — registered, enabled, firing on time, and unable to authenticate.
+  // Matches the shape used by every other dispatcher-run job (see fco-roster-watch).
+  const auth = request.headers.get('authorization');
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isDispatcher = Boolean(process.env.CRON_SECRET) && auth === `Bearer ${process.env.CRON_SECRET}`;
   const password = searchParams.get('password');
-  if (!isVercelCron && password !== ADMIN_PASSWORD) {
+  if (!isVercelCron && !isDispatcher && password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const pull = searchParams.get('pull') || 'both';
+  // dry=1 means ZERO persistent writes: no contact rows, no checkpoint move, no lease, no
+  // clocks, no alert state. It is a read-only rehearsal, not a quieter run.
+  const dry = searchParams.get('dry') === '1';
+  const num = (k: string, d: number) => {
+    const v = Number(searchParams.get(k));
+    return Number.isFinite(v) && v > 0 ? v : d;
+  };
   const started = Date.now();
-  const out: Record<string, unknown> = { pull };
+  const out: Record<string, unknown> = { pull, dry };
 
   try {
     if (pull === 'both' || pull === 'contacts') {
-      out.contacts = await syncContacts();
+      out.contacts = await runDecisionMakersSync(getSupabase(), {
+        dry,
+        pageSize: num('pageSize', 500),
+        refreshPages: num('refreshPages', 12),
+        backfillPages: num('backfillPages', 20),
+        refreshWindowDays: num('refreshWindowDays', 3),
+        budgetMs: num('budgetMs', 210_000),
+      });
     }
-    if (pull === 'both' || pull === 'entities') {
+    if ((pull === 'both' || pull === 'entities') && !dry) {
       out.entities = await syncEntities();
     }
     out.durationSeconds = Math.round((Date.now() - started) / 1000);
     out.success = true;
+    // The dispatcher fire-and-forgets this route (timeout_ms 290s > its 55s await
+    // cap) and records `dispatched` at 12s, which the watchdog ignores. Without
+    // this the run's real outcome is invisible forever — 71 such runs in 30 days.
+    // A `dry` rehearsal must not overwrite the scheduled job's status.
+    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'success');
     return NextResponse.json(out);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'error', msg).catch(() => {});
     return NextResponse.json({ success: false, error: msg, ...out }, { status: 500 });
   }
 }

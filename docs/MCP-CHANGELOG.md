@@ -5,10 +5,69 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 41** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 63** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The stdio server registers a 35-tool subset; the hosted HTTP edge
-exposes all 41.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 63.
+
+---
+
+## September 2026 — get_keyword_coverage BigQuery measurement (identity decoupled)
+
+**Changed tool:** `get_keyword_coverage` (still 5 credits). Deterministic source is BigQuery `usaspending.awards`, latest complete FY, description match, `SUM(obligation_amount)` at transaction grain. Warehouse failure is `NOT_ESTABLISHED` (not $0). Ranked NAICS/PSC shares are a **measured distribution**, not the user's market identity — downstream ranking no longer collapses a keyword to its lead NAICS because the share crossed 40%. Senses v2 (interpretation) is not in this change.
+
+**Consumer neutralization (same pass):** `profile-from-text` keeps company `naics: []` and surfaces `coverageCandidates` for display/confirm; `market-overview` routes forecast/recompete/set-aside via corroborated `?naics=` or keyword language (never `coverageCodes` alone); beginner `/try` relevance treats coverage sector as a signal, not a peak-sector exclusion gate. `pickLeadNaicsFromCoverage` removed. Capability Market Match still requires SAM/award overlap (`resolveLeadNaicsWithEvidence(..., null)`).
+
+---
+
+## September 2026 — lookup_solicitation (catalog 62 → 63)
+
+**New tool:** `lookup_solicitation` (5 credits, scan-class, local `sam_opportunities` — no web, no sow_text). Historical / known-id solicitation lookup. Closed ≠ gone. Short-circuits Potato P2 FIND-first. `MATCHED_CANDIDATE` is not identity. Amendments collapse at query time via #1557. Does not modify `find_opportunities`.
+
+## September 2026 — match_company_to_pathways (catalog 61 → 62)
+
+**New tool:** `match_company_to_pathways` (8 credits). PATHWAY FIT after CURRENT INTELLIGENCE:
+two-sided match of CAI buyer doors to a company’s stranger-verifiable public record (UEI awards +
+SAM certs with provenance). Determinations: SUPPORTED_FIT / POSSIBLE_FIT / NOT_ESTABLISHED /
+NOT_APPLICABLE. `no_proven_door` is success. Never invents Talent, vehicle portfolios, or CAI
+NOT_YET_MEASURABLE doors. Never set-aside-first. CAI `_next.tool` now points here.
+
+## September 2026 — get_current_acquisition_intelligence (catalog 60 → 61)
+
+**New tool:** `get_current_acquisition_intelligence` (8 credits). CURRENT INTELLIGENCE journey
+slot after FIND: what CHANGED about how a buyer is buying for a capability, and what to do
+differently — cited OBSERVED_CHANGE + CURRENT_STATE from LIVE compose only
+(`recompete_changes`, `recompete_opportunities`, `sam_opportunities`, `agency_forecasts`,
+`sam_events`). Killer rule: no `do_differently` without `caused_by`. Pathway gaps stay in
+`not_yet_measurable` (no CSO/OT/consortium/rapid/PAE invention).
+
+
+## September 2026 — understand_customer (catalog 59 → 60)
+
+**New tool:** `understand_customer` (5 credits). First Customer Journey UNDERSTAND transition after
+specific `find_opportunities`: grounded package with **The opportunity says** · **Broader agency
+research shows** · **What that suggests you emphasize**. FIND `_next` for specific shape now points
+here (not bare `get_agency_intel`). Capability statement / Response / Meeting brief intentionally
+not included yet. Seam A (FIND) remains complete via #1535; PR #1526 stays frozen pending reconcile.
+
+## September 2026 — find_opportunities (catalog 58 → 59)
+
+**New tool:** `find_opportunities` (10 credits). Customer-facing Opportunity Map FIND —
+Open now + Coming back + Coming soon in one compose. Independent horizon envelopes
+(empty Open ≠ market zero). `search_sam_opportunities` remains advanced/Open-only.
+Watch coverage honesty: Open + Coming soon until recompete alerts ship.
+
+---
+
+## September 2026 — Schedule discovery without saying "alerts"
+
+**Problem.** Connected agents only reached `schedule_market_search` when users said
+"alerts." Phrases like "monitor this market," "schedule this," "create a watch," or
+"email me new opportunities" did not discover the tool.
+
+**Fix.** Shared discovery copy (`src/lib/mcp/schedule-discovery.ts`): tool title +
+description + MCP `instructions` on both hosted and stdio transports. Cadence honesty
+(daily/weekly/paused only — explain clock times before saving). Unsupported filter keys
+and strategy strands are **rejected** (never silently dropped into a broader watch).
 
 ---
 
@@ -114,7 +173,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 58 tools.
+- Capabilities artifact — 61 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 

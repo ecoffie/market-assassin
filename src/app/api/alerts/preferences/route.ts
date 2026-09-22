@@ -4,6 +4,19 @@ import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setup';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import {
+  mergePrioritiesIntoAggregated,
+  prioritiesFromAggregated,
+  validateNaicsPrioritiesInput,
+} from '@/lib/alerts/naics-priorities';
+import {
+  alertModeFromAggregated,
+  canSelectFocused,
+  defaultAlertModeForNewUser,
+  mergeAlertModeIntoAggregated,
+  parseAlertMode,
+} from '@/lib/alerts/alert-mode';
+import { invalidNaicsCodes, invalidPscCodes, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -92,6 +105,10 @@ export async function GET(request: NextRequest) {
         businessDescription,
         primaryIndustry: data.primary_industry || null,
         naicsCodes: data.naics_codes || [],
+        naicsPriorities: prioritiesFromAggregated(data.aggregated_profile),
+        alertMode: alertModeFromAggregated(data.aggregated_profile),
+        invalidNaics: invalidNaicsCodes(data.naics_codes || []),
+        invalidPsc: invalidPscCodes(data.psc_codes || []),
         keywords: data.keywords || [],
         businessType: data.business_type,
         setAsides: data.set_aside_preferences || (data.business_type ? [data.business_type] : []),
@@ -175,6 +192,8 @@ export async function POST(request: NextRequest) {
       locationStates, // Multi-state support
       // Primary industry
       primaryIndustry,
+      naicsPriorities,
+      alertMode,
       // Master switch
       isActive,
     } = body;
@@ -206,7 +225,7 @@ export async function POST(request: NextRequest) {
     // from NAICS when they're still empty (the slurpee never populated this field).
     const { data: existing, error: existingErr } = await getSupabase()
       .from('user_notification_settings')
-      .select('user_email, agencies, keywords')
+      .select('user_email, agencies, keywords, aggregated_profile, naics_codes')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingErr) console.error('[alerts/preferences] settings query error:', existingErr.message);
@@ -284,13 +303,19 @@ export async function POST(request: NextRequest) {
 
     // Search criteria
     if (naicsCodes !== undefined) {
-      // Only save numeric codes (allow prefixes like '236')
       const cleanCodes = Array.isArray(naicsCodes)
-        ? naicsCodes.filter((c: string) => /^\d+$/.test(c))
+        ? naicsCodes.map((c: string) => String(c).trim()).filter((c: string) => /^\d+$/.test(c))
         : [];
-      record.naics_codes = cleanCodes;
+      const persist = persistNaicsWrite(cleanCodes, existing?.naics_codes);
+      if (!persist.ok) {
+        return NextResponse.json({
+          success: false,
+          error: persist.error,
+        }, { status: 400 });
+      }
+      record.naics_codes = persist.codes;
       // Store profile hash for template matching
-      record.naics_profile_hash = cleanCodes.length > 0 ? hashNaicsProfile(cleanCodes) : null;
+      record.naics_profile_hash = persist.codes.length > 0 ? hashNaicsProfile(persist.codes) : null;
       record.profile_updated_at = new Date().toISOString();
     }
 
@@ -317,6 +342,10 @@ export async function POST(request: NextRequest) {
     // (20260612 migration). Uppercased + deduped; PSCs are alphanumeric (e.g.
     // R425, 1550, P500). Settings now edits these alongside NAICS.
     if (pscCodes !== undefined) {
+      const pscCheck = validateMarketCodesInput(undefined, pscCodes);
+      if (!pscCheck.ok) {
+        return NextResponse.json({ success: false, error: pscCheck.error }, { status: 400 });
+      }
       record.psc_codes = Array.isArray(pscCodes)
         ? Array.from(new Set(pscCodes.map((c: unknown) => String(c).trim().toUpperCase()).filter(Boolean))).slice(0, 30)
         : [];
@@ -384,6 +413,57 @@ export async function POST(request: NextRequest) {
 
     if (primaryIndustry !== undefined) {
       record.primary_industry = primaryIndustry || null;
+    }
+
+    if (naicsPriorities !== undefined || naicsCodes !== undefined) {
+      const stored = Array.isArray(record.naics_codes)
+        ? (record.naics_codes as string[])
+        : Array.isArray(existing?.naics_codes)
+          ? (existing!.naics_codes as string[])
+          : [];
+      if (naicsPriorities !== undefined) {
+        const checked = validateNaicsPrioritiesInput(naicsPriorities, stored);
+        if (!checked.ok) {
+          return NextResponse.json({ success: false, error: checked.error }, { status: 400 });
+        }
+        record.aggregated_profile = mergePrioritiesIntoAggregated(
+          existing?.aggregated_profile,
+          checked.priorities,
+          stored,
+        );
+      } else {
+        record.aggregated_profile = mergePrioritiesIntoAggregated(
+          existing?.aggregated_profile,
+          prioritiesFromAggregated(existing?.aggregated_profile),
+          stored,
+        );
+      }
+    }
+
+    let nextMode = existing
+      ? alertModeFromAggregated(existing.aggregated_profile)
+      : defaultAlertModeForNewUser(effectiveKeywords);
+    if (alertMode !== undefined) {
+      const parsed = parseAlertMode(alertMode);
+      if (!parsed) {
+        return NextResponse.json(
+          { success: false, error: 'alertMode must be market_discovery or focused' },
+          { status: 400 },
+        );
+      }
+      nextMode = parsed;
+    }
+    if (nextMode === 'focused') {
+      const gate = canSelectFocused(effectiveKeywords);
+      if (!gate.ok) {
+        return NextResponse.json({ success: false, error: gate.error }, { status: 400 });
+      }
+    }
+    if (alertMode !== undefined || !existing) {
+      record.aggregated_profile = mergeAlertModeIntoAggregated(
+        record.aggregated_profile ?? existing?.aggregated_profile,
+        nextMode,
+      );
     }
 
     let data;

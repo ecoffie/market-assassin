@@ -25,6 +25,18 @@ const SAFE_ABBREVIATIONS = new Set([
 // must pass the phrase "other transaction" (which IS searchable). Same for any
 // 2-3 char string that collides with common words.
 
+/**
+ * Short acronyms that are real capabilities ONLY when the rest of the keyword
+ * list supplies the domain. "PAM" with Identity / AI Security is Privileged
+ * Access Management. "PAM" alone is a 3-letter reject (campaign / pamphlet).
+ * Do not dump these into SAFE_ABBREVIATIONS — that would accept every 3-letter
+ * word of this shape.
+ */
+export const CONTEXTUAL_ACRONYMS: Record<string, readonly string[]> = {
+  pam: ['identity', 'security', 'governance', 'privileged', 'cyber', 'iam'],
+  iam: ['identity', 'access', 'security', 'governance', 'pam'],
+};
+
 const STOPWORDS = new Set([
   'we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in',
   'on', 'our', 'with', 'services', 'service', 'support', 'solutions', 'company',
@@ -140,17 +152,71 @@ const GENERIC_SINGLE_WORDS = new Set([
  * Use this for precision surfaces (the "hot right now" card, top-ranked matches).
  * Use isSearchableKeyword for the broad/inclusive search where volume is fine.
  */
-export function isDistinctiveKeyword(term: string): boolean {
+export function isContextualAcronym(
+  term: string,
+  siblingKeywords: (string | null | undefined)[] = [],
+): boolean {
   const t = (term || '').trim().toLowerCase();
-  if (!t || !isSearchableKeyword(t)) return false;
-  if (t.includes(' ')) return true;                 // phrase → always distinctive
-  if (SAFE_ABBREVIATIONS.has(t)) return true;       // known clean abbreviation
-  return !GENERIC_SINGLE_WORDS.has(t);              // lone word: distinctive iff not generic
+  const required = CONTEXTUAL_ACRONYMS[t];
+  if (!required) return false;
+  const hay = siblingKeywords.map((k) => String(k || '').toLowerCase()).join(' ');
+  if (!hay) return false;
+  return required.some((hint) => hay.includes(hint));
+}
+
+/** Whole-token match for short/contextual acronyms; substring for longer terms. */
+export function keywordOccursInText(text: string, keyword: string): boolean {
+  const needle = (keyword || '').trim().toLowerCase();
+  if (!needle) return false;
+  const hay = String(text || '').toLowerCase();
+  if (needle.length <= 3 || CONTEXTUAL_ACRONYMS[needle]) {
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`).test(hay);
+  }
+  return hay.includes(needle);
+}
+
+export function keywordHitPassages(
+  fields: Record<string, string | null | undefined>,
+  keywords: string[],
+  window = 90,
+): Array<{ keyword: string; field: string; passage: string }> {
+  const hits: Array<{ keyword: string; field: string; passage: string }> = [];
+  for (const keyword of keywords) {
+    const needle = (keyword || '').trim();
+    if (!needle) continue;
+    for (const [field, raw] of Object.entries(fields)) {
+      const text = String(raw || '');
+      if (!keywordOccursInText(text, needle)) continue;
+      const lower = text.toLowerCase();
+      const at = lower.indexOf(needle.toLowerCase());
+      const start = Math.max(0, at - window);
+      const end = Math.min(text.length, at + needle.length + window);
+      const passage = `${start > 0 ? '…' : ''}${text.slice(start, end).replace(/\s+/g, ' ').trim()}${
+        end < text.length ? '…' : ''
+      }`;
+      hits.push({ keyword: needle, field, passage });
+    }
+  }
+  return hits;
+}
+
+export function isDistinctiveKeyword(
+  term: string,
+  siblingKeywords: (string | null | undefined)[] = [],
+): boolean {
+  const t = (term || '').trim().toLowerCase();
+  if (!t) return false;
+  if (isContextualAcronym(t, siblingKeywords.length ? siblingKeywords : [term])) return true;
+  if (!isSearchableKeyword(t, siblingKeywords)) return false;
+  if (t.includes(' ')) return true;
+  if (SAFE_ABBREVIATIONS.has(t)) return true;
+  return !GENERIC_SINGLE_WORDS.has(t);
 }
 
 /** The distinctive subset of a keyword list (phrases + non-generic single words). */
 export function distinctiveKeywords(keywords: (string | null | undefined)[]): string[] {
-  return sanitizeKeywords(keywords).filter((k) => isDistinctiveKeyword(k));
+  return sanitizeKeywords(keywords).filter((k) => isDistinctiveKeyword(k, keywords));
 }
 
 /**
@@ -294,7 +360,10 @@ function looksLikeProse(t: string): boolean {
 }
 
 /** True if a single keyword is specific enough to text-search without noise. */
-export function isSearchableKeyword(term: string): boolean {
+export function isSearchableKeyword(
+  term: string,
+  siblingKeywords: (string | null | undefined)[] = [],
+): boolean {
   const t = (term || '').trim().toLowerCase();
   if (!t) return false;
   if (STOPWORDS.has(t)) return false;
@@ -307,6 +376,7 @@ export function isSearchableKeyword(term: string): boolean {
   if (looksLikeProse(t)) return false;
   if (t.includes(' ')) return true;                 // multi-word phrase = specific
   if (SAFE_ABBREVIATIONS.has(t)) return true;       // known clean abbreviation
+  if (isContextualAcronym(t, siblingKeywords)) return true;
   const word = t.replace(/[^a-z0-9]/g, '');
   if (word.length < 4) return false;                // single word must be 4+ chars
   return looksLikeRealWord(word);                   // …and not keyboard mash
@@ -341,11 +411,11 @@ function collapseRepeatedWords(term: string): string {
  * collapses within-phrase repeated words before de-duplicating.
  */
 export function sanitizeKeywords(keywords: (string | null | undefined)[]): string[] {
+  const trimmed = keywords.map((raw) => collapseRepeatedWords((raw || '').trim())).filter(Boolean);
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const raw of keywords) {
-    const t = collapseRepeatedWords((raw || '').trim());
-    if (!t || !isSearchableKeyword(t)) continue;
+  for (const t of trimmed) {
+    if (!isSearchableKeyword(t, trimmed)) continue;
     const key = t.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
