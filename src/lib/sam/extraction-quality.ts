@@ -23,18 +23,36 @@ export function isPdfPortfolioStub(text: string): boolean {
 }
 
 /**
- * Share of characters that are ordinary readable Latin text. A font-subset PDF
- * whose glyphs carry no usable ToUnicode map extracts as control characters and
- * private-use codepoints, driving this near zero.
+ * Share of characters that are ordinary readable text.
+ *
+ * Measured by what is UNREADABLE rather than by an allow-list of "normal"
+ * characters. An allow-list is the wrong shape here: a legitimate extracted
+ * CLIN table drawn with box characters (│ ├ ─ ┼) scored 0.583 against one and
+ * would have been suppressed as mojibake — reporting a real priced schedule as
+ * "no usable text" and permanently blocking coverage.complete.
+ *
+ * What actually signals a font-subset failure is the presence of C0 control
+ * codes, private-use-area codepoints and U+FFFD — characters that do not occur
+ * in correctly extracted text at any meaningful rate. Everything else (accents,
+ * CJK, box drawing, typographic punctuation, currency) counts as readable.
  */
 export function readableRatio(text: string): number {
   if (!text) return 0;
-  const readable = text.match(/[A-Za-z0-9 .,;:()/\-\n\r\t'"$%&#]/g);
-  return (readable ? readable.length : 0) / text.length;
+  // C0 controls except tab/newline/CR, DEL, private use areas, replacement char.
+  const unreadable = text.match(
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uE000-\uF8FF\uFFFD]/g,
+  );
+  return 1 - (unreadable ? unreadable.length : 0) / text.length;
 }
 
-/** Below this, the text is not usable prose. Real documents measure 0.98–1.00. */
-export const MIN_READABLE_RATIO = 0.6;
+/**
+ * Below this, the text is not usable prose. Correctly extracted documents have
+ * essentially NO control/private-use characters, so they measure ~1.00; the DLA
+ * font-subset amendments measured 0.35–0.37 on the old metric and score far
+ * below this on the new one. 0.9 keeps a wide margin from real text while still
+ * catching a document that is mostly unmapped glyphs.
+ */
+export const MIN_READABLE_RATIO = 0.9;
 
 export function isMojibake(text: string): boolean {
   // Needs enough characters to judge; a 20-char label proves nothing.

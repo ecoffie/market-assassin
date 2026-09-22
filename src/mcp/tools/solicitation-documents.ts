@@ -96,7 +96,15 @@ export async function solicitationDocuments(
           documents: more.map((d) => ({
             document_id: d.document_id,
             offset: d.text_window.next_offset as number,
-            limit: input.text_limit ?? 20_000,
+            // Carry the window size the caller actually used for THIS document
+            // (per-doc spec first, then the request default). Hardcoding the
+            // 20k default here silently shrank a 120k reader to 20k on its own
+            // continuation, turning a 3-call read into a 15-call one.
+            limit:
+              input.documents?.find((r) => r.document_id === d.document_id)?.limit ??
+              input.documents?.find((r) => !r.document_id)?.limit ??
+              input.text_limit ??
+              20_000,
           })),
         }
       : null;
@@ -136,16 +144,16 @@ export async function solicitationDocuments(
         ? 'Document fetch partially failed — some attachments could not be downloaded/extracted; retry before concluding there are no docs.'
         : grounded
         ? `${res.documents.length} document(s) for notice ${res.notice_id}${res.title ? ` — "${res.title}"` : ''}. ${sowDoc ? `Scope doc: ${sowDoc.filename}. ` : ''}${
-            res.coverage.complete
-              ? 'Full stored text delivered.'
-              : `PARTIAL: ${res.coverage.documents_with_more_text} document(s) have more text — keep paging with next_page.`
+            nextPage
+            ? `PARTIAL: ${res.coverage.documents_with_more_text} document(s) have more text — keep paging with next_page.`
+            : 'Nothing further to read: next_page is null.'
           }`
         : `No documents or text found for notice ${res.notice_id}. Verify the notice_id, or the notice may have no attachments.`,
       how_to_use: grounded
-        ? 'extracted_text is ONE WINDOW of each document. To read the whole thing, re-call with the ready-made `next_page.documents` until coverage.complete is true — do NOT conclude a clause is absent from a partial window. text_availability says why text is or is not here: complete | partial (page on) | extraction_failed | file_unavailable | extraction_capped (the file tail was never extracted — only download_url can reach it). download_url is a short-lived (~1h) link to the raw PDF/DOCX.'
+        ? 'extracted_text is ONE WINDOW of each document. To read the whole thing, keep re-calling with the ready-made `next_page` (pass its document_ids AND documents) and STOP when next_page is null — that, not coverage.complete, is the end of the package. `coverage` describes the CURRENT response only (coverage.scoped=true means it covered part of the notice). Do NOT conclude a clause is absent from a partial window. text_availability says why text is or is not here: complete | partial (page on) | extraction_failed | file_unavailable | extraction_capped (the file tail was never extracted — only download_url can reach it). download_url is a short-lived (~1h) link to the raw PDF/DOCX.'
         : 'No grounded documents; tell the user none were found rather than inventing solicitation content.',
       key_caveats: [
-        'coverage.complete=false means text is still unread — say so instead of implying you read the full package.',
+        'next_page !== null means text is still unread — say so instead of implying you read the full package. coverage.complete describes THIS response, not everything you have read so far.',
         'A clause missing from a PARTIAL window is UNKNOWN, not absent. Page to the end before stating a solicitation lacks something.',
         'text_availability="extraction_capped" means the end of the FILE was never extracted; paging cannot recover it, the raw download can.',
         'Coverage is measured in CHARACTERS. Do NOT convert it to pages — no char→page mapping is stored, so "N of M pages" would be invented.',

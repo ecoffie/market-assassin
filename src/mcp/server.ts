@@ -858,8 +858,8 @@ server.registerTool(
     description:
       'Full text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, notice body, and every ' +
       'attachment. Returns a WINDOW of extracted_text per document + a short-lived signed download_url (~1h) to the ' +
-      'full raw PDF/DOCX. PAGING: when coverage.complete is false, re-call with next_page.documents until it is ' +
-      'true. A clause absent from a PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never ' +
+      'full raw PDF/DOCX. PAGING: while next_page is non-null, re-call with next_page (its document_ids AND ' +
+      'documents) — STOP when next_page is null. A clause absent from a PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never ' +
       'convert it to pages. Cold notices are downloaded + extracted on demand. grounded=false when the notice has ' +
       'no text/attachments.',
     inputSchema: {

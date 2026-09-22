@@ -87,6 +87,12 @@ export interface SolicitationDocument {
   extraction_capped: boolean;
   /** Mechanical extraction succeeded but produced unusable text (see quality). */
   extraction_quality: ExtractionQuality;
+  /**
+   * True when char_count (recorded at extraction) is LARGER than the text on
+   * hand — the stored text is a truncated remnant, so this document is treated
+   * as extraction_capped rather than reported complete.
+   */
+  text_shorter_than_recorded: boolean;
   /** 0..1 share of ordinary readable characters; low = encoding failure. */
   text_readable_ratio: number | null;
   download_url: string | null; // signed Storage URL (~1h) or public SAM fallback
@@ -127,6 +133,7 @@ export interface SolicitationDocumentsResult {
     documents_not_requested: number;
     /** True when document_ids narrowed the response to part of the notice. */
     scoped: boolean;
+
   };
 }
 
@@ -201,12 +208,16 @@ function windowText(
     // No text at all: say WHY. An empty string alone can't distinguish
     // "the file isn't retrievable" from "we have it but couldn't parse it".
     availability = opts.extractionFailed ? 'extraction_failed' : 'file_unavailable';
+  } else if (hasMore) {
+    // "More text exists" outranks a quality verdict: a long unusable document is
+    // still PARTIAL, and saying otherwise both hides next_offset from the reader
+    // and double-counts it as unavailable AND with-more-text in the rollup.
+    // The quality verdict is not lost — extraction_quality carries it verbatim.
+    availability = 'partial';
   } else if (opts.quality !== 'ok') {
     // Non-empty but not the document's words. Reporting this 'complete' is what
     // lets a downstream extractor invent requirements to fill the gap.
     availability = opts.quality === 'container_stub' ? 'container_stub' : 'unreadable_encoding';
-  } else if (hasMore) {
-    availability = 'partial';
   } else if (opts.extractionCapped) {
     // We delivered everything STORED, but extraction itself stopped early, so
     // the end of the FILE is still unread. Never call that 'complete'.
@@ -272,11 +283,18 @@ async function toOutputDocs(
       const offset = spec.offset ?? req.textOffset ?? 0;
       const limit = spec.limit ?? req.textLimit ?? INLINE_CAP;
       const full = m.extractedText || '';
+      const quality = classifyExtraction(full);
+      // The DB's char_count and the text we actually hold can disagree (a row
+      // written by an older/partial extraction). Resolving that silently toward
+      // the shorter string would let a 1k excerpt of a 500k document report
+      // 'complete'. Treat a larger recorded length as evidence that the stored
+      // text is itself incomplete.
+      const recorded = typeof m.charCount === 'number' ? m.charCount : null;
+      const storedShortOfRecord = recorded !== null && full.length > 0 && recorded > full.length;
       // The extractor stops at a fixed ceiling; a stored length sitting exactly
       // ON it means the tail of the file was never read. Paging can't recover
       // that — only the raw file can — so it must not be reported 'complete'.
-      const extractionCapped = full.length >= EXTRACTION_CEILING_CHARS;
-      const quality = classifyExtraction(full);
+      const extractionCapped = full.length >= EXTRACTION_CEILING_CHARS || storedShortOfRecord;
       const w = windowText(full, offset, limit, {
         extractionCapped,
         hadFile: Boolean(m.storagePath || m.samUrl),
@@ -296,6 +314,8 @@ async function toOutputDocs(
         document_id: m.fileId,
         extraction_capped: extractionCapped,
         extraction_quality: quality,
+        /** Recorded length exceeds the text we hold — stored text is incomplete. */
+        text_shorter_than_recorded: storedShortOfRecord,
         text_readable_ratio: full.length > 0 ? Number(readableRatio(full).toFixed(2)) : null,
         download_url: url,
         download_source: source,
@@ -305,6 +325,26 @@ async function toOutputDocs(
 }
 
 /** Roll per-document availability up to one notice-level answer. */
+/**
+ * Roll per-document availability up to ONE notice-level answer.
+ *
+ * ⚠️ `complete` describes THIS RESPONSE, not the caller's accumulated reading.
+ * The call is stateless: it cannot know what earlier calls returned. Two wrong
+ * answers were tried before this. Judging only the returned subset let a
+ * one-document scoped read report complete=true while the rest of the notice
+ * was unread (false positive). Then requiring every notice document in the
+ * response made `complete` UNREACHABLE on any multi-document notice, because
+ * next_page deliberately scopes each continuation to the documents that still
+ * have text — a fully-read 7-document VA package finished 8 calls still
+ * reporting complete=false (false negative). Inferring what was "already read"
+ * from the current window cannot work either: a long document finished on an
+ * earlier call carries no offset in the continuation.
+ *
+ * So `complete` is scoped-honest — true only when this response delivered every
+ * document it covered AND covered the whole notice — and **`next_page === null`
+ * is the termination signal** for a paging loop. Both are documented that way
+ * on the tool, and `scoped` tells the caller which kind of answer this is.
+ */
 function summarize(
   documents: SolicitationDocument[],
   totalOnNotice: number,
@@ -329,8 +369,8 @@ function summarize(
     documents_extraction_capped: capped,
     documents_not_requested: Math.max(0, totalOnNotice - documents.length),
     scoped: totalOnNotice > documents.length,
-    // Honest: capped/unavailable docs, OR documents the caller scoped OUT, mean
-    // the NOTICE is not fully delivered. A scoped read is never 'complete'.
+    // Scoped-honest (see the note above): every document in this response was
+    // fully delivered AND this response covered the whole notice.
     complete:
       documents.length > 0 && complete === documents.length && totalOnNotice === documents.length,
   };

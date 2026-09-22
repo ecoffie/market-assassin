@@ -1,5 +1,6 @@
 /** VA 36C24226Q0857 — primary acceptance case. */
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 import { fetchNoticeResources } from '../../src/lib/sam/fetch-notice-resources';
 import { getRotatedSAMKey } from '../../src/lib/sam/utils';
 import { solicitationDocuments } from '../../src/mcp/tools/solicitation-documents';
@@ -12,7 +13,14 @@ const chk = (name: string, ok: boolean, detail = '') => { console.log(`${ok?'PAS
 const key = await getRotatedSAMKey() as string;
 const app = await fetchNoticeResources(NID, key) ?? [];
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-await sb.from('mcp_external_cache').delete().eq('api_type','solicitation_docs');
+// Evict ONLY this notice's cache row so the run re-extracts. The earlier form
+// deleted every solicitation_docs row for EVERY notice — an unscoped prod
+// delete inside a script presented as read-only acceptance. Key derivation
+// mirrors external-cache.ts: md5(`${apiType}:${sortedParamsJson}`).
+const cacheKey = createHash('md5')
+  .update(`solicitation_docs:${JSON.stringify({ noticeId: NID })}`)
+  .digest('hex');
+await sb.from('mcp_external_cache').delete().eq('cache_key', cacheKey);
 const mcp: any = await solicitationDocuments({ notice_id: NID, text_limit: 120_000 });
 const appIds = new Set(app.map(a=>a.fileId!)); const mcpIds = new Set<string>(mcp.documents.map((d:any)=>d.document_id));
 chk('inventory count matches', app.length===mcp.documents.length, `app=${app.length} mcp=${mcp.documents.length}`);
@@ -35,7 +43,8 @@ for (const d of mcp.documents) {
 chk('exact text reconstruction (assembled === char_count for every doc)', exact, `${calls} calls`);
 // A single response is deliberately BOUNDED (MAX_WINDOW_CHARS), so the real
 // contract is: paging terminates, and when it does nothing is left unread.
-chk('paging terminates (next_page === null)', r.next_page===null);
+chk('paging terminates on the documented signal (next_page === null)', r.next_page===null);
+chk('no unread text remains at termination', r.documents.every((d:any)=>!d.text_window.has_more));
 chk('no document reports unread text after paging',
   mcp.documents.every((d:any)=>{ const got=(acc.get(d.document_id)||'').length; return d.char_count==null || got>=d.char_count; }));
 

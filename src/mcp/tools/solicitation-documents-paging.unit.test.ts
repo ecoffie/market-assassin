@@ -188,6 +188,34 @@ describe('get_solicitation_documents — full-document access', () => {
     expect(second.documents[0].document_id).toBe('file-solicitation');
   });
 
+  it('a MULTI-document notice pages to the end and terminates on next_page=null', async () => {
+    // The suite's other completeness assertions use a SINGLE-document fixture,
+    // where scoping is a no-op — so they could not see that a scoped
+    // continuation makes coverage.complete unreachable on a real notice. This
+    // asserts the DOCUMENTED terminator instead: next_page goes null and no
+    // document is left reporting unread text.
+    mockWarm.mockResolvedValue({
+      data: [
+        warmRows[0],
+        { ...warmRows[0], sam_file_id: 'file-b', filename: 'WD.docx', extracted_text: 'x'.repeat(45_000), char_count: 45_000, page_count: null },
+        { ...warmRows[0], sam_file_id: 'file-short', filename: 'Exhibit.docx', extracted_text: 'short', char_count: 5, page_count: null },
+      ],
+    });
+    let res = await solicitationDocuments({ notice_id: NOTICE, text_limit: 20_000 });
+    let calls = 1;
+    while (res.next_page && calls < 60) {
+      res = await solicitationDocuments({
+        notice_id: NOTICE,
+        document_ids: res.next_page.document_ids,
+        documents: res.next_page.documents,
+      });
+      calls++;
+    }
+    expect(res.next_page).toBeNull();
+    expect(res.documents.every((d) => !d.text_window.has_more)).toBe(true);
+    expect(calls).toBeGreaterThan(1); // it really did page
+  });
+
   it('a SCOPED read is never "complete" — a subset is not the package', async () => {
     mockWarm.mockResolvedValue({
       data: [
