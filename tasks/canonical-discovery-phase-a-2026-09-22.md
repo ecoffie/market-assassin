@@ -1,5 +1,10 @@
 # Canonical Mindy Discovery — Phase A (decisions locked, 2026-09-22)
 
+> **Superseded in part by Phase B** (`tasks/canonical-discovery-phase-b-2026-09-22.md`): the matcher gained a
+> `cybersecurity` concept (cyber ≡ cybersecurity, per MCP CYBER_DIRECT_RE) and case-sensitive acronyms
+> (IT/AI/ML/HR/QA). Counts below for cyber / IT / ai queries predate that; the Phase B replay is current.
+> Re-run `scripts/discovery-saved-search-blast.ts` before the saved-search migration.
+
 **Status:** seam, golden fixtures and measurement tooling built. **No production consumer changed** —
 nothing in MCP, Maps, saved searches or alerts calls `src/lib/discovery` yet.
 Audit that started this: `tasks/map-mcp-discovery-audit-2026-09-22.md`.

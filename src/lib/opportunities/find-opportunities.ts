@@ -6,38 +6,36 @@
  * Does NOT change map viewport APIs. Cross-class dedupe is intentionally absent.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import {
-  applyMapFilters,
-  parseMapFilters,
-  parseStateList,
-  naicsMatchConds,
-  NO_MATCH_SENTINEL,
-} from '@/lib/opportunities/map-filters';
-import { applyForecastFilters } from '@/lib/opportunities/map-data';
-import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
-import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
-import { normalizeStateCode } from '@/lib/utils/us-states';
-import { currentFiscalYear } from '@/lib/forecasts/query';
 import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
 import {
   interpretMarket,
   classifyRecord,
   evidenceWhy,
-  dualBuyerOrExpr,
-  pipeNeedles,
-  retrievalNaics,
-  retrievalPsc,
   plainEnglishInterpretation,
   type EvidenceClass,
   type MarketInterpretation,
 } from '@/lib/opportunities/market-interpretation';
 import {
   OPEN_FETCH_CAP,
-  openCandidateOrExpr,
+  classifyOpenRecord,
+  type OpenRelevanceClass,
   openEvidenceWhy,
   openEvidenceCounts,
-  rankOpenRows,
 } from '@/lib/opportunities/open-relevance';
+// Canonical Mindy Discovery (2026-09-22, Phase B): MCP is the first production consumer.
+// Meaning + eligibility come from the plan; this file owns only MCP surface policy + presentation.
+import {
+  buildDiscoveryPlan,
+  applyOpenPlan,
+  applyRecompetePlan,
+  applyForecastPlan,
+  rankRecords,
+  matchesText,
+  MCP_POLICY,
+  type DiscoveryInput,
+  type DiscoveryPlan,
+  type SurfacePolicy,
+} from '@/lib/discovery';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -151,6 +149,10 @@ export interface FindOpportunitiesResult {
     expansion_note: string;
     watch_coverage: Array<'open_now' | 'coming_soon'>;
     find_shape: 'specific' | 'broad';
+    /** Credit integrity: set only when the tool knows the request could not be performed as asked. */
+    billing_outcome?: 'nonbillable_invalid_input';
+    /** Which canonical discovery plan ran (audit trail; MCP is a consumer of src/lib/discovery). */
+    discovery?: { plan_version: number; status: string; refinement: string | null; eligibility: string };
   };
   _next: FindNextAction[];
   presentation: {
@@ -309,13 +311,13 @@ async function tableAsOf(client: SupabaseClient, table: string, col: string): Pr
 }
 
 type InterpretedQuery = {
+  /** What the customer asked, verbatim (presentation only — never re-parsed downstream). */
   searchText: string;
+  /** The canonical discovery plan. Every horizon executes THIS; none re-reads the query. */
+  plan: DiscoveryPlan;
   stateCode: string | null;
   agency: string;
-  agencyNeedles: string[];
   setAside: string;
-  advancedNaics: string;
-  advancedPsc: string;
   openClosingDays: number;
   recompeteMonths: number;
   forecastIncludePast: boolean;
@@ -323,65 +325,144 @@ type InterpretedQuery = {
   interpreted: Record<HorizonKey, string>;
 };
 
-/** Resolve customer query into per-horizon filter bags (Maps search brain + P3 interpretation). */
-function interpretQuery(input: FindOpportunitiesInput): InterpretedQuery {
-  const searchText = (input.advanced?.keyword_exact || input.query || '').trim();
-  const stateRaw = (input.location || '').trim();
-  const stateCode = stateRaw ? normalizeStateCode(stateRaw) : null;
-  const agency = (input.agency || '').trim();
-  const setAside = (input.set_aside || '').trim();
-  const advancedNaics = (input.advanced?.naics || '').trim();
-  const advancedPsc = (input.advanced?.psc || '').trim();
+/**
+ * MCP's explicit SURFACE policy on top of the shared MCP_POLICY default. The customer's timeframe
+ * narrows the horizons; it never changes what the query means.
+ */
+export function mcpDiscoveryPolicy(input: FindOpportunitiesInput): SurfacePolicy {
   const openClosingDays = Math.max(0, Number(input.timeframe?.open_closing_days) || 0);
   const recompeteMonths = Math.min(60, Math.max(1, Number(input.timeframe?.recompete_months) || 18));
-  const forecastIncludePast = !!input.timeframe?.forecast_include_past;
-
-  const market = interpretMarket(searchText, agency || null);
-  const agencyNeedles = market.buyer.needles.length ? market.buyer.needles : (agency ? [agency] : []);
-  const intent = resolveQueryIntent(searchText);
-  const toa = intent.kind === 'keyword' ? termOfArtNaicsCodes(searchText) : null;
-  const related = market.capability.related_market;
-
   return {
-    searchText,
-    stateCode,
-    agency,
-    agencyNeedles,
-    setAside,
-    advancedNaics,
-    advancedPsc,
-    openClosingDays,
+    ...MCP_POLICY,
+    open: { ...MCP_POLICY.open, ...(openClosingDays ? { closingDays: openClosingDays } : {}) },
+    recompete: { windowMonths: recompeteMonths },
+    forecast: { includePastFiscalYears: !!input.timeframe?.forecast_include_past },
+  };
+}
+
+/**
+ * MCP arguments → the canonical discovery input. `advanced.keyword_exact` is an EXACT phrase
+ * request, so it reaches the plan quoted (the plan treats a fully quoted query as literal).
+ */
+export function mcpDiscoveryInput(input: FindOpportunitiesInput): DiscoveryInput {
+  const exact = String(input.advanced?.keyword_exact || '').replace(/"/g, ' ').trim();
+  return {
+    query: exact ? `"${exact}"` : String(input.query || '').trim(),
+    agency: String(input.agency || '').trim() || null,
+    state: String(input.location || '').trim() || null,
+    setAside: String(input.set_aside || '').trim() || null,
+    naics: String(input.advanced?.naics || '').trim() || null,
+    psc: String(input.advanced?.psc || '').trim() || null,
+  };
+}
+
+function eligibilityLabel(plan: DiscoveryPlan): string {
+  const m = plan.matcher;
+  if (m.mode === 'exact_phrase') return `exact phrase "${m.phrase}"`;
+  if (m.mode === 'code') return `code ${m.phrase}`;
+  if (m.mode !== 'lexical') return 'no text concept';
+  return m.alternatives
+    .map((a) => `${a.eligibility === 'all' ? 'ALL' : 'ANY'}(${a.eligible.map((c) => c.label).join(' · ')})${a.rankOnly.length ? ` rank-only(${a.rankOnly.map((c) => c.label).join(' · ')})` : ''}`)
+    .join(' OR ');
+}
+
+/** What the plan consumed — derived from the plan, never hand-maintained per horizon. */
+function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey): string[] {
+  const out = [`canonical_discovery:v${plan.version}`, `eligibility:${eligibilityLabel(plan)}`];
+  if (plan.buyers.length) out.push(`agency→identity_words(${plan.buyers.map((b) => b.requested).join('|')})`);
+  if (plan.states.length) out.push(`location→${horizon === 'open_now' ? 'pop_or_office' : horizon === 'coming_back' ? 'place_of_performance_state' : 'pop_state'}(${plan.states.join('|')})`);
+  if (plan.setAsides.length) out.push(`set_aside→${plan.setAsides.join('|')}`);
+  if (plan.naics.length) out.push(`naics→${plan.naics.join('|')}`);
+  if (plan.psc.length) out.push(`psc→${plan.psc.join('|')}`);
+  if (plan.matcher.excluded.length) out.push(`exclude→${plan.matcher.excluded.map((c) => c.label).join('|')}`);
+  if (plan.intent.stripped.length) out.push(`stripped→${plan.intent.stripped.join('|')}`);
+  if (horizon === 'open_now') {
+    out.push('status=active');
+    if (plan.horizons.open.via === 'text_or_taxonomy') out.push('query→text∪direct_taxonomy');
+    if (plan.policy.open.closingDays) out.push(`timeframe.open_closing_days=${plan.policy.open.closingDays}`);
+  } else if (horizon === 'coming_back') {
+    out.push('quality_flag=null', 'pop_end≥today', `recompete_via=${plan.horizons.recompete.via}`, `timeframe.recompete_months=${plan.policy.recompete.windowMonths}`);
+  } else {
+    out.push(plan.policy.forecast.includePastFiscalYears ? 'timeframe.forecast_include_past' : 'exclude_past_fy', `forecast_via=${plan.horizons.forecast.via}`);
+  }
+  out.push('rank→evidence_tier·breadth·score·date');
+  return out;
+}
+
+/** Resolve the customer request through CANONICAL DISCOVERY (src/lib/discovery). */
+function interpretQuery(input: FindOpportunitiesInput): InterpretedQuery {
+  const policy = mcpDiscoveryPolicy(input);
+  const plan = buildDiscoveryPlan(mcpDiscoveryInput(input), policy);
+  const keywordText = plan.intent.residualKind === 'keyword' ? plan.intent.residual.replace(/^"|"$/g, '') : '';
+  const primaryAgency = String(input.agency || '').trim() || plan.buyers[0]?.requested || null;
+  // Presentation + evidence labelling: the SAME capability the plan retrieved with, plus the buyer.
+  const market = interpretMarket(keywordText, primaryAgency);
+  const recompeteMonths = policy.recompete.windowMonths ?? 18;
+  const elig = eligibilityLabel(plan);
+  return {
+    searchText: String(input.advanced?.keyword_exact || input.query || '').trim(),
+    plan,
+    stateCode: plan.states.length ? plan.states.join(',') : null,
+    agency: plan.buyers.map((b) => b.requested).join(', '),
+    setAside: String(input.set_aside || '').trim() || plan.setAsides.join(','),
+    openClosingDays: policy.open.closingDays || 0,
     recompeteMonths,
-    forecastIncludePast,
+    forecastIncludePast: policy.forecast.includePastFiscalYears,
     market,
     interpreted: {
-      open_now:
-        `SAM active notices; keyword via search brain (${intent.kind}) OR interpreted DIRECT NAICS/PSC; ` +
-        `rank DIRECT → RELATED → deadline; ` +
-        `buyer = department OR sub_tier` +
-        (agencyNeedles.length ? ` (normalized ${agencyNeedles.length} spellings)` : '') +
-        `; geo = place-of-performance OR buying-office state` +
-        (stateCode ? ` (${stateCode})` : ''),
-      coming_back:
-        `Real future recompetes; ` +
-        (related
-          ? `direct taxonomy + related-market NAICS (labeled, not claimed as the requested capability)`
-          : market.capability.direct.naics.length
-            ? `industry-preset NAICS`
-            : toa?.length
-              ? 'term-of-art NAICS'
-              : intent.kind) +
-        `; buyer = awarding_agency OR awarding_sub_agency` +
-        `; geo = place_of_performance_state only` +
-        (stateCode ? ` (${stateCode})` : '') +
-        `; window ≤${recompeteMonths}mo`,
-      coming_soon:
-        `agency_forecasts (Maps universe, exclude past FY` +
-        `${forecastIncludePast ? ' DISABLED' : ''}); geo = pop_state only` +
-        (stateCode ? ` (${stateCode})` : '') +
-        `; no status=forecasted requirement; unresolved publisher → unavailable not zero`,
+      open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance OR buying-office state; rank = evidence tier → breadth → score → deadline`,
+      coming_back: `Canonical discovery (${plan.horizons.recompete.via}): ${elig}; buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window ≤${recompeteMonths}mo`,
+      coming_soon: `Canonical discovery (${plan.horizons.forecast.via}): ${elig}; agency = forecast identity codes; geo = pop_state; ${policy.forecast.includePastFiscalYears ? 'past fiscal years INCLUDED (opt-in)' : 'current + future fiscal years'}; unresolved publisher → unavailable, not zero`,
     },
   };
+}
+
+/** A plan that cannot define a market (exclusion-only / nothing recognizable). Never a market zero. */
+function blockedHorizon(source: string, handoffs: HandoffKey[], plan: DiscoveryPlan): HorizonResult {
+  return {
+    status: 'unavailable',
+    matched_count: null,
+    returned_count: 0,
+    items: [],
+    source,
+    as_of: null,
+    filters_consumed: [`canonical_discovery:v${plan.version}`, `status:${plan.status}`],
+    filters_unsupported: [],
+    unmapped_count: null,
+    error: { class: plan.status, message: plan.refinement || 'The query needs a positive scope.' },
+    allowed_handoffs: handoffs,
+    semantics_note: 'Not searched: the request only excludes or names nothing searchable. This is a refinement ask — not zero demand.',
+  };
+}
+
+const OPEN_TIER: Record<string, number> = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 1, WEAK_NON_MARKET: 2 };
+
+/**
+ * MCP evidence label for an Open row. MCP's labeller (classifyOpenRecord) stays authoritative for
+ * cyber (physical-security exclusion, related-market IT). Two gaps it had, both measured in the
+ * Phase B replay, are closed from the canonical plan:
+ *   - a plan with NO text concept (buyer / state / NAICS / set-aside only): every admitted row IS
+ *     the requested market. The old labeller called all 280 VA notices for "veterans affairs"
+ *     WEAK_NON_MARKET ("does not establish this market").
+ *   - a non-cyber text query whose eligibility is satisfied in the row's VISIBLE text: that is
+ *     direct textual evidence. The old labeller required every ≥3-letter token, so real
+ *     "AI Governance" titles were WEAK (the 2-letter "ai" never counted).
+ * A row admitted only via sow_text (not returned to the host) stays WEAK — the evidence isn't shown.
+ */
+function openEvidenceClass(row: Record<string, unknown>, plan: DiscoveryPlan, cap: MarketInterpretation['capability']): OpenRelevanceClass {
+  const cls = classifyOpenRecord({
+    title: String(row.title || ''),
+    description: String(row.description || ''),
+    naics_code: (row.naics_code as string) || '',
+    psc_code: (row.psc_code as string) || '',
+    department: String(row.department || ''),
+    solicitation_number: String(row.solicitation_number || ''),
+    response_deadline: (row.response_deadline as string) || null,
+  }, cap);
+  if (cls !== 'WEAK_NON_MARKET' || cap.kind === 'cyber_with_related_it') return cls;
+  if (plan.matcher.mode === 'none') return 'DIRECT_MATCH';
+  if (matchesText(plan.matcher, [row.title as string, row.description as string, row.department as string, row.solicitation_number as string])) return 'DIRECT_MATCH';
+  return cls;
 }
 
 async function queryOpenNow(
@@ -390,97 +471,52 @@ async function queryOpenNow(
   limit: number,
 ): Promise<HorizonResult> {
   const source = 'sam_opportunities';
-  const consumed: string[] = ['query', 'status=active'];
+  if (p.plan.status !== 'ok') return blockedHorizon(source, OPEN_HANDOFFS, p.plan);
+  const consumed = consumedFor(p.plan, 'open_now');
   const unsupported: string[] = [];
   const asOf = await tableAsOf(client, source, 'updated_at');
 
   try {
     const cap = p.market.capability;
-    const searchIntent = p.searchText ? resolveQueryIntent(p.searchText) : { kind: 'empty' as const };
-    const keywordPath = searchIntent.kind === 'keyword' || searchIntent.kind === 'empty';
-    const get = (k: string): string | null => {
-      // Keyword path: skip search here and apply keyword∪DIRECT-taxonomy as ONE .or()
-      // (a second PostgREST .or() would AND and drop Help Desk / DistillerSR).
-      if (k === 'q' || k === 'search') return keywordPath ? null : p.searchText || null;
-      if (k === 'state') return p.stateCode || null;
-      if (k === 'agency') return p.agencyNeedles.length ? pipeNeedles(p.agencyNeedles) : (p.agency || null);
-      if (k === 'setAside') return p.setAside || null;
-      if (k === 'naics') return p.advancedNaics || null;
-      if (k === 'psc') return p.advancedPsc || null;
-      if (k === 'status') return 'active';
-      if (k === 'closingDays') return p.openClosingDays > 0 ? String(p.openClosingDays) : null;
-      return null;
-    };
-    const f = parseMapFilters(get);
-    const candidateOr = keywordPath ? openCandidateOrExpr(p.searchText, cap) : null;
-    if (p.searchText) consumed.push(keywordPath ? 'query→search_brain∪direct_taxonomy' : 'query→search_brain');
-    consumed.push('query→open_relevance_rank');
-    if (p.stateCode) consumed.push('location→pop_or_office');
-    if (p.agency) consumed.push(p.market.buyer.kind === 'normalization' ? 'agency→normalized_buyer' : 'agency');
-    if (p.setAside) consumed.push('set_aside');
-    if (p.advancedNaics) consumed.push('advanced.naics');
-    if (p.advancedPsc) consumed.push('advanced.psc');
-    if (p.openClosingDays > 0) consumed.push('timeframe.open_closing_days');
-
     const COLS =
       'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, updated_at';
 
-    const applyOpen = (q: any) => {
-      let next = applyMapFilters(q, f);
-      if (candidateOr) next = next.or(candidateOr);
-      return next;
-    };
-
+    // Candidate window: deadline-ordered, capped (OPEN_FETCH_CAP measured), then ranked.
     const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
-    let listQ = client.from(source).select(COLS, { count: 'exact' });
-    listQ = applyOpen(listQ);
-    const { data, count, error } = await listQ
+    const { data, count, error } = await applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan)
       .order('response_deadline', { ascending: true, nullsFirst: false })
       .limit(fetchCap);
-
     if (error) return unavailable(source, OPEN_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
     {
-      let uq = client.from(source).select('notice_id', { count: 'exact', head: true }).is('map_lat', null);
-      uq = applyOpen(uq);
-      const { count: uc, error: ue } = await uq;
+      const { count: uc, error: ue } = await applyOpenPlan(client.from(source).select('notice_id', { count: 'exact', head: true }), p.plan).is('map_lat', null);
       if (!ue) unmapped = uc ?? null;
     }
 
-    const matched = count ?? null;
     const rows = (data || []) as Array<Record<string, unknown>>;
     if (!rows.length) {
-      return emptyHorizon(
-        source,
-        OPEN_HANDOFFS,
-        consumed,
-        unsupported,
-        asOf,
-        'No matching open solicitations under these filters.',
-        unmapped,
-      );
+      return emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, 'No matching open solicitations under these filters.', unmapped);
     }
 
-    const ranked = rankOpenRows(
-      rows.map((r) => ({
-        title: String(r.title || ''),
-        description: String(r.description || ''),
-        naics_code: (r.naics_code as string) || '',
-        psc_code: (r.psc_code as string) || '',
-        department: String(r.department || ''),
-        solicitation_number: String(r.solicitation_number || ''),
-        response_deadline: (r.response_deadline as string) || null,
-        _raw: r,
-      })),
-      cap,
-    );
+    // Stage 5 ranking: MCP evidence tier (surface labelling) → canonical breadth → score → deadline.
+    const scores = new Map(rankRecords(p.plan, rows, ['title', 'description', 'department']).map((s) => [s.row, s]));
+    const ranked = rows
+      .map((r, i) => ({
+        i,
+        row: r,
+        cls: openEvidenceClass(r, p.plan, cap),
+        s: scores.get(r),
+      }))
+      .sort((a, b) => OPEN_TIER[a.cls] - OPEN_TIER[b.cls]
+        || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0)
+        || (b.s?.score ?? 0) - (a.s?.score ?? 0)
+        || a.i - b.i);
     const evidence_counts = openEvidenceCounts(ranked);
     const sliced = ranked.slice(0, limit);
     const phrase = p.searchText || 'this work';
 
-    const items: HorizonItem[] = sliced.map(({ row, cls }) => {
-      const r = row._raw;
+    const items: HorizonItem[] = sliced.map(({ row: r, cls }) => {
       const office = r.office_address as { city?: string; state?: string } | null;
       const st = String(r.pop_state || office?.state || '');
       const city = String(r.pop_city || office?.city || '');
@@ -510,7 +546,7 @@ async function queryOpenNow(
 
     return {
       status: 'grounded',
-      matched_count: matched,
+      matched_count: count ?? null,
       returned_count: items.length,
       items,
       source,
@@ -521,7 +557,7 @@ async function queryOpenNow(
       error: null,
       allowed_handoffs: OPEN_HANDOFFS,
       semantics_note:
-        'Ranked DIRECT_MATCH then RELATED_MARKET_CANDIDATE then other matches; deadline sorts inside each tier. Geography: place of performance OR buying-office state.',
+        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.',
       evidence_counts,
     };
   } catch (e) {
@@ -535,153 +571,37 @@ async function queryComingBack(
   limit: number,
 ): Promise<HorizonResult> {
   const source = 'recompete_opportunities';
-  const consumed: string[] = ['quality_flag=null', 'pop_end≥today'];
-  const unsupported: string[] = [];
+  if (p.plan.status !== 'ok') return blockedHorizon(source, BACK_HANDOFFS, p.plan);
+  const consumed = consumedFor(p.plan, 'coming_back');
+  const unsupported = p.plan.notes.filter((n) => n.startsWith('recompete:')).map((n) => n.slice('recompete:'.length).trim());
+  if (p.plan.psc.length && !p.plan.horizons.recompete.naics.length) unsupported.push('psc (recompete psc_code sparse; no NAICS crosswalk)');
   const asOf = await tableAsOf(client, source, 'last_synced_at');
-  const today = new Date().toISOString().slice(0, 10);
-  const bound = new Date();
-  bound.setMonth(bound.getMonth() + p.recompeteMonths);
-  const maxEnd = bound.toISOString().slice(0, 10);
   const cap = p.market.capability;
   const related = cap.related_market;
 
   try {
-    let naics = p.advancedNaics;
-    let qKeyword = '';
-    let qSetAside = '';
-    const q = p.searchText;
-    const pinnedNaics = retrievalNaics(cap);
-    const pinnedPsc = retrievalPsc(cap);
-    const usePinned = !naics && pinnedNaics.length > 0;
-
-    if (q && !naics) {
-      const intent = resolveQueryIntent(q);
-      if (intent.kind === 'setAside' && intent.setAside) {
-        qSetAside = setAsideOrExpr(intent.setAside, { textCols: ['set_aside_type'] }) || '';
-        consumed.push('query→set_aside');
-      } else if (intent.kind === 'naics' && intent.naics?.length) {
-        naics = intent.naics.join(',');
-        consumed.push('query→naics');
-      } else if (intent.kind === 'psc' && intent.psc) {
-        const xw = pscToNaicsCodes(intent.psc);
-        if (xw.length) {
-          naics = xw.join(',');
-          consumed.push('query→psc→naics_crosswalk');
-        } else {
-          qKeyword = intent.psc;
-          unsupported.push('psc (column ~empty; no NAICS crosswalk)');
-          consumed.push('query→keyword_fallback');
-        }
-      } else if (usePinned) {
-        naics = pinnedNaics.join(',');
-        consumed.push(
-          related
-            ? 'query→direct_taxonomy+related_market_naics'
-            : 'query→industry_preset_naics',
-        );
-        if (related) consumed.push('related_market_labeled_not_claimed');
-      } else {
-        const toa = termOfArtNaicsCodes(q);
-        if (toa?.length) {
-          naics = toa.join(',');
-          consumed.push('query→term_of_art_naics');
-        } else {
-          qKeyword = q;
-          consumed.push('query→incumbent/naics_desc/agency');
-        }
-      }
-    } else if (q) {
-      consumed.push('query_ignored_advanced_naics_set');
-    }
-
-    if (p.advancedPsc) {
-      unsupported.push('advanced.psc (recompete psc_code sparse — not applied)');
-    }
-    if (p.stateCode) consumed.push('location→place_of_performance_state');
-    if (p.agency) {
-      consumed.push(
-        p.market.buyer.kind === 'normalization'
-          ? 'agency→awarding_agency_or_sub_normalized'
-          : 'agency→awarding_agency_or_sub',
-      );
-    }
-    if (p.setAside && !qSetAside) {
-      consumed.push('set_aside');
-    }
-    consumed.push(`timeframe.recompete_months=${p.recompeteMonths}`);
-
-    const buyerNeedles = p.agencyNeedles;
-    const buyerExpr = buyerNeedles.length
-      ? dualBuyerOrExpr('awarding_agency', 'awarding_sub_agency', buyerNeedles)
-      : '';
-
-    const capOrParts: string[] = [];
-    if (naics) {
-      const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
-      capOrParts.push(...naicsMatchConds(codes));
-    }
-    if (usePinned && pinnedPsc.length && !p.advancedPsc) {
-      for (const code of pinnedPsc) capOrParts.push(`psc_code.eq.${code}`);
-      consumed.push('direct_psc_if_populated');
-    }
-    if (usePinned && cap.direct.terms.length && related) {
-      for (const t of cap.direct.terms) {
-        const esc = t.replace(/[%,()]/g, ' ').trim();
-        if (esc.length < 3) continue;
-        capOrParts.push(
-          `incumbent_name.ilike.%${esc}%`,
-          `naics_description.ilike.%${esc}%`,
-          `description.ilike.%${esc}%`,
-        );
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apply = (query: any) => {
-      query = query
-        .is('quality_flag', null)
-        .gte('period_of_performance_current_end', today)
-        .lte('period_of_performance_current_end', maxEnd);
-      if (buyerExpr) query = query.or(buyerExpr);
-      if (capOrParts.length) query = query.or(capOrParts.join(','));
-      const states = parseStateList(p.stateCode);
-      if (states) {
-        if (states.length) query = query.or(states.map((st) => `place_of_performance_state.eq.${st}`).join(','));
-        else query = query.eq('place_of_performance_state', NO_MATCH_SENTINEL);
-      }
-      if (qSetAside) query = query.or(qSetAside);
-      else if (p.setAside) query = query.ilike('set_aside_type', `%${p.setAside.replace(/[%,()]/g, ' ')}%`);
-      if (qKeyword) {
-        const esc = qKeyword.replace(/[%,()]/g, ' ');
-        query = query.or(
-          `incumbent_name.ilike.%${esc}%,naics_description.ilike.%${esc}%,awarding_agency.ilike.%${esc}%,awarding_sub_agency.ilike.%${esc}%`,
-        );
-      }
-      return query;
-    };
-
     const COLS =
       'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at';
 
+    // MCP surface policy (unchanged): soonest-ending first; wider window only for related-market.
     const fetchCap = Math.max(limit, related ? 200 : limit);
-    let listQ = apply(client.from(source).select(COLS, { count: 'exact' }));
-    const { data, count, error } = await listQ
+    const { data, count, error } = await applyRecompetePlan(client.from(source).select(COLS, { count: 'exact' }), p.plan)
       .order('period_of_performance_current_end', { ascending: true })
       .limit(fetchCap);
-
     if (error) return unavailable(source, BACK_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
     {
-      let uq = apply(client.from(source).select('contract_id', { count: 'exact', head: true })).is('map_lat', null);
-      const { count: uc, error: ue } = await uq;
+      const { count: uc, error: ue } = await applyRecompetePlan(client.from(source).select('contract_id', { count: 'exact', head: true }), p.plan).is('map_lat', null);
       if (!ue) unmapped = uc ?? null;
     }
 
     const rawRows = (data || []) as Array<Record<string, unknown>>;
-    const classified: Array<{ row: Record<string, unknown>; cls: EvidenceClass }> = [];
+    const scores = new Map(rankRecords(p.plan, rawRows, ['incumbent_name', 'naics_description', 'awarding_agency', 'awarding_sub_agency']).map((s) => [s.row, s]));
+    const classified: Array<{ row: Record<string, unknown>; cls: EvidenceClass; i: number }> = [];
     const evidence_counts = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 0 };
-    for (const row of rawRows) {
+    rawRows.forEach((row, i) => {
+      // MCP evidence labelling (unchanged): physical-only rows in a cyber search carry no class.
       const cls = classifyRecord(
         {
           title: (row.naics_description as string) || (row.piid as string) || '',
@@ -693,28 +613,19 @@ async function queryComingBack(
         },
         cap,
       );
-      if (!cls) continue;
+      if (!cls) return;
       evidence_counts[cls] += 1;
-      classified.push({ row, cls });
-    }
+      classified.push({ row, cls, i });
+    });
     classified.sort((a, b) => {
       if (a.cls !== b.cls) return a.cls === 'DIRECT_MATCH' ? -1 : 1;
-      return String(a.row.period_of_performance_current_end || '').localeCompare(
-        String(b.row.period_of_performance_current_end || ''),
-      );
+      const sa = scores.get(a.row); const sb2 = scores.get(b.row);
+      return (sb2?.breadth ?? 0) - (sa?.breadth ?? 0) || a.i - b.i; // then soonest end (fetch order)
     });
     const sliced = classified.slice(0, limit);
 
     if (!sliced.length) {
-      return emptyHorizon(
-        source,
-        BACK_HANDOFFS,
-        consumed,
-        unsupported,
-        asOf,
-        'No matching future recompetes under these filters.',
-        unmapped,
-      );
+      return emptyHorizon(source, BACK_HANDOFFS, consumed, unsupported, asOf, 'No matching future recompetes under these filters.', unmapped);
     }
 
     const items: HorizonItem[] = sliced.map(({ row: r, cls }) => ({
@@ -772,148 +683,68 @@ async function queryComingSoon(
   limit: number,
 ): Promise<HorizonResult> {
   const source = 'agency_forecasts';
-  const consumed: string[] = ['maps_universe', 'exclude_past_fy'];
+  if (p.plan.status !== 'ok') return blockedHorizon(source, SOON_HANDOFFS, p.plan);
+  const consumed = consumedFor(p.plan, 'coming_soon');
   const unsupported: string[] = [];
   const asOf = await tableAsOf(client, source, 'last_synced_at');
 
   try {
-    if (p.agency) {
-      const forecastRes = resolveForecastAgencies(p.agency);
-      const noneCoverage =
-        !forecastRes.empty &&
-        forecastRes.identities.length > 0 &&
-        forecastRes.identities.every((id) => id.coverage === 'none') &&
-        forecastRes.codes.length === 0 &&
-        forecastRes.children.length === 0 &&
-        forecastRes.unresolved.length === 0;
-      if (noneCoverage) {
-        const id = forecastRes.identities[0];
-        consumed.push('agency→forecast_identity_no_publisher');
-        p.market.truth.what_remains_unsupported.push(
-          `forecast publisher coverage for ${id.label} is not established`,
-        );
-        return {
-          status: 'unavailable',
-          matched_count: null,
-          returned_count: 0,
-          items: [],
-          source,
-          as_of: asOf,
-          filters_consumed: consumed,
-          filters_unsupported: ['agency forecast publisher'],
-          unmapped_count: null,
-          error: {
-            class: 'coverage_unestablished',
-            message:
-              id.note ||
-              `No forecast publisher for ${id.label}. Coverage is not established — not a measured zero.`,
-          },
-          allowed_handoffs: SOON_HANDOFFS,
-          semantics_note:
-            'Coverage not established for this buyer in agency_forecasts. Do not treat as zero demand. Do not substitute parent-department forecasts.',
-        };
+    // Forecast publisher coverage (unchanged MCP contract): a buyer with no publisher is UNAVAILABLE.
+    if (p.plan.horizons.forecast.coverage === 'unestablished') {
+      const first = p.plan.buyers.find((b) => {
+        const fr = resolveForecastAgencies(b.requested);
+        return fr.identities.length > 0 && fr.identities.every((id) => id.coverage === 'none');
+      });
+      const id = first ? resolveForecastAgencies(first.requested).identities[0] : null;
+      if (id) {
+        p.market.truth.what_remains_unsupported.push(`forecast publisher coverage for ${id.label} is not established`);
       }
+      return {
+        status: 'unavailable',
+        matched_count: null,
+        returned_count: 0,
+        items: [],
+        source,
+        as_of: asOf,
+        filters_consumed: [...consumed, 'agency→forecast_identity_no_publisher'],
+        filters_unsupported: ['agency forecast publisher'],
+        unmapped_count: null,
+        error: {
+          class: 'coverage_unestablished',
+          message: id?.note || `No forecast publisher for ${id?.label || 'this buyer'}. Coverage is not established — not a measured zero.`,
+        },
+        allowed_handoffs: SOON_HANDOFFS,
+        semantics_note:
+          'Coverage not established for this buyer in agency_forecasts. Do not treat as zero demand. Do not substitute parent-department forecasts.',
+      };
     }
-
-    // Build search/naics the way Maps applyForecastFilters expects.
-    let q = p.searchText;
-    let naics = p.advancedNaics;
-    if (p.advancedPsc && !naics) {
-      const xw = pscToNaicsCodes(p.advancedPsc);
-      if (xw.length) {
-        naics = xw.join(',');
-        consumed.push('advanced.psc→naics_crosswalk');
-      } else unsupported.push('advanced.psc (no NAICS crosswalk)');
-    }
-    // If free-text is a term-of-art, also feed NAICS so sparse title misses still hit.
-    if (q && !naics) {
-      const intent = resolveQueryIntent(q);
-      if (intent.kind === 'naics' && intent.naics?.length) {
-        naics = intent.naics.join(',');
-        q = '';
-        consumed.push('query→naics');
-      } else if (intent.kind === 'keyword') {
-        const toa = termOfArtNaicsCodes(q);
-        // Keep q for text match; Maps doesn't auto-NAICS on forecast for keyword —
-        // but term-of-art enrichment helps recall without excluding text hits.
-        if (toa?.length) {
-          // Prefer text path (Maps); note enrichment in consumed only when we set naics filter.
-          // Stick to Maps: applyForecastFilters uses q OR naics — if both, both apply (AND).
-          // So for keyword we leave naics empty and use q only (Maps parity).
-          consumed.push('query→forecast_text_brain');
-        } else {
-          consumed.push('query→forecast_text');
-        }
-      } else {
-        consumed.push(`query→${intent.kind}`);
-      }
-    }
-
-    if (p.stateCode) consumed.push('location→pop_state');
-    if (p.agency) consumed.push('agency→source_agency_resolved');
-    if (p.setAside) consumed.push('set_aside');
-    if (p.forecastIncludePast) {
-      consumed.push('timeframe.forecast_include_past');
-      // strip exclude_past_fy marker
-      const i = consumed.indexOf('exclude_past_fy');
-      if (i >= 0) consumed.splice(i, 1);
-    }
-
-    const filters = {
-      q: q || null,
-      naics: naics || null,
-      agency: p.agency || null,
-      state: p.stateCode || null,
-    };
 
     const COLS =
-      'id, title, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, solicitation_date, pop_state, pop_city, map_lat, status, last_synced_at, contracting_office, incumbent_name';
+      'id, title, description, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, solicitation_date, pop_state, pop_city, map_lat, status, last_synced_at, contracting_office, incumbent_name';
 
-    let listQ = client.from(source).select(COLS, { count: 'exact' });
-    listQ = applyForecastFilters(listQ, filters);
-
-    // Past-FY exclusion — same whitelist as queryForecasts (Maps MCP path).
-    if (!p.forecastIncludePast) {
-      const thisFyNum = currentFiscalYear();
-      const future: string[] = [];
-      for (let y = thisFyNum; y <= thisFyNum + 15; y++) future.push(`fiscal_year.ilike.%${y}%`);
-      listQ = listQ.or(`fiscal_year.is.null,${future.join(',')}`);
-    }
-
-    if (p.setAside) {
-      listQ = listQ.ilike('set_aside_type', `%${p.setAside.replace(/[%,()]/g, ' ')}%`);
-    }
-
-    // Over-fetch then sort by anticipated_award_date like map pins.
-    const { data, count, error } = await listQ.limit(Math.max(limit, 200));
+    const { data, count, error } = await applyForecastPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan).limit(Math.max(limit, 200));
     if (error) return unavailable(source, SOON_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
     {
-      let uq = client.from(source).select('id', { count: 'exact', head: true }).is('map_lat', null);
-      uq = applyForecastFilters(uq, filters);
-      if (!p.forecastIncludePast) {
-        const thisFyNum = currentFiscalYear();
-        const future: string[] = [];
-        for (let y = thisFyNum; y <= thisFyNum + 15; y++) future.push(`fiscal_year.ilike.%${y}%`);
-        uq = uq.or(`fiscal_year.is.null,${future.join(',')}`);
-      }
-      if (p.setAside) uq = uq.ilike('set_aside_type', `%${p.setAside.replace(/[%,()]/g, ' ')}%`);
-      const { count: uc, error: ue } = await uq;
+      const { count: uc, error: ue } = await applyForecastPlan(client.from(source).select('id', { count: 'exact', head: true }), p.plan).is('map_lat', null);
       if (!ue) unmapped = uc ?? null;
     }
 
     type Row = Record<string, unknown>;
-    let rows = (data || []) as Row[];
-    rows.sort((a, b) => {
+    const all = (data || []) as Row[];
+    const scores = new Map(rankRecords(p.plan, all, ['title', 'description', 'naics_description', 'department']).map((s) => [s.row, s]));
+    const rows = [...all].sort((a, b) => {
+      const bd = (scores.get(b)?.breadth ?? 0) - (scores.get(a)?.breadth ?? 0);
+      if (bd) return bd;
+      // MCP surface order (unchanged): soonest anticipated award first; undated last.
       const da = String(a.anticipated_award_date || '');
       const db = String(b.anticipated_award_date || '');
       if (!da && !db) return 0;
       if (!da) return 1;
       if (!db) return -1;
       return da.localeCompare(db);
-    });
-    rows = rows.slice(0, limit);
+    }).slice(0, limit);
 
     if (!rows.length) {
       return emptyHorizon(
@@ -922,7 +753,9 @@ async function queryComingSoon(
         consumed,
         unsupported,
         asOf,
-        'No matching forecasts under these filters (past FY excluded unless opted in).',
+        p.plan.policy.forecast.includePastFiscalYears
+          ? 'No matching forecasts under these filters (past fiscal years included).'
+          : 'No matching forecasts under these filters (current and future fiscal years).',
         unmapped,
       );
     }
@@ -973,7 +806,7 @@ async function queryComingSoon(
       error: null,
       allowed_handoffs: SOON_HANDOFFS,
       semantics_note:
-        'Maps forecast universe (no status=forecasted gate). Past fiscal years excluded by default. Geography: pop_state only; many forecasts have no location.',
+        'Canonical discovery eligibility (word-bounded). Current and future fiscal years unless opted in. Ranked by how many of the query’s concepts a forecast carries, then anticipated award date. Geography: pop_state only; many forecasts have no location.',
     };
   } catch (e) {
     return unavailable(source, SOON_HANDOFFS, (e as Error).message, unsupported);
@@ -1216,6 +1049,7 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       .filter((i) => i.evidence_class === 'RELATED_MARKET_CANDIDATE')
       .map((i) => String(i.identity.id)),
   };
+  const blocked = interpreted.plan.status !== 'ok';
   const relatedNote = mi.retrieval_plan.related_market_applied
     ? 'Related-market rows are labeled RELATED_MARKET_CANDIDATE and are not confirmed capability demand. '
     : '';
@@ -1235,9 +1069,11 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       interpreted_as: interpreted.interpreted,
     },
     market_interpretation: mi,
-    presentation_note: [plainEnglishInterpretation(mi), comingBackHostClaim(interpreted.searchText, coming_back.evidence_counts)]
-      .filter(Boolean)
-      .join(' '),
+    presentation_note: blocked
+      ? `${interpreted.plan.refinement} Ask the customer for it — do not present this as zero opportunities.`
+      : [plainEnglishInterpretation(mi), comingBackHostClaim(interpreted.searchText, coming_back.evidence_counts)]
+        .filter(Boolean)
+        .join(' '),
     horizons,
     summary: {
       open_now: { status: open_now.status, matched_count: open_now.matched_count },
@@ -1257,6 +1093,14 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
         : 'Cross-class deduplicated procurement identity is unknown. Buyer alias normalization is not expansion.',
       watch_coverage: [...WATCH_COVERAGE],
       find_shape: shape,
+      // A request that cannot define a market is not research performed — never charged.
+      ...(blocked ? { billing_outcome: 'nonbillable_invalid_input' as const } : {}),
+      discovery: {
+        plan_version: interpreted.plan.version,
+        status: interpreted.plan.status,
+        refinement: interpreted.plan.refinement,
+        eligibility: eligibilityLabel(interpreted.plan),
+      },
     },
     _next: grounded ? buildFindNext(shape, horizons) : [],
     presentation: buildFindPresentation(),

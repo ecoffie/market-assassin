@@ -19,34 +19,7 @@ import { matchTerm } from '@/lib/beginner/relevance';
 const CTX: PlanContext = { today: '2026-09-22', fiscalYear: 2026 };
 const GOLDEN = join(__dirname, '__fixtures__', 'golden-plans.json');
 
-export const FIXTURES: Array<{ id: string; cls: string; input: DiscoveryInput }> = [
-  { id: '541320', cls: 'exact 6-digit NAICS', input: { query: '541320' } },
-  { id: '5413', cls: 'partial NAICS', input: { query: '5413' } },
-  { id: 'pam', cls: 'ordinary keyword', input: { query: 'pam' } },
-  { id: 'ai governance', cls: 'short concept query', input: { query: 'ai governance' } },
-  { id: 'artificial intelligence governance', cls: 'short concept query (long form)', input: { query: 'artificial intelligence governance' } },
-  { id: 'cybersecurity', cls: 'cyber taxonomy', input: { query: 'cybersecurity' } },
-  { id: 'janitorial', cls: 'distinctive keyword + industry preset', input: { query: 'janitorial' } },
-  { id: 'market research', cls: 'distinctive + generic', input: { query: 'market research' } },
-  { id: 'zzzxxyyqqq', cls: 'nonsense', input: { query: 'zzzxxyyqqq' } },
-  { id: 'veterans affairs', cls: 'agency name typed as query', input: { query: 'veterans affairs' } },
-  { id: 'agency=VA janitorial', cls: 'explicit agency param', input: { query: 'janitorial', agency: 'VA' } },
-  { id: 'management', cls: 'generic single term', input: { query: 'management' } },
-  { id: 'drones', cls: 'term of art', input: { query: 'drones' } },
-  { id: '"ai governance"', cls: 'quoted exact phrase', input: { query: '"ai governance"' } },
-  { id: '8a', cls: 'set-aside term', input: { query: '8a' } },
-  { id: 'follow-on support', cls: 'hyphenated compound', input: { query: 'follow-on support' } },
-  { id: 'Show me USDA opportunities', cls: 'NL wrapper → agency', input: { query: 'Show me USDA opportunities' } },
-  { id: 'SDVOSB cybersecurity opportunities in Virginia', cls: 'set-aside + capability + state', input: { query: 'SDVOSB cybersecurity opportunities in Virginia' } },
-  { id: 'cyber cloud compliance network server', cls: 'capability list', input: { query: 'cyber cloud compliance network server' } },
-  { id: 'cyber, cloud', cls: 'explicit alternatives', input: { query: 'cyber, cloud' } },
-  { id: 'Pro Audio', cls: 'generic modifier + distinctive', input: { query: 'Pro Audio' } },
-  { id: '541512 -computers', cls: 'anchored exclusion', input: { query: '541512 -computers' } },
-  { id: '-computers', cls: 'naked exclusion', input: { query: '-computers' } },
-  { id: 'agency=USDA', cls: 'USDA alias collision', input: { query: '', agency: 'USDA' } },
-  { id: 'agency=VA', cls: 'VA/Naval collision', input: { query: '', agency: 'VA' } },
-  { id: 'Naval facilities in Nevada', cls: 'VA/Naval collision (free text)', input: { query: 'Naval facilities in Nevada' } },
-];
+import { FIXTURES } from './__fixtures__/fixtures';
 
 const planFor = (input: DiscoveryInput, policy = MCP_POLICY) => buildDiscoveryPlan(input, policy, CTX);
 const opExprs = (p: DiscoveryPlan) => [
@@ -155,7 +128,7 @@ describe('3 · eligibility', () => {
     const p = planFor({ query: 'cyber cloud compliance network server' });
     const a = p.matcher.alternatives[0];
     expect(a).toMatchObject({ shape: 'capability_list', eligibility: 'any' });
-    expect(a.eligible.map((c) => c.label).sort()).toEqual(['cloud', 'cyber', 'server']);
+    expect(a.eligible.map((c) => c.label).sort()).toEqual(['cloud', 'cybersecurity', 'server']);
     expect(a.rankOnly.map((c) => c.label).sort()).toEqual(['compliance', 'network']);
     expect(firstOr(p)).not.toMatch(/compliance|network/);
     expect(matchesText(p.matcher, ['Network compliance audit services'])).toBe(false);
@@ -271,7 +244,7 @@ describe('5 · ranking reorders, never admits', () => {
     const ranked = rankRecords(p, rows, ['title', 'description']);
     expect(ranked.map((r) => r.row.id)).toEqual(['b', 'c', 'a']);
     expect(ranked[0].breadth).toBe(3); // cyber + cloud + server — eligible breadth is the primary key
-    expect(ranked[0].matched.sort()).toEqual(['cloud', 'compliance', 'cyber', 'network', 'server']);
+    expect(ranked[0].matched.sort()).toEqual(['cloud', 'compliance', 'cybersecurity', 'network', 'server']);
   });
 });
 
@@ -286,6 +259,28 @@ describe('word rule parity with /try relevance.ts matchTerm (exact hits)', () =>
   }
   it('"fences" matches Fence (plural is not derivation — /try singularizes upstream)', () => {
     expect(matchesText(buildTextMatcher('fences'), ['Z--CON Chain Link Fence'])).toBe(true);
+  });
+});
+
+describe('Phase B replay fixes', () => {
+  it('"cyber" is the cybersecurity concept (MCP CYBER_DIRECT_RE): it matches "Cybersecurity"', () => {
+    const p = planFor({ query: 'cyber' });
+    expect(matchesText(p.matcher, ['Cybersecurity Operations Support'])).toBe(true);
+    expect(matchesText(p.matcher, ['Cyber Range'])).toBe(true);
+    expect(matchesText(p.matcher, ['Cyberdyne Robotics'])).toBe(false);
+  });
+  it('acronyms are case-sensitive: IT is not the pronoun "it"; AI is not "Ai"-anything', () => {
+    const it = planFor({ query: 'IT services' });
+    expect(matchesText(it.matcher, ['IT Support Services'])).toBe(true);
+    expect(matchesText(it.matcher, ['It is anticipated that the contractor will provide services'])).toBe(false);
+    expect(matchesText(it.matcher, ['Information Technology Support'])).toBe(true);
+    const ai = planFor({ query: 'ai governance' });
+    expect(matchesText(ai.matcher, ['AI governance framework'])).toBe(true);
+    expect(firstOr(ai)).toContain('.match.'); // the acronym clause is case-sensitive
+  });
+  it('an excluded acronym is excluded in upper case only', () => {
+    const p = planFor({ query: '541512 -ai' });
+    expect(matchesText(p.matcher, ['AI platform'])).toBe(false);
   });
 });
 
