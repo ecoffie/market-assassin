@@ -109,7 +109,7 @@ export function openRetrievalPsc(cap: CapabilityInterpretation): string[] {
   return openDirectPsc(cap);
 }
 
-function pscMatchConds(codes: string[]): string[] {
+export function pscMatchConds(codes: string[]): string[] {
   return codes
     .map((c) => String(c).trim())
     .filter(Boolean)

@@ -419,6 +419,16 @@ Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Hi
 - **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** write the 44,560-family fleet backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Lazy Family v1 only — persist on known-id / pursuit save / confirmed identity, never a fleet write.
 - **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
 
+### Canonical Discovery — Phase A (PR #1637, 2026-09-22) — NO consumer migrated yet
+Record: **`tasks/canonical-discovery-phase-a-2026-09-22.md`**. `src/lib/discovery/` is the ONE search-meaning layer
+below MCP `find_opportunities`; MCP, Maps, saved searches and eligible alerts move onto it one PR at a time.
+- Pipeline (locked): raw → structured intent → concept classification → eligibility → horizon policy → ranking.
+- ⚠️ Until migrated, production still runs the OLD matchers: `%ai%` substring (`ai governance` = 5,072 open) and MCP
+  `agency=USDA` = 4,899 (alias `AG` ⊂ "Defense Logistics AGency"). Do not "fix" either locally — move the consumer.
+- Order: MCP → cross-surface contract test → Maps Open → Recompete → Forecast → saved searches (re-run
+  `scripts/discovery-saved-search-blast.ts` + sign-off) → client (q in URL, agency suggestion = agency filter).
+- Never add a length rule for word importance; classes are semantic (distinctive / qualifier / supporting).
+
 ### Potato v1 — ✅ SHIPPED → CLOSED 2026-09-17
 Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.”
 - Journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → TALENT THIN → POSITION → ACT → MONITOR. Then STOP.
