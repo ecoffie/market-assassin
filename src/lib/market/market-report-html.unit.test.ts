@@ -34,19 +34,32 @@ const summary = (over: Record<string, unknown> = {}) => ({
 
 const TIERS = [
   { basis: 'named' as const, label: 'Awards that say "hypersonic"', amount: 1_634_727_624, method: 'Award text contains the word. A FLOOR.', inputs: ['hypersonic'] },
-  { basis: 'term_of_art' as const, label: 'Plus the words this market is bought under', amount: 1_745_463_547, method: 'Adds 6 curated synonyms, live-verified.', inputs: ['hypersonic', 'scramjet', 'boost glide'] },
-  { basis: 'code_total' as const, label: 'All of NAICS 332993', amount: 9_061_772_056, method: 'The surrounding industry. A CEILING, not the market.', inputs: ['332993'] },
+  { basis: 'term_of_art' as const, role: 'sections_basis' as const, label: 'Plus the words this market is bought under', amount: 1_745_463_547, method: 'Adds 6 curated synonyms, live-verified.', inputs: ['hypersonic', 'scramjet', 'boost glide'] },
+  // POTETO 2026-09-22: a `code_total` tier used to sit here. generate_market_report no
+  // longer produces one (it was removed when coverage.allNaics[0] stopped being treated
+  // as the surrounding industry), so the fixture now matches what production emits.
 ];
 
 describe('market report — the measurement bridge', () => {
-  it('renders all three tiers with their derivations', () => {
+  it('renders all three readings — headline, literal floor, synonym basis — with their derivations', () => {
     const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never);
     expect(html).toContain('How this market was measured');
+    // Three rows: the headline measurement plus the two tiers production produces.
+    const sec = html.slice(html.indexOf('How this market was measured'));
+    expect((sec.slice(0, sec.indexOf('</section>')).match(/<tr>/g) || []).length - 1 /* header row */).toBe(3);
     expect(html).toContain('Awards that say');
-    expect(html).toContain('All of NAICS 332993');
-    expect(html).toContain('A CEILING, not the market.');
-    // The reported tier is marked so the reader knows WHICH number is the answer.
-    expect(html).toContain('← reported');
+    expect(html).toContain('Plus the words this market is bought under');
+    // Each derivation is rendered so the reader can audit it.
+    expect(html).toContain('Award text contains the word. A FLOOR.');
+    expect(html).toContain('Adds 6 curated synonyms, live-verified.');
+    // POTETO 2026-09-22 (was: expect '← reported'). That tag named the synonym tier
+    // "the market" while the headline showed a different, 1-FY figure (drones: $11.0B
+    // "← reported" beside a $90.0M headline). The rule is now: the tier the sections are
+    // ranked on SAYS so, and the headline is its own labelled row — so the reader can
+    // see which number answers which question.
+    expect(html).toContain('← basis of the agency &amp; contractor tables');
+    expect(html).toContain('Total market (headline)');
+    expect(html).not.toContain('← reported');
     // The expansion terms are listed — that is the auditable part.
     expect(html).toContain('scramjet');
   });

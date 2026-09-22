@@ -7251,3 +7251,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** NAVSEA priorities / agency intel provenance / LEGACY_MANUAL / Columbia-class / SIOP.
 
 **Proof.** Unit: `omitUnsourcedDollarAmounts` strips `$2.3B` while keeping Columbia-class; dollar-only inputs (`"$2.3B"`, `"Allocated $2.3B"`) empty and are **omitted** (never restored via `out || text`). SOURCE_FACT dollars kept. Agent recheck recorded; audit **not fully closed** (#13 unverified this pass; #12 identity passed / retrieval incomplete; public-domain dollar suppression awaits separately approved release). Tracker: `docs/issue-log-14-tracker.md`.
+
+## POTETO — Market Report Presentation Truth (2026-09-22)
+
+**What.** Every number, row, date, count and status in `generate_market_report` now agrees with what Mindy measured. The report shows every market figure side by side in "How this market was measured" (headline + literal phrase + synonym basis), each labelled with the question it answers. KPIs print "N shown below" when the population is larger than the table. Recompete rows carry the contract number, forecast rows carry the incumbent, cross-listed forecast copies are removed, set-aside flags are never shown as categories, and the old `estimated_recompete_date` is relabelled `capture_start_date` (PoP end − 12 months) with `capture_start_passed`.
+
+**Why.** A client-ready report that contradicts itself loses the "your data is wrong" argument even when every figure is real. Production showed a $90.0M drones headline beside a "$11.0B — this is the market the report measures" tier, a `$0` literal tier beside a $919.7M construction headline, "15 recompetes" above 12 rows, sections marked `ok` with zero rows, and a DHS `true` in the Set-aside column.
+
+**SEO.** Federal market report / market sizing methodology / recompete capture date / agency forecast set-aside / NAICS market reconciliation.
+
+**Proof.** Live gold masters (`scripts/acceptance/poteto-market-report-presentation.mts`): construction grounds 2/7 with 2 `ok` (was 2/7 beside 4 `ok`); the drones two-tier insight holds (336411 = 64% of 17 codes); MA/236220 removes 4 cross-listed forecast copies (Acquisition Gateway listing `7799` ingested as `7799` and `GW-L:7799` — 3,311 such twins in `agency_forecasts`); recompete KPIs read 24,661 / 5,517 / 65 found with 15 shown. Hermetic regressions fail when each fix is reverted.

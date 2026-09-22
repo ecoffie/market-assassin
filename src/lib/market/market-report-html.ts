@@ -79,6 +79,8 @@ interface ReportLike {
       amount: number | null;
       method: string;
       inputs: string[];
+      role?: 'sections_basis' | 'floor';
+      note?: string | null;
     }[] | null;
     undercount_note?: string | null;
     naics_count: number | null;
@@ -88,6 +90,9 @@ interface ReportLike {
     recompetes: number;
     forecasts: number;
     contacts?: number;
+    recompetes_total?: number | null;
+    forecasts_total?: number | null;
+    forecasts_duplicates_removed?: number;
   };
   sections: {
     market_size: unknown;
@@ -106,6 +111,16 @@ interface ReportLike {
     set_aside_gap: unknown;
   };
   _meta: { degraded: boolean; sections_grounded: number; sections_total: number };
+}
+
+/**
+ * COUNT — a KPI for a table-backed section. The table shows `shown` rows; `total` is
+ * the population they were drawn from when the source states one. The card used to
+ * print the 15-row display cap as the market's count, above a table that rendered 12.
+ */
+function countValue(shown: number, total: number | null | undefined): { value: string; sub?: string } {
+  if (total != null && total > shown) return { value: num(total), sub: `${num(shown)} shown below` };
+  return { value: num(shown) };
 }
 
 // A KPI card. `value` is the big number/code (kept SHORT); `sub` is an optional smaller line
@@ -185,17 +200,25 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   ]);
 
   // ---- Competitive landscape ----
-  const vendorRows = (sections.competition.contractors as Row[]).slice(0, 12).map((c) => [
+  // Every row the KPI counts is rendered (no silent 15→12 cut). The category endpoint
+  // carries no location or award count, so those always-blank columns are gone; the
+  // UEI stays, because two registrations can share one legal name (drones: NORTHROP
+  // GRUMMAN SYSTEMS CORPORATION twice, two UEIs) and without it they read as a dup.
+  const vendorRows = (sections.competition.contractors as Row[]).map((c) => [
     esc(c.recipient_name),
-    esc([c.city, c.state].filter(Boolean).join(', ')),
+    esc(c.recipient_uei || '—'),
     money(c.total_obligated),
-    num(c.award_count),
   ]);
 
   // ---- Recompetes ----
-  const recompeteRows = (sections.recompetes.contracts as Row[]).slice(0, 12).map((c) => [
-    esc(c.incumbent_name || '—'),
-    esc(c.awarding_agency || c.awarding_sub_agency || '—'),
+  // The contract number + a line of its description are what tell two awards to the
+  // same incumbent apart (Heritage-M2C1 holds FA500425F0093 AND FA500425F0094 — two
+  // contracts, not one row printed twice).
+  const recompeteRows = (sections.recompetes.contracts as Row[]).map((c) => [
+    `${esc(c.incumbent_name || '—')}<div class="rowsub">${esc(c.piid || '')}${
+      c.description ? ` · ${esc(s(c.description).slice(0, 90))}${s(c.description).length > 90 ? '…' : ''}` : ''
+    }</div>`,
+    esc(c.awarding_sub_agency || c.awarding_agency || '—'),
     esc(c.naics_code || '—'),
     money(c.potential_total_value ?? c.total_obligation),
     esc(s(c.period_of_performance_current_end).slice(0, 10) || '—'),
@@ -203,13 +226,16 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   ]);
 
   // ---- Forecasts ----
-  const forecastRows = (sections.forecasts.forecasts as Row[]).slice(0, 12).map((f) => [
-    esc(f.title),
+  // Same title ≠ same procurement: Navy's three "OPF-L Delivery Order #3" rows name
+  // three different incumbents. Show the incumbent so the reader can see that.
+  const forecastRows = (sections.forecasts.forecasts as Row[]).map((f) => [
+    esc(f.title) + (f.incumbent_name ? `<div class="rowsub">Incumbent: ${esc(f.incumbent_name)}</div>` : ''),
     esc(f.agency || f.department || '—'),
     esc(f.naics_code || '—'),
     esc(prettyRange(f.value_range, f.value_max, f.value_min)),
     esc([f.fiscal_year, f.quarter].filter(Boolean).join(' ') || '—'),
-    esc(f.set_aside_type || '—'),
+    // Normalized upstream; null = the source did not state a category.
+    esc(f.set_aside_type || 'Not stated'),
   ]);
 
   // ---- Agency deep-dive (optional) ----
@@ -253,9 +279,61 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   const scopeNote = summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
     ? `<p class="note">“Total market” is the <strong>national</strong> figure for this market${
         summary.total_market_basis.window ? ` (${esc(summary.total_market_basis.window)})` : ''
-      }. The agency, contractor and recompete sections below are scoped to <strong>${esc(
+      }. Every section below is scoped to <strong>${esc(
         summary.total_market_basis.requested_state,
-      )}</strong> over a longer window, so those dollars are smaller by design — they answer a different question.</p>`
+      )}</strong> — the agency and contractor dollars cover FY23-25 in that state, and the recompetes and forecasts are that state's rows — so those figures are smaller by design; they answer a different question.</p>`
+    : '';
+
+  /**
+   * EXPLAIN — every market figure on the page, side by side, each with what it
+   * measured. The headline is a row here too: it is a DIFFERENT measurement from the
+   * tiers (1 fiscal year, description-matched) and presenting them apart is what let
+   * drones read "$90.0M total market" above "$11.0B — this is the market the report
+   * measures", and construction carry a "$0" reading beside a $919.7M headline.
+   */
+  const tiers = summary.size_tiers || [];
+  const tb = summary.total_market_basis;
+  // A single tier is only worth a section when it cannot stand unexplained: a $0 or
+  // unknown reading, or a headline that was resolved through other words. A lone
+  // literal tier that agrees with the headline gets no table (nothing to bridge).
+  const tiersNeedExplaining = tiers.length > 1
+    || tiers.some((t) => t.amount == null || t.amount === 0)
+    || !!tb?.identity_resolved_via?.length;
+  const measurementHtml = tiers.length && tiersNeedExplaining
+    ? section(
+        'How this market was measured',
+        'Each figure below answers a different question. None of them contradicts another — read the "What it means" column before comparing them.',
+        table(
+          ['Reading', 'Amount', 'What it means'],
+          [
+            [
+              'Total market (headline)',
+              money(summary.total_market),
+              esc(`${tb?.window || 'Latest complete fiscal year'} — contract obligations for awards matching this market.`)
+                + (tb?.identity_resolved_via?.length
+                  ? `<div class="tier-terms">Measured through: ${esc(tb.identity_resolved_via.join(', '))}</div>`
+                  : '')
+                + '<div class="tier-terms">Basis of Market composition and the NAICS reconciliation.</div>',
+            ],
+            ...tiers.map((t) => [
+              esc(t.label) + (t.role === 'sections_basis' ? ' <span class="tier-tag">← basis of the agency &amp; contractor tables</span>' : ''),
+              t.amount == null ? 'Unknown' : t.amount === 0 ? '$0' : money(t.amount),
+              // Derivation first (auditable), then what the figure means next to the others.
+              esc(t.method)
+                + (t.note ? `<div class="tier-note">${esc(t.note)}</div>` : '')
+                + (t.inputs.length > 1 ? `<div class="tier-terms">Terms: ${esc(t.inputs.join(', '))}</div>` : ''),
+            ]),
+          ],
+        ),
+      )
+    : '';
+
+  /** An empty ranked table explains itself when the phrase it ranked on measured $0. */
+  const sectionsBasisTier = tiers.find((t) => t.role === 'sections_basis');
+  const phraseEmptyNote = sectionsBasisTier && sectionsBasisTier.amount === 0
+    ? `<p class="note">No contract award text contains the exact phrase this table is ranked on, so it is empty for that phrase. That is not a statement that no one buys this work — the market total above was measured ${
+        tb?.identity_resolved_via?.length ? `through: ${esc(tb.identity_resolved_via.join(', '))}` : 'differently (see How this market was measured)'
+      }.</p>`
     : '';
 
   const body = [
@@ -274,28 +352,15 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${summary.top_psc ? statCard('Top product (PSC)', summary.top_psc.code, summary.top_psc.name) : ''}
       ${statCard('Top agencies', num(summary.buying_agencies))}
       ${statCard('Leading contractors', num(summary.top_contractors))}
-      ${statCard('Recompetes', num(summary.recompetes))}
-      ${statCard('Forecasts', num(summary.forecasts))}
+      ${(() => { const c = countValue(summary.recompetes, summary.recompetes_total); return statCard('Recompetes', c.value, c.sub); })()}
+      ${(() => { const c = countValue(summary.forecasts, summary.forecasts_total); return statCard(c.sub ? 'Forecast records' : 'Forecasts', c.value, c.sub); })()}
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
     </section>`,
     scopeNote,
     // THE BRIDGE — how the headline was derived, shown so a client can audit it.
     // A single unlabeled number is what made a $46.3B hypersonics headline
     // indefensible: nobody could see which awards it was built from.
-    (summary.size_tiers && summary.size_tiers.length > 1)
-      ? section(
-          'How this market was measured',
-          'Three honest readings of the same market. The first is a floor — contracts that literally say the word. The last is the surrounding industry, shown for scale, not as the answer.',
-          table(
-            ['Reading', 'Amount', 'How it was derived'],
-            summary.size_tiers.map((t) => [
-              esc(t.label) + (t.basis === 'term_of_art' ? ' <span class="tier-tag">← reported</span>' : ''),
-              t.amount == null ? '—' : money(t.amount),
-              esc(t.method) + (t.inputs.length > 1 ? `<div class="tier-terms">Terms: ${esc(t.inputs.join(', '))}</div>` : ''),
-            ]),
-          ),
-        )
-      : '',
+    measurementHtml,
     summary.undercount_note
       ? section(
           'Read this total as a floor',
@@ -319,12 +384,29 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` of ${sections.top_agencies_total} with spend`
           : ''
       }. Share is of the shown agencies, not of the whole market.`,
-      table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
+      (agencyRows.length ? '' : phraseEmptyNote) + table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
     ),
     contactsHtml,
-    section('Competitive landscape', 'Leading contractors by obligated dollars — the incumbents you would be up against.', table(['Contractor', 'Location', 'Obligated', 'Awards'], vendorRows)),
-    section('Recompetes on the horizon', 'Expiring contracts likely to come back out for bid.', table(['Incumbent', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows)),
-    section('Upcoming forecasts', 'Planned procurements 6–18 months out.', table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows)),
+    section('Competitive landscape', `Leading contractors by obligated dollars${basisNote} — the incumbents you would be up against. Showing the top ${vendorRows.length}.`,
+      (vendorRows.length ? '' : phraseEmptyNote) + table(['Contractor', 'UEI', 'Obligated'], vendorRows)),
+    section('Recompetes on the horizon',
+      `Contracts whose current period of performance ends soonest — soonest first. "Ends" is the period-of-performance end date.${
+        summary.recompetes_total != null && summary.recompetes_total > recompeteRows.length
+          ? ` Showing ${num(recompeteRows.length)} of ${num(summary.recompetes_total)} found.`
+          : ''
+      }`,
+      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows)),
+    section('Upcoming forecasts',
+      `Planned procurements agencies have published.${
+        summary.forecasts_total != null && summary.forecasts_total > forecastRows.length
+          ? ` Showing ${num(forecastRows.length)} of ${num(summary.forecasts_total)} matching forecast records.`
+          : ''
+      }${
+        summary.forecasts_duplicates_removed
+          ? ` ${num(summary.forecasts_duplicates_removed)} duplicate listing${summary.forecasts_duplicates_removed === 1 ? '' : 's'} (the same listing received from two sources) removed.`
+          : ''
+      }`,
+      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows)),
     agencyDetailHtml,
   ].join('\n');
 
@@ -367,6 +449,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   /* The measurement bridge — the reported tier is emphasised, its derivation legible. */
   .tier-tag { font-weight:400; color:var(--muted); font-size:.85em; }
   .tier-terms { color:var(--muted); margin-top:4px; font-size:.9em; }
+  .tier-note { margin-top:4px; font-size:.92em; }
+  .rowsub { color:var(--muted); font-weight:400; font-size:.88em; margin-top:2px; white-space:normal; }
   .note { color:#b45309; font-size:12.5px; }
   .rec { border-color:#c7b7f5; background:linear-gradient(180deg,#faf8ff,#fff); }
   .rec h2 { color:var(--purple); }

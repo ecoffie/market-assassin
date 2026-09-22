@@ -757,7 +757,9 @@ export async function codeMarketSize(opts: {
       basis,
       leadName,
       windowKind: 'latest_complete_fy_live_api',
-      windowLabel: keywordCoverageWindowLabel(fiscalYear) + ' · live USASpending category',
+      // NOT keywordCoverageWindowLabel: that says "description match", and this total
+      // is every award coded to the NAICS/PSC — no description is matched at all.
+      windowLabel: `FY${fiscalYear} (1 complete fiscal year · all awards coded ${basis === 'psc' ? 'PSC' : 'NAICS'} ${basis === 'psc' ? psc : naics})`,
       questionKind: 'code_pinned_fy_category_total',
       fiscalYear,
     };
