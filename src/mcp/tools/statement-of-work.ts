@@ -13,6 +13,7 @@
  */
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
+import { summarizeSourceCoverage, coverageCaveat, type SourceCoverage } from '@/lib/sam/source-coverage';
 import { detectPiee, extractPieeLinks, pieeRetrievalLimitation } from '@/lib/sam/notice-identity';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -52,13 +53,19 @@ type NoticeFetch = {
   attachments_with_text: number;
   piee_links: string[];
   retrieval_limitation: string | null;
+  /** What the SOURCE text was missing (distinct from the LLM's own input cap). */
+  coverage: SourceCoverage | null;
 };
 
 /** Fetch a notice's combined body + attachment text, plus any classified sow_text
  *  as a fallback. Mirrors the compliance-matrix notice fetch. */
 async function textFromNotice(noticeId: string): Promise<NoticeFetch> {
   try {
-    const docs = await getSolicitationDocuments({ noticeId });
+    // textMode:'full' — the internal-consumer path (preserved from main). A SOW's
+    // scope continues well past the first 20k chars and a partial read silently
+    // drops requirements; MCP callers get bounded paging instead.
+    const docs = await getSolicitationDocuments({ noticeId, textMode: 'full' });
+    const srcCoverage = summarizeSourceCoverage(docs);
     const parts: string[] = [];
     if (docs.description) parts.push(docs.description);
     for (const d of docs.documents) {
@@ -72,12 +79,14 @@ async function textFromNotice(noticeId: string): Promise<NoticeFetch> {
       attachments_with_text: docs.attachments_with_text,
       piee_links: docs.piee_links,
       retrieval_limitation: docs.retrieval_limitation,
+      coverage: srcCoverage,
     };
   } catch (err) {
     console.error('[statement-of-work] notice fetch failed', noticeId, err);
     return {
       combined: '',
       classifiedSow: '',
+      coverage: null,
       degraded: true,
       attachments_listed: 0,
       attachments_with_text: 0,
@@ -114,13 +123,16 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
   let classifiedSow = '';
   let source: 'notice_id' | 'text' | 'none' = rfpText ? 'text' : 'none';
   let fetchDegraded = false;
+  let sourceCoverage: SourceCoverage | null = null;
   let honesty = emptyHonesty();
 
   if (!rfpText && noticeId) {
     const fetched = await textFromNotice(noticeId);
+    sourceCoverage = fetched.coverage;
     combined = fetched.combined;
     classifiedSow = fetched.classifiedSow;
     fetchDegraded = fetched.degraded;
+    sourceCoverage = fetched.coverage;
     source = 'notice_id';
     honesty = {
       piee: fetched.piee_links.length > 0 || detectPiee(`${combined}\n${classifiedSow}`),
@@ -249,6 +261,7 @@ export async function extractStatementOfWork(input: StatementOfWorkInput): Promi
       how_to_use:
         'Use sow_text as the scope of work to brief subcontractors or seed a technical response. When method=clin_scope, it is a CLIN summary — confirm against the full solicitation + drawings before relying on it.',
       key_caveats: [
+        ...(sourceCoverage && coverageCaveat(sourceCoverage) ? [coverageCaveat(sourceCoverage) as string] : []),
         'The SOW is detected by heading boundaries; a solicitation with unusual formatting may under- or over-capture — verify the start/end against the source.',
         'This returns the SCOPE text only, not the Section L/M instructions or evaluation factors — pair with extract_compliance_matrix for the full requirement set.',
         'clin_scope is reconstructed from the pricing schedule, not the narrative SOW — it lists what to price, not full performance detail.',

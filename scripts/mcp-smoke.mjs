@@ -402,7 +402,10 @@ try {
   const soBlob = JSON.stringify(soRes.structuredContent || soRes.content || soRes);
   const oppMatch = soBlob.match(/\/opp\/([0-9a-fA-F]{32})/);
   const solMatch = soBlob.match(/"solicitation_number"\s*:\s*"([^"]+)"/);
-  const noticeRef = oppMatch ? oppMatch[1] : solMatch ? solMatch[1] : null;
+  // SMOKE_NOTICE_ID pins a known multi-document notice so the coverage+paging
+  // assertions below actually execute. Without it the search can pick a notice
+  // with no attachments and the whole block silently skips (observed 2026-09-22).
+  const noticeRef = process.env.SMOKE_NOTICE_ID || (oppMatch ? oppMatch[1] : solMatch ? solMatch[1] : null);
   if (!noticeRef) {
     console.error('⚠ solicitation-documents: search returned no notice ref (empty local cache?) — SKIPPING, NON-FATAL');
   } else {
@@ -415,6 +418,42 @@ try {
     if (!['cache', 'on_demand', 'none'].includes(sdS._meta?.source)) fail(`solicitation-documents: unexpected source "${sdS._meta?.source}"`);
     const d0 = sdS.documents[0];
     console.error(`✓ grounded=${sdS._meta?.grounded} · degraded=${sdS._meta?.degraded} · source=${sdS._meta?.source} · doc_count=${sdS._meta?.doc_count} · title=${String(sdS.title).slice(0, 50)}${d0 ? ` · top=${String(d0.filename).slice(0, 40)} (${d0.doc_kind}, ${d0.char_count}ch, url=${d0.download_url ? 'yes' : 'no'})` : ''}`);
+    // Coverage contract: every doc must SAY why its text is or isn't here, and
+    // the notice-level rollup must exist. An empty string alone is not an answer.
+    // Must list EVERY reachable status (solicitation-documents.ts windowText).
+    // container_stub / unreadable_encoding were omitted, so the live smoke would
+    // have failed the first time a PDF Portfolio or font-subset doc appeared —
+    // rejecting the exact statuses we document to customers.
+    const AVAIL = [
+      'complete', 'partial', 'extraction_failed', 'file_unavailable',
+      'extraction_capped', 'container_stub', 'unreadable_encoding',
+    ];
+    if (!sdS.coverage || typeof sdS.coverage.complete !== 'boolean') fail('solicitation-documents: coverage rollup missing');
+    for (const d of sdS.documents) {
+      if (!AVAIL.includes(d.text_availability)) fail(`solicitation-documents: bad text_availability "${d.text_availability}"`);
+      if (!d.document_id) fail('solicitation-documents: document_id missing (paging needs a stable address)');
+      if (!d.text_window || typeof d.text_window.has_more !== 'boolean') fail('solicitation-documents: text_window missing');
+    }
+    console.error(`✓ coverage: complete=${sdS.coverage.complete} · ${sdS.coverage.documents_complete}/${sdS.coverage.documents_total} whole · more=${sdS.coverage.documents_with_more_text} · unavailable=${sdS.coverage.documents_unavailable} · capped=${sdS.coverage.documents_extraction_capped}`);
+
+    // PAGING: a truncated doc must be CONTINUABLE — the remainder cannot be
+    // stranded by the response-size limit (the 20k-cap defect, 2026-09-22).
+    if (sdS.next_page) {
+      const p2 = await client.callTool({
+        name: 'get_solicitation_documents',
+        arguments: { notice_id: noticeRef, document_ids: sdS.next_page.document_ids, documents: sdS.next_page.documents },
+      });
+      const p2S = p2.structuredContent;
+      const want = sdS.next_page.documents[0];
+      const got = p2S?.documents?.find((d) => d.document_id === want.document_id);
+      if (!got) fail('solicitation-documents: next_page did not return the requested document_id');
+      if (got.text_window.offset !== want.offset) fail(`solicitation-documents: paging landed at ${got.text_window.offset}, expected ${want.offset}`);
+      if (got.text_window.returned_chars === 0) fail('solicitation-documents: continuation window returned 0 chars (remainder inaccessible)');
+      console.error(`✓ paging: continued doc at offset ${got.text_window.offset} (+${got.text_window.returned_chars}ch, coverage ${got.text_window.coverage_of_stored_text})`);
+    } else {
+      console.error('✓ paging: nothing truncated for this notice (coverage already complete) — NON-FATAL');
+    }
+
     if (sdS.documents.length > 0) {
       const hasDelivery = sdS.documents.some((d) => d.download_url || (d.extracted_text && d.extracted_text.length > 0));
       if (!hasDelivery) fail('solicitation-documents: documents present but NONE has a download_url or extracted_text (delivery broken)');

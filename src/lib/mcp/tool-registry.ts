@@ -1219,9 +1219,11 @@ const SOLICITATION_DOCUMENTS_TOOL_DEF = {
     description:
       'Get the FULL text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, the notice ' +
       'body, and every attachment. Returns notice metadata + inline body/SOW text + a documents[] list, each with ' +
-      'inline extracted_text (capped; check *_truncated) AND a short-lived signed download_url (~1h) to the full raw ' +
-      'PDF/DOCX so an agent can hand it to a design tool (Canva) or re-parse it. Cold notices (never tracked) are ' +
-      'downloaded + extracted ON DEMAND. grounded=false when the notice has no text or attachments — verify the ' +
+      'a WINDOW of extracted_text per document PLUS a short-lived signed download_url (~1h) to the full raw ' +
+      'PDF/DOCX. PAGING: a response returns text_limit chars per document; while next_page is non-null, re-call with ' +
+      'next_page (pass its document_ids AND documents verbatim) — STOP when next_page is null. A clause absent from a ' +
+      'PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never convert it to pages. Cold notices ' +
+      'are downloaded + extracted ON DEMAND. grounded=false when the notice has no text or attachments — verify the ' +
       'notice_id. SAM attachments are public federal data.',
     parameters: {
       type: 'object',
@@ -1229,6 +1231,34 @@ const SOLICITATION_DOCUMENTS_TOOL_DEF = {
         notice_id: {
           type: 'string',
           description: 'SAM notice id (UUID) or solicitation number. Get it from search_sam_opportunities results.',
+        },
+        text_limit: {
+          type: 'number',
+          description:
+            'Chars of text PER DOCUMENT. Default 20000, max 120000 per document. This is NOT a total ' +
+            'response cap — a notice with N attachments can return up to N x this. Use document_ids to bound the total.',
+        },
+        text_offset: {
+          type: 'number',
+          description: 'Start offset applied to every document (use next_page for exact continuation).',
+        },
+        documents: {
+          type: 'array',
+          description:
+            'Per-document windows. Pass next_page.documents verbatim to continue reading.',
+          items: {
+            type: 'object',
+            properties: {
+              document_id: { type: 'string', description: 'document_id from a previous response.' },
+              offset: { type: 'number' },
+              limit: { type: 'number' },
+            },
+          },
+        },
+        document_ids: {
+          type: 'array',
+          description: 'Only return these document_ids — page one long document without re-sending the rest.',
+          items: { type: 'string' },
         },
       },
       required: ['notice_id'],
@@ -2421,6 +2451,12 @@ export async function runMcpTool(
   if (name === 'get_solicitation_documents') {
     const result = (await solicitationDocuments({
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : '',
+      text_limit: typeof args.text_limit === 'number' ? args.text_limit : undefined,
+      text_offset: typeof args.text_offset === 'number' ? args.text_offset : undefined,
+      documents: Array.isArray(args.documents)
+        ? (args.documents as Array<{ document_id?: string; offset?: number; limit?: number }>)
+        : undefined,
+      document_ids: Array.isArray(args.document_ids) ? (args.document_ids as string[]) : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

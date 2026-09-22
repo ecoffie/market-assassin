@@ -17,6 +17,7 @@ import { extractComplianceMatrixFromText, type ComplianceRequirement } from '@/l
 import { auditSourceSpecCoverage, type SourceSpecCoverage } from '@/lib/proposal/matrix-source-coverage';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
 import { assembleNoticeSourceText } from '@/lib/sam/notice-identity';
+import { summarizeSourceCoverage, coverageCaveat, type SourceCoverage } from '@/lib/sam/source-coverage';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface ComplianceMatrixInput {
@@ -49,6 +50,8 @@ export interface ComplianceMatrixResult {
     recovered_source_specs?: string[];
     resolved_notice_id?: string;
     model: string;
+    /** What the SOURCE text was missing (distinct from `truncated`, the LLM cap). */
+    source_coverage?: SourceCoverage;
   };
 }
 
@@ -59,9 +62,11 @@ async function textFromNotice(noticeId: string): Promise<{
   degraded: boolean;
   truncated_attachments: number;
   resolved_notice_id?: string;
+  coverage: SourceCoverage | null;
 }> {
   try {
     const docs = await getSolicitationDocuments({ noticeId, textMode: 'full' });
+    const srcCoverage = summarizeSourceCoverage(docs);
     const assembled = assembleNoticeSourceText({
       sow_text: docs.source_text ? null : docs.sow_text,
       description: docs.source_text ? null : docs.description,
@@ -73,10 +78,11 @@ async function textFromNotice(noticeId: string): Promise<{
       degraded: docs.degraded,
       truncated_attachments: docs.truncated_attachments ?? assembled.truncated_attachments,
       resolved_notice_id: docs.notice_id,
+      coverage: srcCoverage,
     };
   } catch (err) {
     console.error('[compliance-matrix] notice fetch failed', noticeId, err);
-    return { text: '', degraded: true, truncated_attachments: 0 };
+    return { text: '', degraded: true, truncated_attachments: 0, coverage: null };
   }
 }
 
@@ -86,6 +92,7 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
   let source: 'notice_id' | 'text' | 'none' = sourceText ? 'text' : 'none';
   let fetchDegraded = false;
   let truncatedAttachments = 0;
+  let sourceCoverage: SourceCoverage | null = null;
   let resolvedNoticeId: string | undefined;
 
   // notice_id path: fetch the solicitation text server-side (only when no explicit text).
@@ -94,6 +101,7 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
     sourceText = fetched.text;
     fetchDegraded = fetched.degraded;
     truncatedAttachments = fetched.truncated_attachments;
+    sourceCoverage = fetched.coverage;
     resolvedNoticeId = fetched.resolved_notice_id;
     source = 'notice_id';
   }
@@ -124,7 +132,8 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
           ? `Notice ${noticeId} has no extractable SOW/attachment text yet — pass the RFP text directly via rfp_text, or try get_solicitation_documents first.`
           : 'Provide rfp_text (the solicitation text) or a notice_id to extract from.',
         how_to_use: 'No matrix was produced — do NOT invent requirements. Get the solicitation text (get_solicitation_documents) and retry.',
-        key_caveats: ['grounded=false means nothing was extracted, not that the RFP has no requirements.'],
+        key_caveats: [
+'grounded=false means nothing was extracted, not that the RFP has no requirements.'],
       };
     }
     return result;
@@ -153,6 +162,7 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         ? { recovered_source_specs: ex.recovered_source_specs }
         : {}),
       model: ex.model,
+      ...(sourceCoverage ? { source_coverage: sourceCoverage } : {}),
     },
   };
 
@@ -162,10 +172,17 @@ export async function extractComplianceMatrix(input: ComplianceMatrixInput): Pro
         ? 'The extraction model was unavailable on every chunk — treat as temporarily unavailable, not as "no requirements". Retry shortly.'
         : !grounded
         ? 'No explicit requirements were found in the provided text — it may be a synopsis or cover page rather than the Section L/M/C body. Supply the full solicitation.'
-        : `${ex.requirements.length} requirement(s) extracted${ex.truncated ? ' (input was truncated to the first 50K chars — long RFP; consider extracting sections separately)' : ''}. Each carries a category and, when detected, a section label and a verbatim source_quote.`,
+        : `${ex.requirements.length} requirement(s) extracted${ex.truncated ? ' (input was truncated to the first 50K chars — long RFP; consider extracting sections separately)' : ''}.${
+            sourceCoverage && !sourceCoverage.complete
+              ? ` PARTIAL SOURCE: ${sourceCoverage.documents_partial} document(s) partially read, ${sourceCoverage.documents_unreadable} unreadable — this is not the solicitation's complete requirement set.`
+              : ''
+          } Each carries a category and, when detected, a section label and a verbatim source_quote.`,
       how_to_use:
         'Use this as the compliance matrix: every row is one obligation the bid must address (category = submission/evaluation/technical/past_performance/pricing/admin/other; section = the L/M/C clause when detected). Build the proposal outline from it; where a source_quote is present, verify it against the RFP.',
       key_caveats: [
+        // Source-level gap FIRST: a matrix built from a partial read must not be
+        // read as the solicitation's full requirement set.
+        ...(sourceCoverage && coverageCaveat(sourceCoverage) ? [coverageCaveat(sourceCoverage) as string] : []),
         'Every requirement is derived from the provided solicitation text; when a source_quote is present it is verbatim. Do not add requirements the RFP does not state.',
         'Completeness is source-spec coverage (LOA, flight deck, SCIF, berthing, magazine when those strings are in the source), not the row count. missing_from_matrix means those specs were in the RFP and not extracted.',
         'Single-doc extraction: it does NOT merge amendments over the base RFP. Pass the amendment text too (or the full package) if closing dates/specs were revised.',

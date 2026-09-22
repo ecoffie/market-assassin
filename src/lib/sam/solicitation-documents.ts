@@ -24,7 +24,8 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { getCached, setCached } from '@/lib/mcp/external-cache';
-import { fetchAndExtractNoticeFiles, normalizeNoticeId } from '@/lib/sam/fetch-pursuit-docs';
+import { fetchAndExtractNoticeFiles, normalizeNoticeId, MAX_EXTRACTED_TEXT_CHARS } from '@/lib/sam/fetch-pursuit-docs';
+import { classifyExtraction, readableRatio, type ExtractionQuality } from '@/lib/sam/extraction-quality';
 import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
 import {
   assembleNoticeSourceText,
@@ -44,11 +45,59 @@ import {
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
 const CACHE_TTL = 30 * 24 * 60 * 60; // 30 days
-const INLINE_CAP = 20_000; // chars returned inline per text field (raw file has the full text)
-const CACHE_TEXT_CAP = 40_000; // chars stored per doc in the cold cache
+const INLINE_CAP = 20_000; // DEFAULT chars per doc when the caller doesn't page
+// PER-DOCUMENT window ceiling. NOT a total response-size limit: it is applied
+// inside the per-document map, so a notice with N attachments can return up to
+// N x this in one response (measured: 14 DLA attachments = 481,351 chars at
+// text_limit 120,000). Callers that need a bounded TOTAL should page with
+// document_ids rather than relying on this constant.
+const MAX_WINDOW_CHARS = 120_000;
+// Store what was extracted. This was 40_000, which silently DISCARDED text above
+// that on the cold path — so a textMode:'full' read was full on the cold call and
+// 40k on every warm read for the 30-day TTL (disclosed via extracted_text_truncated,
+// but a real fidelity limit). Now the extraction ceiling itself.
+const CACHE_TEXT_CAP = MAX_EXTRACTED_TEXT_CHARS;
+
+/**
+ * Read-only mode for verification runs. `SAM_DOCS_READONLY=on` suppresses every
+ * write this module can perform — description persistence and Storage upload —
+ * so an acceptance script cannot mutate production while exercising the real
+ * code path. Retrieval is unaffected; only persistence is skipped.
+ *
+ * It exists because a script LABELLED read-only acceptance performed a
+ * production DELETE (2026-09-22). Scoping a write makes the hazard smaller;
+ * removing the ability to write is what actually closes it.
+ */
+function isReadOnly(): boolean {
+  return String(process.env.SAM_DOCS_READONLY || '').toLowerCase() === 'on';
+}
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+}
+
+export type TextAvailability =
+  | 'complete'
+  | 'partial'
+  | 'extraction_failed'
+  | 'file_unavailable'
+  | 'extraction_capped'
+  | 'container_stub'
+  | 'unreadable_encoding';
+
+export interface TextWindow {
+  offset: number;
+  returned_chars: number;
+  total_chars: number | null; // null = unknown, never assume 0
+  next_offset: number | null;
+  has_more: boolean;
+  coverage_of_stored_text: number | null; // CHARS, never pages
+}
+
+export interface DocTextRequest {
+  document_id?: string;
+  offset?: number;
+  limit?: number;
 }
 
 export interface SolicitationDocument {
@@ -57,8 +106,17 @@ export interface SolicitationDocument {
   mime_type: string | null;
   page_count: number | null;
   char_count: number | null; // TRUE length of the extracted text (not the inline cap)
-  extracted_text: string; // inline; capped unless textMode='full'
+  extracted_text: string; // the requested WINDOW (or full text when textMode='full')
   extracted_text_truncated: boolean;
+  text_availability: TextAvailability;
+  text_window: TextWindow;
+  /** Stable address for paging + amendment tracking (never array position). */
+  document_id: string;
+  extraction_capped: boolean;
+  extraction_quality: ExtractionQuality;
+  text_readable_ratio: number | null;
+  /** Recorded length exceeds the text on hand — stored text is incomplete. */
+  text_shorter_than_recorded: boolean;
   download_url: string | null; // signed Storage URL (~1h) or public SAM fallback
   download_source: 'mindy_signed' | 'sam_public' | null;
   /** Where the file actually lives — SAM.gov vs Mindy storage. Always set. */
@@ -87,6 +145,21 @@ export interface SolicitationDocumentsResult {
   /** Assembled SOW + body + attachment text. Full when textMode='full'. */
   source_text?: string;
   truncated_attachments?: number;
+  /**
+   * Completeness of THIS response. NOT a paging terminator — `next_page === null`
+   * is. The call is stateless, so it cannot know what earlier calls returned;
+   * `scoped` says whether this response covered only part of the notice.
+   */
+  coverage: {
+    documents_total: number;
+    documents_complete: number;
+    documents_with_more_text: number;
+    documents_unavailable: number;
+    documents_extraction_capped: number;
+    documents_not_requested: number;
+    scoped: boolean;
+    complete: boolean;
+  };
   /** Every attachment named on the notice, including unread ones. */
   listed_attachments: ListedAttachment[];
   attachments_listed: number;
@@ -107,6 +180,102 @@ interface CachedDocMeta {
   storagePath: string | null;
   samUrl: string | null;
   extractedText: string; // capped at CACHE_TEXT_CAP
+  /** Extractor reported a failure (we hold the file, text is absent). */
+  extractionError?: string | null;
+}
+
+/**
+ * Take the requested WINDOW out of a document's stored text.
+ *
+ * Coverage is reported in CHARS, never pages: no char->page index exists, so
+ * "page N of M" derived from a char ratio would be a fabricated number.
+ */
+function windowText(
+  full: string,
+  offset: number,
+  limit: number,
+  opts: {
+    extractionCapped: boolean;
+    hadFile: boolean;
+    extractionFailed: boolean;
+    quality: ExtractionQuality;
+    /** Internal full-text mode. NOT expressible by a caller-supplied limit. */
+    unbounded?: boolean;
+  },
+): { text: string; window: TextWindow; availability: TextAvailability; truncated: boolean } {
+  const total = full.length;
+  const start = Math.max(0, Math.min(Math.floor(offset) || 0, total));
+  // MAX_WINDOW_CHARS bounds ONE DOCUMENT's window, not the whole response.
+  // textMode:'full' is the INTERNAL consumer path and must return the whole
+  // stored string, so it is signalled by opts.unbounded — never by a numeric
+  // limit. A MAX_SAFE_INTEGER sentinel was caller-reachable:
+  // `documents:[{limit: 9007199254740991}]` escaped the clamp and could return
+  // ~1MB for a single document. A flag cannot be expressed by any
+  // caller-supplied number, so the per-document bound holds by construction.
+  const requested = Math.floor(limit) || INLINE_CAP;
+  const size = opts.unbounded
+    ? Math.max(1, total)
+    : Math.max(1, Math.min(requested, MAX_WINDOW_CHARS));
+  const text = full.slice(start, start + size);
+  const end = start + text.length;
+  const hasMore = end < total;
+
+  let availability: TextAvailability;
+  if (total === 0) {
+    availability = opts.extractionFailed ? 'extraction_failed' : 'file_unavailable';
+  } else if (hasMore) {
+    // "More text exists" outranks a quality verdict, so next_offset stays visible
+    // and one document isn't counted as both unavailable and with-more-text.
+    availability = 'partial';
+  } else if (opts.quality !== 'ok') {
+    availability = opts.quality === 'container_stub' ? 'container_stub' : 'unreadable_encoding';
+  } else if (opts.extractionCapped) {
+    availability = 'extraction_capped';
+  } else {
+    availability = 'complete';
+  }
+
+  return {
+    text,
+    truncated: hasMore,
+    availability,
+    window: {
+      offset: start,
+      returned_chars: text.length,
+      total_chars: total > 0 ? total : opts.hadFile ? 0 : null,
+      next_offset: hasMore ? end : null,
+      has_more: hasMore,
+      coverage_of_stored_text: total > 0 ? Number((end / total).toFixed(4)) : null,
+    },
+  };
+}
+
+/** Roll per-document availability up to ONE notice-level answer. */
+function summarize(
+  documents: SolicitationDocument[],
+  totalOnNotice: number,
+): SolicitationDocumentsResult['coverage'] {
+  const withMore = documents.filter((d) => d.text_window.has_more).length;
+  const unavailable = documents.filter(
+    (d) =>
+      d.text_availability === 'file_unavailable' ||
+      d.text_availability === 'extraction_failed' ||
+      d.text_availability === 'container_stub' ||
+      d.text_availability === 'unreadable_encoding',
+  ).length;
+  const capped = documents.filter((d) => d.text_availability === 'extraction_capped').length;
+  const complete = documents.filter((d) => d.text_availability === 'complete').length;
+  return {
+    documents_total: documents.length,
+    documents_complete: complete,
+    documents_with_more_text: withMore,
+    documents_unavailable: unavailable,
+    documents_extraction_capped: capped,
+    documents_not_requested: Math.max(0, totalOnNotice - documents.length),
+    scoped: totalOnNotice > documents.length,
+    complete:
+      documents.length > 0 && complete === documents.length && totalOnNotice === documents.length,
+  };
 }
 
 function cap(text: string | null | undefined, n: number): { text: string; truncated: boolean } {
@@ -138,20 +307,60 @@ async function toOutputDocs(
   supabase: ReturnType<typeof sb>,
   metas: CachedDocMeta[],
   inlineCap: number,
+  req: SolicitationDocumentsInput = {} as SolicitationDocumentsInput,
 ): Promise<SolicitationDocument[]> {
+  // Per-document paging requests, addressed by stable document_id.
+  const perDoc = new Map<string, DocTextRequest>();
+  let wildcard: DocTextRequest | null = null;
+  for (const d of req.documents || []) {
+    if (d.document_id) perDoc.set(d.document_id, d);
+    else wildcard = d;
+  }
+  const only = req.documentIds && req.documentIds.length > 0 ? new Set(req.documentIds) : null;
+  const selected = only ? metas.filter((m) => only.has(m.fileId)) : metas;
+
   return Promise.all(
-    metas.map(async (m) => {
+    selected.map(async (m) => {
       const { url, source } = await signUrl(supabase, m.storagePath, m.samUrl, m.filename);
-      const inline = cap(m.extractedText, inlineCap);
-      const cacheTruncated = (m.charCount ?? m.extractedText.length) > m.extractedText.length;
+      const full = m.extractedText || '';
+      // main's disclosure, preserved verbatim: recorded length > text on hand
+      // means the stored copy is a truncated remnant.
+      const cacheTruncated = (m.charCount ?? full.length) > full.length;
+
+      const quality = classifyExtraction(full);
+      const extractionCapped = full.length >= MAX_EXTRACTED_TEXT_CHARS || cacheTruncated;
+
+      // textMode:'full' (main's behaviour for internal consumers) = one unbounded
+      // window, signalled by a FLAG the caller cannot forge. Otherwise the
+      // caller's window, defaulting to inlineCap and always clamped.
+      const unbounded = inlineCap === Number.MAX_SAFE_INTEGER;
+      const spec = perDoc.get(m.fileId) || wildcard || {};
+      const offset = spec.offset ?? req.textOffset ?? 0;
+      const limit = Math.min(spec.limit ?? req.textLimit ?? inlineCap, MAX_WINDOW_CHARS);
+
+      const w = windowText(full, offset, limit, {
+        extractionCapped,
+        hadFile: Boolean(m.storagePath || m.samUrl),
+        extractionFailed: Boolean(m.extractionError),
+        unbounded,
+        quality,
+      });
+
       return {
         filename: m.filename,
         doc_kind: m.docKind,
         mime_type: m.mime,
         page_count: m.pageCount,
         char_count: m.charCount,
-        extracted_text: inline.text,
-        extracted_text_truncated: inline.truncated || cacheTruncated,
+        extracted_text: w.text,
+        extracted_text_truncated: w.truncated || cacheTruncated,
+        text_availability: w.availability,
+        text_window: w.window,
+        document_id: m.fileId,
+        extraction_capped: extractionCapped,
+        extraction_quality: quality,
+        text_readable_ratio: full.length > 0 ? Number(readableRatio(full).toFixed(2)) : null,
+        text_shorter_than_recorded: cacheTruncated,
         download_url: url,
         download_source: source,
         location_note: attachmentLocationNote(source) ?? 'No downloadable copy was located for this file.',
@@ -201,7 +410,11 @@ function applyHonestyMeta(
   listedGroups: ListedAttachment[],
   textMode?: 'inline' | 'full',
   noticedescLimitation: string | null = null,
+  totalOnNotice?: number,
 ): SolicitationDocumentsResult {
+  // Single exit point for every retrieval layer — compute coverage here so no
+  // return path can forget it.
+  base.coverage = summarize(base.documents, totalOnNotice ?? base.documents.length);
   const pieeCorpus = `${base.description}\n${base.sow_text}`;
   const pieeLinks = extractPieeLinks(pieeCorpus);
   const pieeListed: ListedAttachment[] = pieeLinks.map((url) => ({
@@ -253,11 +466,22 @@ function applyHonestyMeta(
   return base;
 }
 
-export async function getSolicitationDocuments(input: {
+export interface SolicitationDocumentsInput {
   noticeId: string;
   /** inline (default) caps extracted_text for MCP payloads. full is required for compliance-matrix. */
   textMode?: 'inline' | 'full';
-}): Promise<SolicitationDocumentsResult> {
+  /** Chars per document in this response (default INLINE_CAP, max MAX_WINDOW_CHARS). */
+  textLimit?: number;
+  textOffset?: number;
+  /** Per-document windows — pass next_page.documents verbatim to continue. */
+  documents?: DocTextRequest[];
+  /** Restrict the response to these document_ids. */
+  documentIds?: string[];
+}
+
+export async function getSolicitationDocuments(
+  input: SolicitationDocumentsInput,
+): Promise<SolicitationDocumentsResult> {
   const noticeId = normalizeNoticeId((input.noticeId || '').trim());
   const supabase = sb();
   const inlineCap = input.textMode === 'full' ? Number.MAX_SAFE_INTEGER : INLINE_CAP;
@@ -274,6 +498,16 @@ export async function getSolicitationDocuments(input: {
     documents: [],
     source: 'none',
     degraded: false,
+    coverage: {
+      documents_total: 0,
+      documents_complete: 0,
+      documents_with_more_text: 0,
+      documents_unavailable: 0,
+      documents_extraction_capped: 0,
+      documents_not_requested: 0,
+      scoped: false,
+      complete: false,
+    },
     listed_attachments: [],
     attachments_listed: 0,
     attachments_with_text: 0,
@@ -353,10 +587,12 @@ export async function getSolicitationDocuments(input: {
       } else {
         // Persist so sol# and UUID both hit cache next time (no re-burn of quota).
         const now = new Date().toISOString();
-        const { error: persistErr } = await supabase
-          .from('sam_opportunities')
-          .update({ description: fetched.text, description_checked_at: now })
-          .eq('notice_id', resolvedNoticeId);
+        const { error: persistErr } = isReadOnly()
+          ? { error: null }
+          : await supabase
+              .from('sam_opportunities')
+              .update({ description: fetched.text, description_checked_at: now })
+              .eq('notice_id', resolvedNoticeId);
         if (persistErr) {
           console.error('[getSolicitationDocuments] persist description', persistErr.message);
           // Non-fatal — caller still gets the body this request.
@@ -375,7 +611,9 @@ export async function getSolicitationDocuments(input: {
   // Include rows WITHOUT extracted_text so listed-but-unread files are visible.
   const { data: warmRows, error: warmError } = await supabase
     .from('pursuit_documents')
-    .select('sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind')
+    .select(
+      'sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind, extraction_error',
+    )
     .eq('notice_id', resolvedNoticeId)
     .eq('doc_source', 'sam_public')
     .order('char_count', { ascending: false });
@@ -409,12 +647,13 @@ export async function getSolicitationDocuments(input: {
         storagePath: r.storage_path ?? null,
         samUrl: r.sam_url ?? null,
         extractedText: String(r.extracted_text || ''),
+        extractionError: r.extraction_error ?? null,
       });
     }
     if (metas.length > 0) {
-      base.documents = await toOutputDocs(supabase, metas, inlineCap);
+      base.documents = await toOutputDocs(supabase, metas, inlineCap, input);
       base.source = 'cache';
-      return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode, noticedescLimitation);
+      return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode, noticedescLimitation, metas.length);
     }
   }
 
@@ -427,9 +666,9 @@ export async function getSolicitationDocuments(input: {
       has_extracted_text: !!(m.extractedText && m.extractedText.trim()),
       location: 'sam_public' as const,
     }));
-    base.documents = await toOutputDocs(supabase, cached, inlineCap);
+    base.documents = await toOutputDocs(supabase, cached, inlineCap, input);
     base.source = 'cache';
-    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, cachedListed), input.textMode, noticedescLimitation);
+    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, cachedListed), input.textMode, noticedescLimitation, cached.length);
   }
 
   // ── Layer 3: COLD FETCH — on-demand download + extract (public SAM) ────────
@@ -456,10 +695,12 @@ export async function getSolicitationDocuments(input: {
     const storagePath = `_notices/${resolvedNoticeId}/${safe}`;
     let finalPath: string | null = null;
     try {
-      const { error } = await supabase.storage.from(BUCKET).upload(storagePath, f.buffer, {
-        contentType: f.mime || 'application/octet-stream',
-        upsert: true,
-      });
+      const { error } = isReadOnly()
+        ? { error: { message: 'read-only mode: storage upload skipped' } }
+        : await supabase.storage.from(BUCKET).upload(storagePath, f.buffer, {
+            contentType: f.mime || 'application/octet-stream',
+            upsert: true,
+          });
       if (!error) finalPath = storagePath;
       else console.warn('[solicitation-docs] storage upload failed:', error.message);
     } catch (err) {
@@ -482,13 +723,14 @@ export async function getSolicitationDocuments(input: {
       storagePath: finalPath,
       samUrl: f.samUrl,
       extractedText: input.textMode === 'full' ? f.extractedText : f.extractedText.slice(0, CACHE_TEXT_CAP),
+      extractionError: f.extractionError ?? null,
     });
   }
 
   const cacheMetas = metas.map((m) => ({ ...m, extractedText: m.extractedText.slice(0, CACHE_TEXT_CAP) }));
   await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, cacheMetas, CACHE_TTL);
 
-  base.documents = await toOutputDocs(supabase, metas, inlineCap);
+  base.documents = await toOutputDocs(supabase, metas, inlineCap, input);
   base.source = 'on_demand';
-  return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, fetchedListed), input.textMode, noticedescLimitation);
+  return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, fetchedListed), input.textMode, noticedescLimitation, metas.length);
 }

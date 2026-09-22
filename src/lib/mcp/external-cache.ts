@@ -23,7 +23,20 @@ import { createHash } from 'node:crypto';
 let _client: SupabaseClient | null = null;
 let _disabled = false;
 
+/**
+ * Opt-out for verification runs. `MCP_EXTERNAL_CACHE=off` makes every read miss
+ * and every write a no-op, so an acceptance script can force a cold upstream
+ * path WITHOUT deleting production rows. It exists because the alternative —
+ * evicting the row first — is a production write inside a script presented as
+ * read-only verification, and that actually happened (2026-09-22).
+ * Read-only and reversible: it never touches stored data.
+ */
+function cacheDisabledByEnv(): boolean {
+  return String(process.env.MCP_EXTERNAL_CACHE || '').toLowerCase() === 'off';
+}
+
 function getClient(): SupabaseClient | null {
+  if (cacheDisabledByEnv()) return null;
   if (_disabled) return null;
   if (_client) return _client;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

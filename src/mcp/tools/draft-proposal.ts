@@ -22,6 +22,7 @@
 import { generateAllSections } from '@/lib/proposal/draft-all';
 import { generateV2Draft } from '@/lib/proposal/v2';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';
+import { summarizeSourceCoverage, coverageCaveat, type SourceCoverage } from '@/lib/sam/source-coverage';
 import { RFP_SECTIONS, CAP_STATEMENT_SECTIONS, type SectionType, type DraftResult } from '@/lib/proposal/types';
 import type { ComplianceReq, ReqCategory } from '@/lib/proposal/section-alignment';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -59,19 +60,23 @@ function toComplianceReqs(
 /** Build the source text for a notice: SOW + notice body + each attachment's
  *  extracted text — so the drafter sees the scope wherever it lives. Identical to
  *  compliance-matrix.ts's textFromNotice (honest degraded on a fetch error). */
-async function textFromNotice(noticeId: string): Promise<{ text: string; degraded: boolean }> {
+async function textFromNotice(
+  noticeId: string,
+): Promise<{ text: string; degraded: boolean; coverage: SourceCoverage | null }> {
   try {
-    const docs = await getSolicitationDocuments({ noticeId });
+    // Full window per document so drafting sees the whole requirement, not
+    // just the first 20k chars of each attachment.
+    const docs = await getSolicitationDocuments({ noticeId, textLimit: 120_000 });
     const parts: string[] = [];
     if (docs.sow_text) parts.push(docs.sow_text);
     if (docs.description) parts.push(docs.description);
     for (const d of docs.documents) {
       if (d.extracted_text) parts.push(`--- ${d.filename || 'attachment'} ---\n${d.extracted_text}`);
     }
-    return { text: parts.join('\n\n').trim(), degraded: false };
+    return { text: parts.join('\n\n').trim(), degraded: false, coverage: summarizeSourceCoverage(docs) };
   } catch (err) {
     console.error('[draft-proposal] notice fetch failed', noticeId, err);
-    return { text: '', degraded: true };
+    return { text: '', degraded: true, coverage: null };
   }
 }
 
@@ -79,15 +84,15 @@ async function textFromNotice(noticeId: string): Promise<{ text: string; degrade
 async function resolveSource(
   rfpText?: string,
   noticeId?: string,
-): Promise<{ text: string; source: 'notice_id' | 'text' | 'none'; fetchDegraded: boolean }> {
+): Promise<{ text: string; source: 'notice_id' | 'text' | 'none'; fetchDegraded: boolean; coverage: SourceCoverage | null }> {
   const explicit = (rfpText || '').trim();
-  if (explicit) return { text: explicit, source: 'text', fetchDegraded: false };
+  if (explicit) return { text: explicit, source: 'text', fetchDegraded: false, coverage: null };
   const nid = (noticeId || '').trim();
   if (nid) {
     const fetched = await textFromNotice(nid);
-    return { text: fetched.text, source: 'notice_id', fetchDegraded: fetched.degraded };
+    return { text: fetched.text, source: 'notice_id', fetchDegraded: fetched.degraded, coverage: fetched.coverage };
   }
-  return { text: '', source: 'none', fetchDegraded: false };
+  return { text: '', source: 'none', fetchDegraded: false, coverage: null };
 }
 
 // =====================================================================
@@ -126,6 +131,8 @@ export interface DraftProposalResult {
     source: 'notice_id' | 'text' | 'none';
     section_count: number;
     error_count: number;
+    /** What the SOURCE text was missing when drafted from a notice_id. */
+    source_coverage?: SourceCoverage;
   };
 }
 
@@ -141,7 +148,7 @@ function trimSection(s: DraftResult): DraftProposalSection {
 }
 
 export async function draftProposal(input: DraftProposalInput): Promise<DraftProposalResult> {
-  const { text: sourceText, source, fetchDegraded } = await resolveSource(input.rfp_text, input.notice_id);
+  const { text: sourceText, source, fetchDegraded, coverage: sourceCoverage } = await resolveSource(input.rfp_text, input.notice_id);
 
   // Nothing to draft from — honest miss (or a fetch error). Never fabricate.
   if (!sourceText) {
@@ -193,7 +200,14 @@ export async function draftProposal(input: DraftProposalInput): Promise<DraftPro
   const result: DraftProposalResult = {
     sections,
     outline,
-    _meta: { grounded, degraded, source, section_count: sections.length, error_count: errorCount },
+    _meta: {
+      grounded,
+      degraded,
+      source,
+      section_count: sections.length,
+      error_count: errorCount,
+      ...(sourceCoverage ? { source_coverage: sourceCoverage } : {}),
+    },
   };
 
   if (mcpFlags.aiHint) {
@@ -202,10 +216,17 @@ export async function draftProposal(input: DraftProposalInput): Promise<DraftPro
         ? 'The drafting model was unavailable — treat as temporarily unavailable, not as "no proposal possible". Retry shortly.'
         : !grounded
         ? 'No sections were drafted — the source may be too thin (a synopsis/cover page, not the full solicitation). Supply the full RFP text.'
-        : `${sections.length} section(s) drafted (${sections.map((s) => s.title).join(', ')})${errorCount > 0 ? `; ${errorCount} section(s) failed and were dropped` : ''}. Each is vault-grounded where the caller's Vault had matching past performance.`,
+        : `${sections.length} section(s) drafted (${sections.map((s) => s.title).join(', ')})${errorCount > 0 ? `; ${errorCount} section(s) failed and were dropped` : ''}.${
+            sourceCoverage && !sourceCoverage.complete
+              ? ' PARTIAL SOURCE: the solicitation was not fully readable, so required content may be missing from this draft.'
+              : ''
+          } Each is vault-grounded where the caller's Vault had matching past performance.`,
       how_to_use:
         'Use the drafted sections as a first-pass response. Every [placeholder] is a fact the drafter did not have — fill it with real data, never an invented value. Pass the sections to export_proposal for a .docx, and to referee_proposal_compliance (with the compliance matrix) before submission.',
       key_caveats: [
+        // Source gap FIRST: a draft written from a partial solicitation may omit
+        // whole required volumes without anything in the output saying so.
+        ...(sourceCoverage && coverageCaveat(sourceCoverage) ? [coverageCaveat(sourceCoverage) as string] : []),
         'A DRAFT, not a submission-ready proposal — verify every fact against the RFP and your records; bracketed items are unfilled.',
         'Grounding depends on the caller\'s Vault: with no userEmail (or an empty Vault) the draft leans generic and brackets more.',
         'Do NOT invent facts the draft brackets — a single fabricated number/reference can disqualify the bid.',
