@@ -65,6 +65,24 @@ describe('unreadable encoding', () => {
     expect(classifyExtraction('\uE001\uE002\uE003\uE004\uE005'.repeat(80))).toBe('unreadable_encoding');
   });
 
+  it('a symbol-encoded BODY font is flagged (the exclusion\'s blind spot)', () => {
+    // 0xF000+ascii is the standard symbol-encoded TrueType mapping — the same
+    // mechanism behind the checkbox glyphs. readableRatio scores this 1.00 by
+    // construction, so the ratio ALONE cannot see it.
+    const body = [...'The Contractor shall provide all labor and materials.']
+      .map((c) => String.fromCharCode(0xf000 + c.charCodeAt(0)))
+      .join('')
+      .repeat(50);
+    expect(readableRatio(body)).toBe(1); // ratio is blind, by design
+    expect(classifyExtraction(body)).toBe('unreadable_encoding'); // caught anyway
+  });
+
+  it('a checkbox PAGE is still ok — the body-font check must not undo the fix', () => {
+    // Dense checkboxes but with real readable words: not a symbol body font.
+    const page = '\uF0A8 Yes \uF0A8 No \uF0A8 N/A\n'.repeat(200);
+    expect(classifyExtraction(page)).toBe('ok');
+  });
+
   it('genuine solicitation prose is never flagged', () => {
     const prose =
       'Solicitation No. SPE60525R0222. The Contractor shall provide insurance in ' +

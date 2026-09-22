@@ -49,18 +49,37 @@ chk('exact text reconstruction (assembled length === char_count for every doc)',
 // out — this compares the content, plus a sha256 over it.
 const oneShot: any = await solicitationDocuments({ notice_id: NID, text_limit: 1_000_000, documents: mcp.documents.map((d:any)=>({ document_id: d.document_id, offset: 0, limit: 1_000_000 })) });
 let bytesEqual = true;
+let comparedChars = 0, storedChars = 0;
+const MAX_WINDOW = 120_000; // MAX_WINDOW_CHARS in solicitation-documents.ts
 for (const d of oneShot.documents) {
   const paged = acc.get(d.document_id) || '';
   const direct = d.extracted_text;
-  // A single response is capped at MAX_WINDOW_CHARS, so compare over the
-  // prefix the unpaged read actually returned.
+  // GUARD AGAINST A VACUOUS PASS: if `direct` ever came back empty,
+  // ''.slice(0,0) !== '' is false and this check would "pass" having compared
+  // nothing. Require the unpaged read to be the full document or a full window.
+  const expected = Math.min(d.char_count ?? 0, MAX_WINDOW);
+  if (direct.length !== expected) {
+    bytesEqual = false;
+    console.log(`   SHORT READ ${d.filename}: unpaged returned ${direct.length}, expected ${expected}`);
+    continue;
+  }
   if (paged.slice(0, direct.length) !== direct) {
     bytesEqual = false;
     console.log(`   BYTE MISMATCH ${d.filename}: first diff at ${[...direct].findIndex((c,i)=>paged[i]!==c)}`);
   }
+  comparedChars += direct.length;
+  storedChars += d.char_count ?? 0;
 }
 const sha = createHash('sha256').update([...acc.values()].join('')).digest('hex');
-chk('byte-for-byte: paged assembly === unpaged read (prefix)', bytesEqual, `sha256(assembled)=${sha.slice(0,16)}…`);
+// State the BOUND honestly: a single response is capped at MAX_WINDOW_CHARS, so
+// a document longer than that is compared over its first 120k only. That prefix
+// still spans the first paging boundary, which is where a tiling defect appears.
+const pct = storedChars > 0 ? (100 * comparedChars / storedChars).toFixed(1) : '0.0';
+chk(
+  'byte-for-byte: paged assembly === unpaged read',
+  bytesEqual,
+  `${comparedChars}/${storedChars} chars (${pct}%) compared; sha256(assembled)=${sha.slice(0,16)}…`,
+);
 // A single response is deliberately BOUNDED (MAX_WINDOW_CHARS), so the real
 // contract is: paging terminates, and when it does nothing is left unread.
 chk('paging terminates on the documented signal (next_page === null)', r.next_page===null);

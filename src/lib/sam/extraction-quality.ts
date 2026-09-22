@@ -45,8 +45,11 @@ export function readableRatio(text: string): number {
   // page ("☐ Yes ☐ No ☐ N/A") is mostly those codepoints. Counting them scored
   // such a page 0.82 and would have suppressed a real certifications page as
   // unusable — the same false-suppression this metric was rewritten to stop.
-  // Genuine font-subset failures are unaffected: they sit in C0 or the rest of
-  // the PUA and still measure 0.00–0.09.
+  // TRADE-OFF, stated plainly: excluding this range creates a blind spot. A PDF
+  // whose BODY font is symbol-encoded (0xF000 + ascii — the same mechanism that
+  // produces the checkbox glyphs) lands entirely in F020–F0FF and scores 1.00
+  // here. `hasSymbolEncodedBody` below catches that case; the ratio alone does
+  // not. Failures outside this range are unaffected and still measure 0.00–0.09.
   const unreadable = text.match(
     /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uE000-\uF01F\uF100-\uF8FF\uFFFD]/g,
   );
@@ -68,10 +71,27 @@ export function isMojibake(text: string): boolean {
   return readableRatio(text) < MIN_READABLE_RATIO;
 }
 
+/**
+ * A document whose text is OVERWHELMINGLY symbol-encoded PUA (0xF000+ascii) with
+ * essentially no plain ASCII letters is a symbol-encoded BODY font, not a page
+ * with checkbox glyphs on it. Checked separately because `readableRatio`
+ * deliberately treats that range as readable (see the note above), so the ratio
+ * cannot see this class at all.
+ */
+export function hasSymbolEncodedBody(text: string): boolean {
+  if (text.length < 200) return false;
+  const symbol = (text.match(/[\uF020-\uF0FF]/g) || []).length;
+  const letters = (text.match(/[A-Za-z]/g) || []).length;
+  // Dominated by symbol codepoints AND almost no real letters to read.
+  return symbol / text.length > 0.6 && letters / text.length < 0.05;
+}
+
 export type ExtractionQuality = 'ok' | 'container_stub' | 'unreadable_encoding';
 
 export function classifyExtraction(text: string): ExtractionQuality {
   if (isPdfPortfolioStub(text)) return 'container_stub';
   if (isMojibake(text)) return 'unreadable_encoding';
+  // The ratio is blind to a symbol-encoded body font by construction.
+  if (hasSymbolEncodedBody(text)) return 'unreadable_encoding';
   return 'ok';
 }

@@ -419,7 +419,14 @@ try {
     console.error(`✓ grounded=${sdS._meta?.grounded} · degraded=${sdS._meta?.degraded} · source=${sdS._meta?.source} · doc_count=${sdS._meta?.doc_count} · title=${String(sdS.title).slice(0, 50)}${d0 ? ` · top=${String(d0.filename).slice(0, 40)} (${d0.doc_kind}, ${d0.char_count}ch, url=${d0.download_url ? 'yes' : 'no'})` : ''}`);
     // Coverage contract: every doc must SAY why its text is or isn't here, and
     // the notice-level rollup must exist. An empty string alone is not an answer.
-    const AVAIL = ['complete', 'partial', 'extraction_failed', 'file_unavailable', 'extraction_capped'];
+    // Must list EVERY reachable status (solicitation-documents.ts windowText).
+    // container_stub / unreadable_encoding were omitted, so the live smoke would
+    // have failed the first time a PDF Portfolio or font-subset doc appeared —
+    // rejecting the exact statuses we document to customers.
+    const AVAIL = [
+      'complete', 'partial', 'extraction_failed', 'file_unavailable',
+      'extraction_capped', 'container_stub', 'unreadable_encoding',
+    ];
     if (!sdS.coverage || typeof sdS.coverage.complete !== 'boolean') fail('solicitation-documents: coverage rollup missing');
     for (const d of sdS.documents) {
       if (!AVAIL.includes(d.text_availability)) fail(`solicitation-documents: bad text_availability "${d.text_availability}"`);

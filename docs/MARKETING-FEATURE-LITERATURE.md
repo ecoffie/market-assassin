@@ -6306,8 +6306,7 @@ reports **why** its text is or isn't present: `complete`, `partial`,
 `extraction_failed`, `file_unavailable`, `extraction_capped`, `container_stub`
 (a PDF Portfolio cover sheet whose real files are nested inside) or
 `unreadable_encoding` (a font-subset PDF whose glyphs carry no text map).
-Coverage is
-counted in **characters**, never converted to pages.
+Coverage is counted in **characters**, never converted to pages.
 
 **Why.** Text was capped at 20,000 characters per document with no way to reach
 the rest, so the remainder was unreachable rather than paginated. Measured across
