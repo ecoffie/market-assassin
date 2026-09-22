@@ -4,6 +4,7 @@ import { fetchNoticeResources } from '../../src/lib/sam/fetch-notice-resources';
 import { getRotatedSAMKey } from '../../src/lib/sam/utils';
 import { solicitationDocuments } from '../../src/mcp/tools/solicitation-documents';
 import { generateCacheKey } from '../../src/lib/mcp/external-cache';
+import { createHash } from 'node:crypto';
 
 const NID = '2d232f3ce1f04085be52cbfe43a0e463';
 let pass = true;
@@ -40,7 +41,26 @@ for (const d of mcp.documents) {
   const got = (acc.get(d.document_id)||'').length;
   if (d.char_count != null && got !== d.char_count) { exact=false; console.log(`   mismatch ${d.filename}: assembled ${got} vs char_count ${d.char_count}`); }
 }
-chk('exact text reconstruction (assembled === char_count for every doc)', exact, `${calls} calls`);
+chk('exact text reconstruction (assembled length === char_count for every doc)', exact, `${calls} calls`);
+
+// 2b ── TRUE byte comparison: the paged assembly must equal a single unpaged
+// read, character for character. Length equality alone would pass even if the
+// windows overlapped or dropped a boundary character and happened to balance
+// out — this compares the content, plus a sha256 over it.
+const oneShot: any = await solicitationDocuments({ notice_id: NID, text_limit: 1_000_000, documents: mcp.documents.map((d:any)=>({ document_id: d.document_id, offset: 0, limit: 1_000_000 })) });
+let bytesEqual = true;
+for (const d of oneShot.documents) {
+  const paged = acc.get(d.document_id) || '';
+  const direct = d.extracted_text;
+  // A single response is capped at MAX_WINDOW_CHARS, so compare over the
+  // prefix the unpaged read actually returned.
+  if (paged.slice(0, direct.length) !== direct) {
+    bytesEqual = false;
+    console.log(`   BYTE MISMATCH ${d.filename}: first diff at ${[...direct].findIndex((c,i)=>paged[i]!==c)}`);
+  }
+}
+const sha = createHash('sha256').update([...acc.values()].join('')).digest('hex');
+chk('byte-for-byte: paged assembly === unpaged read (prefix)', bytesEqual, `sha256(assembled)=${sha.slice(0,16)}…`);
 // A single response is deliberately BOUNDED (MAX_WINDOW_CHARS), so the real
 // contract is: paging terminates, and when it does nothing is left unread.
 chk('paging terminates on the documented signal (next_page === null)', r.next_page===null);
