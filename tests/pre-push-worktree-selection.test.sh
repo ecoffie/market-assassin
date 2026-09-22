@@ -27,20 +27,49 @@ set -uo pipefail
 # correctly refusing a temp repo that is not market-assassin.) Clear every
 # channel git uses to inject config, and pin global/system config to nothing,
 # so these fixtures answer only to the config the test itself sets.
-unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE \
+      GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR \
+      GIT_PREFIX GIT_NAMESPACE GIT_CEILING_DIRECTORIES
 i=0; while [ $i -lt 64 ]; do unset "GIT_CONFIG_KEY_$i" "GIT_CONFIG_VALUE_$i"; i=$((i+1)); done
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 export GIT_TERMINAL_PROMPT=0
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESOLVER="$REPO_ROOT/.githooks/resolve-checkout.sh"
-# ⚠️ PHYSICAL path. On macOS /var is a symlink to /private/var, and
-# `git rev-parse --show-toplevel` always answers with the resolved path — so
-# comparing against an unresolved mktemp path fails on a correct resolver.
-TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/prepush-sel-XXXXXX")" && pwd -P)"
+# ⚠️⚠️ THE ANCHOR. Every containment guard below compares against $TMP, and the
+# EXIT trap `rm -rf`s it — so if $TMP is wrong, the guards are tautologies and
+# the trap is a demolition order. This was a REAL defect in this file:
+#
+#     TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/prepush-sel-XXXXXX")" && pwd -P)"
+#
+# A failed `mktemp -d` prints nothing to stdout, and bash's `cd ""` RETURNS 0
+# WITHOUT MOVING — so $TMP silently became the current directory. As blocking
+# gate step 1a the cwd is the checkout being pushed (the hook `cd`s there
+# first), so a stale or unwritable TMPDIR would have deleted the user's working
+# tree while this script printed 8/8 and exited 0. Demonstrated on a sentinel.
+#
+# Four guards, cheapest-to-strongest. The empty-directory check is the generic
+# one: a real checkout is never empty.
+TMP_RAW="$(mktemp -d "${TMPDIR:-/tmp}/prepush-sel-XXXXXX")" \
+  || { echo "  ✗ CONTAINMENT: mktemp -d failed under TMPDIR='${TMPDIR:-/tmp}'" >&2; exit 2; }
+[ -n "$TMP_RAW" ] && [ -d "$TMP_RAW" ] \
+  || { echo "  ✗ CONTAINMENT: mktemp -d produced no usable directory" >&2; exit 2; }
+# PHYSICAL path: on macOS /var is a symlink to /private/var, and
+# `git rev-parse --show-toplevel` always answers resolved — comparing against
+# an unresolved mktemp path would fail a CORRECT resolver.
+TMP="$(cd "$TMP_RAW" && pwd -P)" \
+  || { echo "  ✗ CONTAINMENT: cannot enter $TMP_RAW" >&2; exit 2; }
+case "$TMP" in
+  */prepush-sel-??????) : ;;
+  *) echo "  ✗ CONTAINMENT: refusing \$TMP='$TMP' — not a prepush-sel- temp dir" >&2; exit 2 ;;
+esac
+[ -z "$(ls -A "$TMP" 2>/dev/null)" ] \
+  || { echo "  ✗ CONTAINMENT: refusing \$TMP='$TMP' — not empty" >&2; exit 2; }
+
 pass=0; fail=0
 
 cleanup() { rm -rf "$TMP"; }
+# Armed only AFTER $TMP is validated, so a refusal above cannot fire the trap.
 trap cleanup EXIT
 
 ok()   { echo "  ✓ $1"; pass=$((pass+1)); }
@@ -217,6 +246,35 @@ if [ $rc_f -eq 0 ] && [ "$out_f" = "$A/worktree" ]; then
   ok "ignores inherited GIT_DIR/GIT_WORK_TREE pointing at the primary"
 else
   bad "inherited GIT_DIR/GIT_WORK_TREE changed the answer" "got: $out_f"
+fi
+
+# ── 6. THE ANCHOR ITSELF must fail closed ──────────────────────────────────
+# Regression for the defect found in review: a failed `mktemp -d` silently made
+# $TMP the CURRENT DIRECTORY (bash's `cd ""` returns 0 without moving), every
+# guard below then compared against the real tree, and the EXIT trap deleted
+# it — while this script printed 8/8 and exited 0. Under gate step 1a the cwd
+# is the checkout being pushed.
+#
+# Re-invokes THIS script from a sentinel that looks like a checkout, with a
+# TMPDIR that cannot work, and requires: non-zero exit AND the sentinel intact.
+if [ "${PREPUSH_SEL_SELFTEST:-}" != "1" ]; then
+  sentinel="$TMP/anchor-sentinel"
+  mkdir -p "$sentinel/src"
+  printf '{"name":"market-assassin"}\n' > "$sentinel/package.json"
+  echo precious > "$sentinel/src/precious.ts"
+  cp "${BASH_SOURCE[0]}" "$sentinel/selftest.sh"
+  (
+    cd "$sentinel" || die_hard "cd $sentinel"
+    PREPUSH_SEL_SELFTEST=1 TMPDIR=/nonexistent-anchor-probe/ bash selftest.sh
+  ) >/dev/null 2>&1
+  rc_anchor=$?
+  if [ $rc_anchor -ne 0 ] && [ -f "$sentinel/src/precious.ts" ]; then
+    ok "anchor fails closed on an unusable TMPDIR, leaving the cwd intact"
+  elif [ ! -f "$sentinel/src/precious.ts" ]; then
+    bad "ANCHOR DESTROYED THE CWD — \$TMP degraded to the working directory"
+  else
+    bad "anchor did not fail closed on an unusable TMPDIR" "exit=$rc_anchor"
+  fi
 fi
 
 echo

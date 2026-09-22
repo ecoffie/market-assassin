@@ -2163,6 +2163,16 @@ test. Two mechanisms, both ordinary:
    under `$TMP` *before* git is pointed at it, and assert every repo git creates resolves
    back under `$TMP`. Use `pwd -P` (`git rev-parse --show-toplevel` always answers with the
    PHYSICAL path, so `/var` vs `/private/var` will fail a correct resolver).
+   ⚠️ **VALIDATE THE ANCHOR ITSELF, or every other guard is a tautology.** Found in review
+   of this very file: `TMP="$(cd "$(mktemp -d …)" && pwd -P)"` degrades to the CURRENT
+   DIRECTORY when `mktemp` fails, because a failed `mktemp -d` prints nothing and **bash's
+   `cd ""` returns 0 without moving**. Every `under_tmp` check then compared against the
+   real tree and passed, and the `EXIT` trap's `rm -rf "$TMP"` deleted it — while the test
+   printed 8/8 and exited 0. As gate step 1a the cwd is the checkout being pushed. Four
+   guards: `mktemp` must succeed, the result must be a non-empty existing dir, the path
+   must match the expected `*-XXXXXX` shape, and **the directory must be EMPTY** — that
+   last one is the generic catch, because a real checkout never is. Arm the cleanup trap
+   only after all four pass.
 3. **Every `cd` gets `|| die`.** A test without `set -e` treats a failed `cd` as "carry on
    here", and "here" is the source tree.
 4. ⛔ **Never point `GIT_DIR` at the real repository, even to prove a negative.** Use a
