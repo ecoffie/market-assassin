@@ -4,9 +4,11 @@
 #
 # Usage:  resolve-checkout.sh [HOOK_DIR]
 #   no arg   — print the physical toplevel of the checkout we are running in.
-#   HOOK_DIR — additionally require that HOOK_DIR's parent IS that checkout,
-#              i.e. the hook CODE and the tree it validates are the same
-#              checkout. Fails closed when they differ.
+#   HOOK_DIR — additionally require that HOOK_DIR's PHYSICAL parent IS that
+#              checkout, i.e. the hook CODE and the tree it validates are the
+#              same checkout. Fails closed when they differ. HOOK_DIR is
+#              canonicalized here too, so a symlinked hook directory cannot
+#              launder its ownership through a lexical `..`.
 #
 # ── The supported configuration ───────────────────────────────────────────
 #
@@ -95,13 +97,20 @@ actual_name="$(node -e 'try{process.stdout.write(require(process.argv[1]).name||
 if [ $# -ge 1 ] && [ -n "${1:-}" ]; then
   hook_dir="$1"
   [ -d "$hook_dir" ] || die "hook dir does not exist: $hook_dir"
-  hook_root="$(cd "$hook_dir/.." && pwd -P)" \
-    || die "cannot resolve the checkout owning $hook_dir"
+  # ⚠️ PHYSICAL, and never a lexical `..`. `cd "$dir/.." && pwd -P` resolves the
+  # LOGICAL parent, so a symlinked hook directory
+  #     worktree/.githooks -> primary/.githooks
+  # reports `worktree` as the owner while the code physically lives in the
+  # primary. Canonicalize the directory first, then take ITS physical parent.
+  hook_dir_physical="$(cd -P "$hook_dir" && pwd -P)" \
+    || die "cannot canonicalize hook dir: $hook_dir"
+  hook_root="$(cd -P "$hook_dir_physical/.." && pwd -P)" \
+    || die "cannot resolve the checkout owning $hook_dir_physical"
   if [ "$hook_root" != "$toplevel" ]; then
     die "$(printf '%s\n' \
       "hook code belongs to ANOTHER CHECKOUT — refusing to validate." \
       "  hook code : $hook_dir" \
-      "              (owned by $hook_root)" \
+      "              (physically $hook_dir_physical, owned by $hook_root)" \
       "  pushing   : $toplevel" \
       "core.hooksPath is an absolute path into a different checkout, so this" \
       "tree would be gated by another checkout's hook implementation." \

@@ -2145,6 +2145,18 @@ Actions `verify` ran against the actual commits and passed, and the suite, the 1
 oracles and the browser checks were run directly in the worktree — but the local gate did
 not see it. Do not cite those gate lines as branch validation.
 
+⚠️ **Canonicalize the hook SOURCE before its ownership means anything.** Two laundering
+routes, both closed and both pinned:
+- **symlinked hook DIRECTORY** (`worktree/.githooks -> primary/.githooks`): `cd "$dir/.."`
+  resolves the LOGICAL parent and happily reports `worktree` as the owner while the code
+  physically lives in the primary. Canonicalize the directory first (`cd -P`), then take
+  ITS physical parent. Enforced in both the hook and, defensively, in the resolver.
+- **symlinked hook FILE** (`worktree/.githooks/pre-push -> primary/.../pre-push`): the
+  directory is genuinely local, so a directory-level check passes while git executes the
+  primary's code. `[ -L "$0" ]` refuses it outright — the supported checkout has a real
+  tracked hook file, so a symlink there is always wrong. `post-merge` detects the same and
+  exits 0 silently, being report-only.
+
 **Two traps if you touch the resolver:**
 - **Inherited `GIT_DIR` / `GIT_WORK_TREE`.** Git sets these for hooks; a plain
   `git rev-parse` in a subshell then answers for whatever they name instead of for the

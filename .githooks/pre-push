@@ -20,7 +20,20 @@ set -uo pipefail
 # the primary checkout, where the primary's hook runs with cwd in the pushed
 # worktree. The gate then examined the primary tree and reported on your branch.
 # See .githooks/resolve-checkout.sh for the measurement.
-HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+# ⚠️ The hook SOURCE must be canonical before its ownership means anything.
+#   • a symlinked hook FILE (worktree/.githooks/pre-push -> primary/...) leaves
+#     the directory local, so a directory-level check would pass while git
+#     executes the primary's code. The supported checkout has a real tracked
+#     hook file, so a symlink here is always wrong.
+#   • a symlinked hook DIRECTORY is caught by resolving physically, never via a
+#     lexical `..`.
+if [ -L "$0" ]; then
+  echo "✗ pre-push gate: refusing a SYMLINKED hook file — $0" >&2
+  echo "  The hook that runs must be the real file tracked in the checkout" >&2
+  echo "  being pushed. Restore it with:   npm run hooks:install" >&2
+  exit 1
+fi
+HOOK_DIR="$(cd -P "$(dirname "$0")" && pwd -P)"
 if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR")"; then
   echo "✗ pre-push gate: blocked (see above) — refusing to report on a tree I cannot vouch for." >&2
   exit 1

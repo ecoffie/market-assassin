@@ -18,7 +18,10 @@ set -uo pipefail
 # this reported on the PRIMARY checkout no matter where the merge happened.
 # Report-only here, but it is the identical defect, so it uses the identical
 # fix. See .githooks/resolve-checkout.sh.
-HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Same canonicalization as pre-push. Report-only, so a symlinked hook file or
+# a foreign hook directory is a silent no-op rather than a failure.
+[ -L "$0" ] && exit 0
+HOOK_DIR="$(cd -P "$(dirname "$0")" && pwd -P)"
 # Same ownership rule as pre-push: this hook must not run the PRIMARY
 # checkout's reporting logic against a different worktree while pretending it
 # belongs there. Report-only, so a mismatch is silent rather than blocking.

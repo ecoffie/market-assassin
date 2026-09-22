@@ -170,7 +170,10 @@ install_hook() {
 set -uo pipefail
 echo "GATE: hook code from $label"
 echo "$label" >> "$base/which-hook-ran"
-HOOK_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+if [ -L "\$0" ]; then
+  echo "GATE: refusing a SYMLINKED hook file — \$0" >&2; exit 1
+fi
+HOOK_DIR="\$(cd -P "\$(dirname "\$0")" && pwd -P)"
 if ! ROOT="\$("\$HOOK_DIR/resolve-checkout.sh" "\$HOOK_DIR" 2>&1)"; then
   echo "GATE: blocked — \$ROOT" >&2; exit 1
 fi
@@ -267,6 +270,82 @@ if grep -qF "GATE: validated checkout $B/worktree" <<<"$out_b"; then
   bad "B/absolute: reported the worktree as VALIDATED despite the foreign hook"
 else
   ok "B/absolute: never reported the worktree as validated"
+fi
+
+# ── CASE S1 — SYMLINKED HOOK DIRECTORY ───────────────────────────────────
+# worktree/.githooks -> primary/.githooks, with the SUPPORTED relative config.
+# Git reaches the primary's hook CODE. A lexical `..` would report the worktree
+# as the owner and let it through; physical resolution must catch it.
+S1="$TMP/case-s1"; hooks_mode=relative setup_fixture "$S1"
+rm -f "$S1/primary/FAIL" "$S1/worktree/FAIL"          # BOTH trees valid
+rm -rf "$S1/worktree/.githooks" || die_hard "rm worktree hooks"
+ln -s "$S1/primary/.githooks" "$S1/worktree/.githooks" || die_hard "symlink hooks dir"
+[ -L "$S1/worktree/.githooks" ] || die_hard "fixture: .githooks is not a symlink"
+( cd "$S1/worktree" || die_hard "cd"; echo s1 > s1.txt; git add -A; git commit -qm s1 ) >/dev/null 2>&1
+out_s1="$(cd "$S1/worktree" && git push origin feature 2>&1)"; rc_s1=$?
+ran_s1="$(cat "$S1/which-hook-ran" 2>/dev/null | tr '\n' ',')"
+
+if [ "$ran_s1" = "PRIMARY," ]; then
+  ok "S1/dir-symlink: git reached the PRIMARY's hook code through the symlink"
+else
+  bad "S1/dir-symlink: expected the primary's code to run" "which-hook-ran=[$ran_s1]"
+fi
+if [ $rc_s1 -ne 0 ]; then
+  ok "S1/dir-symlink: push FAILS CLOSED though both trees are valid"
+else
+  bad "S1/dir-symlink: push was ALLOWED — lexical ownership laundered the symlink"
+fi
+if grep -q "hook code belongs to ANOTHER CHECKOUT" <<<"$out_s1"; then
+  ok "S1/dir-symlink: diagnostic identifies the ownership mismatch"
+else
+  bad "S1/dir-symlink: no ownership diagnostic" "$(echo "$out_s1" | tail -4)"
+fi
+if grep -qF "GATE: validated checkout $S1/worktree" <<<"$out_s1"; then
+  bad "S1/dir-symlink: reported the worktree as VALIDATED"
+else
+  ok "S1/dir-symlink: never reported the worktree as validated"
+fi
+
+# S1b — DEFENCE IN DEPTH: the resolver must not trust a LEXICAL `..` even when
+# a caller hands it the logical (symlinked) hook directory. S1 above passes
+# end-to-end because the hook itself resolves with `cd -P`; this check isolates
+# the resolver's own canonicalization, so removing it goes red on its own.
+out_s1b="$(cd "$S1/worktree" && bash "$RESOLVER" "$S1/worktree/.githooks" 2>&1)"; rc_s1b=$?
+if [ $rc_s1b -ne 0 ] && grep -q "hook code belongs to ANOTHER CHECKOUT" <<<"$out_s1b"; then
+  ok "S1b/resolver: canonicalizes a symlinked hook dir handed to it logically"
+else
+  bad "S1b/resolver: accepted a symlinked hook dir via a lexical parent" "exit=$rc_s1b $out_s1b"
+fi
+
+# ── CASE S2 — SYMLINKED HOOK FILE ────────────────────────────────────────
+# Real local .githooks directory, but pre-push -> primary/.githooks/pre-push.
+# The directory check alone passes here, so the file symlink must be refused
+# outright: the supported checkout has a real tracked hook file.
+S2="$TMP/case-s2"; hooks_mode=relative setup_fixture "$S2"
+rm -f "$S2/primary/FAIL" "$S2/worktree/FAIL"          # BOTH trees valid
+rm -f "$S2/worktree/.githooks/pre-push" || die_hard "rm worktree pre-push"
+ln -s "$S2/primary/.githooks/pre-push" "$S2/worktree/.githooks/pre-push" \
+  || die_hard "symlink hook file"
+[ -L "$S2/worktree/.githooks/pre-push" ] || die_hard "fixture: pre-push is not a symlink"
+[ -d "$S2/worktree/.githooks" ] && [ ! -L "$S2/worktree/.githooks" ] \
+  || die_hard "fixture: .githooks should be a REAL directory in S2"
+( cd "$S2/worktree" || die_hard "cd"; echo s2 > s2.txt; git add -A; git commit -qm s2 ) >/dev/null 2>&1
+out_s2="$(cd "$S2/worktree" && git push origin feature 2>&1)"; rc_s2=$?
+
+if [ $rc_s2 -ne 0 ]; then
+  ok "S2/file-symlink: push FAILS CLOSED though both trees are valid"
+else
+  bad "S2/file-symlink: push was ALLOWED — a symlinked hook file gated this branch"
+fi
+if grep -qi "SYMLINKED hook file" <<<"$out_s2"; then
+  ok "S2/file-symlink: diagnostic says a symlinked hook file is refused"
+else
+  bad "S2/file-symlink: no symlink diagnostic" "$(echo "$out_s2" | tail -4)"
+fi
+if grep -qF "GATE: validated checkout $S2/worktree" <<<"$out_s2"; then
+  bad "S2/file-symlink: reported the worktree as VALIDATED"
+else
+  ok "S2/file-symlink: never reported the worktree as validated"
 fi
 
 # ── CASE B2 — an absolute path naming THIS checkout is still allowed ───────
