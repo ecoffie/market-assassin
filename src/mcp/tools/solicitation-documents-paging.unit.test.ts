@@ -188,6 +188,24 @@ describe('get_solicitation_documents — full-document access', () => {
     expect(second.documents[0].document_id).toBe('file-solicitation');
   });
 
+  it('a SCOPED read is never "complete" — a subset is not the package', async () => {
+    mockWarm.mockResolvedValue({
+      data: [
+        warmRows[0],
+        { ...warmRows[0], sam_file_id: 'file-short', filename: 'Exhibit.docx', extracted_text: 'short', char_count: 5, page_count: null },
+      ],
+    });
+    // Ask for ONLY the short doc, which completes in one window. Before the
+    // scoped guard this reported coverage.complete=true while the long
+    // solicitation still held 172,582 unread chars on the SAME notice.
+    const scoped = await solicitationDocuments({ notice_id: NOTICE, document_ids: ['file-short'] });
+    expect(scoped.documents).toHaveLength(1);
+    expect(scoped.documents[0].text_availability).toBe('complete');
+    expect(scoped.coverage.scoped).toBe(true);
+    expect(scoped.coverage.documents_not_requested).toBe(1);
+    expect(scoped.coverage.complete).toBe(false);
+  });
+
   it('documents are addressed by stable document_id, not array position', async () => {
     const res = await solicitationDocuments({
       notice_id: NOTICE,

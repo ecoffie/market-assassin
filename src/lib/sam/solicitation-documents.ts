@@ -118,6 +118,15 @@ export interface SolicitationDocumentsResult {
     documents_extraction_capped: number;
     /** True only when every document's full stored text has been delivered. */
     complete: boolean;
+    /**
+     * Documents on the notice that this response did NOT include, because the
+     * caller scoped it with document_ids. `complete` describes what was
+     * RETURNED, so without this a one-document scoped read looked like a full
+     * package read. Non-zero means: this is a subset, not the notice.
+     */
+    documents_not_requested: number;
+    /** True when document_ids narrowed the response to part of the notice. */
+    scoped: boolean;
   };
 }
 
@@ -296,7 +305,10 @@ async function toOutputDocs(
 }
 
 /** Roll per-document availability up to one notice-level answer. */
-function summarize(documents: SolicitationDocument[]): SolicitationDocumentsResult['coverage'] {
+function summarize(
+  documents: SolicitationDocument[],
+  totalOnNotice: number,
+): SolicitationDocumentsResult['coverage'] {
   const withMore = documents.filter((d) => d.text_window.has_more).length;
   const unavailable = documents.filter(
     (d) =>
@@ -315,8 +327,12 @@ function summarize(documents: SolicitationDocument[]): SolicitationDocumentsResu
     documents_with_more_text: withMore,
     documents_unavailable: unavailable,
     documents_extraction_capped: capped,
-    // Honest: capped or unavailable docs mean the NOTICE is not fully delivered.
-    complete: documents.length > 0 && complete === documents.length,
+    documents_not_requested: Math.max(0, totalOnNotice - documents.length),
+    scoped: totalOnNotice > documents.length,
+    // Honest: capped/unavailable docs, OR documents the caller scoped OUT, mean
+    // the NOTICE is not fully delivered. A scoped read is never 'complete'.
+    complete:
+      documents.length > 0 && complete === documents.length && totalOnNotice === documents.length,
   };
 }
 
@@ -344,6 +360,8 @@ export async function getSolicitationDocuments(
       documents_with_more_text: 0,
       documents_unavailable: 0,
       documents_extraction_capped: 0,
+      documents_not_requested: 0,
+      scoped: false,
       complete: false,
     },
   };
@@ -440,7 +458,7 @@ export async function getSolicitationDocuments(
       });
     }
     base.documents = await toOutputDocs(supabase, metas, input);
-    base.coverage = summarize(base.documents);
+    base.coverage = summarize(base.documents, metas.length);
     base.source = 'cache';
     return base;
   }
@@ -449,7 +467,7 @@ export async function getSolicitationDocuments(
   const cached = await getCached<CachedDocMeta[]>('solicitation_docs', { noticeId: resolvedNoticeId });
   if (cached && cached.length > 0) {
     base.documents = await toOutputDocs(supabase, cached, input);
-    base.coverage = summarize(base.documents);
+    base.coverage = summarize(base.documents, cached.length);
     base.source = 'cache';
     return base;
   }
@@ -513,7 +531,7 @@ export async function getSolicitationDocuments(
   await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, metas, CACHE_TTL);
 
   base.documents = await toOutputDocs(supabase, metas, input);
-  base.coverage = summarize(base.documents);
+  base.coverage = summarize(base.documents, metas.length);
   base.source = 'on_demand';
   return base;
 }
