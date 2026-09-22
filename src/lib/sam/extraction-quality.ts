@@ -78,6 +78,25 @@ export function isMojibake(text: string): boolean {
  * deliberately treats that range as readable (see the note above), so the ratio
  * cannot see this class at all.
  */
+/**
+ * ⚠️ KNOWN, MEASURED BLIND SPOT (accepted 2026-09-22, not a bug to "fix" blindly).
+ * A document between these thresholds is NOT flagged by either gate:
+ *
+ *   symbol density   ASCII letters   readableRatio   hasSymbolEncodedBody
+ *   50%              10%             1.000           false   → not flagged
+ *   55%               8%             1.000           false   → not flagged
+ *   60%               5%             1.000           false   → not flagged
+ *   70%               4%             1.000           true    → FLAGGED
+ *
+ * Tightening the thresholds to close this re-opens the false POSITIVE the
+ * exclusion exists to prevent: a dense Section K checkbox page also has high
+ * symbol density, and suppressing a real certifications page as "no usable
+ * text" is the more expensive error (it blocks coverage.complete and reports a
+ * document we hold as unavailable). So this trade is deliberate: prefer a
+ * missed detection on a rare half-symbol document over falsely destroying a
+ * readable one. Change these numbers only with a measurement showing BOTH
+ * directions still hold — `extraction-quality.unit.test.ts` asserts them.
+ */
 export function hasSymbolEncodedBody(text: string): boolean {
   if (text.length < 200) return false;
   const symbol = (text.match(/[\uF020-\uF0FF]/g) || []).length;

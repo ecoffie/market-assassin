@@ -10,7 +10,7 @@
  * (notice d441cf3c3ee048548057c9fd52499db9), 2026-09-22.
  */
 import { describe, it, expect } from 'vitest';
-import { classifyExtraction, isPdfPortfolioStub, isMojibake, readableRatio, MIN_READABLE_RATIO } from './extraction-quality';
+import { classifyExtraction, isPdfPortfolioStub, isMojibake, readableRatio, hasSymbolEncodedBody, MIN_READABLE_RATIO } from './extraction-quality';
 
 // Attachment C - DLA Energy CQAP.pdf: 1,796,570 bytes on disk → 128 chars.
 const PORTFOLIO_STUB =
@@ -81,6 +81,26 @@ describe('unreadable encoding', () => {
     // Dense checkboxes but with real readable words: not a symbol body font.
     const page = '\uF0A8 Yes \uF0A8 No \uF0A8 N/A\n'.repeat(200);
     expect(classifyExtraction(page)).toBe('ok');
+  });
+
+  it('pins the ACCEPTED blind-spot boundary (change only with a measurement)', () => {
+    // Build text at a given symbol/ASCII mix. Documents the exact band where
+    // neither gate fires, so a future threshold change has to confront it
+    // rather than silently widening or narrowing the trade.
+    const mk = (symPct: number, asciiPct: number, n = 4000) =>
+      Array.from({ length: n }, (_, i) => {
+        const r = i / n;
+        if (r < symPct) return String.fromCharCode(0xf041 + (i % 26));
+        if (r < symPct + asciiPct) return String.fromCharCode(65 + (i % 26));
+        return ' ';
+      }).join('');
+
+    // Inside the blind spot — NOT flagged, knowingly.
+    expect(hasSymbolEncodedBody(mk(0.5, 0.1))).toBe(false);
+    expect(hasSymbolEncodedBody(mk(0.6, 0.05))).toBe(false);
+    // Past the boundary — flagged.
+    expect(hasSymbolEncodedBody(mk(0.7, 0.04))).toBe(true);
+    expect(hasSymbolEncodedBody(mk(0.8, 0.03))).toBe(true);
   });
 
   it('genuine solicitation prose is never flagged', () => {
