@@ -2,8 +2,9 @@
  * Compliance-matrix extraction — the shared engine behind BOTH the in-app proposal
  * route (`/api/app/proposal/compliance`) and the MCP tool (`extract_compliance_matrix`).
  *
- * Harvest every explicit shall/must/required obligation + Section L/M/C requirement
- * from a solicitation into a structured matrix. LLM-backed (Groq llama-3.3 via the
+ * Harvest every explicit shall/must/required obligation, instruction and evaluation
+ * factor from a solicitation into a structured matrix. The LLM only PROPOSES rows —
+ * `src/lib/proposal/matrix-verification.ts` decides which ones survive. LLM-backed (Groq llama-3.3 via the
  * provider-agnostic callLLM chain), chunked + extracted in PARALLEL so a long RFP
  * finishes in ~30-40s instead of timing out.
  *
@@ -32,22 +33,30 @@ export function prioritizeExtractionWindows(text: string, maxChars = MAX_INPUT_C
   text: string;
   truncated: boolean;
   kept_section_3: boolean;
+  /** [start, end) offsets of the ORIGINAL text that the window kept. */
+  ranges: Array<[number, number]>;
 } {
   const sectionRe = /(?:^|\n)\s*(?:section\s*)?3\.0\b|statement of work|performance work statement/i;
   const idx = text.search(sectionRe);
   const hasSection = idx >= 0;
   if (text.length <= maxChars) {
-    return { text, truncated: false, kept_section_3: hasSection };
+    return { text, truncated: false, kept_section_3: hasSection, ranges: [[0, text.length]] };
   }
   if (!hasSection || idx < maxChars) {
-    return { text: text.slice(0, maxChars), truncated: true, kept_section_3: hasSection && idx < maxChars };
+    return {
+      text: text.slice(0, maxChars), truncated: true, kept_section_3: hasSection && idx < maxChars,
+      ranges: [[0, maxChars]],
+    };
   }
   const marker = '\n\n--- SECTION 3.0 WINDOW ---\n\n';
   const specBudget = Math.max(8_000, maxChars - Math.floor(maxChars * 0.5) - marker.length);
   const headBudget = maxChars - specBudget - marker.length;
   const head = text.slice(0, headBudget);
   const spec = text.slice(idx, idx + specBudget);
-  return { text: `${head}${marker}${spec}`, truncated: true, kept_section_3: true };
+  return {
+    text: `${head}${marker}${spec}`, truncated: true, kept_section_3: true,
+    ranges: [[0, headBudget], [idx, Math.min(text.length, idx + specBudget)]],
+  };
 }
 
 export interface ComplianceRequirement {
@@ -64,7 +73,7 @@ const SYSTEM_PROMPT = `You are a federal proposal compliance analyst. Read the s
 
 Look for:
 - "shall", "must", "will", "required", "is required to" obligations
-- Section L (Instructions to Offerors), Section M (Evaluation Factors), Section C (SOW/PWS)
+- Instructions to offerors, evaluation factors/basis for award, and SOW/PWS obligations — wherever this solicitation places them (UCF Sections L/M/C, FAR 52.212-1/52.212-2 provisions, an SF 1442 block, or plain headings)
 - Submission deadlines, page limits, formatting rules, copies required, portal/method
 - Required certifications, representations, reps & certs
 - Past performance volume, technical volume, price volume requirements
@@ -78,8 +87,8 @@ Return ONLY valid JSON in this exact shape, no prose, no markdown fences:
       "id": "REQ-001",
       "requirement": "Short one-line statement of what bidder must do",
       "category": "submission" | "evaluation" | "technical" | "past_performance" | "pricing" | "admin" | "other",
-      "section": "L.3.2",        // optional, omit if unknown
-      "source_quote": "..."       // optional, ~12-25 words verbatim from the doc
+      "section": "2.15",         // optional — the heading label EXACTLY as printed above the quote; omit if none
+      "source_quote": "..."       // REQUIRED — 12-40 words copied character-for-character from the source
     }
   ]
 }
@@ -90,7 +99,9 @@ Rules:
 - One requirement per row. Split compound "shall" sentences into separate rows.
 - Use stable ids REQ-001, REQ-002, ... in document order.
 - Prefer crisp imperatives in "requirement" ("Submit Past Performance volume in PDF, max 25 pages").
-- If a section/clause label is visible nearby (L.3, M-2, 52.212-1), put it in "section".`;
+- source_quote is the evidence a reviewer will check against the document: copy it verbatim (no rewording, no added words, no "..." unless you truly skipped text). It must contain every number, date, amount, and section/clause reference that the "requirement" states. If you cannot quote it, do not emit the row.
+- "section" is ONLY a label printed in the document as the heading above the quote (e.g. "2.15", "E.1", "52.212-1"). Copy it exactly — never add a prefix (write "2.15", not "C.2.15"), never use a clause's paragraph letter ("(l)", "(m)") as a section, and never cite "Section L", "Section M" or "Section C" unless those words are printed in this document. When unsure, omit "section".
+- Rows from a table (e.g. a submittal log): quote the table text that carries the item and its section/spec column; do not attach a sentence from elsewhere as the quote.`;
 
 // Amendments + Q&A don't use "shall" — they state CHANGES ("the purpose of this
 // amendment is to extend the closing date to X", "Question 5: … Answer: …"). A
@@ -177,6 +188,8 @@ export interface MatrixExtraction {
   inputChars: number;
   originalChars: number;
   truncated: boolean;
+  /** [start, end) offsets of the input text the model actually saw. */
+  windowRanges: Array<[number, number]>;
   /** Named source-spec anchors recovered deterministically after the LLM pass. */
   recovered_source_specs?: string[];
 }
@@ -242,6 +255,7 @@ export async function extractComplianceMatrixFromText(
     inputChars: inputText.length,
     originalChars,
     truncated,
+    windowRanges: windowed.ranges,
     recovered_source_specs: recovered.recovered_ids,
   };
 }

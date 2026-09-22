@@ -231,10 +231,14 @@ export function assembleNoticeSourceText(input: {
   if (desc && !/^https?:\/\//i.test(desc)) parts.push(desc);
   let truncated_attachments = 0;
   for (const d of input.documents) {
-    const body = (d.extracted_text || '').trim();
+    const raw = d.extracted_text || '';
+    const body = raw.trim();
     if (!body) continue;
-    const trueLen = d.char_count ?? body.length;
-    if (d.extracted_text_truncated || trueLen > body.length) truncated_attachments += 1;
+    // Compare against the UNTRIMMED text: char_count counts stored whitespace, so a
+    // trimmed comparison flagged every complete document with a trailing newline as
+    // truncated (6 of 7 complete docs on 36C24226Q0857).
+    const trueLen = d.char_count ?? raw.length;
+    if (d.extracted_text_truncated || trueLen > raw.length) truncated_attachments += 1;
     parts.push(`--- ${d.filename || 'attachment'} ---\n${body}`);
   }
   return {
