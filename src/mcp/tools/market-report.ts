@@ -35,6 +35,13 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 import { mcpFlags } from '@/lib/mcp/flags';
 import { renderMarketReportHtml } from '@/lib/market/market-report-html';
 import { saveMarketReport } from '@/lib/market/report-store';
+import {
+  runSection,
+  isGrounded,
+  isFailed,
+  type SectionOutcome,
+  type SectionStatus,
+} from '@/lib/market/section-outcome';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
@@ -271,6 +278,17 @@ export interface MarketReportResult {
     saved: boolean;
     /** True when the report was too thin to publish as a client-facing artifact. */
     deliverable_withheld?: boolean;
+    /**
+     * Why the deliverable did or did not publish:
+     *   publish              — required evidence ok + adequate grounding
+     *   insufficient_evidence— required evidence succeeded but the market is thin
+     *   measurement_failure  — the REQUIRED measurement failed; market UNKNOWN
+     */
+    publication_state?: 'publish' | 'insufficient_evidence' | 'measurement_failure';
+    /** Per-section outcome so a missing section states WHY it is missing. */
+    section_status?: { name: string; status: SectionStatus; required: boolean }[];
+    /** Sections whose query FAILED — unknown, never an established zero. */
+    sections_failed?: string[];
     /** Operator-readable diagnostic when the deliverable is withheld. */
     deliverable_withheld_reason?: string | null;
   };
@@ -278,13 +296,24 @@ export interface MarketReportResult {
 }
 
 /** Settle a guarded section; a throw becomes { value:null, degraded:true } (never rejects). */
-async function guard<T>(p: Promise<T>): Promise<{ value: T | null; degraded: boolean }> {
-  try {
-    return { value: await p, degraded: false };
-  } catch (err) {
-    console.error('[mcp:generate_market_report] section failed:', err);
-    return { value: null, degraded: true };
+/**
+ * Guard a section AND record which of the three things happened.
+ *
+ * `degraded` is kept for back-compat with existing readers, but it is now
+ * DERIVED from `status === 'failed'` rather than being the only signal. The
+ * status is what downstream logic must branch on: a failed section is UNKNOWN,
+ * a successful-empty section is an established zero, and collapsing the two is
+ * the P2 defect (see section-outcome.ts).
+ */
+async function guard<T>(
+  p: Promise<T>,
+  hasEvidence?: (v: T) => boolean,
+): Promise<{ value: T | null; degraded: boolean; status: SectionStatus; outcome: SectionOutcome<T> }> {
+  const outcome = await runSection(p, hasEvidence);
+  if (outcome.status === 'failed') {
+    console.error('[mcp:generate_market_report] section failed:', outcome.failure?.message);
   }
+  return { value: outcome.value, degraded: isFailed(outcome), status: outcome.status, outcome };
 }
 
 /**
@@ -356,12 +385,26 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // Market size first (keyword mode needs the coverage NAICS set to drive the rest).
   // For a NAICS list, codeMarketSize measures the FIRST code as a size reference; the
   // authoritative union total comes from the agencies query below (sum of buyers).
-  const coverage = keyword ? (await guard(keywordCoverage(keyword))).value : null;
-  const marketSize = keyword
-    ? coverage
-    : naicsCodes.length
-      ? (await guard(codeMarketSize({ naics: naicsCodes[0] }))).value
-      : null;
+  //
+  // ── REQUIRED EVIDENCE ────────────────────────────────────────────────────
+  // This is the measurement that ESTABLISHES THE MARKET. Derived from the
+  // report contract, not from convenience: `summary.total_market` is fed by
+  // dominantSize ?? coverage ?? marketSize, and every other section is an
+  // attribute OF that market (who buys it, who holds it, what recompetes).
+  // Without it the report has no subject — so its FAILURE must withhold the
+  // deliverable, while a legitimate empty result is a different answer that
+  // the existing evidence bar already handles.
+  const coverageOutcome: SectionOutcome<Awaited<ReturnType<typeof keywordCoverage>>> = keyword
+    ? await runSection(keywordCoverage(keyword), (c) => !!c && (c.totalMarket ?? 0) > 0)
+    : { status: 'empty', value: null };
+  const coverage = coverageOutcome.value;
+  const codeSizeOutcome: SectionOutcome<Awaited<ReturnType<typeof codeMarketSize>>> =
+    !keyword && naicsCodes.length
+      ? await runSection(codeMarketSize({ naics: naicsCodes[0] }), (m) => !!m && (m.totalMarket ?? 0) > 0)
+      : { status: 'empty', value: null };
+  const marketSize = keyword ? coverage : codeSizeOutcome.value;
+  /** The outcome of the REQUIRED market measurement for THIS report's axis. */
+  const requiredMeasurement: SectionOutcome<unknown> = keyword ? coverageOutcome : codeSizeOutcome;
 
   // Resolve the market scope through the SHARED decision (src/lib/market/spend-query),
   // so this report's "Who is buying" is the IDENTICAL query the in-app FPDS
@@ -416,7 +459,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const [agenciesR, competitionR, recompetesR, forecastsR, agencyDetailR, sbaR] = await Promise.all([
     scopedFilterSets.length
       ? guard(unionSpendingCategory('awarding_subagency', scopedFilterSets, 10))
-      : Promise.resolve({ value: null, degraded: false }),
+      : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
     // Leading contractors from the SAME scoped filter set(s) (USASpending recipient
     // category), so they're the top firms in the exact market — and reconcile with
     // agencies. Unions across the filter sets for a "A OR B" market (Cyber).
@@ -426,7 +469,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
             contractors: rows.map((r) => ({ recipient_name: r.name, total_obligated: r.amount })),
           })),
         )
-      : Promise.resolve({ value: null, degraded: false }),
+      : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
     // Recompetes honor the FULL NAICS union + agency (queryExpiringContracts takes a list).
     //
     // ⚠️ RC-2 (2026-09-22): on the KEYWORD axis `resolveMarketScope` returns
@@ -461,6 +504,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         return Promise.resolve({
           value: { contracts: [] as unknown[], count: 0, withheld_reason: 'no_subject_naics' },
           degraded: false,
+          status: 'withheld_no_subject' as SectionStatus,
+          outcome: { status: 'withheld_no_subject' as SectionStatus, value: null },
         });
       }
       return guard(expiringContracts({
@@ -479,8 +524,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     // NAICS scope is the right market for forecasts; the saved-search agency was a $-section
     // narrowing the forecast table can't honor by name anyway.
     guard(agencyForecasts({ keyword: keyword || undefined, naics: naicsCodes.length ? naicsCodes.join(',') : primaryNaics, state, set_aside: setAside, limit: 15 })),
-    agency ? guard(getAgencySpendingDetailTool({ agency })) : Promise.resolve({ value: null, degraded: false }),
-    agency ? guard(getSbaGoalingShare({ agency })) : Promise.resolve({ value: null, degraded: false }),
+    agency ? guard(getAgencySpendingDetailTool({ agency })) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
+    agency ? guard(getSbaGoalingShare({ agency })) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
   ]);
 
   const agenciesWithSpend: TopAgency[] = Array.isArray(agenciesR.value)
@@ -698,7 +743,24 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     set_aside_gap: sbaR.value ?? null,
   };
 
-  // A section is "grounded" if it returned real rows/values.
+  // A section is "grounded" ONLY when it returned usable evidence. A FAILED
+  // section is unknown — it must never be counted, and must never be reported
+  // as an established zero.
+  const sectionStatuses: { name: string; status: SectionStatus; required: boolean }[] = [
+    // REQUIRED: the measurement that establishes the market itself.
+    {
+      name: 'market_measurement',
+      status: summary.total_market ? 'ok' : requiredMeasurement.status,
+      required: true,
+    },
+    // OPTIONAL enrichment: attributes OF the market, not the market itself.
+    { name: 'top_agencies', status: agenciesR.status, required: false },
+    { name: 'competition', status: competitionR.status, required: false },
+    { name: 'recompetes', status: recompetesR.status, required: false },
+    { name: 'forecasts', status: forecastsR.status, required: false },
+    { name: 'agency_detail', status: agencyDetailR.status, required: false },
+    { name: 'sba_goaling', status: sbaR.status, required: false },
+  ];
   const groundedFlags = [
     !!summary.total_market,
     topAgencies.length > 0,
@@ -709,6 +771,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     !!sbaR.value,
   ];
   const sectionsGrounded = groundedFlags.filter(Boolean).length;
+  const sectionsFailed = sectionStatuses.filter((x) => x.status === 'failed').map((x) => x.name);
+  /** The REQUIRED measurement failed — the market itself is unknown. */
+  const requiredFailed = !summary.total_market && requiredMeasurement.status === 'failed';
 
   /**
    * RC-4 (2026-09-22) — a degraded report may not become a branded deliverable.
@@ -726,7 +791,27 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
    * the drones case grounds 5/7 (published).
    */
   const MIN_GROUNDED_SECTIONS = 2;
-  const deliverableWorthy = !!summary.total_market && sectionsGrounded >= MIN_GROUNDED_SECTIONS;
+
+  /**
+   * P2 — publication is STATE-AWARE, not a single boolean.
+   *
+   *   required ok + adequate grounding      -> publish
+   *   required ok but empty/insufficient    -> withhold: insufficient_evidence
+   *   required FAILED                       -> withhold: measurement_failure
+   *   optional failed, core still defensible-> may publish (statuses retained)
+   *
+   * The third case is the one this exists for. Before, a required-measurement
+   * TIMEOUT scored the same as a thin market, cleared the bar on whatever other
+   * sections happened to return, and minted a NEW permanent share URL (ids are
+   * random) holding a materially thinner answer that looked complete. Two
+   * identical requests could therefore produce two different client artifacts.
+   */
+  const publicationState: 'publish' | 'insufficient_evidence' | 'measurement_failure' = requiredFailed
+    ? 'measurement_failure'
+    : !!summary.total_market && sectionsGrounded >= MIN_GROUNDED_SECTIONS
+      ? 'publish'
+      : 'insufficient_evidence';
+  const deliverableWorthy = publicationState === 'publish';
   const degraded = [coverage === null && keyword !== '', agenciesR.degraded, competitionR.degraded, recompetesR.degraded, forecastsR.degraded, agencyDetailR.degraded, sbaR.degraded].some(Boolean);
 
   const result: MarketReportResult = {
@@ -745,8 +830,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       saved: false,
       /** False when the report is too thin to be a client-facing artifact. */
       deliverable_withheld: !deliverableWorthy,
+      /** publish | insufficient_evidence | measurement_failure */
+      publication_state: publicationState,
+      /** Per-section outcome — tells the caller WHY a section is missing. */
+      section_status: sectionStatuses,
+      /** Sections whose query FAILED (unknown, never an established zero). */
+      sections_failed: sectionsFailed,
       deliverable_withheld_reason: deliverableWorthy
         ? null
+        : requiredFailed
+        ? 'The measurement that establishes this market did not complete (upstream timeout or error), ' +
+          'so the market size is UNKNOWN — not zero. No report was published. Retry; do not treat this ' +
+          'as evidence that the market is small.'
         : !summary.total_market
           ? `No market total could be established for "${subject}", so there is no subject to report on. ` +
             'Refine the keyword, or supply an explicit NAICS/PSC scope.'
