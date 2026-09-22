@@ -189,18 +189,27 @@ function windowText(
   full: string,
   offset: number,
   limit: number,
-  opts: { extractionCapped: boolean; hadFile: boolean; extractionFailed: boolean; quality: ExtractionQuality },
+  opts: {
+    extractionCapped: boolean;
+    hadFile: boolean;
+    extractionFailed: boolean;
+    quality: ExtractionQuality;
+    /** Internal full-text mode. NOT expressible by a caller-supplied limit. */
+    unbounded?: boolean;
+  },
 ): { text: string; window: TextWindow; availability: TextAvailability; truncated: boolean } {
   const total = full.length;
   const start = Math.max(0, Math.min(Math.floor(offset) || 0, total));
-  // MAX_WINDOW_CHARS bounds an MCP RESPONSE. textMode:'full' is the internal
-  // consumer path and must return the whole stored string, so an explicit
-  // MAX_SAFE_INTEGER limit is honoured rather than clamped — clamping it here
-  // silently truncated full-mode reads at 120k (caught by the source-text
-  // comparison: paged assembly 148,483 vs full-mode 120,000).
+  // MAX_WINDOW_CHARS bounds an MCP RESPONSE. textMode:'full' is the INTERNAL
+  // consumer path and must return the whole stored string, so it is signalled by
+  // opts.unbounded — never by a numeric limit. A MAX_SAFE_INTEGER sentinel was
+  // caller-reachable: `documents:[{limit: 9007199254740991}]` escaped the clamp
+  // and could return ~1MB per document. A flag cannot be expressed by any
+  // caller-supplied number, so the bound holds by construction.
   const requested = Math.floor(limit) || INLINE_CAP;
-  const size =
-    limit === Number.MAX_SAFE_INTEGER ? Math.max(1, total) : Math.max(1, Math.min(requested, MAX_WINDOW_CHARS));
+  const size = opts.unbounded
+    ? Math.max(1, total)
+    : Math.max(1, Math.min(requested, MAX_WINDOW_CHARS));
   const text = full.slice(start, start + size);
   const end = start + text.length;
   const hasMore = end < total;
@@ -316,18 +325,18 @@ async function toOutputDocs(
       const extractionCapped = full.length >= MAX_EXTRACTED_TEXT_CHARS || cacheTruncated;
 
       // textMode:'full' (main's behaviour for internal consumers) = one unbounded
-      // window. Otherwise the caller's window, defaulting to inlineCap.
+      // window, signalled by a FLAG the caller cannot forge. Otherwise the
+      // caller's window, defaulting to inlineCap and always clamped.
+      const unbounded = inlineCap === Number.MAX_SAFE_INTEGER;
       const spec = perDoc.get(m.fileId) || wildcard || {};
       const offset = spec.offset ?? req.textOffset ?? 0;
-      const limit =
-        inlineCap === Number.MAX_SAFE_INTEGER
-          ? Number.MAX_SAFE_INTEGER
-          : spec.limit ?? req.textLimit ?? inlineCap;
+      const limit = Math.min(spec.limit ?? req.textLimit ?? inlineCap, MAX_WINDOW_CHARS);
 
       const w = windowText(full, offset, limit, {
         extractionCapped,
         hadFile: Boolean(m.storagePath || m.samUrl),
         extractionFailed: Boolean(m.extractionError),
+        unbounded,
         quality,
       });
 

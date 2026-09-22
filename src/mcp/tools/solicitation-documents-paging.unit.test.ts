@@ -216,6 +216,20 @@ describe('get_solicitation_documents — full-document access', () => {
     expect(calls).toBeGreaterThan(1); // it really did page
   });
 
+  it('a caller CANNOT escape the response bound with a huge per-document limit', async () => {
+    // The internal full-text mode used to be signalled by a MAX_SAFE_INTEGER
+    // limit — a value a caller could simply send, escaping the 120k payload
+    // bound and returning up to ~1MB per document. It is a flag now, so no
+    // caller-supplied number can express it.
+    const escape = await solicitationDocuments({
+      notice_id: NOTICE,
+      documents: [{ document_id: 'file-solicitation', offset: 0, limit: Number.MAX_SAFE_INTEGER }],
+    });
+    expect(escape.documents[0].text_window.returned_chars).toBe(120_000);
+    const viaTop = await solicitationDocuments({ notice_id: NOTICE, text_limit: 999_999_999 });
+    expect(viaTop.documents[0].text_window.returned_chars).toBe(120_000);
+  });
+
   it("textMode:'full' is NOT clamped to MAX_WINDOW_CHARS (internal consumers)", async () => {
     // Regression: windowText clamped every request to MAX_WINDOW_CHARS, so the
     // internal full-text path silently truncated at 120k. Caught by comparing a
