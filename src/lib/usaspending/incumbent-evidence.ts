@@ -102,6 +102,42 @@ export function groundIncumbent(ev: IncumbentEvidence | null | undefined): Incum
   };
 }
 
+export type MatchConfidence = 'high' | 'medium' | 'low';
+export type ConfidenceConstraint = 'sector_conflict' | 'no_taxonomy_agreement';
+
+const CONF_RANK: Record<MatchConfidence, number> = { low: 0, medium: 1, high: 2 };
+
+/**
+ * `matchConfidence` describes the CANDIDATE's evidence — not the textual score
+ * before contradictory evidence was considered. (Poteto: Incumbent Evidence
+ * Truth, 2026-09-22.) Production still shipped AT&T "GUEST WIFI" beside a
+ * demolition notice as `matchConfidence:"high"` with `naicsMatch:false`,
+ * `pscMatch:false`, sector 23 vs 51 — the selection guard refused to NAME it,
+ * but the candidate still claimed high confidence, and `find_predecessor_award`
+ * (which never runs the guard) presented it as "Likely incumbent … [match: high]".
+ *
+ * Structured procurement evidence constrains textual confidence:
+ *   - a valid 2-digit sector conflict → `low` (different KIND of work);
+ *   - neither NAICS nor PSC agrees → at most `medium`.
+ * Only verified identity (never token overlap) lifts the sector constraint,
+ * mirroring groundIncumbent. This never RAISES confidence.
+ */
+export function reconcileMatchConfidence(
+  textual: MatchConfidence,
+  ev: Pick<IncumbentEvidence, 'naicsMatch' | 'pscMatch' | 'noticeSector' | 'awardSector' | 'verifiedIdentity'>,
+): { matchConfidence: MatchConfidence; constraint: ConfidenceConstraint | null } {
+  const sectorConflict =
+    !!ev.noticeSector && !!ev.awardSector && ev.noticeSector !== ev.awardSector && !ev.verifiedIdentity;
+  if (sectorConflict) return { matchConfidence: 'low', constraint: 'sector_conflict' };
+  if (!ev.naicsMatch && !ev.pscMatch) {
+    return {
+      matchConfidence: CONF_RANK[textual] > CONF_RANK.medium ? 'medium' : textual,
+      constraint: 'no_taxonomy_agreement',
+    };
+  }
+  return { matchConfidence: textual, constraint: null };
+}
+
 /** Name an incumbent only when grounding says so. Uncertain candidates stay in prior_awards. */
 export function namedIncumbent<T>(grounding: IncumbentGrounding, candidate: T | null | undefined): T | null {
   return grounding.grounded && candidate ? candidate : null;
