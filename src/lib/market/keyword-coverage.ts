@@ -12,7 +12,13 @@
  * the smallest code set that covers ~90% of the spend (for eligibility filtering).
  */
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
-import { termOfArtSynonyms } from './sector-expansions';
+import { termOfArtSynonyms, sectorSubTradeKeywords } from './sector-expansions';
+
+/**
+ * How many curated alternates the identity fallback may try. Bounded because
+ * each one is a live BQ round-trip; the curated lists are short by design.
+ */
+const MAX_IDENTITY_FALLBACK_TERMS = 4;
 import {
   KEYWORD_COVERAGE_PRIMARY_SENSE,
   KEYWORD_COVERAGE_QUESTION,
@@ -242,6 +248,13 @@ export function marketFilterToUsaspending(
 
 export interface KeywordCoverage {
   keyword: string;
+  /**
+   * Set when the literal phrase measured NOTHING and identity was established
+   * from the curated sector/term-of-art corpus instead. The report labels the
+   * market by what the user asked for, and discloses what actually resolved it.
+   */
+  identityResolvedVia?: string;
+  identityBasis?: 'literal' | 'curated_sector_synonym';
   totalMarket: number;            // $ total: SUM(obligation_amount) on description-matched FY actions
   naicsCount: number;             // distinct NAICS that bought it
   // Dollar-sorted. v1 lead = biggest by action obligations in the description-matched
@@ -488,7 +501,71 @@ export async function queryKeywordCoverage(
       awardIdPrefix: opts?.awardIdPrefix,
       signal,
     });
-    // Net-zero obligations with real actions is still a measured market.
+    // ── RC-1 FALLBACK: a multi-word phrase measures NOTHING as an exact literal ──
+    // descriptionMatchPattern escapes the whole phrase, so "building construction
+    // and renovation" becomes \bbuilding construction and renovation\b — which no
+    // award description contains verbatim. "drones" only works because it is ONE
+    // token. The identity is already available (sectorSubTradeKeywords returns the
+    // real trades: electrical contractor, roofing, masonry, concrete…); the query
+    // just never asked. Consult the curated corpus BEFORE declaring no market —
+    // that is what "map the anchor against the authoritative index before
+    // declaring lead_naics:null" means in this codebase.
+    //
+    // Deliberately a FALLBACK, not a replacement: a literal that DOES measure
+    // (drones, roofing) keeps its own evidence and its synonym-driven broad-market
+    // behaviour untouched.
+    if (row.transactionCount === 0) {
+      const alts = sectorSubTradeKeywords(raw) ?? termOfArtSynonyms(raw) ?? [];
+      // Try the curated alternates and keep the one that measures the LARGEST
+      // market. Taking the first hit would pin a broad sector to whichever trade
+      // happens to be listed first ("electrical contractor" = $79K stands in for
+      // the whole construction market). The broad market is the answer; do NOT
+      // reduce a keyword report to one narrow slice.
+      // PARALLEL, not sequential: the caller's deadline bounds the whole report,
+      // and four serial BQ round-trips blew it (observed: deadline_exceeded, which
+      // then reads as "no market" — re-creating the very failure being fixed).
+      // One round-trip's latency, N queries.
+      assertNotAborted(opts?.signal);
+      const settled = await Promise.allSettled(
+        alts.slice(0, MAX_IDENTITY_FALLBACK_TERMS).map((alt) =>
+          runKeywordCoverageBq({
+            keyword: alt,
+            fiscalYear: latestCompleteFiscalYear(),
+            awardIdPrefix: opts?.awardIdPrefix,
+            signal,
+          }).then((row) => ({ row, term: alt })),
+        ),
+      );
+      let best: { row: Awaited<ReturnType<typeof runKeywordCoverageBq>>; term: string } | null = null;
+      for (const r of settled) {
+        if (r.status === 'rejected') {
+          // A deadline hit during the fan-out is the CALLER's deadline — surface it.
+          if (r.reason instanceof CoverageDeadlineError) throw r.reason;
+          if (isAbortLike(r.reason, opts?.signal) || isAbortLike(r.reason, signal)) {
+            throw new CoverageDeadlineError();
+          }
+          continue; // one alternate failing is not the market failing
+        }
+        const { row: altRow, term } = r.value;
+        if (altRow.transactionCount > 0 && (!best || altRow.totalMarket > best.row.totalMarket)) {
+          best = { row: altRow, term };
+        }
+      }
+      if (best) {
+        // Label the market by what the user ASKED for; measure it by the term
+        // that actually resolves. Never silently rename their market.
+        const cov = rowToCoverage({ ...best.row, keyword: raw }, coverageTarget);
+        const resolved: KeywordCoverage = {
+          ...cov,
+          identityResolvedVia: best.term,
+          identityBasis: 'curated_sector_synonym',
+        };
+        if (!opts?.signal?.aborted && !signal?.aborted) {
+          _covCache.set(cacheKey, { at: Date.now(), val: resolved });
+        }
+        return { status: 'MARKET_EVIDENCE_FOUND', coverage: resolved, degraded: false };
+      }
+    }
     if (row.transactionCount === 0) {
       if (!opts?.signal?.aborted && !signal?.aborted) {
         _covCache.set(cacheKey, { at: Date.now(), val: null });
