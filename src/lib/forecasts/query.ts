@@ -39,6 +39,12 @@ export interface ForecastQueryInput {
 
 export interface ForecastRow {
   id: string;
+  /**
+   * The source listing id. The same Acquisition Gateway listing has been ingested
+   * by two pipelines as `7799` and `GW-L:7799` (3,311 such twins, 2026-09-22), so
+   * this is the identity a consumer needs to recognise one listing shown twice.
+   */
+  external_id: string | null;
   title: string;
   description: string | null;
   agency: string | null;
@@ -143,7 +149,7 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
   let q = supabase
     .from('agency_forecasts')
     .select(
-      'id,title,description,source_agency,department,contracting_office,naics_code,naics_description,psc_code,fiscal_year,anticipated_quarter,anticipated_award_date,solicitation_date,estimated_value_min,estimated_value_max,estimated_value_range,set_aside_type,contract_type,incumbent_name,pop_state,status',
+      'id,external_id,title,description,source_agency,department,contracting_office,naics_code,naics_description,psc_code,fiscal_year,anticipated_quarter,anticipated_award_date,solicitation_date,estimated_value_min,estimated_value_max,estimated_value_range,set_aside_type,contract_type,incumbent_name,pop_state,status',
       { count: 'exact' },
     );
 
@@ -243,6 +249,7 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const forecasts: ForecastRow[] = rows.map((r: any) => ({
     id: r.id,
+    external_id: r.external_id ?? null,
     title: r.title,
     description: r.description ?? null,
     agency: r.source_agency ?? null,

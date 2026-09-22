@@ -37,11 +37,16 @@ import { renderMarketReportHtml } from '@/lib/market/market-report-html';
 import { saveMarketReport } from '@/lib/market/report-store';
 import {
   runSection,
-  isGrounded,
   isFailed,
   type SectionOutcome,
   type SectionStatus,
 } from '@/lib/market/section-outcome';
+import {
+  dedupeForecasts,
+  dedupeRecompetes,
+  normalizeForecastSetAside,
+  presentRecompete,
+} from '@/lib/market/report-presentation';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
@@ -151,6 +156,17 @@ export interface MarketSizeTier {
   method: string;
   /** Terms/codes the tier was measured with. */
   inputs: string[];
+  /**
+   * EXPLAIN (Poteto 2026-09-22): what this reading is FOR in the report. A tier and
+   * the headline measure different things (period, term set); without a role each one
+   * read as "the market", and the construction literal-phrase $0 sat beside a $919.7M
+   * headline as if both described the same market.
+   *   sections_basis — the term set the agency + contractor tables are ranked on
+   *   floor          — literal phrase only; context, not the market
+   */
+  role: 'sections_basis' | 'floor';
+  /** Plain-English relationship to the headline, rendered beside the amount. */
+  note: string | null;
 }
 
 export interface MarketReportSummary {
@@ -185,9 +201,20 @@ export interface MarketReportSummary {
   top_psc: { code: string; name: string } | null;
   buying_agencies: number;
   top_contractors: number;
+  /** Rows SHOWN (after identity dedupe). */
   recompetes: number;
   forecasts: number;
   contacts: number;
+  /**
+   * The population the shown rows were drawn from — null when the source states no
+   * count (unknown, never zero). A KPI prints "15 shown of N", never the display cap
+   * as if it were the market's count.
+   */
+  recompetes_total?: number | null;
+  /** Source forecast RECORDS matched (can include cross-listed copies). */
+  forecasts_total?: number | null;
+  /** Cross-listed forecast copies removed from the shown rows. */
+  forecasts_duplicates_removed?: number;
 }
 
 /** "Who to call" — the market's #1 buying agency, its office, and real contacts. */
@@ -309,7 +336,19 @@ async function guard<T>(
   p: Promise<T>,
   hasEvidence?: (v: T) => boolean,
 ): Promise<{ value: T | null; degraded: boolean; status: SectionStatus; outcome: SectionOutcome<T> }> {
-  const outcome = await runSection(p, hasEvidence);
+  // A tool that CATCHES its own upstream error returns `_meta.degraded:true` with an
+  // empty list rather than throwing. Resolving that as success made a failed forecast
+  // or recompete query read as "empty" — an established zero. Re-raise it so the
+  // section is reported as failed (unknown).
+  const outcome = await runSection(
+    p.then((v) => {
+      if ((v as { _meta?: { degraded?: boolean } } | null)?._meta?.degraded === true) {
+        throw new Error('upstream reported degraded');
+      }
+      return v;
+    }),
+    hasEvidence,
+  );
   if (outcome.status === 'failed') {
     console.error('[mcp:generate_market_report] section failed:', outcome.failure?.message);
   }
@@ -327,27 +366,34 @@ async function unionSpendingCategory(
   category: 'awarding_subagency' | 'recipient',
   filterSets: Record<string, unknown>[],
   limit: number,
-): Promise<{ name: string; amount: number }[]> {
+): Promise<{ name: string; amount: number; uei?: string | null }[]> {
+  // strict: a USAspending failure must surface as a FAILED section, not as an
+  // empty table (the default swallows it into []).
+  const strict = { strict: true };
   if (filterSets.length === 1) {
-    return (await fetchSpendingCategory(category, filterSets[0], limit, 'market-report')).map((r) => ({
+    return (await fetchSpendingCategory(category, filterSets[0], limit, 'market-report', strict)).map((r) => ({
       name: r.name,
       amount: r.amount,
+      uei: r.uei ?? null,
     }));
   }
   // Fetch each set with extra headroom so the merged top-N is accurate (a firm ranked
   // #12 in one set + #14 in the other can be top-10 combined).
   const perSet = await Promise.all(
-    filterSets.map((f) => fetchSpendingCategory(category, f, limit * 2, 'market-report')),
+    filterSets.map((f) => fetchSpendingCategory(category, f, limit * 2, 'market-report', strict)),
   );
-  const merged = new Map<string, number>();
+  // Merge on UEI when present (the entity), else on name — so two registrations that
+  // share a legal name stay two rows, and one entity found in both sets sums.
+  const merged = new Map<string, { name: string; amount: number; uei: string | null }>();
   for (const rows of perSet) {
     for (const r of rows) {
       if (!r.name || !(r.amount > 0)) continue;
-      merged.set(r.name, (merged.get(r.name) || 0) + r.amount);
+      const key = r.uei ? `uei:${r.uei}` : `name:${r.name}`;
+      const prev = merged.get(key);
+      merged.set(key, { name: r.name, amount: (prev?.amount || 0) + r.amount, uei: r.uei ?? null });
     }
   }
-  return [...merged.entries()]
-    .map(([name, amount]) => ({ name, amount }))
+  return [...merged.values()]
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
 }
@@ -458,7 +504,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // Fan out the remaining sections in parallel — each independently guarded.
   const [agenciesR, competitionR, recompetesR, forecastsR, agencyDetailR, sbaR] = await Promise.all([
     scopedFilterSets.length
-      ? guard(unionSpendingCategory('awarding_subagency', scopedFilterSets, 10))
+      ? guard(unionSpendingCategory('awarding_subagency', scopedFilterSets, 10), (rows) => rows.some((r) => r.amount > 0))
       : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
     // Leading contractors from the SAME scoped filter set(s) (USASpending recipient
     // category), so they're the top firms in the exact market — and reconcile with
@@ -466,8 +512,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     scopedFilterSets.length
       ? guard(
           unionSpendingCategory('recipient', scopedFilterSets, 15).then((rows) => ({
-            contractors: rows.map((r) => ({ recipient_name: r.name, total_obligated: r.amount })),
+            contractors: rows.map((r) => ({ recipient_name: r.name, recipient_uei: r.uei ?? null, total_obligated: r.amount })),
           })),
+          (v) => v.contractors.length > 0,
         )
       : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
     // Recompetes honor the FULL NAICS union + agency (queryExpiringContracts takes a list).
@@ -502,7 +549,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       if (!subjectNaics.length && !primaryNaics) {
         // No defensible subject filter exists → withhold the section.
         return Promise.resolve({
-          value: { contracts: [] as unknown[], count: 0, withheld_reason: 'no_subject_naics' },
+          value: { contracts: [] as Array<Record<string, unknown>>, count: 0, withheld_reason: 'no_subject_naics', _meta: { total: 0 } },
           degraded: false,
           status: 'withheld_no_subject' as SectionStatus,
           outcome: { status: 'withheld_no_subject' as SectionStatus, value: null },
@@ -514,7 +561,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         agency: agency || undefined,
         state,
         limit: 15,
-      }));
+      }), (v) => (v.contracts?.length ?? 0) > 0);
     })(),
     // Forecasts honor the FULL NAICS UNION (queryForecasts splits a comma list), NOT one code —
     // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668
@@ -523,9 +570,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     // NOTHING and zeroed the section (Eric 2026-08-02: "the market report shows no forecast?").
     // NAICS scope is the right market for forecasts; the saved-search agency was a $-section
     // narrowing the forecast table can't honor by name anyway.
-    guard(agencyForecasts({ keyword: keyword || undefined, naics: naicsCodes.length ? naicsCodes.join(',') : primaryNaics, state, set_aside: setAside, limit: 15 })),
-    agency ? guard(getAgencySpendingDetailTool({ agency })) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
-    agency ? guard(getSbaGoalingShare({ agency })) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
+    guard(agencyForecasts({ keyword: keyword || undefined, naics: naicsCodes.length ? naicsCodes.join(',') : primaryNaics, state, set_aside: setAside, limit: 15 }), (v) => (v.forecasts?.length ?? 0) > 0),
+    agency ? guard(getAgencySpendingDetailTool({ agency }), (v) => v._meta?.grounded === true) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
+    agency ? guard(getSbaGoalingShare({ agency }), (v) => v._meta?.grounded === true) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
   ]);
 
   const agenciesWithSpend: TopAgency[] = Array.isArray(agenciesR.value)
@@ -535,8 +582,27 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const topAgencies = agenciesWithSpend.slice(0, TOP_AGENCIES_CAP);
 
   const contractors = competitionR.value?.contractors ?? [];
-  const contracts = recompetesR.value?.contracts ?? [];
-  const forecasts = forecastsR.value?.forecasts ?? [];
+  // LIST — one row per customer-visible record, labelled for what it is.
+  const contracts = dedupeRecompetes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>).map((c) => presentRecompete(c));
+  const forecastDedupe = dedupeForecasts(forecastsR.value?.forecasts ?? []);
+  const forecasts = forecastDedupe.rows.map((f) => ({
+    ...f,
+    // A category the reader can act on, or null ("not stated"). The source value is
+    // kept beside it so nothing is hidden — it is just no longer presented AS a category.
+    set_aside_type: normalizeForecastSetAside(f.set_aside_type),
+    set_aside_source_value: f.set_aside_type ?? null,
+  }));
+  /**
+   * COUNT — the population each list was drawn from, when the source can state it.
+   * The table shows at most 15 rows; the KPI used to print that display cap as if it
+   * were the market's number of recompetes. null = the source gave no count (unknown,
+   * never zero). The forecast total is the source's record count, which can include
+   * the cross-listed copies removed above — so it is labelled "records", not listings.
+   */
+  const recompetesTotal: number | null =
+    recompetesR.status === 'ok' ? (recompetesR.value?._meta?.total ?? null) : recompetesR.status === 'empty' ? 0 : null;
+  const forecastsTotal: number | null =
+    forecastsR.status === 'ok' ? (forecastsR.value?._meta?.total ?? null) : forecastsR.status === 'empty' ? 0 : null;
 
   // WHO TO CALL — the market's buyer, its office, and a few real, emailable POCs. Anchor
   // on the saved AGENCY filter when present (that's the department the user scoped to);
@@ -602,12 +668,25 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
      * $1.63B → $1.75B (+$110.7M from the expansion).
      */
     const tierTotal = async (kws: string[], tag: string) => (await guard(
-      fetchSpendingCategory('awarding_subagency', buildSpendingFilters({ marketFilter: { keywords: kws, mode: 'keyword', rankingLabel: '' } }), 100, tag)
+      fetchSpendingCategory('awarding_subagency', buildSpendingFilters({ marketFilter: { keywords: kws, mode: 'keyword', rankingLabel: '' } }), 100, tag, { strict: true })
         .then((rows) => rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)),
     )).value;
 
     const literalOnly = await tierTotal([keyword], 'tier-named');
     const expandedTotal = expanded.length > 1 ? await tierTotal(expanded, 'tier-expanded') : literalOnly;
+
+    const hasSynonyms = expanded.length > 1;
+    // What resolved the headline when the literal phrase is not how the work is written.
+    const resolvedVia = coverage.identityResolvedVia?.length ? coverage.identityResolvedVia : null;
+    const namedNote = literalOnly === 0
+      ? resolvedVia
+        ? `$0 means no contract award text contains this exact phrase — NOT that the market is $0. The headline total was measured from the words this work is actually written in: ${resolvedVia.join(', ')}.`
+        : `$0 means no contract award text contains this exact phrase over FY23-25 — the phrase itself, not necessarily the market.`
+      : literalOnly == null
+        ? 'This reading did not complete (upstream error) — unknown, not zero.'
+        : hasSynonyms
+          ? 'Floor only: the literal word. Shown so the jump to the next reading can be audited.'
+          : 'This literal-phrase reading is what the agency and contractor tables below are ranked on (FY23-25). The headline total is a different measurement (see its label).';
 
     const tiers: MarketSizeTier[] = [{
       basis: 'named',
@@ -615,16 +694,25 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       amount: literalOnly ?? null,
       method: `USASpending award text contains "${keyword}" (FY23-25, contract awards). A FLOOR — classified, component-level and indirectly-titled work never says the name.`,
       inputs: [keyword],
+      // With no synonyms the sections are ranked on this very phrase.
+      role: hasSynonyms ? 'floor' : 'sections_basis',
+      note: namedNote,
     }];
 
-    if (expanded.length > 1) {
+    if (hasSynonyms) {
       tiers.push({
         basis: 'term_of_art',
         label: 'Plus the words this market is actually bought under',
-        // Sections measure this same expanded set — this IS the reported market.
         amount: expandedTotal ?? null,
-        method: `Adds ${expanded.length - 1} curated term-of-art synonyms, each verified against live USASpending before inclusion. This is the market the report measures.`,
+        // WAS: "This is the market the report measures." It is the basis of the agency
+        // and contractor tables — but the HEADLINE is a separate 1-FY description-match
+        // measurement (drones: $90.0M headline vs $11.0B here). Say which is which.
+        method: `Adds ${expanded.length - 1} curated term-of-art synonyms, each verified against live USASpending before inclusion (FY23-25, contract awards).`,
         inputs: expanded,
+        role: 'sections_basis',
+        note: expandedTotal == null
+          ? 'This reading did not complete (upstream error) — unknown, not zero.'
+          : 'The agency and contractor tables below are ranked on this term set over FY23-25. The headline total is a narrower 1-fiscal-year measurement (see its label), so the two figures differ by design.',
       });
     }
 
@@ -665,7 +753,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     return {
       source,
       /** Measurement window for THIS number — not the sections' window. */
-      window: coverage?.windowLabel ?? null,
+      window: coverage?.windowLabel
+        ?? (dominantSize && 'windowLabel' in dominantSize ? dominantSize.windowLabel : null)
+        ?? (marketSize && 'windowLabel' in marketSize ? (marketSize as { windowLabel?: string }).windowLabel ?? null : null),
       /**
        * The headline measurements are NATIONAL; the sections honour `state`.
        * That asymmetry is the entire MA/236220 discrepancy, so state it.
@@ -694,6 +784,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     recompetes: contracts.length,
     forecasts: forecasts.length,
     contacts: contactsSection?.people.length ?? 0,
+    recompetes_total: recompetesTotal,
+    forecasts_total: forecastsTotal,
+    forecasts_duplicates_removed: forecastDedupe.removed,
     total_market_basis: totalMarketBasis,
   };
 
@@ -761,16 +854,17 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     { name: 'agency_detail', status: agencyDetailR.status, required: false },
     { name: 'sba_goaling', status: sbaR.status, required: false },
   ];
-  const groundedFlags = [
-    !!summary.total_market,
-    topAgencies.length > 0,
-    contractors.length > 0,
-    contracts.length > 0,
-    forecasts.length > 0,
-    !!agencyDetailR.value,
-    !!sbaR.value,
-  ];
-  const sectionsGrounded = groundedFlags.filter(Boolean).length;
+  /**
+   * ONE definition of grounded: a section whose status is `ok`. This used to be a
+   * second, parallel list of truthiness flags, and the two disagreed — construction
+   * reported `sections_grounded: 2/7` beside FOUR `ok` statuses, because `guard()`
+   * classified any returned OBJECT as `ok` (a `{ contractors: [] }` wrapper included)
+   * while the flags counted rows. Each section now states its own evidence predicate
+   * in `guard(..., hasEvidence)`, and the count is derived from the statuses, so the
+   * two cannot drift again.
+   */
+  const sectionsGrounded = sectionStatuses.filter((x) => x.status === 'ok').length;
+  const sectionsTotal = sectionStatuses.length;
   const sectionsFailed = sectionStatuses.filter((x) => x.status === 'failed').map((x) => x.name);
   /** The REQUIRED measurement failed — the market itself is unknown. */
   const requiredFailed = !summary.total_market && requiredMeasurement.status === 'failed';
@@ -826,7 +920,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       grounded: sectionsGrounded > 0,
       degraded,
       sections_grounded: sectionsGrounded,
-      sections_total: groundedFlags.length,
+      sections_total: sectionsTotal,
       saved: false,
       /** False when the report is too thin to be a client-facing artifact. */
       deliverable_withheld: !deliverableWorthy,
@@ -845,7 +939,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         : !summary.total_market
           ? `No market total could be established for "${subject}", so there is no subject to report on. ` +
             'Refine the keyword, or supply an explicit NAICS/PSC scope.'
-          : `Only ${sectionsGrounded} of ${groundedFlags.length} sections returned data — too thin to ` +
+          : `Only ${sectionsGrounded} of ${sectionsTotal} sections returned data — too thin to ` +
             'publish as a client-facing report. The structured sections below are still usable as a diagnostic.',
     },
   };

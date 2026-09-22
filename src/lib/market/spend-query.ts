@@ -41,10 +41,17 @@ export interface SpendRow {
   amount: number;
   count: number;
   rank: number;
+  /**
+   * The recipient's UEI, when the category carries one (recipient category only).
+   * Two registrations can share a legal NAME ("NORTHROP GRUMMAN SYSTEMS CORPORATION"
+   * appears twice in the drones market under two UEIs) — the UEI is what tells a
+   * reader they are two entities, not one row printed twice.
+   */
+  uei?: string | null;
 }
 
 interface CategoryResult {
-  results?: Array<{ name?: string; code?: string | null; amount?: number | null }>;
+  results?: Array<{ name?: string; code?: string | null; uei?: string | null; amount?: number | null }>;
   category?: string;
   messages?: string[];
 }
@@ -239,7 +246,18 @@ export async function fetchSpendingCategory(
   filters: Record<string, unknown>,
   limit: number,
   tag = 'spend-query',
+  /**
+   * strict: a failed request THROWS instead of returning []. The default ([] on
+   * failure) is kept for the panels that already depend on it, but a caller that
+   * reports an explicit empty-vs-failed status (generate_market_report) must be
+   * able to tell "USAspending returned no rows" from "USAspending did not answer".
+   */
+  opts: { strict?: boolean } = {},
 ): Promise<SpendRow[]> {
+  const fail = (msg: string): SpendRow[] => {
+    if (opts.strict) throw new Error(`[${tag}] ${category} ${msg}`);
+    return [];
+  };
   let response: Response;
   try {
     response = await fetch(USASPENDING_CATEGORY_URL, {
@@ -252,16 +270,17 @@ export async function fetchSpendingCategory(
     });
   } catch (err) {
     console.warn(`[${tag}] ${category} fetch failed:`, err);
+    if (opts.strict) throw err;
     return [];
   }
 
   if (!response.ok) {
     console.warn(`[${tag}] ${category} HTTP ${response.status}`);
-    return [];
+    return fail(`HTTP ${response.status}`);
   }
 
   const payload = (await response.json().catch(() => null)) as CategoryResult | null;
-  if (!payload?.results) return [];
+  if (!payload?.results) return fail('returned no results array');
 
   return payload.results.slice(0, limit).map((row, idx) => ({
     name: row.name || row.code || `Unknown ${category}`,
@@ -270,5 +289,6 @@ export async function fetchSpendingCategory(
     // and the UI shows "—" rather than claiming zero awards.
     count: 0,
     rank: idx + 1,
+    uei: row.uei ?? null,
   }));
 }
