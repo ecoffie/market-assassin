@@ -161,14 +161,28 @@ if (process.argv.includes('--fresh')) {
   chk('COMPLETENESS claim matches coverage + verification', claimOk, `${m.extraction_completeness}: ${(m.completeness_reasons ?? []).join(' | ')}`);
   chk('COMPLETENESS reports the model(s) that actually answered', typeof m.model === 'string' && m.model.length > 0, m.model);
 
-  // Dedupe: no two trusted rows share evidence AND say the same thing.
+  // Dedupe (customer level, rewritten after the 2026-09-22 production failure — the old check
+  // only caught IDENTICAL readings and passed while two windows' paraphrases of one obligation
+  // both shipped). Independent of matrix-merge.ts: no two trusted rows read by DIFFERENT windows
+  // may share verified evidence, unless they come from two contractual documents or across an
+  // amendment boundary (separate contexts that must stay separate).
+  const ovl = (a: any, b: any) => a.document_id === b.document_id &&
+    Math.min(a.char_end, b.char_end) - Math.max(a.char_start, b.char_start) >= 0.5 * Math.min(a.char_end - a.char_start, b.char_end - b.char_start);
+  const reps = new Set(['notice_description', 'notice_sow']);
   const dups: string[] = [];
-  const norm = (s: string) => squash(s);
   for (let i = 0; i < r.requirements.length; i++) for (let j = i + 1; j < r.requirements.length; j++) {
     const a = r.requirements[i]; const b = r.requirements[j];
-    if (a.source_doc === b.source_doc && norm(a.source_quote) === norm(b.source_quote) && norm(a.requirement) === norm(b.requirement)) dups.push(`${a.id}=${b.id}`);
+    const wa = a.extraction_window, wb = b.extraction_window;
+    if (!wa || !wb || wa.window_id === wb.window_id) continue;
+    const docsDiffer = wa.document_id !== wb.document_id;
+    const amendment = /amend|sf.?30|\bmod\b/i.test(`${a.source_doc} ${b.source_doc}`);
+    if (docsDiffer && (amendment || (!reps.has(wa.document_id) && !reps.has(wb.document_id)))) continue;
+    if (a.verification.found_in.some((x: any) => b.verification.found_in.some((y: any) => ovl(x, y)))) dups.push(`${a.id}/${b.id}`);
   }
-  chk('DEDUPE no duplicated trusted row (same document + same quote + same reading)', dups.length === 0, dups.join(','));
+  chk('DEDUPE no obligation survives twice from two windows\' readings of the same evidence', dups.length === 0, dups.join(','));
+  const multi = r.requirements.filter((x: any) => new Set((x.provenance ?? []).map((p: any) => p.document_id)).size > 1);
+  chk('DEDUPE a requirement repeated by the notice body keeps BOTH sources in its provenance',
+    multi.every((x: any) => x.verification.found_in.length >= 2), `${multi.length} multi-source row(s)`);
   chk('IDS unique across requirements / interpretations / withheld',
     new Set([...r.requirements, ...r.interpretations, ...r.withheld].map((x: any) => x.id)).size === r.requirements.length + r.interpretations.length + r.withheld.length);
   chk('LATENCY within the 60s MCP route budget', newMs < 55_000, `${newMs}ms`);
