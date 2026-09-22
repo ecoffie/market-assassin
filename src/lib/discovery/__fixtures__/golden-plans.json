@@ -448,12 +448,14 @@
               "cls": "distinctive",
               "basis": "recognized_concept",
               "forms": [
-                "artificial intelligence",
-                "ai"
+                "artificial intelligence"
               ],
               "aliases": [],
-              "inflect": "none",
-              "weight": 1
+              "inflect": "full",
+              "weight": 1,
+              "acronyms": [
+                "AI"
+              ]
             },
             {
               "label": "governance",
@@ -517,7 +519,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",sow_text.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",solicitation_number.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(title.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",title.match.\"\\\\mAIs?\\\\M\",description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",description.match.\"\\\\mAIs?\\\\M\",sow_text.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",sow_text.match.\"\\\\mAIs?\\\\M\",department.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",department.match.\"\\\\mAIs?\\\\M\",solicitation_number.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",solicitation_number.match.\"\\\\mAIs?\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           }
         ]
       },
@@ -541,7 +543,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(incumbent_name.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",incumbent_name.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",awarding_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_agency.match.\"\\\\mAIs?\\\\M\",awarding_sub_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_sub_agency.match.\"\\\\mAIs?\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           }
         ],
         "naics": []
@@ -557,7 +559,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(title.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",title.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",department.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",department.match.\"\\\\mAIs?\\\\M\",description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",description.match.\"\\\\mAIs?\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           },
           {
             "op": "or",
@@ -607,12 +609,14 @@
               "cls": "distinctive",
               "basis": "recognized_concept",
               "forms": [
-                "artificial intelligence",
-                "ai"
+                "artificial intelligence"
               ],
               "aliases": [],
-              "inflect": "none",
-              "weight": 1
+              "inflect": "full",
+              "weight": 1,
+              "acronyms": [
+                "AI"
+              ]
             },
             {
               "label": "governance",
@@ -676,7 +680,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",sow_text.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",solicitation_number.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(title.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",title.match.\"\\\\mAIs?\\\\M\",description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",description.match.\"\\\\mAIs?\\\\M\",sow_text.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",sow_text.match.\"\\\\mAIs?\\\\M\",department.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",department.match.\"\\\\mAIs?\\\\M\",solicitation_number.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",solicitation_number.match.\"\\\\mAIs?\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           }
         ]
       },
@@ -700,7 +704,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(incumbent_name.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",incumbent_name.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",awarding_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_agency.match.\"\\\\mAIs?\\\\M\",awarding_sub_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_sub_agency.match.\"\\\\mAIs?\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           }
         ],
         "naics": []
@@ -716,7 +720,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "and(or(title.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",naics_description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",department.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\",description.imatch.\"\\\\m(artificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))|ai)\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(title.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",title.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",department.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",department.match.\"\\\\mAIs?\\\\M\",description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",description.match.\"\\\\mAIs?\\\\M\"),or(title.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",department.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           },
           {
             "op": "or",
@@ -764,9 +768,11 @@
             {
               "label": "cybersecurity",
               "cls": "distinctive",
-              "basis": "not_in_generic_lists",
+              "basis": "recognized_concept",
               "forms": [
-                "cybersecurity"
+                "cybersecurity",
+                "cyber security",
+                "cyber"
               ],
               "aliases": [],
               "inflect": "full",
@@ -842,7 +848,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
           }
         ]
       },
@@ -888,7 +894,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\""
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\""
           },
           {
             "op": "or",
@@ -2618,9 +2624,11 @@
             {
               "label": "cybersecurity",
               "cls": "distinctive",
-              "basis": "not_in_generic_lists",
+              "basis": "recognized_concept",
               "forms": [
-                "cybersecurity"
+                "cybersecurity",
+                "cyber security",
+                "cyber"
               ],
               "aliases": [],
               "inflect": "full",
@@ -2701,7 +2709,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
           },
           {
             "op": "or",
@@ -2759,7 +2767,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcybersecurity(s|es|ing|ed)?\\\\M\""
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\""
           },
           {
             "op": "or",
@@ -2811,10 +2819,12 @@
           "eligibility": "any",
           "eligible": [
             {
-              "label": "cyber",
+              "label": "cybersecurity",
               "cls": "distinctive",
-              "basis": "not_in_generic_lists",
+              "basis": "recognized_concept",
               "forms": [
+                "cybersecurity",
+                "cyber security",
                 "cyber"
               ],
               "aliases": [],
@@ -2936,7 +2946,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
           }
         ]
       },
@@ -2982,7 +2992,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\""
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mserver(s|es|ing|ed)?\\\\M\""
           },
           {
             "op": "or",
@@ -3030,10 +3040,12 @@
           "eligibility": "all",
           "eligible": [
             {
-              "label": "cyber",
+              "label": "cybersecurity",
               "cls": "distinctive",
-              "basis": "not_in_generic_lists",
+              "basis": "recognized_concept",
               "forms": [
+                "cybersecurity",
+                "cyber security",
                 "cyber"
               ],
               "aliases": [],
@@ -3128,7 +3140,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
           }
         ]
       },
@@ -3174,7 +3186,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcyber(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\""
+            "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",title.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcloud(s|es|ing|ed)?\\\\M\""
           },
           {
             "op": "or",

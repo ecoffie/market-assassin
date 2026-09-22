@@ -40,6 +40,13 @@ export interface Concept {
   /** Term-of-art aliases that also satisfy this concept. */
   aliases: string[];
   inflect: Inflect;
+  /**
+   * ACRONYM forms, matched CASE-SENSITIVELY in upper case (PostgREST `match`, i.e. `~`). An acronym
+   * typed in lower case ("it", "ai") is still the acronym; a pronoun in the corpus is not. Measured
+   * 2026-09-22: Virginia forecast descriptions match `\mit\M` 118× case-insensitively vs `\mIT\M`
+   * 68× — ~50 hits were the pronoun "it". Explicit, never inferred from length.
+   */
+  acronyms?: string[];
   /** Rank weight when matched (distinctive 1; generic from the corpus-measured table). */
   weight: number;
   unrecognized?: boolean;
@@ -80,12 +87,21 @@ export const DISCOVERY_SUPPORTING: ReadonlySet<string> = new Set([
  */
 export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set(['market']);
 
-/** Recognized multi-word concepts ↔ acronym (ONE concept, interchangeable forms). */
-export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[] }> = [
-  { id: 'artificial intelligence', forms: ['artificial intelligence', 'ai'] },
-  { id: 'machine learning', forms: ['machine learning', 'ml'] },
-  { id: 'information technology', forms: ['information technology', 'it'] },
+/**
+ * Recognized concepts — ONE unit whose forms are interchangeable. `acronyms` match case-sensitively.
+ * `cybersecurity` mirrors MCP's own CYBER_DIRECT_RE (`cyber(?:\s*security)?`): with word boundaries
+ * alone, "cyber" stopped matching "cybersecurity" — 249 active notices say cybersecurity, 25 say cyber
+ * (measured 2026-09-22) — so a "cyber" search would have lost ~90% of its market.
+ */
+export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: string[] }> = [
+  { id: 'artificial intelligence', forms: ['artificial intelligence'], acronyms: ['AI'] },
+  { id: 'machine learning', forms: ['machine learning'], acronyms: ['ML'] },
+  { id: 'information technology', forms: ['information technology'], acronyms: ['IT'] },
+  { id: 'cybersecurity', forms: ['cybersecurity', 'cyber security', 'cyber'] },
 ];
+
+/** User-typed domain acronyms (the /try SHORT_DOMAIN_TOKENS) — matched case-sensitively in upper case. */
+const TOKEN_ACRONYMS: ReadonlySet<string> = new Set([...SHORT_DOMAIN_TOKENS]);
 
 const CONCEPT_QUERY_MAX = 3;
 
@@ -123,6 +139,9 @@ function wordConcept(w: string): Concept {
   const c = classifyWord(w);
   const aliases = (termOfArtSynonyms(w) || []).map(normalizeQuery).filter((a) => a && a !== w);
   const unrecognized = /^[a-z]+$/.test(w) && !looksLikeRealWord(w);
+  if (TOKEN_ACRONYMS.has(w)) {
+    return { label: w, cls: c.cls, basis: c.basis, forms: [], acronyms: [w.toUpperCase()], aliases: [...new Set(aliases)], inflect: 'none', weight: c.weight };
+  }
   return { label: w, cls: c.cls, basis: c.basis, forms: [w], aliases: [...new Set(aliases)], inflect: inflectFor(w), weight: c.weight, ...(unrecognized ? { unrecognized: true } : {}) };
 }
 
@@ -131,9 +150,10 @@ function conceptsOf(text: string): Concept[] {
   let t = ` ${normalizeQuery(text).replace(/"/g, ' ')} `;
   const out: Concept[] = [];
   for (const c of CONCEPTS) {
-    if (!c.forms.some((f) => t.includes(` ${f} `))) continue;
-    for (const f of c.forms) t = t.split(` ${f} `).join(' ');
-    out.push({ label: c.id, cls: 'distinctive', basis: 'recognized_concept', forms: [...c.forms], aliases: [], inflect: 'none', weight: 1 });
+    const surfaces = [...c.forms, ...(c.acronyms || []).map((a) => a.toLowerCase())].sort((a, b) => b.length - a.length);
+    if (!surfaces.some((f) => t.includes(` ${f} `))) continue;
+    for (const f of surfaces) t = t.split(` ${f} `).join(' ');
+    out.push({ label: c.id, cls: 'distinctive', basis: 'recognized_concept', forms: [...c.forms], aliases: [], inflect: 'full', weight: 1, ...(c.acronyms ? { acronyms: [...c.acronyms] } : {}) });
   }
   t = t.replace(/ ([a-z0-9]+(?:-[a-z0-9]+)+)(?= )/g, (_m, comp: string) => {
     const form = comp.replace(/-/g, ' ');
@@ -227,9 +247,16 @@ function formAlt(form: string, inflect: Inflect): string {
   return words.map((w, i) => wordAlt(w, i === words.length - 1 ? 'full' : 'none')).join('[-\\s]+');
 }
 
-export function conceptRegex(c: Concept): string {
+/**
+ * A concept's regexes: `ci` (case-insensitive, imatch) for words/phrases/aliases and `cs`
+ * (case-SENSITIVE, match) for its upper-case acronyms. Either may be null; never both.
+ */
+export function conceptRegexes(c: Concept): { ci: string | null; cs: string | null } {
   const alts = [...new Set([...c.forms.map((f) => formAlt(f, c.inflect)), ...c.aliases.map((a) => formAlt(a, 'full'))])];
-  return `\\m${alts.length === 1 ? alts[0] : `(${alts.join('|')})`}\\M`;
+  const ci = alts.length ? `\\m${alts.length === 1 ? alts[0] : `(${alts.join('|')})`}\\M` : null;
+  const acr = [...new Set(c.acronyms || [])].map((a) => `${reEscape(a)}s?`);
+  const cs = acr.length ? `\\m${acr.length === 1 ? acr[0] : `(${acr.join('|')})`}\\M` : null;
+  return { ci, cs };
 }
 
 export function phraseRegex(phrase: string): string {
@@ -244,13 +271,31 @@ export function codeRegex(code: string): string {
   return `\\m${flexible}\\M`;
 }
 
+const quote = (re: string) => `"${re.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
 /** `col.imatch."<regex>"` — ALWAYS quoted, backslashes doubled (measured: required for `( | )`). */
 export function imatchClause(col: string, regex: string): string {
-  return `${col}.imatch."${regex.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `${col}.imatch.${quote(regex)}`;
+}
+
+/** Case-SENSITIVE `col.match."<regex>"` — acronyms only. */
+export function matchClause(col: string, regex: string): string {
+  return `${col}.match.${quote(regex)}`;
 }
 
 function unit(re: string, cols: readonly string[]): string {
   return cols.map((c) => imatchClause(c, re)).join(',');
+}
+
+/** One concept across columns: its case-insensitive and case-sensitive clauses, OR-ed. */
+function conceptUnit(c: Concept, cols: readonly string[]): string {
+  const { ci, cs } = conceptRegexes(c);
+  const parts: string[] = [];
+  for (const col of cols) {
+    if (ci) parts.push(imatchClause(col, ci));
+    if (cs) parts.push(matchClause(col, cs));
+  }
+  return parts.join(',');
 }
 
 /**
@@ -264,9 +309,9 @@ export function textPredicate(m: TextMatcher, cols: readonly string[]): string |
   if (m.mode !== 'lexical') return null;
   const blocks = m.alternatives.map((a) => {
     if (a.eligibility === 'any' || a.eligible.length === 1) {
-      return a.eligible.map((c) => unit(conceptRegex(c), cols)).join(',');
+      return a.eligible.map((c) => conceptUnit(c, cols)).join(',');
     }
-    return `and(${a.eligible.map((c) => `or(${unit(conceptRegex(c), cols)})`).join(',')})`;
+    return `and(${a.eligible.map((c) => `or(${conceptUnit(c, cols)})`).join(',')})`;
   });
   return blocks.join(',') || null;
 }
@@ -276,20 +321,25 @@ export function exclusionPredicate(m: TextMatcher, cols: readonly string[]): str
   if (!m.excluded.length || !cols.length) return null;
   const parts: string[] = [];
   for (const c of m.excluded) {
-    const re = conceptRegex(c).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    for (const col of cols) parts.push(`or(${col}.is.null,${col}.not.imatch."${re}")`);
+    const { ci, cs } = conceptRegexes(c);
+    for (const col of cols) {
+      // NULL-safe per column; a record is dropped if EITHER form (word or acronym) appears.
+      const not = [ci && `${col}.not.imatch.${quote(ci)}`, cs && `${col}.not.match.${quote(cs)}`].filter(Boolean) as string[];
+      parts.push(`or(${col}.is.null,${not.length === 1 ? not[0] : `and(${not.join(',')})`})`);
+    }
   }
   return parts.length === 1 ? parts[0] : `and(${parts.join(',')})`;
 }
 
 // ── JS mirror (tests, inspection, ranking) ───────────────────────────────────────────────────
 
-export function jsRegex(pgRegex: string): RegExp {
-  return new RegExp(pgRegex.replace(/\\m/g, '\\b').replace(/\\M/g, '\\b'), 'i');
+export function jsRegex(pgRegex: string, caseSensitive = false): RegExp {
+  return new RegExp(pgRegex.replace(/\\m/g, '\\b').replace(/\\M/g, '\\b'), caseSensitive ? '' : 'i');
 }
 
 export function conceptHit(c: Concept, text: string): boolean {
-  return jsRegex(conceptRegex(c)).test(text);
+  const { ci, cs } = conceptRegexes(c);
+  return (!!ci && jsRegex(ci).test(text)) || (!!cs && jsRegex(cs, true).test(text));
 }
 
 export function matchesText(m: TextMatcher, texts: Array<string | null | undefined>): boolean {
