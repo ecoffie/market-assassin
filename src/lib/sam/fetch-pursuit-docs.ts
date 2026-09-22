@@ -31,7 +31,7 @@ const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_FILE_URL_PREFIX = 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/';
 const SUPABASE_BUCKET = 'pursuit-documents';
 const MAX_FILE_SIZE = 20 * 1024 * 1024;  // 20MB — bigger than the manual upload cap because we're not bottlenecked by Vercel formData
-export const MAX_EXTRACTED_TEXT_CHARS = 200_000; // Extraction ceiling per file: text past this is NEVER read, so a stored length sitting exactly here means the file's tail is missing and only the raw file can reach it. Exported so readers test this number, not a copy.
+export const MAX_EXTRACTED_TEXT_CHARS = 1_000_000; // Extraction ceiling per file. Was 200_000, which silently DISCARDED real text: DLA SPE60525R0222 'Attachment B - Schedule.pdf' (274pp) extracts to 573,558 chars, so 373,558 chars of the priced schedule were dropped before any cap the caller could see. Text past this is NEVER read, so a stored length sitting exactly here means the file's tail is missing and only the raw file reaches it. Exported so readers test this number, not a copy.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;

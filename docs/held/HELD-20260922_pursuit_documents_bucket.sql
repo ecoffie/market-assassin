@@ -1,3 +1,17 @@
+-- ⚠️ HELD — DO NOT APPLY. Deliberately moved OUT of supabase/migrations/ so the
+-- runner cannot pick it up (Eric, 2026-09-22).
+--
+-- WHY IT IS HELD: a missing bucket does NOT establish that documents are missing
+-- from the platform, and the evidence says they are not. Verified 2026-09-22:
+-- SAM discovery (fetch-notice-resources) returns ALL attachments live with real
+-- filenames — 14/14 for DLA SPE60525R0222 (a notice absent from sam_opportunities
+-- entirely) and 7/7 for VA 36C24226Q0857 — and each file downloads server-side
+-- at 200 with valid magic bytes. Retrieval works WITHOUT this bucket.
+--
+-- The bucket would only add a durable Mindy-hosted copy (faster re-reads, and a
+-- signed URL that does not depend on the caller's egress reaching sam.gov). That
+-- is an optimization to decide separately, not a fix for the reported defect.
+--
 -- Create the 'pursuit-documents' Storage bucket.
 --
 -- WHY: the bucket was never created. Every upload in fetch-pursuit-docs.ts and

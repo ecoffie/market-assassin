@@ -21,6 +21,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCached, setCached } from '@/lib/mcp/external-cache';
 import { fetchAndExtractNoticeFiles, normalizeNoticeId, MAX_EXTRACTED_TEXT_CHARS } from '@/lib/sam/fetch-pursuit-docs';
+import { classifyExtraction, readableRatio, type ExtractionQuality } from '@/lib/sam/extraction-quality';
 
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
@@ -29,7 +30,7 @@ const INLINE_CAP = 20_000; // DEFAULT chars per doc when the caller doesn't page
 const MAX_WINDOW_CHARS = 120_000; // hard ceiling for ONE response window (MCP payload safety)
 /** Single source of truth — imported, never re-typed (see the extractor's note). */
 const EXTRACTION_CEILING_CHARS = MAX_EXTRACTED_TEXT_CHARS;
-const CACHE_TEXT_CAP = 200_000; // chars stored per doc in the cold cache — matches the
+const CACHE_TEXT_CAP = MAX_EXTRACTED_TEXT_CHARS; // store what was extracted — matches the
 // extraction ceiling (MAX_EXTRACTED_TEXT_CHARS in fetch-pursuit-docs). It was 40_000, which
 // silently DESTROYED text beyond 40k on the cold path: the window could never reach what the
 // cache never stored. The warm path (pursuit_documents) always had the full extraction.
@@ -48,8 +49,12 @@ export type TextAvailability =
   | 'partial' // more text exists AFTER this window — page with next_offset
   | 'extraction_failed' // we hold the file but could not turn it into text
   | 'file_unavailable' // no file and no text on record
-  | 'extraction_capped'; // extraction itself stopped at the pipeline ceiling; the
-// TAIL OF THE FILE WAS NEVER EXTRACTED. Paging cannot recover it — the raw file can.
+  | 'extraction_capped' // extraction stopped at the pipeline ceiling; the TAIL OF
+  // THE FILE WAS NEVER EXTRACTED. Paging cannot recover it — the raw file can.
+  | 'container_stub' // a PDF Portfolio cover sheet: real content is nested inside
+  // the container and was never reached. Non-empty text, but NOT the document.
+  | 'unreadable_encoding'; // extracted, but the glyphs carry no usable text map
+// (font-subset PDF) — the characters are not the document's words.
 
 /** Byte/char window actually returned for one document. */
 export interface TextWindow {
@@ -80,6 +85,10 @@ export interface SolicitationDocument {
   document_id: string;
   /** True when extraction hit the pipeline ceiling — the file's tail was never read. */
   extraction_capped: boolean;
+  /** Mechanical extraction succeeded but produced unusable text (see quality). */
+  extraction_quality: ExtractionQuality;
+  /** 0..1 share of ordinary readable characters; low = encoding failure. */
+  text_readable_ratio: number | null;
   download_url: string | null; // signed Storage URL (~1h) or public SAM fallback
   download_source: 'mindy_signed' | 'sam_public' | null;
 }
@@ -164,7 +173,12 @@ function windowText(
   full: string,
   offset: number,
   limit: number,
-  opts: { extractionCapped: boolean; hadFile: boolean; extractionFailed: boolean },
+  opts: {
+    extractionCapped: boolean;
+    hadFile: boolean;
+    extractionFailed: boolean;
+    quality: ExtractionQuality;
+  },
 ): { text: string; window: TextWindow; availability: TextAvailability; truncated: boolean } {
   const total = full.length;
   const start = Math.max(0, Math.min(Math.floor(offset) || 0, total));
@@ -178,6 +192,10 @@ function windowText(
     // No text at all: say WHY. An empty string alone can't distinguish
     // "the file isn't retrievable" from "we have it but couldn't parse it".
     availability = opts.extractionFailed ? 'extraction_failed' : 'file_unavailable';
+  } else if (opts.quality !== 'ok') {
+    // Non-empty but not the document's words. Reporting this 'complete' is what
+    // lets a downstream extractor invent requirements to fill the gap.
+    availability = opts.quality === 'container_stub' ? 'container_stub' : 'unreadable_encoding';
   } else if (hasMore) {
     availability = 'partial';
   } else if (opts.extractionCapped) {
@@ -249,10 +267,12 @@ async function toOutputDocs(
       // ON it means the tail of the file was never read. Paging can't recover
       // that — only the raw file can — so it must not be reported 'complete'.
       const extractionCapped = full.length >= EXTRACTION_CEILING_CHARS;
+      const quality = classifyExtraction(full);
       const w = windowText(full, offset, limit, {
         extractionCapped,
         hadFile: Boolean(m.storagePath || m.samUrl),
         extractionFailed: Boolean(m.extractionError),
+        quality,
       });
       return {
         filename: m.filename,
@@ -266,6 +286,8 @@ async function toOutputDocs(
         text_window: w.window,
         document_id: m.fileId,
         extraction_capped: extractionCapped,
+        extraction_quality: quality,
+        text_readable_ratio: full.length > 0 ? Number(readableRatio(full).toFixed(2)) : null,
         download_url: url,
         download_source: source,
       };
@@ -277,7 +299,13 @@ async function toOutputDocs(
 function summarize(documents: SolicitationDocument[]): SolicitationDocumentsResult['coverage'] {
   const withMore = documents.filter((d) => d.text_window.has_more).length;
   const unavailable = documents.filter(
-    (d) => d.text_availability === 'file_unavailable' || d.text_availability === 'extraction_failed',
+    (d) =>
+      d.text_availability === 'file_unavailable' ||
+      d.text_availability === 'extraction_failed' ||
+      // Non-empty but unusable text is NOT readable content — counting it as
+      // delivered is what made a portfolio stub look like a complete document.
+      d.text_availability === 'container_stub' ||
+      d.text_availability === 'unreadable_encoding',
   ).length;
   const capped = documents.filter((d) => d.text_availability === 'extraction_capped').length;
   const complete = documents.filter((d) => d.text_availability === 'complete').length;
@@ -443,7 +471,6 @@ export async function getSolicitationDocuments(
   }
 
   // Upload each raw blob to Storage under a notice-level path, build metadata.
-  let storageDegraded = false;
   const metas: CachedDocMeta[] = [];
   for (const f of fetched.documents) {
     const safe = `${f.fileId}-${(f.filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_')}`.slice(0, 400);
@@ -456,17 +483,17 @@ export async function getSolicitationDocuments(
       });
       if (!error) finalPath = storagePath;
       else {
-        // A swallowed upload failure is what kept "the bucket does not exist"
-        // invisible across 28,092 rows: the text still returned, so the call
-        // looked healthy while the raw-file half silently never worked.
-        // Surface it and mark the response degraded so the caller knows the
-        // download_url is a SAM fallback, not our durable copy.
-        console.error('[solicitation-docs] storage upload failed:', error.message);
-        storageDegraded = true;
+        // Log, but do NOT mark the response degraded: the caller still gets the
+        // extracted text AND a working public SAM download_url, so retrieval is
+        // not impaired. A durable Mindy-hosted copy is an optimization, and
+        // conflating "no cached copy" with "degraded data" would cry wolf on
+        // every cold call. (The bucket does not currently exist — 28,092/28,092
+        // rows have storage_path NULL — which is why download_source reads
+        // 'sam_public' rather than 'mindy_signed'.)
+        console.warn('[solicitation-docs] storage upload skipped:', error.message);
       }
     } catch (err) {
-      console.error('[solicitation-docs] storage upload threw:', err);
-      storageDegraded = true;
+      console.warn('[solicitation-docs] storage upload skipped:', err);
     }
     metas.push({
       fileId: f.fileId,
@@ -488,6 +515,5 @@ export async function getSolicitationDocuments(
   base.documents = await toOutputDocs(supabase, metas, input);
   base.coverage = summarize(base.documents);
   base.source = 'on_demand';
-  if (storageDegraded) base.degraded = true;
   return base;
 }

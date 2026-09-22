@@ -6307,30 +6307,29 @@ reports **why** its text is or isn't present: `complete`, `partial`,
 counted in **characters**, never converted to pages.
 
 **Why.** Text was capped at 20,000 characters per document with no way to reach
-the rest, so the remainder was unreachable rather than merely paginated. On a
-real 69-page Navy solicitation (`N4008024R2401`, 192,582 stored characters) the
-evaluation factors happened to fall inside the window, but the
-limitations-on-subcontracting certificate (offset 67,109), the insurance
-requirements (69,995) and the order limitations (101,707) did not — an agent
-correctly reported it could not read them. The same cap silently starved
-`extract_compliance_matrix`, `extract_statement_of_work` and `draft_proposal`,
-which means a compliance matrix could omit insurance and subcontracting
-requirements without ever saying so. Separately, the `pursuit-documents` storage
-bucket was never created, so every raw-file upload had failed since the feature
-shipped (28,092 of 28,092 rows with `storage_path` NULL) and the advertised
-"download the full PDF" link always degraded to the public SAM URL.
+the rest, so the remainder was unreachable rather than paginated. Measured across
+two live packages: 751,916 real characters, 160,000 retrieved — 21.3%. On a
+federal solicitation the dropped part is the decisive part: instructions to
+offerors, evaluation factors, insurance limits, subcontracting limitations and
+the clause list all sit at the back. Two further losses compounded it. Extraction
+itself stopped at 200,000 characters, so DLA's 274-page priced schedule (573,558
+characters) lost 373,558 before any visible cap. And four documents extracted to
+non-empty but unusable text — two PDF Portfolio cover stubs and two font-subset
+PDFs at 35% readable characters — while reporting as clean, complete reads, which
+is how a downstream compliance matrix can cite a section the solicitation never
+had.
 
 **SEO.** Read a full federal solicitation with AI / RFP evaluation factors
 extraction / AI proposal compliance matrix from SAM.gov attachments.
 
-**Proof.** Live against the production database, notice
-`a218aa7ee6554aceaf33af0da86d3582`: default window → insurance,
-limitations-on-subcontracting and order limitations all absent,
-`coverage.complete=false`; after paging → all 192,582 characters assembled in 4
-calls with all four cited sections found at their true offsets. Compliance
-source text 229,456 → 493,412 characters, with three previously invisible
-clauses now present. MCP transport verified end-to-end
-(`SMOKE_NOTICE_ID=… npm run mcp:smoke` → 21 documents, 16 complete, 5 with more
-text, continuation at offset 20,000). Ten regressions in
-`solicitation-documents-paging.unit.test.ts`, proven to fail when truncation
-honesty is removed.
+**Proof.** Live, 2026-09-22. DLA `SPE60525R0222`: all 14 attachments discovered
+and 2,380,326 characters assembled in 5 calls; `DFARS 252.215-7016` (postaward
+debriefings) — the clause a client debriefing question turned on, previously
+reportable only as PARTIAL — is now confirmable. `Attachment B - Schedule.pdf`
+200,000 → 573,558 characters. VA `36C24226Q0857`: 362,651 characters in 2 calls,
+with `52.212-1`, `52.212-2`, evaluation factors, insurance, asbestos and
+limitations on subcontracting all retrievable — the five gaps that had forced a
+bid/no-bid outside the product. The four unusable extractions now self-report as
+`container_stub` or `unreadable_encoding` instead of `complete`. 15 regressions
+across `solicitation-documents-paging` and `extraction-quality`, proven to fail
+when truncation honesty is removed.
