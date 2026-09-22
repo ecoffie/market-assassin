@@ -2091,6 +2091,56 @@ so that surface self-heals — the annotation does NOT.)
 
 ---
 
+## ⚠️ The gate validates the CHECKOUT BEING PUSHED — not the hook's location
+
+**`.githooks/resolve-checkout.sh` decides which tree the pre-push gate examines, and it
+FAILS CLOSED.** Regression: `tests/pre-push-worktree-selection.test.sh`, wired in as
+blocking step **1a**. The gate now prints the validated checkout path and HEAD on every
+run — a green gate that does not name your tree is not a green gate for your tree.
+
+**The bug it replaces.** The hook derived its root from the hook FILE:
+
+```bash
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"     # ← wrong
+```
+
+`npm run hooks:install` sets **`core.hooksPath` to an ABSOLUTE path inside the primary
+checkout**, and every linked worktree shares that config. So `$0` is always
+`<primary>/.githooks/pre-push` regardless of where you push from, and the gate `cd`ed into
+the **primary checkout** and typechecked and tested **that** — while reporting a verdict on
+your branch. With ~30 worktrees live here, the primary is usually another session's
+in-flight tree.
+
+**Measured 2026-09-22.** A docs-only branch pushed from a worktree was blocked by
+`scripts/_trace-rc1.ts` (another session's scratch file, absent from the pushing worktree
+and from the primary minutes later) and by three `src/lib/usaspending` unit tests that
+passed in isolation AND in the pushing worktree's own full suite (611 files / 6,844 tests,
+exit 0). **The branch under push was never examined.** This is the same family as the
+documented "`vercel --prod` from a worktree uploads the parent tree" trap — the tool's
+notion of "here" is not your notion of "here".
+
+⚠️ **Historical gate claims are corrected accordingly.** PR #1610's pre-push results are
+only trustworthy for its FIRST push, which came from the primary checkout. Rounds 2–3 and
+the removal were pushed from a worktree, so those "✓ pre-push gate passed" lines describe
+the primary checkout, not that branch. That work remains separately evidenced — GitHub
+Actions `verify` ran against the actual commits and passed, and the suite, the 13 live
+oracles and the browser checks were run directly in the worktree — but the local gate did
+not see it. Do not cite those gate lines as branch validation.
+
+**Two traps if you touch the resolver:**
+- **Inherited `GIT_DIR` / `GIT_WORK_TREE`.** Git sets these for hooks; a plain
+  `git rev-parse` in a subshell then answers for whatever they name instead of for the
+  cwd. They are cleared before resolving. Pinned by a regression.
+- **`/var` vs `/private/var`.** `git rev-parse --show-toplevel` always returns the
+  PHYSICAL path, so a test comparing against an unresolved `mktemp -d` fails against a
+  CORRECT resolver. Use `pwd -P`.
+
+**Pushing from a worktree when the hook itself is being repaired:** use a one-command,
+checkout-local override — `git -c core.hooksPath="$PWD/.githooks" push`. Never
+`--no-verify`, and never rewrite the shared `core.hooksPath`; other sessions depend on it.
+
+---
+
 ## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)
 
 Runs as a hard-blocking step of the pre-push gate (see `.githooks/pre-push`
