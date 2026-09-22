@@ -13,11 +13,24 @@
  * cold path downloads + extracts). `_meta` always ships; `_ai_hint` OFF by
  * default. SAM attachments are PUBLIC federal data — no tier gate.
  */
-import { getSolicitationDocuments, type SolicitationDocument } from '@/lib/sam/solicitation-documents';
+import {
+  getSolicitationDocuments,
+  type SolicitationDocument,
+  type SolicitationDocumentsResult,
+  type DocTextRequest,
+} from '@/lib/sam/solicitation-documents';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SolicitationDocumentsToolInput {
   notice_id: string;
+  /** Chars of text per document in THIS response (default 20k, max 120k). */
+  text_limit?: number;
+  /** Start offset, applied to every document unless overridden per-document. */
+  text_offset?: number;
+  /** Per-document windows: [{ document_id, offset, limit }]. */
+  documents?: DocTextRequest[];
+  /** Restrict the response to these document_ids — page one big doc cheaply. */
+  document_ids?: string[];
 }
 
 export interface SolicitationDocumentsToolResult {
@@ -30,6 +43,10 @@ export interface SolicitationDocumentsToolResult {
   sow_text: string;
   sow_text_truncated: boolean;
   documents: SolicitationDocument[];
+  /** Notice-level completeness. `complete:false` means KEEP PAGING. */
+  coverage: SolicitationDocumentsResult['coverage'];
+  /** Ready-to-send continuation calls; empty when nothing is left to read. */
+  next_page: { notice_id: string; documents: DocTextRequest[] } | null;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -37,6 +54,11 @@ export interface SolicitationDocumentsToolResult {
     doc_count: number;
     source: 'cache' | 'on_demand' | 'none';
     signed_url_ttl_seconds: number;
+    /** Chars delivered in this response across all documents. */
+    returned_chars: number;
+    /** True stored chars across all documents (null where unknown). */
+    total_chars: number | null;
+    coverage_complete: boolean;
   };
 }
 
@@ -44,10 +66,31 @@ export async function solicitationDocuments(
   input: SolicitationDocumentsToolInput,
 ): Promise<SolicitationDocumentsToolResult> {
   const noticeId = (input.notice_id || '').trim();
-  const res = await getSolicitationDocuments({ noticeId });
+  const res = await getSolicitationDocuments({
+    noticeId,
+    textLimit: input.text_limit,
+    textOffset: input.text_offset,
+    documents: input.documents,
+    documentIds: input.document_ids,
+  });
 
   const hasText = res.sow_text.length > 0 || res.description.length > 0;
   const grounded = res.documents.length > 0 || hasText;
+
+  // Hand back the EXACT continuation call rather than making the agent compute
+  // offsets. Only documents with text still unread are listed.
+  const more = res.documents.filter((d) => d.text_window.has_more && d.text_window.next_offset !== null);
+  const nextPage =
+    more.length > 0
+      ? {
+          notice_id: res.notice_id,
+          documents: more.map((d) => ({
+            document_id: d.document_id,
+            offset: d.text_window.next_offset as number,
+            limit: input.text_limit ?? 20_000,
+          })),
+        }
+      : null;
 
   const result: SolicitationDocumentsToolResult = {
     notice_id: res.notice_id,
@@ -59,12 +102,21 @@ export async function solicitationDocuments(
     sow_text: res.sow_text,
     sow_text_truncated: res.sow_text_truncated,
     documents: res.documents,
+    coverage: res.coverage,
+    next_page: nextPage,
     _meta: {
       grounded,
       degraded: res.degraded,
       doc_count: res.documents.length,
       source: res.source,
       signed_url_ttl_seconds: 3600,
+      returned_chars: res.documents.reduce((n, d) => n + d.text_window.returned_chars, 0),
+      // Sum only where the length is KNOWN. If any document's length is unknown
+      // the total is unknown too — a partial sum would read as a real total.
+      total_chars: res.documents.some((d) => d.text_window.total_chars === null)
+        ? null
+        : res.documents.reduce((n, d) => n + (d.text_window.total_chars || 0), 0),
+      coverage_complete: res.coverage.complete,
     },
   };
 
@@ -74,14 +126,21 @@ export async function solicitationDocuments(
       summary: res.degraded
         ? 'Document fetch partially failed — some attachments could not be downloaded/extracted; retry before concluding there are no docs.'
         : grounded
-        ? `${res.documents.length} document(s) for notice ${res.notice_id}${res.title ? ` — "${res.title}"` : ''}. ${sowDoc ? `Scope doc: ${sowDoc.filename}.` : ''} Inline text + signed download URLs (valid ~1h) provided.`
+        ? `${res.documents.length} document(s) for notice ${res.notice_id}${res.title ? ` — "${res.title}"` : ''}. ${sowDoc ? `Scope doc: ${sowDoc.filename}. ` : ''}${
+            res.coverage.complete
+              ? 'Full stored text delivered.'
+              : `PARTIAL: ${res.coverage.documents_with_more_text} document(s) have more text — keep paging with next_page.`
+          }`
         : `No documents or text found for notice ${res.notice_id}. Verify the notice_id, or the notice may have no attachments.`,
       how_to_use: grounded
-        ? 'extracted_text is the readable text INLINE (capped — check *_truncated). download_url is a short-lived signed link to the full raw PDF/DOCX; fetch it within ~1h to feed a design tool (Canva) or re-parse the full document. sow_text/description are the notice body. Prefer the SOW/PWS doc for the actual requirement.'
+        ? 'extracted_text is ONE WINDOW of each document. To read the whole thing, re-call with the ready-made `next_page.documents` until coverage.complete is true — do NOT conclude a clause is absent from a partial window. text_availability says why text is or is not here: complete | partial (page on) | extraction_failed | file_unavailable | extraction_capped (the file tail was never extracted — only download_url can reach it). download_url is a short-lived (~1h) link to the raw PDF/DOCX.'
         : 'No grounded documents; tell the user none were found rather than inventing solicitation content.',
       key_caveats: [
+        'coverage.complete=false means text is still unread — say so instead of implying you read the full package.',
+        'A clause missing from a PARTIAL window is UNKNOWN, not absent. Page to the end before stating a solicitation lacks something.',
+        'text_availability="extraction_capped" means the end of the FILE was never extracted; paging cannot recover it, the raw download can.',
+        'Coverage is measured in CHARACTERS. Do NOT convert it to pages — no char→page mapping is stored, so "N of M pages" would be invented.',
         'download_url expires (~1h) — re-call the tool to mint a fresh link.',
-        'extracted_text is truncated for inline delivery; the full text is in the downloadable file (char_count is the true length).',
         'Not every notice has attachments — an empty documents list can be legitimate (e.g. a Sources Sought with only body text).',
       ],
     };

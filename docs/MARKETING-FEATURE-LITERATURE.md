@@ -6293,3 +6293,44 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+
+---
+
+## Read the whole solicitation, not the first eight pages (2026-09-22)
+
+**What.** `get_solicitation_documents` now returns a *window* of each document
+with an explicit continuation. A response carries `coverage.complete` and a
+ready-made `next_page`; an agent pages until coverage is complete and can then
+say it read the package — or say precisely how much it did not. Each document
+reports **why** its text is or isn't present: `complete`, `partial`,
+`extraction_failed`, `file_unavailable`, or `extraction_capped`. Coverage is
+counted in **characters**, never converted to pages.
+
+**Why.** Text was capped at 20,000 characters per document with no way to reach
+the rest, so the remainder was unreachable rather than merely paginated. On a
+real 69-page Navy solicitation (`N4008024R2401`, 192,582 stored characters) the
+evaluation factors happened to fall inside the window, but the
+limitations-on-subcontracting certificate (offset 67,109), the insurance
+requirements (69,995) and the order limitations (101,707) did not — an agent
+correctly reported it could not read them. The same cap silently starved
+`extract_compliance_matrix`, `extract_statement_of_work` and `draft_proposal`,
+which means a compliance matrix could omit insurance and subcontracting
+requirements without ever saying so. Separately, the `pursuit-documents` storage
+bucket was never created, so every raw-file upload had failed since the feature
+shipped (28,092 of 28,092 rows with `storage_path` NULL) and the advertised
+"download the full PDF" link always degraded to the public SAM URL.
+
+**SEO.** Read a full federal solicitation with AI / RFP evaluation factors
+extraction / AI proposal compliance matrix from SAM.gov attachments.
+
+**Proof.** Live against the production database, notice
+`a218aa7ee6554aceaf33af0da86d3582`: default window → insurance,
+limitations-on-subcontracting and order limitations all absent,
+`coverage.complete=false`; after paging → all 192,582 characters assembled in 4
+calls with all four cited sections found at their true offsets. Compliance
+source text 229,456 → 493,412 characters, with three previously invisible
+clauses now present. MCP transport verified end-to-end
+(`SMOKE_NOTICE_ID=… npm run mcp:smoke` → 21 documents, 16 complete, 5 with more
+text, continuation at offset 20,000). Ten regressions in
+`solicitation-documents-paging.unit.test.ts`, proven to fail when truncation
+honesty is removed.

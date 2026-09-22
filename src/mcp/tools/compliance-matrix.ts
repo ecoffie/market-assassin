@@ -42,7 +42,11 @@ export interface ComplianceMatrixResult {
  *  text, so the extractor sees the requirements wherever they live. */
 async function textFromNotice(noticeId: string): Promise<{ text: string; degraded: boolean }> {
   try {
-    const docs = await getSolicitationDocuments({ noticeId });
+    // Read a full window per document, not the 20k inline default: the
+    // extractor accepts MAX_INPUT_CHARS (50k) and reports its own truncation,
+    // so starving it here hid late clauses (insurance, limitations on
+    // subcontracting) that live past page 40 of a long solicitation.
+    const docs = await getSolicitationDocuments({ noticeId, textLimit: 120_000 });
     const parts: string[] = [];
     if (docs.sow_text) parts.push(docs.sow_text);
     if (docs.description) parts.push(docs.description);

@@ -43,7 +43,9 @@ async function textFromNotice(
   noticeId: string,
 ): Promise<{ combined: string; classifiedSow: string; degraded: boolean }> {
   try {
-    const docs = await getSolicitationDocuments({ noticeId });
+    // Full window per document — a SOW's scope often continues well past the
+    // first 20k chars, and a partial read silently drops requirements.
+    const docs = await getSolicitationDocuments({ noticeId, textLimit: 120_000 });
     const parts: string[] = [];
     if (docs.description) parts.push(docs.description);
     for (const d of docs.documents) {

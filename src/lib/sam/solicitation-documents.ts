@@ -20,16 +20,46 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { getCached, setCached } from '@/lib/mcp/external-cache';
-import { fetchAndExtractNoticeFiles, normalizeNoticeId } from '@/lib/sam/fetch-pursuit-docs';
+import { fetchAndExtractNoticeFiles, normalizeNoticeId, MAX_EXTRACTED_TEXT_CHARS } from '@/lib/sam/fetch-pursuit-docs';
 
 const BUCKET = 'pursuit-documents';
 const SIGNED_URL_TTL = 3600; // 1h — long enough for an external agent to fetch
 const CACHE_TTL = 30 * 24 * 60 * 60; // 30 days
-const INLINE_CAP = 20_000; // chars returned inline per text field (raw file has the full text)
-const CACHE_TEXT_CAP = 40_000; // chars stored per doc in the cold cache
+const INLINE_CAP = 20_000; // DEFAULT chars per doc when the caller doesn't page (back-compat)
+const MAX_WINDOW_CHARS = 120_000; // hard ceiling for ONE response window (MCP payload safety)
+/** Single source of truth — imported, never re-typed (see the extractor's note). */
+const EXTRACTION_CEILING_CHARS = MAX_EXTRACTED_TEXT_CHARS;
+const CACHE_TEXT_CAP = 200_000; // chars stored per doc in the cold cache — matches the
+// extraction ceiling (MAX_EXTRACTED_TEXT_CHARS in fetch-pursuit-docs). It was 40_000, which
+// silently DESTROYED text beyond 40k on the cold path: the window could never reach what the
+// cache never stored. The warm path (pursuit_documents) always had the full extraction.
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+}
+
+/**
+ * Why the text for a document is (or isn't) here. Collapsing these into an empty
+ * string is what made "we have no text" indistinguishable from "this response
+ * stopped early" — the caller could not tell absence from truncation.
+ */
+export type TextAvailability =
+  | 'complete' // this window reaches the end of the stored text
+  | 'partial' // more text exists AFTER this window — page with next_offset
+  | 'extraction_failed' // we hold the file but could not turn it into text
+  | 'file_unavailable' // no file and no text on record
+  | 'extraction_capped'; // extraction itself stopped at the pipeline ceiling; the
+// TAIL OF THE FILE WAS NEVER EXTRACTED. Paging cannot recover it — the raw file can.
+
+/** Byte/char window actually returned for one document. */
+export interface TextWindow {
+  offset: number; // char offset this window starts at
+  returned_chars: number; // chars in THIS window
+  total_chars: number | null; // TRUE stored length; null = unknown, never assume 0
+  next_offset: number | null; // pass back as offset to continue; null = no more
+  has_more: boolean;
+  /** Fraction of the STORED text delivered so far (0..1). Chars, never pages. */
+  coverage_of_stored_text: number | null;
 }
 
 export interface SolicitationDocument {
@@ -38,8 +68,18 @@ export interface SolicitationDocument {
   mime_type: string | null;
   page_count: number | null;
   char_count: number | null; // TRUE length of the extracted text (not the inline cap)
-  extracted_text: string; // inline, capped at INLINE_CAP
-  extracted_text_truncated: boolean;
+  extracted_text: string; // the requested WINDOW of text (see text_window)
+  extracted_text_truncated: boolean; // true when more text follows this window
+  text_availability: TextAvailability;
+  text_window: TextWindow;
+  /**
+   * Stable identity for paging + amendment tracking. A notice's documents are
+   * addressed by this, NOT by array position (an amendment landing between two
+   * calls would otherwise shift every index).
+   */
+  document_id: string;
+  /** True when extraction hit the pipeline ceiling — the file's tail was never read. */
+  extraction_capped: boolean;
   download_url: string | null; // signed Storage URL (~1h) or public SAM fallback
   download_source: 'mindy_signed' | 'sam_public' | null;
 }
@@ -56,6 +96,40 @@ export interface SolicitationDocumentsResult {
   documents: SolicitationDocument[];
   source: 'cache' | 'on_demand' | 'none'; // where the documents came from
   degraded: boolean;
+  /** Whole-notice coverage so a caller can assert completeness in ONE place. */
+  coverage: {
+    documents_total: number;
+    /** Docs whose returned window reaches the end of their stored text. */
+    documents_complete: number;
+    /** Docs with text still unread AFTER this response (page them). */
+    documents_with_more_text: number;
+    /** Docs we could not turn into text at all. */
+    documents_unavailable: number;
+    /** Docs whose EXTRACTION was capped — tail unreadable via paging. */
+    documents_extraction_capped: number;
+    /** True only when every document's full stored text has been delivered. */
+    complete: boolean;
+  };
+}
+
+/** Per-document paging request, addressed by stable document_id. */
+export interface DocTextRequest {
+  /** document_id (sam file id). Omit to apply to EVERY document. */
+  document_id?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface SolicitationDocumentsInput {
+  noticeId: string;
+  /** Chars per document in this response. Defaults to INLINE_CAP for back-compat. */
+  textLimit?: number;
+  /** Start offset applied to every document unless overridden per-doc. */
+  textOffset?: number;
+  /** Per-document windows — wins over textOffset/textLimit for that doc. */
+  documents?: DocTextRequest[];
+  /** Only return these document_ids (page one big doc without re-sending the rest). */
+  documentIds?: string[];
 }
 
 interface CachedDocMeta {
@@ -68,11 +142,65 @@ interface CachedDocMeta {
   storagePath: string | null;
   samUrl: string | null;
   extractedText: string; // capped at CACHE_TEXT_CAP
+  /** Extractor reported a failure for this file (we hold it, text is absent). */
+  extractionError?: string | null;
 }
 
 function cap(text: string | null | undefined, n: number): { text: string; truncated: boolean } {
   const s = text || '';
   return s.length > n ? { text: s.slice(0, n), truncated: true } : { text: s, truncated: false };
+}
+
+/**
+ * Take the requested WINDOW out of a document's stored text.
+ *
+ * Coverage is reported in CHARS, never pages: we know the stored char length
+ * exactly, but a char offset cannot be mapped to a page without a per-page
+ * offset index the extractor does not produce. Reporting "page N of M" from a
+ * char ratio would be a fabricated number — see the report that claimed
+ * "roughly 8 pages out of 60" purely from a 20k/char ratio.
+ */
+function windowText(
+  full: string,
+  offset: number,
+  limit: number,
+  opts: { extractionCapped: boolean; hadFile: boolean; extractionFailed: boolean },
+): { text: string; window: TextWindow; availability: TextAvailability; truncated: boolean } {
+  const total = full.length;
+  const start = Math.max(0, Math.min(Math.floor(offset) || 0, total));
+  const size = Math.max(1, Math.min(Math.floor(limit) || INLINE_CAP, MAX_WINDOW_CHARS));
+  const text = full.slice(start, start + size);
+  const end = start + text.length;
+  const hasMore = end < total;
+
+  let availability: TextAvailability;
+  if (total === 0) {
+    // No text at all: say WHY. An empty string alone can't distinguish
+    // "the file isn't retrievable" from "we have it but couldn't parse it".
+    availability = opts.extractionFailed ? 'extraction_failed' : 'file_unavailable';
+  } else if (hasMore) {
+    availability = 'partial';
+  } else if (opts.extractionCapped) {
+    // We delivered everything STORED, but extraction itself stopped early, so
+    // the end of the FILE is still unread. Never call that 'complete'.
+    availability = 'extraction_capped';
+  } else {
+    availability = 'complete';
+  }
+
+  return {
+    text,
+    truncated: hasMore,
+    availability,
+    window: {
+      offset: start,
+      returned_chars: text.length,
+      total_chars: total > 0 ? total : opts.hadFile ? 0 : null,
+      next_offset: hasMore ? end : null,
+      has_more: hasMore,
+      coverage_of_stored_text: total > 0 ? Number((end / total).toFixed(4)) : null,
+    },
+  };
 }
 
 async function signUrl(
@@ -98,19 +226,46 @@ async function signUrl(
 async function toOutputDocs(
   supabase: ReturnType<typeof sb>,
   metas: CachedDocMeta[],
+  req: SolicitationDocumentsInput,
 ): Promise<SolicitationDocument[]> {
+  const perDoc = new Map<string, DocTextRequest>();
+  let wildcard: DocTextRequest | null = null;
+  for (const d of req.documents || []) {
+    if (d.document_id) perDoc.set(d.document_id, d);
+    else wildcard = d;
+  }
+
+  const only = req.documentIds && req.documentIds.length > 0 ? new Set(req.documentIds) : null;
+  const selected = only ? metas.filter((m) => only.has(m.fileId)) : metas;
+
   return Promise.all(
-    metas.map(async (m) => {
+    selected.map(async (m) => {
       const { url, source } = await signUrl(supabase, m.storagePath, m.samUrl, m.filename);
-      const inline = cap(m.extractedText, INLINE_CAP);
+      const spec = perDoc.get(m.fileId) || wildcard || {};
+      const offset = spec.offset ?? req.textOffset ?? 0;
+      const limit = spec.limit ?? req.textLimit ?? INLINE_CAP;
+      const full = m.extractedText || '';
+      // The extractor stops at a fixed ceiling; a stored length sitting exactly
+      // ON it means the tail of the file was never read. Paging can't recover
+      // that — only the raw file can — so it must not be reported 'complete'.
+      const extractionCapped = full.length >= EXTRACTION_CEILING_CHARS;
+      const w = windowText(full, offset, limit, {
+        extractionCapped,
+        hadFile: Boolean(m.storagePath || m.samUrl),
+        extractionFailed: Boolean(m.extractionError),
+      });
       return {
         filename: m.filename,
         doc_kind: m.docKind,
         mime_type: m.mime,
         page_count: m.pageCount,
-        char_count: m.charCount,
-        extracted_text: inline.text,
-        extracted_text_truncated: inline.truncated,
+        char_count: m.charCount ?? (full.length || null),
+        extracted_text: w.text,
+        extracted_text_truncated: w.truncated,
+        text_availability: w.availability,
+        text_window: w.window,
+        document_id: m.fileId,
+        extraction_capped: extractionCapped,
         download_url: url,
         download_source: source,
       };
@@ -118,7 +273,28 @@ async function toOutputDocs(
   );
 }
 
-export async function getSolicitationDocuments(input: { noticeId: string }): Promise<SolicitationDocumentsResult> {
+/** Roll per-document availability up to one notice-level answer. */
+function summarize(documents: SolicitationDocument[]): SolicitationDocumentsResult['coverage'] {
+  const withMore = documents.filter((d) => d.text_window.has_more).length;
+  const unavailable = documents.filter(
+    (d) => d.text_availability === 'file_unavailable' || d.text_availability === 'extraction_failed',
+  ).length;
+  const capped = documents.filter((d) => d.text_availability === 'extraction_capped').length;
+  const complete = documents.filter((d) => d.text_availability === 'complete').length;
+  return {
+    documents_total: documents.length,
+    documents_complete: complete,
+    documents_with_more_text: withMore,
+    documents_unavailable: unavailable,
+    documents_extraction_capped: capped,
+    // Honest: capped or unavailable docs mean the NOTICE is not fully delivered.
+    complete: documents.length > 0 && complete === documents.length,
+  };
+}
+
+export async function getSolicitationDocuments(
+  input: SolicitationDocumentsInput,
+): Promise<SolicitationDocumentsResult> {
   const noticeId = normalizeNoticeId((input.noticeId || '').trim());
   const supabase = sb();
 
@@ -134,6 +310,14 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
     documents: [],
     source: 'none',
     degraded: false,
+    coverage: {
+      documents_total: 0,
+      documents_complete: 0,
+      documents_with_more_text: 0,
+      documents_unavailable: 0,
+      documents_extraction_capped: 0,
+      complete: false,
+    },
   };
 
   if (!noticeId) return base;
@@ -174,22 +358,39 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
     // description may still be a noticedesc URL on the ~5% not yet backfilled;
     // only surface it as text if it isn't a bare link.
     const desc = typeof opp.description === 'string' && !/^https?:\/\//i.test(opp.description.trim()) ? opp.description : '';
-    const dCap = cap(desc, INLINE_CAP);
+    // The notice BODY and SOW page on the same offset/limit as the documents,
+    // so a long notice body is reachable too (it was capped identically before).
+    const bodyOffset = input.textOffset ?? 0;
+    const bodyLimit = Math.min(input.textLimit ?? INLINE_CAP, MAX_WINDOW_CHARS);
+    const dCap = cap((desc || '').slice(bodyOffset), bodyLimit);
     base.description = dCap.text;
     base.description_truncated = dCap.truncated;
-    const sCap = cap(opp.sow_text, INLINE_CAP);
+    const sCap = cap(String(opp.sow_text || '').slice(bodyOffset), bodyLimit);
     base.sow_text = sCap.text;
     base.sow_text_truncated = sCap.truncated;
   }
 
   // ── Layer 1: WARM — notice-level dedup already in pursuit_documents ────────
-  const { data: warmRows } = await supabase
+  const { data: warmRows, error: warmErr } = await supabase
     .from('pursuit_documents')
-    .select('sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind')
+    .select(
+      'sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind, extraction_error',
+    )
     .eq('notice_id', resolvedNoticeId)
     .eq('doc_source', 'sam_public')
-    .not('extracted_text', 'is', null)
-    .order('char_count', { ascending: false });
+    // NOTE: rows with NULL extracted_text are deliberately INCLUDED now. Filtering
+    // them out made a file we hold but could not parse look like a file that does
+    // not exist — the exact absence-vs-failure confusion this work removes. They
+    // come back as text_availability='extraction_failed' with a download_url.
+    .order('char_count', { ascending: false, nullsFirst: false });
+
+  // A failed query returns data=null, which is INDISTINGUISHABLE from "this
+  // notice has no documents" unless the error is surfaced. Mark the result
+  // degraded so a caller never reads a query failure as an empty notice.
+  if (warmErr) {
+    console.error('[solicitation-docs] warm pursuit_documents query failed:', warmErr.message);
+    base.degraded = true;
+  }
 
   if (warmRows && warmRows.length > 0) {
     const seen = new Set<string>();
@@ -207,9 +408,11 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
         storagePath: r.storage_path ?? null,
         samUrl: r.sam_url ?? null,
         extractedText: String(r.extracted_text || ''),
+        extractionError: r.extraction_error ?? null,
       });
     }
-    base.documents = await toOutputDocs(supabase, metas);
+    base.documents = await toOutputDocs(supabase, metas, input);
+    base.coverage = summarize(base.documents);
     base.source = 'cache';
     return base;
   }
@@ -217,7 +420,8 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   // ── Layer 2: COLD CACHE — a prior MCP on-demand fetch ─────────────────────
   const cached = await getCached<CachedDocMeta[]>('solicitation_docs', { noticeId: resolvedNoticeId });
   if (cached && cached.length > 0) {
-    base.documents = await toOutputDocs(supabase, cached);
+    base.documents = await toOutputDocs(supabase, cached, input);
+    base.coverage = summarize(base.documents);
     base.source = 'cache';
     return base;
   }
@@ -239,6 +443,7 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   }
 
   // Upload each raw blob to Storage under a notice-level path, build metadata.
+  let storageDegraded = false;
   const metas: CachedDocMeta[] = [];
   for (const f of fetched.documents) {
     const safe = `${f.fileId}-${(f.filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_')}`.slice(0, 400);
@@ -250,9 +455,18 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
         upsert: true,
       });
       if (!error) finalPath = storagePath;
-      else console.warn('[solicitation-docs] storage upload failed:', error.message);
+      else {
+        // A swallowed upload failure is what kept "the bucket does not exist"
+        // invisible across 28,092 rows: the text still returned, so the call
+        // looked healthy while the raw-file half silently never worked.
+        // Surface it and mark the response degraded so the caller knows the
+        // download_url is a SAM fallback, not our durable copy.
+        console.error('[solicitation-docs] storage upload failed:', error.message);
+        storageDegraded = true;
+      }
     } catch (err) {
-      console.warn('[solicitation-docs] storage upload threw:', err);
+      console.error('[solicitation-docs] storage upload threw:', err);
+      storageDegraded = true;
     }
     metas.push({
       fileId: f.fileId,
@@ -264,13 +478,16 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
       storagePath: finalPath,
       samUrl: f.samUrl, // best-effort fallback if the signed Storage copy is unavailable
       extractedText: f.extractedText.slice(0, CACHE_TEXT_CAP),
+      extractionError: f.extractionError ?? null,
     });
   }
 
   // Cache the metadata (NOT signed URLs — those are minted fresh each call).
   await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, metas, CACHE_TTL);
 
-  base.documents = await toOutputDocs(supabase, metas);
+  base.documents = await toOutputDocs(supabase, metas, input);
+  base.coverage = summarize(base.documents);
   base.source = 'on_demand';
+  if (storageDegraded) base.degraded = true;
   return base;
 }

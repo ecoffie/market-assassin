@@ -61,7 +61,9 @@ function toComplianceReqs(
  *  compliance-matrix.ts's textFromNotice (honest degraded on a fetch error). */
 async function textFromNotice(noticeId: string): Promise<{ text: string; degraded: boolean }> {
   try {
-    const docs = await getSolicitationDocuments({ noticeId });
+    // Full window per document so drafting sees the whole requirement, not
+    // just the first 20k chars of each attachment.
+    const docs = await getSolicitationDocuments({ noticeId, textLimit: 120_000 });
     const parts: string[] = [];
     if (docs.sow_text) parts.push(docs.sow_text);
     if (docs.description) parts.push(docs.description);

@@ -857,15 +857,36 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Full text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, notice body, and every ' +
-      'attachment. Returns inline extracted_text (capped; check *_truncated) + a short-lived signed download_url ' +
-      '(~1h) to the full raw PDF/DOCX so an agent can feed it to a design tool (Canva) or re-parse it. Cold notices ' +
-      'are downloaded + extracted on demand. grounded=false when the notice has no text/attachments.',
+      'attachment. Returns a WINDOW of extracted_text per document + a short-lived signed download_url (~1h) to the ' +
+      'full raw PDF/DOCX. PAGING: when coverage.complete is false, re-call with next_page.documents until it is ' +
+      'true. A clause absent from a PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never ' +
+      'convert it to pages. Cold notices are downloaded + extracted on demand. grounded=false when the notice has ' +
+      'no text/attachments.',
     inputSchema: {
       notice_id: z.string().describe('SAM notice id (UUID) or solicitation number — from search_sam_opportunities.'),
+      text_limit: z.number().optional().describe('Chars of text per document (default 20000, max 120000).'),
+      text_offset: z.number().optional().describe('Start offset applied to every document.'),
+      documents: z
+        .array(
+          z.object({
+            document_id: z.string().optional(),
+            offset: z.number().optional(),
+            limit: z.number().optional(),
+          }),
+        )
+        .optional()
+        .describe('Per-document windows — pass next_page.documents verbatim to continue.'),
+      document_ids: z.array(z.string()).optional().describe('Only return these document_ids.'),
     },
   },
-  async ({ notice_id }) => {
-    const result = await solicitationDocuments({ notice_id });
+  async ({ notice_id, text_limit, text_offset, documents, document_ids }) => {
+    const result = await solicitationDocuments({
+      notice_id,
+      text_limit,
+      text_offset,
+      documents,
+      document_ids,
+    });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
