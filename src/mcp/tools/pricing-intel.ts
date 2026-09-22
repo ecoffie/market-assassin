@@ -192,6 +192,26 @@ export async function getPricingIntel(input: PricingIntelInput): Promise<Pricing
   // and refuse to ground it — the pricing is not applicable, not merely empty.
   const sector = (naics || '').replace(/\D/g, '').slice(0, 2);
   const NON_SERVICE_SECTORS = new Set(['11', '21', '23', '31', '32', '33', '42', '44', '45', '48', '49']);
+  /**
+   * What each excluded sector ACTUALLY is. The refusal was right; the reason
+   * was not: NAICS 236220 (sector 23) was explained to customers as a
+   * "manufacturing/product/wholesale code" — 23 is CONSTRUCTION. A factually
+   * wrong explanation inside a correct refusal is still a wrong statement, and
+   * a contractor reading it learns something false about their own industry.
+   */
+  const SECTOR_LABELS: Record<string, string> = {
+    '11': 'Agriculture, Forestry, Fishing and Hunting',
+    '21': 'Mining, Quarrying, and Oil and Gas Extraction',
+    '23': 'Construction',
+    '31': 'Manufacturing',
+    '32': 'Manufacturing',
+    '33': 'Manufacturing',
+    '42': 'Wholesale Trade',
+    '44': 'Retail Trade',
+    '45': 'Retail Trade',
+    '48': 'Transportation and Warehousing',
+    '49': 'Transportation and Warehousing',
+  };
   const naicsNotPriceable = Boolean(naics) && NON_SERVICE_SECTORS.has(sector);
 
   const grounded = !naicsNotPriceable && !!data && data.laborCategories.length > 0;
@@ -209,7 +229,17 @@ export async function getPricingIntel(input: PricingIntelInput): Promise<Pricing
       vendors: naicsNotPriceable ? 0 : (data?.topVendors.length ?? 0),
       from_cache: fromCache,
       ...(naicsNotPriceable
-        ? { not_applicable: `GSA CALC prices SERVICES labor rates; NAICS ${naics} (sector ${sector}) is a manufacturing/product/wholesale code with no applicable labor category. Search by a labor-category keyword instead, or use a services NAICS.` }
+        ? {
+            not_applicable:
+              `GSA CALC prices SERVICES labor rates. NAICS ${naics} is sector ${sector} ` +
+              `(${SECTOR_LABELS[sector] ?? 'a non-services sector'}), which CALC does not cover, ` +
+              `so no defensible labor rate applies here. ` +
+              (sector === '23'
+                ? 'For construction, price from the wage determination in the solicitation ' +
+                  '(Davis-Bacon) and comparable awarded contracts, not CALC labor rates. '
+                : '') +
+              'Search by a labor-category keyword instead, or use a services NAICS.',
+          }
         : {}),
     },
   };

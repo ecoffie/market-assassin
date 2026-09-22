@@ -19,6 +19,10 @@ import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { searchFederalContacts } from '@/mcp/tools/federal-contacts';
+import {
+  extractPackageNamedContacts,
+  dedupeAgainstPackage,
+} from '@/lib/gov-contacts/package-named-contacts';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 
 /** Inline doc text cap inside the dossier — full text is via get_solicitation_documents. */
@@ -189,7 +193,29 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
   ]);
 
   const degraded = [anchor, docs, depth, pricing, contacts, financials].some((s) => s.degraded);
-  const contactRows = (contacts.value as { contacts?: unknown[] } | null)?.contacts ?? [];
+
+  // ── CONTACT: the people named in THIS solicitation outrank the directory ──
+  // Measured on 36C24226Q0857: the CO (Michael.Spivack@va.gov) is named 8x in
+  // the package and appeared in NONE of the 10 directory contacts, which listed
+  // unrelated national VA staff. The package was already fetched above for the
+  // documents section, so this reads that text rather than adding a lookup.
+  // The directory is KEPT as fallback/enrichment, deduped by email.
+  const docsValue = docs.value as {
+    description?: string;
+    sow_text?: string;
+    documents?: { extracted_text?: string }[];
+  } | null;
+  const packageText = [
+    docsValue?.sow_text ?? '',
+    docsValue?.description ?? '',
+    ...(docsValue?.documents ?? []).map((d) => d.extracted_text ?? ''),
+  ].join('\n');
+  const packageContacts = extractPackageNamedContacts(packageText);
+  const directoryRows = (contacts.value as { contacts?: Record<string, unknown>[] } | null)?.contacts ?? [];
+  const contactRows: unknown[] = [
+    ...packageContacts,
+    ...dedupeAgainstPackage(directoryRows, packageContacts),
+  ];
 
   const depthMeta = (depth.value as {
     _meta?: { businesses_returned?: number; businesses_available?: number };
@@ -234,8 +260,20 @@ export async function buildPursuitDossier(input: PursuitDossierInput): Promise<P
     price_to_win: pricing.value,
     buying_office_contacts: contactRows,
     documents: slimDocs,
-    next_step:
-      'Run evaluate_bid_decision with your read on the 5 gates, then extract_compliance_matrix to start the response.',
+    // ── ACTION: only recommend a handoff whose output is verified ──────────
+    // extract_compliance_matrix was REMOVED from this recommendation. Measured
+    // on 36C24226Q0857: 9 of 72 requirement rows carried a source_quote that
+    // does not appear anywhere in the 257,674-char package, and 4 rows cited a
+    // "Section L" the package does not contain. Most rows are sound, but the
+    // dossier told the customer to "start the response" from it as if it were
+    // verified. Recommending an unverified extractor is how a fabricated
+    // requirement reaches a proposal. It stays available as its own tool; it is
+    // not steered into from here until it has its own acceptance standard.
+    next_step: packageContacts.length
+      ? `Run evaluate_bid_decision with your read on the 5 gates, then contact ${
+          packageContacts[0].contact_fullname ?? packageContacts[0].contact_email
+        }${packageContacts[0].contact_title ? ` (${packageContacts[0].contact_title})` : ''} — named in the solicitation — before the deadline.`
+      : 'Run evaluate_bid_decision with your read on the 5 gates, then read the solicitation documents above and confirm the submission requirements directly against the package.',
     _meta: {
       grounded: true,
       degraded,
