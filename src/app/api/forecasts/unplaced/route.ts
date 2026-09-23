@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { mapsForecastRequest, mapsForecastDiscoveryMeta } from '@/lib/opportunities/maps-forecast-discovery';
+import { applyUnplacedOrder } from '@/lib/forecasts/unplaced-order';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,8 +69,8 @@ export async function GET(request: NextRequest) {
       .select(COLS, { count: 'exact' })
       .is('map_lat', null);
     q = forecastReq.apply(q);
-    const { data, count, error } = await q
-      .order('estimated_value_max', { ascending: false, nullsFirst: false })
+    // Value desc → id: a UNIQUE order, so offset paging enumerates every row exactly once (unplaced-order.ts).
+    const { data, count, error } = await applyUnplacedOrder(q)
       .range(offset, offset + limit - 1);
 
     // Bind AND check {error} — a failed read must not render as "none exist".
