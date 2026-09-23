@@ -97,3 +97,22 @@ dated inside the staging window.
 `99-rollback.sql` — all statements commented out; uncomment one section. Code: the MERGE is
 schema-gated (`resolveIdvIdentityColumnsMode`), so dropping the columns returns ingest to the
 legacy statement automatically; a partial schema makes ingest refuse rather than half-write.
+
+## Controlled execution — `.github/workflows/bq-awards-idv-migration.yml`
+
+Dispatch-only (no schedule/push), environment `bq-production` (required reviewer — **Eric must
+create this Environment in repo settings**; until it exists GitHub creates it unprotected on first
+use, so create it BEFORE the first dispatch), same concurrency group as the weekly ingest.
+Each run = ONE step with typed confirmation `IDV-MIGRATION-<step>`.
+
+| Step | Writes? | Gate | Notes |
+|---|---|---|---|
+| `preflight` | no | — | counts only |
+| `snapshot` | new clone table | — | `awards_clone_pre_idv_<YYYYMMDD_HHMM>`, `CREATE TABLE … CLONE`, expires 30d |
+| `ddl` | ALTER awards | clone < 24h AND clone rows == awards rows; `01` sha256 == validated | verifies 58 cols, rows + exact BIGNUMERIC Σobligation unchanged, else STOP |
+| `verify` | no | — | identity fill, cohort completeness, Mech-Elec II |
+| `repull_window` | MERGE | same clone gate | `window_from >= 2026-01-20`, span <= 62 days; blank `window_to` = today (stamps clocks) |
+| `idv_fy_backfill` | MERGE (IDV rows) | same clone gate | one FY 2016..2025 per run; no rebuild, no clock stamp |
+
+Take a fresh `snapshot` before EACH write step (the gate requires the clone to match the live
+row count, so each write has its own rollback point).
