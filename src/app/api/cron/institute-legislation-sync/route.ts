@@ -19,7 +19,8 @@
  *
  * Four clocks stay distinct, exactly as in the GAO route:
  *   pollOk=false            fetch failure, never "no new legislation"
- *   sourceWatermark         advances ONLY from documents actually parsed
+ *   lastSourceAdvance       newest DATED legislative publication actually parsed —
+ *                           never a bill-record metadata update (legislativeSourceAdvance)
  *   lastInstituteIngest     stamped ONLY when a row was really inserted
  *   lastIntelligenceChange  stamped ONLY when a claim really changed
  *   partial=true            budget ran out mid-run — explicitly NOT "complete"
@@ -55,6 +56,8 @@ import { deriveFromInstituteSource } from '@/lib/strategic-intel/derive';
 import {
   encodeLegislationClocks,
   classifyLegislationFreshness,
+  legislativeSourceAdvance,
+  legislationInstancePatch,
   type LegislationClocks,
 } from '@/lib/institute/legislation-clocks';
 import CODES from '@/data/agency-toptier-codes.json';
@@ -310,13 +313,10 @@ export async function GET(request: NextRequest) {
   const fyStates = fiscalYearStates(families.map((f) => ({ fiscalYear: f.fiscalYear, role: f.role, chamber: f.chamber, textVersions: f.versions, becameLaw: f.becameLaw })));
   const discoveryState = fyStates.current?.state ?? classifyFamilyState({ becameLaw: anyLaw, houseVersions, senateVersions });
 
-  // Watermark comes ONLY from documents we actually parsed.
-  const sourceWatermark =
-    allDocs
-      .map(({ doc }) => doc.sourceWatermark ?? doc.publicationDate)
-      .filter((d): d is string => Boolean(d))
-      .sort()
-      .at(-1) ?? null;
+  // Source advance comes ONLY from DATED documents we actually parsed — an undated
+  // version's per-document watermark is Congress's bill-record updateDate, which is
+  // metadata activity, not publication (see legislativeSourceAdvance).
+  const sourceWatermark = legislativeSourceAdvance(allDocs.map(({ doc }) => doc));
 
   if (mode === 'preview') {
     return NextResponse.json({
@@ -466,6 +466,8 @@ export async function GET(request: NextRequest) {
     && discovery.coverage === 'complete'
     && Boolean(discovery.nextWatermark);
 
+  let notesStamped = false;
+  let controlPlaneStamped = false;
   if (stampable) {
     let notes = encodeLegislationClocks((srcRow?.notes as string) ?? null, clocks);
     if (watermarkAdvanced && discovery.nextWatermark) {
@@ -476,7 +478,22 @@ export async function GET(request: NextRequest) {
         scanned: discovery.scanned,
       });
     }
-    await db.from('data_sources').update({ last_built: pollAt.slice(0, 10), notes }).eq('key', SOURCE_KEY);
+    const { error: notesErr } = await db.from('data_sources').update({ last_built: pollAt.slice(0, 10), notes }).eq('key', SOURCE_KEY);
+    notesStamped = !notesErr;
+
+    // The control plane is stamped from THIS execution's values — one run, two views,
+    // one set of clocks. Without it the notes said 2026-09-23 while the control plane
+    // still said 2026-09-20 (seed time).
+    const { error: instanceErr } = await db
+      .from('data_source_instances')
+      .update(legislationInstancePatch({
+        pollAt,
+        coverageComplete: discovery.coverage === 'complete',
+        corpusChanged: evidenceInserted + evidenceUpdated > 0,
+        sourceAdvance: clocks.lastSourceAdvance,
+      }))
+      .eq('source_key', SOURCE_KEY);
+    controlPlaneStamped = !instanceErr;
   }
 
   const freshness = classifyLegislationFreshness({ clocks, now: pollAt });
@@ -536,7 +553,8 @@ export async function GET(request: NextRequest) {
     collectFailures,
     clocks: { ...clocks, lastInstituteIngest },
     freshness,
-    clocksStamped: stampable,
+    clocksStamped: stampable && notesStamped,
+    controlPlaneStamped,
     clocksReadable,
     elapsedMs: Date.now() - started,
   });

@@ -125,6 +125,14 @@ const { data: gao } = await db.from('institute_sources').select('publication_dat
 chk('FRESHNESS lastSourceAdvance is the newest LEGISLATIVE publication, not GAO\'s',
   !!clocks && clocks.lastSourceAdvance?.slice(0, 10) === newestHeld && clocks.lastSourceAdvance?.slice(0, 10) !== gao?.[0]?.publication_date,
   `legislation=${clocks?.lastSourceAdvance} newestHeld=${newestHeld} newestGAO=${gao?.[0]?.publication_date}`);
+// One execution, two views: the control plane must carry the SAME poll and source clocks.
+const { data: inst, error: instErr } = await db.from('data_source_instances')
+  .select('last_poll, last_source_advance').eq('source_key', 'institute_legislation').maybeSingle();
+chk('FRESHNESS control plane and legislation clock agree (same run: poll + source advance)',
+  !instErr && !!inst && !!clocks
+    && Date.parse(inst.last_poll) === Date.parse(clocks.lastPoll)
+    && (inst.last_source_advance ?? '').slice(0, 10) === (clocks.lastSourceAdvance ?? '').slice(0, 10),
+  `controlPlane poll=${inst?.last_poll} source=${inst?.last_source_advance} · legislation poll=${clocks?.lastPoll} source=${clocks?.lastSourceAdvance}`);
 const newestCongress = expected.map((e) => e.date).filter(Boolean).sort().at(-1)!;
 const lagDays = newestHeld ? Math.floor((Date.parse(newestCongress) - Date.parse(newestHeld)) / 86_400_000) : Infinity;
 chk('FRESHNESS Mindy is not silently behind Congress (newest held ≥ newest published − 8d)', lagDays <= 8, `congress=${newestCongress} held=${newestHeld} lag=${lagDays}d`);
