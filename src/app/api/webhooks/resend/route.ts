@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { applyDeliveryEvent, normalizeRecipient, supabaseSuppressionStore } from '@/lib/email/suppression';
 
 export const runtime = 'nodejs';
 
@@ -73,6 +74,8 @@ function statusForEvent(eventType: string): string | null {
       return 'complained';
     case 'email.delivery_delayed':
       return 'delayed';
+    case 'email.suppressed':
+      return 'suppressed';
     case 'email.sent':
       return 'sent';
     // opened/clicked deliberately return null: they are ENGAGEMENT, not delivery
@@ -218,6 +221,25 @@ export async function POST(request: NextRequest) {
 
     if (insertError && insertError.code !== '23505') {
       throw insertError;
+    }
+
+    // Delivery feedback → mailbox suppression. LOAD-BEARING: hard bounce, complaint and
+    // provider-suppressed events suppress immediately; transient bounces suppress only
+    // under the repeated-transient rule (src/lib/email/suppression.ts). Idempotent — a
+    // replayed event hits insert-if-absent and a de-duplicated strike count. A failure
+    // here THROWS so Resend redelivers (the event insert above is itself idempotent),
+    // rather than acknowledging a bounce Mindy never learned from.
+    const suppression = await applyDeliveryEvent(supabaseSuppressionStore(supabase), {
+      eventType,
+      data,
+      recipient: normalizeRecipient(data.to) || userEmail,
+      providerEventId,
+      providerMessageId,
+      emailType,
+      occurredAt,
+    });
+    if (suppression.newlyWritten) {
+      console.log(`[resend-webhook] suppressed ${userEmail} (${suppression.reason}) from ${eventType}`);
     }
 
     // Engagement (open/click) → the user's counters. Non-fatal by design.

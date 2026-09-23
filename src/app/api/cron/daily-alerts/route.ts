@@ -26,6 +26,8 @@ import {
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
+import { retryFailedDailyAlerts } from '@/lib/alerts/retry-failed-daily';
+import { isMailboxSuppressed } from '@/lib/email/suppression';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
 import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
@@ -286,81 +288,32 @@ async function saveSkippedAlert(
 }
 
 /**
- * Retry failed alerts from previous runs
+ * Retry failed alerts from previous runs. The loop lives in
+ * `@/lib/alerts/retry-failed-daily` so its contract is tested: a retry honors
+ * alerts_enabled / is_active and mailbox suppression, and a guard-blocked send is
+ * recorded as skipped — never stamped 'sent'.
  */
 async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number }> {
-  const results = { retried: 0, succeeded: 0 };
-
-  // Get failed alerts from last 3 days with retry_count < 3
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  const today = new Date().toISOString().split('T')[0];
-
-  const { data: failedAlerts } = await getSupabase()
-    .from('alert_log')
-    .select('*')
-    .eq('alert_type', 'daily')
-    .eq('delivery_status', 'failed')
-    .lt('retry_count', 3)
-    .gte('alert_date', threeDaysAgo.toISOString().split('T')[0])
-    .lt('alert_date', today);
-
-  if (!failedAlerts || failedAlerts.length === 0) return results;
-
-  console.log(`[Daily Alerts] Retrying ${failedAlerts.length} failed alerts...`);
-
-  for (const alert of failedAlerts) {
-    results.retried++;
-
-    try {
-      // Get user settings (unified table)
-      const { data: user } = await getSupabase()
-        .from('user_notification_settings')
-        .select('*')
-        .eq('user_email', alert.user_email)
-        .single();
-
-      if (!user || !alert.opportunities_data) continue;
-
-      // Resend email
-      await sendDailyAlertEmail(
+  const supabase = getSupabase();
+  const r = await retryFailedDailyAlerts({
+    supabase,
+    isSuppressed: (recipient) => isMailboxSuppressed(supabase, recipient),
+    send: (alert, user) =>
+      sendDailyAlertEmail(
         alert.user_email,
-        alert.opportunities_data.map((o: any) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (alert.opportunities_data || []).map((o: any) => ({
           ...o,
           score: 50, // Default score for retry
           uiLink: `https://sam.gov/opp/${o.noticeId}/view`,
         })),
-        user as AlertUser
-      );
-
-      // Mark as sent
-      await getSupabase()
-        .from('alert_log')
-        .update({
-          delivery_status: 'sent',
-          sent_at: new Date().toISOString(),
-          error_message: null,
-        })
-        .eq('id', alert.id);
-
-      results.succeeded++;
-      console.log(`[Daily Alerts] Retry succeeded for ${alert.user_email}`);
-
-    } catch (err: any) {
-      // Increment retry count
-      await getSupabase()
-        .from('alert_log')
-        .update({
-          retry_count: (alert.retry_count || 0) + 1,
-          error_message: err.message,
-        })
-        .eq('id', alert.id);
-
-      console.error(`[Daily Alerts] Retry failed for ${alert.user_email}:`, err.message);
-    }
+        user as unknown as AlertUser,
+      ),
+  });
+  if (r.retried > 0) {
+    console.log(`[Daily Alerts] Retry: ${r.retried} examined, ${r.succeeded} sent, ${r.skipped} retired`, r.skipReasons);
   }
-
-  return results;
+  return { retried: r.retried, succeeded: r.succeeded };
 }
 
 /**
