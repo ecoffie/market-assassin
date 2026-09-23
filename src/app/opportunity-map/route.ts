@@ -12,6 +12,7 @@ import { US_STATE_NAMES } from '@/lib/utils/us-states';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
+import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
 
@@ -9498,7 +9499,17 @@ const CARD_TRACK_JS = `<script>(function(){
 
 
 export async function GET(request: NextRequest) {
-  const embed = new URL(request.url).searchParams.get('embed');
+  const reqUrl = new URL(request.url);
+  const embed = reqUrl.searchParams.get('embed');
+  // SHARE TRUTH: a shared `?opp=<notice_id>` must identify THAT opportunity to crawlers (Facebook,
+  // LinkedIn, X, iMessage), which never run our JS. Started now so the one-row read overlaps the
+  // 600-opp load below; applied to <head> at the end. Embed is never a share target.
+  const shareOppId = embed ? null : reqUrl.searchParams.get('opp');
+  const shareHeadP: Promise<string | null> = isNoticeId(shareOppId)
+    ? fetchOppShareRow(shareOppId)
+        .then((row) => (row ? renderOppShareHead(buildOppShareMeta(row), reqUrl.origin) : null))
+        .catch((e) => { console.error('[opportunity-map] share metadata read failed', shareOppId, e); return null; })
+    : Promise.resolve(null);
   let opps: unknown[] = [];
   try {
     const rows = await getMapOpportunities(600);
@@ -9770,5 +9781,9 @@ export async function GET(request: NextRequest) {
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
     html = html.replace('__FSC_PRESETS__', () => JSON.stringify(FSC_PRESETS));
   }
+  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the page stays
+  // exactly as before (generic title); the authenticated Maps experience is untouched either way.
+  const shareHead = await shareHeadP;
+  if (shareHead) html = repl(html, '<title>Mindy Map</title>', shareHead);
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
