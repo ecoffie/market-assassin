@@ -63,6 +63,41 @@ const PROGRAM_LABEL: Partial<Record<SetAsideKind, string>> = {
   vosb: 'veteran-owned set-aside',
 };
 
+/*
+ * Some sources carry a YES/NO FLAG in the set-aside field instead of a program name. Measured
+ * 2026-09-23 on agency_forecasts.set_aside_type (35,928 rows): "true" 654 · "True" 82 ·
+ * "false" 7 · "False" 1 — every one DHS. The DHS APFS feed has two fields,
+ * `small_business_set_aside` (boolean) and `small_business_program` (SB / 8(a) / SDVOSB /
+ * HUBZone / WOSB / TBD); our ingest keeps the first non-empty of the two, so a flagged row keeps
+ * only the boolean. Live feed 2026-09-23: true travels with SB 249 · TBD 58 · 8(a) 39 ·
+ * SDVOSB 24 · HUBZone 18 · WOSB 14 — so "true" means "the agency marked this as a small-business
+ * set-aside" and the program is not in our record. It must never be quoted to a customer.
+ */
+const FLAG_TRUE = /^(true|yes)$/i;
+const FLAG_FALSE = /^(false|no)$/i;
+const UNDECIDED = /^(tbd|to be determined)$/i;
+
+function unevaluatedRestrictionReason(raw: string | null, kind: SetAsideKind): string {
+  const t = (raw || '').trim();
+  if (FLAG_TRUE.test(t)) {
+    return 'The agency marks this as a small-business set-aside but does not say which program '
+      + '(general small business, 8(a), HUBZone, SDVOSB or WOSB), so eligibility cannot be judged yet.';
+  }
+  if (FLAG_FALSE.test(t)) {
+    return 'The agency marks this as not set aside for small business but does not state how it will be competed, so eligibility is not established.';
+  }
+  if (UNDECIDED.test(t)) {
+    return 'The agency has not decided the set-aside yet, so eligibility is not established.';
+  }
+  if (kind === 'unknown') {
+    // An unrecognized short code — same rule as translateSetAside: omit rather than print it.
+    return 'The record lists a set-aside code this screen does not recognize, so eligibility is not established.';
+  }
+  // A worded restriction (e.g. "Sole Source", "Indian Small Business Economic Enterprise") is the
+  // agency's own language and is safe to quote.
+  return `The record lists a restriction ("${t}") that this screen cannot evaluate against the company record.`;
+}
+
 function sizeFact(anchor: CompanyAnchor, naics: string | null): EligibilityVerdict['basis']['company_size_under_naics'] {
   if (!naics) return 'no_naics_on_record';
   return sizeUnderNaics(anchor, naics);
@@ -94,7 +129,7 @@ export function evaluateEligibility(
     return v('ELIGIBLE', `The record states no set-aside / unrestricted competition, so business size does not restrict ${name}.`);
   }
   if (kind === 'unknown' || kind === 'other') {
-    return v('UNKNOWN', `The record lists a restriction ("${raw}") that this screen cannot evaluate against the company record.`);
+    return v('UNKNOWN', unevaluatedRestrictionReason(raw, kind));
   }
   if (!SMALL_PROGRAMS.has(kind)) {
     return v('UNKNOWN', `Set-aside "${raw}" is not evaluated by this screen.`);
