@@ -35,6 +35,7 @@ import { parseNaicsCodes, naicsOrExpression } from '@/lib/recompete/query';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { getVocabulary } from '@/lib/market/vocabulary';
 import { getNaics } from '@/lib/codes/lookup';
+import { annotateRecompeteRow } from '@/lib/recompete/annotate';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -316,7 +317,7 @@ async function handleRecompeteGet(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      contract,
+      contract: annotateRecompeteRow(contract as Parameters<typeof annotateRecompeteRow>[0]),
     });
   }
 
@@ -586,7 +587,11 @@ async function handleRecompeteGet(request: NextRequest) {
     const naicsCode = String(lead.naics_code || '').trim();
     const naics_description = lead.naics_description ?? (naicsCode ? getNaics(naicsCode)?.title ?? null : null);
     return {
-      ...g.lead,
+      // IMI (2026-09-22): the stored estimated_recompete_date is PoP end − 12mo straight from the
+      // DB trigger, so it was already a year in the past for every near-term row. Same corrected
+      // row as the MCP tool (annotate.ts): capture date kept as capture_start_date, orders
+      // labelled with their parent vehicle, PoP state withdrawn when the record contradicts it.
+      ...annotateRecompeteRow(g.lead as Record<string, unknown> as Parameters<typeof annotateRecompeteRow>[0]),
       naics_description,
       is_multi_award: g.members.length > 1,
       awardee_count: g.incumbentCount,
@@ -605,7 +610,10 @@ async function handleRecompeteGet(request: NextRequest) {
   const pageContracts = pageGroups.flatMap((g) => g.members).map((m) => {
     const row = m as { naics_code?: string; naics_description?: string | null };
     const code = String(row.naics_code || '').trim();
-    return { ...m, naics_description: row.naics_description ?? (code ? getNaics(code)?.title ?? null : null) };
+    return {
+      ...annotateRecompeteRow(m as Record<string, unknown> as Parameters<typeof annotateRecompeteRow>[0]),
+      naics_description: row.naics_description ?? (code ? getNaics(code)?.title ?? null : null),
+    };
   });
 
   const payload = {

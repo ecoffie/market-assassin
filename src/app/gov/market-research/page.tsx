@@ -63,7 +63,7 @@ interface PriorContract {
   naics: string | null;
   pscDescription: string | null;
   state: string | null;
-  estimatedRecompete: string | null;
+  periodEnd: string | null;
   recompeteLikelihood: string | null;
   setAside: string | null;
 }
@@ -730,7 +730,7 @@ export default function GovMarketResearchPage() {
                 </p>
               ) : ctx.history.contracts.length === 0 ? (
                 <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
-                  No active contracts with a future recompete date found in the award record for this scope.
+                  No contracts still in their period of performance found in the award record for this scope.
                   That is a measured result, not a failed lookup — it may indicate a genuinely new requirement,
                   or a scope narrower than the award record captures. Broaden the agency or place of
                   performance to widen the search.
@@ -754,7 +754,7 @@ export default function GovMarketResearchPage() {
                           <th className="pb-2 pr-4">Incumbent</th>
                           <th className="pb-2 pr-4">Work</th>
                           <th className="pb-2 pr-4 text-right">Ceiling</th>
-                          <th className="pb-2 pr-4">Est. recompete</th>
+                          <th className="pb-2 pr-4">Contract ends</th>
                           <th className="pb-2">Set-aside</th>
                         </tr>
                       </thead>
@@ -764,7 +764,7 @@ export default function GovMarketResearchPage() {
                             <td className="py-2 pr-4 font-medium text-slate-100">{c.incumbent}</td>
                             <td className="py-2 pr-4 text-slate-400">{c.pscDescription || '—'}</td>
                             <td className="py-2 pr-4 text-right tabular-nums">{c.value !== null ? money(c.value) : '—'}</td>
-                            <td className="py-2 pr-4 tabular-nums text-slate-400">{c.estimatedRecompete || '—'}</td>
+                            <td className="py-2 pr-4 tabular-nums text-slate-400">{c.periodEnd || '—'}</td>
                             {/* NULL set-aside means UNKNOWN, not "unrestricted" —
                                 only 34% of the award record carries one. */}
                             <td className="py-2 text-slate-400">{c.setAside || 'Not recorded'}</td>
@@ -775,8 +775,8 @@ export default function GovMarketResearchPage() {
                   </div>
 
                   <p className="mt-4 text-[12px] leading-relaxed text-slate-500">
-                    Recompete dates are <strong className="text-slate-400">estimated</strong> from award period-of-performance
-                    data — a planning signal, not a commitment that a solicitation issues on that date.
+                    Contract end dates are the current period-of-performance end in the award record —
+                    no recompete or solicitation date is estimated from them.
                     Set-aside is recorded on {ctx.history.setAsideCoverage.withSetAside} of {ctx.history.setAsideCoverage.total} matched
                     rows; &ldquo;Not recorded&rdquo; means unknown, not unrestricted.
                     {ctx.history.note ? ` ${ctx.history.note}` : ''}
@@ -794,10 +794,10 @@ export default function GovMarketResearchPage() {
               ) : (
                 <>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <Stat label={`Recompetes next ${ctx.signals.horizonMonths} months`}
+                    <Stat label={`Contracts ending next ${ctx.signals.horizonMonths} months`}
                       value={ctx.signals.upcomingRecompetes !== null ? ctx.signals.upcomingRecompetes.toLocaleString() : null}
                       accent={(ctx.signals.upcomingRecompetes ?? 0) > 0}
-                      sub="Contracts in this scope coming up for recompete" />
+                      sub="Current period of performance ends in this window" />
                     <Stat label="Engagement events"
                       value={ctx.signals.measured && ctx.signals.samCount >= 0 && agency ? ctx.signals.samCount.toLocaleString() : null}
                       sub="Industry days, sources sought, RFIs from SAM" />

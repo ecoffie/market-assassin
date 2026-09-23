@@ -56,7 +56,6 @@ export interface PriorContract {
   pscDescription: string | null;
   state: string | null;
   periodEnd: string | null;
-  estimatedRecompete: string | null;
   recompeteLikelihood: string | null;
   setAside: string | null;
   contractType: string | null;
@@ -120,7 +119,7 @@ function applyAgencyFilter<T>(q: T, agency: string): T {
  * Procurement history for a requirement scope, from the award record.
  *
  * Matching is NAICS-first (the scope the workspace is keyed on), narrowed by
- * agency/state when supplied. Ordered by recompete date so the most
+ * agency/state when supplied. Ordered by period-of-performance end so the most
  * actionable rows surface first — a CO cares about what is coming up, not
  * what is largest.
  */
@@ -140,7 +139,7 @@ export async function getProcurementHistory(
       .select(
         'incumbent_name,piid,awarding_agency,awarding_sub_agency,potential_total_value,' +
         'naics_code,psc_description,place_of_performance_state,' +
-        'period_of_performance_current_end,estimated_recompete_date,recompete_likelihood,' +
+        'period_of_performance_current_end,recompete_likelihood,' +
         'set_aside_type,contract_type',
         { count: 'exact' },
       )
@@ -153,14 +152,14 @@ export async function getProcurementHistory(
       q = q.or(`psc_description.ilike.%${k}%,naics_description.ilike.%${k}%`);
     }
 
-    // Only contracts whose recompete is still ahead of us. A history section
-    // that leads with a 2025 date reads as stale data to a CO — and an
-    // already-expired recompete is not actionable acquisition planning.
-    q = q.gte('estimated_recompete_date', new Date().toISOString().slice(0, 10));
+    // Only contracts still performing. Ordered by period-of-performance end — the recorded
+    // date. (IMI 2026-09-22: the table's estimated_recompete_date column is a DERIVED PoP end
+    // − 12 months, not a recompete date; it is no longer read or shown as one.)
+    q = q.gte('period_of_performance_current_end', new Date().toISOString().slice(0, 10));
 
     // Pull a wider slice than we display so the guard + aggregates are honest.
     const { data, error, count } = await q
-      .order('estimated_recompete_date', { ascending: true })
+      .order('period_of_performance_current_end', { ascending: true })
       .limit(200);
 
     // ALWAYS check {error} — a PostgREST failure returns data:null with a
@@ -188,7 +187,6 @@ export async function getProcurementHistory(
       pscDescription: (r.psc_description as string) ?? null,
       state: (r.place_of_performance_state as string) ?? null,
       periodEnd: (r.period_of_performance_current_end as string) ?? null,
-      estimatedRecompete: (r.estimated_recompete_date as string) ?? null,
       recompeteLikelihood: (r.recompete_likelihood as string) ?? null,
       setAside: (r.set_aside_type as string) ?? null,
       contractType: (r.contract_type as string) ?? null,
@@ -278,7 +276,8 @@ export async function getMarketSignals(
     note = 'Engagement events are matched by agency. Add an agency to the requirement to surface industry days, sources sought, and RFIs.';
   }
 
-  // Recompetes inside the horizon — same scope as the history query.
+  // Contracts whose current period of performance ENDS inside the horizon — same scope as the
+  // history query. A recorded date, not an estimated recompete date.
   let upcomingRecompetes: number | null = null;
   try {
     const horizon = new Date();
@@ -287,8 +286,8 @@ export async function getMarketSignals(
       .from('recompete_opportunities')
       .select('id', { count: 'exact', head: true })
       .eq('naics_code', params.naics.trim())
-      .gt('estimated_recompete_date', new Date().toISOString().slice(0, 10))
-      .lte('estimated_recompete_date', horizon.toISOString().slice(0, 10));
+      .gt('period_of_performance_current_end', new Date().toISOString().slice(0, 10))
+      .lte('period_of_performance_current_end', horizon.toISOString().slice(0, 10));
     if (params.agency) q = applyAgencyFilter(q, params.agency);
     if (params.state) q = q.eq('place_of_performance_state', params.state.trim().toUpperCase());
 

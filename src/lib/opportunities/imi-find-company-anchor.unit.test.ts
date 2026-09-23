@@ -389,10 +389,13 @@ describe('findOpportunities end-to-end (fake client, frozen rows)', () => {
     expect(open.some((i) => i.evidence_class === 'DIRECT_MATCH' && (i.match_basis || []).every((b) => String(b).startsWith('company_')))).toBe(false);
     const back = res.horizons.coming_back.items;
     expect(back.every((i) => i.eligibility?.status === 'UNKNOWN')).toBe(true);
+    // The 6 Tyonek rows are task orders under FA8571-23-D-0004. Coming Back never returns orders
+    // (Eric, 2026-09-22): none appears as an item, all 6 are counted as orders_excluded.
     const ty = back.filter((i) => /TYONEK/.test(String(i.incumbent_name)));
-    expect(ty).toHaveLength(6);
-    expect(ty.every((i) => i.evidence_class === 'HOLDER_SIGNAL')).toBe(true);
-    expect(res.summary.coming_back.holder_signal).toBe(6);
+    expect(ty).toHaveLength(0);
+    expect(back.some((i) => i.award_kind === 'order_under_vehicle')).toBe(false);
+    expect(res.horizons.coming_back.orders_excluded).toBe(6);
+    expect(res.summary.coming_back.holder_signal).toBe(0);
     // The fake client returns every fixture row; only the 3 buy-side rows are DIRECT, IMI's own award is
     // recalled by its registered NAICS 332999 (company code, no class), the oven row carries no evidence.
     expect(res.summary.coming_back.direct_match).toBe(3);

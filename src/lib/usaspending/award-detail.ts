@@ -38,6 +38,10 @@ export interface AwardDetail {
   awardingOffice: string;
   fundingAccount: string | null;
   usaSpendingUrl: string;
+  /** Latest transaction's "MULTIPLE AWARD" / "SINGLE AWARD" (IDVs). Null when not reported. */
+  multipleOrSingleAward?: string | null;
+  /** Latest transaction's set-aside description, as reported. Null when not reported. */
+  setAsideDescription?: string | null;
 }
 
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
@@ -125,6 +129,8 @@ export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail
         || (Array.isArray(d.federal_accounts) ? d.federal_accounts[0]?.federal_account_name : null)
         || null,
       usaSpendingUrl: `https://www.usaspending.gov/award/${encodeURIComponent(generatedId)}`,
+      multipleOrSingleAward: d.latest_transaction_contract_data?.multiple_or_single_award_description || null,
+      setAsideDescription: d.latest_transaction_contract_data?.type_set_aside_description || null,
     };
   } catch {
     return null;

@@ -9,13 +9,13 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { getNaics } from '@/lib/codes/lookup';
-import { overlayRecompeteTiming } from '@/lib/recompete/timing';
+import { annotateRecompeteRow, type RecompeteRowAnnotations } from '@/lib/recompete/annotate';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type';
 
 /**
  * Digits-only NAICS codes, deduped, order preserved. Accepts a comma/space-separated
@@ -136,6 +136,16 @@ export interface ExpiringContract {
   estimated_recompete_date: string | null;
   lead_time_months: number | null;
   recompete_likelihood: string | null;
+  /** FPDS award type as stored ("DELIVERY ORDER", "DEFINITIVE CONTRACT", …). */
+  contract_type?: string | null;
+  // ── IMI corrections (annotate.ts) — present on every row this query returns ──
+  capture_start_date?: string | null;
+  capture_start_basis?: RecompeteRowAnnotations['capture_start_basis'];
+  capture_start_passed?: boolean | null;
+  award_kind?: RecompeteRowAnnotations['award_kind'];
+  parent_vehicle_piid?: string | null;
+  parent_vehicle_id?: string | null;
+  place_of_performance_source_note?: RecompeteRowAnnotations['place_of_performance_source_note'];
 }
 
 export interface ExpiringContractsResult {
@@ -283,10 +293,12 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     }
   }
 
-  // MINDY-006 (2026-09-17): estimated_recompete_date is PoP-end minus 12 calendar
-  // months (DB trigger / forecast-PRD). Never derived from today, never clamped
-  // to the run date — a past capture date stays past. lead_time_months is a
-  // different quantity: remaining clock to PoP-end, recomputed live.
+  // Timing, lineage and place of performance all come from annotateRecompeteRow (annotate.ts)
+  // so every surface reading this table shows the same corrected row:
+  //   - PoP end − 12mo is a SUGGESTED capture start (`capture_start_date` + basis), never a
+  //     recompete date; estimated_recompete_date is NULL (the trigger column is overridden).
+  //   - an order under a vehicle is labelled one and carries no standalone recompete date.
+  //   - place_of_performance_state is exposed exactly as USASpending reports it.
   const now = new Date();
   const contracts = rawContracts.map((c) => {
     // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
@@ -302,15 +314,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     // description are NOT derivable from what we store (they live on the per-award
     // detail endpoint) and stay null — an honest miss, never a guess.
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
-    const timing = overlayRecompeteTiming(c.period_of_performance_current_end, now);
-    if (!timing) return { ...c, set_aside_type, naics_description };
-    return {
-      ...c,
-      set_aside_type,
-      naics_description,
-      lead_time_months: timing.lead_time_months,
-      estimated_recompete_date: timing.estimated_recompete_date,
-    };
+    return annotateRecompeteRow({ ...c, set_aside_type, naics_description }, now);
   });
   return { contracts, total: res.count ?? contracts.length, count: res.count ?? null, degraded: false };
 }

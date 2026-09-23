@@ -1,7 +1,7 @@
 /**
  * Recompete timing — capture-start date vs remaining clock.
  *
- * Canonical offset for estimated_recompete_date is 12 calendar months before
+ * Canonical offset for capture_start_date is 12 calendar months before
  * period_of_performance_current_end. Evidence (not invented):
  *   • DB trigger `update_recompete_computed_fields` (20260405 + 20260716):
  *     `NEW.estimated_recompete_date := pop_end - INTERVAL '12 months'`
@@ -45,10 +45,14 @@ export function addCalendarMonths(isoDate: string, months: number): string | nul
   return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-/** Capture-start: PoP end minus 12 calendar months. Never uses today. Past stays past. */
-export function estimatedRecompeteDateFromPopEnd(popEnd: string | null | undefined): string | null {
+/** Suggested capture start: PoP end minus 12 calendar months. Never uses today. Past stays past. */
+export function captureStartDateFromPopEnd(popEnd: string | null | undefined): string | null {
   return addCalendarMonths(popEnd || '', -RECOMPETE_CAPTURE_LEAD_MONTHS);
 }
+
+/** The derived rule behind capture_start_date, stated on every row that carries one. */
+export const CAPTURE_START_BASIS =
+  'derived: period_of_performance_current_end − 12 months (Mindy capture lead rule)' as const;
 
 /**
  * Remaining clock: whole months from `now` until PoP end.
@@ -64,12 +68,46 @@ export function leadTimeMonthsFromPopEnd(popEnd: string | null | undefined, now:
   return end > now.getTime() ? Math.max(1, Math.round(rawMonths)) : 0;
 }
 
+/**
+ * The date contract (Eric, 2026-09-22 — final):
+ *
+ *   capture_start_date       = PoP end − 12 months: a SUGGESTED capture start, derived by our rule.
+ *   capture_start_basis      = that rule, stated.
+ *   estimated_recompete_date = NULL. Nothing we store independently establishes when a follow-on
+ *                              will be solicited or awarded, so the field is unknown. It is never
+ *                              a copy of capture_start_date and never a copy of PoP end.
+ *
+ * Customer story: "Contract ends 2027-11-09. Suggested capture start: 2026-11-09." — never
+ * "Estimated recompete date". The DB trigger still writes PoP end − 12 months into the
+ * estimated_recompete_date COLUMN; every reader overrides it at read time (annotate.ts).
+ *
+ * IMI test (2026-09-22): FA850126F0034 ends 2026-11-09 and printed
+ * "estimated_recompete_date: 2025-11-09" beside likelihood "high".
+ */
+export interface RecompeteTiming {
+  /** PoP end − 12 calendar months (MINDY-006). May be in the past; never clamped. */
+  capture_start_date: string;
+  capture_start_basis: typeof CAPTURE_START_BASIS;
+  /** True when the suggested capture start is already behind today. */
+  capture_start_passed: boolean;
+  /** Always null: no independent source establishes a recompete/acquisition date. */
+  estimated_recompete_date: null;
+  lead_time_months: number;
+}
+
 export function overlayRecompeteTiming(
   popEnd: string | null | undefined,
   now: Date = new Date(),
-): { estimated_recompete_date: string; lead_time_months: number } | null {
-  const estimated = estimatedRecompeteDateFromPopEnd(popEnd);
+): RecompeteTiming | null {
+  const capture = captureStartDateFromPopEnd(popEnd);
   const lead = leadTimeMonthsFromPopEnd(popEnd, now);
-  if (estimated == null || lead == null) return null;
-  return { estimated_recompete_date: estimated, lead_time_months: lead };
+  if (capture == null || lead == null) return null;
+  const today = now.toISOString().slice(0, 10);
+  return {
+    capture_start_date: capture,
+    capture_start_basis: CAPTURE_START_BASIS,
+    capture_start_passed: capture < today,
+    estimated_recompete_date: null,
+    lead_time_months: lead,
+  };
 }

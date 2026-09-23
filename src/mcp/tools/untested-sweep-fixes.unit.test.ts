@@ -62,20 +62,25 @@ describe('FM-U05 — solicitation-documents resolves a solicitation number, not 
 });
 
 describe('FM-U06 — expiring-contracts overlays capture date vs remaining clock (MINDY-006)', () => {
-  const src = read('../../lib/recompete/query.ts');
+  // The overlay moved into the shared annotator (IMI 2026-09-22) so every recompete surface
+  // shows the same corrected row; query.ts delegates to it.
+  const query = read('../../lib/recompete/query.ts');
+  const annotate = read('../../lib/recompete/annotate.ts');
   it('uses overlayRecompeteTiming: PoP−12 capture date, remaining-clock lead, no run-date clamp', () => {
-    expect(src).toMatch(/overlayRecompeteTiming/);
-    expect(src).toMatch(/lead_time_months: timing\.lead_time_months/);
-    expect(src).toMatch(/estimated_recompete_date: timing\.estimated_recompete_date/);
-    expect(src).not.toMatch(/Math\.max\(now, end - solLead\)/);
-    expect(src).not.toMatch(/9 \* 30\.4375/);
+    expect(query).toMatch(/annotateRecompeteRow/);
+    expect(annotate).toMatch(/overlayRecompeteTiming/);
+    expect(annotate).toMatch(/lead_time_months: timing\?\.lead_time_months/);
+    expect(annotate).toMatch(/capture_start_date: timing\?\.capture_start_date/);
+    expect(query).not.toMatch(/Math\.max\(now, end - solLead\)/);
+    expect(query).not.toMatch(/9 \* 30\.4375/);
   });
-  it('near-term remaining clock is at least 1; capture date may already be past', () => {
+  it('near-term remaining clock is at least 1; capture date may already be past, but is never the estimate', () => {
     const now = new Date('2026-09-17T00:00:00.000Z');
     const overlay = overlayRecompeteTiming('2026-09-18', now);
     expect(overlay?.lead_time_months).toBe(1);
-    expect(overlay?.estimated_recompete_date).toBe('2025-09-18');
-    expect(overlay!.estimated_recompete_date < '2026-09-17').toBe(true);
+    expect(overlay?.capture_start_date).toBe('2025-09-18');
+    expect(overlay!.capture_start_date < '2026-09-17').toBe(true);
+    expect(overlay?.estimated_recompete_date).toBeNull();
   });
 });
 

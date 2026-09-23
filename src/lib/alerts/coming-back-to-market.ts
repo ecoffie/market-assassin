@@ -21,7 +21,8 @@ import { getNaics } from '@/lib/codes/lookup';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
 import { parseNaicsCodes, naicsOrExpression, type ExpiringContract } from '@/lib/recompete/query';
-import { overlayRecompeteTiming } from '@/lib/recompete/timing';
+import { annotateRecompeteRow } from '@/lib/recompete/annotate';
+import { parseAwardLineage } from '@/lib/recompete/award-lineage';
 
 export const COMING_BACK_CAP = 5;
 export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
@@ -93,7 +94,14 @@ export type ComingBackRow = {
 
 export type ComingBackDecision =
   | { kind: 'omit'; reason: ComingBackOmitReason }
-  | { kind: 'show'; rows: ComingBackRow[]; matchedNaics: string[]; starterMarket: boolean };
+  | {
+      kind: 'show';
+      rows: ComingBackRow[];
+      matchedNaics: string[];
+      starterMarket: boolean;
+      /** Internal: task/delivery orders dropped before card selection. Never rendered. */
+      ordersExcluded?: number;
+    };
 
 const NUCLEAR_MO_VEHICLE =
   /consolidated nuclear|savannah river nuclear|solutions of sandia|sandia, llc|\bsandia\b|mission support & test|mission support and test|national nuclear|\bnnsa\b|nuclear security|nuclear solutions|management and operat/;
@@ -467,7 +475,18 @@ export function selectComingBackRows(input: {
   };
   const classes = classifyCodes(profile);
 
-  const market = input.contracts.filter((c) => inStoredComingBackMarket(c, stored, storedPsc));
+  // IMI (Eric, 2026-09-22): a task/delivery order under a vehicle is never "coming back to
+  // market" on its own — the next order goes to the same vehicle. Orders are excluded from the
+  // individual cards. The alert path carries no defensible parent-vehicle fields (ordering end,
+  // holders), so no vehicle card is built either. Lineage is derived from the stored row
+  // (parseAwardLineage), not trusted from a caller's annotation. Counted internally only.
+  let ordersExcluded = 0;
+  const standalone = input.contracts.filter((c) => {
+    if (parseAwardLineage(c).award_kind !== 'order_under_vehicle') return true;
+    ordersExcluded += 1;
+    return false;
+  });
+  const market = standalone.filter((c) => inStoredComingBackMarket(c, stored, storedPsc));
   const preferred = preferDistinctiveInOpenMarket(market, profile.keywords || [], distinctiveHaystack);
 
   const scored: ComingBackRow[] = [];
@@ -485,11 +504,12 @@ export function selectComingBackRows(input: {
     matchedNaics: stored,
     rows: picked,
     starterMarket: isStarterMarket(classes),
+    ordersExcluded,
   };
 }
 
 const COMING_BACK_COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type';
 
 function marketOrExpression(naics: string[], pscs: string[]): string | null {
   const parts: string[] = [];
@@ -539,16 +559,10 @@ async function pageComingBackMarket(naics: string[], pscs: string[]): Promise<
   }
 
   const now = new Date();
+  // Same corrected row every recompete surface shows (timing / lineage / PoP — annotate.ts).
   const contracts = (rows as unknown as ExpiringContract[]).map((c) => {
-    const timing = overlayRecompeteTiming(c.period_of_performance_current_end, now);
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
-    if (!timing) return { ...c, naics_description };
-    return {
-      ...c,
-      naics_description,
-      lead_time_months: timing.lead_time_months,
-      estimated_recompete_date: timing.estimated_recompete_date,
-    };
+    return annotateRecompeteRow({ ...c, naics_description }, now);
   });
   return { ok: true, contracts, count: contracts.length };
 }
