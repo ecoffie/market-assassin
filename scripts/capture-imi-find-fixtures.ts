@@ -44,6 +44,7 @@ async function main() {
   // 1 · IMI SAM entity — the raw Entity API response lookup_sam_entity reads (cache-first).
   const key = samCacheKey('entity', { ueiSAM: IMI_UEI });
   const { data: cacheRow, error: cacheErr } = await sb.from('sam_api_cache')
+    // unranged-ok: cache_key is UNIQUE; maybeSingle returns at most one row.
     .select('cache_key, api_type, query_params, fetched_at, expires_at, response_data').eq('cache_key', key).maybeSingle();
   if (cacheErr) throw cacheErr;
   if (!cacheRow) throw new Error(`no sam_api_cache entity row for ${IMI_UEI} — do not fall back to live SAM here`);
@@ -59,7 +60,7 @@ async function main() {
 
   // 2 · Known-fit notices from the IMI manual run (imi-test.md), all notice versions.
   const sols = ['W911KF-26-S-0023', 'W911KF-26-S-0024', 'FA8517-27-R-0056', 'FA480326B0006', 'W911KF25SC002'];
-  const { data: notices, error: nErr } = await sb.from('sam_opportunities').select(NOTICE_COLS).in('solicitation_number', sols);
+  const { data: notices, error: nErr } = await sb.from('sam_opportunities').select(NOTICE_COLS).in('solicitation_number', sols).limit(200);
   if (nErr) throw nErr;
   write('imi-notices.json', {
     source: 'supabase.sam_opportunities',
@@ -75,7 +76,7 @@ async function main() {
 
   // 3 · Tyonek orders — the A2 holder-name defect (recompete rows).
   const { data: ty, error: tErr } = await sb.from('recompete_opportunities').select(RECOMPETE_COLS)
-    .ilike('incumbent_name', '%TYONEK MACHINING%').is('quality_flag', null);
+    .ilike('incumbent_name', '%TYONEK MACHINING%').is('quality_flag', null).limit(200);
   if (tErr) throw tErr;
   write('tyonek-recompete.json', {
     source: 'supabase.recompete_opportunities',
