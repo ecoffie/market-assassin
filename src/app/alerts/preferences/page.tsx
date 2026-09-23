@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { useSearchParams } from 'next/navigation';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 import { commitNaicsFromTypedInput, invalidNaicsCodes } from '@/lib/codes/validate-market-codes';
@@ -226,11 +227,10 @@ function AlertPreferencesContent() {
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="border-b border-slate-800 bg-slate-900/70">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-700">
-              <span className="text-sm font-bold text-white">GC</span>
-            </div>
-            <span className="font-semibold">GovCon Giants</span>
+          {/* Shared alert-preference page (every alert email's "Manage preferences") — Mindy
+              branding since the legacy products were retired into Mindy (PR #1671). */}
+          <Link href="/" className="flex items-center gap-2" aria-label="Mindy">
+            <MindyLogo size={32} showWordmark />
           </Link>
           <Link href="/alerts/signup" className="text-sm text-slate-400 hover:text-white">
             Set up alerts

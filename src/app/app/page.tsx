@@ -18,7 +18,8 @@ import { getSupabase } from '@/lib/supabase/client';
 import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
-import { REPORT_CREDIT_KEY } from '@/lib/mindy/report-credit';
+import { holdReportCredit } from '@/lib/mindy/report-credit';
+import { savePostLoginIntent, consumePostLoginIntent } from '@/lib/mindy/post-login-intent';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -349,6 +350,25 @@ function AppDashboard() {
           // intent router, never the retired profile builder.
           window.location.href = WELCOME_PATH;
           return;
+        }
+      }
+
+      // A magic-link sign-in lands on plain /app. Re-apply the view saved when the link was
+      // requested (validated /app panel/notice/redeem only; expires in an hour; used once) —
+      // unless this URL already names a panel, which is the more recent instruction.
+      if (typeof window !== 'undefined' && !new URLSearchParams(window.location.search).get('panel')) {
+        const intent = consumePostLoginIntent();
+        if (intent) {
+          const iq = new URL(intent, window.location.origin).searchParams;
+          const ip = iq.get('panel');
+          if (ip && KNOWN_PANELS.has(ip as AppPanel)) {
+            activePanelRef.current = ip as AppPanel;
+            setActivePanel(ip as AppPanel);
+          }
+          const inotice = iq.get('notice');
+          if (inotice) setPanelContext((prev) => ({ ...(prev || {}), notice_id: inotice }));
+          holdReportCredit(iq.get('redeem'));
+          window.history.replaceState(window.history.state, '', intent);
         }
       }
 
@@ -725,6 +745,10 @@ function AppDashboard() {
     setMagicLinkSent(false);
     setNeedsSetup(false);
 
+    // The link returns to plain /app; remember the view this customer is on (e.g. Market
+    // Research with a report credit) so sign-in lands back there. See post-login-intent.ts.
+    savePostLoginIntent(`${window.location.pathname}${window.location.search}`);
+
     try {
       const res = await fetch('/api/auth/mindy-magic-link/request', {
         method: 'POST',
@@ -915,10 +939,7 @@ function AppDashboard() {
 
     // ?redeem=<CODE> — a single-use report credit from a legacy /access/<CODE> link. Held for
     // this browser session only; the server decides whether it is valid for the signed-in email.
-    const redeemParam = searchParams.get('redeem')?.trim().toUpperCase();
-    if (redeemParam && /^[A-Z0-9-]{4,64}$/.test(redeemParam)) {
-      try { sessionStorage.setItem(REPORT_CREDIT_KEY, redeemParam); } catch { /* storage blocked */ }
-    }
+    holdReportCredit(searchParams.get('redeem'));
 
     const panelParam = searchParams.get('panel');
     if (panelParam && KNOWN_PANELS.has(panelParam as AppPanel)) {

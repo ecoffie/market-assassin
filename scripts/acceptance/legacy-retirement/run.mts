@@ -233,7 +233,7 @@ async function main() {
     for (const [key, f] of Object.entries(FIXTURES)) {
       if (ONLY && !ONLY.includes(key)) continue;
       const ctx = await browser.createBrowserContext();
-      const page = await ctx.newPage();
+      let page = await ctx.newPage();
       await page.setViewport({ width: 1366, height: 900 });
       if (f.maCookie) await page.setCookie({ name: 'ma_access_email', value: f.maCookie, domain: 'localhost', path: '/', httpOnly: true });
 
@@ -246,6 +246,7 @@ async function main() {
         check(key, 'Content Reaper entry is a FLAGGED migration gap (no /app equivalent) — not redirected', entry.path.startsWith('/content-generator'), entry);
       } else if (key === 'alert-pro') {
         check(key, 'Alert Pro success URL lands on the shared preferences page (no Alert Pro interface)', entry.path === '/alerts/preferences' && !/Alert Pro/i.test(entryText), entry);
+        check(key, 'the shared preferences page is Mindy-branded (no GovCon Giants header)', /Mindy/.test(entryText) && !/GovCon Giants/.test(entryText), entryText.slice(0, 120));
       } else if (key === 'code-holder') {
         check(key, '/access/<code> redeems into Mindy: /app Market Research, email prefilled, credit attached', entry.path === '/app' && entry.panel === 'research' && entry.url.includes('redeem=ACCEPTCODE01'), entry);
       } else {
@@ -278,7 +279,15 @@ async function main() {
         const m = await waitForMail(mail.outbox, f.email, since, /auth\/v1\/verify/);
         const link = m ? ((m.html.match(/href="([^"]*auth\/v1\/verify[^"]*)"/) || [])[1] || '').replace(/&amp;/g, '&') : '';
         check(key, 'magic link requested from /app and emailed by the app', !!link, { mail: m?.subject });
-        if (link) await goto(page, link);
+        if (link) {
+          // An email client opens the link in a NEW tab of the same browser — not the tab that asked.
+          const tab = await ctx.newPage();
+          await tab.setViewport({ width: 1366, height: 900 });
+          await tab.goto(link, { waitUntil: 'domcontentloaded', timeout: 240_000 });
+          await page.close();
+          page = tab;
+          method = 'magic link (opened in a new tab)';
+        }
       } else if (f.signIn === 'google') {
         await fetch(`${SB}/__harness/google-identity?email=${encodeURIComponent(f.email)}`);
         await clickByText(page, /Continue with Google/);
@@ -290,10 +299,16 @@ async function main() {
       const ent = await entitlement(page, f.email);
       const body = (ent.body || {}) as { tier?: string; access?: { legacy_sources?: Record<string, boolean> } };
       check(key, `REAL sign-in (${method}) produced a Mindy session`, ent.hasToken && ent.status === 200, { status: ent.status, hasToken: ent.hasToken });
-      const expectPanel = f.signIn === 'google' && entry.panel ? entry.panel : null;
+      // The view the customer was on before signing in (Google carries it in `next`; a magic link
+      // re-applies the saved post-login intent).
+      const expectPanel = entry.path === '/app' && entry.panel ? entry.panel : null;
       check(key, `destination after sign-in is /app${expectPanel ? `?panel=${expectPanel}` : ''}`, landed.path === '/app' && (!expectPanel || landed.panel === expectPanel), landed);
       check(key, `entitlement resolves to ${f.expectTier}`, body.tier === f.expectTier, { tier: body.tier, legacy_sources: body.access?.legacy_sources });
 
+      if (key === 'code-holder') {
+        await rendered(page, /report credit is attached/);
+        check(key, 'after a magic-link sign-in in a NEW tab: back on Market Research with the credit attached', landed.panel === 'research' && /report credit is attached/i.test(await text(page)), landed);
+      }
       if (key === 'ma-purchaser') check(key, 'Pro comes from the legacy ma: grant', !!body.access?.legacy_sources?.marketAssassinPremium && !body.access?.legacy_sources?.briefings, body.access?.legacy_sources);
       if (key === 'alert-pro') {
         check(key, 'Alert Pro is Pro in Mindy through its ospro: grant', !!body.access?.legacy_sources?.opportunityHunterPro, body.access?.legacy_sources);
