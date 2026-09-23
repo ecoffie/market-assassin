@@ -1,0 +1,776 @@
+{
+  "ranAt": "2026-09-23T23:17:42.512Z",
+  "head": "63bbe7a8864c002854da527737af69db859d2ed6",
+  "only": [
+    "code-holder",
+    "alert-pro",
+    "legacy-paid-no-password",
+    "paid-briefings",
+    "google-returning"
+  ],
+  "appTreeClean": true,
+  "mode": "next build + next start",
+  "build": {
+    "ok": true,
+    "ms": 60727
+  },
+  "supabase": {
+    "forwardedReads": 1502,
+    "fixtureServed": 1574,
+    "absorbedWrites": 71,
+    "forwardedWrites": 0,
+    "authCalls": 29,
+    "authSample": [
+      "POST /token?grant_type=password",
+      "GET /admin/users",
+      "POST /admin/users",
+      "POST /admin/generate_link",
+      "GET /verify",
+      "GET /user",
+      "GET /authorize"
+    ]
+  },
+  "mail": {
+    "captured": 4,
+    "delivered": 0,
+    "subjects": [
+      "214042 is your Mindy verification code",
+      "Your Mindy sign-in link"
+    ]
+  },
+  "kv": {
+    "commands": 561,
+    "writesHeldInMemory": 32,
+    "realKvContacted": false
+  },
+  "results": {
+    "paid-briefings": {
+      "checks": [
+        {
+          "name": "legacy entry /briefings?welcome=true lands on Mindy /app sign-in",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "",
+            "panel": null,
+            "url": "/app"
+          }
+        },
+        {
+          "name": "no legacy interface rendered",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "paid password login asked for a 2FA code, and the app emailed one",
+          "pass": true,
+          "detail": {
+            "mail": "214042 is your Mindy verification code"
+          }
+        },
+        {
+          "name": "REAL sign-in (password + emailed 2FA code) produced a Mindy session",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "hasToken": true
+          }
+        },
+        {
+          "name": "destination after sign-in is /app",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "panel": null,
+            "url": "/app"
+          }
+        },
+        {
+          "name": "entitlement resolves to pro",
+          "pass": true,
+          "detail": {
+            "tier": "pro",
+            "legacy_sources": {
+              "marketAssassin": false,
+              "marketAssassinPremium": false,
+              "contentReaper": false,
+              "opportunityHunterPro": false,
+              "recompete": false,
+              "contractorDb": false,
+              "briefings": true
+            }
+          }
+        },
+        {
+          "name": "deep link /federal-market-assassin → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /opportunity-hunter → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /bd-assist → /app?panel=pipeline",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=pipeline",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "deep link /briefings?tab=forecasts → /app?panel=forecasts",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=forecasts",
+            "panel": "forecasts",
+            "url": "/app?panel=forecasts"
+          }
+        },
+        {
+          "name": "Market Research renders",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "saved pursuit visible in My Pursuits",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "refresh stays on /app; back never returns to a legacy path",
+          "pass": true,
+          "detail": {
+            "hist": {
+              "path": "/app",
+              "panel": null,
+              "url": "/app"
+            },
+            "back": "/app"
+          }
+        }
+      ]
+    },
+    "legacy-paid-no-password": {
+      "checks": [
+        {
+          "name": "legacy entry /briefings?welcome=true lands on Mindy /app sign-in",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "",
+            "panel": null,
+            "url": "/app"
+          }
+        },
+        {
+          "name": "no legacy interface rendered",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "magic link requested from /app and emailed by the app",
+          "pass": true,
+          "detail": {
+            "mail": "Your Mindy sign-in link"
+          }
+        },
+        {
+          "name": "REAL sign-in (magic link (opened in a new tab)) produced a Mindy session",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "hasToken": true
+          }
+        },
+        {
+          "name": "destination after sign-in is /app",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "panel": null,
+            "url": "/app"
+          }
+        },
+        {
+          "name": "entitlement resolves to pro",
+          "pass": true,
+          "detail": {
+            "tier": "pro",
+            "legacy_sources": {
+              "marketAssassin": false,
+              "marketAssassinPremium": false,
+              "contentReaper": false,
+              "opportunityHunterPro": false,
+              "recompete": false,
+              "contractorDb": false,
+              "briefings": true
+            }
+          }
+        },
+        {
+          "name": "deep link /federal-market-assassin → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /opportunity-hunter → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /bd-assist → /app?panel=pipeline",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=pipeline",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "deep link /briefings?tab=forecasts → /app?panel=forecasts",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=forecasts",
+            "panel": "forecasts",
+            "url": "/app?panel=forecasts"
+          }
+        },
+        {
+          "name": "Market Research renders",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "saved pursuit visible in My Pursuits",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "refresh stays on /app; back never returns to a legacy path",
+          "pass": true,
+          "detail": {
+            "hist": {
+              "path": "/app",
+              "panel": null,
+              "url": "/app"
+            },
+            "back": "/app"
+          }
+        }
+      ]
+    },
+    "google-returning": {
+      "checks": [
+        {
+          "name": "legacy entry /bd-assist lands on Mindy /app sign-in",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=pipeline",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "no legacy interface rendered",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "REAL sign-in (google) produced a Mindy session",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "hasToken": true
+          }
+        },
+        {
+          "name": "destination after sign-in is /app?panel=pipeline",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "entitlement resolves to pro",
+          "pass": true,
+          "detail": {
+            "tier": "pro",
+            "legacy_sources": {
+              "marketAssassin": false,
+              "marketAssassinPremium": false,
+              "contentReaper": false,
+              "opportunityHunterPro": false,
+              "recompete": false,
+              "contractorDb": false,
+              "briefings": true
+            }
+          }
+        },
+        {
+          "name": "deep link /federal-market-assassin → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /opportunity-hunter → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /bd-assist → /app?panel=pipeline",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=pipeline",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "deep link /briefings?tab=forecasts → /app?panel=forecasts",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=forecasts",
+            "panel": "forecasts",
+            "url": "/app?panel=forecasts"
+          }
+        },
+        {
+          "name": "Market Research renders",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "saved pursuit visible in My Pursuits",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "refresh stays on /app; back never returns to a legacy path",
+          "pass": true,
+          "detail": {
+            "hist": {
+              "path": "/app",
+              "panel": null,
+              "url": "/app"
+            },
+            "back": "/app"
+          }
+        }
+      ]
+    },
+    "alert-pro": {
+      "checks": [
+        {
+          "name": "Alert Pro success URL lands on the shared preferences page (no Alert Pro interface)",
+          "pass": true,
+          "detail": {
+            "path": "/alerts/preferences",
+            "search": "?upgraded=true",
+            "panel": null,
+            "url": "/alerts/preferences?upgraded=true"
+          }
+        },
+        {
+          "name": "the shared preferences page is Mindy-branded (no GovCon Giants header)",
+          "pass": true,
+          "detail": "Mindy\nSet up alerts\nDaily Alerts Profile\nManage Daily Alerts\n\nAdd keywords, NAICS, set-aside, agency, and delivery setti"
+        },
+        {
+          "name": "no legacy interface rendered",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "magic link requested from /app and emailed by the app",
+          "pass": true,
+          "detail": {
+            "mail": "Your Mindy sign-in link"
+          }
+        },
+        {
+          "name": "REAL sign-in (magic link (opened in a new tab)) produced a Mindy session",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "hasToken": true
+          }
+        },
+        {
+          "name": "destination after sign-in is /app",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "panel": null,
+            "url": "/app"
+          }
+        },
+        {
+          "name": "entitlement resolves to pro",
+          "pass": true,
+          "detail": {
+            "tier": "pro",
+            "legacy_sources": {
+              "marketAssassin": false,
+              "marketAssassinPremium": false,
+              "contentReaper": false,
+              "opportunityHunterPro": true,
+              "recompete": false,
+              "contractorDb": false,
+              "briefings": false
+            }
+          }
+        },
+        {
+          "name": "Alert Pro is Pro in Mindy through its ospro: grant",
+          "pass": true,
+          "detail": {
+            "marketAssassin": false,
+            "marketAssassinPremium": false,
+            "contentReaper": false,
+            "opportunityHunterPro": true,
+            "recompete": false,
+            "contractorDb": false,
+            "briefings": false
+          }
+        },
+        {
+          "name": "alert preferences preserved: daily frequency read back through the same API /app uses",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "data": {
+              "email": "alert-pro@acceptance.invalid",
+              "businessDescription": null,
+              "primaryIndustry": null,
+              "naicsCodes": [
+                "541512",
+                "541611"
+              ],
+              "naicsPriorities": {},
+              "alertMode": "market_discovery",
+              "invalidNaics": [],
+              "invalidPsc": [],
+              "keywords": [
+                "cybersecurity"
+              ],
+              "businessType": "",
+              "setAsides": [],
+              "targetAgencies": [],
+              "locationStates": [],
+              "alertsEnabled": true,
+              "frequency": "daily",
+              "briefingsEnabled": false,
+              "timezone": "America/New_York",
+              "alertRecipientEmail": null,
+              "isActive": true
+            }
+          }
+        },
+        {
+          "name": "Alerts panel renders in /app",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "deep link /federal-market-assassin → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /opportunity-hunter → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /bd-assist → /app?panel=pipeline",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=pipeline",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "deep link /briefings?tab=forecasts → /app?panel=forecasts",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=forecasts",
+            "panel": "forecasts",
+            "url": "/app?panel=forecasts"
+          }
+        },
+        {
+          "name": "Market Research renders",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "saved pursuit visible in My Pursuits",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "refresh stays on /app; back never returns to a legacy path",
+          "pass": true,
+          "detail": {
+            "hist": {
+              "path": "/app",
+              "panel": null,
+              "url": "/app"
+            },
+            "back": "/app"
+          }
+        }
+      ]
+    },
+    "code-holder": {
+      "checks": [
+        {
+          "name": "/access/<code> redeems into Mindy: /app Market Research, email prefilled, credit attached",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research&email=code-holder%40acceptance.invalid&redeem=ACCEPTCODE01",
+            "panel": "research",
+            "url": "/app?panel=research&email=code-holder%40acceptance.invalid&redeem=ACCEPTCODE01"
+          }
+        },
+        {
+          "name": "no legacy interface rendered",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "magic link requested from /app and emailed by the app",
+          "pass": true,
+          "detail": {
+            "mail": "Your Mindy sign-in link"
+          }
+        },
+        {
+          "name": "REAL sign-in (magic link (opened in a new tab)) produced a Mindy session",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "hasToken": true
+          }
+        },
+        {
+          "name": "destination after sign-in is /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "panel": "research",
+            "url": "/app?panel=research&redeem=ACCEPTCODE01"
+          }
+        },
+        {
+          "name": "entitlement resolves to free",
+          "pass": true,
+          "detail": {
+            "tier": "free",
+            "legacy_sources": {
+              "marketAssassin": false,
+              "marketAssassinPremium": false,
+              "contentReaper": false,
+              "opportunityHunterPro": false,
+              "recompete": false,
+              "contractorDb": false,
+              "briefings": false
+            }
+          }
+        },
+        {
+          "name": "after a magic-link sign-in in a NEW tab: back on Market Research with the credit attached",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "panel": "research",
+            "url": "/app?panel=research&redeem=ACCEPTCODE01"
+          }
+        },
+        {
+          "name": "deep link /federal-market-assassin → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /opportunity-hunter → /app?panel=research",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=research",
+            "panel": "research",
+            "url": "/app?panel=research"
+          }
+        },
+        {
+          "name": "deep link /bd-assist → /app?panel=pipeline",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=pipeline",
+            "panel": "pipeline",
+            "url": "/app?panel=pipeline"
+          }
+        },
+        {
+          "name": "deep link /briefings?tab=forecasts → /app?panel=forecasts",
+          "pass": true,
+          "detail": {
+            "path": "/app",
+            "search": "?panel=forecasts",
+            "panel": "forecasts",
+            "url": "/app?panel=forecasts"
+          }
+        },
+        {
+          "name": "Market Research renders",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "report credit banner is shown in Mindy",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "redeeming the credit (verified session, own email) yields a FULL (Pro) report once",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "accessTier": "pro",
+            "redeem": {
+              "ok": true
+            },
+            "reports": [
+              "governmentBuyers",
+              "tier2Subcontracting",
+              "forecastList",
+              "agencyNeeds",
+              "agencyPainPoints",
+              "decemberSpend",
+              "tribalContracting",
+              "primeContractor",
+              "idvContracts",
+              "budgetCheckup",
+              "pricingIntel",
+              "metadata"
+            ]
+          }
+        },
+        {
+          "name": "the code is consumed server-side after the report is built",
+          "pass": true,
+          "detail": {
+            "used": true,
+            "usedAt": "2026-09-23T23:17:03.436Z"
+          }
+        },
+        {
+          "name": "a second use is refused and falls back to the account tier (free)",
+          "pass": true,
+          "detail": {
+            "status": 200,
+            "accessTier": "free",
+            "redeem": {
+              "ok": false,
+              "reason": "This access code has already been used"
+            },
+            "reports": [
+              "governmentBuyers",
+              "budgetCheckup",
+              "metadata"
+            ]
+          }
+        },
+        {
+          "name": "the used link shows a Mindy \"already used\" page (no old tool)",
+          "pass": true,
+          "detail": {
+            "path": "/access/ACCEPTCODE01",
+            "search": "",
+            "panel": null,
+            "url": "/access/ACCEPTCODE01"
+          }
+        },
+        {
+          "name": "saved pursuit visible in My Pursuits",
+          "pass": true,
+          "detail": null
+        },
+        {
+          "name": "refresh stays on /app; back never returns to a legacy path",
+          "pass": true,
+          "detail": {
+            "hist": {
+              "path": "/app",
+              "panel": null,
+              "url": "/app"
+            },
+            "back": "/app"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -14,7 +14,7 @@ or production row has been changed. All figures were read from Stripe / Vercel /
 | `plink_1TTYfRK5zyiZ50PBkZ4mukPq` | Market Intelligence (Mindy Pro) $149/mo | yes | 58 (2026-09-22) | redirect `getmindy.ai/briefings?welcome=true` | **Keep active.** Change redirect → `https://getmindy.ai/app` |
 | `plink_1TTYhlK5zyiZ50PBGhvWwBLq` | Market Intelligence (Mindy Pro) $1,490/yr | yes | 4 (2026-06-27) | same | **Keep active.** Change redirect → `https://getmindy.ai/app` |
 | `plink_1TBXg2K5zyiZ50PBp5xvOJP2` | **Alert Pro** $19/mo | yes | 2 (2026-07-22) | redirect `…/alerts/preferences?upgraded=true` | **Deactivate** (product retired; nothing on the site links it after this PR) |
-| `plink_1SlcMfK5zyiZ50PBVn60ByyO` | **Federal Contractor Database** $497 | yes | 5 (2026-07-21) | hosted confirmation | **Deactivate.** ⚠️ Urgent-ish: the webhook's `contractor_db` branch writes **no `dbaccess:` KV**, so recent buyers may hold no access anywhere (see C.2) |
+| `plink_1SlcMfK5zyiZ50PBVn60ByyO` | **Federal Contractor Database** $497 | yes | 5 (2026-07-21) | hosted confirmation | **Deactivate — treated as a separate URGENT incident:** `tasks/incident-contractor-db-checkout-2026-09-23.md`. All 5 payments reconciled: 4 have access; **1 (2026-07-21, $894) paid and has none** |
 | `plink_1SxuVtK5zyiZ50PBmxd7LM9F` | Ultimate Giant Bundle (discount) $1,497 | yes | 5 (2026-05-26) | hosted confirmation | **Deactivate** (legacy bundle; `/bundles/ultimate` now → `/pricing`) |
 | `plink_1TND04K5zyiZ50PBQ1WruM46` | Ultimate Giant Bundle (discount) $500 | yes | 1 (2026-04-27) | hosted confirmation | **Deactivate** |
 | `plink_1SzGrLK5zyiZ50PBS9w6qvI7` | Upgrade to Tool Bundle $500 | yes | 2 (2026-02-18) | hosted confirmation | **Deactivate** |
@@ -31,7 +31,7 @@ Code follow-up after deactivation: remove the dead `stripeUrl`s in `src/lib/prod
 
 | Cohort | Count (active) | What it grants in Mindy today | Proposal |
 |---|---|---|---|
-| **Alert Pro** `prod_U9rOClXY6MFcRu` | **1** — `sub_1TvookK5zyiZ50PBWnM2pa8R`, customer `cus_UvgBo8DqEWUFKN`, renews **2026-10-22**, not cancelling (1 more already cancelled 2026-07-21) | `alertpro:` + **`ospro:` → full Mindy Pro**, daily alerts on the shared preferences row | Eric decides one of: **(a)** keep the $19 billing and keep Pro (grandfathered; nothing to do), **(b)** email them the Mindy Pro offer before 2026-10-22 and cancel-at-period-end only after they accept, **(c)** move them to the $49 loyalty price. Do **not** cancel or remove grants without contact. |
+| **Alert Pro** `prod_U9rOClXY6MFcRu` | **1** — `sub_1TvookK5zyiZ50PBWnM2pa8R`, customer `cus_UvgBo8DqEWUFKN`, renews **2026-10-22**, not cancelling (1 more already cancelled 2026-07-21) | `alertpro:` + **`ospro:` → full Mindy Pro**, daily alerts on the shared preferences row | **Recommendation: grandfather.** Keep the $19/mo price and the subscription exactly as they are, with their existing access (`alertpro:` + `ospro:` → Mindy Pro). The Alert Pro *interface* is retired in #1671 and they land in Mindy, but their billing is not touched. No price change, no migration, no cancellation, no email without Eric's explicit approval. Deactivating the Alert Pro **payment link** (§A) stops new sales and does not affect this existing subscription. |
 | Mindy Pro $149/mo | 36 active + 4 past_due | `briefings:` | none |
 | Mindy Pro $1,490/yr | 4 | `briefings:` | none |
 | Mindy legacy $49/mo, $497/yr, $499/mo | 1 / 1 / 1 | `briefings:` | none |
@@ -40,14 +40,19 @@ Code follow-up after deactivation: remove the dead `stripeUrl`s in `src/lib/prod
 
 ## C. Grant/provisioning defects found (not fixed in #1671 — they change grants)
 
-1. **Alert Pro cancellation leaves Pro behind.** `stripe-webhook` (subscription-deleted branch)
-   deletes `alertpro:` only; `ospro:` and `access_hunter_pro` stay → a cancelled $19 customer keeps
-   $149 Pro. Proposal: delete `ospro:` in that branch **unless** another product also granted it
-   (FHC does). Needs a decision on what a cancelled Alert Pro customer should keep.
-2. **Contractor Database purchases write no KV.** The `contractor_db` webhook branch only sets
-   Supabase flags + emails `/contractor-database?email=` — the gate reads `dbaccess:` KV, so the
-   buyer is refused. Audit the 5 paid checkouts on `plink_1SlcMf…` (read-only) and grant `dbaccess:`
-   where missing — **after** approval.
+1. **Cancellation revoked the wrong things. FIXED separately in HELD PR #1675**, not in #1671.
+   - Alert Pro cancellation left `ospro:` (Pro) behind.
+   - FHC cancellation wiped unrelated MA/OH purchases, other live subscriptions and comps.
+   - Both fired during Stripe's `past_due` retry window.
+   - Both reset the alert-frequency preference.
+
+   #1675 revokes only the access attributable to the cancelled subscription. It keeps other purchases,
+   comps and live subscriptions, expires paid-through access at period end, and keeps access when
+   attribution is uncertain. It does not retroactively re-grant anyone the old code wiped; that needs
+   a separate, approved audit.
+2. **Contractor Database purchases write no KV.** Now its own incident:
+   `tasks/incident-contractor-db-checkout-2026-09-23.md`. All five payments are reconciled there,
+   with the exact disable and repair actions. One buyer lacks access.
 3. **Content Reaper is sold as a Mindy Pro feature but Pro is rejected by the tool.** Removed from the
    `/market-intelligence` comparison in #1671; the tool still checks `contentgen:` only.
 
@@ -72,12 +77,51 @@ reports — proven in the acceptance run (the anonymous cookie resolves to `acce
    `getEmailFromRequest` from treating a non-email cookie value as an identity.
 3. After the window: remove the `keepFor`/grace code from `legacy-routes.ts`.
 
-## E. Unresolved functionality gaps (entry points NOT retired, deliberately)
+## E. Migration table — purchased capability → Mindy (no deletion, no indefinite exception)
 
-| Legacy product | What customers have that Mindy lacks | Proposed Mindy work |
-|---|---|---|
-| **Content Reaper** (`contentgen:`) | LinkedIn post generator (up to 30/click, templates), quote graphics & carousels (Full Fix), .docx/.zip/PDF export, saved `content_library`, 30-day `scheduled_posts` calendar | Either a `/app` Content panel that embeds the existing tool under Mindy auth (accepting any Pro tier), or a rebuild. Note: its 30-day calendar and carousel already call missing APIs. |
-| **Federal Contractor Database** (`dbaccess:`) | SBLO name/email/phone for ~3,500 primes, subcontracting-plan / supplier-portal filters, CSV export | Load the SBLO/portal columns into the Contractors panel data + CSV export; then retire `/contractor-database`, `/database.html`, `/database-locked` |
-| **Action Planner** (`/planner`, env access code) | 36-task plan with notes/due dates/progress (`user_plans`, `planner_gamification`), PDF export | A tasks view in `/app` reading `user_plans`, or an explicit decision that it is a separate product |
-| Opportunity Hunter (retired into Research) | CSV export of the agency list; per-office "Office ID → SAM" drill | Add both to the Research panel |
-| Recompete Tracker (retired into Recompetes) | CSV/Excel/PDF export; incumbent-name search; contract-value filter | Add to the Recompetes panel |
+Rule for every row: the legacy entry point stays reachable **only** until its Mindy equivalent
+ships. Then it redirects like the rest of #1671 and the entitlement key becomes an entitlement marker
+only. Nothing purchased is deleted. "Reuse" means the existing code or data moves behind Mindy auth;
+nothing is rebuilt from scratch.
+
+### Content Reaper (`contentgen:`, $197 / $397 Full Fix)
+
+| Purchased capability | Current Mindy equivalent | Actual gap | Proposed implementation |
+|---|---|---|---|
+| LinkedIn post generation (≤30/click, agency + template targeting) | **None.** The `/app` panel list has no content panel. `/api/content-generator/generate` exists and works. | Not reachable from Mindy; gated on `contentgen:` only, so Mindy Pro is refused even though Pro is sold as including it | Add a `content` panel in `/app` that hosts the existing `public/content-generator` UI (keep `API_BASE=''`). Gate: `contentgen:` **OR** Mindy Pro. Reuse the generate API unchanged. |
+| Saved posts (`content_library`) | Library panel exists but reads `user_generated_archive`, **not** `content_library` | Saved Reaper posts are invisible in Mindy | Library API: union `content_library` rows for the user as type `linkedin_post`. Read-only merge, no data move. |
+| .docx / .zip / PDF export | None in Mindy | Export only exists inside the legacy page | Comes along with the hosted UI (client-side export code moves as-is) |
+| Quote graphics / carousels (Full Fix) | None | The carousel calls APIs that are **missing today** (already broken on legacy) | Hide these in the hosted panel until repaired, and say so. Repairing is a separate item; never show a dead button. |
+| 30-day calendar (`scheduled_posts`) | None | Calendar also calls **missing** APIs (already broken) | Same as carousels: hidden with a stated notice; repaired later |
+
+### Federal Contractor Database (`dbaccess:`, $497)
+
+| Purchased capability | Current Mindy equivalent | Actual gap | Proposed implementation |
+|---|---|---|---|
+| ~3,500 primes, searchable | **Contractors panel** (317K firms via BigQuery `search-bq`) | none for discovery (Mindy is a superset) | none |
+| SBLO name / email / phone per prime | The panel's type declares `sblo_name/email/phone`, but `search-bq` returns **no SBLO columns** | Contact data a buyer paid for is not shown | Join the existing `src/data/prime-contractors-database.json` + `sblo-roster-2026-06.json` (by UEI, then normalized name) into `search-bq` results. Display email/phone to `dbaccess:` holders **and** Pro. |
+| Subcontracting-plan / supplier-portal filters | `has_subcontract_plan` field exists in the type; no filter in the UI | Filters missing | Add two filter chips backed by the same joined data |
+| CSV export | None in the panel | Export missing | Client-side CSV of the current filtered rows (cap stated in the UI, not silent) |
+| After parity | — | — | Redirect `/contractor-database`, `/database.html`, `/database-locked` → `/app?panel=contractors` |
+
+### Action Planner (`/planner`, env access code, separate planner Supabase)
+
+| Purchased capability | Current Mindy equivalent | Actual gap | Proposed implementation |
+|---|---|---|---|
+| 36-task, 5-phase plan with notes, due dates, progress (`user_plans`, `planner_gamification`) | None | Whole tool; data lives in a **different Supabase project** (`getPlannerSupabase`) | `/app?panel=planner` reusing the existing `src/app/planner` components. It reads through `src/lib/supabase/planner.ts` with the **existing planner client** and does not copy data between projects. Identity: match the planner account by the Mindy session email. |
+| Lessons / resources pages | None | Static content | Move pages under the panel as-is |
+| PDF export | None | Export missing | Comes with the reused components |
+| Planner login (separate password) | Mindy sign-in | Two logins | After the panel ships, `/planner/login` → `/app?panel=planner` with an email-match handoff. Users with no match are shown their planner email, never a fresh empty plan. |
+
+### Missing exports / filters on already-retired products
+
+| Purchased capability | Current Mindy equivalent | Actual gap | Proposed implementation |
+|---|---|---|---|
+| Opportunity Hunter: agency-list CSV | Research panel (same agency data) | No CSV | CSV button on the Research agency list |
+| Opportunity Hunter: office ID → SAM drill | Research panel shows offices | No drill link | Link office IDs to the existing office/DoDAAC search |
+| Recompete Tracker: CSV / Excel / PDF export | Recompetes panel (129K per-contract rows) | No export | CSV of the filtered vehicles. The cap is labelled, and when capped it states "6,000+". |
+| Recompete Tracker: incumbent-name search | Recompetes panel filters by NAICS/agency | No incumbent search | Add `incumbent` to `/api/recompete` → `queryExpiringContracts` (shared lib, so the MCP tool gets it too) |
+| Recompete Tracker: contract-value filter | none | No value filter | Min/max on `potential_total_value` in the same shared query |
+
+Suggested order: Contractor DB (buyer #5 is actively unserved) → Content Reaper (sold inside Pro but
+refused) → exports/filters → Planner.

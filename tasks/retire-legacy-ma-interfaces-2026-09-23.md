@@ -1,4 +1,14 @@
-# Retire legacy product interfaces into Mindy — review packet (final) — 2026-09-23
+# Retire legacy product interfaces into Mindy — review packet — 2026-09-23 — **PARTIAL MIGRATION**
+
+> **This is a partial migration.** Market Assassin, Alert Pro, Opportunity Hunter, Recompete,
+> bundles and `/briefings` entry points now land in Mindy. **Content Reaper, the Federal Contractor
+> Database and the Action Planner are NOT yet migrated.** Their legacy entry points stay reachable
+> until the Mindy equivalents in the migration table ship (proposals §E). That is a sequencing
+> constraint, not an indefinite exception.
+>
+> **Evidence status.** All sign-in tests ran against a **local, fake identity provider**
+> (fake GoTrue, fake KV, fake mail). That is **integration evidence, not production authentication
+> proof.** Production sign-in is verified only by release step 4, which has not run.
 
 PR **#1671** · branch `fix/retire-legacy-ma-interfaces` · base `main` (branched at `bf4556f1`).
 **HOLD: review only.** Not merged, not deployed. No Stripe, subscription, grant, env or
@@ -72,6 +82,29 @@ Decisions applied (Eric, on #1671):
 - **Preferences:** these stay on `user_notification_settings`, which `/app` already reads.
 - **No saved work lost:** the standalone MA tool, Opportunity Hunter and the Recompete Tracker kept no server-side saved work.
 
+## 2b. Head `63bbe7a8` — two customer-facing leftovers fixed (on top of evidence head `99c61662`)
+
+`99c61662` and its evidence are preserved unchanged. The full production-build run was **129/129**,
+with 0 writes forwarded (`tasks/evidence/legacy-retirement/99c61662-full-prod-build.json`).
+
+1. **Magic-link sign-in lost the intended destination.** A customer arriving at
+   `/app?panel=research&redeem=<code>` requested a link and came back to plain `/app`. The report
+   credit also lived in `sessionStorage`, so it died when the mail client opened the link in a new tab.
+   - Before the link request, `/app` now saves a **sanitized** view (`src/lib/mindy/post-login-intent.ts`).
+     Only `/app`, only `panel` / `notice` / `redeem`, with tokens matching `^[A-Za-z0-9_-]{1,64}$`;
+     single use, 1-hour TTL. It is re-applied after sign-in only when the URL names no panel.
+   - The credit moved to `localStorage` with a 24-hour TTL.
+2. **The shared alert-preferences page still said "GovCon Giants".** It now uses the Mindy logo and
+   wordmark, and its shop link points to `/market-intelligence`.
+
+Evidence for `63bbe7a8`, all local:
+- **Focused production-build run: 74/74**, with the magic-link journey opened in a **new tab**
+  (`63bbe7a8-focused-prod-build.json`).
+- **Mutation proof:** with the intent re-apply reverted, the journey lands on `/app` with no panel
+  and the test fails (`63bbe7a8-mutation-intent-reverted.json`). Restored → green.
+- **Unit tests:** `post-login-intent.unit.test.ts`, covering open-redirect and tamper rejection,
+  expiry, single use, wiring order and branding.
+
 ## 3. Unresolved functionality gaps (flagged; entry points NOT retired)
 
 | Product | Missing in Mindy | Status |
@@ -82,7 +115,11 @@ Decisions applied (Eric, on #1671):
 | Opportunity Hunter → Research | agency-list CSV export, office-ID drill | retired; add to Research |
 | Recompete Tracker → Recompetes | export, incumbent-name search, value filter | retired; add to Recompetes |
 
-These are not exemptions. Each has a named owner decision in the proposals doc.
+These are not exemptions. The concrete migration table (purchased capability → current Mindy
+equivalent → actual gap → proposed implementation) is **proposals §E**. The $497 Contractor
+Database checkout is handled as its own **urgent incident**:
+`tasks/incident-contractor-db-checkout-2026-09-23.md`. All 5 payments are reconciled there; one
+buyer paid and has no access.
 
 ## 4. Adam / Andre — evidence vs assumption (read-only; unchanged)
 
@@ -147,6 +184,10 @@ All are in `src/lib/{mindy,email}`.
 4. **Sign-in on production** with an **approved internal test account**, not a customer: password (+2FA), magic link, Google → lands in `/app`; Research and My Pursuits render.
 5. **Report-code check:** issue one **test** code to that internal account, redeem it once, and confirm the second use is refused.
 6. **Stripe (separate approval, proposals §A):** repoint the two MI Pro success URLs to `https://getmindy.ai/app`; deactivate the Alert Pro, Contractor DB, Ultimate ×2 and Tool Bundle links. Re-read each via the API.
-7. **Alert Pro subscriber** (1, renews 2026-10-22): execute the option Eric picks in proposals §B.
+7. **Alert Pro subscriber** (1, renews 2026-10-22). Recommendation: **grandfather**, keeping the
+   price, subscription and access unchanged (proposals §B). No action unless Eric explicitly approves
+   a change.
+7b. **Contractor DB incident** (independent of this merge). Deactivate the link, then repair buyer #5
+   using option B1 (no email) or B2 (sends an email). Exact commands are in the incident doc.
 8. Only after 1–5 pass: consider telling Adam and Andre; outreach is Eric's call.
 9. **Follow-ups:** the security PR (shared-password routes) and the gap work items (Content Reaper, Contractor DB, Planner, exports).
