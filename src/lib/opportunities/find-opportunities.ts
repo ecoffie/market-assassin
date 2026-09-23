@@ -61,6 +61,17 @@ import {
   type ComingBackClass,
   type MatchBasis,
 } from '@/lib/opportunities/match-evidence';
+// IMI Workstream C (2026-09-22): region (multi-state) + acquisition-stage intent.
+import { normalizeStateCode } from '@/lib/utils/us-states';
+import {
+  parseStageGroup,
+  stageOrExpr,
+  unknownStageOrExpr,
+  stageMatchFor,
+  STAGE_GROUP_LABEL,
+  ACQUISITION_STAGE_GROUPS,
+  type AcquisitionStageGroup,
+} from '@/lib/opportunities/acquisition-stage';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -106,6 +117,20 @@ export interface FindOpportunitiesInput {
    * Absent → the beginner first-turn FIND is unchanged.
    */
   uei?: string | null;
+  /**
+   * REGION: several states at once (["GA","AL","TN"], names or codes). ORed with each other and with
+   * `location`. No radius math. Semantics per horizon are unchanged (Open = place of performance OR
+   * buying office; Coming back = place of performance; Coming soon = pop_state). A value that is not
+   * a US state is reported unresolved — it never widens the search to every state.
+   */
+  states?: string[] | string | null;
+  /**
+   * ACQUISITION STAGE intent (Open now only — it is a notice-type filter):
+   *   MARKET_RESEARCH (RFI / sources sought) · VEHICLE_SOLICITATIONS (IDIQ/MACC/MATOC/JOC/SABER/BPA)
+   *   · NON_FAR (CSO / OTA / BAA). Structured notice_type first, title keywords secondary; a notice
+   *   with no recognised notice_type is excluded and counted, never guessed into a stage.
+   */
+  stage?: AcquisitionStageGroup | string | null;
 }
 
 /** Test/verification seams. Production passes nothing. */
@@ -159,6 +184,31 @@ export interface HorizonResult {
   evidence_counts?: EvidenceCounts | null;
   /** Company-anchored FIND only: verdict counts over the RETURNED items (not the matched population). */
   eligibility_counts?: Record<EligibilityStatus, number> | null;
+  /** Stage-filtered FIND only (input.stage). Open now carries the counts; other horizons say "not applied". */
+  stage?: HorizonStage | null;
+}
+
+export interface HorizonStage {
+  group: AcquisitionStageGroup;
+  label: string;
+  applied: boolean;
+  /**
+   * Open now: notices that matched every OTHER filter but carry no recognisable notice_type, so they
+   * were excluded from the stage filter. null = the count query failed (unknown, never 0).
+   */
+  excluded_unknown_stage_count: number | null;
+  /** Signal split over the RETURNED items (structured notice_type vs secondary title keyword). */
+  returned_by_signal: { structured_notice_type: number; title_keyword: number } | null;
+  note: string;
+}
+
+export interface FindRegion {
+  /** Every location token asked for (location + states), as typed. */
+  requested: string[];
+  /** Resolved 2-letter state codes — the filter actually applied. */
+  states: string[];
+  /** Tokens that are not a US state (e.g. "Robins AFB"). Never widen; reported, not guessed. */
+  unresolved: string[];
 }
 
 export interface EvidenceCounts {
@@ -193,6 +243,10 @@ export interface FindOpportunitiesResult {
     set_aside: string | null;
     horizons_requested: HorizonKey[];
     interpreted_as: Record<HorizonKey, string>;
+    /** Present when location/states were passed. */
+    region?: FindRegion;
+    /** Present when stage was passed. */
+    stage?: AcquisitionStageGroup | null;
   };
   market_interpretation: MarketInterpretation;
   presentation_note: string;
@@ -289,9 +343,28 @@ export const FIND_FIRST_VALUE_SECTIONS = {
   },
 } as const;
 
-export function buildFindPresentation(companyAnchored = false): FindOpportunitiesResult['presentation'] {
+/** Added ONLY when input.stage was passed. */
+export const HOST_RULES_STAGE = [
+  'STAGE FILTER: Open now was filtered to the requested acquisition stage (see horizons.open_now.stage). Say which stage. Coming back and Coming soon are NOT stage-filtered (a recompete or forecast has no notice type) — present them as context, not as RFIs / vehicles / non-FAR notices.',
+  'Each Open item carries acquisition_stage.signal: structured_notice_type (the SAM notice type says so) or title_keyword (secondary — only the title names it). Notices with no recognisable notice type were excluded and counted in excluded_unknown_stage_count — mention it when > 0; never call them zero.',
+] as const;
+
+/** Added ONLY when a location token could not be resolved to a US state. */
+export const HOST_RULES_REGION = [
+  'LOCATION: query_summary.region.unresolved lists places that are not a US state (e.g. a base name). They were NOT searched and no radius was applied — say which states were searched. If no state resolved, the location matched nothing; ask for the state instead of calling it zero demand.',
+] as const;
+
+export function buildFindPresentation(
+  companyAnchored = false,
+  extra: { stage?: boolean; regionUnresolved?: boolean } = {},
+): FindOpportunitiesResult['presentation'] {
   return {
-    host_rules: companyAnchored ? [...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_COMPANY_ANCHORED] : [...HOST_RULES_FIND_FIRST_VALUE],
+    host_rules: [
+      ...HOST_RULES_FIND_FIRST_VALUE,
+      ...(companyAnchored ? HOST_RULES_COMPANY_ANCHORED : []),
+      ...(extra.stage ? HOST_RULES_STAGE : []),
+      ...(extra.regionUnresolved ? HOST_RULES_REGION : []),
+    ],
     sections: FIND_FIRST_VALUE_SECTIONS as FindOpportunitiesResult['presentation']['sections'],
   };
 }
@@ -404,6 +477,10 @@ type InterpretedQuery = {
   interpreted: Record<HorizonKey, string>;
   /** Company-anchored FIND: the resolution (null when no uei was passed). */
   company: CompanyAnchorResolution | null;
+  /** Region (location ∪ states), resolved. null when no location was asked. */
+  region: FindRegion | null;
+  /** Acquisition-stage intent (Open now only). 'invalid' = an unrecognised value (never silently ignored). */
+  stage: AcquisitionStageGroup | 'invalid' | null;
   /**
    * The SAME plan without the company's codes — only when the company widened recall. Each horizon
    * also fetches it and unions the rows, so text/taxonomy matches can never be starved out of a
@@ -431,14 +508,47 @@ export function mcpDiscoveryPolicy(input: FindOpportunitiesInput): SurfacePolicy
  * MCP arguments → the canonical discovery input. `advanced.keyword_exact` is an EXACT phrase
  * request, so it reaches the plan quoted (the plan treats a fully quoted query as literal).
  */
+/** Location separators a person types: "GA, AL", "GA/AL/TN", "Robins AFB / GA", "GA; TN". */
+const LOCATION_SPLIT = /\s*[,;/|]\s*/;
+
+/**
+ * location ∪ states → resolved 2-letter codes + the tokens that are not a US state. Pure.
+ * Returns null when no location was asked (the only case that may search every state).
+ */
+export function resolveRegion(input: Pick<FindOpportunitiesInput, 'location' | 'states'>): FindRegion | null {
+  const fromStates = Array.isArray(input.states) ? input.states : input.states != null ? [input.states] : [];
+  const tokens = [String(input.location || ''), ...fromStates.map((s) => String(s ?? ''))]
+    .flatMap((t) => t.split(LOCATION_SPLIT))
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!tokens.length) return null;
+  const states: string[] = [];
+  const unresolved: string[] = [];
+  for (const t of tokens) {
+    const code = normalizeStateCode(t);
+    if (code) { if (!states.includes(code)) states.push(code); }
+    else if (!unresolved.includes(t)) unresolved.push(t);
+  }
+  return { requested: tokens, states, unresolved };
+}
+
+/**
+ * Asked for a location but none of it is a US state → a code no row carries. Every horizon then
+ * fails CLOSED through its existing state handling (map-filters parseStateList → NO_MATCH sentinel;
+ * recompete/forecast eq never matches). The PR #1435 lesson: an asked-for filter that resolves to
+ * nothing must match nothing — never widen to the whole corpus.
+ */
+export const UNRESOLVED_REGION_SENTINEL = 'ZZ';
+
 export function mcpDiscoveryInput(input: FindOpportunitiesInput, anchor?: CompanyAnchor | null): DiscoveryInput {
   const exact = String(input.advanced?.keyword_exact || '').replace(/"/g, ' ').trim();
   const company = companyCodeRecall(anchor);
+  const region = resolveRegion(input);
   return {
     ...(company ? { company } : {}),
     query: exact ? `"${exact}"` : String(input.query || '').trim(),
     agency: String(input.agency || '').trim() || null,
-    state: String(input.location || '').trim() || null,
+    state: !region ? null : region.states.length ? region.states.join(',') : UNRESOLVED_REGION_SENTINEL,
     setAside: String(input.set_aside || '').trim() || null,
     naics: String(input.advanced?.naics || '').trim() || null,
     psc: String(input.advanced?.psc || '').trim() || null,
@@ -456,10 +566,11 @@ function eligibilityLabel(plan: DiscoveryPlan): string {
 }
 
 /** What the plan consumed — derived from the plan, never hand-maintained per horizon. */
-function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey): string[] {
+function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey, stage: AcquisitionStageGroup | 'invalid' | null = null): string[] {
   const out = [`canonical_discovery:v${plan.version}`, `eligibility:${eligibilityLabel(plan)}`];
   if (plan.buyers.length) out.push(`agency→identity_words(${plan.buyers.map((b) => b.requested).join('|')})`);
   if (plan.states.length) out.push(`location→${horizon === 'open_now' ? 'pop_or_office' : horizon === 'coming_back' ? 'place_of_performance_state' : 'pop_state'}(${plan.states.join('|')})`);
+  if (stage && stage !== 'invalid' && horizon === 'open_now') out.push(`stage→${stage}(notice_type·title_secondary)`);
   if (plan.setAsides.length) out.push(`set_aside→${plan.setAsides.join('|')}`);
   if (plan.naics.length) out.push(`naics→${plan.naics.join('|')}`);
   if (plan.psc.length) out.push(`psc→${plan.psc.join('|')}`);
@@ -493,7 +604,7 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
   return {
     searchText: String(input.advanced?.keyword_exact || input.query || '').trim(),
     plan,
-    stateCode: plan.states.length ? plan.states.join(',') : null,
+    stateCode: plan.states.filter((s) => s !== UNRESOLVED_REGION_SENTINEL).join(',') || null,
     agency: plan.buyers.map((b) => b.requested).join(', '),
     setAside: String(input.set_aside || '').trim() || plan.setAsides.join(','),
     openClosingDays: policy.open.closingDays || 0,
@@ -502,6 +613,8 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
     market,
     company,
     basePlan,
+    region: resolveRegion(input),
+    stage: parseStageGroup(input.stage),
     interpreted: {
       open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance OR buying-office state; rank = evidence tier → breadth → score → deadline`,
       coming_back: `Canonical discovery (${plan.horizons.recompete.via}): ${elig}; buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window ≤${recompeteMonths}mo`,
@@ -658,9 +771,22 @@ async function queryOpenNow(
 ): Promise<HorizonResult> {
   const source = 'sam_opportunities';
   if (p.plan.status !== 'ok') return blockedHorizon(source, OPEN_HANDOFFS, p.plan);
-  const consumed = consumedFor(p.plan, 'open_now');
+  if (p.stage === 'invalid') {
+    // An unrecognised stage is never ignored (ignoring it would silently widen to every stage).
+    return {
+      ...unavailable(source, OPEN_HANDOFFS, `stage must be one of ${ACQUISITION_STAGE_GROUPS.join(', ')}`, ['stage']),
+      error: { class: 'validation_error', message: `stage must be one of ${ACQUISITION_STAGE_GROUPS.join(', ')}` },
+      semantics_note: 'Not searched: the requested stage is not recognised. This is a refinement ask — not zero demand.',
+    };
+  }
+  const stage = p.stage;
+  const consumed = consumedFor(p.plan, 'open_now', stage);
   const unsupported: string[] = [];
   const asOf = await tableAsOf(client, source, 'updated_at');
+  // Stage filter goes INTO the fetch (filter-before-rank): the capped deadline window must be drawn
+  // from the requested stage, never filtered after the cap.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inStage = (q: any) => (stage ? q.or(stageOrExpr(stage)) : q);
 
   try {
     const cap = p.market.capability;
@@ -669,27 +795,45 @@ async function queryOpenNow(
 
     // Candidate window: deadline-ordered, capped (OPEN_FETCH_CAP measured), then ranked.
     const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
-    const { data, count, error } = await applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan)
+    const { data, count, error } = await inStage(applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan))
       .order('response_deadline', { ascending: true, nullsFirst: false })
       .limit(fetchCap);
     if (error) return unavailable(source, OPEN_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
     {
-      const { count: uc, error: ue } = await applyOpenPlan(client.from(source).select('notice_id', { count: 'exact', head: true }), p.plan).is('map_lat', null);
+      const { count: uc, error: ue } = await inStage(applyOpenPlan(client.from(source).select('notice_id', { count: 'exact', head: true }), p.plan)).is('map_lat', null);
       if (!ue) unmapped = uc ?? null;
+    }
+
+    // Stage: how many notices matched everything else but have no recognisable notice type.
+    // They are EXCLUDED (never guessed into a stage) and counted; a failed count is null, not 0.
+    let stageInfo: HorizonStage | null = null;
+    if (stage) {
+      let excluded: number | null = null;
+      const { count: xc, error: xe } = await applyOpenPlan(client.from(source).select('notice_id', { count: 'exact', head: true }), p.plan).or(unknownStageOrExpr());
+      if (!xe && typeof xc === 'number') excluded = xc;
+      stageInfo = {
+        group: stage,
+        label: STAGE_GROUP_LABEL[stage],
+        applied: true,
+        excluded_unknown_stage_count: excluded,
+        returned_by_signal: null,
+        note: 'Structured SAM notice_type first; title keywords are a secondary, word-bounded signal on a compatible notice type (see each item\'s acquisition_stage). Notices with no recognisable notice type are excluded and counted, never guessed.',
+      };
     }
 
     let baseRows: Array<Record<string, unknown>> | null = null;
     if (p.basePlan) {
-      const base = await applyOpenPlan(client.from(source).select(COLS), p.basePlan)
+      const base = await inStage(applyOpenPlan(client.from(source).select(COLS), p.basePlan))
         .order('response_deadline', { ascending: true, nullsFirst: false })
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
     const rows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id');
     if (!rows.length) {
-      return emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, 'No matching open solicitations under these filters.', unmapped);
+      const e = emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, stage ? `No matching open ${STAGE_GROUP_LABEL[stage]} notices under these filters.` : 'No matching open solicitations under these filters.', unmapped);
+      return stageInfo ? { ...e, stage: { ...stageInfo, returned_by_signal: { structured_notice_type: 0, title_keyword: 0 } } } : e;
     }
 
     // Stage 5 ranking: MCP evidence tier (surface labelling) → canonical breadth → score → deadline.
@@ -728,6 +872,7 @@ async function queryOpenNow(
         evidence_class: cls === 'WEAK_NON_MARKET' ? undefined : cls,
         match_basis: label.basis,
         ...(eligibility ? { eligibility } : {}),
+        ...(stage ? { acquisition_stage: stageMatchFor(r, stage) } : {}),
         notice_id: String(r.notice_id || ''),
         solicitation_number: String(r.solicitation_number || '') || null,
         response_deadline: (r.response_deadline as string) || null,
@@ -757,10 +902,47 @@ async function queryOpenNow(
         + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
+      ...(stageInfo ? { stage: { ...stageInfo, returned_by_signal: stageSignalCounts(items) } } : {}),
     };
   } catch (e) {
     return unavailable(source, OPEN_HANDOFFS, (e as Error).message, unsupported);
   }
+}
+
+function stageSignalCounts(items: HorizonItem[]): HorizonStage['returned_by_signal'] {
+  const out = { structured_notice_type: 0, title_keyword: 0 };
+  for (const it of items) {
+    const m = it.acquisition_stage as { signal?: keyof typeof out } | null | undefined;
+    if (m?.signal) out[m.signal] += 1;
+  }
+  return out;
+}
+
+/**
+ * Region + stage notes for the horizons that do not own them. Applied AFTER each horizon runs so the
+ * horizon implementations stay untouched (Coming back / Coming soon are shared with other work).
+ */
+function annotateHorizon(key: HorizonKey, h: HorizonResult, p: InterpretedQuery): HorizonResult {
+  const unsupported = [...h.filters_unsupported];
+  if (p.region?.unresolved.length) {
+    unsupported.push(`location not a US state: ${p.region.unresolved.map((u) => `"${u}"`).join(', ')} (no installation/radius lookup; ${p.region.states.length ? `searched ${p.region.states.join(', ')} only` : 'nothing searched — asked-for location matched no state'})`);
+  }
+  let stage = h.stage ?? null;
+  if (p.stage && p.stage !== 'invalid' && key !== 'open_now') {
+    unsupported.push(`stage:${p.stage} (a notice-type filter — applies to Open now only; this horizon is NOT stage-filtered)`);
+    stage = {
+      group: p.stage,
+      label: STAGE_GROUP_LABEL[p.stage],
+      applied: false,
+      excluded_unknown_stage_count: null,
+      returned_by_signal: null,
+      note: key === 'coming_back'
+        ? 'Not applied: a recompete is not a notice and has no notice type. Shown as context.'
+        : 'Not applied: a forecast is not a notice and has no notice type. Shown as context.',
+    };
+  }
+  if (unsupported.length === h.filters_unsupported.length && stage === (h.stage ?? null)) return h;
+  return { ...h, filters_unsupported: unsupported, ...(stage ? { stage } : {}) };
 }
 
 async function queryComingBack(
@@ -1289,9 +1471,12 @@ export async function findOpportunities(
         null,
       );
     }
-    if (key === 'open_now') return queryOpenNow(client, interpreted, limit);
-    if (key === 'coming_back') return queryComingBack(client, interpreted, limit);
-    return queryComingSoon(client, interpreted, limit);
+    const h = key === 'open_now'
+      ? await queryOpenNow(client, interpreted, limit)
+      : key === 'coming_back'
+        ? await queryComingBack(client, interpreted, limit)
+        : await queryComingSoon(client, interpreted, limit);
+    return annotateHorizon(key, h, interpreted);
   };
 
   const [open_now, coming_back, coming_soon] = await Promise.all([
@@ -1329,6 +1514,8 @@ export async function findOpportunities(
       set_aside: interpreted.setAside || null,
       horizons_requested: requested,
       interpreted_as: interpreted.interpreted,
+      ...(interpreted.region ? { region: interpreted.region } : {}),
+      ...(input.stage != null && String(input.stage).trim() ? { stage: interpreted.stage === 'invalid' ? null : interpreted.stage } : {}),
     },
     market_interpretation: mi,
     ...(company ? { company: companySummary(company, interpreted.plan) } : {}),
@@ -1366,6 +1553,9 @@ export async function findOpportunities(
       },
     },
     _next: grounded ? buildFindNext(shape, horizons) : [],
-    presentation: buildFindPresentation(!!company),
+    presentation: buildFindPresentation(!!company, {
+      stage: !!interpreted.stage && interpreted.stage !== 'invalid',
+      regionUnresolved: !!interpreted.region?.unresolved.length,
+    }),
   };
 }

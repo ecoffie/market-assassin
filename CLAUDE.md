@@ -444,6 +444,13 @@ Fixtures + tests: `src/lib/opportunities/__fixtures__/imi-find/` · `imi-find-co
   a buyer-name-only hit is RELATED. `recompete_opportunities.naics_description` is **0% filled** — before this,
   literal Coming-back recall ran only on holder + agency names; `description` (96%) / `psc_description` (99.7%)
   are now in `RECOMPETE_TEXT_COLS`.
+- **Workstream C (region + stage)** — `states: []` ORs with `location` (`resolveRegion`); a non-state token
+  ("Robins AFB") is reported in `query_summary.region.unresolved`, never geocoded; an all-unresolvable region
+  fails CLOSED via the `ZZ` sentinel (PR #1435 class). `stage` (`acquisition-stage.ts`) filters OPEN NOW only,
+  inside the fetch: `notice_type` is the only structured field (`notice_type_code` is NULL fleet-wide) — title
+  keywords are a labelled secondary signal on a compatible type; unknown types are excluded + counted. Measured
+  live 2026-09-22 (36,506 active): MARKET_RESEARCH 1,712 (1,642 structured) · VEHICLE 269 (title only) ·
+  NON_FAR 98 (title only) · unknown 0; SQL counts == JS labeller counts.
 
 ### Potato v1 — ✅ SHIPPED → CLOSED 2026-09-17
 Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.”
