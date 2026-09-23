@@ -50,6 +50,11 @@ export interface Concept {
   /** Rank weight when matched (distinctive 1; generic from the corpus-measured table). */
   weight: number;
   unrecognized?: boolean;
+  /**
+   * Words that ALL appearing anywhere in the record also establish this concept — the query's
+   * plain-word meaning, kept so recognizing a concept only ever ADDS forms (never narrows).
+   */
+  cooccur?: Concept[];
 }
 
 export interface Alternative {
@@ -93,11 +98,37 @@ export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set(['market']);
  * alone, "cyber" stopped matching "cybersecurity" — 249 active notices say cybersecurity, 25 say cyber
  * (measured 2026-09-22) — so a "cyber" search would have lost ~90% of its market.
  */
-export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: string[] }> = [
+export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: string[]; cooccur?: string[]; names?: string[] }> = [
   { id: 'artificial intelligence', forms: ['artificial intelligence'], acronyms: ['AI'] },
   { id: 'machine learning', forms: ['machine learning'], acronyms: ['ML'] },
   { id: 'information technology', forms: ['information technology'], acronyms: ['IT'] },
   { id: 'cybersecurity', forms: ['cybersecurity', 'cyber security', 'cyber'] },
+  /**
+   * SOFTWARE LICENSE (Eric, Decision #4, 2026-09-23). Agencies rarely write "software license" in the
+   * title; they write what they are renewing. Every form below was measured before it was admitted
+   * (active open / live recompete / forecast, 2026-09-23): software licen{se,ses,sing,sed} 46/786/232 ·
+   * software subscription(s) 6/170/50 · software renewal(s) 0/126/77 · software maintenance renewal(s)
+   * 1/32/14 · license subscription(s) 0/70/13 · license renewal(s) 2/217/93 · license maintenance
+   * 1/39/15. The `license …` phrases were audited row by row: the hits with no software cue anywhere
+   * are still named software products (SolarWinds, UiPath, Citrix, Palo Alto, COMSOL, ANSYS, Stata,
+   * GeoStudio) — no professional, reactor or driver license renewal appeared.
+   * ⚠️ Never a bare word: `license`, `subscription`, `maintenance`, `renewal` stay ordinary words, and
+   * "simulation renewal" / "software support" are NOT forms — a license must be named, or software
+   * must be the thing renewed/subscribed.
+   * `cooccur` keeps the pre-concept meaning ("software" AND "license" anywhere): replacing it with the
+   * phrases alone was measured and REJECTED — it dropped real buys the plain words find ("Microsoft
+   * Software Enterprise Licenses", "Renewal of Adobe Subscription Licenses", Oracle ULA, and every
+   * recompete whose PSC reads "(PERPETUAL LICENSE SOFTWARE)"). The concept is additive only.
+   */
+  {
+    id: 'software license',
+    forms: ['software license', 'software subscription', 'software maintenance renewal', 'software renewal', 'license subscription', 'license renewal', 'license maintenance'],
+    cooccur: ['software', 'license'],
+    // Only the NAME recognizes the concept in a query. "license renewal" or "software subscriptions"
+    // typed alone keep their own plain-word meaning; widening them to every software license was
+    // measured (+6,632 recompetes for "license renewal") and is not what those users asked for.
+    names: ['software license'],
+  },
 ];
 
 /** User-typed domain acronyms (the /try SHORT_DOMAIN_TOKENS) — matched case-sensitively in upper case. */
@@ -150,10 +181,18 @@ function conceptsOf(text: string): Concept[] {
   let t = ` ${normalizeQuery(text).replace(/"/g, ' ')} `;
   const out: Concept[] = [];
   for (const c of CONCEPTS) {
-    const surfaces = [...c.forms, ...(c.acronyms || []).map((a) => a.toLowerCase())].sort((a, b) => b.length - a.length);
-    if (!surfaces.some((f) => t.includes(` ${f} `))) continue;
-    for (const f of surfaces) t = t.split(` ${f} `).join(' ');
-    out.push({ label: c.id, cls: 'distinctive', basis: 'recognized_concept', forms: [...c.forms], aliases: [], inflect: 'full', weight: 1, ...(c.acronyms ? { acronyms: [...c.acronyms] } : {}) });
+    // A query names a concept in the same inflections a record does ("software licenses",
+    // "software licensing"), so recognition uses the record regex; acronyms stay exact.
+    const phrases = [...(c.names || c.forms)].sort((a, b) => b.length - a.length).map((f) => new RegExp(` ${formAlt(f, 'full')}(?= )`, 'g'));
+    const acr = (c.acronyms || []).map((a) => a.toLowerCase());
+    if (!phrases.some((re) => re.test(t)) && !acr.some((a) => t.includes(` ${a} `))) continue;
+    for (const re of phrases) t = t.replace(re, ' ');
+    for (const a of acr) t = t.split(` ${a} `).join(' ');
+    out.push({
+      label: c.id, cls: 'distinctive', basis: 'recognized_concept', forms: [...c.forms], aliases: [], inflect: 'full', weight: 1,
+      ...(c.acronyms ? { acronyms: [...c.acronyms] } : {}),
+      ...(c.cooccur ? { cooccur: c.cooccur.map(wordConcept) } : {}),
+    });
   }
   t = t.replace(/ ([a-z0-9]+(?:-[a-z0-9]+)+)(?= )/g, (_m, comp: string) => {
     const form = comp.replace(/-/g, ' ');
@@ -199,7 +238,8 @@ function alternativeOf(text: string): Alternative | null {
  */
 export function buildTextMatcher(residual: string, exclusions: string[] = []): TextMatcher {
   const trimmed = String(residual || '').trim();
-  const excluded = exclusions.flatMap((e) => conceptsOf(e)).map((c) => ({ ...c }));
+  // An exclusion removes the NAMED forms only — never the co-occurrence of two ordinary words.
+  const excluded = exclusions.flatMap((e) => conceptsOf(e)).map(({ cooccur: _drop, ...c }) => c);
   if (!trimmed) return { mode: 'none', normalized: '', phrase: null, alternatives: [], excluded };
 
   if (isCodeLike(trimmed)) return { mode: 'code', normalized: trimmed.toLowerCase(), phrase: trimmed, alternatives: [], excluded };
@@ -295,6 +335,7 @@ function conceptUnit(c: Concept, cols: readonly string[]): string {
     if (ci) parts.push(imatchClause(col, ci));
     if (cs) parts.push(matchClause(col, cs));
   }
+  if (c.cooccur?.length) parts.push(`and(${c.cooccur.map((w) => `or(${conceptUnit(w, cols)})`).join(',')})`);
   return parts.join(',');
 }
 
@@ -339,7 +380,8 @@ export function jsRegex(pgRegex: string, caseSensitive = false): RegExp {
 
 export function conceptHit(c: Concept, text: string): boolean {
   const { ci, cs } = conceptRegexes(c);
-  return (!!ci && jsRegex(ci).test(text)) || (!!cs && jsRegex(cs, true).test(text));
+  return (!!ci && jsRegex(ci).test(text)) || (!!cs && jsRegex(cs, true).test(text))
+    || (!!c.cooccur?.length && c.cooccur.every((w) => conceptHit(w, text)));
 }
 
 export function matchesText(m: TextMatcher, texts: Array<string | null | undefined>): boolean {

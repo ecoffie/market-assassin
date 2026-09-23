@@ -31,4 +31,6 @@ export const FIXTURES: Array<{ id: string; cls: string; input: DiscoveryInput }>
   { id: 'agency=USDA', cls: 'USDA alias collision', input: { query: '', agency: 'USDA' } },
   { id: 'agency=VA', cls: 'VA/Naval collision', input: { query: '', agency: 'VA' } },
   { id: 'Naval facilities in Nevada', cls: 'VA/Naval collision (free text)', input: { query: 'Naval facilities in Nevada' } },
+  { id: 'software license', cls: 'recognized concept (procurement-equivalent forms)', input: { query: 'software license' } },
+  { id: 'software licenses', cls: 'recognized concept (inflected query)', input: { query: 'software licenses' } },
 ];
