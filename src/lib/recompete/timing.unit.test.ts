@@ -47,9 +47,25 @@ describe('recompete timing (MINDY-006)', () => {
   it('lead_time_months is remaining clock to PoP end, not the capture date', () => {
     const now = new Date('2026-09-17T12:00:00.000Z');
     const overlay = overlayRecompeteTiming('2026-09-28', now);
-    expect(overlay?.estimated_recompete_date).toBe('2025-09-28');
+    // The capture date stays historical under its own name (MINDY-006: no clamp) …
+    expect(overlay?.capture_start_date).toBe('2025-09-28');
     expect(overlay?.lead_time_months).toBe(1);
+    // … and is NOT emitted as the recompete date once it has passed (IMI 2026-09-22): unknown,
+    // never a past date and never today.
+    expect(overlay?.estimated_recompete_date).toBeNull();
+    expect(overlay?.recompete_date_status).toBe('capture_window_open');
     expect(overlay?.estimated_recompete_date).not.toBe('2026-09-17');
+  });
+
+  it('an upcoming capture date is emitted unchanged as the estimate', () => {
+    const now = new Date('2026-09-17T12:00:00.000Z');
+    const overlay = overlayRecompeteTiming('2028-03-15', now);
+    expect(overlay).toMatchObject({
+      capture_start_date: '2027-03-15',
+      estimated_recompete_date: '2027-03-15',
+      recompete_date_status: 'capture_start_upcoming',
+      recompete_date_basis: 'pop_end_minus_12_months',
+    });
   });
 
   it('near-term remaining clock is at least 1; capture date stays historical', () => {

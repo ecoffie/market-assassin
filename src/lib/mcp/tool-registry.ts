@@ -751,7 +751,10 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
       'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract so I can ' +
       'pursue it"). Filter by NAICS / agency / state / expiration window (months) / value / recompete-likelihood. ' +
       'Returns incumbent, agency, NAICS, obligated + ceiling value, period-of-performance end, recompete date, ' +
-      'likelihood — soonest-expiring first. A multiple-award IDIQ appears as several rows (one per holder). ' +
+      'likelihood — soonest-expiring first. Task/delivery orders are NOT listed as recompetes: they are rolled up ' +
+      'into vehicles[] under their parent IDV with its ordering end (null = unknown). estimated_recompete_date is ' +
+      'never a past date (null + recompete_date_status when the capture window has passed); place_of_performance_state ' +
+      'is the award\'s place of performance only (null when missing or contradicted by the record). ' +
       'grounded=false when nothing matches — widen months_window. For customer-facing market FIND across Open + ' +
       'Recompete + Forecast, prefer find_opportunities.',
     parameters: {

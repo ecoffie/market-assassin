@@ -64,12 +64,51 @@ export function leadTimeMonthsFromPopEnd(popEnd: string | null | undefined, now:
   return end > now.getTime() ? Math.max(1, Math.round(rawMonths)) : 0;
 }
 
+/**
+ * What `estimated_recompete_date` can honestly say about one contract.
+ *
+ *   capture_start_upcoming — PoP end − 12 months is still ahead of today. That date is the
+ *                            documented capture-start estimate and is emitted as-is.
+ *   capture_window_open    — PoP end − 12 months is already BEHIND today while the contract
+ *                            has not ended. The follow-on acquisition may already be under
+ *                            way, bridged or extended; nothing we store dates it. The field is
+ *                            NULL (unknown) — never a past date, never clamped to today.
+ *   order_under_vehicle    — set by annotateRecompeteRow(): a task/delivery order is not
+ *                            re-competed on its own; its recompete signal is the parent
+ *                            vehicle's ordering end, which this row does not carry.
+ *
+ * IMI test (2026-09-22): FA850126F0034 ends 2026-11-09 and printed
+ * "estimated_recompete_date: 2025-11-09" beside likelihood "high" — a date a year in the past
+ * for a contract with seven weeks left. The capture-start value is still returned under its
+ * own name (`capture_start_date`), so nothing measured is hidden (MINDY-006 holds: no clamp).
+ */
+export type RecompeteDateStatus = 'capture_start_upcoming' | 'capture_window_open' | 'order_under_vehicle';
+
+export interface RecompeteTiming {
+  /** PoP end − 12 calendar months (MINDY-006). May be in the past; never clamped. */
+  capture_start_date: string;
+  /** capture_start_date while it is still ahead of today; otherwise NULL (unknown). */
+  estimated_recompete_date: string | null;
+  recompete_date_status: RecompeteDateStatus;
+  /** The rule behind the date — a stated method, not a measurement. */
+  recompete_date_basis: 'pop_end_minus_12_months';
+  lead_time_months: number;
+}
+
 export function overlayRecompeteTiming(
   popEnd: string | null | undefined,
   now: Date = new Date(),
-): { estimated_recompete_date: string; lead_time_months: number } | null {
-  const estimated = estimatedRecompeteDateFromPopEnd(popEnd);
+): RecompeteTiming | null {
+  const capture = estimatedRecompeteDateFromPopEnd(popEnd);
   const lead = leadTimeMonthsFromPopEnd(popEnd, now);
-  if (estimated == null || lead == null) return null;
-  return { estimated_recompete_date: estimated, lead_time_months: lead };
+  if (capture == null || lead == null) return null;
+  const today = now.toISOString().slice(0, 10);
+  const upcoming = capture >= today;
+  return {
+    capture_start_date: capture,
+    estimated_recompete_date: upcoming ? capture : null,
+    recompete_date_status: upcoming ? 'capture_start_upcoming' : 'capture_window_open',
+    recompete_date_basis: 'pop_end_minus_12_months',
+    lead_time_months: lead,
+  };
 }

@@ -125,7 +125,12 @@ export type PresentedRecompete<T> = Omit<T, 'estimated_recompete_date'> & {
  */
 export function presentRecompete<T extends RecompeteLike>(row: T, now: Date = new Date()): PresentedRecompete<T> {
   const { estimated_recompete_date, ...rest } = row;
-  const capture = typeof estimated_recompete_date === 'string' && estimated_recompete_date ? estimated_recompete_date.slice(0, 10) : null;
+  // The shared query now carries the capture date under its own name (annotate.ts) and nulls
+  // estimated_recompete_date once it has passed — prefer the named field, fall back for rows
+  // that predate it.
+  const named = typeof row.capture_start_date === 'string' && row.capture_start_date ? row.capture_start_date : null;
+  const legacy = typeof estimated_recompete_date === 'string' && estimated_recompete_date ? estimated_recompete_date : null;
+  const capture = (named ?? legacy)?.slice(0, 10) ?? null;
   const today = now.toISOString().slice(0, 10);
   return {
     ...(rest as Omit<T, 'estimated_recompete_date'>),

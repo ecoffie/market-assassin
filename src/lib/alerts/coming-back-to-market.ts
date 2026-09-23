@@ -21,7 +21,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
 import { parseNaicsCodes, naicsOrExpression, type ExpiringContract } from '@/lib/recompete/query';
-import { overlayRecompeteTiming } from '@/lib/recompete/timing';
+import { annotateRecompeteRow } from '@/lib/recompete/annotate';
 
 export const COMING_BACK_CAP = 5;
 export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
@@ -489,7 +489,7 @@ export function selectComingBackRows(input: {
 }
 
 const COMING_BACK_COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type';
 
 function marketOrExpression(naics: string[], pscs: string[]): string | null {
   const parts: string[] = [];
@@ -539,16 +539,10 @@ async function pageComingBackMarket(naics: string[], pscs: string[]): Promise<
   }
 
   const now = new Date();
+  // Same corrected row every recompete surface shows (timing / lineage / PoP — annotate.ts).
   const contracts = (rows as unknown as ExpiringContract[]).map((c) => {
-    const timing = overlayRecompeteTiming(c.period_of_performance_current_end, now);
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
-    if (!timing) return { ...c, naics_description };
-    return {
-      ...c,
-      naics_description,
-      lead_time_months: timing.lead_time_months,
-      estimated_recompete_date: timing.estimated_recompete_date,
-    };
+    return annotateRecompeteRow({ ...c, naics_description }, now);
   });
   return { ok: true, contracts, count: contracts.length };
 }

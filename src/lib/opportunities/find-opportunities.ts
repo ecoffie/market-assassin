@@ -7,6 +7,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
+import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import {
   interpretMarket,
   evidenceWhy,
@@ -961,7 +962,7 @@ async function queryComingBack(
 
   try {
     const COLS =
-      'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,psc_description,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at';
+      'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,psc_description,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at,contract_type';
 
     // MCP surface policy (unchanged): soonest-ending first; wider window only for related-market.
     const baseCap = Math.max(limit, related ? 200 : limit);
@@ -1019,11 +1020,17 @@ async function queryComingBack(
     }
 
     const phraseBack = p.searchText || 'this work';
-    const items: HorizonItem[] = sliced.map(({ row: r, cls, basis }) => ({
+    // Same corrected row as get_expiring_contracts (annotate.ts): an order is labelled with its
+    // parent vehicle (not presented as a standalone recompete). Selection/relevance above is untouched.
+    const items: HorizonItem[] = sliced.map(({ row: r, cls, basis }) => {
+      const a = recompeteRowAnnotations(r as Parameters<typeof recompeteRowAnnotations>[0]);
+      return {
       horizon: 'coming_back',
       title: String(r.naics_description || r.incumbent_name || r.piid || 'Expiring contract'),
       buyer: String(r.awarding_sub_agency || r.awarding_agency || '') || null,
       location_label: locLabel(r.place_of_performance_city as string, r.place_of_performance_state as string),
+      award_kind: a.award_kind,
+      parent_vehicle_piid: a.parent_vehicle_piid,
       relevant_date: (r.period_of_performance_current_end as string) || null,
       relevant_date_label: 'current_end',
       value_label: moneyLabel(r.potential_total_value) || moneyLabel(r.total_obligation),
@@ -1050,11 +1057,16 @@ async function queryComingBack(
       psc_code: (r.psc_code as string) || null,
       description: (r.description as string) || null,
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
-    }));
+      };
+    });
 
     const note = related
       ? 'DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is this buyer’s broader IT market — not confirmed cybersecurity. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet.'
       : 'Geography: place of performance only (not buying-office). Not a live solicitation — do not draft a proposal as if an RFP exists. Watch/email for this horizon is not available yet.';
+    // An order under a vehicle is not re-competed on its own — say so wherever one is present.
+    const orderNote = items.some((i) => i.award_kind === 'order_under_vehicle')
+      ? ' Items with award_kind=order_under_vehicle are task/delivery orders under parent_vehicle_piid: work flowing under that vehicle (a sub-under lead), not a standalone recompete.'
+      : '';
 
     return {
       status: 'grounded',
@@ -1068,7 +1080,7 @@ async function queryComingBack(
       unmapped_count: unmapped,
       error: null,
       allowed_handoffs: BACK_HANDOFFS,
-      semantics_note: note + ' DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder\'s name.',
+      semantics_note: note + ' DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder\'s name.' + orderNote,
       evidence_counts,
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
