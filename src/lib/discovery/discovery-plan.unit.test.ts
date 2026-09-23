@@ -318,3 +318,27 @@ describe('Phase C — explicit agency accepts a list of distinct buyers (ORed)',
     expect(planFor({ query: 'janitorial', agency: [] }).buyers).toEqual([]);
   });
 });
+
+describe('Phase D — a leading "<word> me <opportunity noun>" is an imperative wrapper (structural, not fuzzy)', () => {
+  it('"shoe me opportunities in the Virgin Islands" → state VI only, no "shoe" concept', () => {
+    const p = planFor({ query: 'shoe me opportunities in the Virgin Islands' });
+    expect(p.states).toEqual(['VI']);
+    expect(p.matcher.mode).toBe('none');
+    expect(p.intent.stripped).toContain('shoe me');
+    expect(p.status).toBe('ok');
+  });
+  it('any verb in that clause shape is a request ("email me opportunities in cyber")', () => {
+    const p = planFor({ query: 'email me opportunities in cyber' });
+    expect(p.matcher.alternatives[0].eligible.map((c) => c.label)).toEqual(['cybersecurity']);
+  });
+  it('is NARROW: without "me" + an opportunity noun the word stays a concept', () => {
+    expect(planFor({ query: 'shoe opportunities' }).matcher.alternatives[0].eligible.map((c) => c.label)).toEqual(['shoe']);
+    expect(planFor({ query: 'shoes in Virginia' }).matcher.mode).toBe('lexical');
+    expect(planFor({ query: 'kitchen exhaust' }).intent.stripped).toEqual([]);
+  });
+  it('known wrappers are untouched ("Show me USDA opportunities" still plans exactly as before)', () => {
+    const p = planFor({ query: 'Show me USDA opportunities' });
+    expect(p.intent.stripped).toEqual(['show me', 'opportunities']);
+    expect(p.buyers.map((b) => b.requested)).toEqual(['USDA']);
+  });
+});

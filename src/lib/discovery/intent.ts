@@ -179,8 +179,19 @@ export function extractStructuredIntent(raw: string): StructuredIntent {
   });
 
   // Leading wrapper.
+  let wrapped = false;
   for (const w of WRAPPERS) {
-    if (p.startsWith(` ${w} `)) { out.stripped.push(w); p = ` ${p.slice(w.length + 2)}`; break; }
+    if (p.startsWith(` ${w} `)) { out.stripped.push(w); p = ` ${p.slice(w.length + 2)}`; wrapped = true; break; }
+  }
+  // A leading "<word> me <opportunity noun>" is an imperative addressed to the user WHATEVER the verb —
+  // "shoe me opportunities in the Virgin Islands" is a request, not a search for shoes (saved search
+  // c3f908e3, 2026-09-23: "shoe" became a required concept ∧ VI → 0 while VI had live notices).
+  // STRUCTURAL, not fuzzy: the clause shape decides, the word is never compared to a spelling list, and
+  // it applies only when no known wrapper matched and the very next token is an opportunity noun.
+  if (!wrapped) {
+    const clause = new RegExp(`^ ([a-z]+) me (?=(?:${[...OPP_NOUNS, ...CONTRACT_NOUNS].join('|')}) )`);
+    const m = p.match(clause);
+    if (m) { out.stripped.push(`${m[1]} me`); p = ` ${p.slice(m[0].length)}`; }
   }
 
   // Set-asides (longest phrase first), then states, then agencies (longest first).
