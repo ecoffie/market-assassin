@@ -39,6 +39,27 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 const RESEND_KEY = process.env.RESEND_API_KEY?.replace(/\\n$/, '').trim();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * INTERNAL-MAILBOX SAFETY FILTER. An address on our own domains is bulk-suppressed only
+ * when it is recognisably synthetic/test/demo. Anything else on these domains — a real
+ * working mailbox (eric@) or an uncertain one (hello@) — is HELD out of this bulk write
+ * and reported for separate investigation: a delivery problem on a real internal mailbox
+ * must be diagnosed, not silently turned into a permanent suppression.
+ */
+const INTERNAL_DOMAIN = /@(govcongiants\.com|getmindy\.ai)$/;
+const SYNTHETIC_INTERNAL = [
+  /^test-[a-z0-9-]+@govcongiants\.com$/,
+  /^(demo|pestdemo)@govcongiants\.com$/,
+  /^disa-demo@getmindy\.ai$/,
+  /^seed\+[a-z]+-\d+@getmindy\.ai$/,
+  /^(credit-integrity-acceptance|p0-credits-contract-verify)@getmindy\.ai$/,
+  /^cyrus-[a-z0-9-]+@getmindy\.ai$/,
+];
+function internalHoldReason(email: string): string | null {
+  if (!INTERNAL_DOMAIN.test(email)) return null;
+  return SYNTHETIC_INTERNAL.some((re) => re.test(email)) ? null : 'internal_mailbox_not_known_synthetic';
+}
+
 interface Candidate {
   email: string;
   reason: SuppressionReason;
@@ -185,7 +206,9 @@ async function main() {
     for (const r of sends) sends15.set(r.user_email.toLowerCase(), (sends15.get(r.user_email.toLowerCase()) || 0) + 1);
   }
 
-  const toWrite = [...candidates.values()].filter((c) => !alreadySuppressed.has(c.email));
+  const notYet = [...candidates.values()].filter((c) => !alreadySuppressed.has(c.email));
+  const held = notYet.filter((c) => internalHoldReason(c.email));
+  const toWrite = notYet.filter((c) => !internalHoldReason(c.email));
   const count = <K extends string>(xs: Candidate[], k: (c: Candidate) => K) =>
     xs.reduce<Record<string, number>>((m, c) => { const key = k(c); m[key] = (m[key] || 0) + 1; return m; }, {});
   const domainGroup = (e: string) => {
@@ -207,8 +230,10 @@ async function main() {
     history: { permanent_bounce_events: hard.length, complaint_events: complaints.length, addresses_with_bounces_in_window: byAddr.size },
     healthcheck_addresses_excluded: healthcheckSeen,
     candidates: candidates.size,
-    already_suppressed_locally: candidates.size - toWrite.length,
+    already_suppressed_locally: candidates.size - notYet.length,
+    held_internal_mailboxes: held.map((c) => ({ email: c.email, reason: c.reason, event_at: c.event_at, hold: internalHoldReason(c.email) })),
     write_set_rows: toWrite.length,
+    write_set_internal_synthetic: toWrite.filter((c) => INTERNAL_DOMAIN.test(c.email)).map((c) => c.email),
     write_set_by_reason: count(toWrite, (c) => c.reason),
     write_set_by_source: count(toWrite, (c) => c.source),
     write_set_by_domain_group: count(toWrite, (c) => domainGroup(c.email)),
