@@ -7303,3 +7303,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** Full solicitation compliance matrix / RFP shredding across all attachments / FAR 52.212-2 evaluation factors extraction / Section E instructions to offerors / verified proposal requirements.
 
 **Proof.** Gold master VA `36C24226Q0857` (SAM package, 7 attachments, 257,724 characters). Before (production): 50,000 characters read, 60 verified rows, 2 of 17 hand-built recall anchors recovered. After (same day, same model): every requirement-bearing character read (159,939 of 159,939), 186 verified rows, 15 of 17 anchors recovered, each of the 186 quotes independently re-found in its named document, zero invented Section L citations, zero unsupported figures, 20 seconds. Price unchanged (20 credits). Live in production (2026-09-22, hosted re-run): every requirement-bearing character read, 16 of 17 recall anchors, 180 independently verified rows, and an obligation read by two overlapping passes shows up once — with both readings and both sources kept.
+
+## POTETO — NDAA Legislative Intelligence Live (2026-09-22)
+
+**What.** Mindy's NDAA intelligence now says exactly what the law is. Every FY2026 NDAA requirement Mindy shows cites the enacted statute and section (Public Law 119-60), figures are checked against the enacted text, and provisions that were only proposed in a bill that never became law are no longer presented as requirements. Mindy tracks each legislative version separately — introduced, reported, passed, enrolled, enacted — and states each one's legal weight, so a bill's introduced text is never mistaken for law.
+
+**Why.** Contractors plan capture around NDAA mandates. A requirement that was proposed but never enacted, or a threshold stated wrong, sends a proposal in the wrong direction. On audit, most of Mindy's prior FY2026 NDAA items were real, enacted law — they simply carried no citation — while a few misstated the law (the Cost Accounting Standards threshold is $100M, not $35M).
+
+**SEO.** FY2026 NDAA requirements for contractors / Public Law 119-60 / NDAA cost accounting standards threshold / BIOSECURE Act NDAA / FY2027 NDAA status tracker.
+
+**Proof.** Audited against congress.gov texts of PL 119-60 (S. 1071) and S. 2296: 32 of 45 prior claims enacted and now cited by section, 6 corrected, 7 retired, every original preserved with its evidence. Congress truth for the FY2026 and FY2027 NDAA (5 vehicles, 14 text versions, 5 committee reports) is held in full. Not yet in production at time of writing.

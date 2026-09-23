@@ -36,6 +36,8 @@ import {
   congressApiKey,
   currentCongress,
   chamberOf,
+  fiscalYearFromTitle,
+  measureRole,
   NDAA_TITLE_PATTERN,
   LEGISLATIVE_SOURCE_TYPES,
   type BillRef,
@@ -76,6 +78,34 @@ function sb() {
  * collapsed "NDAA 2027" record cannot express this at all, which is why versions are
  * separate rows.
  */
+/**
+ * The run-level state is the state of the CURRENT authorization — the newest fiscal
+ * year that has a vehicle — never an aggregate over every family.
+ *
+ * ⚠️ Measured 2026-09-22: the aggregate reported `discoveryState: "enacted"` because
+ * the FY2026 vehicle (S.1071, PL 119-60) became law, while the FY2027 vehicles
+ * (H.R. 8800 passed the House, S. 4784 reported) had not. A monitor reading the
+ * headline would have been told the current NDAA was law.
+ */
+export function fiscalYearStates(families: Array<{ fiscalYear: number | null; role: string; chamber: string; textVersions: number; becameLaw: boolean }>): {
+  current: { fiscalYear: number; state: 'enacted' | 'diverging' | 'introduced' } | null;
+  byFiscalYear: Record<string, 'enacted' | 'diverging' | 'introduced'>;
+} {
+  const groups = new Map<number, { law: boolean; house: number; senate: number }>();
+  for (const f of families) {
+    if (f.role !== 'authorization_vehicle' || f.fiscalYear == null) continue;
+    const g = groups.get(f.fiscalYear) ?? { law: false, house: 0, senate: 0 };
+    if (f.becameLaw) g.law = true;
+    if (f.chamber === 'House') g.house += f.textVersions;
+    if (f.chamber === 'Senate') g.senate += f.textVersions;
+    groups.set(f.fiscalYear, g);
+  }
+  const byFiscalYear: Record<string, 'enacted' | 'diverging' | 'introduced'> = {};
+  for (const [fy, g] of groups) byFiscalYear[String(fy)] = classifyFamilyState({ becameLaw: g.law, houseVersions: g.house, senateVersions: g.senate });
+  const latest = [...groups.keys()].sort((a, b) => b - a)[0];
+  return { current: latest == null ? null : { fiscalYear: latest, state: byFiscalYear[String(latest)] }, byFiscalYear };
+}
+
 export function classifyFamilyState(input: {
   becameLaw: boolean;
   houseVersions: number;
@@ -216,6 +246,8 @@ export async function GET(request: NextRequest) {
   type FamilyReport = {
     bill: string;
     chamber: string;
+    fiscalYear: number | null;
+    role: string;
     versions: number;
     committeeReports: number;
     becameLaw: boolean;
@@ -244,9 +276,12 @@ export async function GET(request: NextRequest) {
       if (ch === 'Senate') senateVersions += textCount;
       if (status.becameLaw) anyLaw = true;
 
+      const role = measureRole(ref.title);
       families.push({
         bill: `${ref.billType} ${ref.number}`,
         chamber: ch,
+        fiscalYear: role === 'authorization_vehicle' ? fiscalYearFromTitle(ref.title) : null,
+        role,
         versions: textCount,
         committeeReports: documents.length - textCount,
         becameLaw: status.becameLaw,
@@ -260,6 +295,8 @@ export async function GET(request: NextRequest) {
       families.push({
         bill: `${ref.billType} ${ref.number}`,
         chamber: chamberOf(ref.billType),
+        fiscalYear: null,
+        role: 'unknown',
         versions: -1,
         committeeReports: -1,
         becameLaw: false,
@@ -269,7 +306,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const discoveryState = classifyFamilyState({ becameLaw: anyLaw, houseVersions, senateVersions });
+  // Per fiscal year; the headline is the CURRENT authorization's state (see fiscalYearStates).
+  const fyStates = fiscalYearStates(families.map((f) => ({ fiscalYear: f.fiscalYear, role: f.role, chamber: f.chamber, textVersions: f.versions, becameLaw: f.becameLaw })));
+  const discoveryState = fyStates.current?.state ?? classifyFamilyState({ becameLaw: anyLaw, houseVersions, senateVersions });
 
   // Watermark comes ONLY from documents we actually parsed.
   const sourceWatermark =
@@ -285,6 +324,8 @@ export async function GET(request: NextRequest) {
       mode,
       pollOk: true,
       discoveryState,
+      currentFiscalYear: fyStates.current?.fiscalYear ?? null,
+      fiscalYearStates: fyStates.byFiscalYear,
       coverage: discovery.coverage,
       partial: partial || discovery.coverage !== 'complete',
       congress,
@@ -468,6 +509,8 @@ export async function GET(request: NextRequest) {
     pollOk: true,
     status,
     discoveryState,
+    currentFiscalYear: fyStates.current?.fiscalYear ?? null,
+    fiscalYearStates: fyStates.byFiscalYear,
     coverage: discovery.coverage,
     partial,
     congress,

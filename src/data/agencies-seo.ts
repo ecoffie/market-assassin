@@ -64,7 +64,7 @@ export const AGENCIES_SEO: AgencySeo[] = [
       "Supply chain security and resilience",
       "AI/ML integration for decision support",
       "5G and advanced communications infrastructure",
-      "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - model tampering, prompt injection, lifecycle security"
+      "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - model tampering, prompt injection, lifecycle security"
     ],
     "priorities": [
       "$6.2B allocated for hypersonic weapons development in FY2025-2026, with contracts for offensive and defensive systems open to aerospace and defense primes",
@@ -377,7 +377,7 @@ export const AGENCIES_SEO: AgencySeo[] = [
       "Nuclear security and non-proliferation",
       "Cybersecurity for energy infrastructure",
       "Environmental cleanup and remediation",
-      "FY2026 NDAA: BIOSECURE Act compliance - biotechnology research programs (if applicable)"
+      "FY2026 NDAA (enacted, PL 119-60 §851): BIOSECURE Act compliance - biotechnology research programs (if applicable)"
     ],
     "priorities": [
       "$8.4B allocated for DOE's Environmental Management program, with active contracts for nuclear waste cleanup at Hanford and Savannah River sites through FY2027",

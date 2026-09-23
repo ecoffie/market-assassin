@@ -3,7 +3,13 @@
 **Dataset:** `strategic_intelligence`
 **Instance:** `institute_legislation`
 **Discovery:** https://api.congress.gov/v3/bill
-**Cron:** `/api/cron/institute-legislation-sync` — **NOT YET ENABLED (Gate 5)**
+**Cron:** `/api/cron/institute-legislation-sync` — **ENABLED** weekly (`cron_jobs` row
+`institute-legislation-sync`, `40 13 * * 0` = Sundays 13:40 UTC, since 2026-09-20).
+**Control plane:** `PARKED / BLOCKED_CONTROLLED` (#1596, 2026-09-21) — `data_source_instances`
+`intervention_state=blocked`, `manual_action_type=credential_renewal`. The two named blockers:
+(1) `CONGRESS_API_KEY` is absent in production (it runs on `GOVINFO_API_KEY`, an api.data.gov key
+that api.congress.gov accepts); (2) the corpus reached no customer surface. See **Activation**.
+*(This line said "NOT YET ENABLED (Gate 5)" until 2026-09-22, two days after the row was enabled.)*
 
 ## What this source is
 
@@ -84,6 +90,36 @@ failed: 0     collectFailures: 0
 | `unknown_incomplete_scan` | A ceiling — absence is **not** established |
 | `evidenceUpdated` > 0 on an unchanged corpus | Investigate: something source-derived really changed, or a writer is churning a field |
 | `knownReadError` set | Corpus read failed — tracking is UNKNOWN, not empty. Do not stamp clocks |
+
+## Legal status is per VERSION, never inferred (2026-09-22)
+
+`raw.becameLaw` is a fact about the **measure** and is stamped on every version, so S.1071 *as
+introduced* carries `becameLaw: true`. Consumers must read the per-version fields instead:
+
+| field | meaning |
+|---|---|
+| `legislativeStage` | `introduced` · `reported` · `passed_chamber` · `enrolled` · `enacted` · `other` — from the version code |
+| `lawStatusAtIngestion` | `enacted` (the public law / the signed enrolled text) · `superseded_by_enactment` (an earlier version of a bill that became law — **not** law) · `not_enacted` |
+| `measureRole` | `authorization_vehicle` (the FY's NDAA) · `amends_prior_act` ("To amend the NDAA for FY1994…") · `other` |
+| `fiscalYear` / `amendsFiscalYear` | `fiscalYear` only for vehicles; an amending bill records the year it **amends** |
+
+The run's headline `discoveryState` is the **current fiscal year's** vehicle state
+(`currentFiscalYear`, `fiscalYearStates`). It previously aggregated every family and reported
+`enacted` because FY2026 became law while FY2027 was House-passed.
+
+## Health invariant (stronger than "the cron returned 200")
+
+`scripts/acceptance/poteto-ndaa-legislative-live.mts` — read-only. Reads Congress **directly**
+(text versions + committee reports of every discovered authorization vehicle) and fails unless
+Mindy holds every one with provenance, on a legislation-only clock, and not behind Congress.
+`--post` adds per-version legal status (valid after the first execute run on the new code).
+
+## FY2026 historical claims
+
+The 45 `"FY2026 NDAA: …"` strings in `src/data/agency-pain-points.json` were audited against
+PL 119-60 and S. 2296: 32 enacted (citation added), 6 misstated (corrected — e.g. the CAS
+threshold is $100M, not $35M), 6 proposed-only (SkyFoundry, S. 2296 §882) + 1 unverifiable
+(retired). Every original, its evidence and reason: `src/data/ndaa-fy26-claim-corrections.json`.
 
 ## Related
 

@@ -7,10 +7,9 @@
         "Supply chain security and resilience",
         "AI/ML integration for decision support",
         "5G and advanced communications infrastructure",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - model tampering, prompt injection, lifecycle security",
-        "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance",
-        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - domestic manufacturing capacity",
-        "FY2026 NDAA: Outbound investment controls - hypersonic technology and expanded country restrictions",
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - model tampering, prompt injection, lifecycle security",
+        "FY2026 NDAA (enacted, PL 119-60 §1513): Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance",
+        "FY2026 NDAA (enacted, PL 119-60 Title LXXXV): Outbound investment controls - hypersonic technology and expanded country restrictions",
         "JADC2 (Joint All-Domain Command and Control) - connecting sensors and shooters across all military domains",
         "Workforce recruitment and retention - competing with private sector for cyber, AI, and engineering talent",
         "Contract Management: DOD's Anthrax Vaccine Manufacturer (Source: GAO)",
@@ -81,9 +80,8 @@
         "Climate resilience and sea-level rise adaptation",
         "Base realignment and closure (BRAC) support",
         "Emergency response and disaster recovery",
-        "FY2026 NDAA: Progressive design-build contract implementation - complex facility projects",
-        "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and smart water grids",
-        "FY2026 NDAA: Renewable energy integration - solar, wind, battery storage for installations",
+        "FY2026 NDAA (enacted, PL 119-60 §2809): Progressive design-build contract implementation - complex facility projects",
+        "FY2026 NDAA (enacted, PL 119-60 §2402): Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and smart water grids",
         "Facility condition assessment technology - inspecting and prioritizing repairs across 70,000+ facilities",
         "Cybersecurity for building control systems - protecting HVAC, utilities, and physical access networks"
       ],
@@ -159,8 +157,7 @@
         "Avionics and sensor integration",
         "Training systems and simulators",
         "Aircraft carrier integration",
-        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - maritime UAS capabilities",
-        "FY2026 NDAA: Counter-UAS (C-UAS) systems for base and ship defense",
+        "FY2026 NDAA (enacted, PL 119-60 §912): Counter-UAS (C-UAS) systems for base and ship defense",
         "Propulsion system sustainment - maintaining legacy and advanced engine programs across fleet",
         "Digital engineering and model-based systems - accelerating design-to-production timelines",
         "Workforce technical skills pipeline - recruiting engineers and technicians for aviation depot work"
@@ -186,8 +183,8 @@
         "Environmental restoration and remediation (Environmental offices)",
         "Military construction and base support (MILCON offices only)",
         "Emergency response and disaster recovery (All offices)",
-        "FY2026 NDAA: Progressive design-build contract implementation - complex infrastructure projects",
-        "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and water resilience (MILCON offices)",
+        "FY2026 NDAA (enacted, PL 119-60 §2809): Progressive design-build contract implementation - complex infrastructure projects",
+        "FY2026 NDAA (enacted, PL 119-60 §2402): Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and water resilience (MILCON offices)",
         "Dam safety and rehabilitation - inspecting and repairing aging flood control infrastructure",
         "Digital project management - BIM, GIS integration, and digital twin technology for construction",
         "Permitting and regulatory compliance - streamlining Section 404 and NEPA environmental reviews"
@@ -213,8 +210,7 @@
         "Base infrastructure and facilities",
         "Training and simulation systems",
         "Supply chain and logistics optimization",
-        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - ground force UAS capabilities",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for tactical systems",
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) for tactical systems",
         "Contested logistics in Indo-Pacific - pre-positioning and sustainment under anti-access/area denial threats",
         "Workforce recruitment and retention - filling critical civilian and uniformed technical positions",
         "Autonomous systems integration - deploying robotic combat vehicles and unmanned ground systems"
@@ -265,8 +261,8 @@
         "Acquisition speed vs compliance balance - bureaucracy hampering delivery",
         "Small business participation across 115+ worldwide locations",
         "Contracting workforce retention and training at 6,100+ employee scale",
-        "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - $2M to $35M applicability",
-        "FY2026 NDAA: Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)",
+        "FY2026 NDAA (enacted, PL 119-60 §1806): Cost Accounting Standards (CAS) full-compliance threshold raised to $100M - applicability for contractors above the $100M threshold",
+        "FY2026 NDAA (enacted, PL 119-60 §1804): Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)",
         "DOD IT business systems are $4.4B over budget and years behind schedule per GAO — ACC relies on legacy ERP and procurement platforms that delay contract award timelines and require costly workarounds across 115+ locations.",
         "Other Transaction Authority (OTA) obligations surged from $1.8B (FY2016) to over $18B (FY2024), but GAO-25-107546 found DOD lacks standardized data to assess OTA effectiveness — ACC manages growing OTA portfolio without adequate tracking or performance metrics.",
         "ACC contract closeout backlog persists as the command processes 14,000+ contract actions totaling $34.2B annually — AI-assisted closeout tools are in pilot phase but not yet scaled, leaving aged contracts consuming workforce capacity."
@@ -291,8 +287,7 @@
         "Cybersecurity and IT modernization",
         "Base infrastructure and facilities",
         "Advanced training and simulation",
-        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - air force UAS capabilities",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for air and space systems",
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) for air and space systems",
         "Pilot and maintainer shortage - addressing critical workforce gaps in aviation and technical fields",
         "Collaborative Combat Aircraft (CCA) integration - autonomous wingman drone fleet development",
         "Aging infrastructure at legacy bases - $33B+ backlog in facility recapitalization"
@@ -400,8 +395,7 @@
         "Commercial space integration and partnerships",
         "Space cyber defense and resilience",
         "Accelerating fielding timelines for contested space environment",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - AI for space operations",
-        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - space-based UAS capabilities",
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - AI for space operations",
         "Space Systems Command struggles with implementing Zero Trust Architecture as mandated by OMB M-22-09, requiring specialized cybersecurity solutions to secure critical space infrastructure and meet compliance deadlines by 2024.",
         "Per GAO findings on Strategic Human Capital Management, Space Systems Command faces workforce gaps in IT and engineering talent, needing contractor support for recruitment, training, and retention strategies to build a skilled cadre for space technology development.",
         "GAO reports on IT Acquisitions highlight Space Systems Command's challenges with managing duplicative IT investments, creating a need for contractors to provide data analytics and portfolio management tools to optimize over $1B in annual IT spending.",
@@ -650,7 +644,7 @@
         "Nuclear security and non-proliferation",
         "Cybersecurity for energy infrastructure",
         "Environmental cleanup and remediation",
-        "FY2026 NDAA: BIOSECURE Act compliance - biotechnology research programs (if applicable)",
+        "FY2026 NDAA (enacted, PL 119-60 §851): BIOSECURE Act compliance - biotechnology research programs (if applicable)",
         "AI for energy grid management - deploying machine learning for load balancing and outage prediction",
         "Workforce development - training next-generation nuclear and clean energy technicians",
         "Supply chain for critical minerals - securing domestic sources of lithium, cobalt, and rare earth elements",
@@ -843,9 +837,9 @@
         "Cybersecurity for sensitive health research data",
         "Professional services for specialized biomedical research support",
         "Collaboration platforms for multi-institute research initiatives",
-        "FY2026 NDAA: BIOSECURE Act compliance - vetting biotechnology research equipment and services",
-        "FY2026 NDAA: Replacement of prohibited biotechnology systems in research laboratories",
-        "FY2026 NDAA: Alternative supplier identification for critical biotech research capabilities"
+        "FY2026 NDAA (enacted, PL 119-60 §851): BIOSECURE Act compliance - vetting biotechnology research equipment and services",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Replacement of prohibited biotechnology systems in research laboratories",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Alternative supplier identification for critical biotech research capabilities"
       ],
       "priorities": [
         "$2.5B allocated for NIH's Advanced Research Projects Agency for Health (ARPA-H) to fund high-risk, high-reward biomedical innovations, with solicitations for novel therapeutics expected in FY2025",
@@ -870,9 +864,9 @@
         "Health communications and public outreach systems",
         "Interagency data sharing - coordination with state/local health departments",
         "Supply chain for laboratory reagents and diagnostic equipment",
-        "FY2026 NDAA: BIOSECURE Act compliance - vetting laboratory equipment and diagnostic systems",
-        "FY2026 NDAA: Replacement of prohibited biotechnology equipment in diagnostic laboratories",
-        "FY2026 NDAA: Compliance monitoring and reporting for BIOSECURE Act requirements"
+        "FY2026 NDAA (enacted, PL 119-60 §851): BIOSECURE Act compliance - vetting laboratory equipment and diagnostic systems",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Replacement of prohibited biotechnology equipment in diagnostic laboratories",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Compliance monitoring and reporting for BIOSECURE Act requirements"
       ],
       "priorities": [
         "$20B allocated for BARDA and Strategic National Stockpile (SNS) for medical countermeasure stockpiling, with contracts for vaccine and therapeutic production expected in FY2025-2026",
@@ -897,9 +891,9 @@
         "Drug safety monitoring - adverse event reporting and pharmacovigilance systems",
         "Cybersecurity for regulated industry data",
         "Accelerated approval pathways - balancing speed with safety for critical therapies",
-        "FY2026 NDAA: BIOSECURE Act compliance - vetting testing equipment and regulatory systems",
-        "FY2026 NDAA: Replacement of prohibited biotechnology systems in testing laboratories",
-        "FY2026 NDAA: Risk assessment for existing biotechnology equipment and services"
+        "FY2026 NDAA (enacted, PL 119-60 §851): BIOSECURE Act compliance - vetting testing equipment and regulatory systems",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Replacement of prohibited biotechnology systems in testing laboratories",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Risk assessment for existing biotechnology equipment and services"
       ],
       "priorities": [
         "FDA allocating $500M for the Biologics Evaluation and Research (CBER) program to enhance vaccine and therapeutic development, with contracts for lab support and data analysis expected in FY2025.",
@@ -1220,9 +1214,9 @@
         "Medical readiness and training",
         "Pharmacy and supply chain management",
         "IT infrastructure modernization",
-        "FY2026 NDAA: BIOSECURE Act compliance - vetting biotechnology suppliers and equipment",
-        "FY2026 NDAA: Replacement of prohibited biotechnology systems and medical equipment",
-        "FY2026 NDAA: Alternative supplier identification for critical biotech capabilities",
+        "FY2026 NDAA (enacted, PL 119-60 §851): BIOSECURE Act compliance - vetting biotechnology suppliers and equipment",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Replacement of prohibited biotechnology systems and medical equipment",
+        "FY2026 NDAA (enacted, PL 119-60 §851): Alternative supplier identification for critical biotech capabilities",
         "Mental health and behavioral services - expanding programs for 9.6M+ military health beneficiaries",
         "Medical logistics and supply chain - pharmaceutical distribution and medical device lifecycle management",
         "Cybersecurity workforce shortages at DHA: A 2022 DoD IG report (DODIG-2022-078) highlighted that DHA lacks sufficient trained personnel to implement Zero Trust Architecture per OMB M-22-09, creating vulnerabilities in protecting health data for 9.6M beneficiaries.",
@@ -1251,8 +1245,8 @@
         "Just Enough Logistics model - reducing excess inventory while maintaining readiness",
         "$2B+ distribution center infrastructure backlog",
         "Supply chain visibility - real-time tracking across global network",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - securing 55+ AI models",
-        "FY2026 NDAA: Progressive design-build for distribution center modernization projects"
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - securing DLA AI/ML models",
+        "FY2026 NDAA (enacted, PL 119-60 §2809): Progressive design-build for distribution center modernization projects"
       ],
       "priorities": [
         "DLA allocated $1.2B for the Defense Working Capital Fund to support supply chain operations, with contracts for logistics and warehousing support expected in FY2025.",
@@ -1277,8 +1271,8 @@
         "Increased raid sizes and complex countermeasures",
         "Enhanced electronic warfare capabilities countering",
         "Command and control for multi-domain threat tracking",
-        "FY2026 NDAA: Outbound investment controls - hypersonic technology export restrictions",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - AI for threat detection",
+        "FY2026 NDAA (enacted, PL 119-60 Title LXXXV): Outbound investment controls covering hypersonic systems (restrictions on U.S. investment in countries of concern, not export controls)",
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - AI for threat detection",
         "Cybersecurity vulnerabilities in Missile Defense Agency systems, as highlighted in GAO reports on federal cybersecurity high-risk areas, requiring enhanced incident response and security framework implementation to protect critical missile defense networks.",
         "IT workforce shortages impacting the Missile Defense Agency’s ability to manage and modernize complex systems, aligning with GAO’s strategic human capital management high-risk area, creating a need for specialized training and recruitment support for IT and engineering talent."
       ],
@@ -1305,8 +1299,8 @@
         "Joint Regional Security Stacks (JRSS) deployment",
         "Defense Information Systems Network (DISN) upgrade",
         "Common IT environment consolidation across DoD",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - department-wide policy",
-        "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor compliance"
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - department-wide policy",
+        "FY2026 NDAA (enacted, PL 119-60 §1513): Procurement security framework (NIST/CMMC alignment) - contractor compliance"
       ],
       "priorities": [
         "DISA allocated $1.2B for the Defense Enterprise Office Solutions (DEOS) program to provide cloud-based collaboration tools, with ongoing contract awards through FY2025.",
@@ -1331,8 +1325,8 @@
         "Cyber vs non-cyber workload shift - reallocating resources",
         "Defense Industrial Base (DIB) collaboration and visibility",
         "Robotic process automation for contract management",
-        "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance monitoring",
-        "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - $2M to $35M applicability",
+        "FY2026 NDAA (enacted, PL 119-60 §1513): Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance monitoring",
+        "FY2026 NDAA (enacted, PL 119-60 §1806): Cost Accounting Standards (CAS) full-compliance threshold raised to $100M - applicability for contractors above the $100M threshold",
         "Zero Trust Architecture implementation challenges - DCMA struggles to meet OMB M-22-09 mandates for zero trust by 2024, requiring contractor support for identity management and network segmentation solutions.",
         "Climate change risk management for defense contracts - DCMA lacks robust frameworks to assess climate risks on contractor facilities and supply chains, needing contractor expertise to integrate resilience planning per GAO High Risk findings on federal infrastructure exposure."
       ],
@@ -1359,8 +1353,8 @@
         "Technology integration - AI and automation for fraud detection",
         "Workforce capability development - multi-talented auditor skillsets",
         "Remote auditing capabilities - accessing contractor accounting systems virtually",
-        "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - audit methodology updates for $35M threshold",
-        "FY2026 NDAA: Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)"
+        "FY2026 NDAA (enacted, PL 119-60 §1806): Cost Accounting Standards (CAS) full-compliance threshold raised to $100M - audit methodology updates for the $100M threshold",
+        "FY2026 NDAA (enacted, PL 119-60 §1804): Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)"
       ],
       "priorities": [
         "DCAA allocated $650M in FY2025 for audit support services under the Defense Contract Audit Support contract vehicle, with task orders open for bid through Q3 FY2025.",
@@ -1385,9 +1379,8 @@
         "Biotechnology advancement - human-machine interface and synthetic biology",
         "Microelectronics and semiconductors - advanced chip design for defense applications",
         "Emerging technology assessment - identifying and exploiting technological surprise",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - securing AI research programs",
-        "FY2026 NDAA: Outbound investment controls - hypersonic technology export restrictions",
-        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - advanced UAS research"
+        "FY2026 NDAA (enacted, PL 119-60 §1512): AI/ML security policy implementation (180-day mandate) - securing AI research programs",
+        "FY2026 NDAA (enacted, PL 119-60 Title LXXXV): Outbound investment controls covering hypersonic systems (restrictions on U.S. investment in countries of concern, not export controls)"
       ],
       "priorities": [
         "DARPA allocated $450M for the Microsystems Technology Office (MTO) to advance microelectronics innovation, with solicitations for novel chip designs expected in FY2025.",
