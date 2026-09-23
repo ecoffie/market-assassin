@@ -23,6 +23,7 @@ import { parseMapFilters, applyMapFilters, naicsMatchConds } from '@/lib/opportu
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
+import { multiAgency } from '@/lib/opportunities/agency-match';
 import {
   buildDiscoveryPlan, contextFor, applyOps, applyOpenPlan, applyForecastPlan,
   SAVED_SEARCH_POLICY, MAPS_POLICY, type DiscoveryPlan,
@@ -114,7 +115,11 @@ function material(o: number | null, n: number | null): boolean {
       profileOpts = { profileNaics: (prof?.naics_codes as string[]) || [], profileStates: (prof?.location_states as string[]) || [] };
     }
     const hasSurfaceScope = SCOPE_KEYS.some((k) => { const v = f[k]; return Array.isArray(v) ? v.length > 0 : !!v; }) || f.scope === 'profile';
-    const plan: DiscoveryPlan = buildDiscoveryPlan({ query: q, agency: get('agency'), hasSurfaceScope }, SAVED_SEARCH_POLICY, ctx);
+    // Canonical agency input exactly as the Maps adapters build it (Phase C): a saved multi-select ("A|B") is a
+    // list of DISTINCT buyers, ORed — never one combined buyer that must match every word at once.
+    const agencies = multiAgency(get('agency') ?? '');
+    const canonAgency = agencies.length > 1 ? agencies : agencies[0] ?? null;
+    const plan: DiscoveryPlan = buildDiscoveryPlan({ query: q, agency: canonAgency, hasSurfaceScope }, SAVED_SEARCH_POLICY, ctx);
 
     // OPEN — old = the cron exactly; canonical = saved non-query/non-agency filters + plan.
     const fOld = parseMapFilters(get, profileOpts); fOld.postedDays = fOld.postedDays || 30;
@@ -141,7 +146,7 @@ function material(o: number | null, n: number | null): boolean {
     if (h?.recompete === true && q) {
       const st = get('state') || '';
       const ro = await count('recompete_opportunities', mapsOldRecompete(q, get('naics') || '', st));
-      const rp = buildDiscoveryPlan({ query: q, naics: get('naics'), state: st || null, agency: get('agency'), hasSurfaceScope }, MAPS_POLICY, ctx);
+      const rp = buildDiscoveryPlan({ query: q, naics: get('naics'), state: st || null, agency: canonAgency, hasSurfaceScope }, MAPS_POLICY, ctx);
       const rn = await count('recompete_opportunities', (x) => applyOps(x, rp.horizons.recompete.ops));
       rc = { old: ro, canonical: rn, via: rp.horizons.recompete.via, material: material(ro, rn) };
     }
