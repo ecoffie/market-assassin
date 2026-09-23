@@ -1,6 +1,38 @@
 # Opportunity Share Attribution — the measurement contract
 
-**Frozen 2026-09-23 (POTETO).** Mindy's first-party events are the source of truth for the share
+> ## ✓ FROZEN 2026-09-23 — POTETO — Opportunity Share Attribution
+> **SHARE → CLICK → SESSION → SIGNUP → ACTIVATION → PAID**
+> Product merge: PR #1652, head `83c2fdba`, merge `e8c88086`. Production verified serving `e8c88086`.
+> Do not reopen for tidiness. Reopen only for a production defect in the chain below, a
+> mis-attribution (traffic credited to a share that did not cause it), or a privacy/security issue.
+
+## Production record (2026-09-23, getmindy.ai serving `e8c88086`)
+
+Run: `npx tsx scripts/acceptance/share-attribution-prod-smoke.mts --go` — **23/23 checks passed**.
+The run used a synthetic, clearly labelled sharer holding a real signed MI session. Its smoke rows were
+deleted afterwards (70 deleted, 0 remaining), so the live report shows only real traffic.
+
+| Stage | Production proof |
+|---|---|
+| **Share** | Authenticated share copied `https://getmindy.ai/opportunity-map?opp=1d0334b6ca824be59e69f4965cee4262&src=share&sh=5eed04e7-aa16-4940-9e13-d484601d3e7b`. The prod `listing_share` row (08:07:42Z) stores the same `share_id`, `notice_id`, `kind=opp`, `method=clipboard`, with the sharer's authenticated email. |
+| **Anonymous arrival** | A fresh anonymous browser (`anon:60b8b42b-…`) opened the link. The drawer showed that opportunity: "Next Generation One-Person Life Raft Modernization". Prod `map_view` and `listing_open` store `entry=share`, the same `share_id`, the same notice and the anon id; `map_view.ft_at` = the stored first-touch time (08:07:49.239Z). The server-side validator resolves it to the share and the sharer. |
+| **First touch** | The Map wrote `gca_attribution` (localStorage) and `gca_attr` (cookie) with `first_touch.share_id=S`. A second shared opportunity (`S2` on `164e0be6…`) in the same browser moved `last_touch` only; first touch and its timestamp stayed on S. |
+| **Non-share traffic** | Direct → `direct`, plain listing link → `listing_link`, alert → `alert`, briefing → `pursuit_brief`, saved-search → `saved_search`: none carries a share id and none is attributed. A malformed `sh` is stored as `share_invalid` with no id. A fake well-formed `sh` and a real `sh` lifted onto another opportunity do not resolve as attributed traffic. |
+| **Share Truth** | `<head>` is byte-identical with and without `src`/`sh` (crawler UA). Same title/OG/Twitter metadata, and `canonical`/`og:url` are the clean `?opp=` link. The 1200×630 card at `/opportunity-map/og/1d0334b6…` returned 200 `image/png`, 66,879 bytes, with the same sha256 with or without the params. |
+| **Funnel (live, read-only)** | During the smoke, both smoke shares appeared (1 unique visitor each; the fake and lifted controls were excluded), and every attributable share was dated on or after deploy day. After cleanup the live report is back to 0: the 94 pre-deploy shares carry no `share_id`. |
+
+**Signup → activation → paid** were proven in the pre-merge E2E (`share-attribution-e2e.mts`: local
+production build + live DB, rolled-back activation/purchase). They were deliberately **not** manufactured
+in production.
+
+**Claim coverage:** `mi-session` (Google, Microsoft, magic link), `mindy-complete-signup` (email),
+`mi-login` (password). **Activation:** save, watch/alert or pursuit within 7 days of signup, read
+from existing rows. **Known limits:** pre-deploy shares are unattributable; revenue is first purchase
+only (renewals aren't in `purchases`); GA4 on the Map is deferred.
+
+---
+
+**Contract (2026-09-23, POTETO).** Mindy's first-party events are the source of truth for the share
 growth loop. GA4 is supplemental and is **not** on `/opportunity-map` (see "GA4" below).
 
 ```
