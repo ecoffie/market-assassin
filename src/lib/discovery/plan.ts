@@ -41,8 +41,13 @@ export const FORECAST_TEXT_COLS = ['title', 'naics_description', 'department', '
 
 export interface DiscoveryInput {
   query: string;
-  /** Explicit buyer (MCP `agency`, Maps agency filter). */
-  agency?: string | null;
+  /**
+   * Explicit buyer(s). MCP sends one string; the Maps agency multi-select sends a list of DISTINCT
+   * buyers. Each element resolves independently through resolveBuyer and the buyers are ORed —
+   * the same OR the plan already applies between the explicit agency and agencies named in the
+   * query text. A single string takes exactly the pre-array code path (golden plans unchanged).
+   */
+  agency?: string | string[] | null;
   state?: string | null;
   setAside?: string | null;
   /** Advanced overrides (MCP advanced.naics / advanced.psc). */
@@ -142,7 +147,10 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   if (residualIntent.kind === 'psc' && residualIntent.psc) si.psc.push(residualIntent.psc);
   const keywordText = residualIntent.kind === 'keyword' ? si.residual : '';
 
-  const buyers = uniq([...(input.agency ? [String(input.agency).trim()] : []), ...si.agencies.map((a) => a.resolveAs)]).map(resolveBuyer);
+  const explicitAgencies = Array.isArray(input.agency)
+    ? input.agency.map((a) => String(a ?? '').trim()).filter(Boolean)
+    : input.agency ? [String(input.agency).trim()] : [];
+  const buyers = uniq([...explicitAgencies, ...si.agencies.map((a) => a.resolveAs)]).map(resolveBuyer);
   const states = uniq([
     ...(input.state ? split(input.state).map((s) => normalizeStateCode(s) || s.toUpperCase()) : []),
     ...si.states,

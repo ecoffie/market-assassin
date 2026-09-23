@@ -2,6 +2,7 @@
  * READ-ONLY. Replays old vs canonical discovery semantics against the live corpus.
  *
  *   npx tsx --env-file=.env.local scripts/discovery-replay.ts [--json out.json] [--rank "query"]
+ *   npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-open [--json out.json]   (Phase C: old vs production Maps Open adapter)
  *
  * Per fixture × horizon: Maps-old count, MCP-old count, canonical count (MCP policy), ID overlap
  * against Maps-old, and samples of old-only / new-only records. `--rank "<q>"` prints the canonical
@@ -28,6 +29,8 @@ import {
   buildDiscoveryPlan, contextFor, applyOpenPlan, applyRecompetePlan, applyForecastPlan, rankRecords,
   MCP_POLICY, type DiscoveryInput, type DiscoveryPlan,
 } from '@/lib/discovery';
+import { mapsOpenRequest, applyMapsOpenFilters } from '@/lib/opportunities/maps-open-discovery';
+import { MAPS_OPEN_FIXTURES, MAPS_OPEN_CLASSES } from './discovery-replay-maps-open';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -38,12 +41,14 @@ const rankQ = argVal('--rank');
 const ctx = contextFor();
 const ID_CAP = 25000;
 
-const FIX: Array<{ label: string; input: DiscoveryInput }> = ([] as Array<{ label: string; input: DiscoveryInput }>).concat([
+/** The all-horizon replay predates multi-agency input; its fixtures carry one agency string. */
+type ReplayInput = Omit<DiscoveryInput, 'agency'> & { agency?: string | null };
+const FIX: Array<{ label: string; input: ReplayInput }> = ([] as Array<{ label: string; input: ReplayInput }>).concat([
   '541320', 'pam', 'ai governance', 'artificial intelligence governance', 'cybersecurity', 'janitorial',
   'market research', 'zzzxxyyqqq', 'Show me USDA opportunities', 'SDVOSB cybersecurity opportunities in Virginia',
   'cyber cloud compliance network server', 'Pro Audio', '541512 -computers', '-computers',
   'veterans affairs', 'Naval facilities in Nevada',
-].map((q) => ({ label: q, input: { query: q } as DiscoveryInput })))
+].map((q) => ({ label: q, input: { query: q } as ReplayInput })))
   .concat([
     { label: 'agency=USDA (collision)', input: { query: '', agency: 'USDA' } },
     { label: 'agency=VA (collision)', input: { query: '', agency: 'VA' } },
@@ -73,8 +78,8 @@ async function labels(src: Src, ids: string[]) {
 }
 
 // ── old Maps semantics (@2574fe8d) ─────────────────────────────────────────────────────────
-const mapsOldOpen = (i: DiscoveryInput) => (x: any) => applyMapFilters(x, parseMapFilters((k) => (k === 'q' ? i.query || null : k === 'agency' ? i.agency || null : k === 'status' ? 'active' : null)));
-function mapsOldRecompete(i: DiscoveryInput) {
+const mapsOldOpen = (i: ReplayInput) => (x: any) => applyMapFilters(x, parseMapFilters((k) => (k === 'q' ? i.query || null : k === 'agency' ? i.agency || null : k === 'status' ? 'active' : null)));
+function mapsOldRecompete(i: ReplayInput) {
   const q = i.query || '';
   let naics = ''; let kw = ''; let sa = '';
   if (q) {
@@ -93,7 +98,7 @@ function mapsOldRecompete(i: DiscoveryInput) {
     return r;
   };
 }
-const mapsOldForecast = (i: DiscoveryInput) => (x: any) => applyForecastFilters(x, { q: i.query || null, naics: null, agency: i.agency || null, state: null });
+const mapsOldForecast = (i: ReplayInput) => (x: any) => applyForecastFilters(x, { q: i.query || null, naics: null, agency: i.agency || null, state: null });
 
 function diff(a: Set<string>, b: Set<string>) {
   const onlyA: string[] = []; const onlyB: string[] = []; let both = 0;
@@ -133,7 +138,59 @@ async function rankReport(q: string) {
   console.log('canonical breadth distribution (concepts matched → records):', JSON.stringify(breadth));
 }
 
+// ── --maps-open: Phase C. old = Maps Open @ 15eef4c9 (parseMapFilters → applyMapFilters with q/agency),
+//    new = the PRODUCTION adapter the route now calls. Full active corpus AND the mappable subset.
+//    Exits 1 on any material change without a classification in discovery-replay-maps-open.ts. ──
+async function countRetry(build: (q: any) => any, mappable: boolean) {
+  for (let i = 0; i < 3; i++) {
+    let q = db.from('sam_opportunities').select('notice_id', { count: 'exact', head: true });
+    if (mappable) q = q.not('map_lat', 'is', null);
+    const t0 = Date.now();
+    const { count, error } = await build(q);
+    if (!error && count != null) return { count, ms: Date.now() - t0, attempts: i + 1, error: null as string | null };
+    if (i === 2) return { count: null as number | null, ms: Date.now() - t0, attempts: 3, error: error?.message || 'count null (unknown)' };
+  }
+  return { count: null, ms: 0, attempts: 3, error: 'unreachable' };
+}
+async function mapsOpenReplay() {
+  const out: any[] = [];
+  let unclassified = 0;
+  for (const fx of MAPS_OPEN_FIXTURES) {
+    const get = (k: string) => (k === 'status' ? 'active' : fx.params[k] ?? null);
+    const oldB = (x: any) => applyMapFilters(x, parseMapFilters(get));
+    const req = mapsOpenRequest(get);
+    const newB = (x: any) => applyMapsOpenFilters(x, req);
+    const [o, n] = await Promise.all([idSet(OPEN, oldB), idSet(OPEN, newB)]);
+    const [om, nm] = await Promise.all([countRetry(oldB, true), countRetry(newB, true)]);
+    const d = diff(o.ids, n.ids);
+    const material = o.count !== n.count || d.onlyA.length > 0 || d.onlyB.length > 0;
+    const cls = MAPS_OPEN_CLASSES[fx.label];
+    if (material && !cls) unclassified++;
+    out.push({
+      label: fx.label, params: fx.params, status: req.plan.status, via: req.plan.horizons.open.via,
+      all: { old: o.count, new: n.count, overlap: d.both, old_only: d.onlyA.length, new_only: d.onlyB.length },
+      mapped: { old: om.count, new: nm.count, old_ms: om.ms, new_ms: nm.ms, errors: [om.error, n.error, o.error, nm.error].filter(Boolean) },
+      old_only_sample: await labels(OPEN, d.onlyA), new_only_sample: await labels(OPEN, d.onlyB),
+      class: material ? cls?.cls ?? 'UNCLASSIFIED' : 'unchanged', evidence: material ? cls?.why ?? '' : '',
+      truncated: o.truncated || n.truncated,
+    });
+    console.error(`done ${fx.label}: all ${o.count}→${n.count} mapped ${om.count}→${nm.count}`);
+  }
+  if (jsonOut) writeFileSync(jsonOut, JSON.stringify(out, null, 2));
+  const fmt = (x: number | null | undefined) => (x == null ? 'unknown' : x.toLocaleString());
+  console.log('| fixture | status | all old→new | ∩ | old-only | new-only | mappable old→new | class | evidence |');
+  console.log('|---|---|---|---|---|---|---|---|---|');
+  for (const r of out) {
+    console.log(`| ${r.label} | ${r.status}${r.status === 'ok' ? '' : ''} | ${fmt(r.all.old)} → ${fmt(r.all.new)} | ${fmt(r.all.overlap)} | ${fmt(r.all.old_only)} | ${fmt(r.all.new_only)} | ${fmt(r.mapped.old)} → ${fmt(r.mapped.new)} | ${r.class} | ${r.evidence}${r.mapped.errors.length ? ' ⚠️ ' + r.mapped.errors.join('; ') : ''}${r.truncated ? ' (ID set truncated)' : ''} |`);
+  }
+  const by: Record<string, number> = {};
+  for (const r of out) by[r.class] = (by[r.class] || 0) + 1;
+  console.log(`\n${out.length} fixtures · ${Object.entries(by).map(([k, v]) => `${v} ${k}`).join(' · ')}`);
+  if (unclassified || by.unexpected_regression) { console.error(`FAIL: ${unclassified} unclassified, ${by.unexpected_regression || 0} unexpected_regression`); process.exit(1); }
+}
+
 (async () => {
+  if (args.includes('--maps-open')) { await mapsOpenReplay(); return; }
   if (rankQ) { await rankReport(rankQ); return; }
   const out: any[] = [];
   for (const f of FIX) {

@@ -20,7 +20,8 @@ import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS,
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
-import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
+import { multiVal } from '@/lib/opportunities/map-filters';
+import { mapsOpenRequest, applyMapsOpenFilters, mapsOpenDiscoveryMeta } from '@/lib/opportunities/maps-open-discovery';
 import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/canonical-listing';
 import { decorateWithEarlySignal, filterByEarlySignal, dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
@@ -61,11 +62,10 @@ function wantSbirSources(raw: string | null): boolean {
   return s.includes('sbir') || s === 'all';
 }
 
-// Filter type + logic live in a SHARED lib so this API and the saved-search alert cron
-// filter identically (a saved search re-runs exactly what the user saw).
-type Filters = MapFilters;
-const multi = multiVal;
-const applyFilters = applyMapFilters;
+// Query MEANING (text, agency, query-named codes/set-asides/states, exclusions) comes from the
+// canonical discovery plan; every other filter is Maps surface policy applied by the shared
+// applyMapFilters with the plan-owned keys blanked. One adapter, used by all three Open paths.
+// (Phase C, 2026-09-22 — src/lib/opportunities/maps-open-discovery.ts.)
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toPin(r: Record<string, any>) {
@@ -189,10 +189,10 @@ export async function GET(request: NextRequest) {
     if (email) { const prof = await loadProfile(email); profileNaics = prof.naics; profileStates = prof.states; }
   }
 
-  // Use the SHARED parser (map-filters.ts) so this API and the saved-search cron never
-  // drift — the whole point of the shared lib. (This block used to duplicate it, which is
-  // exactly how the 4 new filters went missing here.)
-  const f: Filters = parseMapFilters((k) => p.get(k), { profileNaics, profileStates });
+  // ONE canonical plan for this request; the headline count, unmapped count and viewport pins
+  // below all apply it through applyMapsOpenFilters, so they can never interpret the query apart.
+  const openReq = mapsOpenRequest((k) => p.get(k), { profileNaics, profileStates });
+  const applyFilters = (q: any) => applyMapsOpenFilters(q, openReq); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   try {
     const db = sb();
@@ -217,10 +217,10 @@ export async function GET(request: NextRequest) {
     // The first page carries `count: 'exact'` for the filtered set, so ONE round-trip tells us how
     // many pages exist; the rest are fetched concurrently. Same rows, same order, same key.
     //
-    // ⚠️ Deliberately still PostgREST + the shared applyFilters + countDistinctListings, NOT a
-    // hand-written SQL RPC. applyMapFilters is the ONE filter builder shared with the viewport
-    // query and saved-search alerts; re-expressing those predicates in SQL would fork the
-    // definition of "what matches" and drift (the exact class the filters oracle guards).
+    // ⚠️ Deliberately still PostgREST + applyFilters (the canonical-plan adapter) + countDistinctListings,
+    // NOT a hand-written SQL RPC. The same adapter builds the viewport query; re-expressing those
+    // predicates in SQL would fork the definition of "what matches" and drift (the exact class the
+    // filters oracle and the cross-surface discovery gate guard).
     async function countUniqueListingsForFilters(): Promise<number> {
       const PAGE = 1000;
       const pageQuery = (from: number, withCount: boolean) => {
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
           .not('map_lat', 'is', null)
           .order('notice_id', { ascending: true })
           .range(from, from + PAGE - 1);
-        q = applyFilters(q, f);
+        q = applyFilters(q);
         return q;
       };
 
@@ -287,7 +287,7 @@ export async function GET(request: NextRequest) {
       let q = db.from('sam_opportunities')
         .select('notice_id', { count: 'exact', head: true })
         .is('map_lat', null);
-      q = applyFilters(q, f);
+      q = applyFilters(q);
       const { count, error } = await q;
       if (error) { console.error('[opportunity-map] unmapped count failed:', error.message); return null; }
       return count ?? null;
@@ -303,7 +303,7 @@ export async function GET(request: NextRequest) {
             .gte('map_lng', west).lte('map_lng', east)
             .order('response_deadline', { ascending: true })
             .limit(MAX_PINS);
-          viewQ = applyFilters(viewQ, f);
+          viewQ = applyFilters(viewQ);
           return Promise.all([totalP, viewQ, unmappedP]);
         })()
       : Promise.resolve([0, { data: [], count: 0, error: null }, 0] as const);
@@ -453,6 +453,9 @@ export async function GET(request: NextRequest) {
       : { SAM: pins.length, DLA: dlaPins.length, SBIR: sbirPins.length };
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
+      // Canonical discovery status for the Open query. needs_positive_scope / needs_refinement mean
+      // "not a searchable market yet" — the SAM counts are then 0 by construction, not market truth.
+      discovery: mapsOpenDiscoveryMeta(openReq.plan),
       totalForFilters: earlyFiltered ? merged.length : headlineTotal,
       // In-view total = the UNIQUE listings we actually return (pins is already deduped) + DLA + SBIR,
       // NOT the raw pre-dedupe viewport count — so "N in view" matches the rendered rail/pins.
