@@ -1941,8 +1941,14 @@ const VIEWPORT_JS = `<script>
   //   unavailable — discovery.coverage 'unestablished': no forecast publisher for any requested buyer
   //   unknown     — the count itself could not be established (null) — Bug Prevention Rule #11
   // This used to be total:d.totalForFilters||0, which printed "0" for an unavailable Forecast.
+  //   needs_scope — discovery.status needs_positive_scope / needs_refinement: the QUERY cannot
+  //                 define a market (e.g. "-computers" alone — an exclusion with nothing to
+  //                 exclude it FROM). Nothing was searched, so there is no count at all; the
+  //                 server's refinement text is what the user sees, never "0 results".
   function horizonCount(d){
     var disc=(d&&d.discovery)||{};
+    if(disc.status==='needs_positive_scope'||disc.status==='needs_refinement')
+      return {total:null,state:'needs_scope',status:disc.status,refinement:String(disc.refinement||''),gaps:[]};
     var gaps=(disc.coverage_gaps||[]).map(function(g){return g&&g.requested;}).filter(Boolean);
     if(disc.coverage==='unestablished') return {total:null,state:'unavailable',gaps:gaps};
     if(!d||typeof d.totalForFilters!=='number') return {total:null,state:'unknown',gaps:gaps};
@@ -1951,6 +1957,7 @@ const VIEWPORT_JS = `<script>
   // Short label for a horizon count (Horizons dropdown). Never '0' for unavailable/unknown.
   function horizonCountLabel(c,fmt){
     if(!c) return '';
+    if(c.state==='needs_scope') return '\u2014';
     if(c.state==='unavailable') return 'n/a';
     if(c.state==='unknown') return '?';
     return fmt(c.total)+(c.state==='partial'?'*':'');
@@ -1960,6 +1967,7 @@ const VIEWPORT_JS = `<script>
     var out=[];
     ['open','recompete','forecast'].forEach(function(h){
       var c=counts&&counts[h]; if(!c) return;
+      if(c.state==='needs_scope') return;   // not a coverage fact — rendered by needsScopeNote()
       var name=h==='forecast'?'Forecasts':(h==='recompete'?'Recompetes':'Open');
       var who=c.gaps&&c.gaps.length?' for '+c.gaps.join(', '):'';
       if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
@@ -1967,6 +1975,16 @@ const VIEWPORT_JS = `<script>
       else if(c.state==='unknown') out.push(name+' count unavailable');
     });
     return out.join(' · ');
+  }
+  // The refinement the canonical plan returned, when EVERY enabled horizon says the query cannot
+  // define a market; '' otherwise. One plan drives all three horizons, so they agree — the first
+  // non-empty refinement is THE message. A fallback sentence covers an older server with no text.
+  function needsScopeNote(counts,enabled){
+    var en=(enabled||[]).filter(function(h){ return counts&&counts[h]; });
+    if(!en.length||en.length!==(enabled||[]).length)return '';
+    if(!en.every(function(h){ return counts[h].state==='needs_scope'; }))return '';
+    for(var i=0;i<en.length;i++){ var r=counts[en[i]].refinement; if(r)return r; }
+    return 'This search only says what to leave out. Add what you do sell \u2014 a capability, NAICS, agency or state.';
   }
   function updateHeader(){
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
@@ -1983,6 +2001,15 @@ const VIEWPORT_JS = `<script>
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     // Every enabled horizon UNAVAILABLE (e.g. Forecast only, agency=NOAA): say so — never "0 results",
     // and never keep a stale prior count either.
+    // NEEDS A POSITIVE SCOPE (canonical discovery decision 5): an exclusion-only query ("-computers")
+    // searched nothing. Say what to add — never "0 results", never a stale prior count.
+    if(window.__needsScope){
+      var _rcN=document.getElementById('rescount');
+      // Short on the sort row; the feed below carries the server's full refinement sentence.
+      if(_rcN){ _rcN.innerHTML='<span style="font-weight:700;color:var(--ink)">Nothing searched yet</span> <span style="font-weight:400;color:var(--sub)">\\u00b7 add what you sell</span>'; }
+      var _mcN=document.getElementById('mapCount'); if(_mcN)_mcN.hidden=true;
+      return;
+    }
     if(window.__coverageAllUnavailable){
       var _rc=document.getElementById('rescount');
       if(_rc)_rc.innerHTML='<span style="font-weight:700;color:var(--ink)">Unavailable</span> <span style="font-weight:400;color:var(--sub)">'+esc(window.__coverageNote||'')+'</span>';
@@ -2628,6 +2655,9 @@ const VIEWPORT_JS = `<script>
       // Coverage: every enabled horizon unavailable → the empty feed/header must say so, never "0".
       window.__coverageNote=coverageNote(window.__horizonCounts);
       window.__coverageAllUnavailable=_enabled.length>0 && _enabled.every(function(k){ var c=window.__horizonCounts[k]; return c&&c.state==='unavailable'; });
+      // A query that cannot define a market (needs_positive_scope / needs_refinement) → the feed and
+      // header show the refinement text, never an empty map that reads as "0 results".
+      window.__needsScope=needsScopeNote(window.__horizonCounts,_enabled);
       // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
       // could not be established; the line says so rather than implying everything is mapped.
       window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
@@ -9365,6 +9395,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
       .then(function(d){
         if(!d||!d.success||!d.total) return;
         if(!panel || !panel.isConnected) return;
+        if((input.value||'').trim()!==q) return;   // never a stale query's count (see needs-positive-scope test)
         var b=document.createElement('button');
         b.className='zsp-row zsp-unplaced';
         b.setAttribute('data-act','unplaced');
