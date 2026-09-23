@@ -543,29 +543,24 @@ export async function sendAccessCodeEmail({
       <span class="brand-govcon">GovCon</span><span class="brand-giants">Giants</span>
     </div>
 
-    <h1>Your Report Access is Ready!</h1>
+    <h1>Your Market Research Access is Ready!</h1>
     <p class="subtitle">Thank you for your purchase${companyName ? `, ${companyName}` : ''}!</p>
 
     <div class="access-box">
-      <p style="margin: 0 0 10px 0; color: #1e40af; font-weight: 600;">Your One-Time Access Code:</p>
-      <div class="access-code">${accessCode}</div>
-      <br><br>
-      <a href="${accessLink}" class="cta-button">Access Your Report Now</a>
-    </div>
-
-    <div class="warning">
-      <div class="warning-title">⚠️ Important: One-Time Use Only</div>
-      <div class="warning-text">This access link can only be used once. Make sure to download and save your report before leaving the page.</div>
+      <p style="margin: 0 0 10px 0; color: #1e40af; font-weight: 600;">Market Assassin now lives in Mindy — sign in with this email (${to}) to open Market Research. Use it as often as you like; your access stays on your account.</p>
+      <p style="margin: 0 0 10px 0; color: #64748b; font-size: 13px;">Reference for your records: ${accessCode}</p>
+      <br>
+      <a href="${accessLink}" class="cta-button">Open Market Research</a>
     </div>
 
     <div class="steps">
-      <h3>How to Get Your Report:</h3>
+      <h3>How to Run Your Reports:</h3>
       <ol>
         <li>Click the button above or copy this link: ${accessLink}</li>
+        <li>Sign in with ${to}</li>
         <li>Enter your business information (NAICS code, location, etc.)</li>
         <li>Select the government agencies you want to target</li>
-        <li>Generate and download your personalized report</li>
-        <li><strong>Click "Print All (PDF)"</strong> to save a permanent copy of your report</li>
+        <li>Generate your reports — export or print to save a copy</li>
       </ol>
     </div>
 
@@ -600,9 +595,9 @@ export async function sendAccessCodeEmail({
 
   return sendEmail({
     to,
-    subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
+    subject: 'Your Market Research Access in Mindy | GovCon Giants',
     html: htmlContent,
-    text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nHow to Get Your Report:\n1. Click the link above\n2. Enter your business information (NAICS code, location, etc.)\n3. Select the government agencies you want to target\n4. Generate and download your personalized report\n5. Click "Print All (PDF)" to save a permanent copy\n\nWATCH THE TUTORIAL\nLearn how to get the most out of your report:\nhttps://vimeo.com/1150857756?fl=tl&fe=ec\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
+    text: `Your Market Research Access is Ready\n\nThank you for your purchase!\n\nMarket Assassin now lives in Mindy. Sign in with this email (${to}) to open Market Research — use it as often as you like; your access stays on your account.\n\nOpen Market Research: ${accessLink}\n\nReference for your records: ${accessCode}\n\nHow to Run Your Reports:\n1. Click the link above\n2. Sign in with ${to}\n3. Enter your business information (NAICS code, location, etc.)\n4. Select the government agencies you want to target\n5. Generate your reports — export or print to save a copy\n\nWATCH THE TUTORIAL\nLearn how to get the most out of your report:\nhttps://vimeo.com/1150857756?fl=tl&fe=ec\n\n- GovCon Giants Team`,
     emailType: 'access_code',
     eventSource: 'stripe-webhook',
     transactional: true,
@@ -614,7 +609,8 @@ export async function sendOpportunityHunterProEmail({
   to,
   customerName,
 }: SendOpportunityHunterProEmailParams): Promise<boolean> {
-  const accessLink = 'https://getmindy.ai/opportunity-hunter';
+  // Opportunity Hunter is retired into Mindy Market Research (legacy-routes.ts); `ospro:` is Pro.
+  const accessLink = workspaceUrl({ panel: 'research', email: to, absolute: true });
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
@@ -656,7 +652,7 @@ export async function sendOpportunityHunterProEmail({
       <h3 style="color: #166534; margin: 0 0 10px 0;">💡 How to Access:</h3>
       <ol style="color: #15803d; margin: 0; padding-left: 20px;">
         <li>Go to <a href="${accessLink}" style="color: #166534;">${accessLink}</a></li>
-        <li>Click "I Have Access" and enter your email: <strong>${to}</strong></li>
+        <li>Sign in to Mindy with your email: <strong>${to}</strong></li>
         <li>Start discovering agencies that buy what you sell!</li>
       </ol>
     </div>
@@ -709,7 +705,7 @@ Your Pro Features:
 
 How to Access:
 1. Go to ${accessLink}
-2. Click "I Have Access" and enter your email: ${to}
+2. Sign in to Mindy with your email: ${to}
 3. Start discovering agencies that buy what you sell!
 
 Your registered email: ${to}
@@ -1092,7 +1088,8 @@ export async function sendRecompeteEmail({
   to,
   customerName,
 }: SendRecompeteEmailParams): Promise<boolean> {
-  const accessLink = 'https://getmindy.ai/recompete';
+  // The Recompete Tracker is retired into Mindy's Recompetes panel; `recompete:` is Pro.
+  const accessLink = workspaceUrl({ panel: 'recompetes', email: to, absolute: true });
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
@@ -1135,7 +1132,7 @@ export async function sendRecompeteEmail({
       <h3 style="color: #166534; margin: 0 0 10px 0;">💡 How to Access:</h3>
       <ol style="color: #15803d; margin: 0; padding-left: 20px;">
         <li>Go to <a href="${accessLink}" style="color: #166534;">${accessLink}</a></li>
-        <li>Click "I Have Access" and enter your email: <strong>${to}</strong></li>
+        <li>Sign in to Mindy with your email: <strong>${to}</strong></li>
         <li>Use filters to find contracts in your NAICS codes</li>
         <li>Click any contract to see details and incumbent info</li>
       </ol>
@@ -1190,7 +1187,7 @@ What You Can Do:
 
 How to Access:
 1. Go to ${accessLink}
-2. Click "I Have Access" and enter your email: ${to}
+2. Sign in to Mindy with your email: ${to}
 3. Use filters to find contracts in your NAICS codes
 4. Click any contract to see details and incumbent info
 
@@ -1226,7 +1223,7 @@ export async function sendBundleEmail({
     'starter': {
       name: 'GovCon Starter Bundle',
       tools: [
-        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Opportunity Hunter Pro', link: workspaceUrl({ panel: 'research', absolute: true }), description: 'Find agencies that buy what you sell' },
         { name: 'Recompete Tracker', link: workspaceUrl({ panel: 'recompetes', absolute: true }), description: '6,900+ expiring contracts to pursue' },
         { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
       ],
@@ -1234,7 +1231,7 @@ export async function sendBundleEmail({
     'govcon-starter-bundle': {
       name: 'GovCon Starter Bundle',
       tools: [
-        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Opportunity Hunter Pro', link: workspaceUrl({ panel: 'research', absolute: true }), description: 'Find agencies that buy what you sell' },
         { name: 'Recompete Tracker', link: workspaceUrl({ panel: 'recompetes', absolute: true }), description: '6,900+ expiring contracts to pursue' },
         { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
       ],
@@ -1266,7 +1263,7 @@ export async function sendBundleEmail({
         { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
         { name: 'Recompete Tracker', link: workspaceUrl({ panel: 'recompetes', absolute: true }), description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: workspaceUrl({ panel: 'research', absolute: true }), description: 'All 8 strategic intelligence reports' },
-        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Opportunity Hunter Pro', link: workspaceUrl({ panel: 'research', absolute: true }), description: 'Find agencies that buy what you sell' },
         { name: 'Mindy AI - Lifetime Access', link: workspaceUrl({ email: to, absolute: true }), description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
@@ -1277,7 +1274,7 @@ export async function sendBundleEmail({
         { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
         { name: 'Recompete Tracker', link: workspaceUrl({ panel: 'recompetes', absolute: true }), description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: workspaceUrl({ panel: 'research', absolute: true }), description: 'All 8 strategic intelligence reports' },
-        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Opportunity Hunter Pro', link: workspaceUrl({ panel: 'research', absolute: true }), description: 'Find agencies that buy what you sell' },
         { name: 'Mindy AI - Lifetime Access', link: workspaceUrl({ email: to, absolute: true }), description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
@@ -1666,10 +1663,10 @@ export async function sendAlertProWelcomeEmail({
   customerName,
 }: SendAlertProWelcomeEmailParams): Promise<boolean> {
   const preferencesLink = await createSecureAccessUrl(to, 'preferences');
-  // Market Assassin is retired as a standalone product. This block is an UPSELL (Alert Pro
-  // is not a Pro grant in verifyMIAccess), so it points at the Mindy sales page rather than
-  // the retired `/market-assassin`. Paid welcome/access emails link /app directly.
-  const maLink = 'https://getmindy.ai/market-intelligence';
+  // Alert Pro is retired into Mindy. Its webhook ALSO writes `ospro:`, which verifyMIAccess
+  // counts as Pro — so an Alert Pro subscriber already has the /app workspace. Send them there,
+  // not to a pricing page (the earlier comment here said the opposite and was wrong).
+  const maLink = workspaceUrl({ panel: 'research', email: to, absolute: true });
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1707,9 +1704,9 @@ export async function sendAlertProWelcomeEmail({
     </div>
 
     <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 1px solid #fca5a5; border-radius: 8px; padding: 18px; margin: 24px 0;">
-      <h4 style="color: #991b1b; margin: 0 0 10px 0;">🎯 Ready to Win? Try Mindy</h4>
-      <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 14px;">Finding opportunities is step one. Mindy shows you how to win them with agency intelligence, competitor analysis, and market research.</p>
-      <a href="${maLink}" style="background: #dc2626; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 14px;">Explore Mindy →</a>
+      <h4 style="color: #991b1b; margin: 0 0 10px 0;">🎯 Your Mindy workspace is included</h4>
+      <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 14px;">Sign in with ${to} to use Market Research — agency intelligence, competitor analysis, and market maps — alongside your daily alerts.</p>
+      <a href="${maLink}" style="background: #dc2626; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 14px;">Open Mindy →</a>
     </div>
 
     <p style="background: #f1f5f9; border-radius: 8px; padding: 14px; color: #475569; font-size: 14px;">
@@ -1748,8 +1745,8 @@ Your Alert Pro Benefits:
 
 Manage your preferences: ${preferencesLink}
 
-Ready to Win? Try Market Assassin:
-Finding opportunities is step one. Market Assassin shows you exactly how to win them.
+Your Mindy workspace is included:
+Sign in with ${to} to use Market Research alongside your daily alerts.
 ${maLink}
 
 Your email: ${to}

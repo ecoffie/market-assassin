@@ -41,7 +41,7 @@ export default async function PscPage({ params }: { params: Promise<{ code: stri
       total={total}
       opps={opps}
       crossLinks={[
-        { href: '/opportunity-hunter', label: 'Browse all opportunities →' },
+        { href: '/opportunity-map', label: 'Browse all opportunities →' },
         { href: '/naics', label: 'Browse by NAICS →' },
         { href: '/forecasts', label: 'Agency forecasts →' },
       ]}

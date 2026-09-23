@@ -15,7 +15,8 @@ import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rat
 import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
-import { getMarketAssassinTier } from '@/lib/access-codes';
+import { getMarketAssassinTier, validateAccessCode, markCodeAsUsed } from '@/lib/access-codes';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
 
 // Free reports available to all users (4 reports)
@@ -113,7 +114,7 @@ async function buildFallbackAgencyData(selectedAgencies: string[]): Promise<Agen
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inputs, selectedAgencies, selectedAgencyData, userEmail }: { inputs: CoreInputs; selectedAgencies: string[]; selectedAgencyData?: Agency[]; userEmail?: string } = body;
+    const { inputs, selectedAgencies, selectedAgencyData, userEmail, redeemCode }: { inputs: CoreInputs; selectedAgencies: string[]; selectedAgencyData?: Agency[]; userEmail?: string; redeemCode?: string } = body;
 
     // Input validation
     const validation = validateReportInputs(body);
@@ -153,7 +154,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Track the access tier for filtering reports later
-    const accessTier: MIAccessTier = auth.tier;
+    let accessTier: MIAccessTier = auth.tier;
+
+    // SINGLE-USE REPORT CREDIT (legacy /access/<code>, retired into Mindy 2026-09-23).
+    // A code is ONE full report run, bound to the email it was issued to. It is honoured only
+    // for that email AND a verified Mindy session (the unverified body email is not enough),
+    // and it is consumed server-side after the report is built — the old page marked it used
+    // from the client after a request that could fail. An invalid/used code changes nothing.
+    let creditToConsume: string | null = null;
+    let redeem: { ok: boolean; reason?: string } | undefined;
+    if (redeemCode && typeof redeemCode === 'string') {
+      const code = redeemCode.trim().toUpperCase();
+      const v = await validateAccessCode(code);
+      const session = email ? requireMIAuthSession(request, email) : null;
+      if (!v.valid || !v.accessCode) redeem = { ok: false, reason: v.error || 'invalid code' };
+      else if (!email || v.accessCode.email.toLowerCase() !== email) redeem = { ok: false, reason: 'code belongs to a different account' };
+      else if (!session?.ok) redeem = { ok: false, reason: 'sign in to Mindy to redeem' };
+      else {
+        redeem = { ok: true };
+        creditToConsume = code;
+        if (accessTier === 'free') accessTier = 'pro';
+      }
+    }
 
     // Check if user is blocked for abuse
     if (email && await isUserBlocked(email)) {
@@ -1024,10 +1046,21 @@ export async function POST(request: NextRequest) {
       }).catch(() => { /* never break the report on telemetry */ });
     }
 
+    // Consume the credit only once the report exists. If this fails, surface it rather than
+    // silently leaving a spent credit reusable.
+    if (creditToConsume) {
+      const consumed = await markCodeAsUsed(creditToConsume).catch((err) => {
+        console.error('[generate-all] could not mark report credit used', err);
+        return false;
+      });
+      redeem = { ok: consumed, reason: consumed ? undefined : 'report built; credit could not be marked used' };
+    }
+
     return NextResponse.json({
       success: true,
       report: filteredReport,
       accessTier, // Let client know what tier they have
+      ...(redeem ? { redeem } : {}),
     });
   } catch (error) {
     // Log detailed error for debugging

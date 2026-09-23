@@ -1,236 +1,42 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-export default function RecompeteLockedPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [hasAccess, setHasAccess] = useState(false);
-  const [accessMethod, setAccessMethod] = useState<'email' | 'password'>('email');
-  const [accessEmail, setAccessEmail] = useState('');
-
-  // Check for cached access on mount
-  useEffect(() => {
-    const cached = localStorage.getItem('recompeteAccess');
-    if (cached) {
-      try {
-        const data = JSON.parse(cached);
-        if (data.hasAccess && data.expiresAt > Date.now()) {
-          setHasAccess(true);
-          if (data.email) setAccessEmail(data.email);
-        }
-      } catch {
-        // Invalid cache, ignore
-      }
-    }
-  }, []);
-
-  // Listen for logout postMessage from iframe
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'recompete-logout') {
-        handleLogout();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('recompeteAccess');
-    setHasAccess(false);
-    setAccessEmail('');
-  };
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/verify-recompete-access', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Cache access for 30 days
-        localStorage.setItem('recompeteAccess', JSON.stringify({
-          hasAccess: true,
-          email: email.toLowerCase(),
-          expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
-        }));
-        setHasAccess(true);
-      } else {
-        setError(data.error || 'No access found for this email');
-      }
-    } catch {
-      setError('Failed to verify access');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/verify-recompete-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Cache access for 30 days
-        localStorage.setItem('recompeteAccess', JSON.stringify({
-          hasAccess: true,
-          expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
-        }));
-        setHasAccess(true);
-      } else {
-        setError(data.error || 'Invalid password');
-      }
-    } catch {
-      setError('Failed to verify password');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // If has access, show the tool
-  if (hasAccess) {
-    const iframeSrc = accessEmail
-      ? `/recompete.html?email=${encodeURIComponent(accessEmail)}`
-      : '/recompete.html';
-    return (
-      <div className="w-screen h-screen">
-        <iframe
-          src={iframeSrc}
-          className="w-full h-full border-0"
-          title="Recompete Tracker"
-        />
-      </div>
-    );
-  }
-
+/**
+ * /recompete — the SEO landing (server-rendered in layout.tsx, 2026-09-21) stays; the legacy
+ * Recompete Tracker interface under it is retired (2026-09-23, PR #1671).
+ *
+ * This page used to be an email/shared-password gate that then iframed `/recompete.html` — a URL
+ * that already 308-redirects to /app?panel=recompetes, so a customer who got past the gate saw
+ * the Mindy workspace squeezed into an iframe. The Recompetes panel IS the product now:
+ * `recompete:` grants are Pro in /app (verifyMIAccess), and the table is the live 129K-row
+ * per-contract data, not the June snapshot the tracker served.
+ *
+ * The shared-password route (/api/verify-recompete-password) is no longer reachable from any
+ * page; its retirement is in the separate security proposal (review packet).
+ */
+export default function RecompeteEntry() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-900 to-orange-800 p-5">
-      <div className="bg-white rounded-2xl p-10 max-w-lg text-center shadow-2xl">
-        <div className="text-6xl mb-5">📋</div>
-        <h2 className="text-amber-800 mb-3 text-3xl font-bold">
-          Recompete Tracker
-        </h2>
-        <p className="text-gray-600 mb-6 text-base leading-relaxed">
-          Track expiring federal contracts and identify recompete opportunities before they hit the market.
+    <section className="bg-slate-950 border-t border-slate-800">
+      <div className="max-w-3xl mx-auto px-6 py-10 text-center">
+        <h2 className="text-2xl font-bold text-white">Track expiring contracts in Mindy</h2>
+        <p className="mt-3 text-slate-400">
+          Customers of the Recompete Tracker: your access carries over. Sign in to Mindy with your
+          purchase email to open Recompetes.
         </p>
-
-        {/* Already have access? - MOVED TO TOP */}
-        <div className="mb-8 pb-6 border-b border-gray-200">
-          <p className="text-gray-600 text-sm mb-4 font-medium">Already have access?</p>
-
-          {/* Toggle between email and password */}
-          <div className="flex justify-center gap-2 mb-4">
-            <button
-              onClick={() => setAccessMethod('email')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                accessMethod === 'email'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Email
-            </button>
-            <button
-              onClick={() => setAccessMethod('password')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                accessMethod === 'password'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Password
-            </button>
-          </div>
-
-          {accessMethod === 'email' ? (
-            <form onSubmit={handleEmailSubmit} className="flex gap-2">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                style={{ color: '#000000', backgroundColor: '#ffffff' }}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg"
-              />
-              <button
-                type="submit"
-                disabled={loading || !email}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? '...' : 'Verify'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handlePasswordSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                style={{ color: '#000000', backgroundColor: '#ffffff' }}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center"
-              />
-              <button
-                type="submit"
-                disabled={loading || !password}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? '...' : 'Unlock'}
-              </button>
-            </form>
-          )}
-
-          {error && (
-            <p className="text-red-600 text-sm mt-3">{error}</p>
-          )}
-        </div>
-
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8 text-left">
-          <h3 className="text-amber-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
-          <ul className="text-amber-700 m-0 pl-5 leading-loose text-sm">
-            <li><strong>6,900+</strong> expiring contracts</li>
-            <li><strong>36</strong> federal agencies</li>
-            <li><strong>435</strong> NAICS codes</li>
-            <li>Filter by agency, NAICS, prime contractor</li>
-            <li>Contract value filtering</li>
-            <li>Lifetime access</li>
-          </ul>
-        </div>
-
-        <a
-          href="/pricing"
-          className="inline-block bg-amber-600 hover:bg-amber-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
-        >
-          See Mindy Plans
-        </a>
-
-        <p className="text-gray-400 text-xs mt-6">
-          <Link href="/" className="text-amber-600 hover:underline">
-            ← Back to Home
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/app?panel=recompetes"
+            className="inline-block px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+          >
+            Open Recompetes in Mindy
           </Link>
-        </p>
+          <Link
+            href="/opportunity-map?mode=recompete"
+            className="inline-block px-6 py-3 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-900"
+          >
+            Browse recompetes on the map
+          </Link>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

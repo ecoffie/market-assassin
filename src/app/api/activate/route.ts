@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       if (profile) {
         if (profile.access_hunter_pro) {
           accessFlags.access_hunter_pro = true;
-          tools.push({ name: 'Opportunity Hunter Pro', key: 'access_hunter_pro', active: true, url: '/opportunity-hunter' });
+          tools.push({ name: 'Opportunity Hunter Pro', key: 'access_hunter_pro', active: true, url: '/app?panel=research' });
         }
         if (profile.access_content_standard && !profile.access_content_full_fix) {
           accessFlags.access_content_standard = true;
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
           const tier = p.tier;
           if (tier === 'hunter_pro' && !accessFlags.access_hunter_pro) {
             accessFlags.access_hunter_pro = true;
-            tools.push({ name: 'Opportunity Hunter Pro', key: 'access_hunter_pro', active: true, url: '/opportunity-hunter' });
+            tools.push({ name: 'Opportunity Hunter Pro', key: 'access_hunter_pro', active: true, url: '/app?panel=research' });
           }
           if (tier === 'content_standard' && !accessFlags.access_content_standard) {
             accessFlags.access_content_standard = true;
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
       const hasOhPro = await hasOpportunityHunterProAccess(normalizedEmail);
       if (hasOhPro) {
         accessFlags.access_hunter_pro = true;
-        tools.push({ name: 'Opportunity Hunter Pro', key: 'access_hunter_pro', active: true, url: '/opportunity-hunter' });
+        tools.push({ name: 'Opportunity Hunter Pro', key: 'access_hunter_pro', active: true, url: '/app?panel=research' });
       }
 
       // Recompete

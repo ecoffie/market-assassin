@@ -32,11 +32,15 @@
  * (Pro = all reports; MA Premium was 8). The standalone tool kept no server-side saved
  * reports (generate-on-demand; only a monthly usage counter), so no saved work moves.
  *
- * ONE KNOWN GAP, deliberately NOT retired: `/api/verify-ma-password` grants an ANONYMOUS
- * cookie (`ma_access_email=authorized-user`) for a shared password. It carries no identity,
- * so `/app` cannot honour it. Holders of that cookie keep the standalone tool (see
- * `keepFor` below) until someone decides what they are owed. Likewise `/access/[code]`
- * (admin-issued single-use report codes) is untouched.
+ * SHARED-PASSWORD HOLDERS — a bounded transition, not an exception. `/api/verify-ma-password`
+ * grants an ANONYMOUS cookie (`ma_access_email=authorized-user`). That value is used as the
+ * "email" for report generation, where it resolves to NO grants — so the old tool only ever gave
+ * these holders FREE-tier reports, the same thing a free Mindy account gives. By default they are
+ * routed to /app like everyone else. `LEGACY_SHARED_PASSWORD_ACCESS=on` opens an explicit, temporary
+ * grace window (a release decision with a sunset — see the review packet); unset it to end it.
+ *
+ * Single-use report codes (`/access/<CODE>`) are redeemed inside Mindy as a report credit —
+ * see src/app/access/[code]/page.tsx.
  *
  * ⚠️ NOT redirected, on purpose — these are not the old combined interface:
  *   /briefings/feedback/*       email thumbs-up/down landing pages
@@ -94,16 +98,27 @@ interface LegacyRoute {
   fixedPanel?: string;
   /** Return true to leave the request alone (an access class /app cannot honour yet). */
   keepFor?: (ctx: LegacyRequestContext) => boolean;
+  /** A non-workspace destination (retired SALES pages go to /pricing, not /app). */
+  target?: string;
 }
 
 export interface LegacyRequestContext {
   /** Value of the legacy `ma_access_email` cookie, if any. */
   maCookie?: string | null;
+  /** True only while the explicit shared-password grace window is open (env switch). */
+  sharedPasswordGrace?: boolean;
+}
+
+/** The env switch that opens the temporary shared-password grace window. */
+export const SHARED_PASSWORD_GRACE_ENV = 'LEGACY_SHARED_PASSWORD_ACCESS';
+export function sharedPasswordGraceOpen(env: Record<string, string | undefined> = process.env): boolean {
+  return (env[SHARED_PASSWORD_GRACE_ENV] || '').trim().toLowerCase() === 'on';
 }
 
 /** The anonymous shared-password cookie value set by /api/verify-ma-password. */
 export const ANONYMOUS_MA_COOKIE = 'authorized-user';
-const keepAnonymousMaHolder = (ctx: LegacyRequestContext) => ctx.maCookie === ANONYMOUS_MA_COOKIE;
+const keepAnonymousMaHolder = (ctx: LegacyRequestContext) =>
+  ctx.sharedPasswordGrace === true && ctx.maCookie === ANONYMOUS_MA_COOKIE;
 
 /**
  * Every legacy customer entry point handled by the proxy. Exact paths only — a prefix match
@@ -118,6 +133,22 @@ export const LEGACY_ROUTES: readonly LegacyRoute[] = [
   { path: '/federal-market-assassin/success', fixedPanel: MARKET_RESEARCH_PANEL },
   { path: '/market-assassin-locked', fixedPanel: MARKET_RESEARCH_PANEL },
   { path: '/market-assassin', fixedPanel: MARKET_RESEARCH_PANEL },
+  // Opportunity Hunter (+ Pro, which Alert Pro and FHC also grant via `ospro:`): agency spend by
+  // NAICS/state/set-aside → Market Research. `ospro:` is Pro in /app. Gaps flagged in the packet:
+  // CSV export of the agency list, the per-office "Office ID → SAM" drill.
+  { path: '/opportunity-hunter', fixedPanel: MARKET_RESEARCH_PANEL },
+  { path: '/opportunity-scout', fixedPanel: MARKET_RESEARCH_PANEL },
+  { path: '/opportunity-scout.html', fixedPanel: MARKET_RESEARCH_PANEL },
+  // Recompete Tracker: /recompete keeps its SEO landing (layout.tsx) and its legacy gate body is
+  // replaced by a Mindy entry (src/app/recompete/page.tsx) — so it is NOT redirected here.
+  // prime-lookup.html (incumbent search over the June snapshot) → the live Recompetes panel.
+  // Gaps flagged: CSV/Excel/PDF export, incumbent-name search, contract-value filter.
+  { path: '/prime-lookup.html', fixedPanel: 'recompetes' },
+  // /start — free-alerts onboarding that still sold Alert Pro ($19). Mindy onboarding owns this.
+  { path: '/start' },
+  // Retired SALES pages with a still-live legacy checkout → the current pricing page.
+  { path: '/bundles/ultimate', target: '/pricing' },
+  { path: '/contractor-database-product', target: '/pricing' },
 ];
 
 const LEGACY_BY_PATH = new Map(LEGACY_ROUTES.map((r) => [r.path, r]));
@@ -151,6 +182,11 @@ export function resolveLegacyDestination(
   if (route.keepFor?.(ctx)) return null;
 
   const out = new URLSearchParams();
+  if (route.target) {
+    for (const [k, v] of searchParams) if (/^utm_[a-z]+$/.test(k) && v.length <= 200) out.set(k, v);
+    const qs = out.toString();
+    return qs ? `${route.target}?${qs}` : route.target;
+  }
 
   // Panel: a fixed one (standalone tool) wins; else an explicit one on the old URL, then
   // the route default. `?setup=true` was the old "open my settings" deep link.

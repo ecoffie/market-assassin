@@ -67,8 +67,13 @@ describe('no successful new-user flow lands in /app', () => {
     expect(c).not.toMatch(/const\s+safeNext\s*=/);
   });
 
-  it('a next pointing back at /app is rejected', () => {
-    expect(safeNext('/app?panel=vault', '/today')).toBe('/today');
+  it('a next pointing at a RETIRED surface is rejected', () => {
+    expect(safeNext('/app/onboarding', '/today')).toBe('/today');
+    expect(safeNext('/briefings?panel=x', '/today')).toBe('/today');
+  });
+
+  it('an explicit next=/app… is honoured — /app is the current workspace (PR #1671)', () => {
+    expect(safeNext('/app?panel=vault', '/today')).toBe('/app?panel=vault');
   });
 
   it('the fallback is the Maps front door', () => {

@@ -84,7 +84,7 @@ export default async function ForecastsPage() {
               the agency directory
             </Link>{' '}
             or{' '}
-            <Link href="/opportunity-hunter" className="text-purple-300 hover:underline">
+            <Link href="/opportunity-map" className="text-purple-300 hover:underline">
               open opportunities
             </Link>{' '}
             in the meantime.
@@ -243,11 +243,11 @@ export default async function ForecastsPage() {
             {' '}— what each buyer purchases and where they post it.
           </li>
           <li>
-            <Link href="/recompete" className="text-purple-300 hover:underline">Contract recompetes</Link>
+            <Link href="/opportunity-map?mode=recompete" className="text-purple-300 hover:underline">Contract recompetes</Link>
             {' '}— work already under contract that comes up again.
           </li>
           <li>
-            <Link href="/opportunity-hunter" className="text-purple-300 hover:underline">Open opportunities</Link>
+            <Link href="/opportunity-map" className="text-purple-300 hover:underline">Open opportunities</Link>
             {' '}— what is solicitable right now.
           </li>
           <li>

@@ -373,10 +373,10 @@ function getCrossSells(sections: SectionScore[], overallScore: number): CrossSel
 
   if (naicsSection && naicsSection.percentage < 70) {
     sells.push({
-      product: 'Opportunity Hunter',
+      product: 'Mindy Market Research',
       price: 'Free',
       reason: 'See which agencies are actively buying in your NAICS codes right now',
-      url: '/opportunity-hunter',
+      url: '/app?panel=research',
     });
   }
 

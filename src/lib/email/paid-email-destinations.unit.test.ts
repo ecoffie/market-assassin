@@ -50,6 +50,7 @@ vi.mock('@supabase/supabase-js', () => ({
 import {
   sendMarketIntelligenceWelcomeEmail, sendFHCWelcomeEmail, sendBundleEmail,
   sendAccessCodeEmail, sendAlertProWelcomeEmail, sendEmail,
+  sendOpportunityHunterProEmail, sendRecompeteEmail,
 } from '@/lib/send-email';
 import { findLegacyDestinations } from '@/lib/email/legacy-destination-guard';
 import { workspaceUrl } from '@/lib/mindy/legacy-routes';
@@ -79,7 +80,7 @@ function wrapAll(p: { html?: string; text?: string }, depth = 1) {
   };
 }
 const last = () => h.sent[h.sent.length - 1];
-const RETIRED = /\/(briefings|bd-assist|market-assassin|market-assassin-locked|federal-market-assassin)(\b|\/|\?|$)|\/app\/onboarding/;
+const RETIRED = /\/(briefings|bd-assist|market-assassin|market-assassin-locked|federal-market-assassin|opportunity-hunter|opportunity-scout|start|bundles\/ultimate|contractor-database-product)(\b|\/|\?|$)|\/app\/onboarding|\/prime-lookup\.html/;
 
 beforeEach(() => { h.sent.length = 0; });
 
@@ -120,13 +121,36 @@ describe('paid welcome/access CTAs land on the current /app sign-in/workspace', 
     const d = destinations(last());
     expect(d).toContain(`https://getmindy.ai/app?panel=research&email=${ENC}`);
     expect(d.filter((u) => RETIRED.test(new URL(u).pathname))).toEqual([]);
+    // The link is a durable workspace link now — the old "one-time" promise is false.
+    const { html = '', text = '', subject = '' } = last();
+    for (const part of [html, text, subject]) {
+      expect(part).not.toMatch(/one[- ]time|only be used once|single[- ]use/i);
+    }
+    expect(text).toMatch(/Sign in with fixture\.buyer@example\.com/);
   });
 
-  it('Alert Pro welcome: its MA upsell points at the Mindy sales page, never the retired tool', async () => {
+  it('Alert Pro welcome → the /app workspace it already includes (ospro: is Pro), no pricing page', async () => {
     await sendAlertProWelcomeEmail({ to: TO, customerName: 'Fixture' });
     const d = destinations(last());
-    expect(d).toContain('https://getmindy.ai/market-intelligence');
+    expect(d).toContain(`https://getmindy.ai/app?panel=research&email=${ENC}`);
+    expect(d.filter((u) => u.includes('/market-intelligence'))).toEqual([]);
     expect(d.filter((u) => RETIRED.test(new URL(u).pathname))).toEqual([]);
+    expect(last().text).not.toMatch(/Market Assassin/);
+  });
+
+  it('Opportunity Hunter Pro → /app Market Research, "sign in to Mindy" (no legacy "I Have Access" step)', async () => {
+    await sendOpportunityHunterProEmail({ to: TO, customerName: 'Fixture' });
+    const d = destinations(last());
+    expect(d).toContain(`https://getmindy.ai/app?panel=research&email=${ENC}`);
+    expect(d.filter((u) => /opportunity-hunter/.test(u))).toEqual([]);
+    expect(`${last().html}${last().text}`).not.toMatch(/I Have Access/);
+  });
+
+  it('Recompete Tracker → /app Recompetes, "sign in to Mindy"', async () => {
+    await sendRecompeteEmail({ to: TO, customerName: 'Fixture' });
+    const d = destinations(last());
+    expect(d).toContain(`https://getmindy.ai/app?panel=recompetes&email=${ENC}`);
+    expect(`${last().html}${last().text}`).not.toMatch(/I Have Access/);
   });
 });
 

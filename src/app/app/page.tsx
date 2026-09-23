@@ -18,6 +18,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { REPORT_CREDIT_KEY } from '@/lib/mindy/report-credit';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -130,7 +131,13 @@ function AppDashboard() {
   // Onboarding reads this next and honors it for returning users. Open-redirect guarded.
   const oauthRedirectTo = useCallback((): string | undefined => {
     if (typeof window === 'undefined') return undefined;
-    const raw = new URLSearchParams(window.location.search).get('next') || '';
+    // No explicit `next` → come back to THIS workspace view (panel, notice, credit…). Before
+    // 2026-09-23 a Google sign-in started on /app finished on the Map front door, because /app
+    // was treated as legacy (PR #1671). The sign-in prefill `email` is not carried.
+    const params = new URLSearchParams(window.location.search);
+    params.delete('email');
+    const here = `/app${params.toString() ? `?${params}` : ''}`;
+    const raw = params.get('next') || here;
     const safe = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
     const base = `${window.location.origin}/app/onboarding`;
     return safe ? `${base}?next=${encodeURIComponent(safe)}` : base;
@@ -904,6 +911,13 @@ function AppDashboard() {
         window.history.replaceState(null, '', '/app');
       }
       return;
+    }
+
+    // ?redeem=<CODE> — a single-use report credit from a legacy /access/<CODE> link. Held for
+    // this browser session only; the server decides whether it is valid for the signed-in email.
+    const redeemParam = searchParams.get('redeem')?.trim().toUpperCase();
+    if (redeemParam && /^[A-Z0-9-]{4,64}$/.test(redeemParam)) {
+      try { sessionStorage.setItem(REPORT_CREDIT_KEY, redeemParam); } catch { /* storage blocked */ }
     }
 
     const panelParam = searchParams.get('panel');

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { resolveLegacyDestination } from '@/lib/mindy/legacy-routes';
+import { resolveLegacyDestination, sharedPasswordGraceOpen } from '@/lib/mindy/legacy-routes';
 
 /**
  * PROXY - ROUTE PROTECTION
@@ -27,6 +27,7 @@ export function proxy(request: NextRequest) {
 
   const legacyDestination = resolveLegacyDestination(pathname, request.nextUrl.searchParams, {
     maCookie: request.cookies.get('ma_access_email')?.value ?? null,
+    sharedPasswordGrace: sharedPasswordGraceOpen(),
   });
   if (legacyDestination) {
     return NextResponse.redirect(new URL(legacyDestination, request.url), 307);
@@ -55,8 +56,8 @@ export function proxy(request: NextRequest) {
   }
 
   // Federal Market Assassin: retired to /app?panel=research by the resolver above. The only
-  // request that reaches here carries the anonymous shared-password cookie (no identity for
-  // /app to honour), so the legacy tool still serves it — see legacy-routes.ts.
+  // request that reaches here is an anonymous shared-password holder DURING an explicitly
+  // opened grace window (LEGACY_SHARED_PASSWORD_ACCESS=on) — see legacy-routes.ts.
 
   return NextResponse.next();
 }
@@ -73,5 +74,12 @@ export const config = {
     '/federal-market-assassin/success',
     '/market-assassin-locked',
     '/market-assassin',
+    '/opportunity-hunter',
+    '/opportunity-scout',
+    '/opportunity-scout.html',
+    '/prime-lookup.html',
+    '/start',
+    '/bundles/ultimate',
+    '/contractor-database-product',
   ],
 };

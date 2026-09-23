@@ -11,6 +11,8 @@
  *   /market-assassin-locked  retired Market Assassin access gate
  *   /federal-market-assassin retired standalone tool — Market Research lives in /app now
  *   /app/onboarding          the retired profile builder (post-signup-destination.ts)
+ *   /opportunity-hunter(+scout), /prime-lookup.html, /start, /bundles/ultimate,
+ *   /contractor-database-product   retired tools / sales pages (legacy-routes.ts)
  *
  * History: from 2026-08-25 to 2026-09-23 this guard banned ALL of `/app` ("the Map is the
  * product"). That is superseded for paid welcome/access CTAs, which now go straight to
@@ -44,6 +46,10 @@ const RETIRED: Array<{ match: RegExp; reason: string }> = [
   { match: /^\/market-assassin-locked(\/|\?|#|$)/i, reason: 'retired Market Assassin access gate' },
   { match: /^\/federal-market-assassin(\/|\?|#|$)/i, reason: 'retired standalone tool — /app?panel=research' },
   { match: /^\/app\/onboarding(\/|\?|#|$)/i, reason: 'retired profile builder' },
+  { match: /^\/opportunity-(hunter|scout)(\.html)?(\/|\?|#|$)/i, reason: 'retired Opportunity Hunter — /app?panel=research' },
+  { match: /^\/prime-lookup\.html(\?|#|$)/i, reason: 'retired snapshot tool — /app?panel=recompetes' },
+  { match: /^\/start(\/|\?|#|$)/i, reason: 'retired free-alerts onboarding that sold Alert Pro' },
+  { match: /^\/(bundles\/ultimate|contractor-database-product)(\/|\?|#|$)/i, reason: 'retired legacy sales page — /pricing' },
 ];
 
 /**

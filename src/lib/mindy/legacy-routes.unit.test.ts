@@ -11,12 +11,12 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   resolveLegacyDestination, isLegacyCustomerPath, mapLegacyPanel, LEGACY_ROUTES, WORKSPACE_PATH,
-  ANONYMOUS_MA_COOKIE, workspaceUrl,
+  ANONYMOUS_MA_COOKIE, workspaceUrl, sharedPasswordGraceOpen, SHARED_PASSWORD_GRACE_ENV,
 } from './legacy-routes';
 
-const resolve = (url: string, maCookie?: string) => {
+const resolve = (url: string, maCookie?: string, sharedPasswordGrace = false) => {
   const u = new URL(url, 'https://getmindy.ai');
-  return resolveLegacyDestination(u.pathname, u.searchParams, { maCookie });
+  return resolveLegacyDestination(u.pathname, u.searchParams, { maCookie, sharedPasswordGrace });
 };
 
 const SRC = join(__dirname, '../..');
@@ -78,7 +78,7 @@ describe('safety — no loops, no external targets, no over-matching', () => {
   it('never produces an absolute or protocol-relative URL', () => {
     for (const r of LEGACY_ROUTES) {
       const d = resolve(`${r.path}?panel=research&email=%2F%2Fevil.com`)!;
-      expect(d.startsWith('/app')).toBe(true);
+      expect(d.startsWith('/app') || d.startsWith('/pricing')).toBe(true);
       expect(d.startsWith('//')).toBe(false);
     }
   });
@@ -217,10 +217,23 @@ describe('standalone Market Assassin — retired into /app Market Research', () 
     expect(resolve('/federal-market-assassin', 'buyer@example.com')).toBe('/app?panel=research');
   });
 
-  it('⚠️ the ANONYMOUS shared-password holder keeps the legacy tool — /app has nothing to honour', () => {
-    expect(resolve('/federal-market-assassin', ANONYMOUS_MA_COOKIE)).toBeNull();
-    // …but only on the tool itself; the dead gate and sales page still route to /app.
-    expect(resolve('/market-assassin-locked', ANONYMOUS_MA_COOKIE)).toBe('/app?panel=research');
+  it('the ANONYMOUS shared-password holder is routed to /app by DEFAULT — no indefinite exception', () => {
+    expect(resolve('/federal-market-assassin', ANONYMOUS_MA_COOKIE)).toBe('/app?panel=research');
+  });
+
+  it('only an explicitly OPENED grace window keeps the old tool, and only for that cookie', () => {
+    expect(resolve('/federal-market-assassin', ANONYMOUS_MA_COOKIE, true)).toBeNull();
+    expect(resolve('/federal-market-assassin', 'buyer@example.com', true)).toBe('/app?panel=research');
+    expect(resolve('/federal-market-assassin', undefined, true)).toBe('/app?panel=research');
+    // …and never on the dead gate / sales page.
+    expect(resolve('/market-assassin-locked', ANONYMOUS_MA_COOKIE, true)).toBe('/app?panel=research');
+  });
+
+  it('the grace switch is OFF unless the env says exactly "on"', () => {
+    expect(sharedPasswordGraceOpen({})).toBe(false);
+    for (const v of ['', 'off', 'true', '1', 'yes']) expect(sharedPasswordGraceOpen({ [SHARED_PASSWORD_GRACE_ENV]: v })).toBe(false);
+    expect(sharedPasswordGraceOpen({ [SHARED_PASSWORD_GRACE_ENV]: 'on' })).toBe(true);
+    expect(sharedPasswordGraceOpen({ [SHARED_PASSWORD_GRACE_ENV]: ' ON ' })).toBe(true);
   });
 
   it('email prefill survives the MA hop', () => {
@@ -249,5 +262,68 @@ describe('standalone Market Assassin — retired into /app Market Research', () 
     const cfg = readFileSync(join(SRC, '..', 'next.config.ts'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     expect(cfg).not.toMatch(/'\/market-assassin',/);
+  });
+});
+
+describe('the rest of the legacy estate — retired into Mindy', () => {
+  it.each([
+    ['/opportunity-hunter', '/app?panel=research'],
+    ['/opportunity-hunter?naics=541512', '/app?panel=research'],
+    ['/opportunity-scout', '/app?panel=research'],
+    ['/opportunity-scout.html', '/app?panel=research'],
+    ['/prime-lookup.html', '/app?panel=recompetes'],
+    ['/start', '/app'],
+    ['/bundles/ultimate', '/pricing'],
+    ['/bundles/ultimate?utm_source=email', '/pricing?utm_source=email'],
+    ['/contractor-database-product', '/pricing'],
+  ])('%s → %s', (from, to) => {
+    expect(resolve(from)).toBe(to);
+  });
+
+  it('/recompete is NOT redirected — its SEO landing stays and its body is a Mindy entry', () => {
+    expect(resolve('/recompete')).toBeNull();
+    const page = code('app/recompete/page.tsx');
+    expect(page).toContain('/app?panel=recompetes');
+    expect(page).not.toMatch(/iframe|verify-recompete-password|verify-recompete-access/);
+  });
+
+  it('flagged migration gaps are NOT silently redirected (their functionality has no /app equivalent yet)', () => {
+    for (const p of ['/content-generator', '/contractor-database', '/database.html', '/database-locked', '/planner']) {
+      expect(resolve(p)).toBeNull();
+    }
+  });
+
+  it('/access/<code> redeems inside Mindy, and the old tool UI is gone from that route', () => {
+    const page = code('app/access/[code]/page.tsx');
+    expect(page).toMatch(/redirect\(`\/app\?\$\{q\.toString\(\)\}`\)/);
+    expect(page).toContain("redeem: code");
+    expect(page).not.toMatch(/federal-market-assassin|generate-all/);
+  });
+
+  it('public SEO pages link the public Map, not the retired tools', () => {
+    for (const rel of ['app/opportunity/[slug]/page.tsx', 'app/forecasts/page.tsx', 'app/set-asides/page.tsx',
+      'app/compare/govwin/page.tsx', 'app/compare/sam-gov/page.tsx', 'lib/seo/site-links.ts', 'data/glossary.ts',
+      'app/psc/[code]/page.tsx', 'app/naics/[code]/[state]/page.tsx', 'app/set-aside/[type]/[naics]/page.tsx']) {
+      expect(code(rel), rel).not.toMatch(/['"`]\/(opportunity-hunter|recompete)['"`]/);
+    }
+  });
+
+  it('customer-facing sources no longer hand out retired tools', () => {
+    const RETIRED_TOOL = /["'`](?:https:\/\/getmindy\.ai)?\/(?:opportunity-hunter|opportunity-scout|prime-lookup|bundles\/ultimate|contractor-database-product|content-generator-product)(?:[?"'`/.]|$)/;
+    for (const rel of ['app/api/activate/route.ts', 'app/api/activate-license/route.ts', 'lib/send-email.ts',
+      'lib/supabase/purchases.ts', 'lib/dsbs-scoring.ts', 'app/market-intelligence/page.tsx',
+      'app/sblo-directory/page.tsx', 'app/tier2-directory/page.tsx', 'app/alerts/signup/page.tsx']) {
+      expect(code(rel), rel).not.toMatch(RETIRED_TOOL);
+    }
+  });
+
+  it('/market-intelligence no longer sells the Ultimate bundle or Content Reaper as a Pro feature', () => {
+    const mi = code('app/market-intelligence/page.tsx');
+    expect(mi).not.toContain('/bundles/ultimate');
+    expect(mi).not.toMatch(/>Content Reaper</);
+  });
+
+  it('the sitemap no longer lists the redirecting /opportunity-hunter', () => {
+    expect(code('app/sitemap.ts')).not.toMatch(/\/opportunity-hunter`/);
   });
 });

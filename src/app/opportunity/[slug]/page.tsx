@@ -137,7 +137,7 @@ export default async function OpportunityPage({
         <nav className="text-xs text-gray-400 mb-4">
           <Link href="/" className="hover:text-gray-600">Home</Link>
           <span className="mx-1.5">/</span>
-          <Link href="/opportunity-hunter" className="hover:text-gray-600">Opportunities</Link>
+          <Link href="/opportunity-map" className="hover:text-gray-600">Opportunities</Link>
           <span className="mx-1.5">/</span>
           <span className="text-gray-500">{opp.noticeType || 'Opportunity'}</span>
         </nav>
@@ -244,7 +244,7 @@ export default async function OpportunityPage({
               More NAICS {opp.naicsCode} opportunities →
             </Link>
           )}
-          <Link href="/opportunity-hunter" className="text-purple-600 hover:underline">Browse all opportunities →</Link>
+          <Link href="/opportunity-map" className="text-purple-600 hover:underline">Browse all opportunities →</Link>
           <Link href="/forecasts" className="text-purple-600 hover:underline">Agency forecasts →</Link>
         </nav>
       </div>

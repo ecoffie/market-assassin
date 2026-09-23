@@ -32,7 +32,7 @@ export default function SBLODirectoryPage() {
           name: 'Full Database',
           price: '$497',
           originalPrice: '$997 value',
-          checkoutUrl: '/contractor-database-product',
+          checkoutUrl: '/pricing',
           description: '3,500+ contractors vs 225 in free list',
           features: [
             '3,500+ prime contractors',
@@ -50,8 +50,8 @@ export default function SBLODirectoryPage() {
         description: 'Go from 225 contacts to 3,500+ prime contractors with contract history, NAICS codes, and direct contact information.',
         price: '$497',
         originalPrice: '$997',
-        checkoutUrl: '/contractor-database-product',
-        linkUrl: '/contractor-database-product',
+        checkoutUrl: '/pricing',
+        linkUrl: '/pricing',
       }}
       videoTitle="SBLO Contact List"
       videoSubtitle="225 contacts across 76+ agencies"

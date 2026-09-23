@@ -494,7 +494,7 @@ export default function SamGovComparePage() {
               Mindy vs GovWin →
             </Link>
             <Link
-              href="/recompete"
+              href="/opportunity-map?mode=recompete"
               className="text-slate-400 hover:text-purple-300 transition"
             >
               See contracts up for recompete →

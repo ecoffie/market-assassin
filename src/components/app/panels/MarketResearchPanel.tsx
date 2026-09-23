@@ -21,6 +21,7 @@ import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { getProductVendorHint } from '@/lib/lookup-intent';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { readReportCredit, clearReportCredit } from '@/lib/mindy/report-credit';
 
 interface MarketResearchPanelProps {
   email: string | null;
@@ -806,10 +807,15 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const track = useAppTracker(email);
   const { showToast } = useToast();
 
+  // A single-use report credit (legacy /access/<CODE>) unlocks every report for ONE run.
+  // The server verifies it against the signed-in email; this only decides what to show.
+  const [reportCredit, setReportCredit] = useState<string | null>(null);
+  useEffect(() => { setReportCredit(readReportCredit()); }, []);
+
   const canAccessReport = useCallback((reportTier: 'free' | 'pro') => {
     if (reportTier === 'free') return true;
-    return tier !== 'free';
-  }, [tier]);
+    return tier !== 'free' || !!reportCredit;
+  }, [tier, reportCredit]);
 
   const validateForm = useCallback((data: FormData = formData, agencyValue: string = selectedAgency): boolean => {
     setValidationError(null);
@@ -951,6 +957,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           selectedAgencies: finalReportAgencyNames,
           selectedAgencyData,
           userEmail: email,
+          ...(reportCredit ? { redeemCode: reportCredit } : {}),
         }),
       });
 
@@ -970,6 +977,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       }
 
       if (data.success && data.report) {
+        if (reportCredit && data.redeem) {
+          // Spent (or refused) — either way it must not be offered again this session.
+          clearReportCredit();
+          setReportCredit(null);
+          if (!data.redeem.ok) showToast({ message: `Report credit not applied: ${data.redeem.reason}`, variant: 'error' });
+        }
         setReportData(data.report);
         setSportReportRan(true);
         // Cache for instant reload (Auto only — Sport is one-off). 24h TTL.
@@ -1853,6 +1866,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         }
         @page { margin: 0.5in; }
       ` }} />
+      {reportCredit && (
+        <div role="status" data-report-credit className="mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          Your report credit is attached: your next Build Market Map includes every report. It is used once.
+        </div>
+      )}
       {/* Header: title + actions on top, full filter strip below (matches Source Feed) */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">

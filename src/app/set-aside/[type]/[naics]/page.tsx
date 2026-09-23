@@ -50,7 +50,7 @@ export default async function SetAsideNaicsPage({ params }: { params: Promise<{ 
       opps={opps}
       crossLinks={[
         { href: `/naics/${naics}`, label: `All NAICS ${naics} opportunities →` },
-        { href: '/opportunity-hunter', label: 'Browse all opportunities →' },
+        { href: '/opportunity-map', label: 'Browse all opportunities →' },
         { href: '/forecasts', label: 'Agency forecasts →' },
       ]}
       canonicalPath={`/set-aside/${type}/${naics}`}

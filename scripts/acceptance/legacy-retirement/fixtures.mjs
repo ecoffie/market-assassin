@@ -11,6 +11,10 @@
  *                     full-fix + `briefings:`=true, no purchases row
  *   ma-purchaser    ← an existing standalone Market Assassin buyer: KV `ma:` premium ONLY
  *                     (no briefings), plus the legacy `ma_access_email` cookie in the browser
+ *   legacy-paid-no-password ← a paid buyer who never set a password (magic link)
+ *   google-returning ← a paid customer who signs in with Google
+ *   alert-pro       ← an existing Alert Pro subscriber (alertpro: + ospro:, daily alerts)
+ *   code-holder     ← an admin-issued single-use report code holder, no other grant
  *   no-grant        ← CONTROL: signed in, no entitlement at all (must stay free)
  *
  * Every fixture has a saved profile (so /app's normal landing applies, not onboarding) and one
@@ -20,41 +24,80 @@ export const FIXTURE_DOMAIN = 'acceptance.invalid';
 const at = (local) => `${local}@${FIXTURE_DOMAIN}`;
 const NOW = '2026-09-23T12:00:00.000Z';
 
+/**
+ * `signIn` says which REAL sign-in flow the acceptance drives for this shape:
+ *   password  → /app form → /api/auth/mindy-login → (paid: emailed 2FA code) → session
+ *   magic     → /app "email me a link" → /api/auth/mindy-magic-link/request → emailed link → /app
+ *   google    → /app "Continue with Google" → /authorize → /app/onboarding?next=… → exchange → session
+ * `password` exists ONLY in the local fake identity provider; nothing is created anywhere real.
+ */
 export const FIXTURES = {
   'paid-briefings': {
-    email: at('paid-briefings'),
-    kv: { briefings: true },
-    maCookie: null,
-    expectTier: 'pro',
+    email: at('paid-briefings'), signIn: 'password', password: 'Fixture-Password-1!',
+    kv: { briefings: true }, maCookie: null, expectTier: 'pro',
+    legacyEntry: '/briefings?welcome=true',
+  },
+  'legacy-paid-no-password': {
+    email: at('legacy-nopw'), signIn: 'magic',
+    kv: { briefings: true }, maCookie: null, expectTier: 'pro',
+    legacyEntry: '/briefings?welcome=true',
+  },
+  'google-returning': {
+    email: at('google-returning'), signIn: 'google', provider: 'google',
+    kv: { briefings: true }, maCookie: null, expectTier: 'pro',
+    legacyEntry: '/bd-assist',
   },
   'legacy-comp': {
-    email: at('legacy-comp'),
+    email: at('legacy-comp'), signIn: 'magic',
     kv: {
       briefings: true,
       contentgen: { email: at('legacy-comp'), customerName: 'Fixture', tier: 'full-fix', createdAt: NOW, productId: 'govcon-content-generator' },
     },
-    maCookie: null,
-    expectTier: 'pro',
+    maCookie: null, expectTier: 'pro', legacyEntry: '/content-generator',
   },
   'ma-purchaser': {
-    email: at('ma-purchaser'),
+    email: at('ma-purchaser'), signIn: 'password', password: 'Fixture-Password-2!',
     kv: { ma: { email: at('ma-purchaser'), tier: 'premium', createdAt: NOW } },
-    maCookie: at('ma-purchaser'),
-    expectTier: 'pro',
+    maCookie: at('ma-purchaser'), expectTier: 'pro', legacyEntry: '/federal-market-assassin',
+  },
+  'alert-pro': {
+    // Exactly what the webhook writes for Alert Pro: alertpro: + ospro: (Alert Pro includes OH Pro)
+    // and alert_frequency 'daily' on the shared preferences row.
+    email: at('alert-pro'), signIn: 'magic',
+    kv: { alertpro: true, ospro: true }, maCookie: null, expectTier: 'pro',
+    legacyEntry: '/alerts/preferences?upgraded=true',
+    settings: { alert_frequency: 'daily', alerts_enabled: true, paid_status: 'alert_pro' },
+  },
+  'code-holder': {
+    // An admin-issued single-use report code, unused. No other grant.
+    email: at('code-holder'), signIn: 'magic',
+    kv: {}, accessCode: 'ACCEPTCODE01', maCookie: null, expectTier: 'free',
+    legacyEntry: '/access/ACCEPTCODE01',
   },
   'no-grant': {
-    email: at('no-grant'),
-    kv: {},
-    maCookie: null,
-    expectTier: 'free',
+    email: at('no-grant'), signIn: 'magic',
+    kv: {}, maCookie: null, expectTier: 'free', legacyEntry: '/briefings?welcome=true',
   },
 };
+
+/** Identities the local fake GoTrue knows: password users + OAuth users. */
+export function authUsers() {
+  const out = {};
+  for (const f of Object.values(FIXTURES)) {
+    if (f.password) out[f.email] = { password: f.password };
+    else if (f.provider) out[f.email] = { provider: f.provider };
+  }
+  return out;
+}
 
 /** KV keys exactly as production writes them (src/lib/access-codes.ts, briefings/access.ts). */
 export function kvSeed() {
   const out = {};
   for (const f of Object.values(FIXTURES)) {
     for (const [prefix, value] of Object.entries(f.kv)) out[`${prefix}:${f.email}`] = JSON.stringify(value);
+    if (f.accessCode) {
+      out[`access:${f.accessCode}`] = JSON.stringify({ code: f.accessCode, email: f.email, companyName: 'Fixture Co', createdAt: NOW, used: false });
+    }
   }
   return out;
 }
@@ -71,6 +114,7 @@ export function supabaseRows(table, email) {
       agencies: [], psc_codes: [], location_states: [], business_type: '', alerts_enabled: false,
       alert_frequency: 'weekly', briefings_enabled: false, timezone: 'America/New_York',
       is_active: true, trial_ends_at: null, created_at: NOW, updated_at: NOW,
+      ...(f.settings || {}),
     }];
   }
   if (table === 'user_pipeline') {

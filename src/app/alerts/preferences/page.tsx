@@ -604,7 +604,7 @@ function AlertPreferencesContent() {
                   Daily Briefings turn alert matches into ranked priorities, weekly analysis, and pursuit guidance.
                 </p>
                 <Link
-                  href="https://shop.govcongiants.com/market-intelligence"
+                  href="/market-intelligence"
                   className="mt-4 inline-flex rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
                 >
                   See Daily Briefings
