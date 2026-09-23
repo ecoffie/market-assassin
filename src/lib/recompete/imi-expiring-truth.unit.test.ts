@@ -39,12 +39,15 @@ vi.mock('@supabase/supabase-js', () => ({
   },
 }));
 
+// No fake timers: every pure helper takes an explicit `now` (NOW). The tool-level test runs on the
+// real clock over rows already selected for FROZEN_NOW; its assertions hold for any later date
+// (estimates only ever move from "a date ≥ today" to null as time passes).
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(NOW);
   sb.rows = inWindowRows();
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  sb.rows = [];
+});
 
 describe('frozen set sanity', () => {
   it('is the captured population the IMI call ran against', () => {
