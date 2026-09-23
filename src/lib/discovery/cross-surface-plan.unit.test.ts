@@ -19,6 +19,7 @@ import { mcpDiscoveryInput, mcpDiscoveryPolicy, type FindOpportunitiesInput } fr
 import { FIXTURES } from './__fixtures__/fixtures';
 import { mapsOpenRequest } from '@/lib/opportunities/maps-open-discovery';
 import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
+import { mapsForecastRequest } from '@/lib/opportunities/maps-forecast-discovery';
 
 const CTX: PlanContext = { today: '2026-09-22', fiscalYear: 2026 };
 
@@ -51,7 +52,15 @@ export const SURFACES: Record<string, Surface> = {
     } as Record<string, string | null | undefined>)[k] ?? null, { ctx: CTX }).plan,
     note: 'Phase C2: /api/app/recompete-map → maps-recompete-discovery.ts.',
   },
-  maps_forecast: { status: 'pending', note: '/api/app/forecast-map (current/future FY default).' },
+  maps_forecast: {
+    status: 'migrated',
+    // The REAL request→plan path shared by /api/app/forecast-map and /api/forecasts/unplaced, fed the
+    // params the Maps client sends (q / agency / state / naics; psc when present).
+    toPlan: (f) => mapsForecastRequest((k) => ({
+      q: f.query, agency: f.agency, state: f.location, naics: f.advanced?.naics, psc: f.advanced?.psc,
+    } as Record<string, string | null | undefined>)[k] ?? null, { ctx: CTX }).plan,
+    note: 'Phase C3: forecast-map + forecasts/unplaced → maps-forecast-discovery.ts.',
+  },
   saved_searches: { status: 'pending', note: 'Gate: scripts/discovery-saved-search-blast.ts sign-off first.' },
   daily_alerts: { status: 'pending', note: 'Profile-keyword path audited separately first.' },
 };
@@ -73,6 +82,9 @@ function meaning(p: DiscoveryPlan) {
     recompete_query_ops: p.horizons.recompete.ops.filter((o) => !(o.op === 'lte' && o.col === 'period_of_performance_current_end')),
     recompete_naics: p.horizons.recompete.naics,
     recompete_via: p.horizons.recompete.via,
+    // Forecast MEANING = filters + every op except the fiscal-year policy clause (a timeframe is policy).
+    forecast_filters: p.horizons.forecast.forecastFilters,
+    forecast_query_ops: p.horizons.forecast.ops.filter((o) => !(o.op === 'or' && o.expr.startsWith('fiscal_year.is.null,'))),
     forecast_via: p.horizons.forecast.via,
   };
 }
@@ -150,6 +162,28 @@ describe('cross-surface query-plan gate', () => {
       expect(adapter, `adapter: ${legacy}`).not.toContain(legacy);
     }
     expect(adapter).toContain('applyRecompetePlan(query, req.plan)');
+  });
+
+  it('Maps Forecast no longer interprets the query itself (both routes + adapter)', () => {
+    const strip = (p: string) => readFileSync(p, 'utf8').replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
+    const map = strip(join(__dirname, '..', '..', 'app', 'api', 'app', 'forecast-map', 'route.ts'));
+    const unplaced = strip(join(__dirname, '..', '..', 'app', 'api', 'forecasts', 'unplaced', 'route.ts'));
+    const adapter = strip(join(__dirname, '..', 'opportunities', 'maps-forecast-discovery.ts'));
+    const LEGACY = ['applyForecastFilters', 'resolveQueryIntent', 'keywordOrExpr', 'setAsideOrExpr', 'pscToNaicsCodes',
+      'forecastAgencyOrExpr', 'resolveForecastAgencies', 'naicsMatchConds', 'parseStateList', 'buildSearchOr', 'excludePastFy', 'currentFiscalYear'];
+    for (const [name, src] of [['forecast-map', map], ['forecasts/unplaced', unplaced], ['adapter', adapter]] as const) {
+      for (const legacy of LEGACY) expect(src, `${name}: ${legacy}`).not.toContain(legacy);
+    }
+    for (const src of [map, unplaced]) expect(src).toContain("from '@/lib/opportunities/maps-forecast-discovery'");
+    // forecast-map: ONE plan; pins, market count, unmapped count and unplaced rows all apply it.
+    expect(map.match(/mapsForecastRequest\(/g)).toHaveLength(1);
+    expect(map).toMatch(/getForecastViewportPins\([^)]*applyPlan\)/);
+    expect(map).toMatch(/getUnplacedForecastRows\([^)]*applyPlan\)/);
+    expect(map.match(/applyPlan\(\s*sb\(\)\.from\('agency_forecasts'\)/g)).toHaveLength(2);
+    // unplaced: rows + facets through the same adapter (facets = same request minus agency only).
+    expect(unplaced).toMatch(/forecastReq\.apply\(q\)/);
+    expect(unplaced).toMatch(/mapsForecastRequest\(get, \{ dropAgency: true \}\)\.apply\(fq\)/);
+    expect(adapter).toContain('applyForecastPlan(query, plan)');
   });
 
   it('MCP no longer carries its own matcher (no parallel interpretation can creep back)', () => {

@@ -17,11 +17,14 @@
  * tool: a buy planned for FY2024 is history, not pipeline. Rows with NO fiscal
  * year are KEPT — unknown timing is not past timing, and most of this corpus is
  * undated.
+ *
+ * Since Phase C3 (2026-09-23) both the query meaning AND that fiscal-year rule come from the ONE
+ * canonical Forecast plan the map uses (maps-forecast-discovery.ts), so this list is exactly the
+ * unplaced subset of the map's Forecast market — never a separately interpreted search.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { applyForecastFilters } from '@/lib/opportunities/map-data';
-import { currentFiscalYear } from '@/lib/forecasts/query';
+import { mapsForecastRequest, mapsForecastDiscoveryMeta } from '@/lib/opportunities/maps-forecast-discovery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,15 +50,6 @@ const COLS = 'external_id, title, source_agency, department, contracting_office,
   + 'naics_description, set_aside_type, fiscal_year, anticipated_quarter, estimated_value_min, '
   + 'estimated_value_max, estimated_value_range, pop_state, pop_city';
 
-/** Future-or-undated only — the same whitelist the MCP query uses. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function excludePastFy(q: any) {
-  const thisFy = currentFiscalYear();
-  const future: string[] = [];
-  for (let y = thisFy; y <= thisFy + 15; y++) future.push(`fiscal_year.ilike.%${y}%`);
-  return q.or(`fiscal_year.is.null,${future.join(',')}`);
-}
-
 export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams;
   const limit = Math.min(200, Math.max(1, parseInt(p.get('limit') || '50', 10) || 50));
@@ -63,9 +57,9 @@ export async function GET(request: NextRequest) {
   // Facet intent is independent of page size. Absent → historical default (tally on
   // first page). Only the literal string "false" opts out.
   const includeFacetsParam = p.get('includeFacets');
-  const filters = {
-    q: p.get('q'), naics: p.get('naics'), agency: p.get('agency'), state: null,
-  };
+  // This route has never taken a state; the plan sees exactly q / naics / agency (+ psc).
+  const get = (k: string) => (k === 'state' ? null : p.get(k));
+  const forecastReq = mapsForecastRequest(get);
 
   const db = sb();
   try {
@@ -73,8 +67,7 @@ export async function GET(request: NextRequest) {
     let q = db.from('agency_forecasts')
       .select(COLS, { count: 'exact' })
       .is('map_lat', null);
-    q = applyForecastFilters(q, filters);
-    q = excludePastFy(q);
+    q = forecastReq.apply(q);
     const { data, count, error } = await q
       .order('estimated_value_max', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1);
@@ -90,8 +83,8 @@ export async function GET(request: NextRequest) {
     let byAgency: Array<{ agency: string; n: number }> = [];
     if (shouldTallyAgencyFacets(includeFacetsParam, offset)) {
       let fq = db.from('agency_forecasts').select('source_agency').is('map_lat', null);
-      fq = applyForecastFilters(fq, { ...filters, agency: null });
-      fq = excludePastFy(fq);
+      // Facets tally ACROSS agencies: the same plan, minus the agency filter only.
+      fq = mapsForecastRequest(get, { dropAgency: true }).apply(fq);
       // PostgREST caps a select at 1,000 rows — page it, or the facet counts
       // silently describe only the first 1,000 of ~11k.
       const tally = new Map<string, number>();
@@ -129,7 +122,7 @@ export async function GET(request: NextRequest) {
       pop_city: r.pop_city ?? null,
     }));
 
-    return NextResponse.json({ success: true, total: count ?? forecasts.length, forecasts, byAgency });
+    return NextResponse.json({ success: true, total: count ?? forecasts.length, forecasts, byAgency, discovery: mapsForecastDiscoveryMeta(forecastReq.plan) });
   } catch (e) {
     console.error('[forecasts/unplaced]', (e as Error).message);
     return NextResponse.json({ success: false, error: 'unavailable' }, { status: 500 });

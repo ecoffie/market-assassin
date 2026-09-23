@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { mapsForecastRequest } from '@/lib/opportunities/maps-forecast-discovery';
 
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
@@ -39,8 +40,15 @@ describe('the API returns what the map CANNOT', () => {
 
   it('excludes past fiscal years but KEEPS undated rows', () => {
     // Same rule as the map and the MCP tool. Most of this corpus is undated — dropping
-    // NULLs would empty the page it exists to fill.
-    expect(API).toContain('fiscal_year.is.null');
+    // NULLs would empty the page it exists to fill. Since Phase C3 the rule comes from the ONE
+    // canonical Forecast plan the route applies (maps-forecast-discovery.ts), asserted on that plan.
+    expect(API).toContain('forecastReq.apply(q)');
+    const ops = mapsForecastRequest((k) => (k === 'q' ? 'janitorial' : null), { ctx: { today: '2026-09-23', fiscalYear: 2026 } })
+      .plan.horizons.forecast.ops;
+    const fy = ops.find((o) => o.op === 'or' && o.expr.startsWith('fiscal_year.is.null,')) as { expr: string } | undefined;
+    expect(fy, 'undated rows kept + past FY excluded').toBeTruthy();
+    expect(fy!.expr).toContain('fiscal_year.ilike.%2026%');
+    expect(fy!.expr).not.toContain('%2025%');
   });
 
   it('checks {error} on the read', () => {
