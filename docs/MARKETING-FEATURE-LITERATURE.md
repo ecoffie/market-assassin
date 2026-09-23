@@ -7312,4 +7312,4 @@ and still drops Dale Carnegie / dirty IT slivers.
 
 **SEO.** FY2026 NDAA requirements for contractors / Public Law 119-60 / NDAA cost accounting standards threshold / BIOSECURE Act NDAA / FY2027 NDAA status tracker.
 
-**Proof.** Audited against congress.gov texts of PL 119-60 (S. 1071) and S. 2296: 32 of 45 prior claims enacted and now cited by section, 6 corrected, 7 retired, every original preserved with its evidence. Congress truth for the FY2026 and FY2027 NDAA (5 vehicles, 14 text versions, 5 committee reports) is held in full. Not yet in production at time of writing.
+**Proof.** Audited against congress.gov texts of PL 119-60 (S. 1071) and S. 2296: 32 of 45 prior claims enacted and now cited by section, 6 corrected, 7 retired, every original preserved with its evidence. Congress truth for the FY2026 and FY2027 NDAA (5 vehicles, 14 text versions, 5 committee reports) is held in full. Live in production 2026-09-23 (weekly Congress sync, health invariant green). The legislative corpus itself is not yet a customer-facing surface; the corrected FY2026 claims are.
