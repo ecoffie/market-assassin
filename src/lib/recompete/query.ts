@@ -140,8 +140,8 @@ export interface ExpiringContract {
   contract_type?: string | null;
   // ── IMI corrections (annotate.ts) — present on every row this query returns ──
   capture_start_date?: string | null;
-  recompete_date_status?: RecompeteRowAnnotations['recompete_date_status'];
-  recompete_date_basis?: RecompeteRowAnnotations['recompete_date_basis'];
+  capture_start_basis?: RecompeteRowAnnotations['capture_start_basis'];
+  capture_start_passed?: boolean | null;
   award_kind?: RecompeteRowAnnotations['award_kind'];
   parent_vehicle_piid?: string | null;
   parent_vehicle_id?: string | null;
@@ -295,8 +295,8 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
 
   // Timing, lineage and place of performance all come from annotateRecompeteRow (annotate.ts)
   // so every surface reading this table shows the same corrected row:
-  //   - estimated_recompete_date = PoP end − 12mo only while that is still ahead; a passed
-  //     capture date moves to `capture_start_date` (MINDY-006: never clamped to today).
+  //   - PoP end − 12mo is a SUGGESTED capture start (`capture_start_date` + basis), never a
+  //     recompete date; estimated_recompete_date is NULL (the trigger column is overridden).
   //   - an order under a vehicle is labelled one and carries no standalone recompete date.
   //   - place_of_performance_state is exposed exactly as USASpending reports it.
   const now = new Date();

@@ -49,6 +49,11 @@ export interface ExpiringContractsToolResult {
    * own; the vehicle's ordering end is the recompete signal (UNKNOWN when not established).
    */
   vehicles: VehicleRollup[];
+  /**
+   * Orders proven to sit under a vehicle whose parent is not recorded. Each is listed on its own
+   * with parent_vehicle = 'UNKNOWN' — never a standalone recompete, never grouped into a vehicle.
+   */
+  unresolved_orders: Array<ExpiringContract & { parent_vehicle: 'UNKNOWN' }>;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -61,6 +66,8 @@ export interface ExpiringContractsToolResult {
     orders_rolled_up: number;
     /** Vehicles whose ordering end could not be established (see each vehicle's reason). */
     vehicles_ordering_end_unknown: number;
+    /** Orders whose parent vehicle could not be established (listed in unresolved_orders). */
+    orders_parent_unknown: number;
   };
 }
 
@@ -89,9 +96,9 @@ export async function expiringContracts(
   const orderingEnds = parentIds.length
     ? await resolveVehicleOrderingEnds(parentIds, { lookup: deps.vehicleLookup })
     : new Map();
-  const { standalone, vehicles } = rollupOrdersByVehicle(res.contracts, orderingEnds);
+  const { standalone, vehicles, unresolved } = rollupOrdersByVehicle(res.contracts, orderingEnds);
 
-  const grounded = standalone.length > 0 || vehicles.length > 0;
+  const grounded = standalone.length > 0 || vehicles.length > 0 || unresolved.length > 0;
   const queried: Record<string, string | number> = {};
   for (const [k, v] of Object.entries({ naics: input.naics, agency: input.agency, state: input.state, months_window: input.months_window, months_min: input.months_min, likelihood: input.likelihood })) {
     if (v !== undefined && v !== '') queried[k] = v as string | number;
@@ -100,6 +107,7 @@ export async function expiringContracts(
     queried,
     contracts: standalone,
     vehicles,
+    unresolved_orders: unresolved,
     _meta: {
       grounded,
       degraded: res.degraded,
@@ -108,6 +116,7 @@ export async function expiringContracts(
       vehicle_count: vehicles.length,
       orders_rolled_up: vehicles.reduce((n, v) => n + v.orders_in_result, 0),
       vehicles_ordering_end_unknown: vehicles.filter((v) => v.ordering_end_status === 'unknown').length,
+      orders_parent_unknown: unresolved.length,
     },
   };
   if (mcpFlags.aiHint) {
@@ -120,7 +129,8 @@ export async function expiringContracts(
         : 'No expiring contracts matched. Widen months_window or drop filters.',
       how_to_use: grounded
         ? 'contracts[] are standalone awards: incumbent_name = who to unseat; period_of_performance_current_end = the clock; potential_total_value = the prize ceiling. '
-          + 'estimated_recompete_date is PoP end − 12 months only while that is still ahead; when null, recompete_date_status says why (capture_window_open = follow-on activity may already be under way, date unknown). '
+          + 'capture_start_date is a SUGGESTED capture start derived by rule (capture_start_basis: PoP end − 12 months) — say "Contract ends <end>. Suggested capture start: <date>." Never call it a recompete date. estimated_recompete_date is null: no source establishes when the follow-on will be solicited. '
+          + 'unresolved_orders[] are task/delivery orders whose parent vehicle is not recorded (parent_vehicle = UNKNOWN) — not recompetes, and not grouped. '
           + 'vehicles[] are task/delivery orders grouped by parent vehicle — orders are NOT re-competed on their own; ordering_end_date is the vehicle\'s recompete signal, and null means unknown; ordering_period_status=closed means the vehicle already stopped taking orders (its follow-on is not established here). Present them as "work flowing under <vehicle>", a teaming/sub-under lead, never as recompetes. '
           + 'set_aside_type is the ELIGIBILITY GATE and the first thing to surface for a small business: "SB-Total"/"8(a)"/"SDVOSB"/"WOSB"/"HUBZone" mean the large primes are legally barred from bidding, while "Full & Open" means they are not. '
           + 'A small firm asking "what can I win" wants the set-aside rows, not the biggest dollar rows — a $90M Full & Open recompete held by a top-10 prime is not a target, and listing it as one reads as noise.'

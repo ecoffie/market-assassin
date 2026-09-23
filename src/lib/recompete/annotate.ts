@@ -4,8 +4,10 @@
  * Every surface that reads `recompete_opportunities` for display runs through this, so the IMI
  * corrections (2026-09-22) cannot land on one surface and miss another:
  *
- *   timing   — `estimated_recompete_date` is never a past date for a contract that has not
- *              ended; the PoP − 12mo capture date is kept as `capture_start_date`.
+ *   timing   — `capture_start_date` (PoP end − 12mo, a SUGGESTED capture start) with its stated
+ *              `capture_start_basis`. `estimated_recompete_date` is always NULL: nothing we store
+ *              independently establishes a recompete date, and the capture start is not one.
+ *              (The DB trigger column is overridden here, at read time.)
  *   lineage  — an order under a vehicle is labelled as one (`award_kind`, parent vehicle) and
  *              carries no standalone recompete date.
  *   location — `place_of_performance_state` is USASpending's reported place of performance,
@@ -16,16 +18,17 @@
  * capability match, recompete map), coming-back-to-market alerts, /api/recompete (panel), and
  * find_opportunities' Coming back horizon.
  */
-import { overlayRecompeteTiming, type RecompeteDateStatus } from './timing';
+import { overlayRecompeteTiming, CAPTURE_START_BASIS } from './timing';
 import { parseAwardLineage, type AwardKind } from './award-lineage';
 
 export const POP_SOURCE_NOTE = 'Place of performance as reported by USASpending.' as const;
 
 export interface RecompeteRowAnnotations {
-  estimated_recompete_date: string | null;
+  /** Always null — see timing.ts. Never a copy of capture_start_date or PoP end. */
+  estimated_recompete_date: null;
   capture_start_date: string | null;
-  recompete_date_status: RecompeteDateStatus | null;
-  recompete_date_basis: 'pop_end_minus_12_months' | null;
+  capture_start_basis: typeof CAPTURE_START_BASIS | null;
+  capture_start_passed: boolean | null;
   lead_time_months: number | null;
   award_kind: AwardKind;
   parent_vehicle_piid: string | null;
@@ -46,13 +49,11 @@ type AnnotatableRow = {
 export function recompeteRowAnnotations(row: AnnotatableRow, now: Date = new Date()): RecompeteRowAnnotations {
   const timing = overlayRecompeteTiming(row.period_of_performance_current_end, now);
   const lineage = parseAwardLineage(row);
-  const isOrder = lineage.award_kind === 'order_under_vehicle';
   return {
-    // An order's own PoP end is not a recompete event; the date is withheld, not moved.
-    estimated_recompete_date: isOrder ? null : timing?.estimated_recompete_date ?? null,
+    estimated_recompete_date: null,
     capture_start_date: timing?.capture_start_date ?? null,
-    recompete_date_status: isOrder ? 'order_under_vehicle' : timing?.recompete_date_status ?? null,
-    recompete_date_basis: timing?.recompete_date_basis ?? null,
+    capture_start_basis: timing?.capture_start_basis ?? null,
+    capture_start_passed: timing?.capture_start_passed ?? null,
     lead_time_months: timing?.lead_time_months ?? row.lead_time_months ?? null,
     award_kind: lineage.award_kind,
     parent_vehicle_piid: lineage.parent_vehicle_piid,

@@ -116,7 +116,7 @@ export interface RolledUpOrder {
 }
 
 export interface VehicleRollup {
-  /** Parent IDV/BPA PIID, or null when the orders' parent is not recorded. */
+  /** Parent IDV/BPA PIID as recorded on the orders (always established — see unresolved). */
   vehicle_piid: string | null;
   vehicle_id: string | null;
   awarding_agency: string | null;
@@ -161,22 +161,31 @@ type RollupRow = {
   parent_vehicle_id?: string | null;
 };
 
+/** An order proven to sit under SOME vehicle whose parent is not recorded. Never aggregated. */
+export type UnresolvedOrder<T> = T & { parent_vehicle: 'UNKNOWN' };
+
 /**
- * Split annotated rows into standalone recompete candidates and vehicles (orders grouped by
- * parent). Orders with no recorded parent are grouped under one `vehicle_piid: null` bucket per
- * agency — still not presented as standalone recompetes. Pure given `orderingEnds`.
+ * Split annotated rows into standalone recompete candidates, vehicles (orders grouped by their
+ * RECORDED parent), and unresolved orders.
+ *
+ * An order whose parent cannot be established is NOT grouped: two parentless orders from the
+ * same agency are not evidence of one vehicle, and an agency-keyed bucket would fabricate one
+ * (Eric, 2026-09-22). Each such order is returned on its own with parent_vehicle = 'UNKNOWN' —
+ * not a standalone recompete, not a vehicle. Pure given `orderingEnds`.
  */
 export function rollupOrdersByVehicle<T extends RollupRow>(
   rows: T[],
   orderingEnds: Map<string, VehicleOrderingEnd>,
   now: Date = new Date(),
-): { standalone: T[]; vehicles: VehicleRollup[] } {
+): { standalone: T[]; vehicles: VehicleRollup[]; unresolved: UnresolvedOrder<T>[] } {
   const today = now.toISOString().slice(0, 10);
   const standalone: T[] = [];
+  const unresolved: UnresolvedOrder<T>[] = [];
   const groups = new Map<string, T[]>();
   for (const r of rows) {
     if (r.award_kind !== 'order_under_vehicle') { standalone.push(r); continue; }
-    const key = r.parent_vehicle_id || r.parent_vehicle_piid || `unrecorded|${r.awarding_agency || ''}|${r.awarding_sub_agency || ''}`;
+    const key = r.parent_vehicle_id || r.parent_vehicle_piid;
+    if (!key) { unresolved.push({ ...r, parent_vehicle: 'UNKNOWN' }); continue; }
     const list = groups.get(key);
     if (list) list.push(r); else groups.set(key, [r]);
   }
@@ -220,5 +229,5 @@ export function rollupOrdersByVehicle<T extends RollupRow>(
     if (b.ordering_end_date) return 1;
     return b.orders_in_result - a.orders_in_result;
   });
-  return { standalone, vehicles };
+  return { standalone, vehicles, unresolved };
 }

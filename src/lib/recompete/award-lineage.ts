@@ -66,3 +66,15 @@ export function parseAwardLineage(row: {
   }
   return { award_kind: 'unknown', parent_vehicle_piid: null, parent_vehicle_id: null, lineage_source: null };
 }
+
+/**
+ * PostgREST `.or()` expression selecting rows parseAwardLineage would NOT call an order:
+ * a generated award id whose parent slot is `-NONE-` (standalone), or a non-generated id whose
+ * stored award type is not an order type (standalone or unknown). Applied INSIDE a fetch so a
+ * row cap is spent on standalone contracts, not on orders that are then thrown away.
+ * Kept beside parseAwardLineage so the two definitions cannot drift apart unnoticed
+ * (award-lineage.unit.test.ts pins both).
+ */
+export const NOT_ORDER_UNDER_VEHICLE_OR =
+  'contract_id.like.%-NONE-_-NONE-,' +
+  'and(contract_id.not.like.CONT_AWD_%,or(contract_type.is.null,contract_type.not.in.("DELIVERY ORDER","BPA CALL","TASK ORDER")))';

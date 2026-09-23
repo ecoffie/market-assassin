@@ -362,10 +362,12 @@ describe('findOpportunities — region + stage end-to-end', () => {
       expect(res.horizons[k].stage).toMatchObject({ applied: false });
       expect(res.horizons[k].filters_unsupported.join(' ')).toMatch(/stage:MARKET_RESEARCH .*Open now only/);
     }
-    // (6) re-asserted under region + stage: Tyonek is still a holder signal, never DIRECT.
+    // (6) under region + stage: the 6 Tyonek rows are task orders under FA8571-23-D-0004, and
+    // Coming Back never returns orders (Eric, 2026-09-22) — none appears, all 6 are counted.
     const ty = res.horizons.coming_back.items;
-    expect(ty.length).toBe(6);
-    expect(ty.every((i) => i.evidence_class === 'HOLDER_SIGNAL')).toBe(true);
+    expect(ty.filter((i) => /TYONEK/.test(String(i.incumbent_name)))).toHaveLength(0);
+    expect(ty.some((i) => i.award_kind === 'order_under_vehicle')).toBe(false);
+    expect(res.horizons.coming_back.orders_excluded).toBe(6);
     expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_COMPANY_ANCHORED, ...HOST_RULES_STAGE]);
   });
 

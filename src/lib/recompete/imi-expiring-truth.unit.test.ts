@@ -58,8 +58,8 @@ describe('frozen set sanity', () => {
   });
 });
 
-describe('(4) recompete date is never already past for a contract that has not ended', () => {
-  it('BEFORE: the stored DB-trigger date was in the past on most in-window rows', () => {
+describe('(4) capture start is not a recompete date (final contract, Eric 2026-09-22)', () => {
+  it('BEFORE: the stored DB-trigger date (PoP end − 12mo) was served as the recompete date, past on most rows', () => {
     const past = inWindowRows().filter((r) => r.estimated_recompete_date && r.estimated_recompete_date < TODAY);
     // Measured on the frozen set: 55 of 59 — every row ending inside the next 12 months.
     expect(past.length).toBe(55);
@@ -68,34 +68,27 @@ describe('(4) recompete date is never already past for a contract that has not e
     expect(rca.estimated_recompete_date).toBe('2025-11-09');
   });
 
-  it('AFTER: 0 of 59 annotated rows carry an estimated_recompete_date earlier than today', () => {
+  it('AFTER: estimated_recompete_date is null on all 59 rows (0 past-dated, 0 copied from capture start or PoP end)', () => {
     const annotated = inWindowRows().map((r) => annotateRecompeteRow(r, NOW));
-    const past = annotated.filter((r) => r.estimated_recompete_date && r.estimated_recompete_date < TODAY);
-    expect(past).toEqual([]);
+    expect(annotated.filter((r) => r.estimated_recompete_date !== null)).toEqual([]);
+    for (const a of annotated) {
+      expect(a.estimated_recompete_date).not.toBe(a.capture_start_date);
+      expect(a.estimated_recompete_date).not.toBe(a.period_of_performance_current_end);
+    }
   });
 
-  it('keeps the measured capture date under its own name — nothing hidden, nothing clamped to today', () => {
+  it('carries the derived capture start with its stated rule — nothing hidden, nothing clamped to today', () => {
     const annotated = inWindowRows().map((r) => annotateRecompeteRow(r, NOW));
     for (const a of annotated) {
       expect(a.capture_start_date).toBeTruthy();
-      expect(a.estimated_recompete_date).not.toBe(TODAY);
-      if (a.award_kind !== 'order_under_vehicle' && a.capture_start_date! >= TODAY) {
-        expect(a.estimated_recompete_date).toBe(a.capture_start_date);
-        expect(a.recompete_date_status).toBe('capture_start_upcoming');
-      }
+      expect(a.capture_start_basis).toBe('derived: period_of_performance_current_end − 12 months (Mindy capture lead rule)');
+      expect(a.capture_start_passed).toBe(a.capture_start_date! < TODAY);
     }
+    // "Contract ends 2026-11-09. Suggested capture start: 2025-11-09."
     const rca = annotated.find((r) => r.piid === 'FA850126F0034')!;
+    expect(rca.period_of_performance_current_end).toBe('2026-11-09');
     expect(rca.capture_start_date).toBe('2025-11-09');
     expect(rca.estimated_recompete_date).toBeNull();
-    expect(rca.recompete_date_status).toBe('order_under_vehicle');
-  });
-
-  it('a standalone contract whose capture date passed says the window is open, with no date', () => {
-    const standalone = inWindowRows()
-      .map((r) => annotateRecompeteRow(r, NOW))
-      .find((r) => r.award_kind === 'standalone_contract' && r.capture_start_date! < TODAY)!;
-    expect(standalone.estimated_recompete_date).toBeNull();
-    expect(standalone.recompete_date_status).toBe('capture_window_open');
   });
 });
 
@@ -156,6 +149,31 @@ describe('(5) orders roll up to the parent vehicle', () => {
       expect(v.ordering_end_reason).toBeTruthy();
       for (const o of v.orders) expect(v.ordering_end_date).not.toBe(o.period_of_performance_current_end);
     }
+  });
+});
+
+describe('(5c) an unknown parent never creates a vehicle', () => {
+  const parentless = (piid: string) => annotateRecompeteRow({
+    contract_id: piid, piid, contract_type: 'DELIVERY ORDER', incumbent_name: `Holder ${piid}`,
+    awarding_agency: 'Department of Defense', awarding_sub_agency: 'Department of the Air Force',
+    total_obligation: 100_000, period_of_performance_current_end: '2027-01-15', description: null,
+  }, NOW);
+
+  it('two parentless DELIVERY ORDER rows from the same agency/sub-agency do NOT become one VehicleRollup', () => {
+    const rows = [parentless('FA000126F0001'), parentless('FA000126F0002')];
+    expect(rows.every((r) => r.award_kind === 'order_under_vehicle' && r.parent_vehicle_piid === null)).toBe(true);
+    const { standalone, vehicles, unresolved } = rollupOrdersByVehicle(rows, new Map(), NOW);
+    expect(vehicles).toEqual([]);
+    expect(standalone).toEqual([]);
+    expect(unresolved.map((u) => u.piid)).toEqual(['FA000126F0001', 'FA000126F0002']);
+    expect(unresolved.every((u) => u.parent_vehicle === 'UNKNOWN')).toBe(true);
+  });
+
+  it('parentless orders sit beside real vehicles without joining them', () => {
+    const annotated = [...inWindowRows().map((r) => annotateRecompeteRow(r, NOW)), parentless('FA000126F0003')];
+    const { vehicles, unresolved } = rollupOrdersByVehicle(annotated, new Map(), NOW);
+    expect(vehicles.every((v) => v.vehicle_piid)).toBe(true);
+    expect(unresolved.map((u) => u.piid)).toEqual(['FA000126F0003']);
   });
 });
 
@@ -231,7 +249,7 @@ describe('get_expiring_contracts (tool) on the frozen set', () => {
     expect(apexOrder).toBeDefined();
     expect(res._meta).not.toHaveProperty('pop_contested_withheld');
     // (4)
-    expect(res.contracts.filter((c) => c.estimated_recompete_date && c.estimated_recompete_date < TODAY)).toEqual([]);
+    expect(res.contracts.filter((c) => c.estimated_recompete_date !== null)).toEqual([]);
     // (5)
     expect(res.contracts.some((c) => c.award_kind === 'order_under_vehicle')).toBe(false);
     const robins = res.vehicles.find((v) => v.vehicle_piid === 'FA850124D0005')!;

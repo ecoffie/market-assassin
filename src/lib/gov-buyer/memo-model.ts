@@ -189,7 +189,7 @@ export function buildMemoModel(input: {
     sections.push({
       heading: '5. Procurement History',
       paragraphs: [
-        'No active contracts with a future recompete date were identified in the award record for this ' +
+        'No contracts still in their period of performance were identified in the award record for this ' +
         'scope. This is a measured result. It may indicate a new requirement, or a scope narrower than ' +
         'the award record captures.',
       ],
@@ -205,19 +205,19 @@ export function buildMemoModel(input: {
         (h.totalValue !== null ? ` Combined ceiling value: ${usd(h.totalValue)}.` : ''),
       ],
       table: {
-        headers: ['Incumbent', 'Work', 'Ceiling', 'Est. Recompete', 'Set-Aside'],
+        headers: ['Incumbent', 'Work', 'Ceiling', 'Contract Ends', 'Set-Aside'],
         rows: h.contracts.slice(0, 25).map((c) => [
           c.incumbent,
           c.pscDescription || '—',
           c.value !== null ? usd(c.value) : '—',
-          c.estimatedRecompete || '—',
+          c.periodEnd || '—',
           // NULL means unknown, NOT unrestricted.
           c.setAside || 'Not recorded',
         ]),
       },
       footnotes: [
-        'Recompete dates are estimated from award period-of-performance data. They are a planning ' +
-        'signal, not a commitment that a solicitation will issue on that date.',
+        'Contract end dates are the current period-of-performance end in the award record. No recompete ' +
+        'or solicitation date is estimated from them.',
         `Set-aside is recorded on ${h.setAsideCoverage.withSetAside} of ${h.setAsideCoverage.total} ` +
         'matched rows. "Not recorded" means the award record does not carry a set-aside value for that ' +
         'contract — it does not mean the contract was unrestricted.',
@@ -269,11 +269,11 @@ export function buildMemoModel(input: {
     if (s.upcomingRecompetes !== null) {
       paras.push(
         `${s.upcomingRecompetes} contract${s.upcomingRecompetes === 1 ? '' : 's'} in this scope ` +
-        `${s.upcomingRecompetes === 1 ? 'is' : 'are'} estimated to come up for recompete within the ` +
-        `next ${s.horizonMonths} months.`,
+        `reach${s.upcomingRecompetes === 1 ? 'es' : ''} the end of ${s.upcomingRecompetes === 1 ? 'its' : 'their'} current period of ` +
+        `performance within the next ${s.horizonMonths} months.`,
       );
     } else {
-      paras.push('Upcoming recompete volume: not measured.');
+      paras.push('Contracts ending in the horizon: not measured.');
     }
     if (s.events.length > 0) {
       paras.push(

@@ -8,6 +8,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
+import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import {
   interpretMarket,
   evidenceWhy,
@@ -183,6 +184,8 @@ export interface HorizonResult {
   allowed_handoffs: HandoffKey[];
   semantics_note: string | null;
   evidence_counts?: EvidenceCounts | null;
+  /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
+  orders_excluded?: number | null;
   /** Company-anchored FIND only: verdict counts over the RETURNED items (not the matched population). */
   eligibility_counts?: Record<EligibilityStatus, number> | null;
   /** Stage-filtered FIND only (input.stage). Open now carries the counts; other horizons say "not applied". */
@@ -969,25 +972,44 @@ async function queryComingBack(
     // Company-anchored: registered codes can admit hundreds of rows ahead of the text matches in
     // end-date order, so the anchored window is wider (OPEN_FETCH_CAP) and the base plan is unioned.
     const fetchCap = p.basePlan ? Math.max(baseCap, OPEN_FETCH_CAP) : baseCap;
+    // COMING BACK NEVER RETURNS ORDERS (Eric, 2026-09-22). A task/delivery order under a vehicle
+    // is not re-competed on its own. The exclusion is applied INSIDE the fetch — before the row
+    // cap, classification and ranking — so every slot goes to a standalone contract instead of
+    // being spent on orders that would then be thrown away. Orders are not reclassified or moved
+    // to Open; they are counted (orders_excluded) and dropped. Relevance/eligibility untouched.
     const { data, count, error } = await applyRecompetePlan(client.from(source).select(COLS, { count: 'exact' }), p.plan)
+      .or(NOT_ORDER_UNDER_VEHICLE_OR)
       .order('period_of_performance_current_end', { ascending: true })
       .limit(fetchCap);
     if (error) return unavailable(source, BACK_HANDOFFS, error.message, unsupported);
 
+    // Orders the same plan matched — measured, never inferred. null = the count query failed.
+    let ordersExcluded: number | null = null;
+    {
+      const { count: all, error: ae } = await applyRecompetePlan(client.from(source).select('contract_id', { count: 'exact', head: true }), p.plan);
+      if (!ae && typeof all === 'number' && typeof count === 'number') ordersExcluded = Math.max(0, all - count);
+    }
+
     let unmapped: number | null = null;
     {
-      const { count: uc, error: ue } = await applyRecompetePlan(client.from(source).select('contract_id', { count: 'exact', head: true }), p.plan).is('map_lat', null);
+      const { count: uc, error: ue } = await applyRecompetePlan(client.from(source).select('contract_id', { count: 'exact', head: true }), p.plan)
+        .or(NOT_ORDER_UNDER_VEHICLE_OR).is('map_lat', null);
       if (!ue) unmapped = uc ?? null;
     }
 
     let baseRows: Array<Record<string, unknown>> | null = null;
     if (p.basePlan) {
       const base = await applyRecompetePlan(client.from(source).select(COLS), p.basePlan)
+        .or(NOT_ORDER_UNDER_VEHICLE_OR)
         .order('period_of_performance_current_end', { ascending: true })
         .limit(baseCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
-    const rawRows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id');
+    // Belt and braces: the same rule in JS (parseAwardLineage), so a row the SQL predicate let
+    // through can still never become an individual Coming Back item.
+    const unioned = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id');
+    const rawRows = unioned.filter((r) => parseAwardLineage(r as { contract_id?: string; contract_type?: string }).award_kind !== 'order_under_vehicle');
+    const ordersDroppedInJs = unioned.length - rawRows.length;
     // Ranking reads BUY-SIDE fields only — the holder's name must not lift a row (it used to).
     const scores = new Map(rankRecords(p.plan, rawRows, ['description', 'psc_description', 'naics_description', 'awarding_agency', 'awarding_sub_agency']).map((s) => [s.row, s]));
     const anchor = p.company?.anchor ?? null;
@@ -1016,12 +1038,16 @@ async function queryComingBack(
     const sliced = classified.slice(0, limit);
 
     if (!sliced.length) {
-      return emptyHorizon(source, BACK_HANDOFFS, consumed, unsupported, asOf, 'No matching future recompetes under these filters.', unmapped);
+      const excluded = ordersExcluded === null ? null : ordersExcluded + ordersDroppedInJs;
+      const msg = excluded
+        ? 'No standalone future recompetes under these filters — only task/delivery orders under existing vehicles matched, and those are not re-competed on their own.'
+        : 'No matching future recompetes under these filters.';
+      const empty = emptyHorizon(source, BACK_HANDOFFS, consumed, unsupported, asOf, msg, unmapped);
+      return { ...empty, orders_excluded: excluded };
     }
 
     const phraseBack = p.searchText || 'this work';
-    // Same corrected row as get_expiring_contracts (annotate.ts): an order is labelled with its
-    // parent vehicle (not presented as a standalone recompete). Selection/relevance above is untouched.
+    // Same corrected row as get_expiring_contracts (annotate.ts). Orders never reach here.
     const items: HorizonItem[] = sliced.map(({ row: r, cls, basis }) => {
       const a = recompeteRowAnnotations(r as Parameters<typeof recompeteRowAnnotations>[0]);
       return {
@@ -1030,7 +1056,9 @@ async function queryComingBack(
       buyer: String(r.awarding_sub_agency || r.awarding_agency || '') || null,
       location_label: locLabel(r.place_of_performance_city as string, r.place_of_performance_state as string),
       award_kind: a.award_kind,
-      parent_vehicle_piid: a.parent_vehicle_piid,
+      // Suggested capture start (derived rule), never a recompete date.
+      capture_start_date: a.capture_start_date,
+      capture_start_basis: a.capture_start_basis,
       relevant_date: (r.period_of_performance_current_end as string) || null,
       relevant_date_label: 'current_end',
       value_label: moneyLabel(r.potential_total_value) || moneyLabel(r.total_obligation),
@@ -1063,10 +1091,7 @@ async function queryComingBack(
     const note = related
       ? 'DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is this buyer’s broader IT market — not confirmed cybersecurity. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet.'
       : 'Geography: place of performance only (not buying-office). Not a live solicitation — do not draft a proposal as if an RFP exists. Watch/email for this horizon is not available yet.';
-    // An order under a vehicle is not re-competed on its own — say so wherever one is present.
-    const orderNote = items.some((i) => i.award_kind === 'order_under_vehicle')
-      ? ' Items with award_kind=order_under_vehicle are task/delivery orders under parent_vehicle_piid: work flowing under that vehicle (a sub-under lead), not a standalone recompete.'
-      : '';
+    const orderNote = ' Task/delivery orders under a contract vehicle are excluded — they are not re-competed on their own.';
 
     return {
       status: 'grounded',
@@ -1082,6 +1107,7 @@ async function queryComingBack(
       allowed_handoffs: BACK_HANDOFFS,
       semantics_note: note + ' DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder\'s name.' + orderNote,
       evidence_counts,
+      orders_excluded: ordersExcluded === null ? null : ordersExcluded + ordersDroppedInJs,
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
   } catch (e) {
