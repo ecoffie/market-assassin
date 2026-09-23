@@ -186,12 +186,15 @@ export function extractStructuredIntent(raw: string): StructuredIntent {
   // A leading "<word> me <opportunity noun>" is an imperative addressed to the user WHATEVER the verb —
   // "shoe me opportunities in the Virgin Islands" is a request, not a search for shoes (saved search
   // c3f908e3, 2026-09-23: "shoe" became a required concept ∧ VI → 0 while VI had live notices).
-  // STRUCTURAL, not fuzzy: the clause shape decides, the word is never compared to a spelling list, and
-  // it applies only when no known wrapper matched and the very next token is an opportunity noun.
+  // STRUCTURAL, not fuzzy: the clause shape decides and the word is never compared to a spelling list.
+  // Contract (Eric, 2026-09-23): only when no known wrapper matched, the very next token is an
+  // opportunity noun, AND the remainder resolves to STRUCTURED intent (state / agency / set-aside / code).
+  // Otherwise the word is restored below and stays a lexical concept, exactly as before.
+  let clauseWord: string | null = null;
   if (!wrapped) {
     const clause = new RegExp(`^ ([a-z]+) me (?=(?:${[...OPP_NOUNS, ...CONTRACT_NOUNS].join('|')}) )`);
     const m = p.match(clause);
-    if (m) { out.stripped.push(`${m[1]} me`); p = ` ${p.slice(m[0].length)}`; }
+    if (m) { clauseWord = m[1]; p = ` me ${p.slice(m[0].length)}`; }
   }
 
   // Set-asides (longest phrase first), then states, then agencies (longest first).
@@ -222,6 +225,10 @@ export function extractStructuredIntent(raw: string): StructuredIntent {
     if (r.hit) { p = r.rest; out.stripped.push(w); }
   }
   const structured = out.agencies.length + out.states.length + out.setAsides.length + out.naics.length + out.psc.length > 0 || out.horizonHint;
+  if (clauseWord) {
+    if (structured) out.stripped.unshift(`${clauseWord} me`);
+    else p = ` ${clauseWord}${p}`; // no structured remainder → the word is a search term again (pre-rule behaviour)
+  }
   if (structured) {
     for (const w of CONTRACT_NOUNS) { const r = takePhrase(p, w); if (r.hit) { p = r.rest; out.stripped.push(w); } }
   }

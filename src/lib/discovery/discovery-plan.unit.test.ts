@@ -327,9 +327,15 @@ describe('Phase D — a leading "<word> me <opportunity noun>" is an imperative 
     expect(p.intent.stripped).toContain('shoe me');
     expect(p.status).toBe('ok');
   });
-  it('any verb in that clause shape is a request ("email me opportunities in cyber")', () => {
+  it('any verb in that clause shape is a request when the remainder is structured ("email me opportunities in Virginia")', () => {
+    const p = planFor({ query: 'email me opportunities in Virginia' });
+    expect(p.states).toEqual(['VA']);
+    expect(p.matcher.mode).toBe('none');
+  });
+  it('without a STRUCTURED remainder the word stays a search term ("email me opportunities in cyber")', () => {
     const p = planFor({ query: 'email me opportunities in cyber' });
-    expect(p.matcher.alternatives[0].eligible.map((c) => c.label)).toEqual(['cybersecurity']);
+    expect(p.matcher.alternatives[0].eligible.map((c) => c.label).sort()).toEqual(['cybersecurity', 'email']);
+    expect(p.intent.stripped).not.toContain('email me');
   });
   it('is NARROW: without "me" + an opportunity noun the word stays a concept', () => {
     expect(planFor({ query: 'shoe opportunities' }).matcher.alternatives[0].eligible.map((c) => c.label)).toEqual(['shoe']);
@@ -340,5 +346,56 @@ describe('Phase D — a leading "<word> me <opportunity noun>" is an imperative 
     const p = planFor({ query: 'Show me USDA opportunities' });
     expect(p.intent.stripped).toEqual(['show me', 'opportunities']);
     expect(p.buyers.map((b) => b.requested)).toEqual(['USDA']);
+  });
+});
+
+describe('Decision #4 — "software license" is ONE concept with procurement-equivalent forms (audited records)', () => {
+  const m = buildTextMatcher('software license');
+  // Real rows from the a9eb09ff saved-search audit (2026-09-23), title + description as stored.
+  it.each([
+    ['ANSYS Fluent License Maintenance- Notice of Intent'],
+    ['Fortify On Demand Software Subscriptions'],
+    ['Applanix POSPac MMS Software Maintenance Renewal'],
+    ['BRAND NAME RF CODE CENTERSCAPE TERM SOFTWARE LICENSES'],
+    ['Software licensing for the enterprise'],
+    ['NUTANIX LICENSE RENEWAL'],
+    ['GITLAB ULTIMATE LICENSE SUBSCRIPTIONS'],
+  ])('admits %s', (title) => expect(matchesText(m, [title])).toBe(true));
+
+  it.each([
+    ['Predictor Remediation Exam', 'Online nursing remediation exam for students'],
+    ['AI Legal Research RFI', 'NAICS 513210 Software Publishers. Market research for legal research tools'],
+    ['AI Legal Research RFI', 'Access to agency-licensed databases and case law'],
+    ['Enterprise Software Support Services', 'Tier 2 software support and help desk'],
+    ['Simview Simulation Renewal', 'Simview Simulation Software- PN: Z9500A-RFP-1YR'],
+  ])('does not admit %s', (title, desc) => expect(matchesText(m, [title, desc])).toBe(false));
+
+  it('bare license / subscription / maintenance / renewal are never sufficient', () => {
+    for (const t of ['Annual license fee', 'Magazine subscription', 'HVAC maintenance renewal', 'Lease renewal', 'Software engineering']) {
+      expect(matchesText(m, [t]), t).toBe(false);
+    }
+  });
+  it('query recognition is inflection-aware and yields ONE concept', () => {
+    for (const q of ['software license', 'software licenses', 'software licensing', 'Software Licensed']) {
+      const a = buildTextMatcher(q).alternatives[0];
+      expect(a.eligible.map((c) => c.label), q).toEqual(['software license']);
+      expect(a.eligible[0].basis).toBe('recognized_concept');
+    }
+  });
+  it('record-only forms typed as a query keep their plain-word meaning (only the NAME recognizes)', () => {
+    expect(buildTextMatcher('license renewal').alternatives[0].eligible.map((c) => c.label)).toEqual(['license', 'renewal']);
+    expect(buildTextMatcher('software subscriptions').alternatives[0].eligible.map((c) => c.label)).toEqual(['software', 'subscriptions']);
+  });
+  it('the concept only ADDS: software + license anywhere still admits (pre-concept meaning kept)', () => {
+    expect(matchesText(m, ['Microsoft Software Enterprise Licenses for BIA'])).toBe(true);
+    expect(matchesText(m, ['Renewal of Adobe Subscription Licenses', 'Adobe software for staff'])).toBe(true);
+  });
+  it('an exclusion removes the named forms, never the two-word co-occurrence', () => {
+    const x = buildTextMatcher('cloud', ['software license']);
+    expect(x.excluded[0].cooccur).toBeUndefined();
+  });
+  it('bare words in a query stay ordinary words (not the concept)', () => {
+    expect(buildTextMatcher('license').alternatives[0].eligible.map((c) => c.label)).toEqual(['license']);
+    expect(buildTextMatcher('software').alternatives[0].eligible.map((c) => c.label)).toEqual(['software']);
   });
 });

@@ -4103,5 +4103,359 @@
       }
     },
     "notes": []
+  },
+  "software license": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "software license",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "software license",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "software license",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "software license",
+              "cls": "distinctive",
+              "basis": "recognized_concept",
+              "forms": [
+                "software license",
+                "software subscription",
+                "software maintenance renewal",
+                "software renewal",
+                "license subscription",
+                "license renewal",
+                "license maintenance"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1,
+              "cooccur": [
+                {
+                  "label": "software",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "software"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "license",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "license"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ]
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "software license"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",sow_text.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",department.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",solicitation_number.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",and(or(title.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",department.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\"),or(title.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",department.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",psc_description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",naics_description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",incumbent_name.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",awarding_agency.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",and(or(description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",psc_description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",incumbent_name.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\"),or(description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",psc_description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",incumbent_name.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\"))"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",naics_description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",department.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",and(or(title.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",department.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\"),or(title.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",department.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
+  },
+  "software licenses": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "software licenses",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "software licenses",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "software licenses",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "software license",
+              "cls": "distinctive",
+              "basis": "recognized_concept",
+              "forms": [
+                "software license",
+                "software subscription",
+                "software maintenance renewal",
+                "software renewal",
+                "license subscription",
+                "license renewal",
+                "license maintenance"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1,
+              "cooccur": [
+                {
+                  "label": "software",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "software"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "license",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "license"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ]
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": [
+          "software licenses"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",sow_text.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",department.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",solicitation_number.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",and(or(title.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",department.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\"),or(title.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",sow_text.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",department.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",solicitation_number.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\"))"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "text",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",psc_description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",naics_description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",incumbent_name.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",awarding_agency.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",and(or(description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",psc_description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",incumbent_name.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\"),or(description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",psc_description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",incumbent_name.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\"))"
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",naics_description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",department.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",description.imatch.\"\\\\m(software[-\\\\s]+(license(s|es|ing|ed)?|licens(ing|ed))|software[-\\\\s]+subscription(s|es|ing|ed)?|software[-\\\\s]+maintenance[-\\\\s]+renewal(s|es|ing|ed)?|software[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+subscription(s|es|ing|ed)?|license[-\\\\s]+renewal(s|es|ing|ed)?|license[-\\\\s]+(maintenance(s|es|ing|ed)?|maintenanc(ing|ed)))\\\\M\",and(or(title.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",department.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\",description.imatch.\"\\\\m(software(s|es|ing|ed)?|softwar(ing|ed))\\\\M\"),or(title.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",department.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\",description.imatch.\"\\\\m(license(s|es|ing|ed)?|licens(ing|ed))\\\\M\"))"
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
+      }
+    },
+    "notes": []
   }
 }
