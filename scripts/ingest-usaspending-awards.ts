@@ -59,6 +59,8 @@ import {
   LAGGARD_CONTINUITY_SLACK_DAYS,
   MAX_LAGGARD_EXTENSION_DAYS,
   resolveIdvIdentityColumnsMode,
+  awardsColumnsQuery,
+  IDV_IDENTITY_REQUIRED,
   resolveIngestWindowStart,
   buildLaggardWeeklyCountsSql,
   resolveDenseFrontier,
@@ -128,22 +130,39 @@ async function currentWatermarks(): Promise<{ global: string; dod: string | null
 }
 
 /**
- * Does the live `awards` schema already carry the IDV identity columns? (see merge-sql.ts)
- * A failed metadata read means the legacy 41-column MERGE — which is valid against either schema
- * (the new columns are simply left NULL/unchanged). A PARTIAL schema still refuses to run.
+ * Does the live `awards` schema already carry the IDV identity columns? Reads names AND data
+ * types (see merge-sql.ts `resolveIdvIdentityColumnsMode`): refuses on a partial DDL, a type
+ * mismatch or a missing legacy column.
+ *
+ * A failed or empty metadata read is UNMEASURED:
+ *   * while IDV_IDENTITY_REQUIRED is false → the legacy 41-column MERGE (valid against either
+ *     schema — the new columns are simply left NULL/unchanged), with a warning (#1658 behaviour);
+ *   * once IDV_IDENTITY_REQUIRED is true → the ingest REFUSES. Falling back to 41 columns then
+ *     would silently stop writing columns the product depends on.
  */
 async function idvIdentityColumnsPresent(): Promise<boolean> {
-  let columns: string[];
+  let live: Array<{ name: string; dataType: string }>;
   try {
-    const rows = await bqQuery<{ column_name: string }>({
-      query: `SELECT column_name FROM \`${PROJECT}.${DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'awards'`,
+    const rows = await bqQuery<{ column_name: string; data_type: string }>({
+      query: awardsColumnsQuery(PROJECT, DATASET),
     });
-    columns = rows.map((r) => r.column_name);
+    live = (rows ?? []).map((r) => ({ name: r.column_name, dataType: r.data_type }));
   } catch (error) {
-    log(`WARNING: awards schema read failed (${error instanceof Error ? error.message : String(error)}) — using the legacy MERGE`);
+    const why = error instanceof Error ? error.message : String(error);
+    if (IDV_IDENTITY_REQUIRED) {
+      throw new Error(`awards schema read failed (${why}) and IDV identity columns are REQUIRED — refusing to run the legacy MERGE`, { cause: error });
+    }
+    log(`WARNING: awards schema read failed (${why}) — using the legacy MERGE`);
     return false;
   }
-  return resolveIdvIdentityColumnsMode(columns) === 'present';
+  if (live.length === 0) {
+    if (IDV_IDENTITY_REQUIRED) {
+      throw new Error('INFORMATION_SCHEMA returned no columns for awards and IDV identity columns are REQUIRED — refusing to run');
+    }
+    log('WARNING: INFORMATION_SCHEMA returned no columns for awards — using the legacy MERGE');
+    return false;
+  }
+  return resolveIdvIdentityColumnsMode(live) === 'present';
 }
 
 async function main() {
@@ -298,11 +317,13 @@ async function main() {
 
     // 5. MERGE staging → awards on txn_id (the measured-unique transaction key). Update-on-match
     //    (absorbs FPDS 90-day corrections in the trailing window), insert-on-miss (new txns). The
-    //    SELECT is the explicit CSV→target mapping (USASpending long names → our 40 columns; the
+    //    SELECT is the explicit CSV→target mapping (USASpending long names → the MERGE columns derived from awards-schema.ts; the
     //    exec_* / detail cols the bulk export omits stay NULL, same as existing rows).
-    // The MERGE scans the whole 63M-row target to find txn_id matches unless we BOUND it — the
-    // table is date-partitioned on action_date, so restricting T to the pull window prunes to the
-    // affected partitions (the full-table scan billed ~43GB and blew the bqQuery 5GB cap). We run
+    // The MERGE scans the whole 63M-row target to find txn_id matches unless we BOUND it. NOTE the
+    // table is partitioned RANGE_BUCKET(fiscal_year, 2015..2030) — NOT on action_date (verified in
+    // INFORMATION_SCHEMA 2026-09-23; see awards-schema.ts). A bare action_date predicate is not a
+    // partition filter, so do not assume it prunes; bytes billed should be measured, not inferred
+    // from this comment (the unbounded full-table scan billed ~43GB and blew the bqQuery 5GB cap). We run
     // it via the `bq query` CLI (like the load) — the app's bqQuery helper is cost-capped for
     // READ safety and isn't the right tool for a bulk DDL MERGE.
     log('MERGE staging → awards on txn_id…');

@@ -315,6 +315,22 @@ else
   fail=1
 fi
 
+# 7b) HARD BLOCK: no NEW destructive writer of `usaspending.awards`. CREATE [OR REPLACE] TABLE /
+#     DROP / TRUNCATE / WRITE_TRUNCATE / bq load --replace / bq cp -f / RENAME / DROP COLUMN on the
+#     63M-row awards table rebuilds it from some other column list and data cut — every column the
+#     replacement does not carry is ERASED (the 7 IDV identity columns, 2026-09-23) and every weekly
+#     MERGE since the cut is rolled back, with no error. Only build-derived.sql (while it carries its
+#     awards-schema guard) and a fully-commented 99-rollback.sql are allowlisted.
+#     Baseline-gated: only NEW ones block. Self-test: --self-test.
+echo -e "  ${BOLD}7b/13${NC} awards destructive-writer audit…"
+if node scripts/audit-awards-schema-writers.mjs > /tmp/mindy-prepush-awardswriters.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new destructive writer of usaspending.awards${NC}"
+else
+  echo -e "      ${RED}✗ new destructive writer of usaspending.awards — push blocked${NC}"
+  cat /tmp/mindy-prepush-awardswriters.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 8) HARD BLOCK: no NEW persist path storing a QUERY-TIME NAICS expansion. Broadening
 #    codes for MATCHING is correct; STORING the broadened set rewrites the user's own
 #    choices. One "Professional Services" preset click (['541']) persisted all 51 codes

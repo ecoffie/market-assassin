@@ -1,3 +1,4 @@
+export * from './awards-schema';
 export * from './acquisition-poll';
 export * from './clocks';
 export * from './cohort-completeness';

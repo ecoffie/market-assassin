@@ -15,6 +15,12 @@ import {
   type AwardsIngestClocks,
 } from './clocks';
 import { INGEST_BASELINE_PATH } from './workflow-control';
+import {
+  AWARDS_COLUMNS,
+  awardsColumnsQuery,
+  classifyAwardsSchema,
+  IDV_IDENTITY_REQUIRED,
+} from './awards-schema';
 
 export { INGEST_BASELINE_PATH };
 
@@ -31,7 +37,21 @@ export interface AwardsIngestSanitizedSnapshot {
   recipientsRebuiltAt: string | null;
   freshnessStatus: string | null;
   freshnessLegacyUnmeasured: boolean;
+  /**
+   * Live `awards` schema (INFORMATION_SCHEMA.COLUMNS). Optional so baselines captured before
+   * 2026-09-23 still parse; absent on `current` = unmeasured.
+   */
+  awardsColumnCount?: number | null;
+  awardsIdvIdentityMode?: 'present' | 'absent' | 'partial' | null;
+  /** classifyAwardsSchema().ok — false on a type mismatch, a missing legacy column or a partial DDL. */
+  awardsSchemaOk?: boolean | null;
+  /** IDV rows (award_or_idv_flag='IDV') in the trailing 90 days of action_date — only when present. */
+  idvRecentRows?: number | null;
+  idvRecentOrderingEndFilled?: number | null;
 }
+
+/** Share of recent IDV rows that must carry ordering_period_end_date (staging measured 100%). */
+export const IDV_ORDERING_END_MIN_FILL = 0.95;
 
 export interface PostApplyCheckResult {
   awardsMaxActionDateNonRegressing: boolean;
@@ -43,6 +63,12 @@ export interface PostApplyCheckResult {
   recipientsRebuiltAtPopulated: boolean;
   freshnessNotLegacyUnmeasured: boolean;
   freshnessStatus: string | null;
+  /** ≥ 58 columns — enforced only when IDV_IDENTITY_REQUIRED; otherwise reported. */
+  awardsColumnCountOk: boolean;
+  /** No type mismatch / missing legacy column / partial IDV DDL (unmeasured = pass unless required). */
+  awardsSchemaTypesOk: boolean;
+  /** When the IDV columns are present: recent IDV rows carry ordering_period_end_date. */
+  idvOrderingEndFillOk: boolean;
 }
 
 export interface PostApplyVerificationResult {
@@ -147,6 +173,7 @@ export async function captureSanitizedSnapshot(): Promise<AwardsIngestSanitizedS
 
   const dataSources = await readSupabaseDataSources();
   const freshness = freshnessFromNotes(dataSources.notes);
+  const schema = await captureAwardsSchemaState();
 
   return {
     capturedAt: new Date().toISOString(),
@@ -156,13 +183,61 @@ export async function captureSanitizedSnapshot(): Promise<AwardsIngestSanitizedS
     recipientsRollupMergedMaxLastActionDate: rollupMergedRow?.max_last_action_date ?? null,
     dataSourcesLastBuilt: dataSources.lastBuilt,
     ...freshness,
+    ...schema,
+  };
+}
+
+/** Live column count / IDV mode / (when present) recent IDV ordering_period_end_date fill. */
+async function captureAwardsSchemaState(): Promise<Pick<AwardsIngestSanitizedSnapshot,
+  'awardsColumnCount' | 'awardsIdvIdentityMode' | 'awardsSchemaOk' | 'idvRecentRows' | 'idvRecentOrderingEndFilled'>> {
+  const cols = await bqQuery<{ column_name: string; data_type: string }>({
+    query: awardsColumnsQuery(),
+    bulkJob: 'awards-ingest-post-apply-baseline',
+  });
+  // Never classify with the IDV requirement here — verifyPostApply applies it, so a baseline
+  // capture never throws. Unknown/mismatch detail stays out of the snapshot (counts only).
+  const state = classifyAwardsSchema(
+    cols.map((c) => ({ name: c.column_name, dataType: c.data_type })),
+    { required: false },
+  );
+  let idvRecentRows: number | null = null;
+  let idvRecentOrderingEndFilled: number | null = null;
+  if (state.idvMode === 'present') {
+    const [fill] = await bqQuery<{ idv_rows?: number | string; filled?: number | string }>({
+      query: `
+        SELECT
+          COUNTIF(award_or_idv_flag = 'IDV') AS idv_rows,
+          COUNTIF(award_or_idv_flag = 'IDV' AND ordering_period_end_date IS NOT NULL) AS filled
+        FROM ${BQ_TABLES.awards}
+        WHERE fiscal_year >= EXTRACT(YEAR FROM CURRENT_DATE()) - 1
+          AND action_date >= DATE_SUB(
+            (SELECT MAX(action_date) FROM ${BQ_TABLES.awards} WHERE fiscal_year >= EXTRACT(YEAR FROM CURRENT_DATE()) - 1),
+            INTERVAL 90 DAY)
+      `,
+      bulkJob: 'awards-ingest-post-apply-baseline',
+    });
+    idvRecentRows = parseCount(fill?.idv_rows);
+    idvRecentOrderingEndFilled = parseCount(fill?.filled);
+  }
+  return {
+    awardsColumnCount: cols.length,
+    awardsIdvIdentityMode: state.idvMode,
+    awardsSchemaOk: state.ok,
+    idvRecentRows,
+    idvRecentOrderingEndFilled,
   };
 }
 
 export function verifyPostApply(
   baseline: AwardsIngestSanitizedSnapshot,
   current: AwardsIngestSanitizedSnapshot,
+  opts: { idvRequired?: boolean } = {},
 ): PostApplyVerificationResult {
+  const idvRequired = opts.idvRequired ?? IDV_IDENTITY_REQUIRED;
+  const colCount = current.awardsColumnCount ?? null;
+  const mode = current.awardsIdvIdentityMode ?? null;
+  const idvRows = current.idvRecentRows ?? null;
+  const idvFilled = current.idvRecentOrderingEndFilled ?? null;
   const checks: PostApplyCheckResult = {
     awardsMaxActionDateNonRegressing: dateNonRegressing(
       baseline.awardsMaxActionDate,
@@ -185,6 +260,14 @@ export function verifyPostApply(
     recipientsRebuiltAtPopulated: Boolean(current.recipientsRebuiltAt),
     freshnessNotLegacyUnmeasured: !current.freshnessLegacyUnmeasured,
     freshnessStatus: current.freshnessStatus,
+    // Unmeasured (null) never passes once the columns are required — unknown is not "58".
+    awardsColumnCountOk: idvRequired ? colCount !== null && colCount >= AWARDS_COLUMNS.length : true,
+    awardsSchemaTypesOk: current.awardsSchemaOk === false
+      ? false
+      : idvRequired ? current.awardsSchemaOk === true && mode === 'present' : true,
+    idvOrderingEndFillOk: mode === 'present'
+      ? idvRows !== null && idvFilled !== null && idvRows > 0 && idvFilled / idvRows >= IDV_ORDERING_END_MIN_FILL
+      : !idvRequired,
   };
 
   const failures: string[] = [];
@@ -212,6 +295,15 @@ export function verifyPostApply(
   if (!checks.freshnessNotLegacyUnmeasured) {
     failures.push('freshness remains legacy unmeasured');
   }
+  if (!checks.awardsColumnCountOk) {
+    failures.push(`awards has ${colCount ?? 'UNMEASURED'} columns; ≥ ${AWARDS_COLUMNS.length} required (IDV_IDENTITY_REQUIRED)`);
+  }
+  if (!checks.awardsSchemaTypesOk) {
+    failures.push(`awards schema refused (idv mode ${mode ?? 'UNMEASURED'}; a type mismatch, missing legacy column or partial IDV DDL)`);
+  }
+  if (!checks.idvOrderingEndFillOk) {
+    failures.push(`recent IDV rows missing ordering_period_end_date (${idvFilled ?? '?'}/${idvRows ?? '?'}; need ≥ ${IDV_ORDERING_END_MIN_FILL * 100}%)`);
+  }
 
   return {
     ok: failures.length === 0,
@@ -237,6 +329,8 @@ export function formatVerificationReport(result: PostApplyVerificationResult): s
     `recipients_rebuilt_at_populated=${result.checks.recipientsRebuiltAtPopulated}`,
     `freshness_status=${result.checks.freshnessStatus}`,
     `freshness_not_legacy_unmeasured=${result.checks.freshnessNotLegacyUnmeasured}`,
+    `awards_column_count=${result.current.awardsColumnCount ?? 'unmeasured'} idv_mode=${result.current.awardsIdvIdentityMode ?? 'unmeasured'} column_count_ok=${result.checks.awardsColumnCountOk} schema_types_ok=${result.checks.awardsSchemaTypesOk}`,
+    `idv_recent_ordering_end_filled=${result.current.idvRecentOrderingEndFilled ?? 'n/a'}/${result.current.idvRecentRows ?? 'n/a'} fill_ok=${result.checks.idvOrderingEndFillOk}`,
   ];
   if (result.failures.length > 0) {
     lines.push(`failures=${result.failures.join('; ')}`);
