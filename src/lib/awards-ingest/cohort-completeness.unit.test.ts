@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   buildCohortMonthlyCountsSql,
   classifyCohortCompleteness,
@@ -91,17 +93,25 @@ describe('ingest window — anchored on the laggard cohort, not only the global 
       globalMax: '2026-09-18', laggardMaxes: { '097': '2026-06-21' },
       correctionDays: 100, laggardSlackDays: LAGGARD_CONTINUITY_SLACK_DAYS,
     });
-    expect(w).toEqual({ startDate: '2026-06-07', anchor: 'laggard:097', unmeasuredLaggards: [] });
+    expect(w).toEqual({ startDate: '2026-06-07', anchor: 'laggard:097', unmeasuredLaggards: [], cappedLaggards: [] });
   });
 
-  it('would have prevented the Jan–May 2026 hole: DoD frontier stuck at 2026-01-25 re-pulls from 2026-01-11', () => {
+  it('a DoD frontier stuck far back (2026-01-25) is CAPPED in the weekly path and reported for a manual backfill', () => {
     // State after the 2026-04-23 snapshot: civilian fresh, DoD dense data ending 2026-01-24.
+    // The weekly run must stay inside its acquisition budget, so it does NOT re-pull 7 months;
+    // it keeps the global start and names the cohort (repair = the one-time --from backfill).
     const w = resolveIngestWindowStart({
       globalMax: '2026-08-01', laggardMaxes: { '097': '2026-01-25' },
       correctionDays: 100, laggardSlackDays: LAGGARD_CONTINUITY_SLACK_DAYS,
     });
-    expect(w.startDate).toBe('2026-01-11');
-    expect(w.anchor).toBe('laggard:097');
+    expect(w).toEqual({ startDate: '2026-04-23', anchor: 'global', unmeasuredLaggards: [], cappedLaggards: ['097'] });
+    // An explicit, larger cap (a deliberate backfill) reaches it.
+    const wide = resolveIngestWindowStart({
+      globalMax: '2026-08-01', laggardMaxes: { '097': '2026-01-25' },
+      correctionDays: 100, laggardSlackDays: LAGGARD_CONTINUITY_SLACK_DAYS, maxLaggardExtensionDays: 365,
+    });
+    expect(wide.startDate).toBe('2026-01-11');
+    expect(wide.anchor).toBe('laggard:097');
     // The legacy rule (global − 100) started at 2026-04-23 and never reached the hole.
     expect(resolveIngestWindowStart({ globalMax: '2026-08-01', laggardMaxes: {}, correctionDays: 100, laggardSlackDays: 14 }).startDate)
       .toBe('2026-04-23');
@@ -112,10 +122,26 @@ describe('ingest window — anchored on the laggard cohort, not only the global 
     expect(w.anchor).toBe('global');
     expect(w.unmeasuredLaggards).toEqual(['097']);
   });
+
+  it('Sunday 2026-09-27 (no writes before it): 2026-06-07 → today, 3 days earlier than the legacy 2026-06-10', () => {
+    const legacy = resolveIngestWindowStart({ globalMax: '2026-09-18', laggardMaxes: {}, correctionDays: 100, laggardSlackDays: 14 });
+    const next = resolveIngestWindowStart({ globalMax: '2026-09-18', laggardMaxes: { '097': '2026-06-21' }, correctionDays: 100, laggardSlackDays: 14 });
+    expect(legacy.startDate).toBe('2026-06-10');
+    expect(next.startDate).toBe('2026-06-07');
+    expect(next.cappedLaggards).toEqual([]);
+  });
 });
 
 describe('MERGE retains IDV vehicle identity (additive, schema-gated)', () => {
-  const base = { awardsTable: '`market-assasin.usaspending.awards`', stagingFq: 'market-assasin.usaspending.awards_ingest_staging', startDate: '2026-06-06' };
+  const base = { awardsTable: '`market-assasin.usaspending.awards`', stagingFq: 'market-assasin.usaspending.awards_ingest_staging', startDate: '2026-06-07' };
+
+  it('GOLDEN: without the DDL the MERGE is byte-identical to the pre-#1658 statement (origin/main 45e3cfba)', () => {
+    // Generated from origin/main's merge-sql.ts (unchanged since #1396) with these exact inputs —
+    // the statement the scheduled weekly ingest runs today against the 51-column table.
+    const golden = readFileSync(join(__dirname, '__fixtures__', 'merge-sql-pre-1658.golden.sql'), 'utf8');
+    expect(buildAwardsMergeSql(base)).toBe(golden);
+    expect(buildAwardsMergeSql({ ...base, idvIdentityColumns: false })).toBe(golden);
+  });
 
   it('without the DDL the MERGE is byte-for-byte the legacy 41-column statement', () => {
     const legacy = buildAwardsMergeSql(base);
@@ -132,7 +158,7 @@ describe('MERGE retains IDV vehicle identity (additive, schema-gated)', () => {
       expect(sql).toContain(`, S.${c.target}`);
     }
     // Same MERGE key + partition bound as before.
-    expect(sql).toContain(`ON T.txn_id = S.txn_id AND T.action_date >= DATE_SUB(DATE('2026-06-06'), INTERVAL 2 DAY)`);
+    expect(sql).toContain(`ON T.txn_id = S.txn_id AND T.action_date >= DATE_SUB(DATE('2026-06-07'), INTERVAL 2 DAY)`);
   });
 
   it('schema gate: none → absent, all → present, partial → refuses', () => {

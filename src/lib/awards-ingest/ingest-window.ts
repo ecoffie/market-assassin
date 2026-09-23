@@ -12,7 +12,10 @@
  * THE RULE. Start the window at the EARLIER of
  *   - global MAX(action_date) − correctionDays   (FPDS 90-day corrections), and
  *   - each lagging cohort's own DENSE frontier − slackDays   (continuity for the laggard),
- * so a cohort that falls behind is always re-pulled from where ITS data stops. In steady state
+ * so a cohort that falls behind is re-pulled from where ITS data stops — bounded by
+ * `maxLaggardExtensionDays` (21 by default) so the weekly acquisition stays inside its poll/timeout
+ * budget; a deeper gap is reported (`cappedLaggards`) and repaired by the one-time --from backfill.
+ * In steady state
  * DoD's frontier ≈ today − 90, so the laggard term (≈ today − 104) and the global term
  * (≈ today − 105) coincide and the download does not grow.
  *
@@ -28,6 +31,13 @@ export interface IngestWindowInput {
   laggardMaxes: Record<string, string | null>;
   correctionDays: number;
   laggardSlackDays: number;
+  /**
+   * The most the laggard term may pull the start EARLIER than the global rule. Beyond this the
+   * gap is a backfill job, not a weekly window: the weekly run keeps the global start and reports
+   * the cohort in `cappedLaggards` (the USASpending acquisition must stay inside the workflow's
+   * poll/timeout budget — a 106-day window took ~61 min on 2026-09-20, against a 90-min poll).
+   */
+  maxLaggardExtensionDays?: number;
 }
 
 export interface IngestWindow {
@@ -36,7 +46,11 @@ export interface IngestWindow {
   anchor: string;
   /** Cohorts with no measurable frontier — reported, never silently treated as current. */
   unmeasuredLaggards: string[];
+  /** Cohorts whose frontier is further back than `maxLaggardExtensionDays` — needs a manual `--from` backfill. */
+  cappedLaggards: string[];
 }
+
+export const MAX_LAGGARD_EXTENSION_DAYS = 21;
 
 export const LAGGARD_CONTINUITY_SLACK_DAYS = 14;
 
@@ -94,17 +108,25 @@ function shift(day: string, deltaDays: number): string {
 export function resolveIngestWindowStart(input: IngestWindowInput): IngestWindow {
   let startDate = shift(input.globalMax, -input.correctionDays);
   let anchor = 'global';
+  const globalStart = startDate;
+  const cap = input.maxLaggardExtensionDays ?? MAX_LAGGARD_EXTENSION_DAYS;
+  const floor = shift(globalStart, -cap);
   const unmeasuredLaggards: string[] = [];
+  const cappedLaggards: string[] = [];
   for (const [code, max] of Object.entries(input.laggardMaxes)) {
     if (!max) {
       unmeasuredLaggards.push(code);
       continue;
     }
     const candidate = shift(max, -input.laggardSlackDays);
+    if (candidate < floor) {
+      cappedLaggards.push(code);
+      continue;
+    }
     if (candidate < startDate) {
       startDate = candidate;
       anchor = `laggard:${code}`;
     }
   }
-  return { startDate, anchor, unmeasuredLaggards };
+  return { startDate, anchor, unmeasuredLaggards, cappedLaggards };
 }

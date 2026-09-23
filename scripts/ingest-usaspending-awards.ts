@@ -57,6 +57,7 @@ import {
   DOD_AWARDING_AGENCY_CODE,
   IDV_IDENTITY_COLUMNS,
   LAGGARD_CONTINUITY_SLACK_DAYS,
+  MAX_LAGGARD_EXTENSION_DAYS,
   resolveIdvIdentityColumnsMode,
   resolveIngestWindowStart,
   buildLaggardWeeklyCountsSql,
@@ -98,34 +99,51 @@ function log(...m: unknown[]) { console.log('[ingest-awards]', ...m); }
 function isoDay(d: Date) { return d.toISOString().slice(0, 10); }
 
 async function currentWatermark(): Promise<string> {
-  return (await currentWatermarks()).global;
-}
-
-/**
- * Global MAX(action_date) AND DoD's dense frontier. DoD publishes on a ~90-day delay, so the
- * global max (civilian-driven) cannot tell us where DoD's data stops — see ingest-window.ts.
- */
-async function currentWatermarks(): Promise<{ global: string; dod: string | null }> {
   const rows = await bqQuery<{ max_date?: string }>({
     query: `SELECT CAST(MAX(action_date) AS STRING) AS max_date FROM ${BQ_TABLES.awards} WHERE fiscal_year >= 2025`,
   });
   const max = rows?.[0]?.max_date;
   if (!max) throw new Error('could not read MAX(action_date) from awards — refusing to guess a start date');
-  // DoD's MAX(action_date) is NOT its frontier (a trickle is published without the delay) —
-  // use the dense frontier from weekly counts.
-  const asOf = isoDay(new Date());
-  const weeks = await bqQuery<{ week: string; n: number }>({
-    query: buildLaggardWeeklyCountsSql(BQ_TABLES.awards, asOf, DOD_AWARDING_AGENCY_CODE),
-  });
-  return { global: max, dod: resolveDenseFrontier(weeks.map((w) => ({ week: String(w.week), n: Number(w.n) })), asOf) };
+  return max;
 }
 
-/** Does the live `awards` schema already carry the IDV identity columns? (see merge-sql.ts) */
+/**
+ * Global MAX(action_date) AND DoD's dense frontier. DoD publishes on a ~90-day delay, so the
+ * global max (civilian-driven) cannot tell us where DoD's data stops — see ingest-window.ts.
+ * A failed frontier read is UNMEASURED (null → the window falls back to the legacy global rule),
+ * never a reason to fail the weekly ingest.
+ */
+async function currentWatermarks(): Promise<{ global: string; dod: string | null }> {
+  const max = await currentWatermark();
+  const asOf = isoDay(new Date());
+  try {
+    const weeks = await bqQuery<{ week: string; n: number }>({
+      query: buildLaggardWeeklyCountsSql(BQ_TABLES.awards, asOf, DOD_AWARDING_AGENCY_CODE),
+    });
+    return { global: max, dod: resolveDenseFrontier(weeks.map((w) => ({ week: String(w.week), n: Number(w.n) })), asOf) };
+  } catch (error) {
+    log(`WARNING: DoD dense-frontier read failed (${error instanceof Error ? error.message : String(error)}) — using the global watermark only`);
+    return { global: max, dod: null };
+  }
+}
+
+/**
+ * Does the live `awards` schema already carry the IDV identity columns? (see merge-sql.ts)
+ * A failed metadata read means the legacy 41-column MERGE — which is valid against either schema
+ * (the new columns are simply left NULL/unchanged). A PARTIAL schema still refuses to run.
+ */
 async function idvIdentityColumnsPresent(): Promise<boolean> {
-  const rows = await bqQuery<{ column_name: string }>({
-    query: `SELECT column_name FROM \`${PROJECT}.${DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'awards'`,
-  });
-  return resolveIdvIdentityColumnsMode(rows.map((r) => r.column_name)) === 'present';
+  let columns: string[];
+  try {
+    const rows = await bqQuery<{ column_name: string }>({
+      query: `SELECT column_name FROM \`${PROJECT}.${DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'awards'`,
+    });
+    columns = rows.map((r) => r.column_name);
+  } catch (error) {
+    log(`WARNING: awards schema read failed (${error instanceof Error ? error.message : String(error)}) — using the legacy MERGE`);
+    return false;
+  }
+  return resolveIdvIdentityColumnsMode(columns) === 'present';
 }
 
 async function main() {
@@ -153,6 +171,9 @@ async function main() {
     });
     startDate = window.startDate;
     windowAnchor = window.anchor;
+    if (window.cappedLaggards.length > 0) {
+      log(`WARNING: laggard cohort(s) ${window.cappedLaggards.join(', ')} end more than ${MAX_LAGGARD_EXTENSION_DAYS} days before the weekly window — NOT re-pulled here (bounded weekly run); run the one-time --from backfill (tasks/idv-vehicle-foundation/README.md step 3)`);
+    }
     if (window.unmeasuredLaggards.length > 0) {
       log(`WARNING: laggard cohort(s) ${window.unmeasuredLaggards.join(', ')} have no measurable dense frontier — window anchored on the global watermark only`);
     }
