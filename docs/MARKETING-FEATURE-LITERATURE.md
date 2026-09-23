@@ -7313,3 +7313,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** FY2026 NDAA requirements for contractors / Public Law 119-60 / NDAA cost accounting standards threshold / BIOSECURE Act NDAA / FY2027 NDAA status tracker.
 
 **Proof.** Audited against congress.gov texts of PL 119-60 (S. 1071) and S. 2296: 32 of 45 prior claims enacted and now cited by section, 6 corrected, 7 retired, every original preserved with its evidence. Congress truth for the FY2026 and FY2027 NDAA (5 vehicles, 14 text versions, 5 committee reports) is held in full. Live in production 2026-09-23 (weekly Congress sync, health invariant green). The legislative corpus itself is not yet a customer-facing surface; the corrected FY2026 claims are.
+
+## POTETO — Opportunity Share Truth (2026-09-23)
+
+**What.** When someone shares a government opportunity from the Mindy Map, the link preview on Facebook, LinkedIn, X, iMessage or Slack now shows *that opportunity*: its title, the buying agency, the place of performance, the response deadline and the solicitation number. Mindy is a small "via Mindy" credit in the corner, not the headline. Closed, archived and award notices are labelled as such, so an old link never looks like an open bid.
+
+**Why.** A shared link is how a contractor brings a teaming partner in. Before this, every shared opportunity previewed as "GETMINDY.AI / Mindy Map" with a purple logo — the preview named the product and hid the thing being shared, so nobody could tell a mower solicitation from a construction IDIQ without clicking.
+
+**SEO.** Share federal opportunity link / SAM.gov solicitation link preview / government contract opportunity share / teaming partner opportunity share.
+
+**Proof.** Production before (2026-09-23, requested as facebookexternalhit, LinkedInBot, Twitterbot and curl): `/opportunity-map?opp=0fdb5f972b2a46648adf2e2b8a6558ce` returned 200 with zero `og:`/`twitter:` tags and `<title>Mindy Map</title>`. After: server-rendered `og:title` "CES Hillside Mower — Government Opportunity", a 1200×630 card, and a description built only from the `sam_opportunities` row (Dept. of the Army · Place of performance: West Virginia · Responses due Sep 29, 2026 · Solicitation W50S9J-26-Q-0013). Fields SAM does not provide are left off the card, never estimated.
