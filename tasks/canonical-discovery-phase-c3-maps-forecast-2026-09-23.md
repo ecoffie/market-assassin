@@ -103,3 +103,45 @@ Recorded as expected policy change (approved decision 2), not a regression.
 
 ## 6. Next (not started)
 Rerun `scripts/discovery-saved-search-blast.ts` (sign-off on changed rows) → Saved Searches → alerts → client.
+
+## 7. Production acceptance (2026-09-23) — ✅ FROZEN
+
+Merges: #1656 → `2a4bd151` (Maps Forecast on the seam) and #1659 → `d131e272` (unplaced paging tiebreaker, value → id).
+Production proven to serve `d131e272` (live `maps-account-build` stamp; Vercel commit status complete; normal main deploy).
+
+The first acceptance run on `2a4bd151` failed 2/13 on exact unplaced IDs (USDA, USDA|VA): `total` correct, but the list
+ordered by `estimated_value_max` alone — USDA's 3,258 unplaced forecasts carry 12 distinct values — so offset pages overlapped
+(509 duplicated, 509 unreachable; deterministic across 6 passes). Pre-existing (same ordering at `a647860c`). Fixed in #1659.
+
+Re-run on `d131e272` — live `https://getmindy.ai/api/app/forecast-map` (tiled past the pin cap) and
+`/api/forecasts/unplaced` (every page) vs MCP's canonical Forecast query on the production DB at the same moment:
+
+| fixture | drawable + unmapped = MCP | drawable ids | unplaced total | unplaced paged: rows · unique · dup · missing | order | FY cur+fut | past-FY excluded (all past) |
+|---|---|---|---|---|---|---|---|
+| ai governance | 4 + 9 = 13 | IDENTICAL | 9/9 | 9 · 9 · 0 · 0 | ✅ | ✅ | 0 |
+| artificial intelligence governance | 4 + 9 = 13 | IDENTICAL | 9/9 | 9 · 9 · 0 · 0 | ✅ | ✅ | 0 |
+| janitorial | 198 + 40 = 238 | IDENTICAL | 40/40 | 40 · 40 · 0 · 0 | ✅ | ✅ | 2 |
+| cybersecurity | 181 + 106 = 287 | IDENTICAL | 106/106 | 106 · 106 · 0 · 0 | ✅ | ✅ | 19 |
+| SIEM | 4 + 0 = 4 | IDENTICAL | 0/0 | 0 · 0 · 0 · 0 | ✅ | ✅ | 0 |
+| SDVOSB cybersecurity opportunities in Virginia | 0 + 1 = 1 | IDENTICAL | 1/1 | 1 · 1 · 0 · 0 | ✅ | ✅ | 0 |
+| janitorial in Florida | 4 + 0 = 4 | IDENTICAL | 0/0 | 0 · 0 · 0 · 0 | ✅ | ✅ | 0 |
+| 541512 -computers | 167 + 120 = 287 | IDENTICAL | 120/120 | 120 · 120 · 0 · 0 | ✅ | ✅ | 45 |
+| -computers (needs_positive_scope) | 0 + 0 = 0 | IDENTICAL | 0/0 | 0 · 0 · 0 · 0 | ✅ | ✅ | 0 |
+| zzzxxyyqqq | 0 + 0 = 0 | IDENTICAL | 0/0 | 0 · 0 · 0 · 0 | ✅ | ✅ | 0 |
+| agency=USDA | 1,770 + 3,258 = 5,028 | IDENTICAL | 3,258/3,258 | 3,258 · 3,258 · 0 · 0 | ✅ | ✅ | 0 |
+| agency=VA | 1,371 + 19 = 1,390 | IDENTICAL | 19/19 | 19 · 19 · 0 · 0 | ✅ | ✅ | 0 |
+| agency=USDA\|VA | 3,141 + 3,277 = 6,418 | IDENTICAL | 3,277/3,277 | 3,277 · 3,277 · 0 · 0 | ✅ | ✅ | 0 |
+
+**13/13** on market count, drawable ids, unplaced totals, exact unplaced ids (every id reachable, exactly once), ordering
+(`estimated_value_max` desc, nulls last; `id` ascending only within ties) and fiscal-year policy. Every row the FY policy
+removed has a past fiscal year (excluded by policy, not lost). Absolute counts are today's corpus.
+
+Regression isolation: Maps Open (vs `b3e37cf0`), Maps Recompete (vs `566c1fe9`) and Forecast membership (adapter, plan,
+forecast-map, map-data vs `2a4bd151`) — 0 lines changed; live Open and Recompete still return their `discovery` blocks.
+Saved searches and daily alerts remain `pending` in the gate registry; no saved-search, alert or client file touched.
+
+Latent, recorded only: the unplaced agency-facet tally pages without an ORDER BY. Measured correct today (13,975 rows, all
+unique, identical per-agency counts with and without `id` ordering). Not part of this incident; not changed.
+
+**Maps Forecast is frozen.** All three Maps horizons are on the canonical layer: Open ✓ · Recompete ✓ · Forecast ✓.
+Next: `scripts/discovery-saved-search-blast.ts` against production for sign-off — no Saved Search migration before that.
