@@ -91,7 +91,7 @@ function MarketIntelligenceContent() {
 
           // Redirect to briefings with setup flag
           setRedirecting(true);
-          window.location.href = '/briefings?setup=true';
+          window.location.href = '/app?panel=settings';
         }
       } catch {
         setError('Failed to verify invitation. Please try again or contact support.');
@@ -128,7 +128,7 @@ function MarketIntelligenceContent() {
         persistAccessEmail(email);
         setRedirecting(true);
         await new Promise((resolve) => setTimeout(resolve, 120));
-        window.location.href = '/briefings';
+        window.location.href = '/app';
         return;
       }
 
@@ -660,7 +660,7 @@ function MarketIntelligenceContent() {
               ← Back to Tools
             </Link>
             <span className="mx-4">•</span>
-            <Link href="/briefings" className="text-muted hover:text-white">
+            <Link href="/app" className="text-muted hover:text-white">
               View Dashboard
             </Link>
             <span className="mx-4">•</span>

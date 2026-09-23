@@ -24,7 +24,7 @@ function ContactsRedirect() {
 
   useEffect(() => {
     const email = searchParams.get('email');
-    const redirectUrl = email ? `/briefings?email=${encodeURIComponent(email)}` : '/briefings';
+    const redirectUrl = email ? `/app?panel=contacts&email=${encodeURIComponent(email)}` : '/app?panel=contacts';
     router.replace(redirectUrl);
   }, [router, searchParams]);
 

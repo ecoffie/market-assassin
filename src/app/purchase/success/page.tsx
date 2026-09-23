@@ -55,7 +55,10 @@ function SuccessContent() {
     'briefings_annual',
     'briefings_lifetime',
   ].includes(product) : false;
-  const appHref = isMindyProduct ? '/app' : '/briefings';
+  // Everything that includes Mindy access opens the workspace. `/briefings` is retired —
+  // the proxy forwards it to /app anyway (src/lib/mindy/legacy-routes.ts); link the real
+  // destination at the source so this page stops distributing the old URL.
+  const appHref = '/app';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -140,10 +143,10 @@ function SuccessContent() {
 
           <div className="space-y-4">
             <Link
-              href={isMindyProduct ? '/app' : '/'}
+              href={isMindyProduct || includesBriefings ? '/app' : '/'}
               className="block w-full px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors text-center"
             >
-              {isMindyProduct ? 'Open Mindy →' : 'Access Your Tools'}
+              {isMindyProduct || includesBriefings ? 'Open Mindy →' : 'Access Your Tools'}
             </Link>
             {includesBriefings && (
               <Link
@@ -174,36 +177,23 @@ function SuccessContent() {
                 {isMindyProduct ? 'Open Mindy' : 'Daily Briefings'}
               </Link>
             )}
-            <Link
-              href="/contractor-database"
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
-            >
-              Contractor Database
-            </Link>
-            <Link
-              href="/recompete-contracts"
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
-            >
-              Recompete Contracts
-            </Link>
-            <Link
-              href="/prime-lookup"
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
-            >
-              Prime Lookup
-            </Link>
-            <Link
-              href="/content-generator-product"
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
-            >
-              Content Reaper
-            </Link>
-            <Link
-              href="/opportunity-hunter"
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
-            >
-              Opportunity Hunter
-            </Link>
+            {/* Current destinations only. This grid used to list /recompete-contracts and
+                /prime-lookup (both 404), /content-generator-product (retired → home) and the
+                legacy /contractor-database gate, which tells a Mindy buyer to purchase. */}
+            {[
+              { href: '/app?panel=research', label: 'Market Research' },
+              { href: '/app?panel=recompetes', label: 'Recompetes' },
+              { href: '/app?panel=contractors', label: 'Contractors' },
+              { href: '/opportunity-map', label: 'Opportunity Map' },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+              >
+                {l.label}
+              </Link>
+            ))}
           </div>
         </div>
       </main>

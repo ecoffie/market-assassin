@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { resolveLegacyDestination } from '@/lib/mindy/legacy-routes';
 
 /**
  * PROXY - ROUTE PROTECTION
@@ -14,10 +15,20 @@ import type { NextRequest } from 'next/server';
  * - Purchase through Stripe (sets cookie automatically)
  * - Access code validation (sets cookie)
  * - Direct cookie set by admin
+ *
+ * Legacy customer interfaces (the pre-/app `/briefings` dashboard and friends) are
+ * redirected to the current workspace — see src/lib/mindy/legacy-routes.ts for the table
+ * and the evidence. 307, not 308: a permanent redirect is cached by browsers indefinitely,
+ * and this must stay reversible by a deploy.
  */
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  const legacyDestination = resolveLegacyDestination(pathname, request.nextUrl.searchParams);
+  if (legacyDestination) {
+    return NextResponse.redirect(new URL(legacyDestination, request.url), 307);
+  }
 
   // Protect Federal Contractor Database (HTML version)
   if (pathname === '/database.html') {
@@ -54,5 +65,13 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/database.html', '/contractor-database', '/federal-market-assassin'],
+  matcher: [
+    '/database.html',
+    '/contractor-database',
+    '/federal-market-assassin',
+    // Legacy customer interfaces — keep in sync with LEGACY_ROUTES (a unit test enforces it).
+    '/briefings',
+    '/briefings/dashboard',
+    '/bd-assist',
+  ],
 };

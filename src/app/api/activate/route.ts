@@ -75,16 +75,16 @@ export async function POST(request: NextRequest) {
         }
         if (profile.access_assassin_standard && !profile.access_assassin_premium) {
           accessFlags.access_assassin_standard = true;
-          tools.push({ name: 'Federal Market Assassin', key: 'access_assassin_standard', active: true, url: '/market-assassin' });
+          tools.push({ name: 'Federal Market Assassin', key: 'access_assassin_standard', active: true, url: '/federal-market-assassin' });
         }
         if (profile.access_assassin_premium) {
           accessFlags.access_assassin_standard = true;
           accessFlags.access_assassin_premium = true;
-          tools.push({ name: 'Market Assassin Premium', key: 'access_assassin_premium', active: true, url: '/market-assassin' });
+          tools.push({ name: 'Market Assassin Premium', key: 'access_assassin_premium', active: true, url: '/federal-market-assassin' });
         }
         if (profile.access_recompete) {
           accessFlags.access_recompete = true;
-          tools.push({ name: 'Recompete Tracker', key: 'access_recompete', active: true, url: '/recompete' });
+          tools.push({ name: 'Recompete Tracker', key: 'access_recompete', active: true, url: '/app?panel=recompetes' });
         }
         if (profile.access_contractor_db) {
           accessFlags.access_contractor_db = true;
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         }
         if (profile.access_briefings) {
           accessFlags.access_briefings = true;
-          tools.push({ name: 'Daily Briefings', key: 'access_briefings', active: true, url: '/briefings' });
+          tools.push({ name: 'Daily Briefings', key: 'access_briefings', active: true, url: '/app' });
         }
       }
     }
@@ -127,16 +127,16 @@ export async function POST(request: NextRequest) {
           }
           if (tier === 'assassin_standard' && !accessFlags.access_assassin_standard) {
             accessFlags.access_assassin_standard = true;
-            tools.push({ name: 'Federal Market Assassin', key: 'access_assassin_standard', active: true, url: '/market-assassin' });
+            tools.push({ name: 'Federal Market Assassin', key: 'access_assassin_standard', active: true, url: '/federal-market-assassin' });
           }
           if (tier === 'assassin_premium' && !accessFlags.access_assassin_premium) {
             accessFlags.access_assassin_standard = true;
             accessFlags.access_assassin_premium = true;
-            tools.push({ name: 'Market Assassin Premium', key: 'access_assassin_premium', active: true, url: '/market-assassin' });
+            tools.push({ name: 'Market Assassin Premium', key: 'access_assassin_premium', active: true, url: '/federal-market-assassin' });
           }
           if (tier === 'recompete' && !accessFlags.access_recompete) {
             accessFlags.access_recompete = true;
-            tools.push({ name: 'Recompete Tracker', key: 'access_recompete', active: true, url: '/recompete' });
+            tools.push({ name: 'Recompete Tracker', key: 'access_recompete', active: true, url: '/app?panel=recompetes' });
           }
           if (tier === 'contractor_db' && !accessFlags.access_contractor_db) {
             accessFlags.access_contractor_db = true;
@@ -157,10 +157,10 @@ export async function POST(request: NextRequest) {
         if (isPremium) {
           accessFlags.access_assassin_standard = true;
           accessFlags.access_assassin_premium = true;
-          tools.push({ name: 'Market Assassin Premium', key: 'access_assassin_premium', active: true, url: '/market-assassin' });
+          tools.push({ name: 'Market Assassin Premium', key: 'access_assassin_premium', active: true, url: '/federal-market-assassin' });
         } else {
           accessFlags.access_assassin_standard = true;
-          tools.push({ name: 'Federal Market Assassin', key: 'access_assassin_standard', active: true, url: '/market-assassin' });
+          tools.push({ name: 'Federal Market Assassin', key: 'access_assassin_standard', active: true, url: '/federal-market-assassin' });
         }
       }
 
@@ -196,14 +196,14 @@ export async function POST(request: NextRequest) {
       const hasRecompete = await hasRecompeteAccess(normalizedEmail);
       if (hasRecompete) {
         accessFlags.access_recompete = true;
-        tools.push({ name: 'Recompete Tracker', key: 'access_recompete', active: true, url: '/recompete' });
+        tools.push({ name: 'Recompete Tracker', key: 'access_recompete', active: true, url: '/app?panel=recompetes' });
       }
 
       // Briefings
       const hasBriefings = await hasBriefingAccess(normalizedEmail);
       if (hasBriefings) {
         accessFlags.access_briefings = true;
-        tools.push({ name: 'Daily Briefings', key: 'access_briefings', active: true, url: '/briefings' });
+        tools.push({ name: 'Daily Briefings', key: 'access_briefings', active: true, url: '/app' });
       }
     }
 

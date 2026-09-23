@@ -601,8 +601,9 @@ export async function POST(request: NextRequest) {
       const accessLink = `https://getmindy.ai/contractor-database?email=${encodeURIComponent(email)}`;
       await sendDatabaseAccessEmail({ to: email, customerName, accessLink });
     } else if (tier === 'assassin_standard' || tier === 'assassin_premium' || tier === 'assassin_premium_upgrade') {
-      // Market Assassin - use access code email with tutorial
-      const accessLink = `https://getmindy.ai/market-assassin?email=${encodeURIComponent(email)}`;
+      // Market Assassin - use access code email with tutorial. Link the TOOL: `/market-assassin`
+      // is the retired sales page and 308s to the homepage, so the buyer never reached it.
+      const accessLink = `https://getmindy.ai/federal-market-assassin?email=${encodeURIComponent(email)}`;
       await sendAccessCodeEmail({
         to: email,
         companyName: customerName,
