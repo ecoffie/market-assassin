@@ -267,9 +267,10 @@ type SupabaseLike = { from: (table: string) => any };
 export function supabaseSuppressionStore(supabase: SupabaseLike): SuppressionStore {
   return {
     async insertIfAbsent(record) {
+      // truncation-ok: a single-row upsert; RETURNING is used only to tell insert from conflict.
       const { data, error } = await supabase
         .from('email_suppressions')
-        .upsert(record, { onConflict: 'user_email', ignoreDuplicates: true })
+        .upsert(record, { onConflict: 'user_email', ignoreDuplicates: true }) // truncation-ok: single row
         .select('user_email');
       if (error) throw new Error(`email_suppressions write failed: ${error.message}`);
       return Array.isArray(data) && data.length > 0;

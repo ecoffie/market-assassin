@@ -88,11 +88,14 @@ async function main() {
   const attached: Record<string, number | 'unknown'> = {};
   for (const [t, c] of ATTACHED) attached[`${t}.${c}`] = await countIn(t, c, emails);
 
-  // Saved-search schedules are a separate alert stream (per-search preference).
-  const { data: ss, error: ssErr } = emails.length
-    ? await sb.from('saved_searches').select('user_email, alerts_enabled').in('user_email', emails.slice(0, 1000))
-    : { data: [], error: null };
-  if (ssErr) throw new Error(`saved_searches read failed: ${ssErr.message}`);
+  // Saved-search schedules are a separate alert stream (per-search preference). Counted, not listed.
+  let ssWithAlerts = 0;
+  for (const part of chunk(emails, 100)) {
+    const { count, error } = await sb.from('saved_searches').select('*', { count: 'exact', head: true })
+      .in('user_email', part).eq('alerts_enabled', true);
+    if (error || count === null) throw new Error(`saved_searches count failed: ${error?.message ?? 'null count'}`);
+    ssWithAlerts += count;
+  }
 
   // Sends in the last 15 days (the Sep 8–23 baseline window size).
   const since = new Date(Date.now() - 15 * 86_400_000).toISOString();
@@ -138,7 +141,7 @@ async function main() {
     created_range: matched.length
       ? [matched.map((r) => String(r.created_at)).sort()[0], matched.map((r) => String(r.created_at)).sort().at(-1)]
       : null,
-    saved_searches: { total: ss?.length ?? 0, with_alerts_enabled: (ss || []).filter((s) => s.alerts_enabled).length },
+    saved_searches: { total: attached['saved_searches.user_email'], with_alerts_enabled: ssWithAlerts },
     provider_sends_last_15d: sends15d,
     attached_data_rows: attached,
     sample: matched.slice(0, 3),
@@ -164,16 +167,17 @@ async function main() {
   }
   let inserted = 0;
   for (const part of chunk(emails, 100)) {
+    // truncation-ok: batches are <= 100 rows, below the 1,000-row RETURNING cap; verified by re-count below.
     const { data, error } = await sb
       .from('email_suppressions')
-      .upsert(
+      .upsert( // truncation-ok: <=100-row batch
         part.map((e) => ({
           user_email: e, reason: 'synthetic_address', source: 'p0_healthcheck_cleanup',
           metadata: { rule: String(HEALTHCHECK_ADDRESS_RE), run_at: new Date().toISOString() },
         })),
         { onConflict: 'user_email', ignoreDuplicates: true },
       )
-      .select('user_email');
+      .select('user_email'); // unranged-ok: RETURNING of a <=100-row batch
     if (error) throw new Error(`suppression insert failed: ${error.message}`);
     inserted += data?.length ?? 0;
   }

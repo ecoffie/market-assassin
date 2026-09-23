@@ -237,14 +237,15 @@ async function main() {
 
   let inserted = 0;
   for (let i = 0; i < toWrite.length; i += 100) {
+    // truncation-ok: batches are <= 100 rows, below the 1,000-row RETURNING cap; verified by re-count below.
     const { data, error } = await sb.from('email_suppressions')
-      .upsert(toWrite.slice(i, i + 100).map((c) => ({
+      .upsert(toWrite.slice(i, i + 100).map((c) => ({ // truncation-ok: <=100-row batch
         user_email: c.email, reason: c.reason, source: c.source, provider: 'resend',
         provider_event_id: c.provider_event_id, provider_message_id: c.provider_message_id,
         bounce_type: c.bounce_type, bounce_subtype: c.bounce_subtype, diagnostic: c.diagnostic,
         event_at: c.event_at, metadata: c.metadata,
       })), { onConflict: 'user_email', ignoreDuplicates: true })
-      .select('user_email');
+      .select('user_email'); // unranged-ok: RETURNING of a <=100-row batch
     if (error) throw new Error(`insert failed: ${error.message}`);
     inserted += data?.length ?? 0;
   }
