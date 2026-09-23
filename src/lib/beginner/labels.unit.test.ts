@@ -29,6 +29,10 @@ describe('set-aside translation', () => {
     expect(translateSetAside('EDWOSB').kind).toBe('edwosb');
     expect(translateSetAside('SDVOSBC').label).toBe('Service-Disabled Veteran-Owned set-aside');
     expect(translateSetAside('HZC').kind).toBe('hubzone');
+    // A veteran-owned reservation that also says "Small Business" is NOT open to every small business.
+    expect(translateSetAside('Veteran-Owned Small Business Set-Aside').kind).toBe('vosb');
+    expect(translateSetAside('VSA').kind).toBe('vosb');
+    expect(translateSetAside('Total Small Business Set-Aside (FAR 19.5)').kind).toBe('sb');
     expect(translateSetAside('No Set aside used').kind).toBe('open');
     expect(translateSetAside('NONE').kind).toBe('open');
     // CHANGED 2026-09-21: absent ≠ unrestricted. 4,261 of 9,030 active open

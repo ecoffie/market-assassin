@@ -596,6 +596,14 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
             keyword_exact: { type: 'string', description: 'Bypass search-brain free-text path when needed.' },
           },
         },
+        uei: {
+          type: 'string',
+          description:
+            'Optional 12-character SAM UEI of the company searching. When present FIND is company-anchored: its SAM-registered ' +
+            'NAICS/PSC widen recall (labelled company_registered_psc / company_registered_naics — never a direct match) and every item ' +
+            'gets eligibility ELIGIBLE | NOT_ELIGIBLE (+reason) | UNKNOWN, judged per the notice NAICS against the company\'s size for ' +
+            'THAT NAICS. Only pass it when the user already gave it — never ask for it before first value.',
+        },
       },
       required: ['query'],
     },
@@ -2182,6 +2190,7 @@ export async function runMcpTool(
             keyword_exact: typeof advanced.keyword_exact === 'string' ? advanced.keyword_exact : undefined,
           }
         : undefined,
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
