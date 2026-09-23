@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Federal Market Assassin',
           tier: 'standard',
-          accessUrl: '/federal-market-assassin',
+          accessUrl: '/app?panel=research',
           cookieName: 'access_assassin_standard',
           cookieValue: 'true',
         });
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Federal Market Assassin - Premium',
           tier: 'premium',
-          accessUrl: '/federal-market-assassin',
+          accessUrl: '/app?panel=research',
           cookieName: 'access_assassin_premium',
           cookieValue: 'true',
         });
@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
           'hunter_pro': { name: 'Opportunity Hunter Pro', cookie: 'access_hunter_pro', url: '/opportunity-hunter' },
           'content_standard': { name: 'Content Reaper', cookie: 'access_content_standard', url: '/content-generator-product' },
           'content_full_fix': { name: 'Content Reaper - Full Fix', cookie: 'access_content_full_fix', url: '/content-generator-product' },
-          'assassin_standard': { name: 'Federal Market Assassin', cookie: 'access_assassin_standard', url: '/federal-market-assassin' },
-          'assassin_premium': { name: 'Federal Market Assassin - Premium', cookie: 'access_assassin_premium', url: '/federal-market-assassin' },
+          'assassin_standard': { name: 'Federal Market Assassin', cookie: 'access_assassin_standard', url: '/app?panel=research' },
+          'assassin_premium': { name: 'Federal Market Assassin - Premium', cookie: 'access_assassin_premium', url: '/app?panel=research' },
           'recompete': { name: 'Recompete Tracker', cookie: 'access_recompete', url: '/recompete' },
           'contractor_db': { name: 'Federal Contractor Database', cookie: 'access_contractor_db', url: '/contractor-database' },
         };
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: isPremium ? 'Federal Market Assassin - Premium' : 'Federal Market Assassin',
           tier: maAccess.tier,
-          accessUrl: '/federal-market-assassin',
+          accessUrl: '/app?panel=research',
           cookieName: isPremium ? 'access_assassin_premium' : 'access_assassin_standard',
           cookieValue: 'true',
         });

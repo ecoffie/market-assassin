@@ -25,6 +25,7 @@ import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
+import { workspaceUrl } from '@/lib/mindy/legacy-routes';
 
 // Webhook secrets
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -601,9 +602,9 @@ export async function POST(request: NextRequest) {
       const accessLink = `https://getmindy.ai/contractor-database?email=${encodeURIComponent(email)}`;
       await sendDatabaseAccessEmail({ to: email, customerName, accessLink });
     } else if (tier === 'assassin_standard' || tier === 'assassin_premium' || tier === 'assassin_premium_upgrade') {
-      // Market Assassin - use access code email with tutorial. Link the TOOL: `/market-assassin`
-      // is the retired sales page and 308s to the homepage, so the buyer never reached it.
-      const accessLink = `https://getmindy.ai/federal-market-assassin?email=${encodeURIComponent(email)}`;
+      // Market Assassin - access email with tutorial. The standalone tool is retired into the
+      // /app workspace (legacy-routes.ts): an `ma:` grant is Pro there, with every report.
+      const accessLink = workspaceUrl({ panel: 'research', email, absolute: true });
       await sendAccessCodeEmail({
         to: email,
         companyName: customerName,

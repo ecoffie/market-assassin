@@ -267,7 +267,7 @@ export async function getUserProducts(email: string): Promise<{
 
   // Map of product IDs to their display info
   const productInfo: Partial<Record<ProductId, { name: string; url: string }>> = {
-    'market-assassin': { name: 'Federal Market Assassin', url: '/federal-market-assassin' },
+    'market-assassin': { name: 'Federal Market Assassin', url: '/app?panel=research' },
     'content-generator': { name: 'Content Reaper', url: '/content-generator' },
     'contractor-database': { name: 'Federal Contractor Database', url: '/contractor-database' },
     'opportunity-hunter-pro': { name: 'Opportunity Hunter Pro', url: '/opportunity-hunter' },

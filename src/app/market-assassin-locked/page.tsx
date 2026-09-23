@@ -58,7 +58,7 @@ export default function MarketAssassinLockedPage() {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Use window.location for full page reload to ensure cookie is sent
-        window.location.href = '/federal-market-assassin';
+        window.location.href = '/app?panel=research';
         return;
       } else {
         // No legacy `ma:` grant. That is every Mindy Pro buyer — market research is part of

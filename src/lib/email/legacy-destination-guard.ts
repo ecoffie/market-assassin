@@ -1,8 +1,24 @@
 /**
- * EMAIL MIGRATION GUARD — no customer email may send a user to a legacy surface.
+ * EMAIL MIGRATION GUARD — no customer email may send a user to a RETIRED surface.
  *
- * THE RULE: `/app` and `/briefings` are legacy surfaces being retired. The Map is the
- * product. No active customer email may intentionally link to either.
+ * THE RULE (reconciled 2026-09-23): the current Mindy workspace is `/app` (Eric's explicit
+ * decision on PR #1671), so `/app` is a valid email destination again. What stays banned is
+ * the set of surfaces that are actually retired — each listed below WITH ITS REASON, because
+ * an unexplained entry is how a rule decays into superstition:
+ *   /briefings*              the pre-/app Unified-MI dashboard (2026-08-25 incident)
+ *   /bd-assist               BD Assist, folded into /app's pipeline panel
+ *   /market-assassin         retired Market Assassin sales page
+ *   /market-assassin-locked  retired Market Assassin access gate
+ *   /federal-market-assassin retired standalone tool — Market Research lives in /app now
+ *   /app/onboarding          the retired profile builder (post-signup-destination.ts)
+ *
+ * History: from 2026-08-25 to 2026-09-23 this guard banned ALL of `/app` ("the Map is the
+ * product"). That is superseded for paid welcome/access CTAs, which now go straight to
+ * /app sign-in instead of a pricing-page detour. The CREDENTIAL-FLOW protection is kept in
+ * two places: credential routes stay explicitly allowed below (even under a retired prefix),
+ * and `MINDY_APP_URL` (email-branding.ts) still refuses to default GENERAL alert CTAs to the
+ * credential-gated /app, because beta/free recipients who never set a password would be
+ * stranded at a sign-in wall — the regression that guard was written for.
  *
  * WHY THIS INSPECTS THE RENDERED PAYLOAD, NOT THE TEMPLATE:
  * Reported 2026-08-25 — a daily briefing's footer sent users to `/briefings`. Reading the
@@ -10,30 +26,37 @@
  * came from a SHARED CONSTANT resolved at import time, three files away.
  *
  * The artifact that matters is the HTML handed to the email provider, so the contract is
- *     rendered CTA -> tracking redirect -> configured Map -> correct filter state
+ *     rendered CTA -> tracking redirect -> real destination
  * not "the template source looks right". This runs on the final payload inside sendEmail(),
  * which every send path goes through — a NEW sender inherits the check rather than having
  * to remember it.
  *
  * It also unwraps `/api/track?...&url=<encoded>` before checking: a tracked link hides its
  * destination in a query parameter, so scanning the visible href would pass a link that
- * lands squarely on a legacy surface.
+ * lands squarely on a retired surface.
  */
 
-/** Surfaces no customer email may intentionally target. */
-const LEGACY_PATHS = /^\/(app|briefings)(\/|\?|#|$)/;
+/** Surfaces no customer email may target, each with the reason it is retired. */
+const RETIRED: Array<{ match: RegExp; reason: string }> = [
+  { match: /^\/briefings(\/|\?|#|$)/i, reason: 'pre-/app Unified-MI dashboard' },
+  { match: /^\/bd-assist(\/|\?|#|$)/i, reason: 'BD Assist — now /app?panel=pipeline' },
+  { match: /^\/market-assassin(\/|\?|#|$)/i, reason: 'retired Market Assassin sales page' },
+  { match: /^\/market-assassin-locked(\/|\?|#|$)/i, reason: 'retired Market Assassin access gate' },
+  { match: /^\/federal-market-assassin(\/|\?|#|$)/i, reason: 'retired standalone tool — /app?panel=research' },
+  { match: /^\/app\/onboarding(\/|\?|#|$)/i, reason: 'retired profile builder' },
+];
 
 /**
- * Documented compatibility exceptions. Each carries a REASON — an undocumented exception
- * list is just a quiet way to reintroduce the bug.
+ * Credential flows are ALWAYS linkable — a reset/setup/sign-in link must never be blocked,
+ * even if a future retired prefix would otherwise cover it.
  */
-const ALLOWED: Array<{ match: RegExp; reason: string }> = [
-  { match: /^\/app\/(reset-password|set-password|verify|signup|sign-in)\b/, reason: 'credential flow — no Map-native equivalent yet' },
-];
+const CREDENTIAL_FLOWS = /^\/app\/(reset-password|set-password|setup-password|setup-account|forgot-password|verify|signup|sign-in|auth\/callback)\b/i;
 
 export interface LegacyLinkFinding {
   url: string;
   path: string;
+  /** Why this surface is retired. */
+  reason: string;
   /** True when the legacy path was hidden inside a tracking redirect. */
   viaTracking: boolean;
 }
@@ -73,12 +96,13 @@ export function findLegacyDestinations(html?: string, text?: string): LegacyLink
     } catch {
       continue;   // mailto:, {{merge_tag}} — not a navigation target
     }
-    if (!LEGACY_PATHS.test(path)) continue;
-    if (ALLOWED.some((a) => a.match.test(path))) continue;
+    if (CREDENTIAL_FLOWS.test(path)) continue;
+    const retired = RETIRED.find((r) => r.match.test(path));
+    if (!retired) continue;
     const key = `${path}|${viaTracking}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ url, path, viaTracking });
+    out.push({ url, path, viaTracking, reason: retired.reason });
   }
   return out;
 }
@@ -95,11 +119,11 @@ export function assertNoLegacyDestinations(
   if (!findings.length) return findings;
 
   const detail = findings
-    .map((f) => `${f.path}${f.viaTracking ? ' (inside /api/track)' : ''} -> ${f.url.slice(0, 120)}`)
+    .map((f) => `${f.path}${f.viaTracking ? ' (inside /api/track)' : ''} [${f.reason}] -> ${f.url.slice(0, 120)}`)
     .join('; ');
   const message =
     `[email-migration] ${findings.length} legacy destination(s) in "${payload.emailType || payload.subject || 'email'}": ${detail}. `
-    + 'No customer email may link to /app or /briefings — see src/lib/email/legacy-destination-guard.ts';
+    + 'No customer email may link to a retired surface — see src/lib/email/legacy-destination-guard.ts';
 
   if (process.env.NODE_ENV !== 'production') throw new Error(message);
   console.error(message);

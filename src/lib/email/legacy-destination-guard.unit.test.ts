@@ -1,5 +1,8 @@
 /**
- * EMAIL MIGRATION GUARD — no customer email links to /app or /briefings.
+ * EMAIL MIGRATION GUARD — no customer email links to a RETIRED surface.
+ *
+ * Reconciled 2026-09-23 (PR #1671): `/app` is the current workspace and is allowed; the
+ * retired list is explicit and each entry carries its reason.
  *
  * Reported 2026-08-25 with screenshots: a daily briefing's footer sent users to
  * /briefings. The template source looked fine — the destination came from a SHARED
@@ -16,8 +19,31 @@ describe('catches legacy destinations in rendered HTML', () => {
     expect(f[0].path).toBe('/briefings');
   });
 
-  it('catches /app', () => {
-    expect(findLegacyDestinations('<a href="https://getmindy.ai/app">x</a>')[0].path).toBe('/app');
+  it.each([
+    ['/bd-assist'],
+    ['/market-assassin'],
+    ['/market-assassin-locked?error=invalid'],
+    ['/federal-market-assassin?email=a%40b.com'],
+    ['/federal-market-assassin/success'],
+    ['/app/onboarding?next=%2F'],
+    ['/briefings/dashboard?email=x'],
+  ])('catches retired surface %s, with a reason', (path) => {
+    const f = findLegacyDestinations(`<a href="https://getmindy.ai${path}">x</a>`);
+    expect(f).toHaveLength(1);
+    expect(f[0].reason).toBeTruthy();
+  });
+
+  it('⚠️ catches a retired Market Assassin link hidden inside a tracking redirect', () => {
+    const inner = encodeURIComponent('https://getmindy.ai/federal-market-assassin?email=a@b.com');
+    const f = findLegacyDestinations(`<a href="https://getmindy.ai/api/track?t=T&a=click&url=${inner}">x</a>`);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ path: '/federal-market-assassin', viaTracking: true });
+  });
+
+  it('catches a DOUBLE-wrapped tracking link', () => {
+    const inner = encodeURIComponent('https://getmindy.ai/briefings');
+    const mid = encodeURIComponent(`https://getmindy.ai/api/track?url=${inner}`);
+    expect(findLegacyDestinations(`<a href="https://getmindy.ai/api/track?url=${mid}">x</a>`)[0].path).toBe('/briefings');
   });
 
   it('⚠️ catches a legacy path HIDDEN inside a tracking redirect', () => {
@@ -48,8 +74,25 @@ describe('does not over-fire', () => {
     expect(findLegacyDestinations(html)).toEqual([]);
   });
 
-  it('a documented credential-flow exception passes', () => {
-    expect(findLegacyDestinations('<a href="https://getmindy.ai/app/reset-password?t=1">Reset</a>')).toEqual([]);
+  it('credential flows always pass', () => {
+    for (const p of ['/app/reset-password?t=1', '/app/setup-password#access_token=x', '/app/signup', '/app/forgot-password', '/app/auth/callback?code=1']) {
+      expect(findLegacyDestinations(`<a href="https://getmindy.ai${p}">x</a>`)).toEqual([]);
+    }
+  });
+
+  it('the CURRENT workspace passes — /app, its panels, and sign-in prefill (decision on #1671)', () => {
+    for (const p of ['/app', '/app?panel=research&email=a%40b.com', '/app?panel=recompetes']) {
+      expect(findLegacyDestinations(`<a href="https://getmindy.ai${p}">x</a>`)).toEqual([]);
+    }
+  });
+
+  it('a TRACKED /app link passes', () => {
+    const inner = encodeURIComponent('https://getmindy.ai/app?panel=research');
+    expect(findLegacyDestinations(`<a href="https://getmindy.ai/api/track?t=T&url=${inner}">x</a>`)).toEqual([]);
+  });
+
+  it('look-alike paths are not retired surfaces', () => {
+    expect(findLegacyDestinations('<a href="/market-assassins-guide">a</a><a href="/app-store">b</a><a href="/access/ABC123">c</a>')).toEqual([]);
   });
 
   it('a path merely CONTAINING the word passes', () => {
@@ -69,7 +112,7 @@ describe('assert behaviour', () => {
   });
 
   it('names the email so the failure is actionable', () => {
-    expect(() => assertNoLegacyDestinations({ html: '<a href="/app">x</a>', emailType: 'weekly_alert' }))
+    expect(() => assertNoLegacyDestinations({ html: '<a href="/bd-assist">x</a>', emailType: 'weekly_alert' }))
       .toThrow(/weekly_alert/);
   });
 
@@ -88,6 +131,8 @@ describe('the shared constants no longer resolve to a legacy surface', () => {
 
   it('an env override at a legacy surface is REJECTED, not honoured', async () => {
     // The regression this guards: an override pointing at /app once stranded beta users.
+    // KEPT after the 2026-09-23 reconciliation — this is the GENERAL alert CTA, sent to
+    // recipients who may have no credential; paid welcome/access emails link /app directly.
     const prev = process.env.NEXT_PUBLIC_MINDY_APP_URL;
     process.env.NEXT_PUBLIC_MINDY_APP_URL = 'https://getmindy.ai/app';
     vi.resetModules();

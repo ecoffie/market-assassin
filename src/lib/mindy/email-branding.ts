@@ -4,8 +4,11 @@ export const MINDY_SITE_URL = process.env.NEXT_PUBLIC_MINDY_SITE_URL || 'https:/
  * WHERE AN EMAIL CTA LANDS — Maps-native, never a legacy surface.
  *
  * ── THE MIGRATION RULE ─────────────────────────────────────────────────────────────────
- * No active customer email may intentionally send a user to `/app` or `/briefings`.
- * Both are legacy surfaces being retired; the Map is the product.
+ * No customer email may send a user to a RETIRED surface (legacy-destination-guard.ts).
+ * Since 2026-09-23 `/app` is the current workspace, and PAID welcome/access emails link
+ * it directly (legacy-routes.ts `workspaceUrl`). This constant is different: it is the
+ * GENERAL alert/briefing CTA, sent to free and beta recipients who may never have set a
+ * credential, so it stays on the open Map rather than the credential-gated /app.
  *
  * ── WHY THIS USED TO POINT AT /briefings, AND WHY THAT NO LONGER APPLIES ────────────────
  * The previous default was deliberate and correct AT THE TIME: beta alert/free users never

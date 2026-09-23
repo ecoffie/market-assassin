@@ -23,16 +23,47 @@
  *     /app; identity always comes from the live session). Nothing here can produce an
  *     external URL, and no destination is itself a legacy path, so no redirect loops.
  *
+ * ── THE STANDALONE MARKET ASSASSIN TOOL (retired 2026-09-23) ─────────────────────────
+ * Entitlement compatibility was established BEFORE retiring it: `/app` resolves its tier
+ * through `verifyMIAccess` (src/lib/api-auth.ts), which counts ANY legacy paid grant —
+ * `ma:` (standard or premium), `contentgen:`, `ospro:`, `recompete:`, `dbaccess:`,
+ * `briefings:` — as Pro, and `/api/reports/generate-all` authorizes through the same
+ * function. So an MA purchaser gets every Market Research report in `/app?panel=research`
+ * (Pro = all reports; MA Premium was 8). The standalone tool kept no server-side saved
+ * reports (generate-on-demand; only a monthly usage counter), so no saved work moves.
+ *
+ * ONE KNOWN GAP, deliberately NOT retired: `/api/verify-ma-password` grants an ANONYMOUS
+ * cookie (`ma_access_email=authorized-user`) for a shared password. It carries no identity,
+ * so `/app` cannot honour it. Holders of that cookie keep the standalone tool (see
+ * `keepFor` below) until someone decides what they are owed. Likewise `/access/[code]`
+ * (admin-issued single-use report codes) is untouched.
+ *
  * ⚠️ NOT redirected, on purpose — these are not the old combined interface:
  *   /briefings/feedback/*       email thumbs-up/down landing pages
- *   /federal-market-assassin    a working PAID tool for ~7 legacy `ma:` buyers; its gate is
- *                               repaired instead (see market-assassin-locked/page.tsx)
+ *   /access/[code]              admin-issued single-use report codes (anonymous)
  *   /alerts/preferences         token-linked alert preferences from every alert email
  *   /alerts/signup              the free-alerts lead form linked from marketing
  */
 
 /** The current workspace. */
 export const WORKSPACE_PATH = '/app';
+export const MINDY_ORIGIN = 'https://getmindy.ai';
+
+/**
+ * A link into the current workspace. Relative by default (in-app); `absolute` for emails.
+ * `email` only pre-fills /app's sign-in form — identity always comes from the live session.
+ */
+export function workspaceUrl(opts: { panel?: string; email?: string; absolute?: boolean } = {}): string {
+  const q = new URLSearchParams();
+  if (opts.panel) q.set('panel', opts.panel);
+  const email = (opts.email || '').trim().toLowerCase();
+  if (email) q.set('email', email);
+  const qs = q.toString();
+  return `${opts.absolute ? MINDY_ORIGIN : ''}${WORKSPACE_PATH}${qs ? `?${qs}` : ''}`;
+}
+
+/** Where a standalone Market Assassin customer belongs now. */
+export const MARKET_RESEARCH_PANEL = 'research';
 
 /**
  * Old `/briefings` sidebar panel ids → current `/app` panel ids. A legacy panel with no
@@ -59,7 +90,20 @@ interface LegacyRoute {
   path: string;
   /** Panel to open when the legacy URL does not name one. */
   defaultPanel?: string;
+  /** Force this panel regardless of the URL's own `panel` (a standalone tool's only job). */
+  fixedPanel?: string;
+  /** Return true to leave the request alone (an access class /app cannot honour yet). */
+  keepFor?: (ctx: LegacyRequestContext) => boolean;
 }
+
+export interface LegacyRequestContext {
+  /** Value of the legacy `ma_access_email` cookie, if any. */
+  maCookie?: string | null;
+}
+
+/** The anonymous shared-password cookie value set by /api/verify-ma-password. */
+export const ANONYMOUS_MA_COOKIE = 'authorized-user';
+const keepAnonymousMaHolder = (ctx: LegacyRequestContext) => ctx.maCookie === ANONYMOUS_MA_COOKIE;
 
 /**
  * Every legacy customer entry point handled by the proxy. Exact paths only — a prefix match
@@ -69,6 +113,11 @@ export const LEGACY_ROUTES: readonly LegacyRoute[] = [
   { path: '/briefings' },
   { path: '/briefings/dashboard', defaultPanel: 'dashboard' },
   { path: '/bd-assist', defaultPanel: 'pipeline' },
+  // Standalone Market Assassin — every entry point lands on Market Research in /app.
+  { path: '/federal-market-assassin', fixedPanel: MARKET_RESEARCH_PANEL, keepFor: keepAnonymousMaHolder },
+  { path: '/federal-market-assassin/success', fixedPanel: MARKET_RESEARCH_PANEL },
+  { path: '/market-assassin-locked', fixedPanel: MARKET_RESEARCH_PANEL },
+  { path: '/market-assassin', fixedPanel: MARKET_RESEARCH_PANEL },
 ];
 
 const LEGACY_BY_PATH = new Map(LEGACY_ROUTES.map((r) => [r.path, r]));
@@ -95,15 +144,18 @@ export function mapLegacyPanel(raw: string | null | undefined): string | null {
 export function resolveLegacyDestination(
   pathname: string,
   searchParams: URLSearchParams,
+  ctx: LegacyRequestContext = {},
 ): string | null {
   const route = LEGACY_BY_PATH.get(normalizePath(pathname));
   if (!route) return null;
+  if (route.keepFor?.(ctx)) return null;
 
   const out = new URLSearchParams();
 
-  // Panel: an explicit one on the old URL wins, then the route default. `?setup=true` was
-  // the old "open my settings" deep link from setup emails.
+  // Panel: a fixed one (standalone tool) wins; else an explicit one on the old URL, then
+  // the route default. `?setup=true` was the old "open my settings" deep link.
   const panel =
+    mapLegacyPanel(route.fixedPanel) ??
     mapLegacyPanel(searchParams.get('panel')) ??
     mapLegacyPanel(searchParams.get('tab')) ??
     (searchParams.get('setup') === 'true' ? 'settings' : null) ??

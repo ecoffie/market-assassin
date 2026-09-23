@@ -11,11 +11,12 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   resolveLegacyDestination, isLegacyCustomerPath, mapLegacyPanel, LEGACY_ROUTES, WORKSPACE_PATH,
+  ANONYMOUS_MA_COOKIE, workspaceUrl,
 } from './legacy-routes';
 
-const resolve = (url: string) => {
+const resolve = (url: string, maCookie?: string) => {
   const u = new URL(url, 'https://getmindy.ai');
-  return resolveLegacyDestination(u.pathname, u.searchParams);
+  return resolveLegacyDestination(u.pathname, u.searchParams, { maCookie });
 };
 
 const SRC = join(__dirname, '../..');
@@ -93,7 +94,7 @@ describe('safety — no loops, no external targets, no over-matching', () => {
   it('does not touch pages that must keep working', () => {
     for (const p of [
       '/app', '/briefings/feedback/thanks', '/briefings/feedback/error', '/briefings/lindy-setup',
-      '/federal-market-assassin', '/market-assassin-locked', '/alerts/preferences', '/alerts/signup',
+      '/access/ABC123', '/alerts/preferences', '/alerts/signup',
       '/api/briefings/feedback', '/opportunity-map', '/today', '/', '/briefingsx',
     ]) {
       expect(resolve(p)).toBeNull();
@@ -116,7 +117,9 @@ describe('wiring — the proxy actually runs for every legacy route', () => {
     for (const r of LEGACY_ROUTES) expect(proxy).toContain(`'${r.path}'`);
   });
   it('the proxy calls the resolver with a temporary (307) redirect', () => {
-    expect(proxy).toMatch(/resolveLegacyDestination\(pathname, request\.nextUrl\.searchParams\)/);
+    expect(proxy).toMatch(/resolveLegacyDestination\(pathname, request\.nextUrl\.searchParams, \{\s*maCookie: request\.cookies\.get\('ma_access_email'\)/);
+    // The old "no cookie → /market-assassin-locked" branch is gone (superseded by the resolver).
+    expect(code('proxy.ts')).not.toContain("'/market-assassin-locked', request.url");
     expect(proxy).toMatch(/NextResponse\.redirect\(new URL\(legacyDestination, request\.url\), 307\)/);
   });
 });
@@ -179,26 +182,72 @@ describe('links are fixed at the SOURCE, not only redirected', () => {
     const route = code('app/api/activate/route.ts');
     expect(route).not.toMatch(/url: '\/market-assassin'/);
     expect(route).not.toMatch(/url: '\/recompete'/);
-    expect(route).toContain("url: '/federal-market-assassin'");
+    expect(route).not.toContain("'/federal-market-assassin'");
+    expect(route).toContain("url: '/app?panel=research'");
   });
 
-  it('the MI Pro welcome email hands a verified buyer to /app (no Map default, no /app link in email)', () => {
-    // Emails may not link /app (legacy-destination-guard.ts, #1362), so the CTA stays on
-    // /market-intelligence — whose verify step now lands a verified buyer on /app, not /briefings.
+  it('the MI Pro welcome email opens the /app sign-in/workspace (no Map default, no pricing detour)', () => {
     const src = code('lib/send-email.ts');
     const fn = src.slice(src.indexOf('export async function sendMarketIntelligenceWelcomeEmail'));
     const body = fn.slice(0, fn.indexOf('\n}\n'));
     expect(body).not.toContain('opportunity-map');
-    expect(body).not.toContain('mindyDashboardUrlFor');
-    expect(body).toContain('https://getmindy.ai/market-intelligence');
-    const mi = code('app/market-intelligence/page.tsx');
-    expect(mi).toContain("window.location.href = '/app';");
-    expect(mi).toContain("window.location.href = '/app?panel=settings';");
+    expect(body).not.toContain('getmindy.ai/market-intelligence');
+    expect(body.match(/workspaceUrl\(\{ email: to, absolute: true \}\)/g)?.length).toBe(2); // html + text
   });
 
   it('no email links the retired /market-assassin sales page', () => {
     for (const rel of ['lib/send-email.ts', 'app/api/stripe-webhook/route.ts']) {
       expect(code(rel)).not.toMatch(/getmindy\.ai\/market-assassin[?'"`]/);
     }
+  });
+});
+
+describe('standalone Market Assassin — retired into /app Market Research', () => {
+  it.each([
+    '/federal-market-assassin',
+    '/federal-market-assassin?panel=pipeline',          // fixed panel: a tool has one job
+    '/federal-market-assassin/success',
+    '/market-assassin-locked?error=invalid',
+    '/market-assassin',
+  ])('%s → /app?panel=research', (from) => {
+    expect(resolve(from)).toBe('/app?panel=research');
+  });
+
+  it('an MA holder with an identity cookie (their email) is routed too — /app honours the ma: grant', () => {
+    expect(resolve('/federal-market-assassin', 'buyer@example.com')).toBe('/app?panel=research');
+  });
+
+  it('⚠️ the ANONYMOUS shared-password holder keeps the legacy tool — /app has nothing to honour', () => {
+    expect(resolve('/federal-market-assassin', ANONYMOUS_MA_COOKIE)).toBeNull();
+    // …but only on the tool itself; the dead gate and sales page still route to /app.
+    expect(resolve('/market-assassin-locked', ANONYMOUS_MA_COOKIE)).toBe('/app?panel=research');
+  });
+
+  it('email prefill survives the MA hop', () => {
+    expect(resolve('/federal-market-assassin?email=a%40b.com')).toBe('/app?panel=research&email=a%40b.com');
+  });
+
+  it('workspaceUrl builds absolute email links and relative in-app links', () => {
+    expect(workspaceUrl({ panel: 'research', email: 'A@B.com', absolute: true }))
+      .toBe('https://getmindy.ai/app?panel=research&email=a%40b.com');
+    expect(workspaceUrl()).toBe('/app');
+  });
+
+  it('no customer-facing source still hands out the standalone MA tool', () => {
+    const MA_TOOL = /["'`](?:https:\/\/getmindy\.ai)?\/(?:federal-market-assassin|market-assassin-locked|market-assassin)(?:[?"'`/]|$)/;
+    for (const rel of [
+      'app/api/activate/route.ts', 'app/api/activate-license/route.ts', 'app/api/ma-access/[token]/route.ts',
+      'app/api/stripe-webhook/route.ts', 'lib/send-email.ts', 'lib/supabase/purchases.ts',
+      'lib/dsbs-scoring.ts', 'app/bundles/ultimate/page.tsx', 'app/market-assassin-locked/page.tsx',
+      'app/purchase/success/page.tsx', 'app/page.tsx',
+    ]) {
+      expect(code(rel), rel).not.toMatch(MA_TOOL);
+    }
+  });
+
+  it('next.config no longer sends /market-assassin to the homepage (one owner: the resolver)', () => {
+    const cfg = readFileSync(join(SRC, '..', 'next.config.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(cfg).not.toMatch(/'\/market-assassin',/);
   });
 });

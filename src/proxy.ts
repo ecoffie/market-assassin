@@ -9,7 +9,7 @@ import { resolveLegacyDestination } from '@/lib/mindy/legacy-routes';
  * Protected Routes:
  * 1. /database.html - Federal Contractor Database (requires db_access_email cookie)
  * 2. /contractor-database - Federal Contractor Database page (requires db_access_email cookie)
- * 3. /federal-market-assassin - Market Assassin tool (requires ma_access_email cookie)
+ * 3. /federal-market-assassin - retired → /app?panel=research (anonymous password holders excepted)
  *
  * Access is granted via:
  * - Purchase through Stripe (sets cookie automatically)
@@ -25,7 +25,9 @@ import { resolveLegacyDestination } from '@/lib/mindy/legacy-routes';
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  const legacyDestination = resolveLegacyDestination(pathname, request.nextUrl.searchParams);
+  const legacyDestination = resolveLegacyDestination(pathname, request.nextUrl.searchParams, {
+    maCookie: request.cookies.get('ma_access_email')?.value ?? null,
+  });
   if (legacyDestination) {
     return NextResponse.redirect(new URL(legacyDestination, request.url), 307);
   }
@@ -52,14 +54,9 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // Protect Federal Market Assassin
-  if (pathname === '/federal-market-assassin') {
-    const hasAccess = request.cookies.get('ma_access_email')?.value;
-
-    if (!hasAccess) {
-      return NextResponse.redirect(new URL('/market-assassin-locked', request.url));
-    }
-  }
+  // Federal Market Assassin: retired to /app?panel=research by the resolver above. The only
+  // request that reaches here carries the anonymous shared-password cookie (no identity for
+  // /app to honour), so the legacy tool still serves it — see legacy-routes.ts.
 
   return NextResponse.next();
 }
@@ -73,5 +70,8 @@ export const config = {
     '/briefings',
     '/briefings/dashboard',
     '/bd-assist',
+    '/federal-market-assassin/success',
+    '/market-assassin-locked',
+    '/market-assassin',
   ],
 };
