@@ -1837,6 +1837,8 @@ const VIEWPORT_JS = `<script>
     // double-apply the same word (AND together, narrowing further than intended).
     var _kw=(typeof intent.keyword==='string')?intent.keyword:'';
     Q=_kw; window.__lastAppliedKeyword=_kw; // the box reflects the ACTUAL applied keyword
+    // The query the search bar applied is the query the URL carries (row 8). A user action.
+    if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
     // Reflect the "Filters N" badge (count of active filter groups) so the applied search shows there too.
     if(applied){ try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.office,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
       var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
@@ -3093,8 +3095,61 @@ const VIEWPORT_JS = `<script>
   // cluster/expand feel instant and correct even when the debounced fetch returns identical data.
   // render() only rebuilds pins/feed from OPPS — it never triggers a fetch — so this is safe.
   map.on('zoomend',function(){ try{ if(typeof render==='function')render(); }catch(e){} });
+  // ── THE QUERY LIVES IN THE URL (canonical discovery Phase A row 8, 2026-09-23) ─────────
+  // A typed search used to exist only in memory: reload or share and the query was gone, while
+  // the scope-link IIFE (BOOT_VIEW_JS) has read ?q= since 2026-08-15. So the URL now carries the
+  // query the user typed, via history.replaceState (no reload, no history entry per keystroke).
+  //
+  // ⚠️ THIS IS A URL WRITER, NOT A STATE WRITER. It never applies anything: every URL reader in
+  // this page (scope link, ?ss=, ?opp=, return continuity, entry/attribution) reads location.search
+  // ONCE, synchronously at boot. Nothing re-reads it later, so a replaceState cannot race a restore
+  // the way the ?naics=&state= alert link did (the 5,416 → 0 incident). It is called only from
+  // USER actions (typing, the search bar's Enter, an agency suggestion, the saved-search picker,
+  // Start fresh) — never from fetchView and never from __applySavedSearch, so a boot restore can
+  // never rewrite the link that booted it.
+  //
+  // dropContext: when the USER changes the query, the page no longer shows the saved search or
+  // the one record the URL named. ?ss= / ?opp= (and the other record ids) are dropped, together
+  // with the share markers that only mean something beside a record — otherwise a reload would
+  // boot TWO appliers (?ss= and ?q=), and a record link would carry a query that can delete its
+  // record (docs/engineering/record-links-vs-market-links.md). Market params (agency, naics, …)
+  // and attribution (utm_*) are left exactly as they were.
+  //
+  // Only the two datasets return continuity restores whole (open · recompete) carry a query.
+  // Players/DLA searches are a different dataset and are not remembered either.
+  window.__mapQueryUrl=function(search,q,dropContext){
+    var src=String(search||''), s=src.charAt(0)==='?'?src.slice(1):src;
+    var parts=s?s.split('&'):[], keep=[], cur='';
+    for(var i=0;i<parts.length;i++){
+      var p=parts[i]; if(!p)continue;
+      if(p.split('=')[0]==='q'){ if(!cur){ try{ cur=decodeURIComponent(p.slice(2).split('+').join(' ')).trim(); }catch(e){ cur=p.slice(2); } } continue; }
+      keep.push(p);
+    }
+    var want=String(q||'').trim();
+    if(cur===want)return src;                       // the URL already says this — change nothing
+    if(dropContext){
+      var CTX={ss:1,opp:1,company:1,buyer:1,recompete:1,forecast:1,sh:1,src:1};
+      keep=keep.filter(function(p){ return !CTX[p.split('=')[0]]; });
+    }
+    if(want)keep.push('q='+encodeURIComponent(want));
+    return keep.length?('?'+keep.join('&')):'';
+  };
+  window.__syncQueryUrl=function(dropContext){
+    try{
+      var mode=window.__mapMode||'open';
+      var cur=location.search||'';
+      if(/[?&]embed=/.test(cur))return;          // a host page's map is not this visitor's URL
+      // On Players / DLA the box searches a different dataset: carry no q (and drop a stale one
+      // typed a moment earlier on Opportunities), never a Players term that would reopen as an
+      // Opportunities query.
+      var q=(mode==='open'||mode==='recompete')&&typeof Q==='string'?Q:'';
+      var next=window.__mapQueryUrl(cur,q,!!dropContext);
+      if(next===cur)return;
+      history.replaceState(history.state,'',location.pathname+next+(location.hash||''));
+    }catch(e){}
+  };
   var zsi=document.getElementById('zsearchInput');
-  if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
+  if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); window.__syncQueryUrl(true); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
   // Server-wired filter controls → write FILT + refetch (no client-side hide). scope=profile
@@ -8736,8 +8791,40 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // a synthetic {mode, filters, bbox}. So URL params and saved-search JSON share ONE vocabulary
   // and one apply path; a second hand-rolled FILT write here is exactly the lib-duplicate drift
   // this codebase keeps getting bitten by. No bbox: a scope link should not move the viewport.
+  // ── ?q= THAT THIS VISITOR WROTE (row 8, 2026-09-23) ─────────────────────────────────
+  // The search bar now writes the query into the URL (window.__syncQueryUrl, VIEWPORT_JS). A
+  // ?q= is a MARKET link, so return continuity stands down for it — correct for a SHARED link.
+  // But the URL carries only the query, while this visitor's remembered market also holds the
+  // agency / NAICS / state / horizons they set around it. Without this, writing ?q= would make a
+  // plain reload WORSE than before (the memory used to bring all of it back).
+  //
+  // So: when the URL names ONLY a query, and this browser's own remembered market (fresh, same
+  // 30-day horizon) has EXACTLY that query, the link is this visitor's own session and the memory
+  // restores it — the URL's query is honoured verbatim, the memory adds only what the URL does not
+  // say. Anyone else opening the link (different or no memory) gets exactly ?q= — the link wins.
+  //
+  // ONE decision, ONE applier: the scope-link IIFE computes it first and stands down; the
+  // restorer reads the SAME decision (window.__qLinkDeferred) instead of re-deriving it, so the
+  // two can never both apply (the second-writer race this page has already paid for once).
+  window.__qLinkOwnSession=function(qs,raw,now){
+    try{
+      qs=String(qs||'');
+      var m=qs.match(/[?&]q=([^&]+)/); if(!m)return false;
+      var q=decodeURIComponent(m[1].split('+').join(' ')).trim(); if(!q)return false;
+      // Any OTHER record/market/embed param → an explicit link; the memory never overrides it.
+      if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return false;
+      var st=JSON.parse(raw||'null');
+      if(!st||typeof st!=='object'||!st.filters||typeof st.filters!=='object')return false;
+      var age=(typeof st.t==='number')?(now-st.t):null;
+      if(age==null||age<0||age>30*24*3600*1000)return false;
+      return String(st.filters.q||'')===q.slice(0,120);
+    }catch(e){ return false; }
+  };
   (function(){ try{
     function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
+    var _lsRaw=''; try{ _lsRaw=localStorage.getItem('mi_map_last_search')||''; }catch(e){}
+    window.__qLinkDeferred=!!window.__qLinkOwnSession(location.search||'',_lsRaw,Date.now());
+    if(window.__qLinkDeferred)return;   // the RETURN CONTINUITY restorer below owns this link
     var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
     // office + subAgency: both Filters controls got real PICKERS on 2026-08-17, but neither was
     // readable from a URL — measured on prod, ?office=SPE7M1 and ?subAgency=DEPT OF THE NAVY left
@@ -8839,8 +8926,13 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // A MARKET link (?ss= ?agency= ?naics= ?strategy= ...) already says which
     // market to open. Either way the URL is the more recent instruction and the
     // memory stands down. ?embed= is a host page's map, not this visitor's.
-    if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
+    //
+    // ONE exception, decided ONCE by the scope-link IIFE above (window.__qLinkDeferred): a ?q=
+    // this visitor's own remembered market already holds verbatim — see __qLinkOwnSession.
     var raw=''; try{ raw=localStorage.getItem('mi_map_last_search')||''; }catch(e){ return; }
+    var ownQ=(typeof window.__qLinkDeferred==='boolean')?window.__qLinkDeferred
+      :(typeof window.__qLinkOwnSession==='function'&&window.__qLinkOwnSession(qs,raw,Date.now()));
+    if(!ownQ&&/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
     if(!raw)return;
     var st=null; try{ st=JSON.parse(raw); }catch(e){ return; }
     if(!st||typeof st!=='object')return;
@@ -8894,6 +8986,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           // Half-clearing (filters but not q, or filters but not horizons) would leave
           // the map narrowed with nothing on screen saying so.
           try{ window.__applySavedSearch({mode:'open',filters:{horizons:{open:true,recompete:false,forecast:false}}}); }catch(e){}
+          // …and the URL: a restored own-session ?q= would otherwise bring the query back on reload.
+          try{ if(window.__syncQueryUrl)window.__syncQueryUrl(true); }catch(e){}
           try{ pill.remove(); }catch(e){}
         };
         pill.appendChild(x); host.appendChild(pill);
@@ -9358,10 +9452,15 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+      if(an && typeof window.__applyAgencySuggestion==='function' && window.__applyAgencySuggestion(an)){ close(); input.blur(); }
     else if(act==='unplaced'){ location.href='/opportunity-map/forecasts?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
-      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
+      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss);
+        // Picking a saved search is a user action: the URL now carries ITS query (or none), never
+        // the one typed before it. The restorer itself never writes the URL.
+        if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
+        close(); input.blur(); }
       else { location.href='/opportunity-map/saved'; } }
   });
   // Close on outside click.
