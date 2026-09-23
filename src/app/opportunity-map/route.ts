@@ -1891,6 +1891,40 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
     el.hidden=false;
   }
+  // HORIZON COUNT MEANING (2026-09-23, after canonical Forecast coverage #1667). A horizon response
+  // carries one of FOUR meanings and they must never collapse into a number:
+  //   ok          — a measured count (0 IS a real zero)
+  //   partial     — a measured count over the COVERED buyers only; the rest are named in gaps
+  //   unavailable — discovery.coverage 'unestablished': no forecast publisher for any requested buyer
+  //   unknown     — the count itself could not be established (null) — Bug Prevention Rule #11
+  // This used to be total:d.totalForFilters||0, which printed "0" for an unavailable Forecast.
+  function horizonCount(d){
+    var disc=(d&&d.discovery)||{};
+    var gaps=(disc.coverage_gaps||[]).map(function(g){return g&&g.requested;}).filter(Boolean);
+    if(disc.coverage==='unestablished') return {total:null,state:'unavailable',gaps:gaps};
+    if(!d||typeof d.totalForFilters!=='number') return {total:null,state:'unknown',gaps:gaps};
+    return {total:d.totalForFilters,state:disc.coverage==='partial'?'partial':'ok',gaps:gaps};
+  }
+  // Short label for a horizon count (Horizons dropdown). Never '0' for unavailable/unknown.
+  function horizonCountLabel(c,fmt){
+    if(!c) return '';
+    if(c.state==='unavailable') return 'n/a';
+    if(c.state==='unknown') return '?';
+    return fmt(c.total)+(c.state==='partial'?'*':'');
+  }
+  // One sentence for the header, or '' when every enabled horizon is fully measured.
+  function coverageNote(counts){
+    var out=[];
+    ['open','recompete','forecast'].forEach(function(h){
+      var c=counts&&counts[h]; if(!c) return;
+      var name=h==='forecast'?'Forecasts':(h==='recompete'?'Recompetes':'Open');
+      var who=c.gaps&&c.gaps.length?' for '+c.gaps.join(', '):'';
+      if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
+      else if(c.state==='partial') out.push(name+' partial — not measured'+who);
+      else if(c.state==='unknown') out.push(name+' count unavailable');
+    });
+    return out.join(' · ');
+  }
   function updateHeader(){
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
@@ -1904,6 +1938,14 @@ const VIEWPORT_JS = `<script>
     // older decision note; the memory two_networks_opp_vs_network_map records the reversal.
     var _title=(MODE==='companies'||MODE==='buyers')?'Players':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
+    // Every enabled horizon UNAVAILABLE (e.g. Forecast only, agency=NOAA): say so — never "0 results",
+    // and never keep a stale prior count either.
+    if(window.__coverageAllUnavailable){
+      var _rc=document.getElementById('rescount');
+      if(_rc)_rc.innerHTML='<span style="font-weight:700;color:var(--ink)">Unavailable</span> <span style="font-weight:400;color:var(--sub)">'+esc(window.__coverageNote||'')+'</span>';
+      var _mc=document.getElementById('mapCount'); if(_mc)_mc.hidden=true;
+      return;
+    }
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a
@@ -1936,7 +1978,9 @@ const VIEWPORT_JS = `<script>
     // LIST's count, so it answers "how many match" — the map pill answers "how many am I seeing".
     // The Jul-26 "ONE number on the sort row" decision therefore stands HERE, unchanged.
     var rc=document.getElementById('rescount'); if(!rc)return;
-    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>'
+      // Partial / unavailable horizons alongside measured ones: the count is only what was measured.
+      +(window.__coverageNote?' <span style="font-weight:400;color:var(--sub)">· '+esc(window.__coverageNote)+'</span>':'');
     setMapCount(shown,n,more);
     // Zillow's "Show N results" on the Filters Apply button — the live count of what the CURRENT view
     // holds, refreshed on every fetch so the user sees the number their filters return.
@@ -2464,7 +2508,8 @@ const VIEWPORT_JS = `<script>
         // captured per-horizon so the Horizons dropdown can show the honest number, never the cap.
         // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
         // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
-        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
+        var hc=horizonCount(d);
+        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:hc.total,count:hc,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
       }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true};});
     })).then(function(parts){
       busy=false; afterFetch();
@@ -2496,7 +2541,10 @@ const VIEWPORT_JS = `<script>
       // A horizon whose count is UNKNOWN (null) makes the whole line unknown rather than
       // letting a missing number quietly read as zero (Bug Prevention Rule #11).
       var unmappedTot=0, unmappedUnknown=false;
-      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true;
+      window.__horizonCounts=window.__horizonCounts||{};
+      ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)delete window.__horizonCounts[k]; });
+      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=(typeof p.total==='number'?p.total:0); inv+=p.inview; if(p.capped)cap=true;
+        if(p.m && !p.failed && p.count)window.__horizonCounts[p.m]=p.count;
         // MAP-TRUTH: sum what each horizon says it could not draw.
         // ⚠️ SUBTRACT forecast's unplaced rows that were ALREADY surfaced in the list — they are
         // concat'd into OPPS and counted in TOTAL above, so counting them again as "not shown on
@@ -2514,6 +2562,9 @@ const VIEWPORT_JS = `<script>
       // toward the headline total so "N results" is honest about what the search returned.
       OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
       window.__unplacedForecastTotal=unplacedTot;
+      // Coverage: every enabled horizon unavailable → the empty feed/header must say so, never "0".
+      window.__coverageNote=coverageNote(window.__horizonCounts);
+      window.__coverageAllUnavailable=_enabled.length>0 && _enabled.every(function(k){ var c=window.__horizonCounts[k]; return c&&c.state==='unavailable'; });
       // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
       // could not be established; the line says so rather than implying everything is mapped.
       window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
@@ -2634,7 +2685,10 @@ const VIEWPORT_JS = `<script>
     ['open','recompete','forecast'].forEach(function(h){
       var el=document.querySelector('.hznn[data-hzn="'+h+'"]'); if(!el)return;
       var on=window.__horizons[h]!==false;
-      el.textContent = on ? fmt(T[h]) : '';   // hidden horizon → no count (it contributes nothing)
+      var C=(window.__horizonCounts||{})[h];
+      // A known count state wins over the bare total: unavailable → 'n/a', unknown → '?', partial → 'N*'.
+      el.textContent = on ? (C ? horizonCountLabel(C,fmt) : fmt(T[h])) : '';   // hidden horizon → no count
+      el.title = on && C && C.state!=='ok' ? coverageNote({[h]:C}) : '';
     });
     var HZ=['open','recompete','forecast'], total=HZ.length;
     var onCount=HZ.filter(function(m){return window.__horizons[m]!==false;}).length;

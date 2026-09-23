@@ -1566,6 +1566,14 @@ function render(){
 }
 function drawFeed(){
   const feed=document.getElementById('feed');
+  // Unavailable is not "no matches": every enabled horizon has no forecast publisher for the buyer
+  // asked (canonical coverage 'unestablished'). Say what is missing — never an empty-result state.
+  if(!rows.length && window.__coverageAllUnavailable){
+    feed.innerHTML=`<div class="empty"><h4>Forecast coverage unavailable</h4>
+      <p>${esc(window.__coverageNote||'We hold no forecasts from this buyer.')}. This is a coverage gap, not zero upcoming buys.</p>
+      <button onclick="document.getElementById('clrAll').click()">Clear all filters</button></div>`;
+    return;
+  }
   if(!rows.length){
     feed.innerHTML=`<div class="empty"><h4>No opportunities match</h4>
       <p>Try removing a filter or widening your service lines.</p>

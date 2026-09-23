@@ -41,7 +41,9 @@ describe('Fetch failure is not a fake empty result', () => {
 
   it('a genuine empty result (fetch OK, 0 rows) still falls through and renders 0 — no failed flag', () => {
     // the successful mapping return must NOT carry failed:true (only the error paths do)
-    expect(mapRoute).toMatch(/pins:\(d\.pins\|\|\[\]\)\.map\(function\(p\)\{return toRow\(p,m\);\}\),total:d\.totalForFilters\|\|0,capped:!!d\.capped[^}]*\}/);
+    // total comes from horizonCount (a real 0 stays 0; null/unavailable stays null — see
+    // forecast-unavailable-not-zero.unit.test.ts). Still no failed flag on the success path.
+    expect(mapRoute).toMatch(/pins:\(d\.pins\|\|\[\]\)\.map\(function\(p\)\{return toRow\(p,m\);\}\),total:hc\.total,count:hc,capped:!!d\.capped[^}]*\}/);
     const successReturn = mapRoute.slice(
       mapRoute.indexOf('pins:(d.pins||[]).map(function(p){return toRow(p,m);})'),
     ).slice(0, 200);
