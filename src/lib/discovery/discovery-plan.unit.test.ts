@@ -289,3 +289,32 @@ describe('PostgREST encoding', () => {
     expect(textPredicate(buildTextMatcher('repair'), ['title'])).toBe('title.imatch."\\\\mrepair(s|es|ing|ed)?\\\\M"');
   });
 });
+
+describe('Phase C — explicit agency accepts a list of distinct buyers (ORed)', () => {
+  const json = (p: DiscoveryPlan) => JSON.parse(JSON.stringify(p));
+  it('a one-element list plans exactly like the string (single-buyer MCP input unchanged)', () => {
+    for (const f of FIXTURES.filter((x) => typeof x.input.agency === 'string')) {
+      expect(json(planFor({ ...f.input, agency: [f.input.agency as string] })), f.id).toEqual(json(planFor(f.input)));
+    }
+  });
+  it('each buyer resolves independently and the buyers are ORed', () => {
+    const p = planFor({ query: 'janitorial', agency: ['USDA', 'VA'] });
+    expect(p.buyers.map((b) => b.requested)).toEqual(['USDA', 'VA']);
+    expect(p.buyers.map((b) => b.canonical)).toEqual([planFor({ query: '', agency: 'USDA' }).buyers[0].canonical, planFor({ query: '', agency: 'VA' }).buyers[0].canonical]);
+    expect(buyerMatches(p.buyers, ['AGRICULTURE, DEPARTMENT OF', 'FOREST SERVICE'])).toBe(true);
+    expect(buyerMatches(p.buyers, ['VETERANS AFFAIRS, DEPARTMENT OF'])).toBe(true);
+    expect(buyerMatches(p.buyers, ['DEPT OF THE NAVY'])).toBe(false);
+    // ONE or-op over the buyer columns carries both identities (OR), never two ANDed ops.
+    const single = (a: string) => buyerPredicate(planFor({ query: '', agency: a }).buyers, ['department', 'sub_tier'])!;
+    const both = buyerPredicate(p.buyers, ['department', 'sub_tier'])!;
+    expect(both).toBe(`${single('USDA')},${single('VA')}`);
+    expect(p.horizons.open.ops.filter((o) => o.op === 'or' && o.expr === both)).toHaveLength(1);
+  });
+  it('a pipe-joined string is NOT split — that is a surface adapter job, not a plan rule', () => {
+    expect(planFor({ query: '', agency: 'USDA|VA' }).buyers).toHaveLength(1);
+  });
+  it('blank list entries are dropped; an empty list is no buyer', () => {
+    expect(planFor({ query: '', agency: ['', '  ', 'USDA'] }).buyers.map((b) => b.requested)).toEqual(['USDA']);
+    expect(planFor({ query: 'janitorial', agency: [] }).buyers).toEqual([]);
+  });
+});

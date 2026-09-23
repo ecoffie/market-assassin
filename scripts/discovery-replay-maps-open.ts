@@ -1,0 +1,66 @@
+/**
+ * Maps Open replay fixtures + the classification of every material old→new change (Phase C).
+ * `npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-open` exits 1 when a fixture
+ * changes and has no entry here, or when any entry is `unexpected_regression`.
+ * Classes: canonical_correction | expected_policy_change | unexpected_regression.
+ */
+export const MAPS_OPEN_FIXTURES: Array<{ label: string; params: Record<string, string> }> = [
+  ...['ai governance', 'artificial intelligence governance', '"ai governance"', 'janitorial', 'Naval facilities in Nevada', 'veterans affairs',
+    'cybersecurity', 'cyber', 'cyber security', 'SIEM', 'cyber cloud compliance network server', 'cyber, cloud', 'janitorial or landscaping',
+    'IT services', 'IT', 'AI', 'ML', 'HR services', 'QA', '-computers', '541512 -computers', 'zzzxxyyqqq',
+    'follow-on support', 'data management', 'janitoral', 'management', 'pam', 'market research', 'drones', 'Pro Audio', '8a',
+    '541320', '5413', 'Show me USDA opportunities', 'SDVOSB cybersecurity opportunities in Virginia',
+  ].map((q) => ({ label: q, params: { q } })),
+  { label: 'janitorial + agency=USDA', params: { q: 'janitorial', agency: 'USDA' } },
+  { label: 'janitorial + agency=VA', params: { q: 'janitorial', agency: 'VA' } },
+  { label: 'agency=USDA', params: { agency: 'USDA' } },
+  { label: 'agency=VA', params: { agency: 'VA' } },
+  { label: 'IT services + state=VA', params: { q: 'IT services', state: 'VA' } },
+  // ── beyond the 40-fixture baseline: multi-agency (Maps presets) + positive-scope contract ──
+  { label: 'agency=AGRICULTURE|VETERANS AFFAIRS', params: { agency: 'AGRICULTURE|VETERANS AFFAIRS' } },
+  { label: 'janitorial + agency=AGRICULTURE|VETERANS AFFAIRS', params: { q: 'janitorial', agency: 'AGRICULTURE|VETERANS AFFAIRS' } },
+  { label: 'USDA -computers', params: { q: 'USDA -computers' } },
+  { label: 'SDVOSB -computers', params: { q: 'SDVOSB -computers' } },
+  { label: '-computers + setAside=SB', params: { q: '-computers', setAside: 'SB' } },
+  { label: '-computers + closingDays=30 + hasDocs', params: { q: '-computers', closingDays: '30', hasDocs: '1' } },
+];
+
+export const MAPS_OPEN_CLASSES: Record<string, { cls: 'canonical_correction' | 'expected_policy_change' | 'unexpected_regression'; why: string }> = {
+  'ai governance': { cls: 'canonical_correction', why: 'Old %ai% substring (m-AI-ntenance, rep-AI-r) → ~5.3k. Canonical AI ∧ governance, word-bounded → 11 (all ⊂ old). 0 dropped rows match canonical text.' },
+  'artificial intelligence governance': { cls: 'canonical_correction', why: 'Old token-OR on intelligence/governance boilerplate. Now identical to "ai governance" (11).' },
+  '"ai governance"': { cls: 'canonical_correction', why: 'Old treated quotes as characters (Blast Shield, HVAC). Now an exact phrase: 2 notices that contain it.' },
+  'janitorial': { cls: 'canonical_correction', why: 'MCP parity: canonical industry preset NAICS 561720/561730/561210 added (102 new, all those codes). 0 old rows dropped. 561210 breadth recorded as a limitation.' },
+  'Naval facilities in Nevada': { cls: 'canonical_correction', why: 'Old token-OR 1.3k. State NV extracted; naval ∧ facilities in NV = true empty (same as MCP Phase B).' },
+  'veterans affairs': { cls: 'canonical_correction', why: 'Now a VA buyer filter (459 VA notices, all ⊂ old). 345 dropped = other buyers whose text says veterans/affairs; 0 dropped VA-buyer rows.' },
+  'cybersecurity': { cls: 'canonical_correction', why: 'Cyber concept forms (cyber / cyber security) + MCP cyber IT taxonomy: +80, 0 dropped. 20 new via 518210; some via body boilerplate (known limitation).' },
+  'cyber': { cls: 'canonical_correction', why: 'cyber ≡ cybersecurity ≡ cyber security (424 each). 17 dropped = cyber-substring words (cyberspace etc.), 0 match the canonical concept; 19 added via 518210 taxonomy.' },
+  'cyber security': { cls: 'canonical_correction', why: 'Old token-OR on "security" → 1,638. Now the one cyber concept → 424 (= cyber = cybersecurity).' },
+  'SIEM': { cls: 'canonical_correction', why: 'Old %siem% = SIEMENS substring (18 dropped, none contain the word SIEM). New 24 = MCP cyber related-IT taxonomy (518210/513210/541511); no active notice carries the word SIEM.' },
+  'cyber cloud compliance network server': { cls: 'canonical_correction', why: 'Capability list: ANY(cybersecurity·cloud·server), compliance/network rank-only → 539 (MCP Phase B 528). Old token-OR 1,530.' },
+  'cyber, cloud': { cls: 'canonical_correction', why: 'Explicit alternatives: cybersecurity OR cloud, word-bounded ∪ cyber taxonomy. 27 dropped substring hits, 16 added via taxonomy.' },
+  'janitorial or landscaping': { cls: 'canonical_correction', why: '"or" = alternatives + industry preset NAICS: 0 dropped, +94 via 561720/561730/561210.' },
+  'IT services': { cls: 'canonical_correction', why: 'Old %it% substring → half the corpus. IT concept (case-sensitive acronym | information technology) ∪ IT taxonomy → 366.' },
+  'IT': { cls: 'canonical_correction', why: 'Acronym IT is case-sensitive: the pronoun "it" no longer matches. 5,464 → 273.' },
+  'AI': { cls: 'canonical_correction', why: 'Acronym AI case-sensitive (no m-ai-ntenance): 5,290 → 109, all ⊂ old.' },
+  'ML': { cls: 'canonical_correction', why: 'Acronym ML | machine learning: 529 → 25. 6 added include ML-as-millilitre unit hits (acronym limitation recorded).' },
+  'HR services': { cls: 'canonical_correction', why: 'Old %hr% substring (tHRee, cHRome) → 2,026. HR acronym case-sensitive → 11. "human resources" long form not a canonical concept (3 notices) — recorded.' },
+  'QA': { cls: 'canonical_correction', why: 'Old %qa% substring → 777. QA acronym → 226, ⊂ old. "quality assurance" (548 notices) is NOT a QA form — canonical limitation recorded; old never matched them either.' },
+  '541512 -computers': { cls: 'canonical_correction', why: 'Old searched literal text "541512"/"-computers". Now NAICS 541512 minus notices mentioning computers (18); all 5 dropped carry "computers".' },
+  'follow-on support': { cls: 'expected_policy_change', why: 'Hyphenated compound is one unit (matches "follow on" too); "support" is a stop word, so follow-on alone admits (known limitation). 0 dropped.' },
+  'data management': { cls: 'canonical_correction', why: 'Old token-OR data|management → 2,303. Canonical requires both → 1,162, ⊂ old. Glued DATAMANAGEMENT: 0 active notices.' },
+  'pam': { cls: 'canonical_correction', why: 'Old %pam% substring (Pamunkey, camera spec). 26 dropped, none contain the word PAM.' },
+  'market research': { cls: 'canonical_correction', why: 'Canonical requires both qualifiers → 477 (MCP 465), ⊂ old; 482 dropped carry only one word.' },
+  'drones': { cls: 'canonical_correction', why: 'Old matched "uas" inside words (persUASive, qUASi) — 10 dropped, none drone-related. Old path also intermittently timed out / returned a null count on this query.' },
+  'Pro Audio': { cls: 'canonical_correction', why: 'Old %pro% substring → 4,632. audio admits, "pro" ranks → 84.' },
+  'Show me USDA opportunities': { cls: 'canonical_correction', why: 'Structured agency intent → 257 USDA notices (was %me%/%show% substring 5,870). 0 USDA buyers dropped.' },
+  'SDVOSB cybersecurity opportunities in Virginia': { cls: 'canonical_correction', why: 'Old resolved the whole query as a set-aside (340). Now SDVOSB ∧ VA ∧ cyber = true empty (same as MCP).' },
+  'janitorial + agency=USDA': { cls: 'canonical_correction', why: 'Old USDA needle found nothing (0). USDA identity (department AGRICULTURE) → 12, all USDA components.' },
+  'janitorial + agency=VA': { cls: 'canonical_correction', why: 'Old VA needle ⊂ "conserVAtion" (1 USDA row). Whole-word VA identity → 30 VA notices.' },
+  'agency=USDA': { cls: 'canonical_correction', why: 'Old %USDA% literal on department/sub_tier → 3. Canonical USDA identity → 257 (Forest Service, ARS, FSIS…).' },
+  'agency=VA': { cls: 'canonical_correction', why: 'Old "VA" substring hit conserVAtion / adVAnced (DARPA) — all 37 wrong. Canonical VA identity → 459 VA notices.' },
+  'IT services + state=VA': { cls: 'canonical_correction', why: 'IT concept (case-sensitive) ∪ taxonomy in VA → 47 (MCP 45). Old %it% substring 807.' },
+  'janitorial + agency=AGRICULTURE|VETERANS AFFAIRS': { cls: 'canonical_correction', why: 'Multi-agency OR proven live: 42 = janitorial+USDA 12 + janitorial+VA 30. Adds the NAICS preset.' },
+  'USDA -computers': { cls: 'canonical_correction', why: 'Now USDA buyers minus computers (248). 26 dropped: 17 non-USDA buyers that merely mention USDA; 9 USDA buyers, all carry "computers".' },
+  'SDVOSB -computers': { cls: 'canonical_correction', why: 'SDVOSB set-aside minus computers: the 8 dropped all carry "computers" (old ignored the exclusion).' },
+  '-computers + setAside=SB': { cls: 'expected_policy_change', why: 'Approved positive-scope rule B: a set-aside group is a Maps positive scope, so the exclusion is valid → SB minus computers (3,067). Old returned 0.' },
+};

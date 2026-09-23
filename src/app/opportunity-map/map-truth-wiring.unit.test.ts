@@ -18,10 +18,13 @@ const clientSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 describe('map-truth contract — API side', () => {
   it('counts unmapped rows with the SAME filters, minus the map_lat predicate', () => {
     expect(apiSrc).toContain('countUnmappedForFilters');
-    // Must reuse the shared filter builder, never re-express "what matches".
+    // Must reuse the shared filter builder, never re-express "what matches". Since Phase C that is
+    // the one canonical-plan adapter (applyFilters = applyMapsOpenFilters over the request's plan),
+    // shared with the headline count and the viewport pins — the discovery gate asserts all three.
     const fn = apiSrc.slice(apiSrc.indexOf('async function countUnmappedForFilters'));
     const body = fn.slice(0, fn.indexOf('\n    }'));
-    expect(body).toContain("applyFilters(q, f)");
+    expect(body).toContain("applyFilters(q)");
+    expect(apiSrc).toContain('const applyFilters = (q: any) => applyMapsOpenFilters(q, openReq);');
     expect(body).toContain("is('map_lat', null)");
   });
 
