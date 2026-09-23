@@ -7323,3 +7323,13 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** Share federal opportunity link / SAM.gov solicitation link preview / government contract opportunity share / teaming partner opportunity share.
 
 **Proof.** Production before (2026-09-23, requested as facebookexternalhit, LinkedInBot, Twitterbot and curl): `/opportunity-map?opp=0fdb5f972b2a46648adf2e2b8a6558ce` returned 200 with zero `og:`/`twitter:` tags and `<title>Mindy Map</title>`. After: server-rendered `og:title` "CES Hillside Mower — Government Opportunity", a 1200×630 card, and a description built only from the `sam_opportunities` row (Dept. of the Army · Place of performance: West Virginia · Responses due Sep 29, 2026 · Solicitation W50S9J-26-Q-0013). Fields SAM does not provide are left off the card, never estimated.
+
+## POTETO — Opportunity Share Attribution (2026-09-23)
+
+**What.** Mindy can now follow a shared opportunity all the way through: the share, the colleague who opened it, whether they signed up, whether they put Mindy to work within a week (saved an opportunity, set a watch, or started a pursuit) and whether they became a customer. Every shared link identifies the individual share, so Mindy knows which opportunity and which sharer brought someone in. It works however the person signs up: email, Google or Microsoft.
+
+**Why.** Contractors share opportunities with teaming partners. That is the growth loop Mindy is built around, and until now it couldn't be measured: every link past the share looked like any other listing link. Google and Microsoft signups also recorded no source at all. The question "how many customers came from shared opportunities?" had no answer.
+
+**SEO.** Internal measurement capability; no public page. Supports "share federal opportunities with teaming partners" positioning, which can now be backed by measured numbers once they accrue.
+
+**Proof.** Audit (2026-09-23): 94 shares by 31 users since Aug 4, with 0 attributable arrivals, signups or purchases; 574 of 1,327 accounts since Jul 6 carried any signup source. After: a real-browser acceptance run against a production build and the live database. One share was opened by four anonymous browsers, which became four accounts through the Google-, Microsoft-, email- and password-signup routes; one of them activated and paid. The funnel query attributed the $149.00 to that share, its opportunity and its sharer. It excluded a fake share id, a real id lifted onto another opportunity, and alert, briefing, saved-search and direct traffic. The activation and payment were inserted in a rolled-back transaction, and every synthetic row was deleted and re-counted to zero. Real numbers accrue from ship date; earlier shares cannot be attributed retroactively.

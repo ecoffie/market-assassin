@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
+import { scheduleAttributionClaim } from '@/lib/attribution/claim-from-request';
 import { createClient } from '@supabase/supabase-js';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 import { hasProAccess } from '@/lib/access/resolve-access';
@@ -145,6 +146,7 @@ export async function POST(request: NextRequest) {
 
     // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
     void qualifyReferralFromRequest(request, email);
+    scheduleAttributionClaim(request, email, authData.user.created_at ?? null);
     const authenticatedAt = new Date().toISOString();
     return NextResponse.json({
       success: true,

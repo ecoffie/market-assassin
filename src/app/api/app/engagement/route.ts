@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EventTypes, logEngagement } from '@/lib/engagement';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { sanitizeShareMetadata } from '@/lib/attribution/share-attribution';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,10 @@ export async function POST(request: NextRequest) {
     const email = String(body.email || '').toLowerCase().trim();
     const eventType = String(body.eventType || '');
     const eventSource = typeof body.eventSource === 'string' ? body.eventSource : 'market_intelligence';
-    const metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
+    // Share fields are CLAIMS from a URL anyone can type: a malformed share id is dropped and a
+    // share-labelled arrival without a well-formed id is relabelled share_invalid, so it can never
+    // be counted as share traffic (real ids are validated again in the funnel query).
+    const metadata = sanitizeShareMetadata(body.metadata && typeof body.metadata === 'object' ? body.metadata : {});
 
     // ── ANONYMOUS VISITORS ────────────────────────────────────────────────────────────────
     // Demo Day (2026-08-22) puts ~800 people on the map, almost none of them signed in on

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { verifyUserSession } from '@/lib/api-auth';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
+import { scheduleAttributionClaim } from '@/lib/attribution/claim-from-request';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
 
     // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
     void qualifyReferralFromRequest(request, auth.email);
+    // Share/anonymous acquisition: associate this browser's pre-signup history with the account.
+    // This route is where Google, Microsoft, magic-link and /app sessions are minted.
+    scheduleAttributionClaim(request, auth.email, auth.createdAt ?? null);
     const authenticatedAt = new Date().toISOString();
 
     return NextResponse.json({

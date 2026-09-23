@@ -36,6 +36,9 @@ export interface AuthResult {
   // an OAuth session already satisfied MFA upstream at Google/Microsoft.
   provider?: string | null;   // app_metadata.provider
   aal?: string | null;        // 'aal1' | 'aal2' from the session JWT, if present
+  // auth.users.created_at — when the account was created. Session path only. Lets the
+  // share-attribution claim tell a brand-new account from an existing one signing in.
+  createdAt?: string | null;
 }
 
 export type MIAccessTier = 'free' | 'pro' | 'team' | 'enterprise' | 'none';
@@ -338,7 +341,9 @@ export async function verifyUserSession(request: NextRequest): Promise<AuthResul
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const aal = ((user as any).aal as string | undefined) ?? null;
 
-    return { authenticated: true, email: user.email.toLowerCase(), method: 'session', provider, aal };
+    const createdAt = (user as { created_at?: string }).created_at ?? null;
+
+    return { authenticated: true, email: user.email.toLowerCase(), method: 'session', provider, aal, createdAt };
   } catch {
     return { authenticated: false, email: null, error: 'Auth verification failed' };
   }

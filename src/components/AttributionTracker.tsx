@@ -113,6 +113,20 @@ export default function AttributionTracker() {
       // Cookie write below is the server-readable fallback.
     }
     writeCookie(next);
+
+    // Mirror an existing anonymous browser id (created by the Map or /try) into the first-party
+    // `mindy_anon` cookie the verified sign-in routes read, so the account this browser becomes
+    // inherits its acquisition history. Only mirrors; never creates an id on Next pages.
+    try {
+      const anon = window.localStorage.getItem("mindy_anon_id") || "";
+      if (/^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(anon)
+          && !document.cookie.split("; ").some((c) => c === `mindy_anon=${encodeURIComponent(anon)}`)) {
+        const secure = window.location.protocol === "https:" ? "; Secure" : "";
+        document.cookie = `mindy_anon=${encodeURIComponent(anon)}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+      }
+    } catch {
+      // Non-fatal: attribution must never break a page.
+    }
   }, []);
 
   return null;

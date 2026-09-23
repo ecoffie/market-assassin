@@ -3158,7 +3158,23 @@ const VIEWPORT_JS = `<script>
   try{
     var _qs=location.search||'';
     var _e='direct';
-    if(/[?&]src=/.test(_qs)) _e=(_qs.match(/[?&]src=([^&]+)/)||[])[1]||'direct';
+    // SHARE ATTRIBUTION. A shared link is ?<kind>=<id>&src=share&sh=<share_id>. entry='share' ONLY
+    // when sh is a well-formed share id AND the link names a record; anything else that claims
+    // src=share is 'share_invalid' (fails closed — a typed or scanner-mangled sh is never share
+    // traffic). The id is still a CLAIM: the server validates it against the real listing_share.
+    // Alert / briefing / saved-search links carry their own src (or none) and never become 'share'.
+    window.__mapShare=null;
+    if(/[?&]src=/.test(_qs)){
+      _e=(_qs.match(/[?&]src=([^&]+)/)||[])[1]||'direct';
+      if(_e==='share'){
+        var _sh=String((_qs.match(/[?&]sh=([^&]+)/)||[])[1]||'').toLowerCase();
+        var _rec=_qs.match(/[?&](opp|forecast|recompete|company|buyer)=([^&]+)/);
+        var _rid=''; if(_rec){ try{ _rid=decodeURIComponent(_rec[2]); }catch(x){ _rid=''; } }
+        if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(_sh) && _rid){
+          window.__mapShare={share_id:_sh, notice_id:_rid.slice(0,120), kind:_rec[1]};
+        } else _e='share_invalid';
+      }
+    }
     else if(/[?&]ss=/.test(_qs)) _e='saved_search';
     else if(/[?&]strategy=/.test(_qs)) _e='lens';
     else if(/[?&]opp=/.test(_qs)) _e='listing_link';
@@ -3194,6 +3210,11 @@ const VIEWPORT_JS = `<script>
              var r=Math.random()*16|0; return (c==='x'?r:((r&0x3)|0x8)).toString(16);}));
         localStorage.setItem(k,v);
       }
+      // Mirror to a first-party cookie so the VERIFIED sign-in routes (mi-session / mi-login /
+      // complete-signup) can associate this browser's history with the account it becomes —
+      // localStorage never reaches the server. Same pattern as RefCapture's mindy_ref.
+      try{ if((document.cookie||'').indexOf('mindy_anon='+encodeURIComponent(v))<0){
+        document.cookie='mindy_anon='+encodeURIComponent(v)+'; Max-Age=31536000; Path=/; SameSite=Lax'+(location.protocol==='https:'?'; Secure':''); } }catch(e){}
       return v;
     }catch(e){ return ''; }
   }
@@ -3220,6 +3241,14 @@ const VIEWPORT_JS = `<script>
       if(action==='map_search'||action==='listing_open'){
         try{ var _st=_mapState(); m.filters=_st.filters; m.bbox=_st.bbox; m.zoom=_st.zoom; m.entry=_st.entry; }catch(e){}
       }
+      // ARRIVAL ATTRIBUTION rides on the arrival events only: map_view (once per session) names
+      // how the visitor entered, and for a shared link which share + which record. listing_open
+      // keeps its own notice_id (the listing opened) and carries the share id alongside.
+      if(action==='map_view'||action==='listing_open'){
+        try{ if(!m.entry) m.entry=window.__mapEntry||'direct'; }catch(e){}
+        try{ var _sh=window.__mapShare; if(_sh){ m.share_id=_sh.share_id; m.share_kind=_sh.kind; if(action==='map_view') m.notice_id=_sh.notice_id; } }catch(e){}
+        try{ if(window.__firstTouchAt) m.ft_at=window.__firstTouchAt; }catch(e){}
+      }
       fetch('/api/app/engagement',{
         method:'POST',
         headers: _anon?{'Content-Type':'application/json'}:{'Content-Type':'application/json','x-mi-auth-token':tk},
@@ -3230,6 +3259,38 @@ const VIEWPORT_JS = `<script>
   }
   window.__anonId=_anonId;
   window.__track=_track;
+
+  // FIRST-TOUCH ATTRIBUTION — the Map establishes it itself. /opportunity-map is a route handler,
+  // so the root layout's AttributionTracker never runs here, and a visitor who arrived from a
+  // shared link reached signup/checkout with no source at all. This writes the SAME object
+  // (localStorage gca_attribution + cookie gca_attr) in the SAME shape, which the existing signup
+  // form, mi-signup's cookie fallback and the /checkout -> KV -> Stripe webhook path already read.
+  //  · first_touch is written ONCE and never overwritten (another shared link does not move it);
+  //  · last_touch is this visit.
+  (function(){
+    try{
+      var K='gca_attribution', st=null;
+      try{ st=JSON.parse(localStorage.getItem(K)||'null'); }catch(e){ st=null; }
+      if(!st||typeof st!=='object') st=null;
+      var p=new URLSearchParams(location.search);
+      var t={ url:String(location.href).slice(0,300), path:String(location.pathname+location.search).slice(0,300),
+              referrer:'', captured_at:new Date().toISOString(), entry:window.__mapEntry||'direct' };
+      try{ var r=document.referrer||''; if(r&&new URL(r).hostname!==location.hostname) t.referrer=r.slice(0,300); }catch(e){}
+      ['utm_source','utm_medium','utm_campaign','utm_term','utm_content','gclid','fbclid','msclkid'].forEach(function(k){
+        var v=p.get(k); if(v) t[k]=String(v).slice(0,250); });
+      var sh=window.__mapShare;
+      if(sh){ t.share_id=sh.share_id; t.notice_id=sh.notice_id; if(!t.utm_source){ t.utm_source='share'; t.utm_medium='share'; } }
+      if(!t.utm_source&&t.referrer){ try{ var h=new URL(t.referrer).hostname; if(h.indexOf('www.')===0)h=h.slice(4); t.utm_source=h; t.utm_medium='referral'; }catch(e){} }
+      if(!t.utm_source){ t.utm_source='direct'; t.utm_medium='none'; }
+      var next={}; if(st){ for(var key in st){ if(Object.prototype.hasOwnProperty.call(st,key)) next[key]=st[key]; } }
+      next.first_touch=(st&&st.first_touch&&typeof st.first_touch==='object')?st.first_touch:t;
+      next.last_touch=t;
+      next.visit_count=((st&&+st.visit_count)||0)+1;
+      try{ localStorage.setItem(K,JSON.stringify(next)); }catch(e){}
+      try{ document.cookie='gca_attr='+encodeURIComponent(JSON.stringify(next))+'; Path=/; Max-Age=7776000; SameSite=Lax'+(location.protocol==='https:'?'; Secure':''); }catch(e){}
+      window.__firstTouchAt=next.first_touch&&next.first_touch.captured_at||'';
+    }catch(e){}
+  })();
 
   // CARDS SHOWN — the denominator for "the Decision Card earns the click".
   //
@@ -5422,11 +5483,20 @@ const DRAWER_JS = `<script>
   // once but they all look saved" bug. Every drawer open MUST call this first.
   window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
-  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':(CUR.kind==='forecast')?'forecast':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
+  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':(CUR.kind==='forecast')?'forecast':'opp'; 
+    // share_id identifies THIS share event (not the opportunity): a fresh UUID per click, carried
+    // in the link as sh= and recorded on listing_share, so an arrival can name the exact share.
+    // src=share is the entry label the Map's classifier already reads first. No platform UTMs:
+    // Copy does not know where the link will be pasted. The record param stays first and alone
+    // names the record (record-link rule) — src/sh are attribution, never filters.
+    var _sid=''; try{ _sid=(crypto&&crypto.randomUUID)?crypto.randomUUID():''; }catch(e){ _sid=''; }
+    if(!_sid){ _sid='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){ var r=Math.random()*16|0; return (c==='x'?r:((r&0x3)|0x8)).toString(16); }); }
+    var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id)+'&src=share&sh='+_sid;
+    var _method=(navigator.clipboard&&navigator.clipboard.writeText)?'clipboard':(navigator.share?'native':'prompt');
     // SHARING IS THE FLYWHEEL. Year five says a shared listing brings a teaming partner in
     // who then browses too — this is the only event that can ever prove or kill that claim.
     // Paired with map_view's referrer, a share and the arrival it causes are both visible.
-    try{ if(window.__track) window.__track('tool_use','listing_share',{notice_id:String(CUR.id),kind:_pk}); }catch(e){}
+    try{ if(window.__track) window.__track('tool_use','listing_share',{share_id:_sid,notice_id:String(CUR.id),kind:_pk,method:_method}); }catch(e){}
     // MEASURED ON PROD (Eric, iPhone: "the share button ... still does not do anything"): the
     // label span is display:none at phone width — the action bar is ICON-ONLY there. So the copy
     // ALWAYS worked and the only confirmation was written to an invisible element. Feedback must
