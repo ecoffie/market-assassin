@@ -263,22 +263,34 @@ describe('frozen IMI acceptance — region + stage, same denominator (4 known-fi
     expect(measure(p, IMI, 'NON_FAR')).toEqual(EMPTY);
   });
 
-  it('(3) FIXTURE RECALL — "fixtures and maintenance stands", Robins AFB / GA: NOT recalled, and not faked', () => {
+  it('(3) CONJUNCTIVE BY DESIGN — "fixtures and maintenance stands", Robins AFB / GA does NOT recall FA8517-27-R-0056 (acceptance NOT met)', () => {
     const p = plan('fixtures and maintenance stands', { location: 'Robins AFB / GA' });
     expect(p.states).toEqual(['GA']); // "Robins AFB" is reported unresolved, not geocoded
-    // A 3-concept query requires every concept (frozen discovery rule). KC-135's only text is its
-    // title — the cache has no description / SOW for it — and the title has no "stand".
+    // A 3-concept query requires EVERY concept (frozen canonical-discovery rule — not changed here).
+    // KC-135's only text in the cache is its title (no description / SOW), and the title has no "stand".
     expect(p.matcher.alternatives).toHaveLength(1);
     expect(p.matcher.alternatives[0].eligibility).toBe('all');
     expect(p.matcher.alternatives[0].eligible.map((c) => c.label).sort()).toEqual(['fixtures', 'maintenance', 'stands']);
     expect(String(KC135.description || '')).toBe('');
     expect(admitsOpen(p, KC135, null)).toBe(false);
-    // The matcher itself is right: word-bounded, plural → singular ("fixtures" matches "Fixture").
-    expect(admitsOpen(plan('fixtures', { location: 'GA' }), KC135, null)).toBe(true);
-    expect(admitsOpen(plan('fixtures, maintenance stands', { location: 'GA' }), KC135, null)).toBe(true);
-    expect(admitsOpen(plan('fixtures', { location: 'GA' }), { ...KC135, title: 'Rotational fixtureless mount' }, null)).toBe(false);
     // A's noted limitation is untouched: "fabrication" does not match "FABRICATE" (not the same fix).
     expect(matchesText(plan('fabrication').matcher, ['FABRICATE AND INSTALL STEEL'])).toBe(false);
+  });
+
+  it('(3) POSITIVE CONTROL — "fixtures", location GA (Robins) → FA8517-27-R-0056 recalled (frozen fixture)', () => {
+    const prov = (noticesFx as { _provenance: { source: string; query: string; captured_at: string } })._provenance;
+    expect(prov.source).toBe('supabase.sam_opportunities');
+    expect(prov.query).toContain('FA8517-27-R-0056');
+    expect(prov.captured_at).toMatch(/^2026-/);
+    expect(KC135).toMatchObject({ solicitation_number: 'FA8517-27-R-0056', active: true, pop_state: 'GA', notice_type: 'Sources Sought' });
+    const p = plan('fixtures', { location: 'GA' });
+    // Word-bounded, plural → singular: "fixtures" matches the title's "Fixture".
+    expect(admitsOpen(p, KC135, null)).toBe(true);
+    expect(matchesText(p.matcher, [KC135.title as string])).toBe(true);
+    // …and never a substring.
+    expect(admitsOpen(p, { ...KC135, title: 'Rotational fixtureless mount' }, null)).toBe(false);
+    // Recalled as a structured MARKET_RESEARCH notice too.
+    expect(admitsOpen(p, KC135, null, 'MARKET_RESEARCH')).toBe(true);
   });
 });
 
