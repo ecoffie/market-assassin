@@ -5,10 +5,17 @@
 **Discovery:** https://api.congress.gov/v3/bill
 **Cron:** `/api/cron/institute-legislation-sync` — **ENABLED** weekly (`cron_jobs` row
 `institute-legislation-sync`, `40 13 * * 0` = Sundays 13:40 UTC, since 2026-09-20).
-**Control plane:** `PARKED / BLOCKED_CONTROLLED` (#1596, 2026-09-21) — `data_source_instances`
-`intervention_state=blocked`, `manual_action_type=credential_renewal`. The two named blockers:
-(1) `CONGRESS_API_KEY` is absent in production (it runs on `GOVINFO_API_KEY`, an api.data.gov key
-that api.congress.gov accepts); (2) the corpus reached no customer surface. See **Activation**.
+**Status: LIVE (operational) — FROZEN 2026-09-23.** `POTETO — NDAA Legislative Intelligence Live ✓`
+(DISCOVER → CLASSIFY → INGEST → PROVENANCE → CORRECT → FRESHNESS → SCHEDULE).
+**Control plane:** `intervention_state=none_required`, `manual_action_type=NULL` (unparked
+2026-09-23 after production sync 0/0/29 on #1643 and `--post` 18/18 green). `source_state` stays
+`upstream_quiet` — the TRUE data state (newest dated NDAA text 2026-07-30, beyond the 45-day
+recess threshold), not a fault. Runs on `GOVINFO_API_KEY` (api.data.gov, accepted by
+api.congress.gov) by decision; a separately named `CONGRESS_API_KEY` is not required.
+⚠️ **Operationally live ≠ customer product.** The Institute legislative corpus is NOT yet wired to
+a customer surface. The corrected FY2026 NDAA pain points (PL 119-60 cited) are customer-facing
+independently of this collector.
+*(Previously `PARKED / BLOCKED_CONTROLLED`, #1596, 2026-09-21 → 2026-09-23.)*
 *(This line said "NOT YET ENABLED (Gate 5)" until 2026-09-22, two days after the row was enabled.)*
 
 ## What this source is
