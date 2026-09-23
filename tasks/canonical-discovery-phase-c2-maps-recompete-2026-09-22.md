@@ -85,8 +85,9 @@ between Maps' full market and MCP's canonical set.
 
 38 fixtures · 19 canonical_correction · 15 unchanged · 4 expected_surface_policy · identity parity failures 0
 
-**Identity parity:** every fixture without a Maps surface filter — **33 of 38** — returns the **identical contract_id set** as MCP.
-The 5 exempt fixtures carry a surface filter (lead time, set-aside checkbox, sub-agency, value/likelihood) that narrows by design.
+**Identity parity:** every fixture without a Maps surface filter — **32 of 38** — returns the **identical contract_id set** as MCP.
+The 6 exempt fixtures carry a surface filter (lead time, set-aside checkbox ×3, sub-agency, value/likelihood) that narrows by design.
+(Corrected: the PR's original commit message said "33/33"; the replay's own count is 32 identical + 6 exempt.)
 
 **janitorial (Maps 25 → canonical 5,304):** the new set is exactly the canonical preset — 561210: 3,057 · 561720: 1,375 ·
 561730: 872 = 5,304 — every PoP end between today and 2028-03-18. The same codes with **no** 18-month cap also give 5,304, so the
@@ -153,7 +154,7 @@ auto-merged). The Recompete product diff (all 12 non-CLAUDE files) is **byte-ide
 
 **But #1648 changed the SHARED canonical layer:** `RECOMPETE_TEXT_COLS` now also searches the buy-side `description`
 (96% filled) and `psc_description` (99.7%). Maps inherits that through the plan exactly as MCP does — identity parity stays
-**33/33 IDENTICAL**. Counts that moved (MCP moved identically):
+**32/32 IDENTICAL** (6 surface-filter fixtures exempt). Counts that moved (MCP moved identically):
 
 | fixture | before merge | after merge |
 |---|---|---|
