@@ -1850,6 +1850,47 @@ const VIEWPORT_JS = `<script>
       fetchView(); }
     return applied;
   };
+  // ── AN AGENCY SUGGESTION IS AN AGENCY FILTER (canonical discovery Phase A row 8) ─────────
+  // Picking "Department of Veterans Affairs" from the search suggestions used to type the NAME
+  // into the keyword box (data-act="run"), so the map searched q="Department of Veterans Affairs"
+  // — a TEXT query over titles/descriptions — while the Agency control still read "Agency". The
+  // user chose a BUYER; the canonical input for a buyer is the agency param, which the server
+  // resolves whole-term (src/lib/discovery/buyer.ts). So a suggestion now sets FILT.agency, lights
+  // the Agency control, clears the typed fragment (it was only the lookup text), and refetches.
+  //
+  // Value sent: the preset's match needle when the name IS a preset (so the Agency pill checks
+  // that row), otherwise the agency's full official name. Deliberately NO substring fallback onto
+  // a preset: "Department of the Army" must not collapse into the broader DEFENSE needle — the
+  // server's whole-name resolution is the authority, not a client guess.
+  window.__agencyNeedleFor=function(name){
+    var nm=String(name||'').trim(); if(!nm)return '';
+    var pres=window.__AGENCY_PRESETS||[];
+    for(var i=0;i<pres.length;i++){
+      var pn=String(pres[i].name||''), pm=String(pres[i].match||'');
+      if(pn.toLowerCase()===nm.toLowerCase()||(pm&&pm.toLowerCase()===nm.toLowerCase()))return pm||pn;
+    }
+    return nm;
+  };
+  window.__applyAgencySuggestion=function(name){
+    var needle=window.__agencyNeedleFor(name); if(!needle)return false;
+    FILT.agency=needle;
+    var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=needle;
+    // Preset → the picker checks its row + owns the label. Anything else → show the name honestly.
+    if(window.__agSetFromVal)window.__agSetFromVal(needle);
+    var isPreset=(window.__AGENCY_PRESETS||[]).some(function(p){ return p&&p.match===needle; });
+    if(!isPreset){ var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=String(name);
+      var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('hasfilt'); }
+    // The typed text was the lookup for this buyer, not a keyword to AND with it.
+    Q=''; var zi=document.getElementById('zsearchInput'); if(zi)zi.value='';
+    window.__lastAppliedKeyword='';
+    if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
+    try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.office,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
+      var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
+      var _mb=document.getElementById('moreBtn'); if(_mb)_mb.classList.toggle('hasfilt',_n>0); }catch(e){}
+    try{ if(window.__track)window.__track('tool_use','map_agency_suggestion',{agency:String(needle).slice(0,80)}); }catch(e){}
+    fetchView();
+    return true;
+  };
   // (Removed the header source badge — Eric 2026-07-27: the data source does NOT belong in the
   // sidebar header. Zillow credits the source on the LISTING/detail, not the results header. Our
   // per-dataset source now lives ONLY in the drawer Overview's freshness line — freshnessSec():
@@ -9291,7 +9332,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
         // "Run report" lives on each SAVED SEARCH card (/opportunity-map/saved),
         // beside "View on map", where the market is already defined.
         if(ags.length){ h+='<div class="zsp-h">Agencies</div>';
-          ags.slice(0,4).forEach(function(g){ var nm=g.name||g.shortName||''; if(!nm)return; var abbr=(g.shortName&&g.shortName!==nm)?g.shortName:''; h+='<button class="zsp-row" data-act="run" data-q="'+esc(nm)+'">'+ICON.bldg+'<span>'+esc(nm)+'</span>'+(abbr?'<span class="sub">'+esc(abbr)+'</span>':'')+'</button>'; }); }
+          ags.slice(0,4).forEach(function(g){ var nm=g.name||g.shortName||''; if(!nm)return; var abbr=(g.shortName&&g.shortName!==nm)?g.shortName:''; h+='<button class="zsp-row" data-act="agency" data-agency="'+esc(nm)+'">'+ICON.bldg+'<span>'+esc(nm)+'</span>'+(abbr?'<span class="sub">'+esc(abbr)+'</span>':'')+'</button>'; }); }
         if(res.length){ h+='<div class="zsp-h">Codes</div>';
           res.slice(0,6).forEach(function(x){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(x.code)+'"><span class="code">'+esc(x.type.toUpperCase())+' '+esc(x.code)+'</span><span class="sub">'+esc(x.name)+'</span></button>'; }); }
         if(!ags.length && !res.length){ h+='<div class="zsp-empty">Press Enter to search \\u201c'+esc(q)+'\\u201d across titles, agencies &amp; descriptions.</div>'; }
@@ -9452,7 +9493,11 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+    // An agency suggestion is a BUYER, not a keyword: apply it as the agency filter (row 8).
+    // Falls back to the old keyword run only if the bridge is missing (a partial deploy).
+    else if(act==='agency'){ var an=el.getAttribute('data-agency')||'';
       if(an && typeof window.__applyAgencySuggestion==='function' && window.__applyAgencySuggestion(an)){ close(); input.blur(); }
+      else runSearch(an); }
     else if(act==='unplaced'){ location.href='/opportunity-map/forecasts?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
