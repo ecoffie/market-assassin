@@ -11,7 +11,8 @@
  * branching: { success, mode, totalForFilters, totalInView, capped, pins }.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getForecastViewportPins, getUnplacedForecastRows, applyForecastFilters } from '@/lib/opportunities/map-data';
+import { getForecastViewportPins, getUnplacedForecastRows } from '@/lib/opportunities/map-data';
+import { mapsForecastRequest, mapsForecastDiscoveryMeta } from '@/lib/opportunities/maps-forecast-discovery';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -32,22 +33,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'bbox must be west,south,east,north' }, { status: 400 });
   }
   const [west, south, east, north] = parts;
-  // Search + filters — previously IGNORED here, so a search flooded the merged map with unfiltered
-  // forecasts (Eric 2026-08-01). Thread them into the pins query + the headline count.
-  const filters = {
-    q: p.get('q'), naics: p.get('naics'), agency: p.get('agency'), state: p.get('state'),
-  };
+  // ONE canonical Forecast plan for this request (Phase C3, 2026-09-23 — maps-forecast-discovery.ts).
+  // It owns the query's meaning AND the fiscal-year policy (current + future FY, same as MCP); every read
+  // below — pins, market count, unmapped count, unplaced rows — applies it, so they cannot disagree.
+  // (Search + filters used to be IGNORED here and flooded the map with unfiltered forecasts, 2026-08-01.)
+  const forecastReq = mapsForecastRequest((k) => p.get(k));
+  const applyPlan = forecastReq.apply;
 
   try {
-    const pins = await getForecastViewportPins({ west, south, east, north }, MAX_PINS, filters);
+    const pins = await getForecastViewportPins({ west, south, east, north }, MAX_PINS, undefined, applyPlan);
     // totalForFilters — the mappable forecast corpus matching the FILTERS (has coords), no bbox, for
     // the headline. Bind + check error (silent-failure gate): a failed count must not read as 0.
     // Best-effort — a count error shouldn't drop the pins, so on error fall back to the in-view count.
     let totalForFilters = pins.length;
-    // Same filters as the pins (shared applyForecastFilters) so the headline count can't disagree.
-    const cq = applyForecastFilters(
+    // Same plan as the pins so the headline count can't disagree.
+    const cq = applyPlan(
       sb().from('agency_forecasts').select('id', { count: 'exact', head: true }).not('map_lat', 'is', null),
-      filters,
     );
     const { count, error: countErr } = await cq;
     if (countErr) {
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
     // onto every pan. Returned as a separate `unplaced` array the client renders list-only (no pin).
     let unplaced: Awaited<ReturnType<typeof getUnplacedForecastRows>> = [];
     let unplacedTotal = 0;
-    const hasSearchKey = !!(filters.q || filters.naics || filters.agency);
+    const hasSearchKey = !!(p.get('q') || p.get('naics') || p.get('agency'));
 
     // THE MAP-TRUTH CONTRACT — ALWAYS count the matching rows the map cannot draw, even when we
     // don't fetch them for the list. This count is a single head query (no rows), so it is cheap.
@@ -74,9 +75,8 @@ export async function GET(request: NextRequest) {
     // decline to take is UNKNOWN, never zero — and here we can always afford to take it.
     let unmappedForFilters: number | null = null;
     {
-      const uq = applyForecastFilters(
+      const uq = applyPlan(
         sb().from('agency_forecasts').select('id', { count: 'exact', head: true }).is('map_lat', null),
-        filters,
       );
       const { count: uc, error: ucErr } = await uq;
       if (ucErr) console.error('[forecast-map] unmapped count failed:', ucErr.message);
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     // location-less rows onto every pan. Only the COUNT above is unconditional.
     if (hasSearchKey && p.get('includeUnplaced') === '1') {
       try {
-        unplaced = await getUnplacedForecastRows(150, filters);
+        unplaced = await getUnplacedForecastRows(150, undefined, applyPlan);
         unplacedTotal = unmappedForFilters ?? 0;
       } catch (ue) {
         console.error('[forecast-map] unplaced fetch failed:', (ue as Error).message);
@@ -97,6 +97,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       mode: 'forecast',
+      // Canonical discovery status + FY policy. coverage 'unestablished' = the buyer publishes no forecasts
+      // we hold (MCP: unavailable) — a 0 then is not market truth.
+      discovery: mapsForecastDiscoveryMeta(forecastReq.plan),
       totalForFilters,
       totalInView: pins.length,
       capped: pins.length >= MAX_PINS,

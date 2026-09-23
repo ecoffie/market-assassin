@@ -542,10 +542,19 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
   return query;
 }
 
+/**
+ * `apply` (optional) replaces the filter step with a caller-supplied query applier. The Maps Forecast
+ * routes pass the canonical discovery plan (maps-forecast-discovery.ts); without it the legacy
+ * applyForecastFilters runs exactly as before, so un-migrated callers are unchanged.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ForecastQueryApplier = (query: any) => any;
+
 export async function getForecastViewportPins(
   bbox: { west: number; south: number; east: number; north: number },
   limit = 1000,
   filters?: ForecastFilters,
+  apply?: ForecastQueryApplier,
 ): Promise<MapOpp[]> {
   const sb = getReadClient();
   let query = sb
@@ -554,7 +563,7 @@ export async function getForecastViewportPins(
     .not('map_lat', 'is', null)
     .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
     .gte('map_lng', bbox.west).lte('map_lng', bbox.east);
-  query = applyForecastFilters(query, filters);
+  query = apply ? apply(query) : applyForecastFilters(query, filters);
   const { data, error } = await query
     // Soonest anticipated award first (most actionable "position now"), nulls last.
     .order('anticipated_award_date', { ascending: true, nullsFirst: false })
@@ -617,13 +626,14 @@ export type UnplacedForecastRow = {
 export async function getUnplacedForecastRows(
   limit = 200,
   filters?: ForecastFilters,
+  apply?: ForecastQueryApplier,
 ): Promise<UnplacedForecastRow[]> {
   const sb = getReadClient();
   let query = sb
     .from('agency_forecasts')
     .select('id, title, department, source_agency, naics_code, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, pop_city, pop_state')
     .is('map_lat', null);
-  query = applyForecastFilters(query, filters);
+  query = apply ? apply(query) : applyForecastFilters(query, filters);
   const { data, error } = await query
     .order('anticipated_award_date', { ascending: true, nullsFirst: false })
     .limit(limit);

@@ -434,7 +434,8 @@ Records: **`tasks/canonical-discovery-phase-a-2026-09-22.md`**, **`tasks/canonic
 `src/lib/discovery/` is the ONE search-meaning layer. **MCP `find_opportunities` (Phase B) and Maps Open (Phase C,
 `src/lib/opportunities/maps-open-discovery.ts`, record `tasks/canonical-discovery-phase-c-maps-open-2026-09-22.md`)
 consume it, and Maps Recompete (Phase C2, `src/lib/recompete/maps-recompete-discovery.ts`, record
-`tasks/canonical-discovery-phase-c2-maps-recompete-2026-09-22.md`).** Maps Forecast, saved searches and alerts do NOT yet. `applyMapFilters` still runs the old search
+`tasks/canonical-discovery-phase-c2-maps-recompete-2026-09-22.md`), and Maps Forecast (Phase C3, `src/lib/opportunities/maps-forecast-discovery.ts` — forecast-map AND forecasts/unplaced; record
+`tasks/canonical-discovery-phase-c3-maps-forecast-2026-09-23.md`).** Saved searches and alerts do NOT yet. `applyMapFilters` still runs the old search
 brain for callers that pass `search` — Maps Open blanks `search`/`agency` and never lets it interpret.
 - Pipeline (locked): raw → structured intent → concept classification → eligibility → horizon policy → ranking.
 - ⛔ Do not fix Maps/saved-search search locally — migrate the consumer. The **cross-surface gate**

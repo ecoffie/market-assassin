@@ -4,6 +4,7 @@
  *   npx tsx --env-file=.env.local scripts/discovery-replay.ts [--json out.json] [--rank "query"]
  *   npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-open [--json out.json]   (Phase C: old vs production Maps Open adapter)
  *   npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-recompete [--json out.json]   (Phase C2: old vs adapter vs MCP canonical)
+ *   npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-forecast [--json out.json]   (Phase C3: old vs FY-only vs adapter vs MCP + unplaced)
  *
  * Per fixture × horizon: Maps-old count, MCP-old count, canonical count (MCP policy), ID overlap
  * against Maps-old, and samples of old-only / new-only records. `--rank "<q>"` prints the canonical
@@ -34,6 +35,8 @@ import { mapsOpenRequest, applyMapsOpenFilters } from '@/lib/opportunities/maps-
 import { MAPS_OPEN_FIXTURES, MAPS_OPEN_CLASSES } from './discovery-replay-maps-open';
 import { MAPS_RECOMPETE_FIXTURES, MAPS_RECOMPETE_CLASSES, PARITY_EXEMPT, mapsOldRecompeteRoute } from './discovery-replay-maps-recompete';
 import { mapsRecompeteRequest, applyMapsRecompeteFilters } from '@/lib/recompete/maps-recompete-discovery';
+import { MAPS_FORECAST_FIXTURES, MAPS_FORECAST_CLASSES } from './discovery-replay-maps-forecast';
+import { mapsForecastRequest } from '@/lib/opportunities/maps-forecast-discovery';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -247,7 +250,74 @@ async function mapsRecompeteReplay() {
   }
 }
 
+// ── --maps-forecast: Phase C3 (see scripts/discovery-replay-maps-forecast.ts for the contract). ──
+async function mapsForecastReplay() {
+  const FC = FORECAST;
+  const CAP = 60000; // whole agency_forecasts table — identity sets are never truncated
+  const out: any[] = [];
+  let unclassified = 0; let parityFail = 0; let unplacedFail = 0;
+  for (const fx of MAPS_FORECAST_FIXTURES) {
+    const get = (k: string) => fx.params[k] ?? null;
+    const req = mapsForecastRequest(get, { ctx });
+    const fyOp = req.plan.horizons.forecast.ops.find((o: any) => o.op === 'or' && String(o.expr).startsWith('fiscal_year.is.null,')) as any;
+    const legacyFilters = { q: fx.params.q || null, naics: fx.params.naics || null, agency: fx.params.agency || null, state: fx.params.state || null };
+    const oldB = (x: any) => applyForecastFilters(x, legacyFilters);
+    // A blocked plan (needs_positive_scope) carries only the fail-closed op, so take the FY clause from an
+    // unblocked plan under the same policy + context — it is query-independent.
+    const fyExpr: string = fyOp?.expr ?? (buildDiscoveryPlan({ query: '' }, MCP_POLICY, ctx).horizons.forecast.ops.find((o: any) => o.op === 'or' && String(o.expr).startsWith('fiscal_year.is.null,')) as any).expr;
+    const oldFyB = (x: any) => oldB(x).or(fyExpr);
+    const newB = (x: any) => req.apply(x);
+    const mcpPlan = buildDiscoveryPlan({ query: fx.params.q || '', agency: req.input.agency, state: fx.params.state || null, naics: fx.params.naics || null }, MCP_POLICY, ctx);
+    const mcpB = (x: any) => applyForecastPlan(x, mcpPlan);
+    const [o, of, n, m] = await Promise.all([idSet(FC, oldB, CAP), idSet(FC, oldFyB, CAP), idSet(FC, newB, CAP), idSet(FC, mcpB, CAP)]);
+    const [nu, mu, ou, nm] = await Promise.all([
+      idSet(FC, (x: any) => newB(x.is('map_lat', null)), CAP),
+      idSet(FC, (x: any) => mcpB(x.is('map_lat', null)), CAP),
+      idSet(FC, (x: any) => oldFyB(x.is('map_lat', null)), CAP), // the OLD /api/forecasts/unplaced semantics (filters + its own past-FY rule)
+      idSet(FC, (x: any) => newB(x.not('map_lat', 'is', null)), CAP),
+    ]);
+    const fyOnly = diff(o.ids, of.ids);           // rows removed by the FY policy alone
+    const sem = diff(of.ids, n.ids);              // semantic delta, FY held constant
+    const pm = diff(n.ids, m.ids);
+    const pu = diff(nu.ids, mu.ids);
+    const parity = n.count === m.count && pm.onlyA.length === 0 && pm.onlyB.length === 0 ? 'IDENTICAL' : 'DIFFERENT';
+    const unplacedParity = nu.count === mu.count && pu.onlyA.length === 0 && pu.onlyB.length === 0 && [...nu.ids].every((i) => n.ids.has(i)) ? 'IDENTICAL ⊂ market' : 'DIFFERENT';
+    if (parity !== 'IDENTICAL') parityFail++;
+    if (unplacedParity === 'DIFFERENT') unplacedFail++;
+    const semantic = sem.onlyA.length > 0 || sem.onlyB.length > 0;
+    const cls = MAPS_FORECAST_CLASSES[fx.label];
+    if (semantic && !cls) unclassified++;
+    out.push({
+      label: fx.label, params: fx.params, status: req.plan.status, via: req.plan.horizons.forecast.via, coverage: req.plan.horizons.forecast.coverage,
+      old: o.count, old_fy: of.count, fy_removed: fyOnly.onlyA.length, new: n.count, mcp: m.count,
+      sem_old_only: sem.onlyA.length, sem_new_only: sem.onlyB.length, parity,
+      mapped_new: nm.count, unplaced_new: nu.count, unplaced_mcp: mu.count, unplaced_old_route: ou.count, unplaced_parity: unplacedParity,
+      old_only_sample: await labels(FC, sem.onlyA), new_only_sample: await labels(FC, sem.onlyB), fy_removed_sample: await labels(FC, fyOnly.onlyA),
+      errors: [o.error, of.error, n.error, m.error, nu.error, mu.error, ou.error, nm.error].filter(Boolean),
+      truncated: o.truncated || n.truncated || m.truncated,
+      class: semantic ? cls?.cls ?? 'UNCLASSIFIED' : (fyOnly.onlyA.length ? 'expected_policy_change (FY only)' : 'unchanged'),
+      evidence: semantic ? cls?.why ?? '' : (fyOnly.onlyA.length ? `${fyOnly.onlyA.length} past-FY forecasts removed by the canonical current+future-FY default; nothing else changed.` : ''),
+    });
+    console.error(`done ${fx.label}: ${o.count}→(FY)${of.count}→${n.count} mcp ${m.count} ${parity} unplaced ${nu.count}/${mu.count} ${unplacedParity}`);
+  }
+  if (jsonOut) writeFileSync(jsonOut, JSON.stringify(out, null, 2));
+  const fmt = (x: number | null | undefined) => (x == null ? 'unknown' : x.toLocaleString());
+  console.log('| fixture | status · via | old | − past FY | = old (cur+fut FY) | new | MCP | Maps≡MCP | sem old-only | sem new-only | drawable | unplaced new = MCP (old route) | unplaced parity | class | evidence |');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  for (const r of out) {
+    console.log(`| ${r.label.replace(/\|/g, '\\|')} | ${r.status} · ${r.via}${r.coverage !== 'ok' ? ' · coverage ' + r.coverage : ''} | ${fmt(r.old)} | ${fmt(r.fy_removed)} | ${fmt(r.old_fy)} | ${fmt(r.new)} | ${fmt(r.mcp)} | ${r.parity} | ${fmt(r.sem_old_only)} | ${fmt(r.sem_new_only)} | ${fmt(r.mapped_new)} | ${fmt(r.unplaced_new)} = ${fmt(r.unplaced_mcp)} (${fmt(r.unplaced_old_route)}) | ${r.unplaced_parity} | ${r.class} | ${r.evidence}${r.errors.length ? ' ⚠️ ' + r.errors.join('; ') : ''}${r.truncated ? ' (truncated)' : ''} |`);
+  }
+  const by: Record<string, number> = {};
+  for (const r of out) by[r.class] = (by[r.class] || 0) + 1;
+  console.log(`\n${out.length} fixtures · ${Object.entries(by).map(([k, v]) => `${v} ${k}`).join(' · ')} · parity failures ${parityFail} · unplaced failures ${unplacedFail}`);
+  if (unclassified || by.unexpected_regression || parityFail || unplacedFail || out.some((r) => r.errors.length || r.truncated)) {
+    console.error(`FAIL: ${unclassified} unclassified, ${by.unexpected_regression || 0} unexpected_regression, ${parityFail} parity, ${unplacedFail} unplaced, ${out.filter((r) => r.errors.length).length} query errors`);
+    process.exit(1);
+  }
+}
+
 (async () => {
+  if (args.includes('--maps-forecast')) { await mapsForecastReplay(); return; }
   if (args.includes('--maps-recompete')) { await mapsRecompeteReplay(); return; }
   if (args.includes('--maps-open')) { await mapsOpenReplay(); return; }
   if (rankQ) { await rankReport(rankQ); return; }
