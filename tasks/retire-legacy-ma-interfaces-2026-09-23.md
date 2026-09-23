@@ -1,101 +1,157 @@
 # Retire legacy Market Assassin / Unified-MI customer interfaces — 2026-09-23
 
-Branch `fix/retire-legacy-ma-interfaces` · base `origin/main` @ `bf4556f1`.
-Status: **review PR only.** Not merged, not deployed. No production data, Stripe, KV or
-account changes were made. Everything below marked "local" was verified on a local dev
-server built from the branch head, not in production.
+Branch `fix/retire-legacy-ma-interfaces` · base `bf4556f1` (origin/main at branch time).
+Commits: `8a326a87` (routing + source links) · `9d509ed8` (this packet, v1) ·
+`ee870864` (email CTAs: no Map default) · this revision.
+Status: **review PR only — not merged, not deployed.** No production writes, no Stripe
+changes, no KV / account / customer changes were made.
 
-## Accounts investigated (read-only: check-access admin GET, `user_engagement`, Stripe API GETs)
+Decision applied (Eric, 2026-09-23): **destination = current `/app`**, supported deep links
+preserved, `/app` applies its own normal landing. No separate Map default.
 
-| Customer | Identity confirmed | Records | What the evidence shows |
+---
+
+## 1. Confirmed legacy routes and repaired destinations (CODE — this branch)
+
+"Before" was measured on production with `curl -L` (read-only). "After" was verified locally
+on the branch (see §3), not in production.
+
+| Legacy entry point | Before (production, measured) | After (branch) | Mechanism |
 |---|---|---|---|
-| Adam Sokolowski `adam.sokolowski01@gmail.com` | Stripe customer `cus_VDgMnVsrSPZ3F4` (same email) | 1 purchase $149.00, 2026-09-08, `prod_UI5RXVGKsdywuf` "Mindy Ai" (`tier: briefings`); sub active; KV `briefings:`=true; **no `ma:` grant** | Checkout session came from payment link `plink_1TTYfR…` whose **success URL is `getmindy.ai/briefings?welcome=true`**. His last `/app` events are 2026-08-15 (tier free); **zero `/app` events after paying**. `/briefings` logs no event before it knows an email, consistent with (not proof of) the `/briefings → /alerts/signup` bounce. Used the Map 2026-09-22 via Google. |
-| Andre Jerry `aj@cypherintel.com` | Advocate registry (`advocate-accounts.ts`) + CLAUDE.md; KV contentgen customerName "Andre" | No `purchases` row (comp); KV `contentgen:` full-fix (legacy) + `briefings:`=true | **Confirmed** use of the legacy `/briefings` dashboard: 16 events on panels that exist only there (`sbir`, `content`) on 2026-07-20; ~122 path-less legacy-shaped events 2026-07-09→07-27. Entry link not recoverable from records. |
+| `/briefings?welcome=true` (Stripe MI Pro success URL) | old Unified-MI dashboard; no saved legacy email → `/alerts/signup` | 307 → `/app` (normal landing) | `proxy.ts` + `legacy-routes.ts` |
+| `/briefings?panel=X` / `?tab=X` / `?setup=true` | old dashboard | 307 → `/app?panel=<mapped>` (research, pipeline, forecasts, recompetes, contractors, contacts, grants, alerts, dashboard, settings); legacy-only panels (content, planner, sbir) → `/app` | same |
+| `/briefings?email=…&notice=…&utm_*` | old dashboard | carried through (email = sign-in prefill only; identity always from the live session). Everything else (`next`, `returnTo`, …) dropped | same |
+| `/briefings/dashboard` | old stats page | 307 → `/app?panel=dashboard` | same |
+| `/bd-assist` | → `/briefings` | 307 → `/app?panel=pipeline` (page fallback updated too) | same |
+| `/` on every host except `getmindy.ai` (e.g. `market-assassin.vercel.app/`, measured) | "Government Contracting Intelligence Tools" card grid | Supabase recovery/invite hash handled first (unchanged); else → `/app` (production aliases → `https://getmindy.ai/app`) | `src/app/page.tsx` |
+| `/market-assassin-locked`, email without an `ma:` grant (every Mindy Pro buyer) | "No access found for this email. Please purchase below." | → `/app?panel=research&email=…` | gate page |
+| `/federal-market-assassin` with a real `ma:` cookie | paid legacy tool | **unchanged** (~7 legacy buyers keep their tool) | — |
 
-**Not available:** browser history, server access logs by user, the exact URL either customer
-opened, whether Adam clicked the welcome-email CTA. Fixture shapes below are sanitized
-representations; they do **not** prove either real account is fixed.
+**Links fixed at the source** (so we stop distributing old URLs):
+- `/purchase/success`: primary + dashboard buttons → `/app`; "Quick Access" had `/recompete-contracts` (404), `/prime-lookup` (404), `/content-generator-product` (308 → home), `/contractor-database` (legacy gate) → `/app?panel=research|recompetes|contractors`, `/opportunity-map`.
+- `/activate` tiles: MA → `/federal-market-assassin` (was `/market-assassin`, 308 → home); briefings → `/app`; recompete → `/app?panel=recompetes`.
+- `/market-intelligence`: verify-access → `/app` (was `/briefings`), setup → `/app?panel=settings`, nav → `/app`.
+- Mute / pipeline / contacts / shared-opportunity / alerts-signup / MA-tool pages → `/app` (+ panel).
+- Emails: MA access email (webhook) and FHC + bundle MA links → `/federal-market-assassin` (were `/market-assassin` → home). Alert Pro upsell → `/market-intelligence` (was retired MA sales page).
+- **Emails do not link `/app`.** The frozen send-time guard (`legacy-destination-guard.ts`, #1362) throws on any `/app` link outside production. So the MI Pro welcome CTA stays on `/market-intelligence`, whose verify step now lands a verified buyer on `/app`. Linking `/app` directly from email would need a documented guard exception — **a separate decision, not made here.**
 
-## Root cause
+Untouched on purpose: all `/api/*`, webhook grant logic, `/briefings/feedback/*` (email
+feedback pages), `/alerts/preferences`, `/alerts/signup`, admin routes.
 
-A paying Mindy Pro buyer is handed legacy URLs by **three distributors**, all still live:
+## 2. Adam / Andre — historical evidence vs assumptions
 
-1. **Stripe payment-link success URL** (dashboard config, not code): MI Pro $149/mo
-   (`plink_1TTYfR…`) and $1,490/yr (`plink_1TTYhl…`) → `getmindy.ai/briefings?welcome=true`.
-   58 paid monthly + 4 paid annual checkouts, 2026-05-10 → 2026-09-22.
-2. **MI Pro welcome email** (`sendMarketIntelligenceWelcomeEmail`) CTA → `/market-intelligence`
-   (sales page) whose "verify access" → `/briefings`.
-3. **Non-apex hosts** (`market-assassin.vercel.app/`, verified live) render the old
-   "Government Contracting Intelligence Tools" grid at `/`.
+Sources (all read-only): `check-access` admin GET (KV + Supabase + purchases),
+`user_engagement`, Stripe API GETs. No sessions impersonated, nothing modified.
 
-`/briefings` then: no saved legacy email → `/alerts/signup` (free signup form); with one →
-"Market Research" card → `/federal-market-assassin` → (no `ma:` cookie) `/market-assassin-locked`
-→ enter email → **"No access found for this email. Please purchase below."**
+| | Adam Sokolowski (`adam.sokolowski01@gmail.com`) | Andre Jerry (`aj@cypherintel.com`) |
+|---|---|---|
+| **Identity — confirmed** | Stripe customer `cus_VDgMnVsrSPZ3F4`, same email | Advocate registry (`advocate-accounts.ts`); KV `contentgen:` record name "Andre" |
+| **Entitlements — confirmed** | 1 purchase $149.00, 2026-09-08, `prod_UI5RXVGKsdywuf` "Mindy Ai" (`tier: briefings`); sub active; KV `briefings:`=true; no `ma:` | No purchases row (comp); KV `contentgen:` full-fix + `briefings:`=true |
+| **Routing — confirmed** | His checkout session came from `plink_1TTYfR…`, whose redirect is `getmindy.ai/briefings?welcome=true`. Zero `/app` events after paying (last `/app` events 2026-08-15, tier free). | 16 events on panels that exist only in legacy `/briefings` (`sbir`, `content`) on 2026-07-20; ~122 path-less legacy-shaped events 2026-07-09→07-27. |
+| **Assumption — NOT established** | That he then hit `/alerts/signup` or the Market Assassin "purchase" page. `/briefings` logs nothing before it knows an email, so no event is consistent with that but doesn't prove it. That he clicked the welcome-email CTA. | Which link took him to `/briefings`. |
+| **Unavailable** | Browser history, per-user access logs, the exact URL opened | same |
 
-## Entry-point table (before → after)
+Fixtures in the tests represent these account *shapes* (Pro buyer without `ma:`; legacy
+panel deep link). **They do not show either real account is fixed.**
 
-| Old path | Before (live, measured) | After (this branch, local) | Evidence |
-|---|---|---|---|
-| `/briefings?welcome=true` (Stripe return) | legacy dashboard / → `/alerts/signup` | 307 → `/app` (sign-in or dashboard) | curl + browser |
-| `/briefings?panel=X&email=Y` | legacy dashboard | 307 → `/app?panel=X'&email=Y` (panel mapped; only email/notice/utm carried) | curl + browser (prefill shown) |
-| `/briefings/dashboard` | legacy stats page | 307 → `/app?panel=dashboard` | curl |
-| `/bd-assist` | → `/briefings` | 307 → `/app?panel=pipeline` | curl |
-| `/` on non-`getmindy.ai` hosts | legacy tools grid | recovery-token hop kept; else → `/app` (canonical domain for prod aliases) | browser (localhost) |
-| `/market-assassin-locked` with a non-MA email | "No access found… purchase below" | → `/app?panel=research&email=` | browser |
-| `/federal-market-assassin` with `ma:` cookie | tool | **unchanged** (paid legacy tool) | code |
-| `/purchase/success` quick links | 2×404, retired sales page, legacy DB gate | `/app` panels + `/opportunity-map` | browser |
-| `/activate` tiles | MA → `/market-assassin` (308 → home); briefings → `/briefings`; recompete → SEO page | `/federal-market-assassin`, `/app`, `/app?panel=recompetes` | unit |
-| MI Pro welcome email CTA | `/market-intelligence` | `mindyDashboardUrlFor(to)` (email policy #1362) | unit |
-| MA access email (webhook) | `/market-assassin?email=` (308 → home) | `/federal-market-assassin?email=` | unit |
-| FHC / Alert Pro / bundle emails | `/market-assassin`, `/market-intelligence` | `/federal-market-assassin` (holders) / Mindy dashboard URL | unit |
-| mute, pipeline, contacts, shared-opp, alerts-signup, market-intelligence pages | `/briefings`, `/bd-assist` | `/app` (+ panel) | unit |
+## 3. Local/browser verification vs production
 
-Untouched on purpose: `/briefings/feedback/*`, `/alerts/preferences`, `/alerts/signup` (page),
-all `/api/*`, webhook grant logic, `/federal-market-assassin` for entitled holders.
+**Local / branch (done):**
+- Unit: `src/lib/mindy/legacy-routes.unit.test.ts` — 41 tests (resolver, loop/external-URL safety, proxy wiring, source links, email CTAs). Mutation-checked: 4 injected regressions each turned it red.
+- Full suite: 7,542 passed / 0 failed in the worktree (vitest's exit code was 1 because of 3 worker-RPC timeouts; see §5). Typecheck clean.
+- Pre-push gate at `ee870864`: named this worktree and HEAD; **"✓ pre-push gate passed"**.
+- curl against local dev server (from `8a326a87`): all redirects above returned the expected 307 targets; `/briefings/feedback/thanks` 200; `/federal-market-assassin` (no cookie) → gate.
+- Browser (local dev, logged out, test emails only, no customer sessions):
+  - Stripe return URL → Mindy sign-in rendered, no legacy UI.
+  - `/briefings?panel=research&email=<fixture>` → `/app?panel=research`, email pre-filled.
+  - Back button → previous `/app` entry; the 307 never enters history, no loop.
+  - `/?utm_source=bookmark` → `/app?utm_source=bookmark`, no grid.
+  - `/market-assassin-locked` + non-MA fixture email → `/app?panel=research&email=…`.
+  - `/purchase/success?product=briefings` → every rendered link is a current destination.
+- Not browser-tested:
+  - The recovery-hash hop on `/`. Unchanged logic; asserted in unit tests. Driving it would navigate to production with a fake token.
+  - `/activate`. Its API upserts `user_profiles` in production, so it was not driven.
+- The email CTA change in `ee870864` is unit-verified only (email rendering, not a browser flow).
 
-## Destination decision — needs Eric's confirmation
+**Production: nothing verified. Nothing is deployed.**
 
-The brief says "route to the current Mindy /app". The repo also carries a frozen rule
-(2026-08-24/25, #1362) that `/app` is itself legacy and **emails must land on Maps**
-(`legacy-destination-guard.ts`, `email-branding.ts`). This branch follows the brief for
-**pages/redirects** (→ `/app`, where the paid panels live) and the enforced guard for
-**emails** (→ `mindyDashboardUrlFor`, i.e. `/opportunity-map`). If pages should go to Maps
-instead, it is a one-line change: `WORKSPACE_PATH` in `src/lib/mindy/legacy-routes.ts`
-(plus the panel map).
+## 4. Code changes vs pending Stripe / infrastructure changes
 
-## Infrastructure proposal (NOT executed — needs approval)
+**Code (this PR):** everything in §1.
 
-Update the after-completion redirect on two live Stripe payment links:
+**Stripe — PROPOSAL ONLY, not applied (needs approval).** Live values read via the Stripe API 2026-09-23:
 
-| Link | Product | Current | Proposed |
-|---|---|---|---|
-| `plink_1TTYfRK5zyiZ50PBkZ4mukPq` | Market Intelligence $149/mo | `https://getmindy.ai/briefings?welcome=true` | `https://getmindy.ai/purchase/success?product=briefings_monthly` |
-| `plink_1TTYhlK5zyiZ50PBGhvWwBLq` | Market Intelligence $1,490/yr | same | `https://getmindy.ai/purchase/success?product=briefings_annual` |
+| Payment link | Product / price | Paid via link | `after_completion` now | Proposed |
+|---|---|---|---|---|
+| `plink_1TTYfRK5zyiZ50PBkZ4mukPq` (buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C) | Market Intelligence $149.00/mo | 58 (2026-05-10 → 2026-09-22) | redirect `https://getmindy.ai/briefings?welcome=true` | redirect `https://getmindy.ai/app` |
+| `plink_1TTYhlK5zyiZ50PBGhvWwBLq` (buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D) | Market Intelligence $1,490.00/yr | 4 (2026-06-23 → 06-27) | redirect `https://getmindy.ai/briefings?welcome=true` | redirect `https://getmindy.ai/app` |
+| `plink_1TBXg2K5zyiZ50PBp5xvOJP2` (optional, low priority) | Alert Pro $19.00/mo | 2 | redirect `https://getmindy.ai/alerts/preferences?upgraded=true` | leave (working page) or `https://getmindy.ai/app?panel=alerts` |
 
-Optional: `plink_1TBXg2…` Alert Pro $19 → `/alerts/preferences?upgraded=true` (working page; low priority).
-The code redirect makes the current URL safe, so this is cleanup, not a blocker.
+Once this PR is deployed, the current URLs are safe (redirected), so the Stripe edit is
+cleanup and does not block the PR. Apply only after production verification (§6 step 2).
 
-## Remaining legacy surfaces (not changed here)
+**Other infrastructure / remaining legacy surfaces (not changed):**
+- `/briefings` page code (unreachable via the proxy; delete in a separate cleanup).
+- Admin-triggered email templates linking `/briefings`, `/briefings/settings`, `/briefings/unsubscribe` (the last two don't exist): `lib/briefings/recompete/email-templates.ts`, `lib/briefings/contractor-db/email-templates.ts`, `admin/send-all-briefings`, `admin/feedback`, `admin/align-treatment-types`.
+- `shop.govcongiants.com/activate` in license/bundle emails (govcon-shop repo).
+- `vercel.json` `tools.govcongiants.org/*` → `mi.govcongiants.com` → `getmindy.ai` (works; two hops).
+- SEO pages, `lib/dsbs-scoring.ts`, `/store` linking `/opportunity-hunter` / `/recompete`.
+- Email → `/app` directly needs a guard exception decision (§1).
 
-- `/briefings` page code itself (now unreachable via proxy; deletion is a separate cleanup).
-- Admin-triggered email templates: `lib/briefings/recompete/email-templates.ts`,
-  `lib/briefings/contractor-db/email-templates.ts` (link `/briefings/settings` and
-  `/briefings/unsubscribe`, which don't exist), `admin/send-all-briefings`, `admin/feedback`,
-  `admin/align-treatment-types`.
-- `sendLicenseKeyEmail` / bundle `activateUrl` → `shop.govcongiants.com/activate` (separate repo).
-- In-app upgrade CTAs → `/market-intelligence` (a Mindy sales page; its verify step now lands on `/app`).
-- SEO pages linking `/opportunity-hunter`, `/recompete`; `lib/dsbs-scoring.ts` CTAs; `/store` page.
-- `vercel.json`: `tools.govcongiants.org/*` → `mi.govcongiants.com` (which then → `getmindy.ai`).
-- Webhook tier detection: no amount-based fallback for a $149 line item without tier metadata (both current links carry `tier: briefings`, so not triggered today).
+## 5. Pre-push gate findings (no bypass, no suppression, no shared gate change)
 
-## Post-release acceptance plan (bounded, after an approved merge + deploy)
+| Attempt | HEAD | Load (1m) | Assertion failures | DB/test timeouts | Worker errors | Verdict |
+|---|---|---|---|---|---|---|
+| 1 (11:38) | `9d509ed8` | ~149 | 0 | 0 | 3 × `[vitest-worker]: Timeout calling "onTaskUpdate"` | blocked |
+| 2 (11:48) | `9d509ed8` | ~29 → ~80 | 0 | 0 | 3 × same | blocked |
+| 3 (11:56) | `9d509ed8` | 15, no other vitest | 0 recorded | 4 × `Test timed out in 20000ms` (all in `lookup-solicitation.live.test.ts`) | 0 | blocked |
+| 4 (~12:0x) | `9d509ed8` | ~60 | 0 | not recoverable* | reported, count not recoverable* | blocked |
+| 5 (12:17) | `ee870864` | ~33 | 0 | 0 | 0 | **passed** (`VITEST_MAX_FORKS=4` on the command) |
 
-1. Serving SHA contains this branch's merge commit.
-2. `curl -sI https://getmindy.ai/briefings?welcome=true` → 307 `Location: /app`;
-   same for `/bd-assist` (→ `/app?panel=pipeline`) and `/briefings/dashboard`.
-3. `curl -s https://market-assassin.vercel.app/` does **not** contain "Government Contracting Intelligence Tools".
-4. Browser (logged out): open the Stripe success URL → Mindy sign-in renders; back button does not loop.
-5. Browser: `/market-assassin-locked` with a test email without `ma:` → lands on `/app?panel=research`.
-6. `/briefings/feedback/thanks` and `/alerts/preferences` still 200.
-7. Only after 1–6: apply the Stripe proposal above (with approval), then buy-flow check with a test link.
-8. Do **not** tell Adam or Andre they are fixed until 1–6 pass in production; any outreach is Eric's call.
+\* `/tmp/mindy-prepush-unit.log` is a fixed path shared by every worktree's gate; concurrent
+sessions overwrote it (headers from `agent-adc2d8…` and `agent-a32bcd…` were seen). The
+gate named this worktree and HEAD on every attempt.
+
+**The one assertion failure is NOT preserved.** In an isolated run of
+`lookup-solicitation.live.test.ts` between attempts 3 and 4, test A failed at 9,015 ms. My
+output filter dropped its message. Test A asserts `elapsed < 8_000` and `db_ms < 8_000`, so a
+latency assertion is *plausible* but **not established**. A later pass does not establish it.
+
+**Branch vs clean main, equivalent conditions.** File-only runs, `--maxWorkers=1`, same
+Node (v22.14, the gate's PATH), alternating, 3 rounds each. Baseline was a detached worktree
+at `bf4556f1` with the same `node_modules` and `.env.local` (via the helper). The test file is
+identical, and none of the branch's changed files is in its 8-module import graph.
+
+| Run | A | E | B/C/D | F | routing |
+|---|---|---|---|---|---|
+| branch 1 / 2 / 3 | pass 5,904 / 2,635 / 2,367 ms | pass | pass | pass | pass |
+| main 1 / 2 / 3 | pass 3,453 / 3,815 / 2,910 ms | pass | pass | pass | pass |
+
+Assertion failures 0/6 on both sides, timeouts 0, worker errors 0. No branch-specific
+difference was found. Loads were 12–20 during these runs.
+
+Supported concurrency setting used: `VITEST_MAX_FORKS` (read by vitest 3.2.6). Nothing in
+`vitest.config.ts` or `package.json` bounds workers, so the default is ~15 forks on a 16-core
+machine shared by many worktree sessions. Noted: `package.json` `engines.node` is `24.x`,
+but the gate runs `/Users/ericcoffie/local/nodejs/bin/node` v22.14 (see open PR #1602).
+
+### Proposed tooling repair (separate PR, NOT in this branch)
+
+1. Split the unit gate into two named steps:
+   - **deterministic** (`*.unit.test.*`, seam tests) — stays blocking;
+   - **live integration** (`*.live.test.ts`, e.g. `lookup-solicitation.live.test.ts`, which queries production and asserts wall-clock `< 8s`) — runs and reports an explicit outcome per test: `PASS / ASSERTION_FAIL / TIMEOUT / SKIPPED(no env)`.
+   - Never silently skipped. Whether an assertion failure there blocks is a decision for Eric.
+2. Per-worktree log paths: `/tmp/mindy-prepush-<worktree-hash>-unit.log` instead of one shared file, so evidence can't be overwritten by another session.
+3. Bounded workers in the gate via the supported setting (`--maxWorkers` or `VITEST_MAX_FORKS`), sized for multi-session use.
+4. Report vitest "unhandled errors" separately from test failures in the gate output, so a worker-RPC timeout is labelled as infrastructure, not a failing test. It still blocks until decided otherwise.
+
+## 6. Post-release acceptance plan (bounded; after an approved merge + deploy)
+
+1. Serving SHA contains this PR's merge commit.
+2. `curl -sI "https://getmindy.ai/briefings?welcome=true"` → 307, `location: /app`. Same shape for `/briefings/dashboard` (→ `/app?panel=dashboard`) and `/bd-assist` (→ `/app?panel=pipeline`).
+3. `curl -s https://market-assassin.vercel.app/` does not contain "Government Contracting Intelligence Tools".
+4. Browser, logged out: the Stripe success URL renders Mindy sign-in; back does not loop.
+5. Browser: `/market-assassin-locked` + a test email without `ma:` → `/app?panel=research`.
+6. `/briefings/feedback/thanks`, `/alerts/preferences`, `/app`, `/opportunity-map` → 200.
+7. Only then, with approval: apply the Stripe redirects in §4; re-read them via the API.
+8. Adam and Andre are **not** described as fixed until 1–6 pass in production. Outreach is Eric's call.
