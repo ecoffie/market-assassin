@@ -24,7 +24,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { mapsForecastRequest, mapsForecastDiscoveryMeta } from '@/lib/opportunities/maps-forecast-discovery';
+import { mapsForecastRequest, mapsForecastDiscoveryMeta, forecastCoverageUnavailable } from '@/lib/opportunities/maps-forecast-discovery';
 import { applyUnplacedOrder } from '@/lib/forecasts/unplaced-order';
 
 export const runtime = 'nodejs';
@@ -123,7 +123,8 @@ export async function GET(request: NextRequest) {
       pop_city: r.pop_city ?? null,
     }));
 
-    return NextResponse.json({ success: true, total: count ?? forecasts.length, forecasts, byAgency, discovery: mapsForecastDiscoveryMeta(forecastReq.plan) });
+    // Coverage unestablished → total is UNAVAILABLE (null), never a measured 0.
+    return NextResponse.json({ success: true, total: forecastCoverageUnavailable(forecastReq.plan) ? null : count ?? forecasts.length, forecasts, byAgency, discovery: mapsForecastDiscoveryMeta(forecastReq.plan) });
   } catch (e) {
     console.error('[forecasts/unplaced]', (e as Error).message);
     return NextResponse.json({ success: false, error: 'unavailable' }, { status: 500 });

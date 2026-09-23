@@ -33,4 +33,7 @@ export const FIXTURES: Array<{ id: string; cls: string; input: DiscoveryInput }>
   { id: 'Naval facilities in Nevada', cls: 'VA/Naval collision (free text)', input: { query: 'Naval facilities in Nevada' } },
   { id: 'software license', cls: 'recognized concept (procurement-equivalent forms)', input: { query: 'software license' } },
   { id: 'software licenses', cls: 'recognized concept (inflected query)', input: { query: 'software licenses' } },
+  { id: 'agency=NOAA', cls: 'forecast coverage: unresolved publisher', input: { query: '', agency: 'NOAA' } },
+  { id: 'agency=FAA', cls: 'forecast coverage: known publisher without forecasts', input: { query: '', agency: 'FAA' } },
+  { id: 'agency=HUD janitorial', cls: 'forecast coverage: unresolved publisher + concept', input: { query: 'janitorial', agency: 'HUD' } },
 ];

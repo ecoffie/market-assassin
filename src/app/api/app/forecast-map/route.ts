@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getForecastViewportPins, getUnplacedForecastRows } from '@/lib/opportunities/map-data';
-import { mapsForecastRequest, mapsForecastDiscoveryMeta } from '@/lib/opportunities/maps-forecast-discovery';
+import { mapsForecastRequest, mapsForecastDiscoveryMeta, forecastCoverageUnavailable } from '@/lib/opportunities/maps-forecast-discovery';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
   // (Search + filters used to be IGNORED here and flooded the map with unfiltered forecasts, 2026-08-01.)
   const forecastReq = mapsForecastRequest((k) => p.get(k));
   const applyPlan = forecastReq.apply;
+  const noCoverage = forecastCoverageUnavailable(forecastReq.plan);
 
   try {
     const pins = await getForecastViewportPins({ west, south, east, north }, MAX_PINS, undefined, applyPlan);
@@ -100,14 +101,16 @@ export async function GET(request: NextRequest) {
       // Canonical discovery status + FY policy. coverage 'unestablished' = the buyer publishes no forecasts
       // we hold (MCP: unavailable) — a 0 then is not market truth.
       discovery: mapsForecastDiscoveryMeta(forecastReq.plan),
-      totalForFilters,
+      // Coverage unestablished (no requested buyer has a forecast publisher) → the counts are UNAVAILABLE:
+      // null, never a measured 0. The plan already returns no rows.
+      totalForFilters: noCoverage ? null : totalForFilters,
       totalInView: pins.length,
       capped: pins.length >= MAX_PINS,
       pins,
       unplaced,
-      unplacedTotal,
+      unplacedTotal: noCoverage ? null : unplacedTotal,
       // Matching rows with no coordinate — the map-truth disclosure. null = UNKNOWN, never 0.
-      unmappedForFilters,
+      unmappedForFilters: noCoverage ? null : unmappedForFilters,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });

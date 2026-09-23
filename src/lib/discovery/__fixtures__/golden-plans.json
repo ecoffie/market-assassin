@@ -4457,5 +4457,506 @@
       }
     },
     "notes": []
+  },
+  "agency=NOAA": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "NOAA",
+        "canonical": "National Oceanic and Atmospheric Administration",
+        "kind": "normalization",
+        "needles": [
+          "NOAA",
+          "National Oceanic and Atmospheric Administration",
+          "OCEAN"
+        ],
+        "identity": [
+          [
+            "noaa"
+          ],
+          [
+            "national",
+            "oceanic",
+            "atmospheric",
+            "administration"
+          ],
+          [
+            "ocean"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\mnoaa\\\\M\",sub_tier.imatch.\"\\\\mnoaa\\\\M\",and(department.imatch.\"\\\\mnational\\\\M\",department.imatch.\"\\\\moceanic\\\\M\",department.imatch.\"\\\\matmospheric\\\\M\",department.imatch.\"\\\\madministration\\\\M\"),and(sub_tier.imatch.\"\\\\mnational\\\\M\",sub_tier.imatch.\"\\\\moceanic\\\\M\",sub_tier.imatch.\"\\\\matmospheric\\\\M\",sub_tier.imatch.\"\\\\madministration\\\\M\"),department.imatch.\"\\\\mocean\\\\M\",sub_tier.imatch.\"\\\\mocean\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\mnoaa\\\\M\",awarding_sub_agency.imatch.\"\\\\mnoaa\\\\M\",and(awarding_agency.imatch.\"\\\\mnational\\\\M\",awarding_agency.imatch.\"\\\\moceanic\\\\M\",awarding_agency.imatch.\"\\\\matmospheric\\\\M\",awarding_agency.imatch.\"\\\\madministration\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mnational\\\\M\",awarding_sub_agency.imatch.\"\\\\moceanic\\\\M\",awarding_sub_agency.imatch.\"\\\\matmospheric\\\\M\",awarding_sub_agency.imatch.\"\\\\madministration\\\\M\"),awarding_agency.imatch.\"\\\\mocean\\\\M\",awarding_sub_agency.imatch.\"\\\\mocean\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "coverage_unestablished",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "is",
+            "col": "id",
+            "val": null
+          }
+        ],
+        "coverage": "unestablished",
+        "coverageGaps": [
+          {
+            "requested": "NOAA",
+            "reason": "unresolved_publisher"
+          }
+        ]
+      }
+    },
+    "notes": []
+  },
+  "agency=FAA": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "",
+      "residualKind": "empty"
+    },
+    "matcher": {
+      "mode": "none",
+      "normalized": "",
+      "phrase": null,
+      "alternatives": [],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "literal",
+      "direct": {
+        "naics": [],
+        "psc": [],
+        "terms": []
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "FAA",
+        "canonical": "Federal Aviation Administration",
+        "kind": "normalization",
+        "needles": [
+          "FAA",
+          "Federal Aviation Administration",
+          "AVIATION"
+        ],
+        "identity": [
+          [
+            "faa"
+          ],
+          [
+            "federal",
+            "aviation",
+            "administration"
+          ],
+          [
+            "aviation"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "structured_only",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\mfaa\\\\M\",sub_tier.imatch.\"\\\\mfaa\\\\M\",and(department.imatch.\"\\\\mfederal\\\\M\",department.imatch.\"\\\\maviation\\\\M\",department.imatch.\"\\\\madministration\\\\M\"),and(sub_tier.imatch.\"\\\\mfederal\\\\M\",sub_tier.imatch.\"\\\\maviation\\\\M\",sub_tier.imatch.\"\\\\madministration\\\\M\"),department.imatch.\"\\\\maviation\\\\M\",sub_tier.imatch.\"\\\\maviation\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "structured_only",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\mfaa\\\\M\",awarding_sub_agency.imatch.\"\\\\mfaa\\\\M\",and(awarding_agency.imatch.\"\\\\mfederal\\\\M\",awarding_agency.imatch.\"\\\\maviation\\\\M\",awarding_agency.imatch.\"\\\\madministration\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mfederal\\\\M\",awarding_sub_agency.imatch.\"\\\\maviation\\\\M\",awarding_sub_agency.imatch.\"\\\\madministration\\\\M\"),awarding_agency.imatch.\"\\\\maviation\\\\M\",awarding_sub_agency.imatch.\"\\\\maviation\\\\M\""
+          }
+        ],
+        "naics": []
+      },
+      "forecast": {
+        "via": "coverage_unestablished",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "is",
+            "col": "id",
+            "val": null
+          }
+        ],
+        "coverage": "unestablished",
+        "coverageGaps": [
+          {
+            "requested": "FAA",
+            "reason": "publisher_without_forecasts",
+            "label": "Federal Aviation Administration",
+            "parentWithData": "DOT",
+            "note": "No FAA-specific forecast feed. DOT publishes at department level."
+          }
+        ]
+      }
+    },
+    "notes": []
+  },
+  "agency=HUD janitorial": {
+    "version": 2,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "janitorial",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "janitorial",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "janitorial",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "janitorial",
+              "cls": "distinctive",
+              "basis": "not_in_generic_lists",
+              "forms": [
+                "janitorial"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": []
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "industry_preset",
+      "direct": {
+        "naics": [
+          "561210",
+          "561720",
+          "561730"
+        ],
+        "psc": [],
+        "terms": [
+          "Facilities & Maintenance",
+          "janitorial"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [
+      {
+        "requested": "HUD",
+        "canonical": "Department of Housing and Urban Development",
+        "kind": "normalization",
+        "needles": [
+          "HUD",
+          "Department of Housing and Urban Development",
+          "HOUSING"
+        ],
+        "identity": [
+          [
+            "hud"
+          ],
+          [
+            "housing",
+            "urban",
+            "development"
+          ],
+          [
+            "housing"
+          ]
+        ]
+      }
+    ],
+    "states": [],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+          },
+          {
+            "op": "or",
+            "expr": "department.imatch.\"\\\\mhud\\\\M\",sub_tier.imatch.\"\\\\mhud\\\\M\",and(department.imatch.\"\\\\mhousing\\\\M\",department.imatch.\"\\\\murban\\\\M\",department.imatch.\"\\\\mdevelopment\\\\M\"),and(sub_tier.imatch.\"\\\\mhousing\\\\M\",sub_tier.imatch.\"\\\\murban\\\\M\",sub_tier.imatch.\"\\\\mdevelopment\\\\M\"),department.imatch.\"\\\\mhousing\\\\M\",sub_tier.imatch.\"\\\\mhousing\\\\M\""
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+          },
+          {
+            "op": "or",
+            "expr": "awarding_agency.imatch.\"\\\\mhud\\\\M\",awarding_sub_agency.imatch.\"\\\\mhud\\\\M\",and(awarding_agency.imatch.\"\\\\mhousing\\\\M\",awarding_agency.imatch.\"\\\\murban\\\\M\",awarding_agency.imatch.\"\\\\mdevelopment\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mhousing\\\\M\",awarding_sub_agency.imatch.\"\\\\murban\\\\M\",awarding_sub_agency.imatch.\"\\\\mdevelopment\\\\M\"),awarding_agency.imatch.\"\\\\mhousing\\\\M\",awarding_sub_agency.imatch.\"\\\\mhousing\\\\M\""
+          }
+        ],
+        "naics": [
+          "561210",
+          "561720",
+          "561730"
+        ]
+      },
+      "forecast": {
+        "via": "coverage_unestablished",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": null
+        },
+        "ops": [
+          {
+            "op": "is",
+            "col": "id",
+            "val": null
+          }
+        ],
+        "coverage": "unestablished",
+        "coverageGaps": [
+          {
+            "requested": "HUD",
+            "reason": "unresolved_publisher"
+          }
+        ]
+      }
+    },
+    "notes": []
   }
 }
