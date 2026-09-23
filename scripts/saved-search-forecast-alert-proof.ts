@@ -35,7 +35,7 @@ const IDS: Record<string, string> = {
   e00435f7: 'e00435f7-4c68-4dde-bb8b-270385a4f57a',
 };
 async function load(prefix: string) {
-  const { data, error } = await db.from('saved_searches').select('id,name,filters,last_seen_notice_ids,last_alerted_at').eq('id', IDS[prefix]).maybeSingle();
+  const { data, error } = await db.from('saved_searches').select('id,name,filters,last_seen_notice_ids,last_alerted_at').eq('id', IDS[prefix]).limit(1).maybeSingle();
   if (error || !data) throw new Error(`saved search ${prefix}: ${error?.message ?? 'not found'}`);
   return data as any;
 }

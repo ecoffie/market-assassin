@@ -92,7 +92,7 @@ async function openRows(s: any): Promise<any[] | null> {
   const saved = s.filters as Record<string, string>;
   let profileOpts: { profileNaics?: string[]; profileStates?: string[] } | undefined;
   if (saved.scope === 'profile') {
-    const { data: prof, error } = await db.from('user_notification_settings').select('naics_codes, location_states').eq('user_email', s.user_email).maybeSingle();
+    const { data: prof, error } = await db.from('user_notification_settings').select('naics_codes, location_states').eq('user_email', s.user_email).limit(1).maybeSingle();
     if (error) return null;
     const pn = (prof?.naics_codes as string[] | null) || [];
     if (!pn.length) return []; // the cron skips this search (skippedNoProfile) — identical for both engines
