@@ -39,6 +39,8 @@
  *   npx tsx scripts/ingest-usaspending-awards.ts --apply             # weekly incremental, REAL
  *   npx tsx scripts/ingest-usaspending-awards.ts --from=2026-04-23   # backfill the gap, DRY-RUN
  *   npx tsx scripts/ingest-usaspending-awards.ts --from=2026-04-23 --apply   # backfill, REAL
+ *   npx tsx scripts/ingest-usaspending-awards.ts --idv-only --from=2024-10-01 --to=2025-09-30
+ *       # historical IDV identity backfill for one FY, DRY-RUN (see tasks/idv-vehicle-foundation/)
  */
 
 import { config } from 'dotenv';
@@ -52,6 +54,13 @@ import {
   buildPipelinePlan,
   buildAwardsMergeSql,
   classifyMembers,
+  DOD_AWARDING_AGENCY_CODE,
+  IDV_IDENTITY_COLUMNS,
+  LAGGARD_CONTINUITY_SLACK_DAYS,
+  resolveIdvIdentityColumnsMode,
+  resolveIngestWindowStart,
+  buildLaggardWeeklyCountsSql,
+  resolveDenseFrontier,
   encodeAwardsIngestClocks,
   formatStagingLoadFailure,
   loadCsvsIntoStaging,
@@ -77,48 +86,96 @@ const DATASET = 'usaspending';
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
 const fromArg = args.find((a) => a.startsWith('--from='))?.split('=')[1];
+// --to=YYYY-MM-DD bounds a backfill (e.g. one fiscal year per run); default today.
+const toArg = args.find((a) => a.startsWith('--to='))?.split('=')[1];
+// --idv-only: request IDV award types only. For the one-time historical IDV identity backfill
+// (tasks/idv-vehicle-foundation/README.md step 4) — requires an explicit --from.
+const IDV_ONLY = args.includes('--idv-only');
+const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
+const IDV_AWARD_TYPES = ['IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E'];
 
 function log(...m: unknown[]) { console.log('[ingest-awards]', ...m); }
 function isoDay(d: Date) { return d.toISOString().slice(0, 10); }
 
 async function currentWatermark(): Promise<string> {
+  return (await currentWatermarks()).global;
+}
+
+/**
+ * Global MAX(action_date) AND DoD's dense frontier. DoD publishes on a ~90-day delay, so the
+ * global max (civilian-driven) cannot tell us where DoD's data stops — see ingest-window.ts.
+ */
+async function currentWatermarks(): Promise<{ global: string; dod: string | null }> {
   const rows = await bqQuery<{ max_date?: string }>({
     query: `SELECT CAST(MAX(action_date) AS STRING) AS max_date FROM ${BQ_TABLES.awards} WHERE fiscal_year >= 2025`,
   });
   const max = rows?.[0]?.max_date;
   if (!max) throw new Error('could not read MAX(action_date) from awards — refusing to guess a start date');
-  return max;
+  // DoD's MAX(action_date) is NOT its frontier (a trickle is published without the delay) —
+  // use the dense frontier from weekly counts.
+  const asOf = isoDay(new Date());
+  const weeks = await bqQuery<{ week: string; n: number }>({
+    query: buildLaggardWeeklyCountsSql(BQ_TABLES.awards, asOf, DOD_AWARDING_AGENCY_CODE),
+  });
+  return { global: max, dod: resolveDenseFrontier(weeks.map((w) => ({ week: String(w.week), n: Number(w.n) })), asOf) };
+}
+
+/** Does the live `awards` schema already carry the IDV identity columns? (see merge-sql.ts) */
+async function idvIdentityColumnsPresent(): Promise<boolean> {
+  const rows = await bqQuery<{ column_name: string }>({
+    query: `SELECT column_name FROM \`${PROJECT}.${DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'awards'`,
+  });
+  return resolveIdvIdentityColumnsMode(rows.map((r) => r.column_name)) === 'present';
 }
 
 async function main() {
   log(APPLY ? 'MODE: APPLY (real load)' : 'MODE: DRY-RUN (no writes) — pass --apply to load for real');
 
-  const watermark = await currentWatermark();
+  const watermarks = await currentWatermarks();
+  const watermark = watermarks.global;
   const today = isoDay(new Date());
+  if (IDV_ONLY && !fromArg) throw new Error('--idv-only is a backfill mode and requires an explicit --from=YYYY-MM-DD');
+  if (toArg && !fromArg) throw new Error('--to= requires an explicit --from=');
+  const endDate = toArg || today;
 
-  // Start date = an explicit --from (backfill) OR the watermark minus the correction window.
+  // Start date = an explicit --from (backfill) OR the earlier of (global watermark − correction
+  // window) and (DoD's own watermark − continuity slack). See src/lib/awards-ingest/ingest-window.ts.
   let startDate: string;
+  let windowAnchor = 'explicit --from';
   if (fromArg) {
     startDate = fromArg;
   } else {
-    const w = new Date(watermark + 'T00:00:00Z');
-    w.setUTCDate(w.getUTCDate() - TRAILING_CORRECTION_DAYS);
-    startDate = isoDay(w);
+    const window = resolveIngestWindowStart({
+      globalMax: watermark,
+      laggardMaxes: { [DOD_AWARDING_AGENCY_CODE]: watermarks.dod },
+      correctionDays: TRAILING_CORRECTION_DAYS,
+      laggardSlackDays: LAGGARD_CONTINUITY_SLACK_DAYS,
+    });
+    startDate = window.startDate;
+    windowAnchor = window.anchor;
+    if (window.unmeasuredLaggards.length > 0) {
+      log(`WARNING: laggard cohort(s) ${window.unmeasuredLaggards.join(', ')} have no measurable dense frontier — window anchored on the global watermark only`);
+    }
   }
+  const writeIdvIdentity = await idvIdentityColumnsPresent();
 
   log(`BQ awards watermark (current MAX action_date): ${watermark}`);
+  log(`DoD (${DOD_AWARDING_AGENCY_CODE}) dense frontier: ${watermarks.dod ?? 'UNMEASURED'} · window anchor: ${windowAnchor}`);
+  log(`IDV identity columns (${IDV_IDENTITY_COLUMNS.map((c) => c.target).join(', ')}): ` +
+    (writeIdvIdentity ? 'present in awards — MERGE will write them' : 'absent from awards — MERGE keeps the legacy 41 columns'));
   log(`today: ${today}`);
   log(`staleness: ${Math.round((Date.parse(today) - Date.parse(watermark)) / 86400000)} days behind`);
-  log(`planned pull window: action_date ${startDate} → ${today}` +
-    (fromArg ? ' (BACKFILL — explicit --from)' : ` (weekly incremental: watermark − ${TRAILING_CORRECTION_DAYS}d correction window)`));
+  log(`award types: ${IDV_ONLY ? 'IDV only (--idv-only)' : 'contracts + IDVs'}`);
+  log(`planned pull window: action_date ${startDate} → ${endDate}` +
+    (fromArg ? ' (BACKFILL — explicit --from)' : ` (weekly incremental: min(watermark − ${TRAILING_CORRECTION_DAYS}d, DoD dense frontier − ${LAGGARD_CONTINUITY_SLACK_DAYS}d))`));
 
   // Request contract + IDV award TYPES (rows land in Contracts*.csv). A separate IDV-named ZIP
   // member is classified and fails closed before MERGE — we do not invent an IDV file mapping.
   const downloadRequest = {
     filters: {
-      prime_award_types: ['A', 'B', 'C', 'D', 'IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E'],
+      prime_award_types: IDV_ONLY ? IDV_AWARD_TYPES : [...CONTRACT_AWARD_TYPES, ...IDV_AWARD_TYPES],
       date_type: 'action_date',
-      date_range: { start_date: startDate, end_date: today },
+      date_range: { start_date: startDate, end_date: endDate },
     },
     columns: [], // empty = USASpending's full standard award column set
     file_format: 'csv',
@@ -232,6 +289,7 @@ async function main() {
       awardsTable: BQ_TABLES.awards,
       stagingFq,
       startDate,
+      idvIdentityColumns: writeIdvIdentity,
     });
     try {
       execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql'],
@@ -244,6 +302,14 @@ async function main() {
 
     const after = await currentWatermark();
     log(`MERGE complete. Awards source max is now ${after} (was ${watermark}). Loaded ~${totalRows} transactions.`);
+
+    // IDV-only history backfill: run once per fiscal year, so the (heavy, ~full-table) recipients
+    // rebuild is deferred to the next weekly run instead of repeating it per FY. Any IDV txn this
+    // INSERTs shows in recipient rollups from that rebuild on. Clocks are not stamped.
+    if (IDV_ONLY) {
+      log('--idv-only: recipients rebuild and clock stamp skipped (next weekly run rebuilds)');
+      return;
+    }
 
     const rebuildSql = readFileSync(
       resolve(process.cwd(), 'scripts/usaspending-ingest/rebuild-recipients-from-awards.sql'),
@@ -258,6 +324,13 @@ async function main() {
       throw new Error(`${outcome.status}: MERGE succeeded but recipients rebuild failed`, { cause: error });
     }
     const recipientsRebuiltAt = new Date().toISOString();
+
+    // A partial backfill (IDV types only, or a window that stops before today) is NOT a weekly
+    // refresh: stamping the run clocks would tell the freshness oracle a full refresh happened.
+    if (IDV_ONLY || toArg) {
+      log('partial backfill (--idv-only / --to): data_sources[bq_awards] clocks deliberately NOT stamped');
+      return;
+    }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

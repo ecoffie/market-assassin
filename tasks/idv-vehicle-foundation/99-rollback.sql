@@ -1,0 +1,51 @@
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+-- 99 — ROLLBACK for the IDV vehicle foundation                            ⛔ NOT EXECUTED
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+-- Every statement is COMMENTED OUT so running this file whole does nothing. Uncomment only the
+-- section for the step being undone. Every write step in README.md is preceded by
+-- a zero-copy SNAPSHOT, so every rollback below is exact, not a re-derivation.
+
+-- ── §0  Pre-write snapshot (README step 0 — run BEFORE 01/02/03, not a rollback) ─────────────
+-- CREATE SNAPSHOT TABLE `market-assasin.usaspending.awards_snap_pre_idv_foundation`
+--   CLONE `market-assasin.usaspending.awards`
+--   OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 30 DAY));
+-- A snapshot stores only bytes that later CHANGE in the base table, so it is ~free until the
+-- backfills rewrite partitions.
+
+-- ── §A  Undo 01 (DDL) — drop the 7 columns ──────────────────────────────────────────────────
+-- Safe at any time: code gate `resolveIdvIdentityColumnsMode` sees 'absent' and the ingest MERGE
+-- returns to the byte-identical 41-column statement. Dropping a column is metadata-only; no other
+-- column's data is touched. (Do NOT drop only some — a partial schema makes the ingest refuse.)
+-- ALTER TABLE `market-assasin.usaspending.awards`
+--   DROP COLUMN IF EXISTS solicitation_identifier,
+--   DROP COLUMN IF EXISTS ordering_period_end_date,
+--   DROP COLUMN IF EXISTS award_or_idv_flag,
+--   DROP COLUMN IF EXISTS idv_type_code,
+--   DROP COLUMN IF EXISTS multiple_or_single_award_idv_code,
+--   DROP COLUMN IF EXISTS parent_award_agency_id,
+--   DROP COLUMN IF EXISTS parent_award_single_or_multiple_code;
+
+-- ── §B  Undo 02 (staging backfill) — clear only what it wrote ───────────────────────────────
+-- 02 wrote only the 7 new columns, only on action_date 2026-06-01..2026-09-18. §A also undoes it.
+-- UPDATE `market-assasin.usaspending.awards`
+-- SET solicitation_identifier = NULL, ordering_period_end_date = NULL, award_or_idv_flag = NULL,
+--     idv_type_code = NULL, multiple_or_single_award_idv_code = NULL, parent_award_agency_id = NULL,
+--     parent_award_single_or_multiple_code = NULL
+-- WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18';
+
+-- ── §C  Undo 03/04 (re-acquisition MERGEs: DoD hole + IDV history) — restore from snapshot ───
+-- These MERGEs update existing rows AND insert missing ones, so "undo" = restore the table as it
+-- was. Restore into a NEW table first, verify, then swap — never overwrite blind.
+-- CREATE TABLE `market-assasin.usaspending.awards_restored`
+--   CLONE `market-assasin.usaspending.awards_snap_pre_idv_foundation`;
+-- -- verify row count / MAX(action_date) / DoD month counts on awards_restored, then:
+-- -- (1) rename awards → awards_rolled_back_<date>, (2) rename awards_restored → awards
+-- ALTER TABLE `market-assasin.usaspending.awards` RENAME TO awards_rolled_back_20260923;
+-- ALTER TABLE `market-assasin.usaspending.awards_restored` RENAME TO awards;
+-- Then rebuild recipients (scripts/usaspending-ingest/rebuild-recipients-from-awards.sql) so the
+-- rollups match the restored table. Within 7 days, `FOR SYSTEM_TIME AS OF` time travel is an
+-- alternative source for the CLONE if the snapshot was skipped.
+
+-- ── §D  Undo the code (uncommitted working tree on fix/idv-vehicle-data-foundation) ──────────
+-- Nothing is committed. `git checkout -- <file>` / delete the new files. The code is safe to
+-- ship BEFORE 01: with the columns absent it produces the legacy MERGE byte-for-byte.

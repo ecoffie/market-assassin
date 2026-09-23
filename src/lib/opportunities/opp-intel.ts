@@ -50,6 +50,23 @@ export type OppIntel = {
   } | null;
 };
 
+/**
+ * The predecessor dollar value opp-intel shows ("value") and anchors the M-Estimate on.
+ *
+ * PINNED to what it has always been: the award's OBLIGATION. This read `pred.ceiling ?? …`, but
+ * `fetchAwardDetail` used to read award-API keys that do not exist (`base_and_all_options_value`),
+ * so `ceiling` was always `total_obligation` — i.e. this value was the obligation for every award
+ * (and 0 for every IDV). Fixing the ceiling mapping (2026-09-23) made `ceiling` the real
+ * base-and-all-options value, which would silently move the M-Estimate anchor from "obligated"
+ * to "potential" on every contract with unexercised options. Whether the estimate SHOULD anchor
+ * on the potential value is a product decision, not a side effect of a field-name fix — so the
+ * anchor is kept on the obligation explicitly until that decision is made.
+ */
+export function predecessorAnchorValue(pred: { obligated?: unknown } | null | undefined): number | null {
+  const v = pred ? Number(pred.obligated) : NaN;
+  return Number.isFinite(v) ? v : null;
+}
+
 export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null, psc: string | null = null, opts: { estimate?: boolean } = {}): Promise<OppIntel> {
   const guard = <T>(p: Promise<T>, ms = perToolMs): Promise<T | null> => Promise.race([
     p.then((v) => v).catch(() => null),
@@ -89,7 +106,7 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
     predecessor: (pred && pred.recipientName) ? {
       incumbent: pred.recipientName || null,
       incumbentState: pred.recipientState || null,
-      value: fmt(pred.ceiling ?? pred.currentValue ?? pred.obligated),
+      value: fmt(predecessorAnchorValue(pred)),
       expires: (pred.popPotentialEnd || pred.popEnd) ? String(pred.popPotentialEnd || pred.popEnd).slice(0, 10) : null,
       vehicle: pred.parentIdvPiid || null,
       confidence: pred.matchConfidence || null,
@@ -129,7 +146,7 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
         comps?: { incumbent: string; value: number; awardDate: string | null; subAgency: string | null }[];
         timeline?: { year: number; median: number; n: number }[];
       } | null;
-      const predVal = pred ? (pred.ceiling ?? pred.currentValue ?? pred.obligated) : null;
+      const predVal = pred ? predecessorAnchorValue(pred) : null;
       const conf = pred ? pred.matchConfidence : null;
       const cmpMed = cr && cr.median > 0 ? cr.median : null;
       // PSC-FAMILY MATCH bypass (Eric 2026-08-03): a LARGE predecessor is TRUSTWORTHY — even past the

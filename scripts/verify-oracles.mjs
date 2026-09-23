@@ -392,6 +392,30 @@ if (want('freshness')) {
     record('freshness: BQ awards unmeasured', true,
       'WARN; clocks unreadable, so the oracle cannot prove ingest_broken: ' + String(e?.message || e).slice(0, 120));
   }
+
+  // 8b. COMPLETENESS — the second derivation. MAX(action_date) stayed fresh (civilian agencies
+  // publish within days) while ~1.2M DoD transactions dated 2026-01-25..2026-05-03 were absent,
+  // so the check above printed healthy over a warehouse missing half of Robins Mech-Elec II's
+  // orders. This compares each SETTLED month per cohort (DoD / civilian) with the same month a
+  // year earlier; a settled month under 40% of its baseline is a hole and FAILS the oracle.
+  // Proven on the 2026-09-23 state: dod 2026-02/03/04 at 0.0% → FAIL (cohort-completeness.unit.test.ts).
+  try {
+    const { bqQuery, BQ_TABLES } = await import('@/lib/bigquery/client');
+    const { buildCohortMonthlyCountsSql, classifyCohortCompleteness, describeCohortHoles } = await import('@/lib/awards-ingest');
+    const asOf = new Date().toISOString().slice(0, 10);
+    const rows = await bqQuery({ query: buildCohortMonthlyCountsSql(BQ_TABLES.awards, asOf) });
+    const completeness = classifyCohortCompleteness(
+      rows.map((r) => ({ cohort: r.cohort, month: r.month, n: Number(r.n) })), asOf);
+    if (completeness.status === 'unmeasured') {
+      record('freshness: BQ awards cohort completeness unmeasured', true, 'WARN; ' + describeCohortHoles(completeness));
+    } else {
+      record(`freshness: BQ awards cohort completeness ${completeness.status}`,
+        completeness.status === 'complete', describeCohortHoles(completeness));
+    }
+  } catch (e) {
+    record('freshness: BQ awards cohort completeness unmeasured', true,
+      'WARN; BQ probe unavailable, completeness NOT proven: ' + String(e?.message || e).slice(0, 160));
+  }
 }
 
 // ── 9. RECOMPETE COUNT — the "N results" is a real count, and the 6000-cap FLOOR flags itself ──

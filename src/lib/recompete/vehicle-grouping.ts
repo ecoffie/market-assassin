@@ -14,6 +14,10 @@
  * children.
  */
 
+import { resolveVehicleCeiling, type VehicleCeilingBasis } from './vehicle-ceiling';
+
+export type { VehicleCeilingBasis };
+
 /** A PIID stripped of the "(+N more)" display artifact + non-alphanumerics. */
 function cleanPiid(piid: string | null | undefined): string {
   return (piid || '')
@@ -67,8 +71,16 @@ export interface VehicleGroup<T> {
   incumbentNames: string[];
   /** Latest expiry across awardees — when the vehicle actually recompetes. */
   latestExpiry: string | null;
-  /** Combined ceiling across awardees. */
+  /**
+   * The vehicle's ceiling, counted ONCE. For members that are award/order records this is the sum
+   * of their own values (each order's value is its own). For members that are holder IDV records
+   * of one multiple-award program, each holder reports the SAME shared program ceiling — summing
+   * it per holder turned Robins Mech-Elec II's $95M into $380M — so it is taken once. See
+   * `combinedCeilingBasis` and ./vehicle-ceiling.ts.
+   */
   combinedCeiling: number;
+  /** How `combinedCeiling` was derived — never display it without this. */
+  combinedCeilingBasis: VehicleCeilingBasis;
 }
 
 /**
@@ -83,10 +95,15 @@ export function groupRecompetesByVehicle<T extends {
   potential_total_value?: number | null;
   total_obligation?: number | null;
   period_of_performance_current_end?: string | null;
-}>(rows: T[]): VehicleGroup<T>[] {
+  contract_id?: string | null;
+  award_or_idv_flag?: string | null;
+}>(rows: T[], opts: { keyOf?: (row: T) => string } = {}): VehicleGroup<T>[] {
+  // keyOf: a caller with a FACTUAL program key (e.g. an IDV's solicitation_identifier) passes it;
+  // the default stays the PIID-shape key, which is only valid for the <IDV root><serial> pattern.
+  const keyOf = opts.keyOf ?? recompeteVehicleKey;
   const byKey = new Map<string, T[]>();
   for (const r of rows) {
-    const k = recompeteVehicleKey(r);
+    const k = keyOf(r);
     const list = byKey.get(k);
     if (list) list.push(r);
     else byKey.set(k, [r]);
@@ -104,15 +121,14 @@ export function groupRecompetesByVehicle<T extends {
       .filter(Boolean)
       .sort()
       .pop() || null;
-    const combinedCeiling = members.reduce(
-      (n, m) => n + (m.potential_total_value || m.total_obligation || 0), 0,
-    );
+    const { ceiling: combinedCeiling, basis: combinedCeilingBasis } = resolveVehicleCeiling(members);
     groups.push({
       key, lead, members,
       incumbentCount: incumbentNames.length || members.length,
       incumbentNames,
       latestExpiry,
       combinedCeiling,
+      combinedCeilingBasis,
     });
   }
   return groups;
