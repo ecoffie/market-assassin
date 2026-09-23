@@ -558,6 +558,10 @@ server.registerTool(
           keyword_exact: z.string().optional(),
         })
         .optional(),
+      uei: z
+        .string()
+        .optional()
+        .describe('Optional SAM UEI of the searching company. Company-anchored FIND: registered NAICS/PSC widen recall (never a direct match); every item gets eligibility ELIGIBLE | NOT_ELIGIBLE | UNKNOWN. Only when the user already gave it.'),
     },
   },
   async (args) => {

@@ -431,6 +431,18 @@ searches and alerts do NOT yet — they still run the old substring matchers (`%
   unclassified change). Order next: Maps Open → Recompete → Forecast → saved searches (blast re-run + sign-off) → client.
 - Never add a length rule for word importance; classes are semantic (distinctive / qualifier / supporting).
 
+### IMI FIND — company-anchored FIND + DIRECT_MATCH semantics (Workstream A, 2026-09-22, PR open)
+Fixtures + tests: `src/lib/opportunities/__fixtures__/imi-find/` · `imi-find-company-anchor.unit.test.ts`.
+- `find_opportunities` takes optional `uei`. `resolveCompanyAnchor` (`company-anchor.ts`) projects the record
+  `lookup_sam_entity` already returns (cache-first) — NOT a new profile system. Registered NAICS/PSC are
+  UNIONED into recall (base plan fetched too, so text rows are never starved) and labelled
+  `company_registered_psc|naics` — never DIRECT_MATCH. Eligibility (`company-eligibility.ts`) is a separate
+  screen: per-notice-NAICS size, absent set-aside = UNKNOWN, recompetes always UNKNOWN. No uei → P2 unchanged.
+- ⚠️ **DIRECT_MATCH needs BUY-SIDE evidence** (`match-evidence.ts`). A holder-name-only hit is `HOLDER_SIGNAL`;
+  a buyer-name-only hit is RELATED. `recompete_opportunities.naics_description` is **0% filled** — before this,
+  literal Coming-back recall ran only on holder + agency names; `description` (96%) / `psc_description` (99.7%)
+  are now in `RECOMPETE_TEXT_COLS`.
+
 ### Potato v1 — ✅ SHIPPED → CLOSED 2026-09-17
 Full record: **`docs/POTATO-V1-COMPLETION.md`**. Do **not** “continue Potato.”
 - Journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY FIT → TALENT THIN → POSITION → ACT → MONITOR. Then STOP.

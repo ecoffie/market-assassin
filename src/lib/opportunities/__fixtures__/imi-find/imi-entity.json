@@ -1,0 +1,384 @@
+{
+  "_provenance": {
+    "captured_at": "2026-09-23T01:16:33.130Z",
+    "source": "supabase.sam_api_cache (SAM Entity Management API v3 response, as cached by lookup_sam_entity)",
+    "query": "select response_data where cache_key = md5('entity:{\"ueiSAM\":\"M66AH329AJM6\"}') → entityData[0]",
+    "cache_fetched_at": "2026-09-23T00:32:26.338+00:00",
+    "note": "pointsOfContact removed (PII, not used by FIND)."
+  },
+  "data": {
+    "coreData": {
+      "businessTypes": {
+        "businessTypeList": [
+          {
+            "businessTypeCode": "27",
+            "businessTypeDesc": "Self Certified Small Disadvantaged Business"
+          },
+          {
+            "businessTypeCode": "2X",
+            "businessTypeDesc": "For Profit Organization"
+          },
+          {
+            "businessTypeCode": "A5",
+            "businessTypeDesc": "Veteran-Owned Business"
+          },
+          {
+            "businessTypeCode": "F",
+            "businessTypeDesc": "Business or Organization"
+          }
+        ],
+        "sbaBusinessTypeList": [
+          {
+            "sbaBusinessTypeCode": null,
+            "sbaBusinessTypeDesc": null,
+            "certificationExitDate": null,
+            "certificationEntryDate": null
+          }
+        ]
+      },
+      "mailingAddress": {
+        "city": "WATKINSVILLE",
+        "zipCode": "30677",
+        "countryCode": "USA",
+        "addressLine1": "PO BOX 537",
+        "addressLine2": null,
+        "zipCodePlus4": "2718",
+        "stateOrProvinceCode": "GA"
+      },
+      "physicalAddress": {
+        "city": "WATKINSVILLE",
+        "zipCode": "30677",
+        "countryCode": "USA",
+        "addressLine1": "1241 GREENSBORO HWY",
+        "addressLine2": null,
+        "zipCodePlus4": "2718",
+        "stateOrProvinceCode": "GA"
+      },
+      "entityInformation": {
+        "entityURL": "https://www.imiindustrialservices.com/",
+        "submissionDate": "2026-07-13",
+        "entityStartDate": "1988-07-01",
+        "entityDivisionName": null,
+        "entityDivisionNumber": null,
+        "fiscalYearEndCloseDate": "03/31"
+      },
+      "generalInformation": {
+        "entityTypeCode": "F",
+        "entityTypeDesc": "Business or Organization",
+        "entityStructureCode": "2L",
+        "entityStructureDesc": "Corporate Entity (Not Tax Exempt)",
+        "profitStructureCode": "2X",
+        "profitStructureDesc": "For Profit Organization",
+        "stateOfIncorporationCode": "GA",
+        "stateOfIncorporationDesc": "GEORGIA",
+        "organizationStructureCode": null,
+        "organizationStructureDesc": null,
+        "countryOfIncorporationCode": "USA",
+        "countryOfIncorporationDesc": "UNITED STATES"
+      },
+      "financialInformation": {
+        "creditCardUsage": "Y",
+        "debtSubjectToOffset": "N"
+      },
+      "congressionalDistrict": "10"
+    },
+    "assertions": {
+      "ediInformation": {
+        "ediInformationFlag": "N"
+      },
+      "goodsAndServices": {
+        "pscList": [
+          {
+            "pscCode": "J034",
+            "pscDescription": "MAINTENANCE, REPAIR, AND REBUILDING OF EQUIPMENT- METALWORKING MACHINERY"
+          },
+          {
+            "pscCode": "J035",
+            "pscDescription": "MAINTENANCE, REPAIR, AND REBUILDING OF EQUIPMENT- SERVICE AND TRADE EQUIPMENT"
+          },
+          {
+            "pscCode": "J036",
+            "pscDescription": "MAINTENANCE, REPAIR, AND REBUILDING OF EQUIPMENT- SPECIAL INDUSTRY MACHINERY"
+          },
+          {
+            "pscCode": "J039",
+            "pscDescription": "MAINTENANCE, REPAIR, AND REBUILDING OF EQUIPMENT- MATERIALS HANDLING EQUIPMENT"
+          },
+          {
+            "pscCode": "K028",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- ENGINES, TURBINES, AND COMPONENTS"
+          },
+          {
+            "pscCode": "K030",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- MECHANICAL POWER TRANSMISSION EQUIPMENT"
+          },
+          {
+            "pscCode": "K034",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- METALWORKING MACHINERY"
+          },
+          {
+            "pscCode": "K035",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- SERVICE AND TRADE EQUIPMENT"
+          },
+          {
+            "pscCode": "K036",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- SPECIAL INDUSTRY MACHINERY"
+          },
+          {
+            "pscCode": "K039",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- MATERIALS HANDLING EQUIPMENT"
+          },
+          {
+            "pscCode": "K040",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- ROPE, CABLE, CHAIN, AND FITTINGS"
+          },
+          {
+            "pscCode": "K043",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- PUMPS AND COMPRESSORS"
+          },
+          {
+            "pscCode": "K044",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- FURNACE, STEAM PLANT, AND DRYING EQUIPMENT; NUCLEAR REACTORS"
+          },
+          {
+            "pscCode": "K047",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- PIPE, TUBING, HOSE, AND FITTINGS"
+          },
+          {
+            "pscCode": "K048",
+            "pscDescription": "MODIFICATION OF EQUIPMENT- VALVES"
+          },
+          {
+            "pscCode": "N028",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- ENGINES, TURBINES, AND COMPONENTS"
+          },
+          {
+            "pscCode": "N031",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- BEARINGS"
+          },
+          {
+            "pscCode": "N032",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- WOODWORKING MACHINERY AND EQUIPMENT"
+          },
+          {
+            "pscCode": "N034",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- METALWORKING MACHINERY"
+          },
+          {
+            "pscCode": "N035",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- SERVICE AND TRADE EQUIPMENT"
+          },
+          {
+            "pscCode": "N036",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- SPECIAL INDUSTRY MACHINERY"
+          },
+          {
+            "pscCode": "N039",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- MATERIALS HANDLING EQUIPMENT"
+          },
+          {
+            "pscCode": "N040",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- ROPE, CABLE, CHAIN, AND FITTINGS"
+          },
+          {
+            "pscCode": "N043",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- PUMPS AND COMPRESSORS"
+          },
+          {
+            "pscCode": "N044",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- FURNACE, STEAM PLANT, AND DRYING EQUIPMENT; NUCLEAR REACTORS"
+          },
+          {
+            "pscCode": "N045",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- PLUMBING, HEATING, AND WASTE DISPOSAL EQUIPMENT"
+          },
+          {
+            "pscCode": "N047",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- PIPE, TUBING, HOSE, AND FITTINGS"
+          },
+          {
+            "pscCode": "N048",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- VALVES"
+          },
+          {
+            "pscCode": "N049",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- MAINTENANCE AND REPAIR SHOP EQUIPMENT"
+          },
+          {
+            "pscCode": "N059",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- ELECTRICAL AND ELECTRONIC EQUIPMENT COMPONENTS"
+          },
+          {
+            "pscCode": "N061",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- ELECTRIC WIRE AND POWER DISTRIBUTION EQUIPMENT"
+          },
+          {
+            "pscCode": "N099",
+            "pscDescription": "INSTALLATION OF EQUIPMENT- MISCELLANEOUS"
+          }
+        ],
+        "naicsList": [
+          {
+            "naicsCode": "236210",
+            "naicsException": null,
+            "naicsDescription": "Industrial Building Construction ",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "236220",
+            "naicsException": null,
+            "naicsDescription": "Commercial and Institutional Building Construction ",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238110",
+            "naicsException": null,
+            "naicsDescription": "Poured Concrete Foundation and Structure Contractors ",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238120",
+            "naicsException": null,
+            "naicsDescription": "Structural Steel and Precast Concrete Contractors ",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238190",
+            "naicsException": null,
+            "naicsDescription": "Other Foundation, Structure, and Building Exterior Contractors ",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238210",
+            "naicsException": null,
+            "naicsDescription": "Electrical Contractors and Other Wiring Installation Contractors",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238290",
+            "naicsException": null,
+            "naicsDescription": "Other Building Equipment Contractors ",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238910",
+            "naicsException": null,
+            "naicsDescription": "Site Preparation Contractors",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "238990",
+            "naicsException": "NN",
+            "naicsDescription": "All Other Specialty Trade Contractors",
+            "sbaSmallBusiness": "E"
+          },
+          {
+            "naicsCode": "331210",
+            "naicsException": null,
+            "naicsDescription": "Iron and Steel Pipe and Tube Manufacturing from Purchased Steel",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "331221",
+            "naicsException": null,
+            "naicsDescription": "Rolled Steel Shape Manufacturing ",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "332312",
+            "naicsException": null,
+            "naicsDescription": "Fabricated Structural Metal Manufacturing ",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "332313",
+            "naicsException": null,
+            "naicsDescription": "Plate Work Manufacturing ",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "332420",
+            "naicsException": null,
+            "naicsDescription": "Metal Tank (Heavy Gauge) Manufacturing",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "332710",
+            "naicsException": null,
+            "naicsDescription": "Machine Shops",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "332721",
+            "naicsException": null,
+            "naicsDescription": "Precision Turned Product Manufacturing ",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "332999",
+            "naicsException": null,
+            "naicsDescription": "All Other Miscellaneous Fabricated Metal Product Manufacturing ",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "333922",
+            "naicsException": null,
+            "naicsDescription": "Conveyor and Conveying Equipment Manufacturing ",
+            "sbaSmallBusiness": "Y"
+          },
+          {
+            "naicsCode": "561210",
+            "naicsException": null,
+            "naicsDescription": "Facilities Support Services",
+            "sbaSmallBusiness": "N"
+          },
+          {
+            "naicsCode": "811310",
+            "naicsException": null,
+            "naicsDescription": "Commercial and Industrial Machinery and Equipment (except Automotive and Electronic) Repair and Maintenance ",
+            "sbaSmallBusiness": "N"
+          }
+        ],
+        "primaryNaics": "238990"
+      },
+      "disasterReliefData": {
+        "bondingFlag": "NO",
+        "disasterRegistryFlag": "NO",
+        "geographicalAreaServed": [
+          {
+            "geographicalAreaServedStateCode": null,
+            "geographicalAreaServedStateName": null,
+            "geographicalAreaServedCountyCode": null,
+            "geographicalAreaServedCountyName": null,
+            "geographicalAreaServedmetropolitanStatisticalAreaCode": null,
+            "geographicalAreaServedmetropolitanStatisticalAreaName": null
+          }
+        ]
+      }
+    },
+    "entityRegistration": {
+      "dodaac": null,
+      "ueiSAM": "M66AH329AJM6",
+      "dbaName": "IMI INDUSTRIAL SERVICES GROUP",
+      "cageCode": "4PK02",
+      "evsSource": "E&Y",
+      "ueiStatus": "Active",
+      "dnbOpenData": null,
+      "exclusionURL": null,
+      "samRegistered": "Yes",
+      "activationDate": "2026-07-14",
+      "lastUpdateDate": "2026-07-14",
+      "ueiCreationDate": "2020-05-01",
+      "registrationDate": "2007-03-09",
+      "legalBusinessName": "INDUSTRIAL MECHANICAL INC",
+      "publicDisplayFlag": "Y",
+      "ueiExpirationDate": null,
+      "entityEFTIndicator": null,
+      "registrationStatus": "Active",
+      "exclusionStatusFlag": "N",
+      "purposeOfRegistrationCode": "Z2",
+      "purposeOfRegistrationDesc": "All Awards",
+      "registrationExpirationDate": "2027-07-13"
+    }
+  }
+}

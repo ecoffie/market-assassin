@@ -9,7 +9,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
 import {
   interpretMarket,
-  classifyRecord,
   evidenceWhy,
   plainEnglishInterpretation,
   type EvidenceClass,
@@ -21,6 +20,7 @@ import {
   type OpenRelevanceClass,
   openEvidenceWhy,
   openEvidenceCounts,
+  openRetrievalPsc,
 } from '@/lib/opportunities/open-relevance';
 // Canonical Mindy Discovery (2026-09-22, Phase B): MCP is the first production consumer.
 // Meaning + eligibility come from the plan; this file owns only MCP surface policy + presentation.
@@ -36,6 +36,31 @@ import {
   type DiscoveryPlan,
   type SurfacePolicy,
 } from '@/lib/discovery';
+// Company-anchored FIND (IMI test, 2026-09-22). The anchor is a projection of lookup_sam_entity's
+// canonical record; eligibility is a separate screen from relevance.
+import {
+  resolveCompanyAnchor,
+  companyCodeRecall,
+  companyRecallBasis,
+  type CompanyAnchor,
+  type CompanyAnchorResolution,
+  type EntityLookup,
+} from '@/lib/opportunities/company-anchor';
+import {
+  evaluateEligibility,
+  evaluateRecompeteEligibility,
+  unresolvedCompanyVerdict,
+  type EligibilityStatus,
+  type EligibilityVerdict,
+} from '@/lib/opportunities/company-eligibility';
+import {
+  classifyComingBackEvidence,
+  holderSignalWhy,
+  buyerNameWhy,
+  companyCodeWhy,
+  type ComingBackClass,
+  type MatchBasis,
+} from '@/lib/opportunities/match-evidence';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -74,6 +99,19 @@ export interface FindOpportunitiesInput {
     psc?: string | null;
     keyword_exact?: string | null;
   } | null;
+  /**
+   * Optional SAM UEI. When present FIND is COMPANY-ANCHORED: the company's registered NAICS/PSC widen
+   * recall (labelled company_registered_*, never DIRECT_MATCH) and every returned item carries an
+   * `eligibility` verdict (ELIGIBLE | NOT_ELIGIBLE | UNKNOWN) judged separately from relevance.
+   * Absent → the beginner first-turn FIND is unchanged.
+   */
+  uei?: string | null;
+}
+
+/** Test/verification seams. Production passes nothing. */
+export interface FindOpportunitiesDeps {
+  client?: SupabaseClient;
+  entityLookup?: EntityLookup;
 }
 
 export interface FindNextAction {
@@ -96,7 +134,11 @@ export interface HorizonItemBase {
   source: string;
   why_this_matched: string;
   identity: { kind: string; id: string };
-  evidence_class?: EvidenceClass;
+  evidence_class?: EvidenceClass | 'HOLDER_SIGNAL';
+  /** What put this row in front of the customer (buy-side vs holder/buyer name vs company codes). */
+  match_basis?: MatchBasis[];
+  /** Company-anchored FIND only (input.uei). Separate from relevance. */
+  eligibility?: EligibilityVerdict;
 }
 
 export type HorizonItem = HorizonItemBase & Record<string, unknown>;
@@ -114,7 +156,32 @@ export interface HorizonResult {
   error: { class: string; message: string } | null;
   allowed_handoffs: HandoffKey[];
   semantics_note: string | null;
-  evidence_counts?: { DIRECT_MATCH: number; RELATED_MARKET_CANDIDATE: number } | null;
+  evidence_counts?: EvidenceCounts | null;
+  /** Company-anchored FIND only: verdict counts over the RETURNED items (not the matched population). */
+  eligibility_counts?: Record<EligibilityStatus, number> | null;
+}
+
+export interface EvidenceCounts {
+  DIRECT_MATCH: number;
+  RELATED_MARKET_CANDIDATE: number;
+  /** Coming back: rows whose ONLY evidence is the holder's name. Never part of DIRECT. */
+  HOLDER_SIGNAL?: number;
+  /** Company-anchored FIND: rows recalled only by the company's registered PSC/NAICS. */
+  COMPANY_REGISTERED_CODE?: number;
+}
+
+export interface FindCompanySummary {
+  uei: string;
+  status: CompanyAnchorResolution['status'];
+  legal_name: string | null;
+  source: CompanyAnchor['source'] | null;
+  as_of: string | null;
+  note: string | null;
+  /** Registered codes that widened recall (exact codes, not families). */
+  recall_codes: { naics: string[]; psc: string[] } | null;
+  /** Per-NAICS SAM size representation, verbatim tri-state. */
+  size_by_naics: CompanyAnchor['size_by_naics'] | null;
+  location: CompanyAnchor['location'] | null;
 }
 
 export interface FindOpportunitiesResult {
@@ -129,6 +196,8 @@ export interface FindOpportunitiesResult {
   };
   market_interpretation: MarketInterpretation;
   presentation_note: string;
+  /** Present only when input.uei was passed. */
+  company?: FindCompanySummary;
   horizons: Record<HorizonKey, HorizonResult>;
   summary: {
     open_now: { status: HorizonStatus; matched_count: number | null };
@@ -137,6 +206,8 @@ export interface FindOpportunitiesResult {
       matched_count: number | null;
       direct_match: number | null;
       related_market_candidate: number | null;
+      /** Holder-name-only rows. A subcontracting lead to check, not demand for this work. */
+      holder_signal: number | null;
     };
     coming_soon: { status: HorizonStatus; matched_count: number | null };
     headline: string;
@@ -177,6 +248,14 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say “N contracts with direct cybersecurity evidence and M related SOCOM IT contracts worth reviewing.” Never say “N+M cybersecurity recompetes/contracts.” presentation_note and summary.headline already split the counts — use them.',
   'INTERPRETATION: use presentation_note / market_interpretation.truth. Buyer alias (SOCOM = U.S. Special Operations Command) is spelling, not a wider department. Never say you searched all of DoD. Never claim the entire IT-services market is cybersecurity.',
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
+  'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (e.g. a firm called “… Machining and Fabrication”). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
+] as const;
+
+/** Added to host_rules ONLY for a company-anchored call (input.uei). The beginner first turn is unchanged. */
+export const HOST_RULES_COMPANY_ANCHORED = [
+  'COMPANY-ANCHORED: this FIND used the company\'s own SAM registration (see `company`). Items with match_basis company_registered_psc / company_registered_naics were recalled by a code the company REGISTERED — say so; they are not a match on the words typed and never a DIRECT_MATCH.',
+  'ELIGIBILITY is separate from relevance. Report each item\'s eligibility.status with its reason: ELIGIBLE, NOT_ELIGIBLE (say why — e.g. not small under the notice NAICS), or UNKNOWN. Never turn UNKNOWN into eligible or not eligible. A missing set-aside is UNKNOWN, not unrestricted. Size is per NAICS — never call the company "small" in general.',
+  'Coming back eligibility is always UNKNOWN: a recompete is not a live solicitation and its set-aside is not stated yet. Coming soon eligibility reflects the agency\'s ANTICIPATED set-aside only.',
 ] as const;
 
 export const FIND_FIRST_VALUE_SECTIONS = {
@@ -210,9 +289,9 @@ export const FIND_FIRST_VALUE_SECTIONS = {
   },
 } as const;
 
-export function buildFindPresentation(): FindOpportunitiesResult['presentation'] {
+export function buildFindPresentation(companyAnchored = false): FindOpportunitiesResult['presentation'] {
   return {
-    host_rules: [...HOST_RULES_FIND_FIRST_VALUE],
+    host_rules: companyAnchored ? [...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_COMPANY_ANCHORED] : [...HOST_RULES_FIND_FIRST_VALUE],
     sections: FIND_FIRST_VALUE_SECTIONS as FindOpportunitiesResult['presentation']['sections'],
   };
 }
@@ -323,6 +402,14 @@ type InterpretedQuery = {
   forecastIncludePast: boolean;
   market: MarketInterpretation;
   interpreted: Record<HorizonKey, string>;
+  /** Company-anchored FIND: the resolution (null when no uei was passed). */
+  company: CompanyAnchorResolution | null;
+  /**
+   * The SAME plan without the company's codes — only when the company widened recall. Each horizon
+   * also fetches it and unions the rows, so text/taxonomy matches can never be starved out of a
+   * capped, date-ordered fetch window by the (often much larger) registered-code population.
+   */
+  basePlan: DiscoveryPlan | null;
 };
 
 /**
@@ -344,9 +431,11 @@ export function mcpDiscoveryPolicy(input: FindOpportunitiesInput): SurfacePolicy
  * MCP arguments → the canonical discovery input. `advanced.keyword_exact` is an EXACT phrase
  * request, so it reaches the plan quoted (the plan treats a fully quoted query as literal).
  */
-export function mcpDiscoveryInput(input: FindOpportunitiesInput): DiscoveryInput {
+export function mcpDiscoveryInput(input: FindOpportunitiesInput, anchor?: CompanyAnchor | null): DiscoveryInput {
   const exact = String(input.advanced?.keyword_exact || '').replace(/"/g, ' ').trim();
+  const company = companyCodeRecall(anchor);
   return {
+    ...(company ? { company } : {}),
     query: exact ? `"${exact}"` : String(input.query || '').trim(),
     agency: String(input.agency || '').trim() || null,
     state: String(input.location || '').trim() || null,
@@ -374,6 +463,7 @@ function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey): string[] {
   if (plan.setAsides.length) out.push(`set_aside→${plan.setAsides.join('|')}`);
   if (plan.naics.length) out.push(`naics→${plan.naics.join('|')}`);
   if (plan.psc.length) out.push(`psc→${plan.psc.join('|')}`);
+  if (plan.company) out.push(`company_registered_codes∪recall(naics:${plan.company.naics.length}${horizon === 'coming_soon' ? '' : `,psc:${plan.company.psc.length}`})`);
   if (plan.matcher.excluded.length) out.push(`exclude→${plan.matcher.excluded.map((c) => c.label).join('|')}`);
   if (plan.intent.stripped.length) out.push(`stripped→${plan.intent.stripped.join('|')}`);
   if (horizon === 'open_now') {
@@ -390,9 +480,10 @@ function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey): string[] {
 }
 
 /** Resolve the customer request through CANONICAL DISCOVERY (src/lib/discovery). */
-function interpretQuery(input: FindOpportunitiesInput): InterpretedQuery {
+function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorResolution | null = null): InterpretedQuery {
   const policy = mcpDiscoveryPolicy(input);
-  const plan = buildDiscoveryPlan(mcpDiscoveryInput(input), policy);
+  const plan = buildDiscoveryPlan(mcpDiscoveryInput(input, company?.anchor), policy);
+  const basePlan = plan.company ? buildDiscoveryPlan(mcpDiscoveryInput(input, null), policy) : null;
   const keywordText = plan.intent.residualKind === 'keyword' ? plan.intent.residual.replace(/^"|"$/g, '') : '';
   const primaryAgency = String(input.agency || '').trim() || plan.buyers[0]?.requested || null;
   // Presentation + evidence labelling: the SAME capability the plan retrieved with, plus the buyer.
@@ -409,6 +500,8 @@ function interpretQuery(input: FindOpportunitiesInput): InterpretedQuery {
     recompeteMonths,
     forecastIncludePast: policy.forecast.includePastFiscalYears,
     market,
+    company,
+    basePlan,
     interpreted: {
       open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance OR buying-office state; rank = evidence tier → breadth → score → deadline`,
       coming_back: `Canonical discovery (${plan.horizons.recompete.via}): ${elig}; buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window ≤${recompeteMonths}mo`,
@@ -435,7 +528,7 @@ function blockedHorizon(source: string, handoffs: HandoffKey[], plan: DiscoveryP
   };
 }
 
-const OPEN_TIER: Record<string, number> = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 1, WEAK_NON_MARKET: 2 };
+const OPEN_TIER: Record<string, number> = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 1, COMPANY_CODE: 1.5, WEAK_NON_MARKET: 2 };
 
 /**
  * MCP evidence label for an Open row. MCP's labeller (classifyOpenRecord) stays authoritative for
@@ -463,6 +556,99 @@ function openEvidenceClass(row: Record<string, unknown>, plan: DiscoveryPlan, ca
   if (plan.matcher.mode === 'none') return 'DIRECT_MATCH';
   if (matchesText(plan.matcher, [row.title as string, row.description as string, row.department as string, row.solicitation_number as string])) return 'DIRECT_MATCH';
   return cls;
+}
+
+function codeIn(list: string[], value: unknown): boolean {
+  const v = String(value || '').trim();
+  if (!v || !list.length) return false;
+  return list.some((c) => (c.length < 6 ? v.startsWith(c) : v === c));
+}
+
+export interface OpenLabel {
+  cls: OpenRelevanceClass;
+  basis: MatchBasis[];
+  /** Sort tier: DIRECT 0 · RELATED 1 · company-code recall 1.5 · other 2. */
+  tier: number;
+}
+
+/**
+ * Open row → evidence class + WHAT established it. A DIRECT_MATCH must survive with the identity
+ * fields (buying department, solicitation number) blanked: a match that exists only in the BUYER'S
+ * NAME is the buyer's broader market (RELATED_MARKET_CANDIDATE, basis buyer_name), not the work.
+ * (Code-mode queries keep solicitation_number — the user typed an identifier.) Rows recalled only by
+ * the company's registered PSC/NAICS stay non-DIRECT and are labelled company_registered_*.
+ */
+export function labelOpenRow(
+  row: Record<string, unknown>,
+  plan: DiscoveryPlan,
+  cap: MarketInterpretation['capability'],
+  anchor?: CompanyAnchor | null,
+): OpenLabel {
+  let cls = openEvidenceClass(row, plan, cap);
+  const basis: MatchBasis[] = [];
+  if (cls === 'DIRECT_MATCH') {
+    if (plan.matcher.mode === 'none') basis.push('structured_scope');
+    else {
+      const codeHit = codeIn([...cap.direct.naics, ...plan.naics], row.naics_code)
+        || codeIn([...openRetrievalPsc(cap), ...plan.psc], row.psc_code);
+      const keepId = plan.matcher.mode === 'code';
+      const stripped = { ...row, department: '', sub_tier: '', solicitation_number: keepId ? row.solicitation_number : '' };
+      if (codeHit) basis.push('buy_side_code');
+      else if (openEvidenceClass(stripped, plan, cap) === 'DIRECT_MATCH') basis.push('buy_side_text');
+      else { cls = 'RELATED_MARKET_CANDIDATE'; basis.push('buyer_name'); }
+    }
+  }
+  const company = companyRecallBasis(row, anchor);
+  if (company) basis.push(company);
+  const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls];
+  return { cls, basis, tier };
+}
+
+function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>): string {
+  if (label.basis[0] === 'buyer_name') return buyerNameWhy(phrase);
+  const company = label.basis.find((b) => b === 'company_registered_psc' || b === 'company_registered_naics') as
+    | 'company_registered_psc' | 'company_registered_naics' | undefined;
+  if (label.cls === 'WEAK_NON_MARKET' && company) return companyCodeWhy(company, row as { naics_code?: string; psc_code?: string });
+  return openEvidenceWhy(label.cls, phrase);
+}
+
+function eligibilityFor(
+  company: CompanyAnchorResolution | null,
+  record: 'notice' | 'forecast' | 'recompete',
+  row: Record<string, unknown>,
+): EligibilityVerdict | undefined {
+  if (!company) return undefined;
+  if (!company.anchor) return unresolvedCompanyVerdict(company.note || company.status, record);
+  if (record === 'recompete') {
+    return evaluateRecompeteEligibility({ set_aside_type: row.set_aside_type as string, naics_code: row.naics_code as string }, company.anchor);
+  }
+  if (record === 'forecast') {
+    return evaluateEligibility({ set_aside_description: row.set_aside_type as string, naics_code: row.naics_code as string }, company.anchor, 'forecast');
+  }
+  return evaluateEligibility({
+    set_aside_code: row.set_aside_code as string,
+    set_aside_description: row.set_aside_description as string,
+    naics_code: row.naics_code as string,
+  }, company.anchor, 'notice');
+}
+
+/**
+ * Company-anchored recall is a UNION: rows the unanchored plan admits (text/taxonomy) + rows the
+ * anchored plan admits. Base rows come first; the anchored fetch is de-duplicated against them.
+ * A failed base fetch is not fatal — the anchored plan already includes those rows (it just may
+ * have been capped), so we keep what we have.
+ */
+function unionRows(base: Array<Record<string, unknown>> | null, anchored: Array<Record<string, unknown>>, key: string): Array<Record<string, unknown>> {
+  if (!base) return anchored;
+  const seen = new Set(base.map((r) => String(r[key])));
+  return [...base, ...anchored.filter((r) => !seen.has(String(r[key])))];
+}
+
+function eligibilityCounts(items: HorizonItem[], company: CompanyAnchorResolution | null): Record<EligibilityStatus, number> | null {
+  if (!company) return null;
+  const out: Record<EligibilityStatus, number> = { ELIGIBLE: 0, NOT_ELIGIBLE: 0, UNKNOWN: 0 };
+  for (const it of items) if (it.eligibility) out[it.eligibility.status] += 1;
+  return out;
 }
 
 async function queryOpenNow(
@@ -494,30 +680,38 @@ async function queryOpenNow(
       if (!ue) unmapped = uc ?? null;
     }
 
-    const rows = (data || []) as Array<Record<string, unknown>>;
+    let baseRows: Array<Record<string, unknown>> | null = null;
+    if (p.basePlan) {
+      const base = await applyOpenPlan(client.from(source).select(COLS), p.basePlan)
+        .order('response_deadline', { ascending: true, nullsFirst: false })
+        .limit(fetchCap);
+      if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
+    }
+    const rows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id');
     if (!rows.length) {
       return emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, 'No matching open solicitations under these filters.', unmapped);
     }
 
     // Stage 5 ranking: MCP evidence tier (surface labelling) → canonical breadth → score → deadline.
     const scores = new Map(rankRecords(p.plan, rows, ['title', 'description', 'department']).map((s) => [s.row, s]));
+    const anchor = p.company?.anchor ?? null;
     const ranked = rows
-      .map((r, i) => ({
-        i,
-        row: r,
-        cls: openEvidenceClass(r, p.plan, cap),
-        s: scores.get(r),
-      }))
-      .sort((a, b) => OPEN_TIER[a.cls] - OPEN_TIER[b.cls]
+      .map((r, i) => {
+        const label = labelOpenRow(r, p.plan, cap, anchor);
+        return { i, row: r, cls: label.cls, label, s: scores.get(r) };
+      })
+      .sort((a, b) => a.label.tier - b.label.tier
         || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0)
         || (b.s?.score ?? 0) - (a.s?.score ?? 0)
         || a.i - b.i);
-    const evidence_counts = openEvidenceCounts(ranked);
+    const evidence_counts: EvidenceCounts = openEvidenceCounts(ranked);
+    if (p.company) evidence_counts.COMPANY_REGISTERED_CODE = ranked.filter((x) => x.label.tier === OPEN_TIER.COMPANY_CODE).length;
     const sliced = ranked.slice(0, limit);
     const phrase = p.searchText || 'this work';
 
-    const items: HorizonItem[] = sliced.map(({ row: r, cls }) => {
+    const items: HorizonItem[] = sliced.map(({ row: r, cls, label }) => {
       const office = r.office_address as { city?: string; state?: string } | null;
+      const eligibility = eligibilityFor(p.company, 'notice', r);
       const st = String(r.pop_state || office?.state || '');
       const city = String(r.pop_city || office?.city || '');
       return {
@@ -529,9 +723,11 @@ async function queryOpenNow(
         relevant_date_label: 'response_deadline',
         value_label: null,
         source,
-        why_this_matched: openEvidenceWhy(cls, phrase),
+        why_this_matched: openWhy(label, phrase, r),
         identity: { kind: 'notice_id', id: String(r.notice_id || '') },
         evidence_class: cls === 'WEAK_NON_MARKET' ? undefined : cls,
+        match_basis: label.basis,
+        ...(eligibility ? { eligibility } : {}),
         notice_id: String(r.notice_id || ''),
         solicitation_number: String(r.solicitation_number || '') || null,
         response_deadline: (r.response_deadline as string) || null,
@@ -557,8 +753,10 @@ async function queryOpenNow(
       error: null,
       allowed_handoffs: OPEN_HANDOFFS,
       semantics_note:
-        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.',
+        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.'
+        + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
+      ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
   } catch (e) {
     return unavailable(source, OPEN_HANDOFFS, (e as Error).message, unsupported);
@@ -581,10 +779,13 @@ async function queryComingBack(
 
   try {
     const COLS =
-      'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at';
+      'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,psc_description,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at';
 
     // MCP surface policy (unchanged): soonest-ending first; wider window only for related-market.
-    const fetchCap = Math.max(limit, related ? 200 : limit);
+    const baseCap = Math.max(limit, related ? 200 : limit);
+    // Company-anchored: registered codes can admit hundreds of rows ahead of the text matches in
+    // end-date order, so the anchored window is wider (OPEN_FETCH_CAP) and the base plan is unioned.
+    const fetchCap = p.basePlan ? Math.max(baseCap, OPEN_FETCH_CAP) : baseCap;
     const { data, count, error } = await applyRecompetePlan(client.from(source).select(COLS, { count: 'exact' }), p.plan)
       .order('period_of_performance_current_end', { ascending: true })
       .limit(fetchCap);
@@ -596,29 +797,36 @@ async function queryComingBack(
       if (!ue) unmapped = uc ?? null;
     }
 
-    const rawRows = (data || []) as Array<Record<string, unknown>>;
-    const scores = new Map(rankRecords(p.plan, rawRows, ['incumbent_name', 'naics_description', 'awarding_agency', 'awarding_sub_agency']).map((s) => [s.row, s]));
-    const classified: Array<{ row: Record<string, unknown>; cls: EvidenceClass; i: number }> = [];
-    const evidence_counts = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 0 };
+    let baseRows: Array<Record<string, unknown>> | null = null;
+    if (p.basePlan) {
+      const base = await applyRecompetePlan(client.from(source).select(COLS), p.basePlan)
+        .order('period_of_performance_current_end', { ascending: true })
+        .limit(baseCap);
+      if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
+    }
+    const rawRows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id');
+    // Ranking reads BUY-SIDE fields only — the holder's name must not lift a row (it used to).
+    const scores = new Map(rankRecords(p.plan, rawRows, ['description', 'psc_description', 'naics_description', 'awarding_agency', 'awarding_sub_agency']).map((s) => [s.row, s]));
+    const anchor = p.company?.anchor ?? null;
+    const CB_TIER: Record<ComingBackClass | 'COMPANY_CODE', number> = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 1, HOLDER_SIGNAL: 2, COMPANY_CODE: 3 };
+    const classified: Array<{ row: Record<string, unknown>; cls: ComingBackClass | null; basis: MatchBasis[]; i: number }> = [];
+    const evidence_counts: EvidenceCounts = { DIRECT_MATCH: 0, RELATED_MARKET_CANDIDATE: 0, HOLDER_SIGNAL: 0 };
     rawRows.forEach((row, i) => {
-      // MCP evidence labelling (unchanged): physical-only rows in a cyber search carry no class.
-      const cls = classifyRecord(
-        {
-          title: (row.naics_description as string) || (row.piid as string) || '',
-          description: (row.description as string) || '',
-          naics_code: (row.naics_code as string) || '',
-          naics_description: (row.naics_description as string) || '',
-          psc_code: (row.psc_code as string) || '',
-          incumbent_name: (row.incumbent_name as string) || '',
-        },
-        cap,
-      );
-      if (!cls) return;
-      evidence_counts[cls] += 1;
-      classified.push({ row, cls, i });
+      // Buy-side evidence decides DIRECT; the holder's name is its own signal (match-evidence.ts).
+      // Physical-only rows in a cyber search still carry no class.
+      const ev = classifyComingBackEvidence(row, p.plan, cap, anchor);
+      if (ev.cls) {
+        evidence_counts[ev.cls] = (evidence_counts[ev.cls] ?? 0) + 1;
+        classified.push({ row, cls: ev.cls, basis: ev.basis, i });
+      } else if (ev.basis.some((b) => b === 'company_registered_psc' || b === 'company_registered_naics')) {
+        // Recalled ONLY by the company's registered codes: kept, labelled, never an evidence class.
+        evidence_counts.COMPANY_REGISTERED_CODE = (evidence_counts.COMPANY_REGISTERED_CODE ?? 0) + 1;
+        classified.push({ row, cls: null, basis: ev.basis, i });
+      }
     });
+    const tierOf = (c: ComingBackClass | null) => CB_TIER[c ?? 'COMPANY_CODE'];
     classified.sort((a, b) => {
-      if (a.cls !== b.cls) return a.cls === 'DIRECT_MATCH' ? -1 : 1;
+      if (a.cls !== b.cls) return tierOf(a.cls) - tierOf(b.cls);
       const sa = scores.get(a.row); const sb2 = scores.get(b.row);
       return (sb2?.breadth ?? 0) - (sa?.breadth ?? 0) || a.i - b.i; // then soonest end (fetch order)
     });
@@ -628,7 +836,8 @@ async function queryComingBack(
       return emptyHorizon(source, BACK_HANDOFFS, consumed, unsupported, asOf, 'No matching future recompetes under these filters.', unmapped);
     }
 
-    const items: HorizonItem[] = sliced.map(({ row: r, cls }) => ({
+    const phraseBack = p.searchText || 'this work';
+    const items: HorizonItem[] = sliced.map(({ row: r, cls, basis }) => ({
       horizon: 'coming_back',
       title: String(r.naics_description || r.incumbent_name || r.piid || 'Expiring contract'),
       buyer: String(r.awarding_sub_agency || r.awarding_agency || '') || null,
@@ -637,9 +846,15 @@ async function queryComingBack(
       relevant_date_label: 'current_end',
       value_label: moneyLabel(r.potential_total_value) || moneyLabel(r.total_obligation),
       source,
-      why_this_matched: evidenceWhy(cls, p.searchText || 'this work'),
+      why_this_matched: cls === null
+        ? companyCodeWhy(basis.includes('company_registered_psc') ? 'company_registered_psc' : 'company_registered_naics', r as { naics_code?: string; psc_code?: string }, 'contract')
+        : cls === 'HOLDER_SIGNAL'
+          ? holderSignalWhy(phraseBack, r as { incumbent_name?: string; naics_code?: string; psc_code?: string })
+          : basis[0] === 'buyer_name' ? buyerNameWhy(phraseBack) : evidenceWhy(cls, phraseBack),
       identity: { kind: 'contract_id', id: String(r.contract_id || '') },
-      evidence_class: cls,
+      ...(cls ? { evidence_class: cls } : {}),
+      match_basis: basis,
+      ...(p.company ? { eligibility: eligibilityFor(p.company, 'recompete', r) } : {}),
       contract_id: String(r.contract_id || ''),
       piid: String(r.piid || '') || null,
       incumbent_name: (r.incumbent_name as string) || null,
@@ -650,6 +865,8 @@ async function queryComingBack(
       recompete_likelihood: (r.recompete_likelihood as string) || null,
       set_aside_type: (r.set_aside_type as string) || null,
       naics_code: (r.naics_code as string) || null,
+      psc_code: (r.psc_code as string) || null,
+      description: (r.description as string) || null,
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
     }));
 
@@ -669,8 +886,9 @@ async function queryComingBack(
       unmapped_count: unmapped,
       error: null,
       allowed_handoffs: BACK_HANDOFFS,
-      semantics_note: note,
+      semantics_note: note + ' DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder\'s name.',
       evidence_counts,
+      ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
   } catch (e) {
     return unavailable(source, BACK_HANDOFFS, (e as Error).message, unsupported);
@@ -722,7 +940,7 @@ async function queryComingSoon(
     const COLS =
       'id, title, description, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, solicitation_date, pop_state, pop_city, map_lat, status, last_synced_at, contracting_office, incumbent_name';
 
-    const { data, count, error } = await applyForecastPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan).limit(Math.max(limit, 200));
+    const { data, count, error } = await applyForecastPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan).limit(Math.max(limit, p.basePlan ? OPEN_FETCH_CAP : 200));
     if (error) return unavailable(source, SOON_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
@@ -732,7 +950,12 @@ async function queryComingSoon(
     }
 
     type Row = Record<string, unknown>;
-    const all = (data || []) as Row[];
+    let baseRows: Row[] | null = null;
+    if (p.basePlan) {
+      const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).limit(Math.max(limit, 200));
+      if (!base.error) baseRows = (base.data || []) as Row[];
+    }
+    const all = unionRows(baseRows, (data || []) as Row[], 'id') as Row[];
     const scores = new Map(rankRecords(p.plan, all, ['title', 'description', 'naics_description', 'department']).map((s) => [s.row, s]));
     const rows = [...all].sort((a, b) => {
       const bd = (scores.get(b)?.breadth ?? 0) - (scores.get(a)?.breadth ?? 0);
@@ -760,7 +983,14 @@ async function queryComingSoon(
       );
     }
 
+    const soonAnchor = p.company?.anchor ?? null;
     const items: HorizonItem[] = rows.map((r) => {
+      const soonCompany = companyRecallBasis(r, soonAnchor);
+      const soonText = p.plan.matcher.mode === 'none' || matchesText(p.plan.matcher, [r.title as string, r.description as string, r.naics_description as string]);
+      const soonBasis: MatchBasis[] = [
+        ...(p.plan.matcher.mode === 'none' ? ['structured_scope' as const] : soonText ? ['buy_side_text' as const] : []),
+        ...(soonCompany ? [soonCompany] : []),
+      ];
       const lo = moneyLabel(r.estimated_value_min);
       const hi = moneyLabel(r.estimated_value_max);
       const value =
@@ -775,10 +1005,14 @@ async function queryComingSoon(
         relevant_date_label: 'anticipated_award_date',
         value_label: value || null,
         source,
-        why_this_matched: p.searchText
-          ? `Matched agency forecast for “${p.searchText}”`
-          : 'Matched agency forecast',
+        why_this_matched: !soonText && soonCompany
+          ? companyCodeWhy(soonCompany, r as { naics_code?: string; psc_code?: string }, 'forecast')
+          : p.searchText
+            ? `Matched agency forecast for “${p.searchText}”`
+            : 'Matched agency forecast',
         identity: { kind: 'forecast_id', id: String(r.id || '') },
+        match_basis: soonBasis,
+        ...(p.company ? { eligibility: eligibilityFor(p.company, 'forecast', r) } : {}),
         forecast_id: String(r.id || ''),
         anticipated_award_date: (r.anticipated_award_date as string) || null,
         solicitation_date: (r.solicitation_date as string) || null,
@@ -807,6 +1041,7 @@ async function queryComingSoon(
       allowed_handoffs: SOON_HANDOFFS,
       semantics_note:
         'Canonical discovery eligibility (word-bounded). Current and future fiscal years unless opted in. Ranked by how many of the query’s concepts a forecast carries, then anticipated award date. Geography: pop_state only; many forecasts have no location.',
+      ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
   } catch (e) {
     return unavailable(source, SOON_HANDOFFS, (e as Error).message, unsupported);
@@ -904,24 +1139,28 @@ export function comingBackSummary(h: HorizonResult): FindOpportunitiesResult['su
     matched_count: h.matched_count,
     direct_match: ev?.DIRECT_MATCH ?? null,
     related_market_candidate: ev?.RELATED_MARKET_CANDIDATE ?? null,
+    holder_signal: ev ? ev.HOLDER_SIGNAL ?? 0 : null,
   };
 }
 
 /** Host-facing Coming back sentence. Never collapses DIRECT+RELATED into one capability count. */
 export function comingBackHostClaim(
   phrase: string,
-  ev: { DIRECT_MATCH: number; RELATED_MARKET_CANDIDATE: number } | null | undefined,
+  ev: EvidenceCounts | null | undefined,
 ): string {
   const p = (phrase || 'this market').trim();
   if (!ev) return '';
+  const holder = ev.HOLDER_SIGNAL
+    ? ` ${ev.HOLDER_SIGNAL} more matched only on the holder's name — holder signals, not ${p} demand.`
+    : '';
   if (ev.RELATED_MARKET_CANDIDATE > 0) {
     return (
       `I found ${ev.DIRECT_MATCH} contracts with direct ${p} evidence and ` +
       `${ev.RELATED_MARKET_CANDIDATE} related-market candidates worth reviewing. ` +
-      `Do not call the combined ${ev.DIRECT_MATCH + ev.RELATED_MARKET_CANDIDATE} "${p} contracts".`
+      `Do not call the combined ${ev.DIRECT_MATCH + ev.RELATED_MARKET_CANDIDATE} "${p} contracts".` + holder
     );
   }
-  return `I found ${ev.DIRECT_MATCH} coming-back contracts with direct ${p} evidence.`;
+  return `I found ${ev.DIRECT_MATCH} coming-back contracts with direct ${p} evidence.` + holder;
 }
 
 export function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string {
@@ -931,8 +1170,8 @@ export function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string
     if (h.status === 'empty') return `0 ${label}`;
     const n = h.matched_count;
     const ev = h.evidence_counts;
-    if (ev && (ev.DIRECT_MATCH + ev.RELATED_MARKET_CANDIDATE) > 0) {
-      return `${n == null ? '?' : n.toLocaleString()} ${label} (${ev.DIRECT_MATCH} direct · ${ev.RELATED_MARKET_CANDIDATE} related-market)`;
+    if (ev && (ev.DIRECT_MATCH + ev.RELATED_MARKET_CANDIDATE + (ev.HOLDER_SIGNAL ?? 0)) > 0) {
+      return `${n == null ? '?' : n.toLocaleString()} ${label} (${ev.DIRECT_MATCH} direct · ${ev.RELATED_MARKET_CANDIDATE} related-market${ev.HOLDER_SIGNAL ? ` · ${ev.HOLDER_SIGNAL} holder-name only` : ''})`;
     }
     if (n == null) return `${label} count unknown`;
     return `${n.toLocaleString()} ${label}`;
@@ -944,7 +1183,25 @@ export function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string
   ].join(' · ');
 }
 
-export async function findOpportunities(input: FindOpportunitiesInput): Promise<FindOpportunitiesResult> {
+function companySummary(c: CompanyAnchorResolution, plan: DiscoveryPlan): FindCompanySummary {
+  const a = c.anchor;
+  return {
+    uei: c.uei,
+    status: c.status,
+    legal_name: a?.legal_name ?? null,
+    source: a?.source ?? null,
+    as_of: a?.as_of ?? null,
+    note: c.note,
+    recall_codes: plan.company ?? null,
+    size_by_naics: a ? a.size_by_naics : null,
+    location: a?.location ?? null,
+  };
+}
+
+export async function findOpportunities(
+  input: FindOpportunitiesInput,
+  deps: FindOpportunitiesDeps = {},
+): Promise<FindOpportunitiesResult> {
   const query = String(input.query || '').trim();
   if (!query && !input.advanced?.naics && !input.advanced?.keyword_exact) {
     const empty = (source: string, handoffs: HandoffKey[]): HorizonResult =>
@@ -987,6 +1244,7 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
           matched_count: null,
           direct_match: null,
           related_market_candidate: null,
+          holder_signal: null,
         },
         coming_soon: { status: 'unavailable', matched_count: null },
         headline: 'query required',
@@ -1012,8 +1270,12 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
   ).filter((k) => hz[k] !== false);
 
   const limit = clampLimit(input.limit_per_horizon);
-  const interpreted = interpretQuery({ ...input, query: query || String(input.advanced?.keyword_exact || '') });
-  const client = sb();
+  // Company-anchored FIND: resolve BEFORE the plan so registered codes can widen recall. A failed
+  // lookup never blocks FIND — it runs unanchored and every item's eligibility says why it is UNKNOWN.
+  const uei = String(input.uei || '').trim();
+  const company = uei ? await resolveCompanyAnchor(uei, deps.entityLookup) : null;
+  const interpreted = interpretQuery({ ...input, query: query || String(input.advanced?.keyword_exact || '') }, company);
+  const client = deps.client ?? sb();
 
   const run = async (key: HorizonKey): Promise<HorizonResult> => {
     if (!requested.includes(key)) {
@@ -1069,6 +1331,7 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       interpreted_as: interpreted.interpreted,
     },
     market_interpretation: mi,
+    ...(company ? { company: companySummary(company, interpreted.plan) } : {}),
     presentation_note: blocked
       ? `${interpreted.plan.refinement} Ask the customer for it — do not present this as zero opportunities.`
       : [plainEnglishInterpretation(mi), comingBackHostClaim(interpreted.searchText, coming_back.evidence_counts)]
@@ -1103,6 +1366,6 @@ export async function findOpportunities(input: FindOpportunitiesInput): Promise<
       },
     },
     _next: grounded ? buildFindNext(shape, horizons) : [],
-    presentation: buildFindPresentation(),
+    presentation: buildFindPresentation(!!company),
   };
 }

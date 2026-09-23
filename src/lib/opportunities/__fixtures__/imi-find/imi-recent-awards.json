@@ -1,0 +1,57 @@
+{
+  "_provenance": {
+    "captured_at": "2026-09-23T01:16:33.130Z",
+    "source": "Vercel KV — BigQuery result cache read by get_contractor_profile (getRecentAwardsForRecipient)",
+    "query": "GET bq:v4-2026-08-28:rollup:M66AH329AJM6:recent-awards:5:v4-m"
+  },
+  "data": [
+    {
+      "award_id": "CONT_AWD_1232SA26P0404_12H2_-NONE-_-NONE-",
+      "piid": "1232SA26P0404",
+      "mod_number": "0",
+      "awarding_agency": "Department of Agriculture",
+      "awarding_office": "USDA ARS AFM APD",
+      "naics_code": "332999",
+      "naics_description": "ALL OTHER MISCELLANEOUS FABRICATED METAL PRODUCT MANUFACTURING",
+      "description": "FABRICATE AND INSTALL HOT DIPPED GALVANIZED STEEL SERVICE PLATFORMS FOR SIX COOLING TOWERS LOCATED AT BUILDING 2 AND BUILDING 47 AT THE UNITED STATES NATIONAL POULTRY RESEARCH CENTER (USNPRC) IN ATHENS, GA.",
+      "obligation_amount": 413337,
+      "action_date": "2026-07-08",
+      "pop_start_date": "2026-07-08",
+      "pop_end_date": "2027-01-29",
+      "pop_state": "GA",
+      "set_aside": "SMALL BUSINESS SET ASIDE - TOTAL"
+    },
+    {
+      "award_id": "CONT_AWD_1232SA26P0190_12H2_-NONE-_-NONE-",
+      "piid": "1232SA26P0190",
+      "mod_number": "0",
+      "awarding_agency": "Department of Agriculture",
+      "awarding_office": "USDA ARS AFM APD",
+      "naics_code": "811310",
+      "naics_description": "COMMERCIAL AND INDUSTRIAL MACHINERY AND EQUIPMENT (EXCEPT AUTOMOTIVE AND ELECTRONIC) REPAIR AND MAINTENANCE",
+      "description": "EMERGENCY REPAIR GENERATOR #1 FEEDERS",
+      "obligation_amount": 24100,
+      "action_date": "2026-04-09",
+      "pop_start_date": "2026-04-09",
+      "pop_end_date": "2026-04-13",
+      "pop_state": "GA",
+      "set_aside": "NO SET ASIDE USED."
+    },
+    {
+      "award_id": "CONT_IDV_HHSF223201710177C_7524",
+      "piid": "HHSF223201710177C",
+      "mod_number": "0",
+      "awarding_agency": "Department of Health and Human Services",
+      "awarding_office": "FDA OFFICE OF ACQ  GRANT SVCS",
+      "naics_code": "238290",
+      "naics_description": "OTHER BUILDING EQUIPMENT CONTRACTORS",
+      "description": "IGF::OT::IGF FFP FOR A DUST COLLECTOR",
+      "obligation_amount": 149633,
+      "action_date": "2017-09-08",
+      "pop_start_date": "2017-09-08",
+      "pop_end_date": null,
+      "pop_state": null,
+      "set_aside": "NO SET ASIDE USED."
+    }
+  ]
+}
