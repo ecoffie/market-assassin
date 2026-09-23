@@ -182,12 +182,18 @@ describe('links are fixed at the SOURCE, not only redirected', () => {
     expect(route).toContain("url: '/federal-market-assassin'");
   });
 
-  it('the MI Pro welcome email opens Mindy, not the /market-intelligence sales page', () => {
-    const src = read('lib/send-email.ts');
+  it('the MI Pro welcome email hands a verified buyer to /app (no Map default, no /app link in email)', () => {
+    // Emails may not link /app (legacy-destination-guard.ts, #1362), so the CTA stays on
+    // /market-intelligence — whose verify step now lands a verified buyer on /app, not /briefings.
+    const src = code('lib/send-email.ts');
     const fn = src.slice(src.indexOf('export async function sendMarketIntelligenceWelcomeEmail'));
     const body = fn.slice(0, fn.indexOf('\n}\n'));
-    expect(body).not.toContain('getmindy.ai/market-intelligence');
-    expect(body.match(/mindyDashboardUrlFor\(to\)/g)?.length).toBe(2); // html CTA + text part
+    expect(body).not.toContain('opportunity-map');
+    expect(body).not.toContain('mindyDashboardUrlFor');
+    expect(body).toContain('https://getmindy.ai/market-intelligence');
+    const mi = code('app/market-intelligence/page.tsx');
+    expect(mi).toContain("window.location.href = '/app';");
+    expect(mi).toContain("window.location.href = '/app?panel=settings';");
   });
 
   it('no email links the retired /market-assassin sales page', () => {
