@@ -2,13 +2,15 @@
  * Expired recompete honesty (Eric 2026-07-27, the NRWA case): a contract past its period-of-performance
  * end already recompeted — its follow-on is (or soon will be) awarded, so it's a dead lead, not a live
  * "get ahead of the rebid" target. Two fixes:
- *  1) the default Recompetes view FILTERS OUT past-expiry rows (recompete-map route, ?includePast opts in);
+ *  1) the Recompetes view FILTERS OUT past-expiry rows. Since Phase C2 (2026-09-22) this is canonical Recompete
+ *     policy (the discovery plan's `gte today`), shared with MCP; the ?includePast opt-in is retired;
  *  2) any expired row that surfaces elsewhere reads "Expired" + shows the YEAR, never "Recompete now"/
  *     "Expiring now" (which the same-year year-strip would have hidden).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
 
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 const route = readFileSync(join(__dirname, '../api/app/recompete-map/route.ts'), 'utf8');
@@ -50,9 +52,14 @@ describe('fmtDays — an expired recompete reads "Expired", never a live window'
   });
 });
 
-describe('recompete-map route filters out past-expiry by default', () => {
-  it('excludes contracts whose PoP end is before today unless ?includePast=1', () => {
-    expect(route).toContain("const includePast = p.get('includePast') === '1'");
-    expect(route).toContain("if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd)");
+describe('recompete-map never shows past-expiry contracts (canonical Recompete policy)', () => {
+  it('the plan the route executes always bounds PoP end at today — ?includePast no longer widens it', () => {
+    const ctx = { today: '2026-09-22', fiscalYear: 2026 };
+    for (const params of [{}, { includePast: '1' }, { q: 'janitorial', includePast: '1' }] as Array<Record<string, string>>) {
+      const ops = mapsRecompeteRequest((k) => params[k] ?? null, { ctx }).plan.horizons.recompete.ops;
+      expect(ops).toContainEqual({ op: 'gte', col: 'period_of_performance_current_end', val: '2026-09-22' });
+    }
+    expect(route).not.toMatch(/p\.get\('includePast'\)/);
+    expect(route).toContain('mapsRecompeteRequest(');
   });
 });

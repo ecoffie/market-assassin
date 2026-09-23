@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
 
 const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
@@ -276,20 +277,23 @@ describe('opportunity-map filter parity — fetchView param wiring', () => {
 });
 
 describe('recompete-map route — new params backed by measured-populated columns only', () => {
-  const recomputeSrc = readFileSync(
-    join(__dirname, '../api/app/recompete-map/route.ts'),
-    'utf8',
-  );
+  // Since Phase C2 (2026-09-22) the route delegates to maps-recompete-discovery.ts: the canonical plan
+  // owns state/NAICS/query meaning, the adapter applies the surface filters. Checked across both.
+  const recomputeSrc = readFileSync(join(__dirname, '../api/app/recompete-map/route.ts'), 'utf8')
+    + readFileSync(join(__dirname, '../../lib/recompete/maps-recompete-discovery.ts'), 'utf8');
+  const recompeteOps = (params: Record<string, string>) =>
+    mapsRecompeteRequest((k) => params[k] ?? null, { ctx: { today: '2026-09-22', fiscalYear: 2026 } }).plan.horizons.recompete.ops;
 
   it('wires state, subAgency, minValue/maxValue', () => {
     // State is a MULTI-SELECT since 2026-09-12 (was `.eq(col, state)`, a single value that
-    // FAILED OPEN on "FL,GA" — 4,506 -> 106,965, the whole table). It now ORs each resolved
-    // code and pins an unresolvable-but-asked-for filter to NO_MATCH_SENTINEL (fail closed).
-    expect(recomputeSrc).toContain('place_of_performance_state.eq.${st}');
-    expect(recomputeSrc).toContain("place_of_performance_state', NO_MATCH_SENTINEL");
-    expect(recomputeSrc).toContain("awarding_sub_agency', `%${subAgency}%`");
-    expect(recomputeSrc).toContain("potential_total_value', minValue");
-    expect(recomputeSrc).toContain("potential_total_value', maxValue");
+    // FAILED OPEN on "FL,GA" — 4,506 -> 106,965, the whole table). It ORs each resolved code, and
+    // an asked-for but unresolvable value still narrows (to a code no row carries) — fail closed.
+    expect(recompeteOps({ state: 'FL,GA' })).toContainEqual({ op: 'or', expr: 'place_of_performance_state.eq.FL,place_of_performance_state.eq.GA' });
+    const bad = recompeteOps({ state: 'ZZZZ' }).find((o) => o.op === 'or' && /place_of_performance_state/.test(o.expr));
+    expect(bad, 'an unresolvable state must still narrow, never fall open').toBeTruthy();
+    expect(recomputeSrc).toContain("awarding_sub_agency', `%${s.subAgency}%`");
+    expect(recomputeSrc).toContain("potential_total_value', s.minValue");
+    expect(recomputeSrc).toContain("potential_total_value', s.maxValue");
   });
 
   it('wires the SAP-friendly / likelihood / lead-time filters on real columns (2026-07-27)', () => {
@@ -301,8 +305,9 @@ describe('recompete-map route — new params backed by measured-populated column
     // lead-time / expiring-within window. FM-U06 (2026-07-29): the stored lead_time_months is STALE
     // (often 0), so the filter now uses the LIVE relationship — PoP-end <= today + N months — matching
     // the shared queryExpiringContracts instead of the raw column.
-    expect(recomputeSrc).toContain("period_of_performance_current_end', bound");
-    expect(recomputeSrc).not.toContain("lead_time_months', leadMax"); // the stale-column filter is gone
+    // Since Phase C2 lead time is canonical TIMING POLICY (the plan's recompete window), not a column.
+    expect(recompeteOps({ leadMax: '6' })).toContainEqual({ op: 'lte', col: 'period_of_performance_current_end', val: '2027-03-22' });
+    expect(recomputeSrc).not.toContain("lead_time_months'"); // the stale-column filter is gone
   });
 
   it('never wires a psc filter (measured 0/125,917 populated) — no query call touches psc_code', () => {

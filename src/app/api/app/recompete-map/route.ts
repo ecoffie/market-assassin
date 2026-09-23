@@ -16,9 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
-import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
-import { multiAgency, agencyOrExpr, naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from '@/lib/opportunities/map-filters';
+import { mapsRecompeteRequest, applyMapsRecompeteFilters, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
@@ -39,146 +37,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'bbox must be west,south,east,north' }, { status: 400 });
   }
   const [west, south, east, north] = parts;
-  const setAside = p.get('setAside') || '';
-  const agency = p.get('agency') || '';
-  let naics = p.get('naics') || '';
-  // TERM-OF-ART search (Eric 2026-07-28) — recompete rows have NO searchable notice text (incumbent
-  // NAME + agency only; description/psc 0% populated), so a text search for "drones" can't match. The
-  // honest equivalent is to filter recompetes IN that industry: resolve a term-of-art `q` to its
-  // CURATED NAICS set (verified codes, not the noisy full-coverage tail) and apply it as the NAICS
-  // filter. Only when the user hasn't already set an explicit NAICS. Non-term-of-art `q` is a no-op
-  // here (there's genuinely nothing to text-search — we don't fabricate a match).
-  const q = (p.get('q') || '').trim();
-  // SEARCH BRAIN (Eric 2026-08-01) — resolve what the user TYPED into an intent, applied the SAME
-  // way as SAM/forecast so "8a"/"236220"/"cyber" mean the same thing across all 3 horizons:
-  //   set-aside term ("8a"/"women owned") → set_aside_type (recompete's set-aside column)
-  //   NAICS code ("236220") / term-of-art phrase ("cybersecurity"→codes) → the naics filter
-  //   free text → keyword ilike on incumbent/naics_desc/agency.
-  // NO PSC branch here: recompete's psc_code is measured 0/125,917 populated (100% NULL) — filtering
-  // it would silently return ZERO (a dead filter). So a PSC search falls through to keyword. This is
-  // the honest "source lacks the data" case, like DLA has no set-aside. (filter-parity gate enforces it.)
-  let qKeyword = '', qSetAside = '';
-  if (q && !naics) {
-    const intent = resolveQueryIntent(q);
-    if (intent.kind === 'setAside' && intent.setAside) {
-      qSetAside = setAsideOrExpr(intent.setAside, { textCols: ['set_aside_type'] });
-    } else if (intent.kind === 'naics' && intent.naics?.length) {
-      naics = intent.naics.join(',');
-    } else if (intent.kind === 'psc' && intent.psc) {
-      // recompete's psc_code is ~100% NULL, so instead of a dead PSC filter, CROSSWALK the PSC to its
-      // equivalent NAICS and filter by industry (the brain solve). No mapping → keyword fallback.
-      const xw = pscToNaicsCodes(intent.psc);
-      if (xw.length) naics = xw.join(','); else qKeyword = intent.psc;
-    } else {
-      // Free text: term-of-art → curated NAICS; else keyword ilike on the populated columns
-      // (incumbent_name/naics_description/awarding_agency).
-      const toaCodes = termOfArtNaicsCodes(q);
-      if (toaCodes && toaCodes.length) naics = toaCodes.join(',');
-      else qKeyword = q;
-    }
-  }
-  // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
-  // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
-  // State multi-select — "FL,GA" means FL OR GA. Shared parseStateList so all three horizons
-  // agree; a value the user DID supply that resolves to nothing must match NOTHING (fail closed),
-  // never fall through to the unfiltered corpus (measured 2026-09-12: state=FL 4,506 ->
-  // state=FL,GA 106,965 = the entire table).
-  const states = parseStateList(p.get('state'));
-  // Sub-agency — awarding_sub_agency is 100% populated. Free-text ilike, mirrors the
-  // open-opp path's subAgency handling.
-  const subAgency = p.get('subAgency') || '';
-  // Value range — the client already sends minValue/maxValue for recompete (FILT.valueRange).
-  // potential_total_value is populated on 100% of rows (measured 2026-07-26).
-  const minValue = p.get('minValue') ? Number(p.get('minValue')) : null;
-  const maxValue = p.get('maxValue') ? Number(p.get('maxValue')) : null;
-  // "How this buyer buys" as a FILTER (GOS #11) — contract_type is 99% populated (measured
-  // 2026-07-27: DELIVERY ORDER 438 / PURCHASE ORDER 222 / DEFINITIVE 104 / BPA CALL 31 / null 5
-  // in an 800-row sample; fleet split PO 25,860 / DO 77,586). A PURCHASE ORDER is a
-  // simplified-acquisition buy a small firm can win directly; a DELIVERY ORDER is a task order
-  // under a vehicle you must already hold. So `sap=friendly` keeps PO+BPA CALL (the SB-winnable
-  // buys), `sap=gated` keeps DELIVERY ORDER (vehicle-gated). Definitive contracts are neither
-  // bucket's signal, so each filter EXCLUDES them (honest — we only claim the two we can defend).
-  const sap = (p.get('sap') || '').toLowerCase(); // '' | 'friendly' | 'gated'
-  // Recompete likelihood — measured 2026-07-27 the ONLY real values are high (51,591) and
-  // medium (92,011); low is 0 fleet-wide, so there is NO "low" option (would be a dead control).
-  // `likelihood=high` narrows to the strongest recompete signal.
-  const likelihood = (p.get('likelihood') || '').toLowerCase(); // '' | 'high'
-  // Lead time — months until the incumbent's period of performance ends. 100% populated;
-  // measured buckets ≤6 / 7-12 / 13-18 all real (>18 is ~0). "Expiring within N months" = the
-  // recompete-window planning filter. lead_time_months <= N (N ∈ {6,12,18}).
-  const leadMax = p.get('leadMax') ? Number(p.get('leadMax')) : null;
-  // NOTE: psc_code is measured 0/125,917 populated on this table (2026-07-26) — a PSC
-  // filter here would be a dead control (always empty or always everything). Deliberately
-  // NOT wired; the UI hides the PSC control for Awarded (see route.ts syncFilterVis).
-
-  // Exclude ALREADY-EXPIRED contracts from the default view (Eric 2026-07-27). A contract past its
-  // period-of-performance end has already recompeted — its follow-on is (or soon will be) awarded, so
-  // it's a dead lead, not a live "get ahead of the rebid" target. Measured 2026-07-27: only 2,150 of
-  // 134,220 rows (1.6%) are past-expiry (0 expired >6mo ago — the sync prunes old ones), so this is a
-  // thin recently-slipped edge, not a scope change. `?includePast=1` opts back in (favorites/audits).
-  // ⚠️ Root cause noted separately: the EXPIRED parent is in the table but its already-awarded
-  // follow-on often is NOT — a sync gap tracked as Layer-2 follow-up, not fixed by this filter.
-  const includePast = p.get('includePast') === '1';
-  const todayYmd = new Date().toISOString().slice(0, 10);
-  // `mapped` controls the coordinate bound so the SAME filter contract can express both halves of
-  // the map-truth disclosure: 'only'  = rows the map can draw (the default, every existing caller),
-  // 'none' = the matching rows it CANNOT (map_lat IS NULL), 'any' = market truth.
-  // ⚠️ This bound used to be hardcoded `.not('map_lat','is',null)`. An unmapped-count query built on
-  // top of it therefore asked for `map_lat IS NOT NULL AND map_lat IS NULL` and always returned 0 —
-  // silently reporting "0 unmapped" for a horizon holding 33,127 of them. The contradiction was
-  // invisible: no error, just a plausible zero. Parameterised so it cannot be self-contradictory.
+  // ONE canonical plan for this request (Phase C2, 2026-09-22 — src/lib/recompete/maps-recompete-discovery.ts).
+  // It owns the Recompete MARKET: free text (industry preset → term of art → whole-word matcher), agency
+  // identity (multi-select = OR), query-named NAICS / PSC-crosswalk / set-aside / state, exclusions, and
+  // the timing window — not expired, 18 months by policy (`leadMax` sets the window, like MCP's
+  // timeframe.recompete_months). The route keeps only surface filters (set-aside checkbox, sub-agency,
+  // value, SAP contract type, likelihood) and presentation (map_lat bound, bbox, ordering, pin cap).
+  //
+  // Column facts that shaped the old route and still hold: psc_code is ~0% populated (a PSC search is
+  // crosswalked to NAICS by the plan, never a dead psc filter); place_of_performance_state is 99.9%
+  // populated; lead_time_months is STALE (baked at sync), which is why timing is a live date bound.
+  // ⚠️ `?includePast=1` is retired: canonical Recompete policy is "not expired", no caller sent it, and
+  // the table held 0 expired rows when this moved (measured 2026-09-22).
+  const recompeteReq = mapsRecompeteRequest((k) => p.get(k));
+  // `mapped` splits the SAME market into the two halves of the map-truth disclosure: 'only' = rows the
+  // map can draw (every existing caller), 'none' = matching rows it CANNOT (map_lat IS NULL).
+  // ⚠️ This bound used to be hardcoded `.not('map_lat','is',null)`; an unmapped count built on it asked
+  // for `map_lat IS NOT NULL AND map_lat IS NULL` and silently reported 0 unmapped.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const applyFilters = (q: any, mapped: 'only' | 'none' | 'any' = 'only') => {
-    q = q.is('quality_flag', null);
-    if (mapped === 'only') q = q.not('map_lat', 'is', null);
-    else if (mapped === 'none') q = q.is('map_lat', null);
-    if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
-    if (setAside) q = q.eq('set_aside_type', setAside);
-    // Agency multi-select — pipe-joined needles OR'd into awarding_agency via agencyOrExpr (matches
-    // both word orders: recompete stores "Department of State", SAM stores "STATE, DEPARTMENT OF").
-    const agencyExpr = agencyOrExpr('awarding_agency', multiAgency(agency));
-    if (agencyExpr) q = q.or(agencyExpr);
-    if (naics) {
-      // Same gold-master rule Open/Forecast use (naicsMatchConds): <6 → prefix LIKE, 6 → exact,
-      // multi → OR. The prior multi-code branch forced exact-only, so Industry presets that emit
-      // short codes behaved differently on Awarded than on Open.
-      const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
-      const conds = naicsMatchConds(codes);
-      if (conds.length) q = q.or(conds.join(','));
-    }
-    if (states) {
-      if (states.length) q = q.or(states.map((st) => `place_of_performance_state.eq.${st}`).join(','));
-      else q = q.eq('place_of_performance_state', NO_MATCH_SENTINEL); // asked, unresolvable → empty
-    }
-    if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
-    // Set-aside term from the search brain → recompete's set_aside_type column.
-    if (qSetAside) q = q.or(qSetAside);
-    // (No PSC filter — psc_code is 100% NULL on recompete; a PSC search falls through to keyword.)
-    // Free-text keyword (non-NAICS, non-term-of-art, non-set-aside) → match the incumbent name, NAICS
-    // description, or awarding agency (the searchable recompete columns; no award title in this table).
-    if (qKeyword) {
-      const esc = qKeyword.replace(/[%,()]/g, ' ');
-      q = q.or(`incumbent_name.ilike.%${esc}%,naics_description.ilike.%${esc}%,awarding_agency.ilike.%${esc}%`);
-    }
-    if (minValue != null && Number.isFinite(minValue)) q = q.gte('potential_total_value', minValue);
-    if (maxValue != null && Number.isFinite(maxValue)) q = q.lte('potential_total_value', maxValue);
-    // SAP-friendly (contract_type). friendly = PO + BPA CALL (SB-winnable); gated = DELIVERY ORDER.
-    if (sap === 'friendly') q = q.in('contract_type', ['PURCHASE ORDER', 'BPA CALL']);
-    else if (sap === 'gated') q = q.eq('contract_type', 'DELIVERY ORDER');
-    // Recompete likelihood — only 'high' is offered (medium is the majority default, low=0).
-    if (likelihood === 'high') q = q.eq('recompete_likelihood', 'high');
-    // Expiring within N months (lead time). FM-U06 (Eric/QA 2026-07-29): the stored lead_time_months
-    // is STALE (baked at sync time, often 0), so filter on the LIVE relationship instead — a contract
-    // "expiring within N months" is one whose PoP-end is between today and today+N months. This is the
-    // same live intent the shared queryExpiringContracts computes; the map read the raw column and
-    // bypassed it. Guard the parsed number.
-    if (leadMax != null && Number.isFinite(leadMax)) {
-      const bound = new Date();
-      bound.setMonth(bound.getMonth() + Math.round(leadMax));
-      q = q.lte('period_of_performance_current_end', bound.toISOString().slice(0, 10));
-    }
-    return q;
-  };
+  const applyFilters = (q: any, mapped: 'only' | 'none' = 'only') => applyMapsRecompeteFilters(q, recompeteReq, mapped);
 
   try {
     const db = sb();
@@ -217,6 +94,9 @@ export async function GET(request: NextRequest) {
     const pins = [...rows, ...extraFollowOns].map(toPin);
     return NextResponse.json({
       success: true, mode: 'recompete',
+      // Canonical discovery status + the recompete window actually applied. needs_positive_scope /
+      // needs_refinement mean "not a searchable market yet" — the counts are 0 by construction.
+      discovery: mapsRecompeteDiscoveryMeta(recompeteReq.plan),
       totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
       capped: (totalInView ?? 0) > (rows.length),
       // null = UNKNOWN (the count failed), never 0 — a missing number must not read as
