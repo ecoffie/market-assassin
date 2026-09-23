@@ -419,6 +419,13 @@ export function resolveForecastAgencyIdentity(term: string): ForecastAgencyIdent
   return null;
 }
 
+/** Words that describe a KIND of organisation, never which one. A fragment of only these is noise. */
+const GENERIC_FRAGMENT_WORDS = new Set(['DEPARTMENT', 'DEPARTMENTS', 'DEPT', 'OF', 'THE', 'AND', 'FOR', 'BUREAU', 'OFFICE', 'AGENCY', 'ADMINISTRATION', 'US', 'U', 'S']);
+function isGenericFragment(term: string): boolean {
+  const words = normalize(term).split(' ').filter(Boolean);
+  return words.length > 0 && words.every((w) => GENERIC_FRAGMENT_WORDS.has(w));
+}
+
 /**
  * Resolve an agency filter value to exact `source_agency` codes.
  *
@@ -432,31 +439,47 @@ export function resolveForecastAgencies(input: unknown): ForecastAgencyResolutio
     : typeof input === 'string' || typeof input === 'number'
       ? String(input)
       : '';
-  // Split on pipe and comma. A canonical code never contains either, and the multi-select joins
-  // on pipe precisely because an agency name can contain a comma ("STATE, DEPARTMENT OF") — so a
-  // comma-split term that fails to resolve simply falls through to the text fallback intact.
-  const needles = [...new Set(raw.split(/[|,]/).map((s) => s.trim()).filter(Boolean))];
-  if (!needles.length) return { codes: [], identities: [], children: [], unresolved: [], empty: true };
+  // WHOLE NAME FIRST, then comma fragments (#1666, 2026-09-23). The pipe separates buyers (the Maps
+  // multi-select joins on pipe precisely because an agency name can contain a comma). A comma is
+  // EITHER part of a SAM-style name ("STATE, DEPARTMENT OF" — normalize() makes it "STATE DEPARTMENT
+  // OF", a registered alias) OR MCP's documented comma list ("NAVY,HHS"). So each pipe part is
+  // resolved WHOLE; only when that fails is it split on commas.
+  // ⚠️ A fragment made ONLY of generic words ("DEPARTMENT", "DEPARTMENT OF", "THE", "BUREAU OF") is
+  // never an identity and never a text-fallback needle. Splitting first used to send "DEPARTMENT"
+  // to `department.imatch.\mDEPARTMENT\M`, which matches every "Department of …" row: measured
+  // 7,196 Interior/Agriculture/VA/Transportation/Labor/Navy forecasts for "STATE, DEPARTMENT"
+  // (State holds 0), 7,195 for "COMMERCE, DEPARTMENT OF", 3,190 for "SENATE, THE".
+  const parts = [...new Set(raw.split('|').map((s) => s.trim()).filter(Boolean))];
+  if (!parts.length) return { codes: [], identities: [], children: [], unresolved: [], empty: true };
 
   const codes: string[] = [];
   const identities: ForecastAgencyIdentity[] = [];
   const children: ForecastChildIdentity[] = [];
   const unresolved: string[] = [];
-  for (const n of needles) {
+  const resolveOne = (n: string): boolean => {
     // CHILD FIRST. "NAVFAC" must resolve to the NAVFAC command, not to the Navy parent — the
     // parent fall-through is precisely the 8,881-row false positive this closes.
     const child = resolveForecastChildIdentity(n);
-    if (child) { if (!children.includes(child)) children.push(child); continue; }
+    if (child) { if (!children.includes(child)) children.push(child); return true; }
     const id = resolveForecastAgencyIdentity(n);
     if (id) {
       if (!identities.includes(id)) identities.push(id);
       for (const c of id.codes) if (!codes.includes(c)) codes.push(c);
-      continue;
+      return true;
     }
     // A bare code we have not given an identity to (future-proofing the closed vocabulary).
     const asCode = CODE_BY_UPPER.get(normalize(n));
-    if (asCode) { if (!codes.includes(asCode)) codes.push(asCode); continue; }
-    unresolved.push(n);
+    if (asCode) { if (!codes.includes(asCode)) codes.push(asCode); return true; }
+    return false;
+  };
+  for (const part of parts) {
+    if (resolveOne(part)) continue;
+    const fragments = part.includes(',') ? part.split(',').map((s) => s.trim()).filter(Boolean) : [part];
+    for (const f of fragments) {
+      if (fragments.length > 1 && isGenericFragment(f)) continue;
+      if (fragments.length > 1 && resolveOne(f)) continue;
+      if (!unresolved.includes(f)) unresolved.push(f);
+    }
   }
   return { codes, identities, children, unresolved, empty: false };
 }
