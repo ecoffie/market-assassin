@@ -419,6 +419,16 @@ Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Hi
 - **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** write the 44,560-family fleet backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Lazy Family v1 only — persist on known-id / pursuit save / confirmed identity, never a fleet write.
 - **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
 
+### Opportunity Share Attribution — ✅ FROZEN 2026-09-23 (PR #1652, merge `e8c88086`)
+Record: **`docs/engineering/opportunity-share-attribution.md`** — read it; do NOT re-audit.
+SHARE → CLICK → SESSION → SIGNUP → ACTIVATION → PAID from first-party data (`user_engagement` +
+`signup_attribution` + `purchases_canonical`); GA4 supplemental and deferred on the Map.
+- Share link `?opp=<id>&src=share&sh=<uuid per click>`; `src`/`sh` never touch the frozen Share Truth.
+- Map writes first touch itself (route handler — root-layout AttributionTracker never runs there); never overwritten.
+- Anon → account claim at verified auth (`mi-session` / `mindy-complete-signup` / `mi-login`) via `mindy_anon` cookie.
+- Report: `npx tsx scripts/report-share-funnel.mts --by notice_id` (read-only). Prod smoke: `scripts/acceptance/share-attribution-prod-smoke.mts`.
+- `opportunity_shares` is the LEGACY briefings share table — not this contract.
+
 ### Canonical Discovery — Phase A (#1637) + Phase B MCP (2026-09-22)
 Records: **`tasks/canonical-discovery-phase-a-2026-09-22.md`**, **`tasks/canonical-discovery-phase-b-2026-09-22.md`**.
 `src/lib/discovery/` is the ONE search-meaning layer. **MCP `find_opportunities` (Phase B) and Maps Open (Phase C,
