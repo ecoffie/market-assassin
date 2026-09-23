@@ -23,6 +23,7 @@ import { parseMapFilters, applyMapFilters, naicsMatchConds } from '@/lib/opportu
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
+import { multiAgency } from '@/lib/opportunities/agency-match';
 import {
   buildDiscoveryPlan, contextFor, applyOps, applyOpenPlan, applyForecastPlan,
   SAVED_SEARCH_POLICY, MAPS_POLICY, type DiscoveryPlan,
@@ -114,7 +115,11 @@ function material(o: number | null, n: number | null): boolean {
       profileOpts = { profileNaics: (prof?.naics_codes as string[]) || [], profileStates: (prof?.location_states as string[]) || [] };
     }
     const hasSurfaceScope = SCOPE_KEYS.some((k) => { const v = f[k]; return Array.isArray(v) ? v.length > 0 : !!v; }) || f.scope === 'profile';
-    const plan: DiscoveryPlan = buildDiscoveryPlan({ query: q, agency: get('agency'), hasSurfaceScope }, SAVED_SEARCH_POLICY, ctx);
+    // Canonical agency input exactly as the Maps adapters build it (Phase C): a saved multi-select ("A|B") is a
+    // list of DISTINCT buyers, ORed — never one combined buyer that must match every word at once.
+    const agencies = multiAgency(get('agency') ?? '');
+    const canonAgency = agencies.length > 1 ? agencies : agencies[0] ?? null;
+    const plan: DiscoveryPlan = buildDiscoveryPlan({ query: q, agency: canonAgency, hasSurfaceScope }, SAVED_SEARCH_POLICY, ctx);
 
     // OPEN — old = the cron exactly; canonical = saved non-query/non-agency filters + plan.
     const fOld = parseMapFilters(get, profileOpts); fOld.postedDays = fOld.postedDays || 30;
@@ -133,7 +138,20 @@ function material(o: number | null, n: number | null): boolean {
     if (wantsForecast) {
       const fo = await count('agency_forecasts', (x) => applyForecastFilters(x, { q: q || null, naics: get('naics'), agency: get('agency'), state: get('state') }));
       const fn = await count('agency_forecasts', (x) => applyForecastPlan(applyForecastFilters(x, { q: null, naics: get('naics'), agency: null, state: get('state') }), plan));
-      fc = { old: fo, canonical: fn, delta: fo != null && fn != null ? fn - fo : null, material: material(fo, fn) };
+      // Separate the decided FY policy from meaning: old semantics + the canonical FY clause alone.
+      const fyOp = buildDiscoveryPlan({ query: '' }, SAVED_SEARCH_POLICY, ctx).horizons.forecast.ops
+        .find((o: any) => o.op === 'or' && String(o.expr).startsWith('fiscal_year.is.null,')) as any;
+      const foFy = fyOp ? await count('agency_forecasts', (x) => applyForecastFilters(x, { q: q || null, naics: get('naics'), agency: get('agency'), state: get('state') }).or(fyOp.expr)) : null;
+      const coverage = plan.horizons.forecast.coverage;
+      fc = {
+        old: fo, old_fy: foFy, canonical: fn, coverage,
+        // coverage 'unestablished' = we hold no forecasts from this publisher: the canonical answer is
+        // UNAVAILABLE, never a count (MCP reports that horizon unavailable).
+        canonical_reading: coverage === 'unestablished' ? 'unavailable' : fn,
+        fy_policy_delta: fo != null && foFy != null ? foFy - fo : null,
+        semantic_delta: foFy != null && fn != null ? fn - foFy : null,
+        delta: fo != null && fn != null ? fn - fo : null, material: material(fo, fn),
+      };
     }
 
     // RECOMPETE (map view)
@@ -141,7 +159,7 @@ function material(o: number | null, n: number | null): boolean {
     if (h?.recompete === true && q) {
       const st = get('state') || '';
       const ro = await count('recompete_opportunities', mapsOldRecompete(q, get('naics') || '', st));
-      const rp = buildDiscoveryPlan({ query: q, naics: get('naics'), state: st || null, agency: get('agency'), hasSurfaceScope }, MAPS_POLICY, ctx);
+      const rp = buildDiscoveryPlan({ query: q, naics: get('naics'), state: st || null, agency: canonAgency, hasSurfaceScope }, MAPS_POLICY, ctx);
       const rn = await count('recompete_opportunities', (x) => applyOps(x, rp.horizons.recompete.ops));
       rc = { old: ro, canonical: rn, via: rp.horizons.recompete.via, material: material(ro, rn) };
     }
@@ -166,11 +184,11 @@ function material(o: number | null, n: number | null): boolean {
   }
   if (jsonOut) writeFileSync(jsonOut, JSON.stringify(out, null, 2));
   const n = (x: any) => (x == null ? 'unknown' : String(x));
-  console.log('| search | user | q | Open old → canonical (Δ) | Forecast old → canonical (Δ) | Recompete map old → canonical | material | canonical reading |');
+  console.log('| search | user | q | Open old → canonical (Δ) | Forecast old → canonical (FY-policy Δ, meaning Δ) | Recompete map old → canonical | material | canonical reading |');
   console.log('|---|---|---|---|---|---|---|---|');
   for (const r of out) {
     if (r.error) { console.log(`| ${String(r.id).slice(0, 8)} | ${r.user} | ${r.q} | — | — | — | ⚠️ | ${r.error} |`); continue; }
     const mat = [r.open.material && 'open', r.forecast?.material && 'forecast', r.recompete_map?.material && 'recompete-map'].filter(Boolean).join(', ');
-    console.log(`| ${String(r.id).slice(0, 8)} | ${r.user} | ${r.q || '—'} | ${n(r.open.old)} → ${n(r.open.canonical)} (${n(r.open.delta)}) | ${r.forecast ? `${n(r.forecast.old)} → ${n(r.forecast.canonical)} (${n(r.forecast.delta)})` : 'n/a'} | ${r.recompete_map ? `${n(r.recompete_map.old)} → ${n(r.recompete_map.canonical)} [${r.recompete_map.via}]` : 'n/a'} | ${mat ? '⚠️ ' + mat : 'no'} | ${r.reason} |`);
+    console.log(`| ${String(r.id).slice(0, 8)} | ${r.user} | ${r.q || '—'} | ${n(r.open.old)} → ${n(r.open.canonical)} (${n(r.open.delta)}) | ${r.forecast ? `${n(r.forecast.old)} → ${r.forecast.coverage === 'unestablished' ? `UNAVAILABLE (${n(r.forecast.canonical)} held)` : n(r.forecast.canonical)} (FY ${n(r.forecast.fy_policy_delta)}, meaning ${n(r.forecast.semantic_delta)})` : 'n/a'} | ${r.recompete_map ? `${n(r.recompete_map.old)} → ${n(r.recompete_map.canonical)} [${r.recompete_map.via}]` : 'n/a'} | ${mat ? '⚠️ ' + mat : 'no'} | ${r.reason} |`);
   }
 })().catch((e) => { console.error(e); process.exit(1); });
