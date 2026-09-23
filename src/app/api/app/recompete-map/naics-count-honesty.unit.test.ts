@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
 
 /**
  * The count must describe the SAME universe as the rows.
@@ -31,9 +32,21 @@ describe('recompete-map NAICS count honesty', () => {
   });
 
   it('uses the shared naicsMatchConds gold master (prefix <6, exact at 6, multi OR)', () => {
-    // Do not re-inline the rule here — Open/Forecast already own it in map-filters.ts.
-    expect(SRC).toMatch(/naicsMatchConds/);
-    expect(SRC).toMatch(/conds\.join\(','\)/);
+    // Since Phase C2 (2026-09-22) the route executes the canonical discovery plan, which applies the
+    // gold master (route → maps-recompete-discovery.ts → discovery/plan.ts). Asserted on that path AND
+    // behaviourally: the exact demo case must stay exact.
+    const path = ['src/lib/recompete/maps-recompete-discovery.ts', 'src/lib/discovery/plan.ts']
+      .map((f) => readFileSync(join(process.cwd(), f), 'utf8')).join('\n');
+    expect(SRC).toContain('applyMapsRecompeteFilters');
+    expect(path).toContain('applyRecompetePlan');
+    expect(path).toMatch(/naicsMatchConds\(inputNaics\)\.join\(','\)/);
+    expect(path).not.toContain('substring(0, 3)');
+    const ops = (params: Record<string, string>) => mapsRecompeteRequest((k) => params[k] ?? null, { ctx: { today: '2026-09-22', fiscalYear: 2026 } })
+      .plan.horizons.recompete.ops.filter((o) => o.op === 'or').map((o) => (o as { expr: string }).expr);
+    expect(ops({ naics: '333612' })).toContain('naics_code.eq.333612');
+    expect(ops({ naics: '333612' }).join()).not.toMatch(/naics_code\.like\.333%/);
+    expect(ops({ naics: '333' })).toContain('naics_code.like.333%');
+    expect(ops({ naics: '541512,541611' })).toContain('naics_code.eq.541512,naics_code.eq.541611');
   });
 
   it('applies the same filter builder to the count and the rows', () => {

@@ -14,7 +14,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const openSrc = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts'), 'utf8');
-const recompeteSrc = readFileSync(join(__dirname, '../api/app/recompete-map/route.ts'), 'utf8');
+// Since Phase C2 the Awarded filter contract (incl. the parameterised map_lat bound) lives in the
+// adapter the route calls; the invariant is checked across both files.
+const recompeteSrc = readFileSync(join(__dirname, '../api/app/recompete-map/route.ts'), 'utf8')
+  + readFileSync(join(__dirname, '../../lib/recompete/maps-recompete-discovery.ts'), 'utf8');
 const forecastSrc = readFileSync(join(__dirname, '../api/app/forecast-map/route.ts'), 'utf8');
 const clientSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 

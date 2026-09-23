@@ -18,6 +18,7 @@ import { MCP_POLICY } from './policy';
 import { mcpDiscoveryInput, mcpDiscoveryPolicy, type FindOpportunitiesInput } from '@/lib/opportunities/find-opportunities';
 import { FIXTURES } from './__fixtures__/fixtures';
 import { mapsOpenRequest } from '@/lib/opportunities/maps-open-discovery';
+import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
 
 const CTX: PlanContext = { today: '2026-09-22', fiscalYear: 2026 };
 
@@ -40,7 +41,16 @@ export const SURFACES: Record<string, Surface> = {
     } as Record<string, string | null | undefined>)[k] ?? null, { ctx: CTX }).plan,
     note: 'Phase C: /api/app/opportunity-map → maps-open-discovery.ts.',
   },
-  maps_recompete: { status: 'pending', note: '/api/app/recompete-map (18-month policy).' },
+  maps_recompete: {
+    status: 'migrated',
+    // The REAL request→plan path of /api/app/recompete-map, fed the params the Maps client sends.
+    // MCP set_aside is deliberately NOT mapped: on this horizon the Maps set-aside CHECKBOX is a surface
+    // filter (group vocabulary SB/8A/HZ), not a canonical set-aside — see maps-recompete-discovery.ts.
+    toPlan: (f) => mapsRecompeteRequest((k) => ({
+      q: f.query, agency: f.agency, state: f.location, naics: f.advanced?.naics, psc: f.advanced?.psc,
+    } as Record<string, string | null | undefined>)[k] ?? null, { ctx: CTX }).plan,
+    note: 'Phase C2: /api/app/recompete-map → maps-recompete-discovery.ts.',
+  },
   maps_forecast: { status: 'pending', note: '/api/app/forecast-map (current/future FY default).' },
   saved_searches: { status: 'pending', note: 'Gate: scripts/discovery-saved-search-blast.ts sign-off first.' },
   daily_alerts: { status: 'pending', note: 'Profile-keyword path audited separately first.' },
@@ -59,6 +69,9 @@ function meaning(p: DiscoveryPlan) {
     psc: p.psc,
     expansion: p.expansion,
     open_query_ops: p.horizons.open.ops,
+    // Recompete MEANING = every op except the policy window bound (a timeframe is policy, not meaning).
+    recompete_query_ops: p.horizons.recompete.ops.filter((o) => !(o.op === 'lte' && o.col === 'period_of_performance_current_end')),
+    recompete_naics: p.horizons.recompete.naics,
     recompete_via: p.horizons.recompete.via,
     forecast_via: p.horizons.forecast.via,
   };
@@ -119,6 +132,24 @@ describe('cross-surface query-plan gate', () => {
     expect(adapter).toMatch(/search: '',/);
     expect(adapter).toMatch(/agency: '',/);
     expect(adapter).toContain("from '@/lib/discovery'");
+  });
+
+  it('Maps Recompete no longer interprets the query itself (route + adapter)', () => {
+    const strip = (p: string) => readFileSync(p, 'utf8').replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
+    const route = strip(join(__dirname, '..', '..', 'app', 'api', 'app', 'recompete-map', 'route.ts'));
+    const adapter = strip(join(__dirname, '..', 'recompete', 'maps-recompete-discovery.ts'));
+    for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'setAsideOrExpr', 'pscToNaicsCodes', 'agencyOrExpr', 'agencyIlikeConds',
+      'multiAgency', 'naicsMatchConds', 'parseStateList', 'buildSearchOr', 'applyMapFilters', 'incumbent_name.ilike', "'period_of_performance_current_end', todayYmd"]) {
+      expect(route, `route: ${legacy}`).not.toContain(legacy);
+    }
+    expect(route).toContain("from '@/lib/recompete/maps-recompete-discovery'");
+    // One plan; all four reads (market total · unmapped · viewport pins · follow-ons) use it.
+    expect(route.match(/mapsRecompeteRequest\(/g)).toHaveLength(1);
+    expect(route.match(/applyFilters\(\s*db\.from\('recompete_opportunities'\)/g)).toHaveLength(4);
+    for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'setAsideOrExpr', 'agencyOrExpr', 'naicsMatchConds', 'incumbent_name']) {
+      expect(adapter, `adapter: ${legacy}`).not.toContain(legacy);
+    }
+    expect(adapter).toContain('applyRecompetePlan(query, req.plan)');
   });
 
   it('MCP no longer carries its own matcher (no parallel interpretation can creep back)', () => {

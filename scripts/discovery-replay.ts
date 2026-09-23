@@ -3,6 +3,7 @@
  *
  *   npx tsx --env-file=.env.local scripts/discovery-replay.ts [--json out.json] [--rank "query"]
  *   npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-open [--json out.json]   (Phase C: old vs production Maps Open adapter)
+ *   npx tsx --env-file=.env.local scripts/discovery-replay.ts --maps-recompete [--json out.json]   (Phase C2: old vs adapter vs MCP canonical)
  *
  * Per fixture × horizon: Maps-old count, MCP-old count, canonical count (MCP policy), ID overlap
  * against Maps-old, and samples of old-only / new-only records. `--rank "<q>"` prints the canonical
@@ -31,6 +32,8 @@ import {
 } from '@/lib/discovery';
 import { mapsOpenRequest, applyMapsOpenFilters } from '@/lib/opportunities/maps-open-discovery';
 import { MAPS_OPEN_FIXTURES, MAPS_OPEN_CLASSES } from './discovery-replay-maps-open';
+import { MAPS_RECOMPETE_FIXTURES, MAPS_RECOMPETE_CLASSES, PARITY_EXEMPT, mapsOldRecompeteRoute } from './discovery-replay-maps-recompete';
+import { mapsRecompeteRequest, applyMapsRecompeteFilters } from '@/lib/recompete/maps-recompete-discovery';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -59,10 +62,10 @@ const OPEN: Src = { table: 'sam_opportunities', id: 'notice_id', cols: 'notice_i
 const RECOMPETE: Src = { table: 'recompete_opportunities', id: 'contract_id', cols: 'contract_id,incumbent_name,naics_code,naics_description,awarding_sub_agency', label: (r) => `${r.incumbent_name} · ${r.naics_code} ${r.naics_description || ''} · ${r.awarding_sub_agency || ''}` };
 const FORECAST: Src = { table: 'agency_forecasts', id: 'id', cols: 'id,title,naics_code,fiscal_year,source_agency', label: (r) => `${r.title} [${r.naics_code || '—'}] ${r.fiscal_year || ''} · ${r.source_agency || ''}` };
 
-async function idSet(src: Src, build: (q: any) => any) {
+async function idSet(src: Src, build: (q: any) => any, cap = ID_CAP) {
   const ids = new Set<string>();
   let count: number | null = null;
-  for (let from = 0; from < ID_CAP; from += 1000) {
+  for (let from = 0; from < cap; from += 1000) {
     const { data, count: c, error } = await build(db.from(src.table).select(src.id, { count: from === 0 ? 'exact' : undefined })).order(src.id).range(from, from + 999);
     if (error) return { ids, count: null as number | null, error: error.message, truncated: false };
     if (from === 0) count = c ?? null;
@@ -189,7 +192,63 @@ async function mapsOpenReplay() {
   if (unclassified || by.unexpected_regression) { console.error(`FAIL: ${unclassified} unclassified, ${by.unexpected_regression || 0} unexpected_regression`); process.exit(1); }
 }
 
+// ── --maps-recompete: Phase C2. Three sets per fixture over recompete_opportunities:
+//    maps_old  = the pre-migration route (measurement copy, a647860c)
+//    maps_new  = the PRODUCTION adapter (mapsRecompeteRequest → applyMapsRecompeteFilters)
+//    mcp       = MCP's canonical recompete query (applyRecompetePlan, MCP_POLICY)
+//    Full market first (no map_lat bound) — maps_new must EQUAL mcp identity-for-identity unless the
+//    fixture carries a Maps surface filter — then the mappable subset (map_lat not null).
+async function mapsRecompeteReplay() {
+  const RC = RECOMPETE;
+  const out: any[] = [];
+  let unclassified = 0; let parityFail = 0;
+  for (const fx of MAPS_RECOMPETE_FIXTURES) {
+    const get = (k: string) => fx.params[k] ?? null;
+    const req = mapsRecompeteRequest(get, { ctx });
+    const oldAny = mapsOldRecompeteRoute(fx.params, ctx.today);
+    const newAny = (x: any) => applyMapsRecompeteFilters(x, req, 'any');
+    const mcpPlan = buildDiscoveryPlan({ query: fx.params.q || '', agency: req.input.agency, state: fx.params.state || null, naics: fx.params.naics || null }, MCP_POLICY, ctx);
+    const mcpAny = (x: any) => applyRecompetePlan(x, mcpPlan);
+    const CAP = 160000; // whole recompete table — parity must compare COMPLETE identity sets
+    const [o, n, m] = await Promise.all([idSet(RC, oldAny, CAP), idSet(RC, newAny, CAP), idSet(RC, mcpAny, CAP)]);
+    const [om, nm] = await Promise.all([idSet(RC, (x: any) => oldAny(x).not('map_lat', 'is', null), CAP), idSet(RC, (x: any) => applyMapsRecompeteFilters(x, req, 'only'), CAP)]);
+    const d = diff(o.ids, n.ids);
+    const pm = diff(n.ids, m.ids);
+    const exempt = PARITY_EXEMPT(fx.params);
+    const parity = exempt ? 'n/a (surface filter)' : (n.count === m.count && pm.onlyA.length === 0 && pm.onlyB.length === 0 && !n.truncated) ? 'IDENTICAL' : 'DIFFERENT';
+    if (parity === 'DIFFERENT') parityFail++;
+    const material = o.count !== n.count || d.onlyA.length > 0 || d.onlyB.length > 0 || om.count !== nm.count;
+    const cls = MAPS_RECOMPETE_CLASSES[fx.label];
+    if (material && !cls) unclassified++;
+    out.push({
+      label: fx.label, params: fx.params, status: req.plan.status, via: req.plan.horizons.recompete.via, window: req.policy.recompete.windowMonths,
+      full: { old: o.count, new: n.count, mcp: m.count, overlap: d.both, old_only: d.onlyA.length, new_only: d.onlyB.length },
+      mapped: { old: om.count, new: nm.count, unmapped_new: n.count != null && nm.count != null ? n.count - nm.count : null },
+      parity, parity_new_only: pm.onlyA.length, parity_mcp_only: pm.onlyB.length,
+      old_only_sample: await labels(RC, d.onlyA), new_only_sample: await labels(RC, d.onlyB),
+      errors: [o.error, n.error, m.error, om.error, nm.error].filter(Boolean), truncated: o.truncated || n.truncated || m.truncated,
+      class: material ? cls?.cls ?? 'UNCLASSIFIED' : 'unchanged', evidence: material ? cls?.why ?? '' : '',
+    });
+    console.error(`done ${fx.label}: full ${o.count}→${n.count} (mcp ${m.count}, ${parity}) mapped ${om.count}→${nm.count}`);
+  }
+  if (jsonOut) writeFileSync(jsonOut, JSON.stringify(out, null, 2));
+  const fmt = (x: number | null | undefined) => (x == null ? 'unknown' : x.toLocaleString());
+  console.log('| fixture | status · via | full old → new | MCP canonical | Maps≡MCP identities | old-only | new-only | mappable old → new | class | evidence |');
+  console.log('|---|---|---|---|---|---|---|---|---|---|');
+  for (const r of out) {
+    console.log(`| ${r.label} | ${r.status} · ${r.via} | ${fmt(r.full.old)} → ${fmt(r.full.new)} | ${fmt(r.full.mcp)} | ${r.parity} | ${fmt(r.full.old_only)} | ${fmt(r.full.new_only)} | ${fmt(r.mapped.old)} → ${fmt(r.mapped.new)} | ${r.class} | ${r.evidence}${r.errors.length ? ' ⚠️ ' + r.errors.join('; ') : ''}${r.truncated ? ' (ID set truncated)' : ''} |`);
+  }
+  const by: Record<string, number> = {};
+  for (const r of out) by[r.class] = (by[r.class] || 0) + 1;
+  console.log(`\n${out.length} fixtures · ${Object.entries(by).map(([k, v]) => `${v} ${k}`).join(' · ')} · identity parity failures ${parityFail}`);
+  if (unclassified || by.unexpected_regression || parityFail || out.some((r) => r.errors.length)) {
+    console.error(`FAIL: ${unclassified} unclassified, ${by.unexpected_regression || 0} unexpected_regression, ${parityFail} parity failures, ${out.filter((r) => r.errors.length).length} with query errors`);
+    process.exit(1);
+  }
+}
+
 (async () => {
+  if (args.includes('--maps-recompete')) { await mapsRecompeteReplay(); return; }
   if (args.includes('--maps-open')) { await mapsOpenReplay(); return; }
   if (rankQ) { await rankReport(rankQ); return; }
   const out: any[] = [];

@@ -13,10 +13,10 @@ import { join } from 'node:path';
 import { naicsMatchConds } from '@/lib/opportunities/map-filters';
 
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-const RECOMPETE = readFileSync(
-  join(process.cwd(), 'src/app/api/app/recompete-map/route.ts'),
-  'utf8',
-);
+// Since Phase C2 the Awarded NAICS rule is applied by the canonical discovery plan the route executes
+// (route → maps-recompete-discovery.ts → discovery/plan.ts); the gold master is checked along that path.
+const RECOMPETE = ['src/app/api/app/recompete-map/route.ts', 'src/lib/recompete/maps-recompete-discovery.ts', 'src/lib/discovery/plan.ts']
+  .map((f) => readFileSync(join(process.cwd(), f), 'utf8')).join('\n');
 
 function deEscape(s: string): string {
   return s.replace(/\\\\/g, '\\');
