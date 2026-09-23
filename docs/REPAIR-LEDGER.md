@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## FIND eligibility — raw set-aside flag wording
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-23 | find_opportunities / company eligibility | **A raw boolean reached customers as a quoted "restriction":** `The record lists a restriction ("true") that this screen cannot evaluate…`. Source = `agency_forecasts.set_aside_type` (35,928 rows): "true" 654 · "True" 82 · "false" 7 · "False" 1, all DHS. Now TRUE/YES → "The agency marks this as a small-business set-aside but does not say which program…", FALSE/NO → "…not set aside for small business but does not state how it will be competed…", TBD → "has not decided the set-aside yet", unrecognized short codes are omitted (not printed). Worded restrictions are still quoted. **Status unchanged — all remain UNKNOWN.** ⚠️ **DATA DEBT (not fixed here):** the DHS APFS feed provides `small_business_set_aside` (bool) AND `small_business_program` (SB / 8(a) / SDVOSB / HUBZone / WOSB / TBD); `src/app/api/cron/sync-forecasts/route.ts:123` and `scripts/import-forecasts-live.js:148` keep whichever is non-empty first, so the program name is DISCARDED whenever the flag is set (736 rows 'true'/'True'). Storing the program would let these rows get a real verdict instead of UNKNOWN. | `unevaluatedRestrictionReason` → `src/lib/opportunities/company-eligibility.ts` | `eligibility-restriction-wording.unit.test.ts` (12, incl. an end-to-end `findOpportunities` run on the real prod DHS row `0b5d41d9-…`); red 10/12 with the source change reverted. | OPEN PR |
+
+---
+
 ## Opportunity share metadata
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
