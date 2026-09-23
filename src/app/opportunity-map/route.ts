@@ -1946,6 +1946,26 @@ const VIEWPORT_JS = `<script>
       var _mc=document.getElementById('mapCount'); if(_mc)_mc.hidden=true;
       return;
     }
+    // TOTAL is 0 in two DIFFERENT situations: nothing loaded yet (keep the prior header), or every
+    // enabled horizon has reported and the measured total is genuinely 0 / includes an unknown count.
+    // The second must repaint — a stale pill ("3,174 of 129,849") or a bare pin count ("11 results")
+    // is a number the user did not ask for. Opportunity horizons only; contacts keep their own path.
+    if(!TOTAL && !(typeof isContactMode==='function'&&isContactMode(MODE))){
+      var _hc=window.__horizonCounts||{}, _hz=window.__horizons||{};
+      var _en=['open','recompete','forecast'].filter(function(h){ return _hz[h]!==false; });
+      var _reported=_en.length>0 && _en.every(function(h){ return !!_hc[h]; });
+      if(_reported){
+        var _unknown=_en.some(function(h){ return _hc[h].state==='unknown'; });
+        var _rc0=document.getElementById('rescount');
+        var _shown0=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
+        if(_rc0)_rc0.innerHTML=_unknown
+          // A FAILED count is unknown — never "0 results", and never the loaded-pin count dressed as a total.
+          ? '<span style="font-weight:700;color:var(--ink)">?</span> <span style="font-weight:400;color:var(--sub)">results · '+_shown0.toLocaleString()+' shown · '+esc(window.__coverageNote||'count unavailable')+'</span>'
+          : '<span style="font-weight:700;color:var(--ink)">0</span> <span style="font-weight:400;color:var(--sub)">results'+(window.__coverageNote?' · '+esc(window.__coverageNote):'')+'</span>';
+        var _mc0=document.getElementById('mapCount'); if(_mc0)_mc0.hidden=true;
+        return;
+      }
+    }
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a

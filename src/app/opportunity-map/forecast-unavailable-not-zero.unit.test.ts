@@ -83,6 +83,17 @@ describe('wiring — no null-to-zero coercion left on the horizon path', () => {
     expect(unav).toBeLessThan(early);
     expect(hdr).toContain('>Unavailable</span>');
   });
+  it('a MEASURED zero or an UNKNOWN count repaints the header and hides the stale map pill (browser-found, 2026-09-23)', () => {
+    const hdr = extractFn(route, 'updateHeader');
+    const branch = hdr.indexOf('var _reported=');
+    const early = hdr.lastIndexOf('if(!TOTAL)return;');
+    expect(branch).toBeGreaterThan(-1);
+    expect(branch).toBeLessThan(early);
+    const block = hdr.slice(branch, early);
+    expect(block).toContain("_hc[h].state==='unknown'");
+    expect(block).toContain("'<span style=\"font-weight:700;color:var(--ink)\">?</span>");   // unknown → "?", never 0
+    expect(block).toContain("_mc0.hidden=true");                                             // no stale "3,174 of 129,849"
+  });
   it('the Horizons dropdown prints the count STATE label, not fmt(null) = "0"', () => {
     expect(route).toContain('horizonCountLabel(C,fmt)');
   });
