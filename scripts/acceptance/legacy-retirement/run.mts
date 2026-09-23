@@ -48,6 +48,8 @@ const argOut = process.argv.indexOf('--out');
 const OUT = resolve(argOut > -1 ? process.argv[argOut + 1] : join(ROOT, 'tmp', 'legacy-retirement-acceptance'));
 mkdirSync(OUT, { recursive: true });
 const PROD = process.argv.includes('--prod');
+const argOnly = process.argv.indexOf('--only');
+const ONLY = argOnly > -1 ? process.argv[argOnly + 1].split(',') : null;   // debugging a subset
 const PORT = Number(process.env.ACCEPT_PORT || 3218);
 const KV_PORT = 18901, SB_PORT = 18902, MAIL_PORT = 18903;
 const BASE = `http://localhost:${PORT}`;
@@ -184,7 +186,7 @@ async function main() {
     browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
 
     // ── A. Retired routes over HTTP (no browser): status + Location, never the old UI. ──
-    for (const [from, to] of [
+    if (!ONLY) for (const [from, to] of [
       ['/briefings?welcome=true', '/app'], ['/briefings/dashboard', '/app?panel=dashboard'], ['/bd-assist', '/app?panel=pipeline'],
       ['/federal-market-assassin', '/app?panel=research'], ['/market-assassin-locked', '/app?panel=research'], ['/market-assassin', '/app?panel=research'],
       ['/opportunity-hunter', '/app?panel=research'], ['/prime-lookup.html', '/app?panel=recompetes'], ['/start', '/app'],
@@ -195,7 +197,7 @@ async function main() {
       const got = location ? new URL(location, BASE) : null;
       check('routes', `${from} → ${to}`, [307, 308].includes(r.status) && !!got && `${got.pathname}${got.search}` === to, { status: r.status, location });
     }
-    {
+    if (!ONLY) {
       const r = await fetch(`${BASE}/recompete`);
       const html = await r.text();
       check('routes', '/recompete keeps its SEO page and shows the Mindy entry (no legacy gate/iframe)', r.status === 200 && html.includes('/app?panel=recompetes') && !/<iframe|verify-recompete/.test(html), { status: r.status });
@@ -206,7 +208,7 @@ async function main() {
 
     // ── B. Shared password (MA): which URL/credential, does the source default still work,
     //       and can a normal customer wander into the old tool? ──
-    {
+    if (!ONLY) {
       const src = readFileSync(join(ROOT, 'src/app/api/verify-ma-password/route.ts'), 'utf8');
       const fallback = (src.match(/MA_ACCESS_PASSWORD \|\| '([^']+)'/) || [])[1] || '';
       const r = await fetch(`${BASE}/api/verify-ma-password`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: fallback }) });
@@ -229,6 +231,7 @@ async function main() {
 
     // ── C. Each legacy customer shape: legacy entry → REAL sign-in → Mindy. ──
     for (const [key, f] of Object.entries(FIXTURES)) {
+      if (ONLY && !ONLY.includes(key)) continue;
       const ctx = await browser.createBrowserContext();
       const page = await ctx.newPage();
       await page.setViewport({ width: 1366, height: 900 });
@@ -259,7 +262,8 @@ async function main() {
       if (f.signIn === 'password') {
         await typeInto(page, 'input[name="email"]', f.email);
         await typeInto(page, 'input[name="password"]', f.password!);
-        await clickByText(page, /^\s*Sign in\s*$/);
+        // Submit the PASSWORD form itself (a bare "Sign in" text match also hits the tab button).
+        await page.evaluate(() => (document.querySelector('input[name="password"]') as HTMLInputElement | null)?.form?.requestSubmit());
         await page.waitForFunction(() => /Verify & Access Dashboard/.test(document.body.innerText) || !!localStorage.getItem('mi_beta_auth_token'), { timeout: 120_000, polling: 500 }).catch(() => {});
         if (/Verify & Access Dashboard/.test(await text(page))) {
           method = 'password + emailed 2FA code';
@@ -363,7 +367,7 @@ async function main() {
   }
 
   const summary = {
-    ranAt: new Date().toISOString(), head, appTreeClean: !dirty, mode: PROD ? 'next build + next start' : 'next dev', build,
+    ranAt: new Date().toISOString(), head, only: ONLY, appTreeClean: !dirty, mode: PROD ? 'next build + next start' : 'next dev', build,
     supabase: { forwardedReads: sb.stats.forwardedReads, fixtureServed: sb.stats.fixtureServed, absorbedWrites: sb.stats.absorbedWrites, forwardedWrites: sb.stats.forwardedWrites, authCalls: sb.stats.auth.length, authSample: [...new Set(sb.stats.auth)].slice(0, 30) },
     mail: { captured: mail.outbox.length, delivered: 0, subjects: [...new Set(mail.outbox.map((m) => m.subject))] },
     kv: { commands: kv.log.commands, writesHeldInMemory: kv.log.writes, realKvContacted: false },

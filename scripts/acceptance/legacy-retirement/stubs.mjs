@@ -156,9 +156,17 @@ export function startReadOnlySupabase(port, upstream, auth) {
       const email = control.googleIdentity;
       const redirect = new URL(q.get('redirect_to') || 'http://localhost/');
       if (!email) { redirect.searchParams.set('error', 'access_denied'); return json(res, 302, undefined, { location: redirect.toString(), ...cors }); }
-      const code = randomUUID(); codes.set(code, { email, provider: q.get('provider') || 'google' });
-      redirect.searchParams.set('code', code);
-      return json(res, 302, undefined, { location: redirect.toString(), ...cors });
+      const provider = q.get('provider') || 'google';
+      if (q.get('code_challenge')) {
+        // PKCE flow: GoTrue returns ?code= for the client to exchange.
+        const code = randomUUID(); codes.set(code, { email, provider });
+        redirect.searchParams.set('code', code);
+        return json(res, 302, undefined, { location: redirect.toString(), ...cors });
+      }
+      // Implicit flow (supabase-js default): GoTrue returns the session in the URL fragment.
+      const sess = session(email, provider);
+      const frag = new URLSearchParams({ access_token: sess.access_token, expires_in: '3600', expires_at: String(sess.expires_at), refresh_token: sess.refresh_token, token_type: 'bearer', provider_token: 'acceptance' });
+      return json(res, 302, undefined, { location: `${redirect.toString()}#${frag}`, ...cors });
     }
     if (path === '/token') {
       const grant = q.get('grant_type');
@@ -209,7 +217,9 @@ export function startReadOnlySupabase(port, upstream, auth) {
       if (!email.endsWith(`@${FIXTURE_DOMAIN}`)) return json(res, 422, { msg: 'acceptance harness: only fixture identities' }, cors);
       const u = ensureUser(email); const token = randomUUID();
       codes.set(token, { email, provider: 'email', type: parsed.type || 'magiclink' });
-      const redirectTo = parsed.redirect_to || parsed.options?.redirectTo || 'http://localhost/app';
+      // supabase-js sends redirect_to as a QUERY parameter on generate_link.
+      const redirectTo = q.get('redirect_to') || parsed.redirect_to || parsed.options?.redirectTo;
+      if (!redirectTo) return json(res, 400, { msg: 'acceptance harness: generate_link without redirect_to' }, cors);
       const action_link = `http://127.0.0.1:${port}/auth/v1/verify?token=${token}&type=${parsed.type || 'magiclink'}&redirect_to=${encodeURIComponent(redirectTo)}`;
       return json(res, 200, { ...u, action_link, email_otp: '000000', hashed_token: token, redirect_to: redirectTo, verification_type: parsed.type || 'magiclink' }, cors);
     }
