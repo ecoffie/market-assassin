@@ -145,10 +145,7 @@ export interface ExpiringContract {
   award_kind?: RecompeteRowAnnotations['award_kind'];
   parent_vehicle_piid?: string | null;
   parent_vehicle_id?: string | null;
-  place_of_performance_state_source?: RecompeteRowAnnotations['place_of_performance_state_source'];
-  place_of_performance_state_status?: RecompeteRowAnnotations['place_of_performance_state_status'];
-  place_of_performance_state_reported?: string | null;
-  place_of_performance_contest?: RecompeteRowAnnotations['place_of_performance_contest'];
+  place_of_performance_source_note?: RecompeteRowAnnotations['place_of_performance_source_note'];
 }
 
 export interface ExpiringContractsResult {
@@ -157,13 +154,6 @@ export interface ExpiringContractsResult {
   /** Exact head count from `{ count: 'exact' }`. Null means unknown — never treat as 0. */
   count: number | null;
   degraded: boolean;
-  /**
-   * Rows the DB matched on `place_of_performance_state = <state>` but whose own description
-   * names an installation in a different state (see pop-integrity.ts). They are withheld from a
-   * state-scoped result because their being in that state is not established — and counted here
-   * so the withholding is visible, never silent. 0 when no state filter was applied.
-   */
-  pop_contested_withheld: number;
 }
 
 export async function queryExpiringContracts(input: ExpiringContractsInput): Promise<ExpiringContractsResult> {
@@ -260,7 +250,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   }
   if (res.error) {
     console.error('[recompete:query] supabase error:', res.error.message);
-    return { contracts: [], total: 0, count: null, degraded: true, pop_contested_withheld: 0 };
+    return { contracts: [], total: 0, count: null, degraded: true };
   }
 
   let rawContracts = (res.data || []) as unknown as ExpiringContract[];
@@ -308,11 +298,9 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   //   - estimated_recompete_date = PoP end − 12mo only while that is still ahead; a passed
   //     capture date moves to `capture_start_date` (MINDY-006: never clamped to today).
   //   - an order under a vehicle is labelled one and carries no standalone recompete date.
-  //   - place_of_performance_state is the canonical PoP column or NULL when contested.
+  //   - place_of_performance_state is exposed exactly as USASpending reports it.
   const now = new Date();
-  const state = (input.state || '').trim().toUpperCase();
-  let popContestedWithheld = 0;
-  const annotated = rawContracts.map((c) => {
+  const contracts = rawContracts.map((c) => {
     // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
     // recovered it into set_aside_enriched from BQ awards.set_aside. Coalesce so every downstream
     // consumer (map, drawer, MCP) sees the real value. Enriched wins; both null → stays null ("unknown",
@@ -328,20 +316,5 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
     return annotateRecompeteRow({ ...c, set_aside_type, naics_description }, now);
   });
-  // A state-scoped query matched on the STORED PoP column. A row whose own description
-  // contradicts that state is not established to be in it → withheld and counted.
-  const contracts = state
-    ? annotated.filter((c) => {
-        if (c.place_of_performance_state_status !== 'contested') return true;
-        popContestedWithheld += 1;
-        return false;
-      })
-    : annotated;
-  return {
-    contracts,
-    total: res.count ?? contracts.length,
-    count: res.count ?? null,
-    degraded: false,
-    pop_contested_withheld: popContestedWithheld,
-  };
+  return { contracts, total: res.count ?? contracts.length, count: res.count ?? null, degraded: false };
 }

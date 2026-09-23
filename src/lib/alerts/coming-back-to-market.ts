@@ -22,6 +22,7 @@ import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
 import { parseNaicsCodes, naicsOrExpression, type ExpiringContract } from '@/lib/recompete/query';
 import { annotateRecompeteRow } from '@/lib/recompete/annotate';
+import { parseAwardLineage } from '@/lib/recompete/award-lineage';
 
 export const COMING_BACK_CAP = 5;
 export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
@@ -93,7 +94,14 @@ export type ComingBackRow = {
 
 export type ComingBackDecision =
   | { kind: 'omit'; reason: ComingBackOmitReason }
-  | { kind: 'show'; rows: ComingBackRow[]; matchedNaics: string[]; starterMarket: boolean };
+  | {
+      kind: 'show';
+      rows: ComingBackRow[];
+      matchedNaics: string[];
+      starterMarket: boolean;
+      /** Internal: task/delivery orders dropped before card selection. Never rendered. */
+      ordersExcluded?: number;
+    };
 
 const NUCLEAR_MO_VEHICLE =
   /consolidated nuclear|savannah river nuclear|solutions of sandia|sandia, llc|\bsandia\b|mission support & test|mission support and test|national nuclear|\bnnsa\b|nuclear security|nuclear solutions|management and operat/;
@@ -467,7 +475,18 @@ export function selectComingBackRows(input: {
   };
   const classes = classifyCodes(profile);
 
-  const market = input.contracts.filter((c) => inStoredComingBackMarket(c, stored, storedPsc));
+  // IMI (Eric, 2026-09-22): a task/delivery order under a vehicle is never "coming back to
+  // market" on its own — the next order goes to the same vehicle. Orders are excluded from the
+  // individual cards. The alert path carries no defensible parent-vehicle fields (ordering end,
+  // holders), so no vehicle card is built either. Lineage is derived from the stored row
+  // (parseAwardLineage), not trusted from a caller's annotation. Counted internally only.
+  let ordersExcluded = 0;
+  const standalone = input.contracts.filter((c) => {
+    if (parseAwardLineage(c).award_kind !== 'order_under_vehicle') return true;
+    ordersExcluded += 1;
+    return false;
+  });
+  const market = standalone.filter((c) => inStoredComingBackMarket(c, stored, storedPsc));
   const preferred = preferDistinctiveInOpenMarket(market, profile.keywords || [], distinctiveHaystack);
 
   const scored: ComingBackRow[] = [];
@@ -485,6 +504,7 @@ export function selectComingBackRows(input: {
     matchedNaics: stored,
     rows: picked,
     starterMarket: isStarterMarket(classes),
+    ordersExcluded,
   };
 }
 

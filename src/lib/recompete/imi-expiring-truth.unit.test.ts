@@ -8,14 +8,16 @@
  *   (4) no contract that has not ended carries an estimated recompete date already in the past;
  *   (5) RCA's orders under FA8501-24-D-0005 appear under that ONE vehicle (ordering end
  *       2029-04-23), not as separate recompetes;
- *   (7) FA805126F0034 (HVAC at Patrick SFB) is not tagged GA, and the state a row DOES assert
- *       came from the place-of-performance field.
+ *   (7) place of performance is exposed AS REPORTED by USASpending — no free-text override and
+ *       no substituted state (Eric, 2026-09-22). FA805126F0034 stays GA, as reported.
+ *   (B4) a task/delivery order can never be an individual Coming Back alert card.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { annotateRecompeteRow } from './annotate';
+import { annotateRecompeteRow, POP_SOURCE_NOTE } from './annotate';
 import { parseAwardLineage } from './award-lineage';
-import { namedInstallations, resolvePlaceOfPerformance } from './pop-integrity';
 import { rollupOrdersByVehicle, resolveVehicleOrderingEnds } from './vehicle-rollup';
+import { selectComingBackRows } from '@/lib/alerts/coming-back-to-market';
+import type { ExpiringContract } from './query';
 import { AWARD_GROUPS, fetchExpiringForNaics } from './usaspending-sync';
 import {
   FROZEN_NOW,
@@ -172,48 +174,23 @@ describe('(5b) a vehicle whose ordering period already ended is labelled closed,
   });
 });
 
-describe('(7) place of performance is the PoP field or nothing', () => {
-  it('BEFORE: FA805126F0034 was stored as GA (FPDS entered the awardee address as PoP)', () => {
-    const apex = IMI_GA_2382_ROWS.find((r) => r.piid === 'FA805126F0034')!;
+describe('(7) place of performance is exposed as reported by USASpending — nothing substituted', () => {
+  it('FA805126F0034 returns GA as reported — not FL, not null', () => {
+    const raw = IMI_GA_2382_ROWS.find((r) => r.piid === 'FA805126F0034')!;
+    const apex = annotateRecompeteRow(raw, NOW);
     expect(apex.place_of_performance_state).toBe('GA');
-    expect(apex.description).toMatch(/PATRICK SFB/);
+    expect(apex.place_of_performance_source_note).toBe('Place of performance as reported by USASpending.');
   });
 
-  it('AFTER: the row is not tagged GA — the contradiction withdraws the state, it does not substitute FL', () => {
-    const apex = annotateRecompeteRow(IMI_GA_2382_ROWS.find((r) => r.piid === 'FA805126F0034')!, NOW);
-    expect(apex.place_of_performance_state).not.toBe('GA');
-    expect(apex.place_of_performance_state).toBeNull();
-    expect(apex.place_of_performance_state_status).toBe('contested');
-    expect(apex.place_of_performance_state_reported).toBe('GA');
-    expect(apex.place_of_performance_contest).toEqual({ named_installations: ['PATRICK SFB'], installation_state: 'FL' });
-  });
-
-  it('every asserted state equals the stored place-of-performance column and names that source', () => {
+  it('every row carries its stored place-of-performance value unchanged (no override field exists)', () => {
     for (const r of IMI_GA_2382_ROWS) {
-      const a = annotateRecompeteRow(r, NOW);
-      if (a.place_of_performance_state === null) continue;
+      const a = annotateRecompeteRow(r, NOW) as Record<string, unknown>;
       expect(a.place_of_performance_state).toBe(r.place_of_performance_state);
-      expect(a.place_of_performance_state_source).toBe('usaspending_place_of_performance_state_code');
+      expect(a.place_of_performance_source_note).toBe(POP_SOURCE_NOTE);
+      for (const k of ['place_of_performance_state_status', 'place_of_performance_contest', 'place_of_performance_state_reported']) {
+        expect(a).not.toHaveProperty(k);
+      }
     }
-  });
-
-  it('a description naming an installation IN the PoP state, or none, leaves the PoP state alone', () => {
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'GA', description: 'REPAIRS AT MOODY AFB' }).state).toBe('GA');
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'GA', description: 'WORK AT ROBINS AFB' }).state).toBe('GA'); // not in table → no verdict
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: null, description: 'AT PATRICK SFB' })).toMatchObject({ state: null, status: 'missing' });
-    // Two installations in different states: not a contradiction of either.
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'GA', description: 'MOODY AFB AND PATRICK SFB' }).status).toBe('reported');
-    expect(namedInstallations('HVAC ... (PWS) AT PATRICK SFB.')).toEqual([{ name: 'PATRICK SFB', state: 'FL' }]);
-  });
-
-  it('multi-site or self-naming descriptions never withdraw (live false-positive shapes, 2026-09-23)', () => {
-    // Vance AFB (OK) is not in the table; only Laughlin (TX) resolves — still two sites.
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'OK', description: 'ENVIRONMENTAL ASSESSMENT (EA)FOR MO AREAS AT VANCE AFB, OK AND LAUGHLIN AFB, TX' }).status).toBe('reported');
-    // Another installation form + plural wording.
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'FL', description: 'AIRFIELD DAMAGE REPAIR EQUIPMENT, DELIVERY LOCATIONS: EIELSON AIR FORCE BASE, JOINT BASE ELMENDORF RICHARDSON' }).status).toBe('reported');
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'MA', description: 'DELIVER AND INSTALL EQUIPMENT TO TWO CONUS BASES INCLUDING MINOT AFB' }).status).toBe('reported');
-    // The text names the reported state too.
-    expect(resolvePlaceOfPerformance({ place_of_performance_state: 'GA', description: 'SUPPORT FROM ATLANTA, GEORGIA FOR PATRICK SFB' }).status).toBe('reported');
   });
 
   it('the sync writes place_of_performance_state from the PoP field only — never recipient/office', async () => {
@@ -244,15 +221,15 @@ describe('(7) place of performance is the PoP field or nothing', () => {
 });
 
 describe('get_expiring_contracts (tool) on the frozen set', () => {
-  it('returns standalone contracts + vehicles, withholds the contested GA row, and no past estimate', async () => {
+  it('returns standalone contracts + vehicles, PoP as reported, and no past estimate', async () => {
     const { expiringContracts } = await import('@/mcp/tools/expiring-contracts');
     const lookup = async (id: string) => (id === 'CONT_IDV_FA850124D0005_9700' ? IDV_DETAIL_FA850124D0005 : null);
     const res = await expiringContracts({ naics: '2382', state: 'GA', limit: 200 }, { vehicleLookup: lookup });
 
-    // (7) the Patrick SFB row is withheld from a GA result, and counted.
-    const allPiids = [...res.contracts.map((c) => c.piid), ...res.vehicles.flatMap((v) => v.orders.map((o) => o.piid))];
-    expect(allPiids).not.toContain('FA805126F0034');
-    expect(res._meta.pop_contested_withheld).toBe(1);
+    // (7) the Patrick SFB order is present under its vehicle, as reported (nothing withheld).
+    const apexOrder = res.vehicles.flatMap((v) => v.orders).find((o) => o.piid === 'FA805126F0034');
+    expect(apexOrder).toBeDefined();
+    expect(res._meta).not.toHaveProperty('pop_contested_withheld');
     // (4)
     expect(res.contracts.filter((c) => c.estimated_recompete_date && c.estimated_recompete_date < TODAY)).toEqual([]);
     // (5)
@@ -260,9 +237,51 @@ describe('get_expiring_contracts (tool) on the frozen set', () => {
     const robins = res.vehicles.find((v) => v.vehicle_piid === 'FA850124D0005')!;
     expect(robins.ordering_end_date).toBe('2029-04-23');
     expect(robins.orders).toHaveLength(5);
-    // Counts reconcile: 59 rows = standalone + rolled-up orders + withheld.
-    expect(res.contracts.length + res._meta.orders_rolled_up + res._meta.pop_contested_withheld).toBe(59);
+    // Counts reconcile: 59 rows = standalone + rolled-up orders.
+    expect(res.contracts.length + res._meta.orders_rolled_up).toBe(59);
     expect(res._meta.count).toBe(res.contracts.length);
     expect(res._meta.grounded).toBe(true);
+  });
+});
+
+describe('(B4) Coming Back alert cards never include task/delivery orders', () => {
+  // A row the alert selector would otherwise pick: stored NAICS, 6–18 month lead window.
+  const card = (over: Partial<ExpiringContract> & { contract_id: string }): ExpiringContract => ({
+    piid: over.contract_id, incumbent_name: 'Incumbent', incumbent_uei: null, awarding_agency: 'Department of Defense',
+    awarding_sub_agency: 'Department of the Air Force', naics_code: '238220', naics_description: null, psc_code: null,
+    description: null, total_obligation: 2_000_000, potential_total_value: 2_000_000, period_of_performance_start: null,
+    period_of_performance_current_end: '2027-06-01', place_of_performance_state: 'GA', place_of_performance_city: null,
+    set_aside_type: null, competition_type: null, number_of_offers: null, estimated_recompete_date: null,
+    lead_time_months: 9, recompete_likelihood: 'medium', ...over,
+  });
+  const run = (contracts: ExpiringContract[]) =>
+    selectComingBackRows({ contracts, count: contracts.length, naicsCodes: ['238220'] });
+
+  it('order_under_vehicle cannot be selected as an alert item', () => {
+    const order = card({ contract_id: 'CONT_AWD_FA850126F0062_9700_FA850124D0005_9700', piid: 'FA850126F0062', contract_type: 'DELIVERY ORDER' });
+    const d = run([order]);
+    // No card, and no customer-facing zero/error: the section is simply omitted.
+    expect(d).toEqual({ kind: 'omit', reason: 'none_qualify' });
+  });
+
+  it('a standalone contract remains eligible, and excluded orders are counted internally only', () => {
+    const standalone = card({ contract_id: 'CONT_AWD_36C24726C0032_3600_-NONE-_-NONE-', piid: '36C24726C0032', contract_type: 'DEFINITIVE CONTRACT' });
+    const orders = ['F0062', 'F0075', 'F0140'].map((s) =>
+      card({ contract_id: `CONT_AWD_FA85012${s}_9700_FA850124D0005_9700`, piid: `FA85012${s}`, contract_type: 'DELIVERY ORDER', potential_total_value: 90_000_000 }));
+    const d = run([...orders, standalone]);
+    expect(d.kind).toBe('show');
+    if (d.kind !== 'show') return;
+    expect(d.rows.map((r) => r.contract_id)).toEqual([standalone.contract_id]);
+    expect(d.ordersExcluded).toBe(3);
+  });
+
+  it('on the frozen IMI set, no selected card is an order', () => {
+    const rows = inWindowRows().map((r) => annotateRecompeteRow(r, NOW)) as unknown as ExpiringContract[];
+    const d = run(rows);
+    if (d.kind === 'show') {
+      const ids = new Set(d.rows.map((r) => r.contract_id));
+      for (const r of rows) if (ids.has(r.contract_id)) expect(parseAwardLineage(r).award_kind).not.toBe('order_under_vehicle');
+      expect(d.ordersExcluded).toBe(24);
+    }
   });
 });

@@ -61,8 +61,6 @@ export interface ExpiringContractsToolResult {
     orders_rolled_up: number;
     /** Vehicles whose ordering end could not be established (see each vehicle's reason). */
     vehicles_ordering_end_unknown: number;
-    /** State-scoped rows withheld because their own description contradicts the PoP state. */
-    pop_contested_withheld: number;
   };
 }
 
@@ -110,7 +108,6 @@ export async function expiringContracts(
       vehicle_count: vehicles.length,
       orders_rolled_up: vehicles.reduce((n, v) => n + v.orders_in_result, 0),
       vehicles_ordering_end_unknown: vehicles.filter((v) => v.ordering_end_status === 'unknown').length,
-      pop_contested_withheld: res.pop_contested_withheld ?? 0,
     },
   };
   if (mcpFlags.aiHint) {
@@ -130,7 +127,7 @@ export async function expiringContracts(
         : 'No grounded contracts; say none matched rather than inventing one.',
       key_caveats: [
         'vehicles[] groups orders by the parent IDV recorded on each order. Holders of a multiple-award vehicle each hold their own IDV number, so sibling IDVs from one solicitation appear as separate vehicles; holders_in_result lists only holders seen in these rows.',
-        'place_of_performance_state is the award record\'s place of performance only; null when missing or when the record\'s own description names an installation in another state (place_of_performance_state_status = contested).',
+        'place_of_performance_state is the place of performance as reported by USASpending, shown as reported; null means USASpending reported none.',
         'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
         // set_aside_type is NULL on ~65% of rows (only PIIDs matched in the BQ awards
         // backfill carry it). NULL means UNKNOWN, never "Full & Open" — do not tell a
