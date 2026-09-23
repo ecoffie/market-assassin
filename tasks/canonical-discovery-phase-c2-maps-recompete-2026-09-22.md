@@ -143,3 +143,26 @@ The not-drawable remainder is reported as `unmappedForFilters`.
 
 ## 7. Next (not started)
 Maps Forecast → rerun `scripts/discovery-saved-search-blast.ts` (sign-off on changed rows) → saved searches.
+
+## 8. Reconciled with main (merge `a66868e5`, no rebase)
+
+`main` advanced 6 commits after this branch was cut (`a647860c` → `d56abe3f`): #1646 company-anchored FIND and #1648
+region + acquisition-stage intent. **No textual conflicts** (`git merge-tree` clean; only `CLAUDE.md` overlapped and
+auto-merged). The Recompete product diff (all 12 non-CLAUDE files) is **byte-identical** before and after the merge
+(same patch SHA-1 `9a3deaa4…`), and the Maps Open files have 0 lines of diff vs main and vs production-proven `b3e37cf0`.
+
+**But #1648 changed the SHARED canonical layer:** `RECOMPETE_TEXT_COLS` now also searches the buy-side `description`
+(96% filled) and `psc_description` (99.7%). Maps inherits that through the plan exactly as MCP does — identity parity stays
+**33/33 IDENTICAL**. Counts that moved (MCP moved identically):
+
+| fixture | before merge | after merge |
+|---|---|---|
+| ai governance / artificial intelligence governance | 0 | 5 (all genuine AI-governance contracts; newly classified canonical_correction) |
+| pam | 0 | 18 |
+| market research | 4 | 160 |
+| management | 4,493 | 15,604 |
+| 541512 -computers | 4,246 | 4,223 (description text now also carries the excluded word) |
+| USDA -computers | 4,581 | 4,578 |
+| -computers + SDVOSB / Forest Service (surface) | 3,484 / 2,456 | 3,478 / 2,454 |
+
+Everything else — janitorial 5,304, cyber 15,639, USDA 4,596, VA 16,257, multi-agency 20,853 / 881 — is unchanged.
