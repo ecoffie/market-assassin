@@ -1,0 +1,227 @@
+{
+  "_provenance": {
+    "captured_at": "2026-09-23T01:54:36.867Z",
+    "source": "supabase.sam_opportunities (active = true)",
+    "query": [
+      "MARKET_RESEARCH/structured_notice_type: select notice_id, solicitation_number, title, notice_type, active where active and (notice_type.imatch.\"(sources sought|\\\\mrfi\\\\M|request for information)\") order by notice_id limit 4",
+      "MARKET_RESEARCH/title_keyword: select notice_id, solicitation_number, title, notice_type, active where active and (and(notice_type.imatch.\"(special notice|presol|pre-sol)\",or(title.imatch.\"\\\\m(rfis?|requests? for information|sources sought|market research|market survey)\\\\M\"))) order by notice_id limit 4",
+      "VEHICLE_SOLICITATIONS/title_keyword: select notice_id, solicitation_number, title, notice_type, active where active and (and(notice_type.imatch.\"(solicitation|combined|consolidat|bundle)\",or(title.imatch.\"\\\\m(idiqs?|id/iq|indefinite[-\\\\s]+delivery|maccs?|matocs?|satocs?|jocs?|job order contract(s|ing)?|bpas?|blanket purchase agreements?|multiple[-\\\\s]+award)\\\\M\",title.match.\"\\\\mSABER\\\\M\"))) order by notice_id limit 4",
+      "NON_FAR/structured_notice_type: select notice_id, solicitation_number, title, notice_type, active where active and (notice_type.imatch.\"(broad agency|\\\\mbaa\\\\M|commercial solutions|\\\\mcso\\\\M|other transaction|\\\\mota\\\\M)\") order by notice_id limit 4",
+      "NON_FAR/title_keyword: select notice_id, solicitation_number, title, notice_type, active where active and (and(notice_type.imatch.\"(sources sought|\\\\mrfi\\\\M|request for information|special notice|presol|pre-sol|solicitation|combined|consolidat|bundle)\",or(title.imatch.\"\\\\m(commercial solutions? openings?|other transactions?|broad agency announcements?)\\\\M\",title.match.\"\\\\m(CSO|OTA|BAA)s?\\\\M\"))) order by notice_id limit 4",
+      "negative award_notice_titled_vehicle: select notice_id, solicitation_number, title, notice_type, active where active and notice_type ~* 'Award Notice' and title ~* '\\m(idiq|matoc|macc|bpa)\\M' order by notice_id limit 3",
+      "negative solicitation_titled_rfi: select notice_id, solicitation_number, title, notice_type, active where active and notice_type ~* '(solicitation|combined)' and title ~* '\\m(rfi|request for information)\\M' order by notice_id limit 3",
+      "negative justification_naming_non_far: select notice_id, solicitation_number, title, notice_type, active where active and notice_type ~* 'justification' and title ~* '\\m(ota|other transaction|baa|cso)\\M' order by notice_id limit 3",
+      "negative special_notice_plain: select notice_id, solicitation_number, title, notice_type, active where active and notice_type ~* 'special notice' and title ~* '\\m(industry day|notice of intent)\\M' order by notice_id limit 3"
+    ],
+    "live_counts_at_capture": {
+      "MARKET_RESEARCH": 1712,
+      "VEHICLE_SOLICITATIONS": 269,
+      "NON_FAR": 98,
+      "UNKNOWN_NOTICE_TYPE": 0,
+      "ACTIVE_TOTAL": 36506
+    },
+    "note": "Each row carries _sampled_for (the rule or negative control it was drawn for). The test re-derives every classification from the frozen notice_type + title."
+  },
+  "data": [
+    {
+      "notice_id": "003894dfd3104bbd87eb09343215f7ea",
+      "solicitation_number": "W912CH26RA116",
+      "title": "Sources Sought_ Mounted Machine- Gun Optic, XM156",
+      "notice_type": "Sources Sought",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/structured_notice_type"
+    },
+    {
+      "notice_id": "008453b5201f490da62a0e3183fe907b",
+      "solicitation_number": "FA910126RCoolers",
+      "title": "Process Air Dehumidification Coolers  & Process Air Exhaust Coolers",
+      "notice_type": "Sources Sought",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/structured_notice_type"
+    },
+    {
+      "notice_id": "00a17ae64b7f4025a5e4d4312d1bc328",
+      "solicitation_number": "PCA-NIEHS-05005",
+      "title": "Quantom Tx Microbial Cell Counter Basic Package with consumables",
+      "notice_type": "Sources Sought",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/structured_notice_type"
+    },
+    {
+      "notice_id": "00aa1ea40ae247b0bd8a22385a44f44f",
+      "solicitation_number": "36C26126Q1167",
+      "title": "J012--Fire Damper Inspection Repairs  VA Central California Healthcare System",
+      "notice_type": "Sources Sought",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/structured_notice_type"
+    },
+    {
+      "notice_id": "01507cc5de3d472487ed4fbb0f758991",
+      "solicitation_number": "N00019-27-RFPREQ-APM274-0086",
+      "title": "Request for Information (RFI) for the Environmental Control System (ECS)",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/title_keyword"
+    },
+    {
+      "notice_id": "02a4a067e3f943478a20d29c7a2b2418",
+      "solicitation_number": "36C10F26Q0100",
+      "title": "X1JZ--Request for Information - Temporary Veteran Canteen Service  North Campus, West Los Angeles VAMC",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/title_keyword"
+    },
+    {
+      "notice_id": "048c2f62d2554a4fbc42eeeae50df8fe",
+      "solicitation_number": null,
+      "title": "Sources Sought- Sources Sought & Other Transaction Authority (OTA) Market Research Repair B5546 Crisis Action Center, Barksdale AFB",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/title_keyword"
+    },
+    {
+      "notice_id": "11832b9204eb4d4ea08b7c696c2b62ca",
+      "solicitation_number": "RFI-KSC-ResearchCollaboration-2026",
+      "title": "Request for Information - Potential Research and Technology Partnership Opportunities",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "MARKET_RESEARCH/title_keyword"
+    },
+    {
+      "notice_id": "0044a04a30b9491ea3b8953cb6d36660",
+      "solicitation_number": "N0017424SN0028",
+      "title": "BPA - Boxes and Packaging PSC 8115, 8135",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "active": true,
+      "_sampled_for": "VEHICLE_SOLICITATIONS/title_keyword"
+    },
+    {
+      "notice_id": "0380adeb9a3a4bb7b950a711acdd22bb",
+      "solicitation_number": "FA8137-26-R-0040",
+      "title": "Tinker AFB 2026 Multiple Award Construction Contract (MACC)",
+      "notice_type": "Solicitation",
+      "active": true,
+      "_sampled_for": "VEHICLE_SOLICITATIONS/title_keyword"
+    },
+    {
+      "notice_id": "06767e8a1a8f41eb85fd399bebceced3",
+      "solicitation_number": "140R3026Q0048",
+      "title": "J--Hoover Dam Armature Rewind IDIQ",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "active": true,
+      "_sampled_for": "VEHICLE_SOLICITATIONS/title_keyword"
+    },
+    {
+      "notice_id": "06e68b2ad8484be6aec4ac65f8233d93",
+      "solicitation_number": "70Z04427IC2PL2711",
+      "title": "Follow-on Ports and Waterways Safety System (PAWSS) Sustainment Support IDIQ Contract",
+      "notice_type": "Presolicitation",
+      "active": true,
+      "_sampled_for": "VEHICLE_SOLICITATIONS/title_keyword"
+    },
+    {
+      "notice_id": "02d98fba28de4a70b82ebe638954f5d4",
+      "solicitation_number": "W912HQ26S0050",
+      "title": "Strategic Environmental Research and Development Program (SERDP) – Open Topics Broad Agency Announcement (BAA)",
+      "notice_type": "Presolicitation",
+      "active": true,
+      "_sampled_for": "NON_FAR/title_keyword"
+    },
+    {
+      "notice_id": "03f1c001470344e89fe3ce94deaf8425",
+      "solicitation_number": "W519TC26ACSO",
+      "title": "Automated Fluidized Bed Mixer Facility Modernization for end use at Pine Bluff Arsenal – CSO",
+      "notice_type": "Solicitation",
+      "active": true,
+      "_sampled_for": "NON_FAR/title_keyword"
+    },
+    {
+      "notice_id": "048c2f62d2554a4fbc42eeeae50df8fe",
+      "solicitation_number": null,
+      "title": "Sources Sought- Sources Sought & Other Transaction Authority (OTA) Market Research Repair B5546 Crisis Action Center, Barksdale AFB",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "NON_FAR/title_keyword"
+    },
+    {
+      "notice_id": "076324c3b20a47d7a98a253b9a46d4b6",
+      "solicitation_number": "W912CH-26-S-0010",
+      "title": "Stryker Family of Vehicles Commercial Solutions Opening",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "NON_FAR/title_keyword"
+    },
+    {
+      "notice_id": "021ba955c8d240dd977ba364226086f1",
+      "solicitation_number": "36C26326R0068",
+      "title": "6640--Notice of Award - 5-Year IDIQ - Disposable Individually  Ventilated Caging System for Rodents - Minneapolis VA Health  Care System",
+      "notice_type": "Award Notice",
+      "active": true,
+      "_sampled_for": "negative/award_notice_titled_vehicle"
+    },
+    {
+      "notice_id": "029067a9d94747c3bce74a8dca61bb82",
+      "solicitation_number": "75F40126D00023",
+      "title": "Pharmaceutical Products for CDER Research Studies - IDIQ",
+      "notice_type": "Award Notice",
+      "active": true,
+      "_sampled_for": "negative/award_notice_titled_vehicle"
+    },
+    {
+      "notice_id": "06111a2013b24244885cf285bdaf24c8",
+      "solicitation_number": "12444726Q0040",
+      "title": "Notice of Intent to Award a BPA Call Order against The Land Management Integrated Resources BPA  (LMIR) George Washington & Jefferson National Forest",
+      "notice_type": "Award Notice",
+      "active": true,
+      "_sampled_for": "negative/award_notice_titled_vehicle"
+    },
+    {
+      "notice_id": "0aadee0757454aed8ebf9ed1b12f48f0",
+      "solicitation_number": "36C25626Q1279",
+      "title": "7520--RFI 25-28 Aug  Letter Folding Machine - ALX",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "active": true,
+      "_sampled_for": "negative/solicitation_titled_rfi"
+    },
+    {
+      "notice_id": "2693aafd9ced4277bd526f49e5767f4f",
+      "solicitation_number": "SCAN-MSFC-0002",
+      "title": "Unified Network and Navigation Operations (UNNO) Request for Information",
+      "notice_type": "Presolicitation",
+      "active": true,
+      "_sampled_for": "negative/solicitation_titled_rfi"
+    },
+    {
+      "notice_id": "30fb3d93c3b640b0973819384ee62454",
+      "solicitation_number": "68HE0526Q0019",
+      "title": "MADE IN AMERICA REQUEST FOR INFORMATION",
+      "notice_type": "Solicitation",
+      "active": true,
+      "_sampled_for": "negative/solicitation_titled_rfi"
+    },
+    {
+      "notice_id": "00585b2b92424299a7cee9b4bef2231d",
+      "solicitation_number": "26-010014",
+      "title": "Notice of Intent to Sole Source – Adaptive Biotechnologies Corporation",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "negative/special_notice_plain"
+    },
+    {
+      "notice_id": "0070cd09cb7f4173b6ef5928d1a6b1dd",
+      "solicitation_number": "PUR260217",
+      "title": "Notice of Intent to Sole Source for Virtual Acquisition Office (VAO) Licenses to Unison Virtual Acquisition Office, LLC",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "negative/special_notice_plain"
+    },
+    {
+      "notice_id": "00aa17ea3ccc40549e017f0c59422271",
+      "solicitation_number": "W912HQ26S0074",
+      "title": "I Storm Membership – Notice of Intent to Sole Source",
+      "notice_type": "Special Notice",
+      "active": true,
+      "_sampled_for": "negative/special_notice_plain"
+    }
+  ]
+}

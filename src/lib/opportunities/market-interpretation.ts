@@ -344,8 +344,15 @@ export function interpretMarket(phrase: string, buyerRaw?: string | null): Marke
   };
 }
 
+/**
+ * BUY-SIDE text only. The holder's name (`incumbent_name`) is deliberately absent: a company called
+ * "… Machining and Fabrication" or "CyberCore" says nothing about what THIS contract bought. Holder
+ * identity is its own signal (HOLDER_SIGNAL, match-evidence.ts), never an acquisition's direct match.
+ * Measured 2026-09-22 (IMI test): 7 TYONEK MACHINING AND FABRICATION orders — NAICS 334515, PSC 4920,
+ * "VERSATILE DIAGNOSTIC AUTOMATED TEST STATION" — were DIRECT_MATCH for "industrial steel fabrication".
+ */
 function blob(row: ClassifiableRecord): string {
-  return [row.title, row.description, row.naics_description, row.incumbent_name]
+  return [row.title, row.description, row.naics_description]
     .map((s) => String(s || ''))
     .join(' ');
 }
@@ -382,7 +389,10 @@ export function classifyRecord(
   if (physicalOnly && CYBER_DIRECT_RE.test(cap.requested)) return null;
   if (codeIn(cap.direct.naics, row.naics_code) || codeIn(cap.direct.psc, row.psc_code)) return 'DIRECT_MATCH';
   if (CYBER_DIRECT_RE.test(text) && cap.kind !== 'literal') return 'DIRECT_MATCH';
-  return 'DIRECT_MATCH';
+  // A direct term in the BUY-SIDE text. This used to fall through to an unconditional DIRECT_MATCH,
+  // so any row the retrieval admitted — including by the holder's NAME — was labelled a direct match.
+  const termHit = cap.direct.terms.some((t) => t && new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text));
+  return termHit ? 'DIRECT_MATCH' : null;
 }
 
 export function evidenceWhy(cls: EvidenceClass, phrase: string): string {

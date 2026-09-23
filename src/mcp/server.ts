@@ -558,6 +558,18 @@ server.registerTool(
           keyword_exact: z.string().optional(),
         })
         .optional(),
+      uei: z
+        .string()
+        .optional()
+        .describe('Optional SAM UEI of the searching company. Company-anchored FIND: registered NAICS/PSC widen recall (never a direct match); every item gets eligibility ELIGIBLE | NOT_ELIGIBLE | UNKNOWN. Only when the user already gave it.'),
+      states: z
+        .array(z.string())
+        .optional()
+        .describe('Optional region: several states ["GA","AL","TN"] (names or codes), ORed with location. Non-state values are reported unresolved, never widened.'),
+      stage: z
+        .enum(['MARKET_RESEARCH', 'VEHICLE_SOLICITATIONS', 'NON_FAR'])
+        .optional()
+        .describe('Optional acquisition stage for Open now only: MARKET_RESEARCH (RFI/sources sought), VEHICLE_SOLICITATIONS (IDIQ/MACC/MATOC/JOC/SABER/BPA), NON_FAR (CSO/OTA/BAA).'),
     },
   },
   async (args) => {

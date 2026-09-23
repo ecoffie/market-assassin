@@ -382,7 +382,7 @@
           },
           {
             "op": "or",
-            "expr": "incumbent_name.imatch.\"\\\\mpams?\\\\M\",naics_description.imatch.\"\\\\mpams?\\\\M\",awarding_agency.imatch.\"\\\\mpams?\\\\M\",awarding_sub_agency.imatch.\"\\\\mpams?\\\\M\""
+            "expr": "description.imatch.\"\\\\mpams?\\\\M\",psc_description.imatch.\"\\\\mpams?\\\\M\",naics_description.imatch.\"\\\\mpams?\\\\M\",incumbent_name.imatch.\"\\\\mpams?\\\\M\",awarding_agency.imatch.\"\\\\mpams?\\\\M\",awarding_sub_agency.imatch.\"\\\\mpams?\\\\M\""
           }
         ],
         "naics": []
@@ -543,7 +543,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",incumbent_name.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",awarding_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_agency.match.\"\\\\mAIs?\\\\M\",awarding_sub_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_sub_agency.match.\"\\\\mAIs?\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",description.match.\"\\\\mAIs?\\\\M\",psc_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",psc_description.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",incumbent_name.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",incumbent_name.match.\"\\\\mAIs?\\\\M\",awarding_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_agency.match.\"\\\\mAIs?\\\\M\",awarding_sub_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_sub_agency.match.\"\\\\mAIs?\\\\M\"),or(description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",psc_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           }
         ],
         "naics": []
@@ -704,7 +704,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",incumbent_name.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",awarding_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_agency.match.\"\\\\mAIs?\\\\M\",awarding_sub_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_sub_agency.match.\"\\\\mAIs?\\\\M\"),or(incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
+            "expr": "and(or(description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",description.match.\"\\\\mAIs?\\\\M\",psc_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",psc_description.match.\"\\\\mAIs?\\\\M\",naics_description.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",naics_description.match.\"\\\\mAIs?\\\\M\",incumbent_name.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",incumbent_name.match.\"\\\\mAIs?\\\\M\",awarding_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_agency.match.\"\\\\mAIs?\\\\M\",awarding_sub_agency.imatch.\"\\\\martificial[-\\\\s]+(intelligence(s|es|ing|ed)?|intelligenc(ing|ed))\\\\M\",awarding_sub_agency.match.\"\\\\mAIs?\\\\M\"),or(description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",psc_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",naics_description.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",incumbent_name.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\",awarding_sub_agency.imatch.\"\\\\m(governance(s|es|ing|ed)?|governanc(ing|ed))\\\\M\"))"
           }
         ],
         "naics": []
@@ -1192,7 +1192,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\"),or(incumbent_name.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\"))"
+            "expr": "and(or(description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mmarket(s|es|ing|ed)?\\\\M\"),or(description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mresearch(s|es|ing|ed)?\\\\M\"))"
           }
         ],
         "naics": []
@@ -1340,7 +1340,7 @@
           },
           {
             "op": "or",
-            "expr": "incumbent_name.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\""
+            "expr": "description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mzzzxxyyqqq(s|es|ing|ed)?\\\\M\""
           }
         ],
         "naics": []
@@ -1832,7 +1832,7 @@
           },
           {
             "op": "or",
-            "expr": "incumbent_name.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\""
+            "expr": "description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mmanagement(s|es|ing|ed)?\\\\M\""
           }
         ],
         "naics": []
@@ -2122,7 +2122,7 @@
           },
           {
             "op": "or",
-            "expr": "incumbent_name.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",naics_description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",awarding_agency.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",awarding_sub_agency.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\""
+            "expr": "description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",psc_description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",naics_description.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",incumbent_name.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",awarding_agency.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\",awarding_sub_agency.imatch.\"\\\\mai[-\\\\s]+governance\\\\M\""
           }
         ],
         "naics": []
@@ -2399,7 +2399,7 @@
           },
           {
             "op": "or",
-            "expr": "incumbent_name.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\""
+            "expr": "description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mfollow[-\\\\s]+on(s|es|ing|ed)?\\\\M\""
           }
         ],
         "naics": []
@@ -3329,7 +3329,7 @@
           },
           {
             "op": "or",
-            "expr": "incumbent_name.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\""
+            "expr": "description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\maudio(s|es|ing|ed)?\\\\M\""
           }
         ],
         "naics": []
@@ -3483,7 +3483,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.is.null,incumbent_name.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(naics_description.is.null,naics_description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(awarding_agency.is.null,awarding_agency.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(awarding_sub_agency.is.null,awarding_sub_agency.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"))"
+            "expr": "and(or(description.is.null,description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(psc_description.is.null,psc_description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(naics_description.is.null,naics_description.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(incumbent_name.is.null,incumbent_name.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(awarding_agency.is.null,awarding_agency.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"),or(awarding_sub_agency.is.null,awarding_sub_agency.not.imatch.\"\\\\m(computers(s|es|ing|ed)?|computer(s|es|ing|ed)?)\\\\M\"))"
           }
         ],
         "naics": [
@@ -4072,7 +4072,7 @@
           },
           {
             "op": "or",
-            "expr": "and(or(incumbent_name.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\"),or(incumbent_name.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",awarding_agency.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\"))"
+            "expr": "and(or(description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mnaval(s|es|ing|ed)?\\\\M\"),or(description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",psc_description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",incumbent_name.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",awarding_agency.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(facilities(s|es|ing|ed)?|facilitie(s|es|ing|ed)?|faciliti(ing|ed)|faciliti(s|es|ing|ed)?)\\\\M\"))"
           },
           {
             "op": "or",

@@ -596,6 +596,29 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
             keyword_exact: { type: 'string', description: 'Bypass search-brain free-text path when needed.' },
           },
         },
+        uei: {
+          type: 'string',
+          description:
+            'Optional 12-character SAM UEI of the company searching. When present FIND is company-anchored: its SAM-registered ' +
+            'NAICS/PSC widen recall (labelled company_registered_psc / company_registered_naics — never a direct match) and every item ' +
+            'gets eligibility ELIGIBLE | NOT_ELIGIBLE (+reason) | UNKNOWN, judged per the notice NAICS against the company\'s size for ' +
+            'THAT NAICS. Only pass it when the user already gave it — never ask for it before first value.',
+        },
+        states: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Optional REGION — several states at once, names or 2-letter codes (["GA","AL","TN"]). ORed together and with `location`. ' +
+            'No radius / installation lookup: a value that is not a US state is reported in query_summary.region.unresolved and never widens the search.',
+        },
+        stage: {
+          type: 'string',
+          enum: ['MARKET_RESEARCH', 'VEHICLE_SOLICITATIONS', 'NON_FAR'],
+          description:
+            'Optional acquisition stage for OPEN NOW only: MARKET_RESEARCH (RFI / sources sought), VEHICLE_SOLICITATIONS (IDIQ, MACC, MATOC, JOC, SABER, BPA), ' +
+            'NON_FAR (CSO, OTA, BAA). SAM notice type first; title keywords are a labelled secondary signal; notices with no recognisable type are excluded and counted. ' +
+            'Coming back / Coming soon are not stage-filtered. Only pass it when the user asked for that stage.',
+        },
       },
       required: ['query'],
     },
@@ -2182,6 +2205,11 @@ export async function runMcpTool(
             keyword_exact: typeof advanced.keyword_exact === 'string' ? advanced.keyword_exact : undefined,
           }
         : undefined,
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
+      states: Array.isArray(args.states)
+        ? (args.states as unknown[]).filter((s): s is string => typeof s === 'string')
+        : typeof args.states === 'string' ? args.states : undefined,
+      stage: typeof args.stage === 'string' ? args.stage : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

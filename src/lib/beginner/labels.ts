@@ -167,10 +167,13 @@ export function classifySetAside(raw: string | null | undefined): SetAsideKind {
   ) {
     return 'other';
   }
+  // Same trap as above: "Veteran-Owned Small Business Set-Aside" CONTAINS "small business". It
+  // used to be checked AFTER the catch-all and read as open-to-every-small-business — which the
+  // company-anchored FIND eligibility screen would have turned into ELIGIBLE for any small firm.
+  if (n === 'vsa' || n === 'vss' || n.includes('veteran')) return 'vosb';
   if (n === 'sba' || n === 'sbp' || n === 'sb' || n.includes('smallbusiness') || n.includes('totalsmall')) {
     return 'sb';
   }
-  if (n === 'vsa' || n === 'vss' || n.includes('veteran')) return 'vosb';
   if (n === 'isbee' || n === 'iee' || n === 'biciv' || n === 'las') return 'other';
   // Unrecognized non-empty value — omit rather than print a raw code.
   if (/^[A-Z0-9]{2,8}$/.test(t) && t === t.toUpperCase()) return 'unknown';

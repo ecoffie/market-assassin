@@ -33,7 +33,16 @@ export const PIPELINE = ['structured_intent', 'concept_classification', 'eligibi
 
 export const OPEN_TEXT_COLS = ['title', 'description', 'sow_text', 'department', 'solicitation_number'] as const;
 export const OPEN_BUYER_COLS = ['department', 'sub_tier'] as const;
-export const RECOMPETE_TEXT_COLS = ['incumbent_name', 'naics_description', 'awarding_agency', 'awarding_sub_agency'] as const;
+/**
+ * Recompete text recall. BUY-SIDE columns first: `description` (96% filled) and `psc_description`
+ * (99.7%) say what was bought. Measured 2026-09-22 on the 141,468 future rows: `naics_description`
+ * is 0% filled, so before this change literal Coming-back recall ran ONLY on the holder's name and
+ * the agency's name — "machining" recalled every TYONEK MACHINING AND FABRICATION order (NAICS 334515,
+ * a diagnostic test station) and labelled them direct matches. `incumbent_name` stays for recall so
+ * the holder lead is not lost, but a holder-name hit is labelled HOLDER_SIGNAL, never DIRECT_MATCH
+ * (src/lib/opportunities/match-evidence.ts).
+ */
+export const RECOMPETE_TEXT_COLS = ['description', 'psc_description', 'naics_description', 'incumbent_name', 'awarding_agency', 'awarding_sub_agency'] as const;
 export const RECOMPETE_BUYER_COLS = ['awarding_agency', 'awarding_sub_agency'] as const;
 /** Columns for the capability's DIRECT terms (MCP related-market path). `description` is ~0% populated. */
 export const RECOMPETE_TERM_COLS = ['incumbent_name', 'naics_description', 'description'] as const;
@@ -58,6 +67,14 @@ export interface DiscoveryInput {
    * strategy filters, a profile scope). Lets an exclusion-only query ("-computers") be valid there.
    */
   hasSurfaceScope?: boolean;
+  /**
+   * Company-anchored recall (MCP `uei`): the company's REGISTERED codes, exact. They are UNIONED
+   * into the text/taxonomy recall of each horizon — they widen who can be a candidate, never narrow,
+   * and never establish a DIRECT match (labels: company_registered_psc / company_registered_naics).
+   * Only applied when the query carries a text concept; a structured-only plan already admits the
+   * whole scope.
+   */
+  company?: { naics: string[]; psc: string[] } | null;
 }
 
 export type Op =
@@ -87,6 +104,8 @@ export interface DiscoveryPlan {
     related: { naics: string[]; psc: string[] } | null;
     term_of_art_naics: string[];
   };
+  /** Present only when a company anchor widened recall (MCP `uei`). Absent keeps golden plans stable. */
+  company?: { naics: string[]; psc: string[] };
   buyers: ResolvedBuyer[];
   states: string[];
   setAsides: string[];
@@ -169,6 +188,14 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   const matcher = buildTextMatcher(keywordText, si.exclusions.map((e) => e.term));
   const toaNaics = keywordText ? termOfArtNaicsCodes(keywordText) || [] : [];
   const lexicalPositive = matcher.mode !== 'none';
+  // Company codes are exact (a registered NAICS/PSC is a specific code, never a family prefix).
+  const company = input.company && (input.company.naics.length || input.company.psc.length)
+    ? { naics: uniq(input.company.naics.map((c) => c.trim()).filter((c) => /^\d{6}$/.test(c))), psc: uniq(input.company.psc.map((c) => c.trim().toUpperCase()).filter(Boolean)) }
+    : null;
+  const companyConds = company && lexicalPositive
+    ? [...company.naics.map((c) => `naics_code.eq.${c}`), ...company.psc.map((c) => `psc_code.eq.${c}`)]
+    : [];
+  if (company && !lexicalPositive) notes.push('company: registered codes not applied (no text concept — the structured scope already admits every row)');
 
   // Positive anchor: something must say WHAT market, not only what to leave out.
   const anchored = lexicalPositive || naics.length > 0 || psc.length > 0 || setAsides.length > 0 || buyers.length > 0
@@ -207,9 +234,10 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   if (lexicalPositive) {
     const tn = openRetrievalNaics(cap);
     const tp = openRetrievalPsc(cap);
-    const parts = [textPredicate(matcher, OPEN_TEXT_COLS), ...naicsMatchConds(tn), ...pscMatchConds(tp)].filter(Boolean) as string[];
+    const parts = [textPredicate(matcher, OPEN_TEXT_COLS), ...naicsMatchConds(tn), ...pscMatchConds(tp), ...companyConds].filter(Boolean) as string[];
     oOps.push({ op: 'or', expr: parts.join(',') || 'notice_id.is.null' });
     oVia = tn.length || tp.length ? 'text_or_taxonomy' : 'text';
+    if (companyConds.length) oVia += '_or_company_codes';
   }
   const oEx = exclusionPredicate(matcher, OPEN_TEXT_COLS);
   if (oEx) oOps.push({ op: 'or', expr: oEx });
@@ -251,8 +279,9 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
       rVia = 'text';
       capOr.push(textPredicate(matcher, RECOMPETE_TEXT_COLS) || '');
     }
-    const expr = [...naicsMatchConds(capNaics), ...capOr.filter(Boolean)].join(',');
+    const expr = [...naicsMatchConds(capNaics), ...capOr.filter(Boolean), ...companyConds].join(',');
     rOps.push({ op: 'or', expr: expr || 'contract_id.is.null' });
+    if (companyConds.length) rVia += '_or_company_codes';
     rNaics = uniq([...rNaics, ...capNaics]);
   }
   const rEx = exclusionPredicate(matcher, RECOMPETE_TEXT_COLS);
@@ -271,7 +300,10 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   if (!fNaics && psc.length) { const xw = uniq(psc.flatMap((p) => pscToNaicsCodes(p))); if (xw.length) fNaics = xw.join(','); }
   if (lexicalPositive) {
     fVia = 'text';
-    fOps.push({ op: 'or', expr: textPredicate(matcher, FORECAST_TEXT_COLS) || 'id.is.null' });
+    // agency_forecasts carries naics_code but no psc_code — only registered NAICS widen Coming soon.
+    const fCompany = company ? company.naics.map((c) => `naics_code.eq.${c}`) : [];
+    fOps.push({ op: 'or', expr: [textPredicate(matcher, FORECAST_TEXT_COLS), ...fCompany].filter(Boolean).join(',') || 'id.is.null' });
+    if (fCompany.length) fVia = 'text_or_company_naics';
   }
   const fEx = exclusionPredicate(matcher, FORECAST_TEXT_COLS);
   if (fEx) fOps.push({ op: 'or', expr: fEx });
@@ -304,6 +336,7 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
       related: cap.related_market ? { naics: [...cap.related_market.naics], psc: [...cap.related_market.psc] } : null,
       term_of_art_naics: toaNaics,
     },
+    ...(company && lexicalPositive ? { company } : {}),
     buyers,
     states,
     setAsides,
