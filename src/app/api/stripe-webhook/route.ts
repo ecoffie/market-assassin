@@ -25,6 +25,9 @@ import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
+import { planCancellationRevocation, NON_TERMINAL_STATUSES, type CancellableProduct, type GrantKey } from '@/lib/billing/cancellation-revocation';
+import { classifySpecialAccount } from '@/lib/admin/member-grants';
+import { getStaffRole } from '@/lib/api-auth';
 
 // Webhook secrets
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -818,107 +821,131 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, action: 'ignored' });
     }
 
-    // Handle Alert Pro cancellation
-    if (isAlertProSubscription) {
-      const customerId = typeof subscription.customer === 'string'
-        ? subscription.customer
-        : subscription.customer?.id;
-
-      if (customerId) {
-        const customer = await stripe.customers.retrieve(customerId);
-        if (!customer.deleted && customer.email) {
-          const email = customer.email.toLowerCase();
-          console.log(`🚫 Alert Pro subscription canceled for: ${email}`);
-
-          // Revert to weekly/free tier
-          if (supabase) {
-            await supabase
-              .from('user_notification_settings')
-              .update({
-                alert_frequency: 'weekly',
-                subscription_status: 'canceled',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('user_email', email);
-          }
-
-          // Remove KV access
-          try {
-            await kv.del(`alertpro:${email}`);
-            console.log(`✅ Revoked Alert Pro for: ${email}`);
-          } catch (kvError) {
-            console.error('KV error:', kvError);
-          }
-        }
-      }
-
-      return NextResponse.json({
-        received: true,
-        action: 'alert_pro_revoked',
-        reason: subscription.status,
-      });
-    }
-
-    // Get customer email
+    // CANCELLATION → remove ONLY what this subscription granted (src/lib/billing/
+    // cancellation-revocation.ts). Before 2026-09-23 this deleted grants unconditionally
+    // (FHC wiped separate MA / OH Pro purchases), left Alert Pro's ospro: behind (Pro survived
+    // cancellation), ran during past_due retries, and reset the free daily-alert preference.
     const customerId = typeof subscription.customer === 'string'
       ? subscription.customer
       : subscription.customer?.id;
-
     if (!customerId) {
       return NextResponse.json({ error: 'No customer ID' }, { status: 400 });
     }
-
     const customer = await stripe.customers.retrieve(customerId);
     if (customer.deleted || !customer.email) {
       return NextResponse.json({ error: 'Customer not found or no email' }, { status: 400 });
     }
-
     const email = customer.email.toLowerCase();
-    console.log(`🚫 FHC subscription canceled for: ${email}`);
+    const cancelled: CancellableProduct = isFHCSubscription ? 'fhc' : 'alert_pro';
 
-    // Revoke MA Standard + Alert Pro access (FHC members get Alert Pro, not briefings)
-    if (supabase) {
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({
-          access_assassin_standard: false,
-          access_hunter_pro: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('email', email);
-
-      if (updateError) {
-        console.error('Error revoking access:', updateError);
-      } else {
-        console.log(`✅ Revoked Supabase access for: ${email}`);
-      }
-
-      // Revert alert frequency to weekly
-      await supabase
-        .from('user_notification_settings')
-        .update({
-          alert_frequency: 'weekly',
-          subscription_status: 'canceled',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_email', email);
-    }
-
-    // Remove KV access (MA + Alert Pro + OH Pro)
+    // Other LIVE subscriptions of this customer that grant the same keys.
+    const otherLiveSubscriptions: CancellableProduct[] = [];
+    let attributionUncertain = false;
     try {
-      await kv.del(`ma:${email}`);
-      await kv.del(`alertpro:${email}`);
-      await kv.del(`ospro:${email}`);
-      console.log(`✅ Revoked KV access for FHC member: ${email}`);
-    } catch (kvError) {
-      console.error('KV error revoking access:', kvError);
+      const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+      for (const other of subs.data) {
+        if (other.id === subscription.id || !NON_TERMINAL_STATUSES.has(other.status)) continue;
+        for (const item of other.items.data) {
+          const pid = typeof item.price.product === 'string' ? item.price.product : item.price.product?.id;
+          if (pid === 'prod_TaiXlKb350EIQs' || pid === 'prod_TMUmxKTtooTx6C' || item.price.metadata?.tier === 'fhc_membership') otherLiveSubscriptions.push('fhc');
+          if (pid === 'prod_U9rOClXY6MFcRu' || item.price.metadata?.tier === 'alert_pro') otherLiveSubscriptions.push('alert_pro');
+        }
+      }
+    } catch (err) {
+      console.error('[cancellation] could not list other subscriptions — keeping access:', err);
+      attributionUncertain = true;
     }
 
+    // Current KV values (a purchase/admin grant writes an object; these subscriptions write 'true').
+    const kvValues: Partial<Record<GrantKey, unknown>> = {};
+    try {
+      for (const key of ['ma', 'alertpro', 'ospro'] as GrantKey[]) {
+        const v = await kv.get(`${key}:${email}`);
+        if (v !== null && v !== undefined) kvValues[key] = v;
+      }
+    } catch (err) {
+      console.error('[cancellation] could not read KV — keeping access:', err);
+      attributionUncertain = true;
+    }
+
+    // One-time purchases (product text only — purchases.tier is mostly backfill_unknown).
+    const purchaseTexts: string[] = [];
+    if (supabase) {
+      const { data: purchaseRows, error: purchaseError } = await supabase
+        .from('purchases')
+        .select('product_id, product_name, tier, bundle')
+        .eq('user_email', email);
+      if (purchaseError) {
+        console.error('[cancellation] could not read purchases — keeping access:', purchaseError.message);
+        attributionUncertain = true;
+      }
+      for (const r of purchaseRows || []) {
+        purchaseTexts.push([r.product_id, r.product_name, r.tier, r.bundle].filter(Boolean).join(' '));
+      }
+    } else {
+      attributionUncertain = true;
+    }
+
+    const periodEnds = [
+      (subscription as unknown as { current_period_end?: number }).current_period_end,
+      ...subscription.items.data.map((it) => (it as unknown as { current_period_end?: number }).current_period_end),
+    ].filter((x): x is number => typeof x === 'number');
+    const paidThroughMs = periodEnds.length ? Math.max(...periodEnds) * 1000 : null;
+
+    if (attributionUncertain) {
+      // Uncertain attribution resolves to KEEPING access (see cancellation-revocation.ts).
+      return NextResponse.json({ received: true, action: 'kept_uncertain_attribution', cancelled, email });
+    }
+
+    const plan = planCancellationRevocation({
+      cancelled,
+      status: subscription.status,
+      deleted: event.type === 'customer.subscription.deleted',
+      otherLiveSubscriptions,
+      kvValues,
+      purchaseTexts,
+      isComp: classifySpecialAccount(email).isSpecial || getStaffRole(email) !== 'none',
+      paidThroughMs,
+      nowMs: Date.now(),
+    });
+
+    if (plan.action === 'none') {
+      return NextResponse.json({ received: true, action: 'none', reason: plan.reason, keep: plan.keep, cancelled });
+    }
+
+    try {
+      for (const key of plan.deleteKv) await kv.del(`${key}:${email}`);
+      for (const { key, atMs } of plan.expireKvAt) await kv.expireat(`${key}:${email}`, Math.floor(atMs / 1000));
+    } catch (kvError) {
+      console.error('[cancellation] KV error applying revocation plan:', kvError);
+    }
+    if (supabase) {
+      if (plan.clearFlags.length) {
+        const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        for (const flag of plan.clearFlags) update[flag] = false;
+        const { error: flagError } = await supabase.from('user_profiles').update(update).eq('email', email);
+        if (flagError) console.error('[cancellation] could not clear flags:', flagError.message);
+      }
+      if (plan.setSubscriptionStatusCanceled) {
+        // Preference untouched: daily alerts are free for everyone.
+        const { error: statusError } = await supabase
+          .from('user_notification_settings')
+          .update({ subscription_status: 'canceled', updated_at: new Date().toISOString() })
+          .eq('user_email', email);
+        if (statusError) console.error('[cancellation] could not mark subscription canceled:', statusError.message);
+      }
+    }
+
+    console.log(`🚫 ${cancelled} cancellation for ${email}: deleted ${plan.deleteKv.join(',') || '-'}, expiring ${plan.expireKvAt.map((e) => e.key).join(',') || '-'}, cleared ${plan.clearFlags.join(',') || '-'}, kept ${plan.keep.map((k) => k.key).join(',') || '-'}`);
     return NextResponse.json({
       received: true,
       action: 'revoked',
-      email,
+      cancelled,
       reason: subscription.status,
+      deleted: plan.deleteKv,
+      expiring: plan.expireKvAt,
+      clearedFlags: plan.clearFlags,
+      kept: plan.keep,
     });
   }
 
