@@ -22,7 +22,9 @@ const src = readFileSync(join(__dirname, 'federal-contacts/route.ts'), 'utf8');
 
 describe('DoDAAC office-anchoring — precise, never dept-wide (memory: mcp_tool_strengths_to_protect #1)', () => {
   it('a valid DoDAAC filters solicitation_number by the office prefix', () => {
-    expect(src).toMatch(/if\s*\(validDodaac\)\s*{[\s\S]*ilike\('solicitation_number',\s*`\$\{validDodaac\}%`\)/);
+    // Via the shared trigram-indexed predicate (src/lib/gov-contacts/dodaac-prefix.ts), which
+    // emits ilike('solicitation_number', `${code}%`) — pinned in dodaac-prefix.unit.test.ts.
+    expect(src).toMatch(/if\s*\(validDodaac\)\s*{[\s\S]*q = withDodaacPrefix\(q, validDodaac\)/);
   });
 
   it('anchoring sets a flag that SUPPRESSES the dept-wide fallback', () => {
