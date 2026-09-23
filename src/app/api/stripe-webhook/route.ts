@@ -871,16 +871,24 @@ export async function POST(request: NextRequest) {
     // One-time purchases (product text only — purchases.tier is mostly backfill_unknown).
     const purchaseTexts: string[] = [];
     if (supabase) {
-      const { data: purchaseRows, error: purchaseError } = await supabase
-        .from('purchases')
-        .select('product_id, product_name, tier, bundle')
-        .eq('user_email', email);
-      if (purchaseError) {
-        console.error('[cancellation] could not read purchases — keeping access:', purchaseError.message);
-        attributionUncertain = true;
-      }
-      for (const r of purchaseRows || []) {
-        purchaseTexts.push([r.product_id, r.product_name, r.tier, r.bundle].filter(Boolean).join(' '));
+      // Paginated: a truncated read could drop the one purchase that keeps a grant.
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data: purchaseRows, error: purchaseError } = await supabase
+          .from('purchases')
+          .select('product_id, product_name, tier, bundle')
+          .eq('user_email', email)
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (purchaseError) {
+          console.error('[cancellation] could not read purchases — keeping access:', purchaseError.message);
+          attributionUncertain = true;
+          break;
+        }
+        for (const r of purchaseRows || []) {
+          purchaseTexts.push([r.product_id, r.product_name, r.tier, r.bundle].filter(Boolean).join(' '));
+        }
+        if (!purchaseRows || purchaseRows.length < PAGE) break;
       }
     } else {
       attributionUncertain = true;
