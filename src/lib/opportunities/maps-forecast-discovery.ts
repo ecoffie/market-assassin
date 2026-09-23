@@ -54,12 +54,20 @@ export function mapsForecastRequest(get: Get, opts?: { ctx?: PlanContext; dropAg
 }
 
 /**
- * Additive `discovery` block. `coverage: 'unestablished'` means the requested buyer publishes no forecasts
- * we hold — MCP reports that horizon UNAVAILABLE, so a 0 here is not market truth either.
+ * Additive `discovery` block — the SAME coverage result MCP reads (canonical plan):
+ *   coverage 'unestablished' — no requested buyer has a forecast publisher: UNAVAILABLE, counts are null.
+ *   coverage 'partial'       — counts cover only the covered buyers; `coverage_gaps` names the rest.
  */
 export function mapsForecastDiscoveryMeta(plan: DiscoveryPlan) {
+  const f = plan.horizons.forecast;
   return {
-    version: plan.version, status: plan.status, refinement: plan.refinement, via: plan.horizons.forecast.via,
-    coverage: plan.horizons.forecast.coverage, include_past_fiscal_years: plan.policy.forecast.includePastFiscalYears,
+    version: plan.version, status: plan.status, refinement: plan.refinement, via: f.via,
+    coverage: f.coverage, include_past_fiscal_years: plan.policy.forecast.includePastFiscalYears,
+    ...(f.coverageGaps?.length ? { coverage_gaps: f.coverageGaps } : {}),
   };
+}
+
+/** True when the Forecast horizon has no measurable coverage — every count must be null, never 0. */
+export function forecastCoverageUnavailable(plan: DiscoveryPlan): boolean {
+  return plan.horizons.forecast.coverage === 'unestablished';
 }

@@ -116,12 +116,43 @@ export interface DiscoveryPlan {
   horizons: {
     open: { via: string; mapFilters: Record<string, string>; ops: Op[] };
     recompete: { via: string; ops: Op[]; naics: string[] };
-    forecast: { via: string; forecastFilters: { q: null; naics: string | null; agency: string | null; state: string | null }; ops: Op[]; coverage: 'ok' | 'unestablished' };
+    forecast: {
+      via: string; forecastFilters: { q: null; naics: string | null; agency: string | null; state: string | null }; ops: Op[];
+      /** See ForecastCoverage. 'ok' also covers "no buyer asked for". */
+      coverage: ForecastCoverage;
+      /** Present only when coverage ≠ 'ok': every requested buyer the forecast horizon cannot measure. */
+      coverageGaps?: ForecastCoverageGap[];
+    };
   };
   notes: string[];
 }
 
 export interface PlanContext { today: string; fiscalYear: number }
+
+/**
+ * Forecast publisher coverage for the requested buyers (Eric, 2026-09-23 — "unavailable ≠ zero").
+ *   ok            — every requested buyer resolves to a forecast publisher we hold (or no buyer was asked).
+ *                   A 0 here IS a measured zero.
+ *   partial       — some buyers are covered, some are not. Counts measure ONLY the covered buyers; the
+ *                   missing ones are named in `coverageGaps` and never contribute a zero.
+ *   unestablished — no requested buyer is covered. The horizon is UNAVAILABLE: no records, no count.
+ */
+export type ForecastCoverage = 'ok' | 'partial' | 'unestablished';
+
+/**
+ * Why one requested buyer cannot be measured in agency_forecasts. The two reasons stay distinct:
+ *   unresolved_publisher        — the name resolves to NO forecast publisher identity at all
+ *                                 (NOAA, COMMERCE, HUD, SBA: measured 2026-09-23, 0 rows under any code).
+ *   publisher_without_forecasts — a KNOWN identity we hold no forecasts for (FAA, FBI, DLA …); it
+ *                                 carries the parent that does publish, for honest copy.
+ */
+export interface ForecastCoverageGap {
+  requested: string;
+  reason: 'unresolved_publisher' | 'publisher_without_forecasts';
+  label?: string;
+  parentWithData?: string;
+  note?: string;
+}
 
 export function contextFor(now = new Date()): PlanContext {
   const fy = now.getUTCMonth() >= 9 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
@@ -314,13 +345,26 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
     for (let y = ctx.fiscalYear; y <= ctx.fiscalYear + 15; y++) future.push(`fiscal_year.ilike.%${y}%`);
     fOps.push({ op: 'or', expr: `fiscal_year.is.null,${future.join(',')}` });
   }
-  const forecastAgency = buyers.length ? buyers.map((b) => b.requested).join('|') : null;
-  let coverage: 'ok' | 'unestablished' = 'ok';
+  // Publisher coverage is decided PER BUYER. A buyer is covered when it resolves to at least one
+  // publisher code or child anchor we hold. An unresolved fragment inside a covered buyer ("STATE,
+  // DEPARTMENT" → STATE) is not a missing publisher. The OR across covered buyers is unchanged; an
+  // uncovered buyer is removed from the filter rather than left to the text fallback, because
+  // `department` only ever holds the names of publishers we already hold (measured 2026-09-23) — the
+  // fallback could return 0 (a fabricated zero) or another publisher's rows, never this buyer's.
+  const covered: string[] = [];
+  const coverageGaps: ForecastCoverageGap[] = [];
   for (const b of buyers) {
     const fr = resolveForecastAgencies(b.requested);
-    if (!fr.empty && fr.identities.length > 0 && fr.identities.every((id) => id.coverage === 'none') && !fr.codes.length && !fr.children.length && !fr.unresolved.length) coverage = 'unestablished';
+    if (fr.empty || fr.codes.length || fr.children.length) { covered.push(b.requested); continue; }
+    const id = fr.identities[0];
+    coverageGaps.push(id
+      ? { requested: b.requested, reason: 'publisher_without_forecasts', label: id.label, ...(id.parentWithData ? { parentWithData: id.parentWithData } : {}), ...(id.note ? { note: id.note } : {}) }
+      : { requested: b.requested, reason: 'unresolved_publisher' });
   }
-  if (blocked) fOps.splice(0, fOps.length, NEVER('id'));
+  const coverage: ForecastCoverage = !coverageGaps.length ? 'ok' : covered.length ? 'partial' : 'unestablished';
+  const forecastAgency = covered.length ? covered.join('|') : null;
+  // No covered buyer: the horizon is unavailable — fail closed, never the unfiltered corpus.
+  if (blocked || coverage === 'unestablished') fOps.splice(0, fOps.length, NEVER('id'));
 
   return {
     version: DISCOVERY_PLAN_VERSION,
@@ -346,7 +390,11 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
     horizons: {
       open: { via: blocked ? status : oVia, mapFilters, ops: oOps },
       recompete: { via: blocked ? status : rVia, ops: rOps, naics: rNaics },
-      forecast: { via: blocked ? status : fVia, forecastFilters: { q: null, naics: fNaics, agency: forecastAgency, state: states.length ? states.join(',') : null }, ops: fOps, coverage },
+      forecast: {
+        via: blocked ? status : coverage === 'unestablished' ? 'coverage_unestablished' : fVia,
+        forecastFilters: { q: null, naics: fNaics, agency: forecastAgency, state: states.length ? states.join(',') : null },
+        ops: fOps, coverage, ...(coverageGaps.length ? { coverageGaps } : {}),
+      },
     },
     notes,
   };

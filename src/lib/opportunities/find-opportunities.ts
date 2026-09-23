@@ -6,7 +6,6 @@
  * Does NOT change map viewport APIs. Cross-class dedupe is intentionally absent.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import {
@@ -37,6 +36,7 @@ import {
   type DiscoveryInput,
   type DiscoveryPlan,
   type SurfacePolicy,
+  type ForecastCoverageGap,
 } from '@/lib/discovery';
 // Company-anchored FIND (IMI test, 2026-09-22). The anchor is a projection of lookup_sam_entity's
 // canonical record; eligibility is a separate screen from relevance.
@@ -184,6 +184,8 @@ export interface HorizonResult {
   allowed_handoffs: HandoffKey[];
   semantics_note: string | null;
   evidence_counts?: EvidenceCounts | null;
+  /** Coming Soon only: forecast publisher coverage when it is not complete (canonical plan). */
+  coverage?: { state: 'partial' | 'unestablished'; gaps: ForecastCoverageGap[] };
   /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
   orders_excluded?: number | null;
   /** Company-anchored FIND only: verdict counts over the RETURNED items (not the matched population). */
@@ -306,6 +308,7 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say “N contracts with direct cybersecurity evidence and M related SOCOM IT contracts worth reviewing.” Never say “N+M cybersecurity recompetes/contracts.” presentation_note and summary.headline already split the counts — use them.',
   'INTERPRETATION: use presentation_note / market_interpretation.truth. Buyer alias (SOCOM = U.S. Special Operations Command) is spelling, not a wider department. Never say you searched all of DoD. Never claim the entire IT-services market is cybersecurity.',
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
+  'COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured — never say they have zero upcoming buys.',
   'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (e.g. a firm called “… Machining and Fabrication”). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
 ] as const;
 
@@ -1127,16 +1130,16 @@ async function queryComingSoon(
   const asOf = await tableAsOf(client, source, 'last_synced_at');
 
   try {
-    // Forecast publisher coverage (unchanged MCP contract): a buyer with no publisher is UNAVAILABLE.
-    if (p.plan.horizons.forecast.coverage === 'unestablished') {
-      const first = p.plan.buyers.find((b) => {
-        const fr = resolveForecastAgencies(b.requested);
-        return fr.identities.length > 0 && fr.identities.every((id) => id.coverage === 'none');
-      });
-      const id = first ? resolveForecastAgencies(first.requested).identities[0] : null;
-      if (id) {
-        p.market.truth.what_remains_unsupported.push(`forecast publisher coverage for ${id.label} is not established`);
-      }
+    // Forecast publisher coverage (canonical plan): no covered buyer → UNAVAILABLE, never a measured 0.
+    const fcCov = p.plan.horizons.forecast;
+    const gaps = fcCov.coverageGaps ?? [];
+    for (const g of gaps) {
+      p.market.truth.what_remains_unsupported.push(g.reason === 'unresolved_publisher'
+        ? `no forecast publisher could be resolved for "${g.requested}"`
+        : `forecast publisher coverage for ${g.label || g.requested} is not established`);
+    }
+    if (fcCov.coverage === 'unestablished') {
+      const g = gaps[0];
       return {
         status: 'unavailable',
         matched_count: null,
@@ -1144,12 +1147,15 @@ async function queryComingSoon(
         items: [],
         source,
         as_of: asOf,
-        filters_consumed: [...consumed, 'agency→forecast_identity_no_publisher'],
+        filters_consumed: [...consumed, gaps.some((x) => x.reason === 'unresolved_publisher') ? 'agency→forecast_publisher_unresolved' : 'agency→forecast_identity_no_publisher'],
         filters_unsupported: ['agency forecast publisher'],
         unmapped_count: null,
+        coverage: { state: 'unestablished', gaps },
         error: {
           class: 'coverage_unestablished',
-          message: id?.note || `No forecast publisher for ${id?.label || 'this buyer'}. Coverage is not established — not a measured zero.`,
+          message: g?.reason === 'unresolved_publisher'
+            ? `No forecast publisher could be resolved for ${gaps.map((x) => `"${x.requested}"`).join(', ')}. Coverage is not established — not a measured zero.`
+            : g?.note || `No forecast publisher for ${g?.label || 'this buyer'}. Coverage is not established — not a measured zero.`,
         },
         allowed_handoffs: SOON_HANDOFFS,
         semantics_note:
@@ -1189,8 +1195,17 @@ async function queryComingSoon(
       return da.localeCompare(db);
     }).slice(0, limit);
 
+    // Partial coverage: the count measures ONLY the covered buyers; the missing ones are named, never zero.
+    const partial = fcCov.coverage === 'partial'
+      ? {
+        coverage: { state: 'partial' as const, gaps },
+        partialNote: `Partial coverage: counts cover ${fcCov.forecastFilters.agency?.split('|').join(', ')} only. Not measured (no forecast publisher): ${gaps.map((x) => x.requested).join(', ')} — not a zero.`,
+      }
+      : null;
+    if (partial) unsupported.push(`forecast publisher not established for: ${gaps.map((x) => x.requested).join(', ')}`);
+
     if (!rows.length) {
-      return emptyHorizon(
+      const empty = emptyHorizon(
         source,
         SOON_HANDOFFS,
         consumed,
@@ -1201,6 +1216,7 @@ async function queryComingSoon(
           : 'No matching forecasts under these filters (current and future fiscal years).',
         unmapped,
       );
+      return partial ? { ...empty, status: 'partial', coverage: partial.coverage, semantics_note: `${empty.semantics_note ?? ''} ${partial.partialNote}`.trim() } : empty;
     }
 
     const soonAnchor = p.company?.anchor ?? null;
@@ -1248,7 +1264,7 @@ async function queryComingSoon(
     });
 
     return {
-      status: 'grounded',
+      status: partial ? 'partial' : 'grounded',
       matched_count: count ?? null,
       returned_count: items.length,
       items,
@@ -1259,8 +1275,10 @@ async function queryComingSoon(
       unmapped_count: unmapped,
       error: null,
       allowed_handoffs: SOON_HANDOFFS,
+      ...(partial ? { coverage: partial.coverage } : {}),
       semantics_note:
-        'Canonical discovery eligibility (word-bounded). Current and future fiscal years unless opted in. Ranked by how many of the query’s concepts a forecast carries, then anticipated award date. Geography: pop_state only; many forecasts have no location.',
+        'Canonical discovery eligibility (word-bounded). Current and future fiscal years unless opted in. Ranked by how many of the query’s concepts a forecast carries, then anticipated award date. Geography: pop_state only; many forecasts have no location.'
+        + (partial ? ` ${partial.partialNote}` : ''),
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
   } catch (e) {
@@ -1394,6 +1412,7 @@ export function headlineFor(horizons: Record<HorizonKey, HorizonResult>): string
       return `${n == null ? '?' : n.toLocaleString()} ${label} (${ev.DIRECT_MATCH} direct · ${ev.RELATED_MARKET_CANDIDATE} related-market${ev.HOLDER_SIGNAL ? ` · ${ev.HOLDER_SIGNAL} holder-name only` : ''})`;
     }
     if (n == null) return `${label} count unknown`;
+    if (h.status === 'partial' && h.coverage) return `${n.toLocaleString()} ${label} (partial — not measured: ${h.coverage.gaps.map((g) => g.requested).join(', ')})`;
     return `${n.toLocaleString()} ${label}`;
   };
   return [
