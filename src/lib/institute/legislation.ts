@@ -139,6 +139,64 @@ export function fiscalYearFromTitle(title: string): number | null {
 }
 
 /**
+ * Where a VERSION sits in the legislative process — derived from its version code,
+ * never from a title or from the bill-level `becameLaw` fact.
+ *
+ * ⚠️ WHY THIS EXISTS (Poteto "NDAA Legislative Intelligence Live", 2026-09-22).
+ * `becameLaw` is a fact about the MEASURE, and it was stamped onto every version:
+ * S.1071 as *introduced in the Senate* carried `becameLaw: true, lawNumber 119-60`.
+ * A consumer reading the row would treat introduced text as enacted law. The stage
+ * says what THIS text is; `lawStatusAtIngestion` says what it was worth legally.
+ */
+export type LegislativeStage = 'introduced' | 'reported' | 'passed_chamber' | 'enrolled' | 'enacted' | 'other';
+
+const STAGE_BY_CODE: Record<string, LegislativeStage> = {
+  IH: 'introduced', IS: 'introduced',
+  RH: 'reported', RS: 'reported', PCH: 'reported', PCS: 'reported',
+  EH: 'passed_chamber', ES: 'passed_chamber', CPH: 'passed_chamber', CPS: 'passed_chamber',
+  EAH: 'passed_chamber', EAS: 'passed_chamber',
+  RDH: 'passed_chamber', RDS: 'passed_chamber', RFH: 'passed_chamber', RFS: 'passed_chamber',
+  ENR: 'enrolled',
+  'PUBLIC-LAW': 'enacted',
+};
+
+export function legislativeStage(code: string, becameLaw: boolean): LegislativeStage {
+  if (code === 'PP') return becameLaw ? 'enacted' : 'other';
+  return STAGE_BY_CODE[code] ?? 'other';
+}
+
+/**
+ * The legal weight of THIS version when it was ingested.
+ *  enacted                  — the text that is law (public law; the enrolled text of a
+ *                             measure that became law is the signed text)
+ *  superseded_by_enactment  — an earlier version of a measure that later became law;
+ *                             it is NOT law, the enacted text is
+ *  not_enacted              — the measure has not become law
+ */
+export type LawStatusAtIngestion = 'enacted' | 'superseded_by_enactment' | 'not_enacted';
+
+export function lawStatusAtIngestion(stage: LegislativeStage, measureBecameLaw: boolean): LawStatusAtIngestion {
+  if (!measureBecameLaw) return 'not_enacted';
+  return stage === 'enacted' || stage === 'enrolled' ? 'enacted' : 'superseded_by_enactment';
+}
+
+/**
+ * Is this measure the fiscal year's authorization VEHICLE, or a bill that AMENDS an
+ * existing act? `fiscalYearFromTitle` alone cannot tell: "To amend the National
+ * Defense Authorization Act for Fiscal Year 1994 …" is a 2026 bill, and was being
+ * tagged fiscalYear 1994. A vehicle's title NAMES itself the act for that year; an
+ * amending bill's title says it amends / corrects one.
+ */
+export type MeasureRole = 'authorization_vehicle' | 'amends_prior_act' | 'other';
+
+export function measureRole(title: string): MeasureRole {
+  const t = title.trim();
+  if (/\b(amend|amends|amending|technical corrections? to|repeal|modify)\b/i.test(t)) return 'amends_prior_act';
+  if (/national defense authorization act for fiscal year \d{4}\s*$/i.test(t)) return 'authorization_vehicle';
+  return 'other';
+}
+
+/**
  * Every source_type this collector can emit — the SCOPE of the legislative corpus.
  *
  * ⚠️ THIS IS A CLOCK BOUNDARY, NOT A CONVENIENCE LIST. institute_sources is SHARED
@@ -384,7 +442,11 @@ export function billVersionsToDocuments(
 ): InstituteDocument[] {
   const out: InstituteDocument[] = [];
   const chamber = chamberOf(ref.billType);
-  const fy = fiscalYearFromTitle(ref.title);
+  const role = measureRole(undecorateTitle(ref.title));
+  // A fiscal year is the year a VEHICLE authorizes. An amending bill names a PRIOR
+  // act's year — that is the year it amends, not the year it authorizes.
+  const titleYear = fiscalYearFromTitle(ref.title);
+  const fy = role === 'authorization_vehicle' ? titleYear : null;
 
   for (const v of textVersions) {
     const label = String(v.type ?? '').trim();
@@ -436,10 +498,15 @@ export function billVersionsToDocuments(
         billNumber: ref.number,
         legislativeVersion: label,
         versionCode: code,
+        legislativeStage: legislativeStage(code, status.becameLaw),
+        lawStatusAtIngestion: lawStatusAtIngestion(legislativeStage(code, status.becameLaw), status.becameLaw),
+        measureRole: role,
         fiscalYear: fy,
+        ...(role === 'amends_prior_act' && titleYear ? { amendsFiscalYear: titleYear } : {}),
         versionDate: date,
         latestActionDate: status.latestActionDate,
         latestActionText: status.latestActionText,
+        /** MEASURE-level: the bill became law. NOT a statement about this version — read lawStatusAtIngestion. */
         becameLaw: status.becameLaw,
         lawNumber: status.lawNumber,
         retrievedAt,
