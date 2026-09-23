@@ -50,9 +50,14 @@ if (!url || !key) {
 const sb = createClient(url, key);
 
 const results = [];
-function record(name, pass, detail) {
-  results.push({ name, pass, detail });
-  if (!JSON_OUT) console.log((pass ? '\x1b[32m✓\x1b[0m ' : '\x1b[31m✗ FAIL\x1b[0m ') + name + '  \x1b[2m' + detail + '\x1b[0m');
+// status: 'pass' | 'fail' | 'unmeasured'. UNMEASURED = the check could not observe its surface
+// (e.g. a degraded/timed-out query). It is neither a pass nor a FAIL, and it is never rendered as
+// a zero — "0 people" from a timeout is the lie this state exists to prevent.
+function record(name, pass, detail, status = pass ? 'pass' : 'fail') {
+  results.push({ name, pass: status === 'pass', status, detail });
+  if (JSON_OUT) return;
+  const tag = status === 'pass' ? '\x1b[32m✓\x1b[0m ' : status === 'unmeasured' ? '\x1b[33m? UNMEASURED\x1b[0m ' : '\x1b[31m✗ FAIL\x1b[0m ';
+  console.log(tag + name + '  \x1b[2m' + detail + '\x1b[0m');
 }
 const want = (id) => !ONLY || ONLY === id;
 
@@ -65,15 +70,11 @@ const want = (id) => !ONLY || ONLY === id;
 if (want('contacts')) {
   try {
     const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const { classifyContactsRoster } = await import('@/lib/gov-contacts/contacts-oracle');
     const r = await queryFederalContacts({ dodaac: 'W912PL', limit: 10 });
-    const people = r.contacts || r.people || r.roster || [];
-    const emails = people.map((p) => (p.contact_email || p.email || '').toLowerCase()).filter(Boolean);
-    const usace = emails.filter((e) => e.includes('usace.army.mil')).length;
-    const deptWideFallback = emails.some((e) => /osd\.osbp|osd\.mil/i.test(e));
-    // Correct = a real roster (≥3), majority the district's own domain, and NO dept-wide leak.
-    const pass = people.length >= 3 && usace >= Math.ceil(people.length / 2) && !deptWideFallback;
-    record('contacts: W912PL → LA District USACE roster (not dept-wide DoD)', pass,
-      `${people.length} people, ${usace} @usace.army.mil, dept-wide-fallback=${deptWideFallback}`);
+    // A degraded roster (timeout/query error) is UNMEASURED — never "0 people".
+    const v = classifyContactsRoster(r);
+    record('contacts: W912PL → LA District USACE roster (not dept-wide DoD)', v.status === 'pass', v.detail, v.status);
   } catch (e) {
     record('contacts: W912PL → LA District USACE roster (not dept-wide DoD)', false, 'threw: ' + (e?.message || e));
   }
@@ -478,12 +479,15 @@ if (want('forecast-match')) {
 }
 
 // ── SUMMARY ──────────────────────────────────────────────────────────────────────────────────
-const failed = results.filter((r) => !r.pass);
+const failed = results.filter((r) => r.status === 'fail');
+const unmeasured = results.filter((r) => r.status === 'unmeasured');
 if (JSON_OUT) {
-  console.log(JSON.stringify({ ok: failed.length === 0, results }, null, 2));
+  console.log(JSON.stringify({ ok: failed.length === 0 && unmeasured.length === 0, failed: failed.length, unmeasured: unmeasured.length, results }, null, 2));
 } else {
   console.log('');
-  if (failed.length === 0) console.log(`\x1b[32m✓ all ${results.length} oracle checks passed\x1b[0m`);
-  else console.log(`\x1b[31m✗ ${failed.length}/${results.length} oracle checks FAILED\x1b[0m`);
+  if (failed.length > 0) console.log(`\x1b[31m✗ ${failed.length}/${results.length} oracle checks FAILED\x1b[0m`);
+  if (unmeasured.length > 0) console.log(`\x1b[33m? ${unmeasured.length}/${results.length} oracle checks UNMEASURED (could not observe — not a pass)\x1b[0m`);
+  if (failed.length === 0 && unmeasured.length === 0) console.log(`\x1b[32m✓ all ${results.length} oracle checks passed\x1b[0m`);
 }
-process.exit(failed.length === 0 ? 0 : 1);
+// 0 = every check measured and passed · 1 = a check FAILED · 3 = none failed but some were UNMEASURED.
+process.exit(failed.length > 0 ? 1 : unmeasured.length > 0 ? 3 : 0);

@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Contacts — DoDAAC-prefix lookup indexed + degraded ≠ zero
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-23 | federal_contacts / MCP search_federal_contacts · /api/app/federal-contacts · /api/app/contacts-map · verify:oracles | **A timeout was reported as "0 people".** W912PL has 182 government-buyer rows, but federal_contacts (~298K rows, 391 MB) had NO index on solicitation_number: the prefix ILIKE was a parallel seq scan evaluating six placeholder NOT ILIKEs per row, twice (page + count:'exact'). Measured live: serial 5,189 ms; 8 concurrent → 8/8 canceling statement due to statement timeout (8s authenticator statement_timeout) → {contacts:[],degraded:true} → oracle printed "0 people". Fix: trigram GIN idx_fed_contacts_solnum_trgm (CONCURRENTLY, **not yet applied**) serves the existing ILIKE unchanged (an upper() btree cannot — PostgREST can't emit the expression; measured on a copy it still seq-scans). On a temp copy: 3,459 ms → 5.9 ms (page+exact count); exact count kept (planner estimate is 11 vs 182 real). One shared predicate on all surfaces; oracle has a third state UNMEASURED (exit 3); MCP degraded is never grounded + carries degraded_reason. | `idx_fed_contacts_solnum_trgm` → `supabase/migrations/20260923_federal_contacts_solnum_prefix_idx.sql`; `withDodaacPrefix` → `src/lib/gov-contacts/dodaac-prefix.ts`; `classifyContactsRoster` → `scripts/verify-oracles.mjs` | dodaac-prefix.unit.test.ts, contacts-oracle.unit.test.ts, contact-roster.dodaac-query.unit.test.ts, federal-contacts.unit.test.ts (red→green for oracle, surfaces, MCP). Live under load: OLD oracle ✗ 0 people exit 1 · NEW ? UNMEASURED … statement timeout exit 3. | OPEN PR — index applies after review |
+
+---
+
 ## FIND eligibility — raw set-aside flag wording
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

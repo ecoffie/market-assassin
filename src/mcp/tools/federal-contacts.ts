@@ -6,7 +6,8 @@
  *
  * Wraps the shared src/lib/gov-contacts/contact-roster.ts (Supabase read, no LLM).
  * The agency's OSBP small-business contact is prepended as the front door. Honest:
- * grounded=false = no matching contacts (not an invented POC); _meta.anchor tells you
+ * grounded=false = no matching contacts (not an invented POC) — unless degraded=true, which means
+ * the lookup failed/timed out and the answer is UNKNOWN (never "zero"); _meta.anchor tells you
  * whether the roster is office-precise ('dodaac'/'agency-dodaac') or a broad department
  * preview ('department'). tier: metered, credits: 15. `_ai_hint` OFF by default.
  */
@@ -32,6 +33,8 @@ export interface FederalContactsToolResult {
     count: number;
     emailable_count: number;
     total: number;
+    /** Why the source could not answer (e.g. a statement timeout). Present only when degraded. */
+    degraded_reason?: string;
   };
 }
 
@@ -45,7 +48,11 @@ export async function searchFederalContacts(input: FederalContactsToolInput): Pr
     limit: input.limit,
   });
 
-  const grounded = res.contacts.length > 0;
+  // A degraded lookup (timeout / query error) is UNKNOWN, never an empty grounded roster:
+  // grounded stays false so runMeteredTool's degraded+ungrounded rule does not bill it, and the
+  // agent must not tell the user "this office has no contacts" (W912PL has 182 — the query
+  // timed out, it did not come back empty).
+  const grounded = !res.degraded && res.contacts.length > 0;
   const officePrecise = res.anchor === 'dodaac' || res.anchor === 'agency-dodaac';
 
   const result: FederalContactsToolResult = {
@@ -57,6 +64,9 @@ export async function searchFederalContacts(input: FederalContactsToolInput): Pr
       count: res.contacts.length,
       emailable_count: res.emailableCount,
       total: res.total,
+      ...(res.degraded
+        ? { degraded_reason: res.trace.filter(Boolean).slice(-1)[0] || 'contacts source unavailable' }
+        : {}),
     },
   };
 
@@ -64,7 +74,7 @@ export async function searchFederalContacts(input: FederalContactsToolInput): Pr
     const named = res.contacts.find((c) => c.contact_email);
     result._ai_hint = {
       summary: res.degraded
-        ? 'The contacts source errored (Supabase unreachable) — temporarily unavailable, not "no contacts".'
+        ? 'The contacts lookup failed or timed out — temporarily unavailable, NOT "no contacts". Retry; do not tell the user this office has no people.'
         : res.anchor === 'none'
         ? 'Provide an agency/command name, a 6-char DoDAAC, or a search term — nothing to look up.'
         : !grounded

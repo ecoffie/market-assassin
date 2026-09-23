@@ -397,8 +397,8 @@ if [ ! -f .env.local ]; then
 elif npm run --silent verify:oracles > /tmp/mindy-prepush-oracles.log 2>&1; then
   echo -e "      ${GREEN}✓ all oracle checks passed (numbers reconcile with source)${NC}"
 else
-  echo -e "      ${YEL}⚠ an oracle check FAILED — a data regression may be shipping (NOT blocking):${NC}"
-  grep -E "FAIL|threw" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}⚠ an oracle check FAILED or was UNMEASURED — a data regression may be shipping (NOT blocking):${NC}"
+  grep -E "FAIL|threw|UNMEASURED" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
   echo -e "      ${YEL}  (review with: npm run verify:oracles — a transient DB/network blip can also cause this)${NC}"
 fi
 
