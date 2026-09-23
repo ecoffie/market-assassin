@@ -137,6 +137,13 @@ async function emailGuardBlock(to: string, emailType: string | undefined, transa
   // domain, damaging the sender reputation every real Mindy email depends on.
   // Unconditional: even "transactional" must not be delivered here.
   if (email.endsWith('@clients.getmindy.ai')) return 'synthetic_client_address';
+  // email_suppressions is MAILBOX suppression (hard bounce, complaint, provider list,
+  // repeated transient bounce — written by the Resend webhook, src/lib/email/suppression.ts).
+  // It blocks every non-transactional stream below. User-initiated transactional mail
+  // (password reset, 2FA, receipts) deliberately bypasses it; Resend's own list is the
+  // backstop there. The PRODUCT preference alerts_enabled is NOT consulted here at all —
+  // it only shapes the alert crons' audiences — so turning alerts off can never block
+  // security mail.
   if (transactional || isTransactionalType(emailType)) return null;
   try {
     const sb = getSupabase();
