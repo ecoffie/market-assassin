@@ -82,3 +82,62 @@ export function classifyLegislationFreshness(input: {
   }
   return { status: 'healthy', pollAgeDays: pollAge, sourceAgeDays: srcAge };
 }
+
+/**
+ * lastSourceAdvance — the newest DEFENSIBLE publication date of legislative source
+ * material this run held. Only a document's own publication/version date counts.
+ *
+ * ⚠️ NOT `sourceWatermark`. The collector's per-document `sourceWatermark` falls back
+ * to Congress's bill-record `updateDate` when a version is undated (it is persisted as
+ * `institute_sources.source_watermark` and means "record activity", not publication).
+ * Measured 2026-09-23: 119-S1071-ENR is undated; its bill record was edited on
+ * 2026-09-22, and that metadata edit advanced this clock to 2026-09-22 — "healthy,
+ * 1 day old" — when the newest dated legislative text was 2026-07-30.
+ *
+ * Undated documents stay held and provenanced; they simply contribute NOTHING here.
+ * No dated document at all → null (unknown), never an invented date.
+ */
+export function legislativeSourceAdvance(docs: Array<{ publicationDate: string | null }>): string | null {
+  return docs
+    .map((d) => d.publicationDate)
+    .filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d))
+    .sort()
+    .at(-1) ?? null;
+}
+
+/**
+ * The control-plane view (`data_source_instances`) of ONE successful execution.
+ *
+ * The route used to stamp only the `data_sources.notes` sentinel, so every run left
+ * the control plane at its seed-time clocks — measured 2026-09-23: notes lastPoll
+ * 2026-09-23T00:57Z, control plane last_poll 2026-09-20T12:59Z. Both views are now
+ * written from the SAME execution's values (same pollAt, same source advance).
+ *
+ * Four clocks, never collapsed:
+ *   last_poll / last_successful_check  polled        — Congress was checked
+ *   last_source_advance                source advanced — newest dated legislative publication
+ *   last_verified_ingest               reconciliation completed with no failures
+ *   last_data_advance                  ingested      — Mindy's corpus actually changed
+ *   (intelligence changed lives in the notes sentinel: lastIntelligenceChange)
+ *
+ * Deliberately NOT written: source_state / intervention_state / manual_action_type —
+ * the operator-owned parked state is cleared by a human, never by a run.
+ */
+export function legislationInstancePatch(input: {
+  pollAt: string;
+  coverageComplete: boolean;
+  corpusChanged: boolean;
+  sourceAdvance: string | null;
+}): Record<string, string | null> {
+  const patch: Record<string, string | null> = {
+    last_poll: input.pollAt,
+    last_verified_ingest: input.pollAt,
+    last_source_advance: input.sourceAdvance
+      ? (/^\d{4}-\d{2}-\d{2}$/.test(input.sourceAdvance) ? `${input.sourceAdvance}T00:00:00.000Z` : input.sourceAdvance)
+      : null,
+    updated_at: input.pollAt,
+  };
+  if (input.coverageComplete) patch.last_successful_check = input.pollAt;
+  if (input.corpusChanged) patch.last_data_advance = input.pollAt;
+  return patch;
+}

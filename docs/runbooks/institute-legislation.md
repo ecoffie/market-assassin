@@ -48,13 +48,32 @@ so the citation qualifier is part of the key.
 
 ## Clocks (never conflate)
 
-| Clock | Advances when |
-|---|---|
-| `last_poll` | Every real Congress API check attempt |
-| `last_successful_check` | Feed read succeeded and parsed |
-| `last_verified_ingest` | Complete-coverage reconciliation (never on `partial`) |
-| `last_data_advance` | Held rows actually changed |
-| `last_source_advance` | Newest legislative **publication** date held (never Mindy time) |
+One successful execution writes **both** views — the `data_sources.notes` sentinel and the
+`data_source_instances` control plane — from the same values (same `pollAt`, same source
+advance). Before 2026-09-23 only the notes were stamped, so the control plane sat at its
+seed time (notes said 2026-09-23, control plane said 2026-09-20).
+
+| Concept | Control plane | Notes sentinel | Advances when |
+|---|---|---|---|
+| **polled** | `last_poll`, `last_successful_check` | `lastPoll` | A successful, stampable run checked Congress (`last_successful_check` only on complete coverage) |
+| **source advanced** | `last_source_advance` | `lastSourceAdvance` | Newest **dated** legislative publication held — a document's own version/issue date only |
+| **ingested** | `last_data_advance` | — | Mindy's corpus actually changed (insert or source-field update) |
+| (verified) | `last_verified_ingest` | — | Reconciliation finished with no failure, block or partial |
+| **intelligence changed** | — | `lastIntelligenceChange` | A legislative derivation actually changed |
+
+⚠️ **Source advance is never bill-record metadata.** Congress edits bill records (actions,
+cosponsors) without publishing text. An undated version (e.g. `119-S1071-ENR`) carries the
+bill's `updateDate` as its per-document `source_watermark` — that column means *record
+activity*, not publication — and it contributes **nothing** to the source-advance clock
+(`legislativeSourceAdvance`). No dated document → `null` (unknown), never an invented date.
+
+The run never writes `source_state`, `intervention_state` or `manual_action_type` — the
+parked state is operator-owned.
+
+**Open follow-up (general reliability, not this source):** `reportCronOutcome` closes the
+job's *newest* `cron_job_runs` row regardless of which invocation it is, so a manual
+execution on 2026-09-23 stamped `success` onto the 2026-09-20 scheduled row (its real
+outcome is unknown). Tracked with #1593's completion-reporting work.
 
 `upstream_population` is **NULL** — we never counted the upstream universe.
 `held_population` = `count(*)` of `institute_sources` where `source_type IN
