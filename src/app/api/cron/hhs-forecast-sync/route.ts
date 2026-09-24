@@ -9,7 +9,7 @@
  * indistinguishable from "0 new records" — every outcome below names itself.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { forecastWriterClient } from '@/lib/forecasts/writer';
 import { runHhsIngest } from '@/lib/forecasts/hhs-ingest';
 
 export const runtime = 'nodejs';
@@ -25,11 +25,17 @@ export async function GET(request: NextRequest) {
   // ?dry=1 runs the full plan and writes nothing — for production smoke.
   const apply = request.nextUrl.searchParams.get('dry') !== '1';
 
-  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Declares itself the DAILY SYNC to the agency_forecasts floor guard (src/lib/forecasts/writer.ts).
+  const sb = forecastWriterClient('daily_sync');
   const nowIso = new Date().toISOString();
 
   try {
     const r = await runHhsIngest(sb, { apply });
+    // A refused bulk of NEW rows is a FAILED run (ops must route it through a publisher backfill), never a quiet success.
+    if (r.insertRefused) {
+      console.error(`[forecast-sync] new-row guard refused inserts: ${r.insertRefused}`);
+      return NextResponse.json({ success: false, failure: `insert_refused: ${r.insertRefused}`, detail: r }, { status: 500 });
+    }
 
     // A failed source is NEVER recorded as a quiet, current one.
     if (!r.ok) {

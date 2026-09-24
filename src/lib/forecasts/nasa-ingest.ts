@@ -7,6 +7,7 @@
  * NASA SourceID and nothing else — a title bridge that survived into runtime
  * would silently re-introduce the ambiguity it was built to escape.
  */
+import { guardForecastInserts } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import * as XLSX from 'xlsx';
@@ -18,6 +19,8 @@ export const NASA_CURRENT_SOURCE_TYPE = 'naf_xlsx';
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
 export interface NasaIngestResult {
+  /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
+  insertRefused?: string;
   ok: boolean; failure?: string; applied: boolean;
   rawUpstream: number; distinctSourceIds: number; rejectedNoIdentity: number; duplicateSourceIds: number;
   fingerprint: string | null; sourceLastModified: string | null; sourceEtag: string | null;
@@ -151,9 +154,14 @@ export async function runNasaIngest(
   if (!apply) return r;
 
   r.applied = true;
-  r.insertAttempted = toInsert.length;
-  for (let i = 0; i < toInsert.length; i += 500) {
-    const batch = toInsert.slice(i, i + 500).map((m) => ({
+  // BACKFILL SAFETY (src/lib/forecasts/writer.ts): a daily run may not create a bulk of NEW rows while the
+  // publisher's alert floor is active — those would all read as "new" Forecasts. Updates still apply.
+  const insertGuard = await guardForecastInserts(sb, 'NASA', toInsert.length);
+  if (!insertGuard.allow) r.insertRefused = insertGuard.reason;
+  const allowedInserts = insertGuard.allow ? toInsert : [];
+  r.insertAttempted = allowedInserts.length;
+  for (let i = 0; i < allowedInserts.length; i += 500) {
+    const batch = allowedInserts.slice(i, i + 500).map((m) => ({
       ...(m.fields as Record<string, unknown>), ...(m.derived as Record<string, unknown>),
       source_agency: 'NASA', source_type: NASA_CURRENT_SOURCE_TYPE,
       source_url: NASA_FORECAST_URL, last_synced_at: new Date().toISOString(),

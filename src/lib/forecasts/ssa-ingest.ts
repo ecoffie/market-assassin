@@ -22,6 +22,7 @@
  * Identity is the source-native APP # (`SSA-<APP#>`). The recovered 12112026 edition is
  * provenance-repair EVIDENCE ONLY and must never participate in runtime ingestion.
  */
+import { guardForecastInserts } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 import * as xlsx from 'xlsx';
@@ -56,6 +57,8 @@ export type SsaFailure =
   | 'parse_failure' | 'source_schema_failure' | 'identity_failure' | 'receipt_mismatch';
 
 export interface SsaIngestResult {
+  /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
+  insertRefused?: string;
   ok: boolean; failure?: SsaFailure; failureDetail?: string; applied: boolean;
   discoveryUrl: string; selectedUrl?: string; selectedLabel?: string;
   fingerprint?: string; sourceLastModified?: string | null; sourceEtag?: string | null;
@@ -320,7 +323,10 @@ export async function runSsaIngest(
   // 6) apply
   let inserted = 0, insertFailed = 0, updated = 0, updateFailed = 0;
   const nowIso = new Date().toISOString();
-  for (const id of newIds) {
+  // BACKFILL SAFETY (src/lib/forecasts/writer.ts): no bulk of NEW rows while SSA's alert floor is active.
+  const insertGuard = await guardForecastInserts(sb, 'SSA', newIds.length);
+  if (!insertGuard.allow) result.insertRefused = insertGuard.reason;
+  for (const id of insertGuard.allow ? newIds : []) {
     const src = byId.get(id)!;
     const { error } = await sb.from('agency_forecasts').insert({
       source_agency: 'SSA', source_type: 'excel', source_url: pick.url, external_id: id,

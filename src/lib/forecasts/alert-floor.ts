@@ -8,14 +8,16 @@
  *
  * Who may move a floor:
  *   - an operator seeding floors at cutover (scripts/forecast-publisher-floor.ts --seed),
- *   - an onboarding/backfill job through runPublisherBackfill() — suspend first, activate at the load's
- *     last created_at only after it succeeds (a failed load stays suspended: no burst, no silent reopen).
+ *   - an onboarding/backfill job through runPublisherBackfill() — suspend (verified) → load → reconcile, and it
+ *     STOPS suspended with a proposed floor; activation is a separate explicit act (scripts/forecast-publisher-floor.ts).
+ * The database floor guard (writer.ts) refuses any other path that tries to CREATE rows while the floor is active.
  * The ordinary daily sync NEVER calls this module (pinned by alert-floor.unit.test.ts): a routine sync
  * inserts genuinely new rows that must stay alertable, and re-stamps old rows without changing created_at.
  *
  * Floors never move BACKWARD without `allowRewind` — a rewind would expose historical rows as "new".
  */
 import { FORECAST_SOURCE_AGENCY_CODES } from './agency-identity';
+import { isTimestamp, tsMicros } from '@/lib/saved-searches/forecast-watermark';
 
 export type FloorState = 'active' | 'suspended';
 export type FloorRow = { source_agency: string; state: FloorState; alertable_after: string | null; reason?: string; set_by?: string };
@@ -29,7 +31,6 @@ export type FloorDecision =
   | { ok: false; error: string };
 
 const KNOWN = new Set<string>(FORECAST_SOURCE_AGENCY_CODES as readonly string[]);
-const t = (s: string) => new Date(s).getTime();
 
 /** Pure: what a floor change would do. Validates identity, reason, monotonicity. */
 export function decideFloorChange(prev: FloorRow | null, change: FloorChange): FloorDecision {
@@ -38,19 +39,21 @@ export function decideFloorChange(prev: FloorRow | null, change: FloorChange): F
   if (!change.set_by?.trim()) return { ok: false, error: 'set_by is required' };
   if (change.kind === 'seed') {
     if (prev) return { ok: true, next: prev, noop: true }; // seeding never overwrites an existing floor
-    if (Number.isNaN(t(change.alertable_after))) return { ok: false, error: 'alertable_after is not a timestamp' };
-    return { ok: true, noop: false, next: { source_agency: change.source_agency, state: 'active', alertable_after: new Date(change.alertable_after).toISOString(), reason: change.reason, set_by: change.set_by } };
+    if (!isTimestamp(change.alertable_after)) return { ok: false, error: 'alertable_after is not a timestamp' };
+    return { ok: true, noop: false, next: { source_agency: change.source_agency, state: 'active', alertable_after: change.alertable_after, reason: change.reason, set_by: change.set_by } };
   }
   if (change.kind === 'suspend') {
     if (prev?.state === 'suspended') return { ok: true, next: prev, noop: true };
     return { ok: true, noop: false, next: { source_agency: change.source_agency, state: 'suspended', alertable_after: prev?.alertable_after ?? null, reason: change.reason, set_by: change.set_by } };
   }
-  if (Number.isNaN(t(change.alertable_after))) return { ok: false, error: 'alertable_after is not a timestamp' };
-  if (prev?.alertable_after && t(change.alertable_after) < t(prev.alertable_after) && !change.allowRewind) {
+  if (!isTimestamp(change.alertable_after)) return { ok: false, error: 'alertable_after is not a timestamp' };
+  if (prev?.alertable_after && tsMicros(change.alertable_after) < tsMicros(prev.alertable_after) && !change.allowRewind) {
     return { ok: false, error: `floor would move backward (${prev.alertable_after} → ${change.alertable_after}); that exposes historical rows as new — pass allowRewind with a reason` };
   }
-  const next: FloorRow = { source_agency: change.source_agency, state: 'active', alertable_after: new Date(change.alertable_after).toISOString(), reason: change.reason, set_by: change.set_by };
-  const noop = prev?.state === 'active' && prev.alertable_after != null && t(prev.alertable_after) === t(next.alertable_after!);
+  // Stored exactly as given (microsecond precision). Rounding through Date would put the row created AT the
+  // boundary on the alertable side of its own floor.
+  const next: FloorRow = { source_agency: change.source_agency, state: 'active', alertable_after: change.alertable_after, reason: change.reason, set_by: change.set_by };
+  const noop = prev?.state === 'active' && prev.alertable_after != null && tsMicros(prev.alertable_after) === tsMicros(next.alertable_after!);
   return { ok: true, next, noop };
 }
 
@@ -87,21 +90,31 @@ export async function publisherLastCreatedAt(db: any, source: string): Promise<{
 }
 
 /**
- * Run a historical onboarding / backfill for ONE publisher without turning its rows into alerts:
- *   suspend → load() → floor = the publisher's last created_at → active.
- * If load() throws, the floor stays SUSPENDED (fail closed) and the error propagates.
+ * The ONLY sanctioned path for a historical onboarding / backfill of ONE publisher:
+ *
+ *   suspend (verified) → load → reconcile → STOP, still suspended, with a PROPOSED floor
+ *
+ * It never re-activates the publisher. Activation is a separate explicit act after the load has been reviewed:
+ *   scripts/forecast-publisher-floor.ts --activate <CODE> --after <proposedFloor> --reason "…" --go
+ * While suspended the publisher sends no alerts, and the database floor guard lets the load create rows.
+ * A throw from load() or a failed reconcile leaves it suspended and propagates — no burst, no silent reopen.
  */
 export async function runPublisherBackfill<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any, source: string, reason: string, setBy: string, load: () => Promise<T>,
-): Promise<T> {
+  db: any, source: string, reason: string, setBy: string,
+  load: () => Promise<T>,
+  reconcile: (result: T) => Promise<{ ok: boolean; detail?: string }>,
+): Promise<{ result: T; state: 'suspended_awaiting_activation'; proposedFloor: string }> {
   const s = await applyFloorChange(db, { kind: 'suspend', source_agency: source, reason: `backfill start: ${reason}`, set_by: setBy }, { dryRun: false });
   if (!s.ok) throw new Error(`cannot suspend ${source}: ${s.error}`);
+  // Verify, never assume: a load must not start against an active floor.
+  const { data: now, error: re } = await db.from('forecast_publisher_alert_floor').select('state').eq('source_agency', source).limit(1).maybeSingle();
+  if (re || now?.state !== 'suspended') throw new Error(`${source} is not suspended (${re?.message ?? now?.state ?? 'no row'}) — refusing to load`);
   const result = await load();
+  const rec = await reconcile(result);
+  if (!rec.ok) throw new Error(`backfill for ${source} did not reconcile (stays suspended): ${rec.detail ?? 'no detail'}`);
   const last = await publisherLastCreatedAt(db, source);
-  if ('error' in last) throw new Error(`backfill for ${source} loaded but floor NOT activated (stays suspended): ${last.error}`);
-  if (!last.at) throw new Error(`backfill for ${source} loaded 0 rows — floor stays suspended`);
-  const a = await applyFloorChange(db, { kind: 'activate', source_agency: source, alertable_after: last.at, reason: `backfill complete: ${reason}`, set_by: setBy }, { dryRun: false });
-  if (!a.ok) throw new Error(`backfill for ${source} loaded but floor NOT activated (stays suspended): ${a.error}`);
-  return result;
+  if ('error' in last) throw new Error(`backfill for ${source} reconciled but its boundary could not be read (stays suspended): ${last.error}`);
+  if (!last.at) throw new Error(`backfill for ${source} holds 0 rows — stays suspended`);
+  return { result, state: 'suspended_awaiting_activation', proposedFloor: last.at };
 }

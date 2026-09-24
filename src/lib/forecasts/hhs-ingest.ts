@@ -4,6 +4,7 @@
  * Read-only by default: `apply: false` produces the full plan and writes nothing,
  * so the accounting and the semantic gate can both be inspected before mutation.
  */
+import { guardForecastInserts } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { HHS_FORECAST_URL, parseHhsForecast, hhsExternalId, hhsQuarter, hhsFy, hhsValueLabel, type HhsForecastRow } from './hhs-forecast';
 import {
@@ -13,6 +14,8 @@ import {
 } from './hhs-reconcile';
 
 export interface HhsIngestResult {
+  /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
+  insertRefused?: string;
   ok: boolean;
   failure?: string;
   upstreamTotal: number;
@@ -158,9 +161,14 @@ export async function runHhsIngest(
 
   // ── WRITE. Batched, with EXACT receipts — never inferred from a capped payload. ──
   result.applied = true;
-  result.insertAttempted = plan.toInsert.length;
-  for (let i = 0; i < plan.toInsert.length; i += 500) {
-    const batch = plan.toInsert.slice(i, i + 500).map((r) => ({
+  // BACKFILL SAFETY (src/lib/forecasts/writer.ts): a daily run may not create a bulk of NEW rows while the
+  // publisher's alert floor is active — those would all read as "new" Forecasts. Updates still apply.
+  const insertGuard = await guardForecastInserts(sb, 'HHS', plan.toInsert.length);
+  if (!insertGuard.allow) result.insertRefused = insertGuard.reason;
+  const allowedInserts = insertGuard.allow ? plan.toInsert : [];
+  result.insertAttempted = allowedInserts.length;
+  for (let i = 0; i < allowedInserts.length; i += 500) {
+    const batch = allowedInserts.slice(i, i + 500).map((r) => ({
       ...r,
       ...(derivedById.get(r.external_id) ?? {}),   // INSERT ONLY — never an update
       source_agency: 'HHS', source_type: 'sbcx_api',

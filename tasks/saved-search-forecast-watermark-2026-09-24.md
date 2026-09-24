@@ -5,23 +5,21 @@
   the literal `'true'`.
 - The migration is **not applied**. No saved-search state was written, no floor was set, no email was sent.
 - The companion identity fix is **PR #1682** (DHS `*` republish ids). It blocks enabling this engine.
+- Review round 2 (this revision) closes three issues: the 5,000-candidate dead-end (§5), backfill enforcement (§6),
+  and a rollback that cannot burst (§7).
 
 ## 1. Is one global watermark sufficient? — NO (proof)
 
-**Counterexample.** Take a saved search for `VETERANS AFFAIRS | X` whose buyer X is uncovered (the resolver has no
-publisher identity for it) while X's rows are already arriving in `agency_forecasts`.
-1. **Days 1–2:** the run is partial. VA is measured, so W advances to each snapshot.
-2. **Day 1:** a genuinely new X forecast is created, with `created_at` inside day 1.
-3. **Day 3:** a resolver change makes X covered. The next interval is (W₂, S₃], and the day-1 X row is before W₂.
+**Counterexample.** Take a saved search for `VETERANS AFFAIRS | X`, where buyer X is uncovered while X's rows are
+already arriving.
+1. **Days 1–2:** the run is partial. VA is measured and W advances.
+2. **Day 1:** a genuinely new X forecast is created.
+3. **Day 3:** X becomes covered. The next interval starts at W₂, past the day-1 row.
 
-That row is never read by any future run: a **permanent blind spot**. Pinned as test `11b` (the global-only state finds
-0 rows); test `11+12` shows the gap boundary finding it.
+That row is never read again: a permanent blind spot. Pinned as test `11b`. The fix is `forecast_gap_since`, a
+per-buyer catch-up boundary.
 
-When does the corpus actually hold rows for an uncovered buyer? Today the four unresolved publishers (NOAA, COMMERCE,
-HUD, SBA) hold 0 rows, so the blind spot is latent. It opens whenever an ingest lands before, or without, the resolver
-mapping, or when a child identity or anchor is added later. The design must not depend on that ordering.
-
-## 2. Final schema — `supabase/migrations/20260924_saved_search_forecast_watermark.sql`
+## 2. Schema — `supabase/migrations/20260924_saved_search_forecast_watermark.sql` (additive, NOT applied)
 
 ```sql
 -- Saved Search FORECAST newness = a created_at watermark (2026-09-24).
@@ -41,6 +39,11 @@ ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS forecast_seen_through TIMEST
 --     stay discoverable once it becomes covered (no permanent blind spot). Bounded by the number of saved
 --     buyers (≤ the agency multi-select), never by the number of Forecasts.
 ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS forecast_gap_since JSONB;
+
+-- 2b · Durable progress of an interval that could not be processed in one run (> 20 keyset pages). Holds the
+--      fixed snapshot, one (created_at, id) keyset cursor per segment, a running count and 3 evidence ids. The
+--      watermark moves only when every segment is done. Bounded size; never a list of Forecasts.
+ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS forecast_pending JSONB;
 
 -- 3 · Publisher alert floors. Key = agency_forecasts.source_agency — the canonical publisher code Discovery
 --     resolves buyers to (resolveForecastAgencies().codes / child parentSourceAgency).
@@ -86,211 +89,325 @@ GRANT EXECUTE ON FUNCTION saved_search_forecast_snapshot() TO service_role;
 
 -- 5 · Candidate selection filters on created_at.
 CREATE INDEX IF NOT EXISTS idx_agency_forecasts_created_at ON agency_forecasts (created_at);
+
+-- 6 · BACKFILL SAFETY GUARD. Creating a row stamps created_at = now(), which is what makes a Forecast "new".
+--     While a publisher's floor is ACTIVE, only the declared DAILY SYNC may create rows for it:
+--       PostgREST header  x-forecast-writer: daily_sync   (src/lib/forecasts/writer.ts forecastWriterClient)
+--       or, in SQL,       SET LOCAL app.forecast_writer = 'daily_sync'
+--     Any other writer (a historical import, a backfill script, psql) is refused until the publisher is suspended
+--     (scripts/forecast-publisher-floor.ts --suspend / runPublisherBackfill). Upserts that only UPDATE an existing
+--     (source_agency, external_id) are never refused — they cannot create a new created_at.
+CREATE OR REPLACE FUNCTION agency_forecasts_floor_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  floor_state TEXT;
+  writer      TEXT;
+  hdrs        TEXT;
+BEGIN
+  SELECT state INTO floor_state FROM forecast_publisher_alert_floor WHERE source_agency = NEW.source_agency;
+  IF floor_state IS NULL OR floor_state = 'suspended' THEN
+    RETURN NEW;   -- no floor (not alertable) or suspended (a sanctioned load): nothing here can become an alert
+  END IF;
+  IF EXISTS (SELECT 1 FROM agency_forecasts WHERE source_agency = NEW.source_agency AND external_id = NEW.external_id) THEN
+    RETURN NEW;   -- the ON CONFLICT path of an upsert: an update, created_at is kept
+  END IF;
+  writer := NULLIF(current_setting('app.forecast_writer', true), '');
+  IF writer IS NULL THEN
+    hdrs := NULLIF(current_setting('request.headers', true), '');
+    IF hdrs IS NOT NULL THEN
+      writer := hdrs::json ->> 'x-forecast-writer';
+    END IF;
+  END IF;
+  IF writer = 'daily_sync' THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION USING
+    ERRCODE = 'P0001',
+    MESSAGE = format('agency_forecasts: refusing to create %s/%s while the %s alert floor is ACTIVE (writer=%s).',
+                     NEW.source_agency, NEW.external_id, NEW.source_agency, COALESCE(writer, 'undeclared')),
+    HINT = 'Historical/bulk loads must suspend the publisher first: scripts/forecast-publisher-floor.ts --suspend, load, reconcile, --activate (or runPublisherBackfill).';
+END
+$$;
+
+DROP TRIGGER IF EXISTS agency_forecasts_floor_guard ON agency_forecasts;
+CREATE TRIGGER agency_forecasts_floor_guard
+  BEFORE INSERT ON agency_forecasts
+  FOR EACH ROW EXECUTE FUNCTION agency_forecasts_floor_guard();
 ```
 
-All objects are additive. `forecast_seen_through` / `forecast_gap_since` are selected **only** by the canonical engine, so
-code deployed before the migration cannot break the legacy cron. That is pinned by the route test "legacy engine: no
-watermark columns selected".
+Executed end to end, never against a real database:
+`NODE_PATH=<pglite>/node_modules node scripts/proofs/forecast-floor-guard.pglite.mjs` → **12/12 PASS**
+(details in §6).
 
-## 3. Partial-coverage state design
+## 3. State model
 
-State per search is `W = forecast_seen_through` plus `G = forecast_gap_since {saved buyer → boundary}`. It is bounded by
-the number of saved buyers, never by Forecast volume. Each evaluation captures **one** snapshot S from the database clock,
-lagged 5 minutes, so a transaction still in flight cannot straddle two runs.
+- **Per search:** `W = forecast_seen_through` and `G = forecast_gap_since {saved buyer → boundary}`. Both are bounded by
+  the number of saved buyers.
+- **`P = forecast_pending`:** only while an interval is in progress (§5). It holds the fixed snapshot, one keyset cursor
+  per segment, a count, and 3 evidence ids.
+- **Snapshot:** one per interval, from the database clock lagged 5 minutes, kept as exact text. Timestamps are compared
+  at microsecond precision and never rounded through a JS `Date`; test `13b` pins a row created exactly at a floor.
 
-| run outcome | Forecast read | state after (written only if the whole run succeeds) |
+| run outcome | state after (written only if the whole run succeeds) |
+|---|---|
+| W NULL (new / unmigrated search) | W=S; each uncovered buyer g gets G[g]=S; **no Forecast alert** |
+| interval complete, fully covered (incl. zero) | W=S; P cleared |
+| interval complete, partial | W=S; a newly uncovered g gets G[g]=W (an existing boundary is kept); P cleared |
+| buyer g in G becomes covered | the interval gets a `gap:g` segment over (G[g], W]; g leaves G **only when the whole interval completes** |
+| interval NOT complete (> 20,000 rows) | P saved with its cursors; **W and G unchanged** |
+| unavailable / refused plan | **nothing written** |
+| failed query / snapshot / floor read / email send | **nothing written**; the retry resumes from the last durable P |
+
+## 4. Partial-coverage proofs (all pass)
+
+| requirement | test |
+|---|---|
+| newly uncovered buyer gets the pre-gap boundary | G1 |
+| repeated partial runs never move it forward | G2 (4 runs) |
+| becoming covered catches up from the ORIGINAL boundary | G3+G7 |
+| the publisher floor still applies during catch-up | G4 |
+| a successful catch-up clears only that buyer's gap | G5 |
+| a failed catch-up preserves the gap (and W) | G6 |
+| an interrupted catch-up keeps the gap until its segment completes | G6b |
+| other covered buyers keep advancing normally | G3+G7 |
+
+## 5. High-volume processing — the 5,000-candidate dead-end is removed
+
+**Discovery.** Each segment is read by **keyset pagination** over the unique, stable tuple **(created_at, id)**:
+`created_at > c OR (created_at = c AND id > i)`, ordered `created_at, id`. There is no OFFSET, and `created_at` alone is
+never assumed unique. Each page is 500 rows plus one look-ahead row; a run reads at most 40 pages (20,000 rows). Only one
+page is in memory.
+
+**Progress.** `forecast_pending` stores the snapshot, one cursor per segment, the running count and 3 evidence ids, and
+nothing else (under 2 KB at 100,000 rows). The next run **resumes the same interval with the same snapshot** before a new
+interval can start. W moves only when every segment is done, so the watermark never passes an unprocessed row. A failed
+run writes nothing and the retry resumes from the last durable cursor, so there are no drops and no double counts.
+
+**Presentation.** One email per completed interval: the count plus 3 evidence rows (the template renders at most 3). Open
+alerts are **not held back** while a Forecast interval is still being processed.
+
+⚠️ **PostgREST caps every response at 1,000 rows.** The first version used 1,000-row pages. It asked for 1,001, got
+1,000, read that as "no more pages", and **dropped 1,018 of 2,018 rows**. The unit fakes did not cap, so only the
+real-SQL replay caught it. Fixed: pages stay below the cap, a response at the cap always means "more", and the fake now
+enforces the cap. A regression test fails with both guards removed.
+
+| adversarial | result |
+|---|---|
+| 5,001 new rows | 1 run, count 5,001, all 5,001 visited once, 3 evidence rows, then 0 |
+| 25,000 new rows | run 1 `in_progress` (20,000 processed, **W unchanged**); run 2 completes 25,000; 0 repeats; state back to `{W, null, null}` |
+| 100,000 new rows, **all with one identical created_at** | 4 runs; 100,000 distinct ids visited once (the id tiebreak) |
+| failure mid-interval | the failed run writes nothing; the retry completes the exact count; W = the ORIGINAL snapshot |
+| row created during a pending interval | excluded (after its snapshot); alerted by the next interval |
+| 2,018 rows at a 1,000-row page size (server cap) | exact, at page sizes 1,000 / 999 / 500 |
+| real SQL, production (02dc20b6, HHS onboarding window) | 2,018 rows over 11 resumed runs (100-row pages) = single pass = JS mirror; 0 missing, 0 repeated |
+
+### ❓ DECISION NEEDED — high-volume notification behaviour (not implemented as policy)
+The engine emails **one count + 3 examples per completed interval**. It never sends thousands of cards. What it does not
+decide is whether a very large genuine interval should be emailed at all, or how it should be framed. Options:
+- **(a) As built:** "N new matches" plus 3 examples plus "See all N on the map". This is the existing template, with no
+  new rule.
+- **(b) Threshold summary:** above a threshold (e.g. 500) the email says it's a bulk publication ("HHS published 1,861
+  forecasts") instead of "new matches", perhaps grouped by publisher.
+- **(c) Hold for review:** above a threshold, record the interval but do not email until an operator releases it.
+
+The floors (§6) mean a genuine interval above ~500 should be rare: bulk loads are floored, and daily-sync volume is
+capped. Recommendation: (a) now, and revisit with (b) once real volumes are observed.
+
+## 6. Backfill safety — enforced, not remembered
+
+**Forecast writer inventory** (every path that can insert `agency_forecasts` rows):
+
+| path | kind | how it is governed |
 |---|---|---|
-| W is NULL (new search, missed migration) | nothing | W=S; every currently uncovered buyer g gets G[g]=S; **no Forecast alert** |
-| fully covered | plan ∧ created_at ∈ (W,S] ∧ > floor | W=S |
-| covered zero | the same, 0 rows | W=S |
-| partial | covered buyers over (W,S]; buyers newly uncovered: G[g]=W (kept if already set) | W=S, G updated |
-| buyer g in G becomes covered | adds g over (G[g], W] (catch-up), then g leaves G | W=S |
-| unavailable (no buyer covered) | nothing | **unchanged** |
-| plan refused (nothing positive to search) | nothing | **unchanged** |
-| failed query / snapshot / floor read / email send | — | **nothing written** |
+| `cron/sync-forecasts` (DHS, DOE) | daily sync | declared `daily_sync` client + new-row guard per publisher |
+| `cron/hhs-forecast-sync` → `hhs-ingest` | daily sync | declared client + guard on `toInsert` |
+| `cron/doj-forecast-sync` → `doj-ingest` | daily sync | declared client + guard |
+| `cron/nasa-forecast-sync` → `nasa-ingest` | daily sync | declared client + guard |
+| `cron/ssa-forecast-sync` → `ssa-ingest` | daily sync | declared client + guard (row-by-row inserts) |
+| `admin/run-forecast-scraper` | admin bulk | **DB guard refuses new rows while the floor is active** |
+| `scripts/import-forecasts.js`, `import-forecast-refresh.js`, `import-gsa-forecasts.js`, `import-nsf-forecasts.js`, `import-ssa-forecasts.js`, `run-all-forecast-scrapers.js`, `run-scrapers-tsx.ts`, `ingest-doe-forecast.ts`, `ingest-usace-forecast.ts` | historical / manual loads | **DB guard refuses**; they must run through suspend → load → reconcile → activate |
+| `scripts/import-forecasts-live.js` | RETIRED ("DO NOT RUN") | DB guard refuses anyway |
+| psql / SQL editor | manual | DB guard refuses unless the publisher is suspended |
 
-Open state: under this engine `last_seen_notice_ids` receives **Open ids only**, so neither horizon can evict the other.
-Route tests "Open + Forecast both new → the Open seen list gains ONLY Open ids" and "unavailable → … last_seen = Open ids".
+**Enforcement, strongest first:**
+1. **Database trigger `agency_forecasts_floor_guard`** (BEFORE INSERT). While a publisher's floor is ACTIVE it refuses to
+   **create** a row unless the writer is the declared daily sync (`x-forecast-writer: daily_sync` header, or
+   `SET LOCAL app.forecast_writer`). Upserts that only update an existing `(source_agency, external_id)` pass, because
+   they keep `created_at`. No floor or suspended passes, because those rows are not alertable. This covers every path,
+   including JS scripts and psql.
+2. **Declared identity is allowlisted.** Only the five daily crons may call `forecastWriterClient('daily_sync')`, and none
+   of them has a raw `createClient` left. `writer.unit.test.ts` scans `src/` and `scripts/`, and nothing else may set the
+   header or setting.
+3. **Daily-sync breaker** (`guardForecastInserts`). With an active floor, one daily run may create at most **500** new
+   rows per publisher. Above that its inserts are refused, and the run fails loudly with an ops alert, because a bulk
+   arriving through the daily sync is a re-key or a publication dump and must become a backfill.
+   - Measured: DHS, the only publisher with daily history (45 days), creates a median of 17 rows a day, p90 44, max 759
+     (its first load).
+   - ❓ **The 500 threshold is a DECISION** for review.
+4. **Lifecycle** (`runPublisherBackfill`): suspend → **verify suspended** (refuses to load otherwise) → load →
+   **reconcile** (required callback) → **stop, still suspended, with a proposed floor**. It **never re-activates**.
+   Activation is a separate explicit act: `scripts/forecast-publisher-floor.ts --activate <CODE> --after <floor>`.
+   A failed load or reconcile leaves the publisher suspended.
 
-## 4. Publisher floors
+**Tests:**
+- PGlite (the real migration SQL, 12/12):
+  - an undeclared new row is refused under an active floor;
+  - a `backfill` writer that did not suspend is refused;
+  - `daily_sync` is allowed;
+  - an update-only upsert keeps `created_at`;
+  - a 2,519-row load is allowed only while suspended;
+  - re-activation refuses again;
+  - `active` requires `alertable_after`;
+  - the migration is idempotent;
+  - the snapshot is `now() − 5 min`.
+- `writer.unit.test.ts` (11): the guard decision table and bypass detection.
+- `alert-floor.unit.test.ts` (10):
+  - the daily sync can never import the floor module;
+  - a backfill cannot run with an active floor;
+  - a failed backfill stays suspended;
+  - a failed reconcile stays suspended;
+  - success needs explicit activation;
+  - floors keep microseconds.
+- Mutants:
+  - breaker set to unlimited → caught;
+  - auto-activation re-added → caught.
 
-Floors are keyed on `agency_forecasts.source_agency`. That is the canonical publisher code Discovery resolves buyers to
-(`resolveForecastAgencies().codes`; a child identity's rows live under its `parentSourceAgency`). A floor is validated
-against `FORECAST_SOURCE_AGENCY_CODES`. A row is alertable only when its publisher has an **ACTIVE** floor and
-`created_at > alertable_after`.
+## 7. Emergency rollback — cannot send a Forecast burst
 
-| situation | floor behaviour | tested |
-|---|---|---|
-| normal publisher already in the corpus | seeded once at cutover to its last `created_at` (`--seed`); a re-seed never overwrites | alert-floor.unit |
-| newly onboarded publisher with history | no floor row = **not alertable (fail closed)** → `runPublisherBackfill`: suspend → load → activate at the load's last `created_at` | watermark #13, alert-floor.unit |
-| unresolved publisher becoming available | same as onboarding; the saved-search gap boundary makes post-floor rows discoverable | watermark #11/#12 |
-| historical backfill into an existing publisher | suspend → load → floor moves forward to the load's last `created_at`; backward only with an explicit `allowRewind` | alert-floor.unit |
-| ordinary daily sync | **never touches floors** (guard test: no cron or forecasts module imports `alert-floor`); re-stamps never change `created_at` | alert-floor.unit, watermark #14 |
-| genuinely new Forecast after the floor | alerts once | watermark #2, #13 |
-| correction / amendment to an existing record | `created_at` unchanged → not new | watermark #15 |
-| failed ingest | the floor stays **suspended** (no burst, no silent reopen); the error propagates | alert-floor.unit |
+**Rule:** once a search has been measured by the canonical engine (`forecast_seen_through` set), the **legacy engine
+never delivers Forecasts for it**. The cron probes once per invocation whether the watermark columns exist.
 
-Stated cost: rows a routine sync creates *during* a backfill's suspended window are floored out. Run backfills outside
-the 13:00 UTC sync.
-
-## 5. Adversarial tests (Phase D) — all pass, mutation-checked
-
-`src/lib/saved-searches/forecast-watermark.unit.test.ts` (20) runs the **real** `evaluateForecastWatermark` over an
-in-memory corpus that honours `created_at`, floors, agency and paging. `src/lib/forecasts/alert-floor.unit.test.ts` (7).
-`src/app/api/cron/saved-search-alerts/forecast-engine.unit.test.ts` (17) runs the **real route** with recording fakes.
-
-| # | property | result |
-|---|---|---|
-| 1 | historical row before W → no alert | ✅ |
-| 2/3 | new row alerts once; the same row re-synced → never again | ✅ |
-| 4 | 2,519 rows with one `last_synced_at` → no effect | ✅ |
-| 5 | 650 genuinely new of 1,250 matching → all 650, then 0, then 0 | ✅ |
-| 6 | 32,500 matching → state stays `{W, null}` (< 120 bytes) | ✅ |
-| 7 | row inserted during the run (after S) → next run, W = S (not the wall clock) | ✅ |
-| 8 | failed run → W unchanged | ✅ |
-| 9 | covered zero → W advances | ✅ |
-| 10 | unavailable → W unchanged, 0 queries | ✅ |
-| 11 | partial → no permanent blind spot (+ `11b` global-only counterexample) | ✅ |
-| 12 | publisher covered later → post-floor rows discoverable (catch-up) | ✅ |
-| 13 | historical onboarding (1,861 rows) → 0 while suspended, 0 after the floor, then the next genuine row alerts; no floor → never | ✅ |
-| 14 | daily sync re-stamps 870 old rows → 0 | ✅ |
-| 15 | amendment to an old row → not new | ✅ |
-| 16 | new search (NULL W) → silent baseline, 0 queries | ✅ |
-| 17 | explicit baseline → first run alerts only rows created after it | ✅ |
-| 18 | Open seen state gains Open ids only; a send failure writes nothing | ✅ (route) |
-| + | candidate overflow (> 5,000) → failed, W unchanged | ✅ |
-
-Mutants caught, each then reverted:
-- drop the catch-up → #11 fails
-- gap boundary advances with W → #11 fails
-- a missing floor admits rows → the floor test fails
-- Forecast ids enter the Open seen list → 3 route tests fail
-- watermark written before the send → 4 route tests fail
-
-## 6. Real-corpus replay (Phase E) — read-only
-
-`npx tsx --env-file=.env.local scripts/saved-search-forecast-watermark-replay.ts`, measured 2026-09-24T04:01Z.
-- 56 Forecast-alerting searches, 43 of them cron-eligible.
-- The watermark side runs the **real SQL** (`evaluateForecastWatermark`) with the snapshot and floors injected, so it runs
-  before the migration exists.
-- **SQL ≡ JS mirror on every search (0 mismatches).**
-
-| cron-eligible totals (search × alert pairs) | legacy | #1674 ID-list | watermark |
+| columns | flag | Forecast behaviour | Open |
 |---|---|---|---|
-| treated as "new" | 332 | 1,941 | cutover **0** · steady 172 |
-| of which old rows (created before the last run) | **303** | **1,907** | **0** |
-| genuinely new | 29 | 34 | **172** |
+| absent (pre-migration) | any | legacy exactly as today | normal |
+| present | `'true'` | canonical watermark engine | normal |
+| present | unset / not `'true'` | legacy only for never-measured searches; **paused** (`rollback_paused`) for measured ones | normal |
+| probe inconclusive | unset | **paused for all** (fail safe) | normal |
+| absent | `'true'` | refuses with a 500 and writes nothing (the migration is required) | — |
 
-What the numbers mean:
-- **Cutover:** the explicit baseline produces 0 migration alerts. The previously measured 1,934 (#1674's first run)
-  and today's 1,941 both become 0.
-- **Steady state:** W is each search's last real run (2026-09-23 ~11:00). Only **11 distinct rows** were created since:
-  10 genuinely new (9 DHS, 1 HHS) and 1 DHS `*` republish. Every corpus-wide search matches all 11.
-  - The legacy engine alerted only 1 of those 11 per corpus-wide search: its 200-row window was full of re-stamped DOE
-    rows. So the legacy engine was **missing genuine new forecasts while alerting old ones**.
-  - The watermark alerts exactly the 11.
-  - **13** of the 172 pairs are the one DHS `*` republish, which PR #1682 removes.
-- **Previously measured, carried forward:** 352 legacy new → today 332. 323 old → today 303, all avoided. 29 genuine →
-  all preserved, plus the genuine rows legacy never showed. DOE/DHS re-sync churn → 0.
-- **Publisher floors in steady state:** 0 rows removed (no onboarding in the interval).
-- **HHS onboarding simulation** (the 1,861 rows created 2026-09-13, W just before): **24,920** search-alert pairs without
-  a floor → **0** with the floor at the load's end.
+So an emergency rollback is just **unsetting the flag**. There is no repopulation of the shared id list and no new env
+var. During rollback the Forecast state (`W`, `G`, `P`) is untouched. When the flag is set again, the engine resumes from
+W and the forecasts created during the rollback alert **exactly once**.
+
+Route test "canonical ON → OFF → ON":
+- The rollback run faces an Open-only seen list with 200 old forecasts in the legacy window plus a genuinely new
+  forecast. It makes **0 Forecast emails and 0 Forecast queries**. Open still delivers ("1 new match"). The seen list
+  gains Open ids only. The `forecast_*` columns are not written.
+- A second rollback day sends nothing.
+- Canonical back ON: the forecast created during the rollback alerts once and never again.
+
+Mutant with the rollback guard disabled → 2 tests fail.
+
+## 8. Real-corpus replay (read-only) — `scripts/saved-search-forecast-watermark-replay.ts`
+
+Measured 2026-09-24T11:19:31.317Z. The replay covers 56 Forecast-alerting searches, 43 of them cron-eligible.
+Everything runs through **real production SQL** with an injected snapshot and injected floors.
+- **0 problems.** SQL ≡ JS mirror on every search.
+- The live cron had run at 11:00 UTC today, so each search's W (its last real run) is recent.
+
+| cron-eligible search-alert pairs | legacy | #1674 ID-list | watermark |
+|---|---|---|---|
+| treated as new | 68 | 1,872 | cutover **0** · steady **4** |
+| old rows (created before the last run) | **64** (DOE 60, DHS 4) | **1,868** | **0** |
+| genuinely new | 4 | 4 | **4** (every genuine row legacy alerted is also alerted ✓) |
+| HHS 1,861-row onboarding (simulated) | — | — | **24,920 pairs without a floor → 0 with the floor** |
+
+Earlier measurements carried forward:
+- 1,934 migration-generated first-run alerts (#1674): **0** at cutover (1,872 today).
+- The daily DOE/DHS re-sync churn: **0**.
+- The 352 / 323 / 29 of 2026-09-23 were replaced by today's 68 / 64 / 4 on a much shorter interval. Every old row is
+  still excluded, and every genuine row is still preserved.
+- Open is unchanged: the Open path is the same code under both engines, apart from Forecast ids no longer entering the
+  shared seen list.
+
+Real-SQL resumption proof: search 02dc20b6, 2,018 rows, 11 runs at 100-row
+pages: count 2,018 = distinct 2,018 = mirror; missing 0, repeated
+0; equals the single pass: True.
 
 ### Every Forecast-alerting search
 
-| search | cron | coverage | matches | legacy new (old) | ID-list new (old) | WM cutover | WM steady | floor removed | DHS `*` | W before → after | HHS onboard no floor → floor |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 02dc20b6 | yes | ok | 32,422 | 15 (14 old) | 86 (85 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 175a893e | yes | ok | 32,422 | 15 (14 old) | 97 (96 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:00 → 2026-09-24T03:55 | 1861 → 0 |
-| 1b018df4 | yes | ok | 32,422 | 15 (14 old) | 94 (93 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 4692743e | yes | ok | 32,422 | 14 (13 old) | 48 (47 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 54fd0605 | yes | ok | 32,422 | 15 (14 old) | 127 (126 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 5b867c2f | yes | ok | 32,422 | 14 (13 old) | 60 (59 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 64eb46b6 | yes | ok | 32,422 | 15 (14 old) | 126 (125 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 749d017b | yes | ok | 32,422 | 15 (14 old) | 109 (108 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 7d3a2556 | yes | ok | 32,422 | 15 (14 old) | 129 (128 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| 88d24ae2 | yes | ok | 32,422 | 15 (14 old) | 84 (83 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| ae5ddb00 | yes | ok | 32,422 | 15 (14 old) | 80 (79 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 1861 → 0 |
-| dd024647 | yes | ok | 32,422 | 15 (14 old) | 95 (94 old) | 0 | 11 | 0 | 1 | 2026-09-23T11:00 → 2026-09-24T03:55 | 1861 → 0 |
-| e2466850 | yes | ok | 11,389 | 0 (0 old) | 1 (1 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| 14466713 | yes | ok | 8,455 | 79 (78 old) | 96 (95 old) | 0 | 6 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 763 → 0 |
-| c4158f3a | yes | ok | 5,617 | 2 (2 old) | 5 (5 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 154 → 0 |
-| 386e228b | yes | ok | 5,028 | 0 (0 old) | 200 (200 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| 14d902aa | yes | ok | 4,850 | 27 (27 old) | 27 (27 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 131 → 0 |
-| 5c25203a | yes | ok | 4,850 | 8 (4 old) | 8 (4 old) | 0 | 4 | 0 | 0 | 2026-09-21T11:01 → 2026-09-24T03:55 | 131 → 0 |
-| 32846637 | yes | ok | 4,701 | 1 (0 old) | 1 (0 old) | 0 | 4 | 0 | 0 | 2026-09-23T11:00 → 2026-09-24T03:55 | 193 → 0 |
-| 81bf2414 | yes | ok | 4,701 | 1 (0 old) | 1 (0 old) | 0 | 4 | 0 | 0 | 2026-09-23T11:00 → 2026-09-24T03:55 | 193 → 0 |
-| 983d2867 | yes | ok | 4,672 | 1 (0 old) | 1 (0 old) | 0 | 4 | 0 | 0 | 2026-09-23T11:00 → 2026-09-24T03:55 | 180 → 0 |
-| a82d3d77 | yes | ok | 4,301 | 14 (13 old) | 14 (13 old) | 0 | 3 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 103 → 0 |
-| 74839699 | yes | ok | 3,534 | 1 (0 old) | 1 (0 old) | 0 | 3 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 80 → 0 |
-| 1c3b715a | yes | ok | 2,968 | 13 (12 old) | 15 (13 old) | 0 | 2 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 138 → 0 |
-| 32acc010 | yes | ok | 2,002 | 5 (1 old) | 12 (8 old) | 0 | 4 | 0 | 1 | 2026-09-23T11:01 → 2026-09-24T03:55 | 358 → 0 |
-| 994c599e | yes | ok | 1,575 | 0 (0 old) | 200 (197 old) | 0 | 3 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 79 → 0 |
-| 6f121c25 | yes | ok | 767 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 23 → 0 |
-| 9ca2d2de | yes | ok | 619 | 0 (0 old) | 200 (200 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| c75b5e65 | yes | ok | 493 | 2 (0 old) | 2 (0 old) | 0 | 2 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 20 → 0 |
-| 5e4bcd5a | yes | ok | 233 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 4 → 0 |
-| ab8bb3c8 | yes | ok | 233 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 4 → 0 |
-| 08d970cb | yes | ok | 138 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:00 → 2026-09-24T03:55 | 26 → 0 |
-| 943f7486 | yes | ok | 26 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:00 → 2026-09-24T03:55 | 0 → 0 |
-| 5759ff87 | yes | ok | 17 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 2 → 0 |
-| c3f908e3 | yes | ok | 11 | 0 (0 old) | 11 (11 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| ff372605 | yes | ok | 6 | 0 (0 old) | 6 (6 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 6 → 0 |
-| b4e40d05 | yes | ok | 5 | 0 (0 old) | 3 (3 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| 0678583e | yes | ok | 2 | 0 (0 old) | 2 (1 old) | 0 | 1 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| 61d1ca1f | yes | unestablished (HUD) | 0 | 0 (0 old) | unavailable (0 old) | unavailable | unavailable | 0 | 0 | 2026-09-23T11:02 → 2026-09-23T11:02 | 0 → 0 |
-| 7ef11325 | yes | ok | 0 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| b032f39f | yes | unestablished (SBA) | 0 | 0 (0 old) | unavailable (0 old) | unavailable | unavailable | 0 | 0 | 2026-09-23T11:01 → 2026-09-23T11:01 | 0 → 0 |
-| e00435f7 | yes | unestablished (National Oceanic and Atmospheric Administration) | 0 | 0 (0 old) | unavailable (0 old) | unavailable | unavailable | 0 | 0 | 2026-09-23T11:01 → 2026-09-23T11:01 | 0 → 0 |
-| e9c0f9be | yes | ok | 0 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | 0 | 2026-09-23T11:01 → 2026-09-24T03:55 | 0 → 0 |
-| 1f01ad20 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 1861 → 0 |
-| 507cdd28 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 1861 → 0 |
-| 5eaba2aa | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 1861 → 0 |
-| 915af605 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 1861 → 0 |
-| 9953d49b | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 1861 → 0 |
-| c55dbe32 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 1861 → 0 |
-| 48df9f00 | no | ok | 6,655 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 237 → 0 |
-| 2cca41bc | no | ok | 4,850 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 131 → 0 |
-| bfe464e2 | no | ok | 4,100 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 135 → 0 |
-| f587f86b | no | ok | 3,687 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 99 → 0 |
-| a5f952c7 | no | partial (COMMERCE) | 3,578 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 380 → 0 |
-| 46275c5f | no | ok | 1,541 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 147 → 0 |
-| ad3f8e7c | no | ok | 153 | 190 (0 old) | 153 (0 old) | 0 | baseline(never alerted) | 0 | 0 | — → 2026-09-24T03:55 | 19 → 0 |
+| search | cron | coverage | matches | legacy new (old) | ID-list new (old) | WM cutover | WM steady | WM old rows | genuine preserved | HHS onboard no floor → floor |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 02dc20b6 | yes | ok | 32,422 | 0 (0 old) | 103 (103 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 175a893e | yes | ok | 32,422 | 0 (0 old) | 87 (87 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 1b018df4 | yes | ok | 32,422 | 0 (0 old) | 93 (93 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 4692743e | yes | ok | 32,422 | 0 (0 old) | 68 (68 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 54fd0605 | yes | ok | 32,422 | 0 (0 old) | 133 (133 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 5b867c2f | yes | ok | 32,422 | 0 (0 old) | 66 (66 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 64eb46b6 | yes | ok | 32,422 | 0 (0 old) | 126 (126 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 749d017b | yes | ok | 32,422 | 0 (0 old) | 126 (126 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 7d3a2556 | yes | ok | 32,422 | 0 (0 old) | 91 (91 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| 88d24ae2 | yes | ok | 32,422 | 0 (0 old) | 74 (74 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| ae5ddb00 | yes | ok | 32,422 | 0 (0 old) | 69 (69 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| dd024647 | yes | ok | 32,422 | 0 (0 old) | 86 (86 old) | 0 | 0 | 0 | ✓ | 1861 → 0 |
+| e2466850 | yes | ok | 11,389 | 0 (0 old) | 1 (1 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| 14466713 | yes | ok | 8,455 | 60 (60 old) | 91 (91 old) | 0 | 0 | 0 | ✓ | 763 → 0 |
+| c4158f3a | yes | ok | 5,617 | 0 (0 old) | 3 (3 old) | 0 | 0 | 0 | ✓ | 154 → 0 |
+| 386e228b | yes | ok | 5,028 | 0 (0 old) | 200 (200 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| 14d902aa | yes | ok | 4,850 | 0 (0 old) | 8 (8 old) | 0 | 0 | 0 | ✓ | 131 → 0 |
+| 5c25203a | yes | ok | 4,850 | 8 (4 old) | 8 (4 old) | 0 | 4 | 0 | ✓ | 131 → 0 |
+| 32846637 | yes | ok | 4,701 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 193 → 0 |
+| 81bf2414 | yes | ok | 4,701 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 193 → 0 |
+| 983d2867 | yes | ok | 4,672 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 180 → 0 |
+| a82d3d77 | yes | ok | 4,301 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 103 → 0 |
+| 74839699 | yes | ok | 3,534 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 80 → 0 |
+| 1c3b715a | yes | ok | 2,968 | 0 (0 old) | 4 (4 old) | 0 | 0 | 0 | ✓ | 138 → 0 |
+| 32acc010 | yes | ok | 2,002 | 0 (0 old) | 13 (13 old) | 0 | 0 | 0 | ✓ | 358 → 0 |
+| 994c599e | yes | ok | 1,575 | 0 (0 old) | 200 (200 old) | 0 | 0 | 0 | ✓ | 79 → 0 |
+| 6f121c25 | yes | ok | 767 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 23 → 0 |
+| 9ca2d2de | yes | ok | 619 | 0 (0 old) | 200 (200 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| c75b5e65 | yes | ok | 493 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 20 → 0 |
+| 5e4bcd5a | yes | ok | 233 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 4 → 0 |
+| ab8bb3c8 | yes | ok | 233 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 4 → 0 |
+| 08d970cb | yes | ok | 138 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 26 → 0 |
+| 943f7486 | yes | ok | 26 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| 5759ff87 | yes | ok | 17 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 2 → 0 |
+| c3f908e3 | yes | ok | 11 | 0 (0 old) | 11 (11 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| ff372605 | yes | ok | 6 | 0 (0 old) | 6 (6 old) | 0 | 0 | 0 | ✓ | 6 → 0 |
+| b4e40d05 | yes | ok | 5 | 0 (0 old) | 3 (3 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| 0678583e | yes | ok | 2 | 0 (0 old) | 2 (2 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| 61d1ca1f | yes | unestablished (HUD) | 0 | 0 (0 old) | unavailable (0 old) | 0 | unavailable | 0 | ✓ | 0 → 0 |
+| 7ef11325 | yes | ok | 0 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| b032f39f | yes | unestablished (SBA) | 0 | 0 (0 old) | unavailable (0 old) | 0 | unavailable | 0 | ✓ | 0 → 0 |
+| e00435f7 | yes | unestablished (National Oceanic and Atmospheric Administration) | 0 | 0 (0 old) | unavailable (0 old) | 0 | unavailable | 0 | ✓ | 0 → 0 |
+| e9c0f9be | yes | ok | 0 | 0 (0 old) | 0 (0 old) | 0 | 0 | 0 | ✓ | 0 → 0 |
+| 1f01ad20 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 1861 → 0 |
+| 507cdd28 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 1861 → 0 |
+| 5eaba2aa | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 1861 → 0 |
+| 915af605 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 1861 → 0 |
+| 9953d49b | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 1861 → 0 |
+| c55dbe32 | no | ok | 32,422 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 1861 → 0 |
+| 48df9f00 | no | ok | 6,655 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 237 → 0 |
+| 2cca41bc | no | ok | 4,850 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 131 → 0 |
+| bfe464e2 | no | ok | 4,100 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 135 → 0 |
+| f587f86b | no | ok | 3,687 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 99 → 0 |
+| a5f952c7 | no | partial (COMMERCE) | 3,578 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 380 → 0 |
+| 46275c5f | no | ok | 1,541 | 200 (0 old) | 200 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 147 → 0 |
+| ad3f8e7c | no | ok | 153 | 190 (0 old) | 153 (0 old) | 0 | baseline(never alerted) | 0 | ✓ | 19 → 0 |
 
-## 7. Scripts (none run with `--go`)
+## 9. Scripts (none run with `--go`)
 
-| script | default | writes on `--go` | guards |
+| script | default | on `--go` | guards |
 |---|---|---|---|
-| `scripts/saved-search-forecast-baseline.ts` | dry run: counts + DB snapshot | `forecast_seen_through` / `forecast_gap_since` on Forecast-alerting rows where W IS NULL | refuses without the migration; backup file first; idempotent (`.is('forecast_seen_through', null)`, `count: 'exact'`); verifies 0 NULL left and Open state byte-identical; no email path |
-| `… --rollback <backup.json> [--go]` | dry run | restores both columns from the backup | — |
-| `scripts/forecast-publisher-floor.ts` | dry run | `--seed` (never overwrites) / `--suspend` / `--activate` + append-only log | canonical codes only, reason and actor required, monotonic unless `--allow-rewind` |
-| `scripts/saved-search-forecast-watermark-replay.ts` | read-only | — | exits 1 on any SQL-vs-mirror mismatch |
+| `saved-search-forecast-baseline.ts` | dry run | sets W (and G for uncovered buyers) where W IS NULL | refuses without the migration; backup first; idempotent; verifies 0 NULL left and Open state byte-identical; no email path; `--rollback <backup>` |
+| `forecast-publisher-floor.ts` | dry run | `--seed` (never overwrites), `--suspend`, `--activate` (+ an append-only log) | canonical codes only; reason and actor required; monotonic unless `--allow-rewind` |
+| `saved-search-forecast-watermark-replay.ts` | read-only | — | exits 1 on any mismatch, old-row alert, cutover alert, or lost genuine row |
+| `proofs/forecast-floor-guard.pglite.mjs` | in-process Postgres only | — | exits 1 on any failed expectation |
 
-Verified against production today: the baseline dry run **refuses** (columns missing), and the floor seed **refuses per
-publisher** (table missing). Both fail closed, nothing written.
-
-## 8. Cutover (proposed, for sign-off)
+## 10. Cutover (proposed)
 
 | # | step | writes | check | reverse |
 |---|---|---|---|---|
-| 1 | merge #1674 + this PR dark | none (flag absent) | serving SHA contains the merge | revert |
-| 2 | DHS identity window (PR #1682 run order) | agency_forecasts DHS rows | 1,738 DHS rows, 0 `*` | backup file |
-| 3 | apply the migration (`npm run migrate`) | new columns/tables/function/index | `db:check` + PostgREST read of each; the RPC returns now()−5m | drop objects (legacy never reads them) |
-| 4 | seed floors | 19 floor rows + log | `--status` lists 19 active; STATE has none (no rows) | delete floor rows |
-| 5 | explicit baseline | W on the 56 Forecast-alerting rows | 0 NULL; Open state byte-identical to the backup | `--rollback <backup>` |
-| 6 | shadow | none: `?mode=preview&forecastEngine=canonical` after the next 13:00 sync | `forecastNewCount` = rows created after the baseline only; 0 old; DHS `*` 0 | — |
-| 7 | enable | `printf true \| vercel env add SAVED_SEARCH_FORECAST_CANONICAL production` + fresh deploy | first 11:00 run: `cron_job_runs` 200; sends ≈ shadow; W advanced to that run's S | unset the env + redeploy → the legacy engine resumes (see rollback note) |
+| 1 | merge #1674 + this PR dark | none | serving SHA contains the merge; `watermarkColumns: absent` in the cron response | revert |
+| 2 | DHS identity window (#1682 run order) | DHS rows | its own assertions; `--check-resume` | backup |
+| 3 | apply the migration (`npm run migrate`) | columns, tables, function, index, **trigger** | `db:check` + PostgREST read; the RPC works; cron `watermarkColumns: present` | drop the trigger/objects |
+| 4 | seed floors | 19 active floors + log | `--status`; from here, bulk loads without a suspend are refused | delete floor rows |
+| 5 | explicit baseline | W on the 56 Forecast-alerting rows | 0 NULL; Open state byte-identical | `--rollback <backup>` |
+| 6 | shadow | none (`?mode=preview&forecastEngine=canonical` after a 13:00 sync) | Forecast-new = rows created after the baseline only | — |
+| 7 | enable | `printf true \| vercel env add …` + fresh deploy | the first 11:00 run matches the shadow | **unset the flag → Forecast paused, Open continues (§7)** |
 
-**Rollback note:** the legacy engine keeps its shared seen list. After a canonical period that list holds only Open ids,
-so falling back to legacy would re-alert the legacy Forecast window once. The legacy window is at most 200 per search;
-accept it, or re-run the legacy seed. Stated so it is a decision, not a surprise.
-
-## 9. Remaining blockers before production cutover
-1. **Review and decision on this design + #1674 + #1682.**
-2. **DHS identity (#1682) run window.** Until it runs, every DHS republish is a false "new" (1 row in the last day,
-   13 search-alert pairs).
-3. Migration apply + floor seed + explicit baseline, in the order above, each with its check.
-4. A shadow cycle across one real 13:00 sync, before the flag.
-5. Operator rule: historical onboarding and backfills must go through `runPublisherBackfill` (or `--suspend`/`--activate`);
-   the existing importer scripts do not yet call it.
-6. NAVY hyphen-variant pairs (2) are data-quality follow-up, not blocking.
+## 11. Decisions for review
+1. High-volume notification behaviour (§5): (a) as built, (b) threshold summary, or (c) hold for review.
+2. Daily-sync breaker threshold: 500 new rows per publisher per run (§6).

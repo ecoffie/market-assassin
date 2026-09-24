@@ -1,12 +1,15 @@
 /**
  * In-memory stand-in for the PostgREST calls the Forecast watermark makes against agency_forecasts.
  *
- * It honours exactly the predicates newness depends on — created_at gt/lte, the publisher-floor `.or()`
- * groups (`and(source_agency.eq.X,created_at.gt.T)`), `source_agency.in.(…)` agency terms, `id.is.null`
- * (fail closed), ordering and range paging. Plan terms it cannot evaluate (FY clause, NAICS, text) are
- * treated as matching: every test row is built to match the plan, so they never decide a test.
- * The live replay proves the real SQL agrees with the JS mirror on production data.
+ * It honours exactly the predicates newness depends on — created_at gt/lte (microsecond-exact), the publisher-floor
+ * `.or()` groups (`and(source_agency.eq.X,created_at.gt.T)`), the keyset `.or()` (`created_at.gt.T,and(created_at.eq.T,
+ * id.gt.I)`), `source_agency.in.(…)` agency terms, `id.is.null` (fail closed), `.in('id', …)`, ordering by
+ * (created_at, id) and `limit`. Plan terms it cannot evaluate (FY clause, NAICS, text) are treated as matching: every
+ * test row is built to match the plan, so they never decide a test. The live replay proves the real SQL agrees with
+ * the JS mirror on production data.
  */
+import { tsMicros } from '../forecast-watermark';
+
 export type FakeForecastRow = {
   id: string; external_id: string; source_agency: string; created_at: string; last_synced_at: string;
   title?: string; fiscal_year?: string | null;
@@ -24,12 +27,21 @@ function splitTop(expr: string): string[] {
   return out;
 }
 const unq = (v: string) => v.replace(/^"|"$/g, '');
+const MICROS = new WeakMap<FakeForecastRow, bigint>();
+const mu = (r: FakeForecastRow) => { let v = MICROS.get(r); if (v === undefined) { v = tsMicros(r.created_at); MICROS.set(r, v); } return v; };
+const litCache = new Map<string, bigint>();
+const lit = (s: string) => { let v = litCache.get(s); if (v === undefined) { v = tsMicros(s); litCache.set(s, v); } return v; };
 function term(row: FakeForecastRow, t: string): boolean | null {
-  if (t.startsWith('and(') && t.endsWith(')')) return splitTop(t.slice(4, -1)).every((x) => term(row, x) !== false);
+  if (t.startsWith('and(') && t.endsWith(')')) {
+    const parts = splitTop(t.slice(4, -1)).map((x) => term(row, x));
+    return parts.every((p) => p !== false);
+  }
   if (t.startsWith('or(') && t.endsWith(')')) return splitTop(t.slice(3, -1)).some((x) => term(row, x) !== false);
   let m = /^source_agency\.eq\.(.+)$/.exec(t); if (m) return row.source_agency === unq(m[1]);
   m = /^source_agency\.in\.\((.*)\)$/.exec(t); if (m) return m[1].split(',').map(unq).includes(row.source_agency);
-  m = /^created_at\.gt\.(.+)$/.exec(t); if (m) return new Date(row.created_at) > new Date(m[1]);
+  m = /^created_at\.gt\.(.+)$/.exec(t); if (m) return mu(row) > lit(m[1]);
+  m = /^created_at\.eq\.(.+)$/.exec(t); if (m) return mu(row) === lit(m[1]);
+  m = /^id\.gt\.(.+)$/.exec(t); if (m) return row.id > m[1];
   if (t === 'id.is.null') return false;
   return null; // not modelled → does not decide
 }
@@ -38,19 +50,59 @@ function orMatches(row: FakeForecastRow, expr: string): boolean {
   if (parts.every((p) => p === null)) return true;
   return parts.some((p) => p === true);
 }
+/** Compile an .or() body once into closures — per-row parsing made the 100k-row tests crawl. */
+type Pred = (r: FakeForecastRow) => boolean | null;
+function compileTerm(t: string): Pred {
+  if (t.startsWith('and(') && t.endsWith(')')) {
+    const ps = splitTop(t.slice(4, -1)).map(compileTerm);
+    return (r) => ps.every((p) => p(r) !== false);
+  }
+  if (t.startsWith('or(') && t.endsWith(')')) {
+    const ps = splitTop(t.slice(3, -1)).map(compileTerm);
+    return (r) => ps.some((p) => p(r) !== false);
+  }
+  let m = /^source_agency\.eq\.(.+)$/.exec(t); if (m) { const v = unq(m[1]); return (r) => r.source_agency === v; }
+  m = /^source_agency\.in\.\((.*)\)$/.exec(t); if (m) { const set = new Set(m[1].split(',').map(unq)); return (r) => set.has(r.source_agency); }
+  m = /^created_at\.gt\.(.+)$/.exec(t); if (m) { const b = lit(m[1]); return (r) => mu(r) > b; }
+  m = /^created_at\.eq\.(.+)$/.exec(t); if (m) { const b = lit(m[1]); return (r) => mu(r) === b; }
+  m = /^id\.gt\.(.+)$/.exec(t); if (m) { const v = m[1]; return (r) => r.id > v; }
+  if (t === 'id.is.null') return () => false;
+  return () => null;
+}
+const compiled = new Map<string, (r: FakeForecastRow) => boolean>();
+function compileOr(expr: string): (r: FakeForecastRow) => boolean {
+  const hit = compiled.get(expr); if (hit) return hit;
+  const ps = splitTop(expr).map(compileTerm);
+  const fn = (r: FakeForecastRow) => {
+    let any = false;
+    for (const p of ps) { const v = p(r); if (v === true) return true; if (v === false) any = true; }
+    return !any; // every term unmodelled → does not decide
+  };
+  compiled.set(expr, fn);
+  return fn;
+}
 
 /** Apply the recorded PostgREST ops to a row set (shared with the route-level fake). */
 export function applyForecastOps(corpus: FakeForecastRow[], ops: Array<[string, unknown[]]>): FakeForecastRow[] {
   let rows = corpus.slice();
   for (const [m, a] of ops) {
-    if (m === 'gt' && a[0] === 'created_at') rows = rows.filter((r) => new Date(r.created_at) > new Date(String(a[1])));
-    if (m === 'lte' && a[0] === 'created_at') rows = rows.filter((r) => new Date(r.created_at) <= new Date(String(a[1])));
-    if (m === 'or') rows = rows.filter((r) => orMatches(r, String(a[0])));
+    if (m === 'gt' && a[0] === 'created_at') { const b = lit(String(a[1])); rows = rows.filter((r) => mu(r) > b); }
+    if (m === 'lte' && a[0] === 'created_at') { const b = lit(String(a[1])); rows = rows.filter((r) => mu(r) <= b); }
+    if (m === 'or') { const f = compileOr(String(a[0])); rows = rows.filter(f); }
+    if (m === 'in' && a[0] === 'id') { const set = new Set(a[1] as string[]); rows = rows.filter((r) => set.has(r.id)); }
   }
-  rows.sort((x, y) => (x.created_at < y.created_at ? -1 : x.created_at > y.created_at ? 1 : x.id < y.id ? -1 : 1));
+  rows.sort((x, y) => {
+    const d = mu(x) - mu(y);
+    return d < BigInt(0) ? -1 : d > BigInt(0) ? 1 : x.id < y.id ? -1 : x.id > y.id ? 1 : 0;
+  });
+  const lim = ops.find((o) => o[0] === 'limit');
   const rg = ops.find((o) => o[0] === 'range');
-  return rg ? rows.slice(Number(rg[1][0]), Number(rg[1][1]) + 1) : rows;
+  if (rg) return rows.slice(Number(rg[1][0]), Number(rg[1][1]) + 1);
+  return lim ? rows.slice(0, Number(lim[1][0])) : rows;
 }
+
+/** PostgREST's max-rows: every response is capped at 1,000 rows whatever `limit` asks for (as in production). */
+export const FAKE_SERVER_ROW_CAP = 1000;
 
 export function fakeForecastDb(corpus: () => FakeForecastRow[], opts: { failOn?: (call: number) => boolean } = {}) {
   let calls = 0;
@@ -65,7 +117,7 @@ export function fakeForecastDb(corpus: () => FakeForecastRow[], opts: { failOn?:
       calls++;
       if (table !== 'agency_forecasts') return Promise.resolve({ data: [], error: null }).then(resolve);
       if (opts.failOn?.(calls)) return Promise.resolve({ data: null, error: { message: 'simulated statement timeout' } }).then(resolve);
-      return Promise.resolve({ data: applyForecastOps(corpus(), ops), error: null }).then(resolve);
+      return Promise.resolve({ data: applyForecastOps(corpus(), ops).slice(0, FAKE_SERVER_ROW_CAP), error: null }).then(resolve);
     };
     return q;
   };

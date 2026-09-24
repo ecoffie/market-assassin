@@ -91,7 +91,18 @@ const DUE_SELECT =
   'id, user_email, name, mode, filters, alert_frequency, last_seen_notice_ids, total_alerts_sent, last_alerted_at';
 // The watermark columns exist only after 20260924_saved_search_forecast_watermark.sql; the legacy engine
 // never selects them, so deploying this code before the migration cannot break the legacy cron.
-const DUE_SELECT_CANONICAL = `${DUE_SELECT}, forecast_seen_through, forecast_gap_since`;
+const DUE_SELECT_CANONICAL = `${DUE_SELECT}, forecast_seen_through, forecast_gap_since, forecast_pending`;
+
+/**
+ * EMERGENCY-ROLLBACK SAFETY. Whether the watermark columns exist decides what the LEGACY engine may do:
+ *   absent  — migration never applied: legacy behaves exactly as before.
+ *   present — legacy NEVER delivers Forecasts for a search the canonical engine has measured
+ *             (forecast_seen_through set). Its shared seen list is Open-only by then, so legacy Forecast
+ *             delivery would re-alert its whole 200-row window as "new". Open continues; Forecast state is
+ *             left untouched, so turning canonical back on resumes from the stored watermark.
+ *   unknown — the probe failed for another reason: fail SAFE, no legacy Forecast delivery this invocation.
+ */
+export type WatermarkColumns = 'absent' | 'present' | 'unknown';
 
 /**
  * Does this saved search want FORECASTS?
@@ -146,6 +157,7 @@ type PreviewRow = {
   forecastNewCount?: number;
   forecastWatermarkBefore?: string | null;
   forecastWatermarkAfter?: string | null;
+  forecastInProgress?: number;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,6 +230,7 @@ async function evaluateSavedSearch(
   preview: boolean,
   previewRows: PreviewRow[],
   forecastEngine: ForecastEngine = 'legacy',
+  watermarkColumns: WatermarkColumns = 'absent',
 ): Promise<SavedSearchAlertEvalCounts> {
   if (!isSavedSearchDueAt(s.alert_frequency, now)) return { skippedNotDue: 1 };
 
@@ -283,7 +296,12 @@ async function evaluateSavedSearch(
     return evaluateCanonicalForecast(db, s, opps, preview, previewRows);
   }
 
-  if (doForecast) {
+  // Rollback guard (see WatermarkColumns): legacy must never deliver Forecasts for a search the canonical
+  // engine has measured, and must not guess when it cannot tell. Open proceeds either way.
+  const legacyForecastPaused = doForecast && (
+    watermarkColumns === 'unknown' || (watermarkColumns === 'present' && !!s.forecast_seen_through)
+  );
+  if (doForecast && !legacyForecastPaused) {
     // Forecasts are the EARLIEST signal (6-18mo upstream) and the only corpus with no
     // push channel until now. Adapted into the same card shape so one email template
     // serves both — see src/lib/alerts/forecast-alert-row.ts.
@@ -305,29 +323,30 @@ async function evaluateSavedSearch(
     records: opps || [],
   });
 
+  const paused = legacyForecastPaused ? { forecastCoverage: 'rollback_paused' as const } : {};
   if (decision.action === 'baseline') {
     if (!preview) {
       const stamped = await stampSearchEvaluation(db, s.id, {
         last_seen_notice_ids: decision.nextSeen,
       });
-      if (!stamped) return { failureClass: 'state_update_failed' };
+      if (!stamped) return { failureClass: 'state_update_failed', ...paused };
     }
-    return { noMatches: 1 };
+    return { noMatches: 1, ...paused };
   }
 
   if (decision.action === 'no_new') {
     if (!preview) {
       const stamped = await stampSearchEvaluation(db, s.id, {});
-      if (!stamped) return { failureClass: 'state_update_failed' };
+      if (!stamped) return { failureClass: 'state_update_failed', ...paused };
     }
-    return { noMatches: 1 };
+    return { noMatches: 1, ...paused };
   }
 
   const fresh = decision.fresh;
 
   if (preview) {
     previewRows.push({ email: s.user_email, name: s.name, newCount: fresh.length });
-    return { matched: 1 };
+    return { matched: 1, ...paused };
   }
 
   const { subject, html, text } = buildEmail(s, fresh);
@@ -348,8 +367,8 @@ async function evaluateSavedSearch(
     last_seen_notice_ids: cappedSeen,
     total_alerts_sent: (s.total_alerts_sent || 0) + 1,
   });
-  if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed' };
-  return { matched: 1, sendAttempts: 1, sent: 1 };
+  if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed', ...paused };
+  return { matched: 1, sendAttempts: 1, sent: 1, ...paused };
 }
 
 /**
@@ -387,6 +406,7 @@ async function evaluateCanonicalForecast(
 
   const forecastCoverage: SavedSearchAlertEvalCounts['forecastCoverage'] =
     fo.kind === 'measured' ? (fo.coverage === 'partial' ? 'partial' : 'covered')
+    : fo.kind === 'in_progress' ? 'in_progress'
     : fo.kind === 'unavailable' ? 'unavailable'
     : fo.kind === 'needs_refinement' ? 'needs_refinement'
     : 'baseline';
@@ -394,32 +414,37 @@ async function evaluateCanonicalForecast(
   const notice = fo.kind === 'measured' || fo.kind === 'unavailable' || fo.kind === 'needs_refinement'
     ? forecastCoverageNotice(fo as unknown as ForecastHorizonOutcome) : null;
   const coverageNotices = notice ? [notice] : [];
-  // Forecast state: only a MEASURED run or a baseline moves it. Unavailable / refused → untouched.
-  const forecastState = fo.kind === 'measured' || fo.kind === 'baseline' ? stateToColumns(fo.nextState) : {};
+  // Forecast state: a completed interval / baseline moves the watermark; an interval in progress persists only its
+  // keyset progress (forecast_pending). Unavailable / refused → untouched.
+  const forecastState = fo.kind === 'measured' || fo.kind === 'baseline' || fo.kind === 'in_progress' ? stateToColumns(fo.nextState) : {};
 
   const openDecision = decideSavedSearchAlert({ lastAlertedAt: s.last_alerted_at, lastSeenIds: s.last_seen_notice_ids, records: openRows });
   const openFresh = openDecision.action === 'send' ? openDecision.fresh : [];
   const openSeen = openDecision.action === 'baseline' ? { last_seen_notice_ids: openDecision.nextSeen }
     : openDecision.action === 'send' ? { last_seen_notice_ids: openDecision.nextSeenAfterSend } : {};
-  const forecastFresh = fo.kind === 'measured' ? fo.rows.map((r) => toAlertRow(r, MINDY_URL)) : [];
-  const fresh = [...openFresh, ...forecastFresh];
+  // PRESENTATION: the email carries the interval's full COUNT but only its evidence rows (the template renders 3).
+  const forecastEvidence = fo.kind === 'measured' ? fo.evidence.map((r) => toAlertRow(r, MINDY_URL)) : [];
+  const forecastCount = fo.kind === 'measured' ? fo.count : 0;
+  const fresh = [...openFresh, ...forecastEvidence];
+  const total = openFresh.length + forecastCount;
 
   if (preview) {
     previewRows.push({
-      email: s.user_email, name: s.name, newCount: fresh.length, forecastEngine: 'canonical', forecastCoverage,
-      coverageNotices, openNewCount: openFresh.length, forecastNewCount: forecastFresh.length,
+      email: s.user_email, name: s.name, newCount: total, forecastEngine: 'canonical', forecastCoverage,
+      coverageNotices, openNewCount: openFresh.length, forecastNewCount: forecastCount,
+      ...(fo.kind === 'in_progress' ? { forecastInProgress: fo.processed } : {}),
       forecastWatermarkBefore: before.seenThrough, forecastWatermarkAfter: fo.kind === 'measured' || fo.kind === 'baseline' ? fo.nextState.seenThrough : before.seenThrough,
     });
-    return fresh.length ? { matched: 1, ...cov } : { noMatches: 1, ...cov };
+    return total ? { matched: 1, ...cov } : { noMatches: 1, ...cov };
   }
 
-  if (fresh.length === 0) {
+  if (total === 0) {
     const stamped = await stampSearchEvaluation(db, s.id, { ...openSeen, ...forecastState });
     if (!stamped) return { failureClass: 'state_update_failed', ...cov };
     return { noMatches: 1, ...cov };
   }
 
-  const { subject, html, text } = buildEmail(s, fresh, coverageNotices);
+  const { subject, html, text } = buildEmail(s, fresh, coverageNotices, { total });
   let ok = false;
   try {
     ok = await sendEmail({ to: s.user_email, subject, html, text, emailType: 'saved_search_alert', eventSource: 'saved_search' });
@@ -454,6 +479,20 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get('forecastEngine'),
   );
 
+  // Probe once per invocation whether the watermark columns exist (see WatermarkColumns).
+  let watermarkColumns: WatermarkColumns = 'present';
+  {
+    const { error: probeErr } = await db.from('saved_searches').select('forecast_seen_through').limit(1);
+    if (probeErr) {
+      const msg = `${probeErr.code ?? ''} ${probeErr.message ?? ''}`;
+      watermarkColumns = /42703|PGRST204|forecast_seen_through|does not exist|schema cache/i.test(msg) ? 'absent' : 'unknown';
+    }
+  }
+  if (forecastEngine === 'canonical' && watermarkColumns !== 'present') {
+    // The canonical engine cannot run without its state columns; refuse loudly rather than half-run.
+    return NextResponse.json({ success: false, outcome: 'error', forecastEngine, watermarkColumns, note: 'canonical Forecast engine requires migration 20260924_saved_search_forecast_watermark.sql' }, { status: 500 });
+  }
+
   const results = await runSavedSearchAlertDrain({
     dueFrequencies,
     batchSize,
@@ -461,7 +500,7 @@ export async function GET(request: NextRequest) {
     timeBudgetMs: SAVED_SEARCH_ALERT_TIME_BUDGET_MS,
     fetchDueBatch: async ({ limit, excludeIds }) => {
       const { data, error } = await fetchDueSavedSearchBatch(
-        db, dueFrequencies, excludeIds, limit, forecastEngine === 'canonical' ? DUE_SELECT_CANONICAL : DUE_SELECT,
+        db, dueFrequencies, excludeIds, limit, watermarkColumns === 'present' ? DUE_SELECT_CANONICAL : DUE_SELECT,
       );
       return { rows: (data || []) as SavedSearch[], error };
     },
@@ -470,7 +509,7 @@ export async function GET(request: NextRequest) {
       if (error || count === null) return null;
       return count;
     },
-    evaluate: (row) => evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine),
+    evaluate: (row) => evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns),
   });
 
   if (dispatcherRun) {
@@ -497,6 +536,7 @@ export async function GET(request: NextRequest) {
       success: results.success,
       outcome: results.outcome,
       forecastEngine,
+      watermarkColumns,
       forecastCoverage: results.forecastCoverage,
       processed: results.processed,
       matched: results.matched,

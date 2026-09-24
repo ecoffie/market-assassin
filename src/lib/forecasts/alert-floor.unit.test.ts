@@ -13,7 +13,7 @@ const active = (at: string): FloorRow => ({ source_agency: 'DHS', state: 'active
 describe('decideFloorChange', () => {
   it('normal publisher already in the corpus: seeded once at its last created_at; a re-seed never overwrites', () => {
     const d = decideFloorChange(null, { kind: 'seed', source_agency: 'DOE', alertable_after: '2026-09-23T13:00:38Z', ...base });
-    expect(d).toMatchObject({ ok: true, noop: false, next: { state: 'active', alertable_after: '2026-09-23T13:00:38.000Z' } });
+    expect(d).toMatchObject({ ok: true, noop: false, next: { state: 'active', alertable_after: '2026-09-23T13:00:38Z' } });
     expect(decideFloorChange(active('2026-09-01T00:00:00Z'), { kind: 'seed', source_agency: 'DHS', alertable_after: '2026-09-30T00:00:00Z', ...base }))
       .toMatchObject({ ok: true, noop: true, next: { alertable_after: '2026-09-01T00:00:00Z' } });
   });
@@ -21,7 +21,7 @@ describe('decideFloorChange', () => {
     const s = decideFloorChange(null, { kind: 'suspend', source_agency: 'SSA', ...base });
     expect(s).toMatchObject({ ok: true, next: { state: 'suspended', alertable_after: null } });
     const a = decideFloorChange(s.ok ? s.next : null, { kind: 'activate', source_agency: 'SSA', alertable_after: '2026-09-24T02:00:00Z', ...base });
-    expect(a).toMatchObject({ ok: true, next: { state: 'active', alertable_after: '2026-09-24T02:00:00.000Z' } });
+    expect(a).toMatchObject({ ok: true, next: { state: 'active', alertable_after: '2026-09-24T02:00:00Z' } });
   });
   it('historical backfill into an existing publisher moves the floor FORWARD; backward needs an explicit rewind', () => {
     expect(decideFloorChange(active('2026-09-20T00:00:00Z'), { kind: 'activate', source_agency: 'DHS', alertable_after: '2026-09-24T00:00:00Z', ...base }).ok).toBe(true);
@@ -56,19 +56,50 @@ function floorDb(lastCreatedAt: string | null) {
   return { db: { from }, floors, log };
 }
 
-describe('runPublisherBackfill', () => {
-  it('success: suspended during the load, then active at the last created_at — logged twice', async () => {
-    const f = floorDb('2026-09-24T02:00:00.123Z');
+describe('runPublisherBackfill — suspended → load → reconcile → STOP (explicit activation required)', () => {
+  it('success: suspended during the load, reconciled, and LEFT suspended with a proposed floor (never auto-activated)', async () => {
+    const f = floorDb('2026-09-24T02:00:00.123456+00:00');
     const states: string[] = [];
-    await runPublisherBackfill(f.db, 'SSA', 'initial SSA onboarding', 'unit', async () => { states.push(f.floors.get('SSA')!.state); });
+    const out = await runPublisherBackfill(f.db, 'SSA', 'initial SSA onboarding', 'unit',
+      async () => { states.push(f.floors.get('SSA')!.state); return 110; },
+      async (n) => ({ ok: n === 110 }));
     expect(states).toEqual(['suspended']);
-    expect(f.floors.get('SSA')).toMatchObject({ state: 'active', alertable_after: '2026-09-24T02:00:00.123Z' });
-    expect(f.log).toHaveLength(2);
-  });
-  it('failed ingest: the floor stays SUSPENDED (no burst, no silent reopen) and the error propagates', async () => {
-    const f = floorDb('2026-09-24T02:00:00Z');
-    await expect(runPublisherBackfill(f.db, 'SSA', 'x', 'unit', async () => { throw new Error('portal 503'); })).rejects.toThrow('portal 503');
+    expect(out).toEqual({ result: 110, state: 'suspended_awaiting_activation', proposedFloor: '2026-09-24T02:00:00.123456+00:00' });
     expect(f.floors.get('SSA')).toMatchObject({ state: 'suspended' });
+    expect(f.log).toHaveLength(1); // only the suspend — activation is a separate explicit act
+  });
+  it('explicit activation afterwards uses the proposed floor exactly (microseconds kept)', () => {
+    const d = decideFloorChange({ source_agency: 'SSA', state: 'suspended', alertable_after: null },
+      { kind: 'activate', source_agency: 'SSA', alertable_after: '2026-09-24T02:00:00.123456+00:00', ...base });
+    expect(d).toMatchObject({ ok: true, next: { state: 'active', alertable_after: '2026-09-24T02:00:00.123456+00:00' } });
+  });
+  it('failed ingest: the floor stays SUSPENDED and the error propagates', async () => {
+    const f = floorDb('2026-09-24T02:00:00Z');
+    await expect(runPublisherBackfill(f.db, 'SSA', 'x', 'unit', async () => { throw new Error('portal 503'); }, async () => ({ ok: true })))
+      .rejects.toThrow('portal 503');
+    expect(f.floors.get('SSA')).toMatchObject({ state: 'suspended' });
+  });
+  it('failed reconciliation: stays SUSPENDED, no proposed floor', async () => {
+    const f = floorDb('2026-09-24T02:00:00Z');
+    await expect(runPublisherBackfill(f.db, 'SSA', 'x', 'unit', async () => 3, async () => ({ ok: false, detail: 'row count 3 ≠ source 110' })))
+      .rejects.toThrow('did not reconcile');
+    expect(f.floors.get('SSA')).toMatchObject({ state: 'suspended' });
+  });
+  it('refuses to load if the suspension cannot be confirmed', async () => {
+    const f = floorDb('2026-09-24T02:00:00Z');
+    const orig = f.db.from;
+    let reads = 0;
+    f.db.from = (t: string) => {
+      const q = orig(t) as Record<string, unknown>;
+      if (t === 'forecast_publisher_alert_floor') {
+        const ms = q.maybeSingle as () => Promise<unknown>;
+        q.maybeSingle = async () => (++reads === 2 ? { data: { state: 'active' }, error: null } : ms());
+      }
+      return q;
+    };
+    let loaded = false;
+    await expect(runPublisherBackfill(f.db, 'SSA', 'x', 'unit', async () => { loaded = true; }, async () => ({ ok: true }))).rejects.toThrow('not suspended');
+    expect(loaded).toBe(false);
   });
 });
 

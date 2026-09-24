@@ -166,8 +166,11 @@ export function buildEmail(
   search: SavedSearchLite,
   opps: AlertOpp[],
   coverageNotices: readonly string[] = [],
+  opts: { total?: number } = {},
 ): { subject: string; html: string; text: string } {
-  const n = opps.length;
+  // `total` — the real number of new matches when `opps` carries only the evidence rows (the canonical Forecast
+  // engine sends a count plus 3 examples, never thousands of cards). Omitted → legacy behaviour (opps.length).
+  const n = opts.total ?? opps.length;
   const notices = coverageNotices.filter(Boolean);
   const noticeHtml = notices.map((t) =>
     `<p style="font:400 12.5px/1.5 ${FONT};color:#7c5a10;background:#fdf6e3;border:1px solid #f1e3b8;border-radius:8px;padding:9px 12px;margin:14px 0 0 0;">${esc(t)}</p>`).join('');

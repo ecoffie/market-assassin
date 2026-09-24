@@ -52,7 +52,10 @@ export type SavedSearchAlertEvalCounts = {
   forecastCoverage?: SavedSearchForecastCoverageState;
 };
 
-export type SavedSearchForecastCoverageState = 'covered' | 'partial' | 'unavailable' | 'needs_refinement' | 'baseline';
+export type SavedSearchForecastCoverageState =
+  | 'covered' | 'partial' | 'unavailable' | 'needs_refinement' | 'baseline' | 'in_progress'
+  /** Legacy engine skipped Forecast delivery for a canonically-measured search (emergency rollback). */
+  | 'rollback_paused';
 
 export type SavedSearchAlertDueRow = {
   id: string;
@@ -67,6 +70,7 @@ export type SavedSearchAlertDueRow = {
   /** Canonical Forecast engine only (selected only when that engine runs). */
   forecast_seen_through?: string | null;
   forecast_gap_since?: Record<string, string> | null;
+  forecast_pending?: unknown;
 };
 
 export type SavedSearchAlertDrainResult = {
