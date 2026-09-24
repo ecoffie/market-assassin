@@ -22,8 +22,10 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
   assertFreshCloneGate,
+  ddlPostCheck,
   IDV_DDL_FILE,
-  IDV_DDL_SHA256,
+  IDV_DDL_STATEMENT_SHA256,
+  ddlStatementText,
   IDV_MIGRATION_CLONE_EXPIRATION_DAYS,
   IDV_MIGRATION_CLONE_PREFIX,
   IDV_MIGRATION_WRITE_STEPS,
@@ -32,7 +34,15 @@ import {
   validateIdvMigrationDispatch,
   type CloneCandidate,
 } from '../src/lib/awards-ingest/idv-migration-control';
-import { IDV_IDENTITY_COLUMNS, resolveIdvIdentityColumnsMode } from '../src/lib/awards-ingest/merge-sql';
+import {
+  AWARDS_COLUMNS,
+  awardsColumnsQuery,
+  classifyAwardsSchema,
+  IDV_IDENTITY_COLUMNS,
+  type AwardsSchemaState,
+  type LiveAwardsColumn,
+} from '../src/lib/awards-ingest/awards-schema';
+import { resolveIdvIdentityColumnsMode } from '../src/lib/awards-ingest/merge-sql';
 import {
   buildCohortMonthlyCountsSql,
   classifyCohortCompleteness,
@@ -83,10 +93,17 @@ async function tableState(bq: BigQuery): Promise<{ awardsRows: number; clones: C
   };
 }
 
-async function awardsColumns(bq: BigQuery): Promise<string[]> {
-  const { rows } = await query<{ column_name: string }>(bq,
-    `SELECT column_name FROM \`${PROJECT}.${DATASET}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'awards'`, { label: 'schema' });
-  return rows.map((r) => r.column_name);
+/** Live column names AND data types (#1670's canonical query) — never names only. */
+async function awardsColumns(bq: BigQuery): Promise<LiveAwardsColumn[]> {
+  const { rows } = await query<{ column_name: string; data_type: string }>(bq,
+    awardsColumnsQuery(PROJECT, DATASET), { label: 'schema' });
+  return rows.map((r) => ({ name: r.column_name, dataType: r.data_type }));
+}
+
+function describeSchema(state: AwardsSchemaState): string {
+  return `columns=${state.columnCount} idv=${state.idvMode} ok=${state.ok}`
+    + (state.unknownColumns.length ? ` unknown=[${state.unknownColumns.join(', ')}]` : '')
+    + (state.problems.length ? ` problems=[${state.problems.join(' | ')}]` : '');
 }
 
 /** Exact (BIGNUMERIC) — a FLOAT64 SUM varies in the last cent with summation order. */
@@ -97,10 +114,9 @@ async function obligationTotal(bq: BigQuery, table: string): Promise<string> {
 }
 
 async function probes(bq: BigQuery): Promise<void> {
-  const cols = await awardsColumns(bq);
-  const mode = resolveIdvIdentityColumnsMode(cols);
-  log(`awards columns=${cols.length} identity_columns=${mode}`);
-  if (mode === 'present') {
+  const state = classifyAwardsSchema(await awardsColumns(bq), { required: false });
+  log(`awards schema ${describeSchema(state)}`);
+  if (state.ok && state.idvMode === 'present') {
     const { rows } = await query<Record<string, number>>(bq, `
       SELECT COUNTIF(award_or_idv_flag = 'IDV') AS idv_rows,
         COUNTIF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL) AS idv_rows_with_solicitation,
@@ -164,23 +180,26 @@ async function main(): Promise<void> {
     }
     case 'ddl': {
       const sql = readFileSync(IDV_DDL_FILE, 'utf8');
-      const sha = createHash('sha256').update(sql).digest('hex');
-      if (sha !== IDV_DDL_SHA256) throw new Error(`refused: ${IDV_DDL_FILE} sha256 ${sha} != validated ${IDV_DDL_SHA256}`);
-      const mode = resolveIdvIdentityColumnsMode(await awardsColumns(bq));
+      // Pin the EXECUTABLE statement (comments may change; what BigQuery runs may not).
+      const sha = createHash('sha256').update(ddlStatementText(sql)).digest('hex');
+      if (sha !== IDV_DDL_STATEMENT_SHA256) throw new Error(`refused: ${IDV_DDL_FILE} statement sha256 ${sha} != validated ${IDV_DDL_STATEMENT_SHA256}`);
+      // Pre-check: the live table must be the healthy 51-column shape (typed) before ALTERing it;
+      // resolveIdvIdentityColumnsMode throws on a partial / mistyped / legacy-missing schema.
+      const mode = resolveIdvIdentityColumnsMode(await awardsColumns(bq), { required: false });
       if (mode === 'present') { log('identity columns already present — nothing to do'); return; }
       const oblBefore = await obligationTotal(bq, AWARDS);
       await query(bq, sql, { defaultDataset: true, label: 'ddl_01' });
-      const cols = await awardsColumns(bq);
+      const post = ddlPostCheck(await awardsColumns(bq));
       const after = await tableState(bq);
       const oblAfter = await obligationTotal(bq, AWARDS);
-      const ok = resolveIdvIdentityColumnsMode(cols) === 'present' && after.awardsRows === before.awardsRows && oblAfter === oblBefore;
-      log(`ddl verify: columns=${cols.length} (${IDV_IDENTITY_COLUMNS.length} identity) rows ${before.awardsRows}->${after.awardsRows} obligation ${oblBefore}->${oblAfter}`);
+      const ok = post.ok && after.awardsRows === before.awardsRows && oblAfter === oblBefore;
+      log(`ddl verify: ${describeSchema(post.state)} (expected ${AWARDS_COLUMNS.length}, ${IDV_IDENTITY_COLUMNS.length} IDV typed) rows ${before.awardsRows}->${after.awardsRows} obligation ${oblBefore}->${oblAfter}`);
       if (!ok) throw new Error('STOP: unexpected change after DDL — see 99-rollback.sql §A');
       return;
     }
     case 'repull_window':
     case 'idv_fy_backfill': {
-      if (resolveIdvIdentityColumnsMode(await awardsColumns(bq)) !== 'present') {
+      if (!ddlPostCheck(await awardsColumns(bq)).ok) {
         throw new Error('refused: identity columns absent — run the ddl step first');
       }
       const args = ingestArgsForStep(dispatch);

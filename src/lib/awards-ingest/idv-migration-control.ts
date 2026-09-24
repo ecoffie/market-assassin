@@ -9,6 +9,13 @@
  * Never logs confirmation or secret values.
  */
 
+import {
+  AWARDS_COLUMNS,
+  classifyAwardsSchema,
+  type AwardsSchemaState,
+  type LiveAwardsColumn,
+} from './awards-schema';
+
 export const IDV_MIGRATION_STEPS = ['preflight', 'snapshot', 'ddl', 'verify', 'repull_window', 'idv_fy_backfill'] as const;
 export type IdvMigrationStep = (typeof IDV_MIGRATION_STEPS)[number];
 
@@ -21,9 +28,20 @@ export const IDV_MIGRATION_CLONE_EXPIRATION_DAYS = 30;
 export const IDV_MIGRATION_REPULL_FROM = '2026-01-20' as const;
 export const IDV_MIGRATION_FY_MIN = 2016;
 export const IDV_MIGRATION_FY_MAX = 2025;
-/** sha256 of tasks/idv-vehicle-foundation/01-ddl-add-columns.sql as validated on 2026-09-23. */
 export const IDV_DDL_FILE = 'tasks/idv-vehicle-foundation/01-ddl-add-columns.sql' as const;
-export const IDV_DDL_SHA256 = 'c163e9c43da9a372f39022ad5b4a42c5a3f006cd6c4f0f91a10884f9a425302c' as const;
+/**
+ * sha256 of the EXECUTABLE statement of 01-ddl-add-columns.sql (see `ddlStatementText`) — the
+ * `ALTER TABLE awards ADD COLUMN …` bytes that were executed in the rollback-safe validation on
+ * 2026-09-23 (file sha256 then: c163e9c4…). #1670 later edited only the file's `--` comment lines
+ * (file sha256 now 4f9825c6…); the statement is byte-identical, so the pin is on the statement:
+ * any change to what BigQuery would execute refuses the ddl step, comment edits do not.
+ */
+export const IDV_DDL_STATEMENT_SHA256 = '53c6849411d9887d2011e48aedd9eceb582a73662522ce22e5680015de5f17df' as const;
+
+/** The executable text of a SQL file: every `--` comment line and blank line removed. */
+export function ddlStatementText(sql: string): string {
+  return sql.split('\n').filter((line) => !/^\s*--/.test(line) && line.trim() !== '').join('\n');
+}
 
 export function expectedIdvMigrationConfirmation(step: IdvMigrationStep): string {
   return `IDV-MIGRATION-${step}`;
@@ -158,4 +176,17 @@ export function ingestArgsForStep(result: IdvMigrationDispatchResult): string[] 
     return ['--idv-only', `--from=${fiscalYear - 1}-10-01`, `--to=${fiscalYear}-09-30`, '--apply'];
   }
   throw new Error(`step ${step} does not run the ingest script`);
+}
+
+/**
+ * The ddl post-check against the CANONICAL schema (awards-schema.ts): exactly the 58 columns of
+ * AWARDS_COLUMNS — all 51 legacy + 7 IDV present with the expected BigQuery types (e.g.
+ * ordering_period_end_date DATE), nothing unknown, nothing missing. Also the precondition for the
+ * re-acquisition steps.
+ */
+export function ddlPostCheck(live: readonly LiveAwardsColumn[]): { ok: boolean; state: AwardsSchemaState } {
+  const state = classifyAwardsSchema(live, { required: true });
+  const ok = state.ok && state.idvMode === 'present' && state.unknownColumns.length === 0
+    && state.columnCount === AWARDS_COLUMNS.length;
+  return { ok, state };
 }

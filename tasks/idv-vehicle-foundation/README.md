@@ -100,16 +100,17 @@ legacy statement automatically; a partial schema makes ingest refuse rather than
 
 ## Controlled execution — `.github/workflows/bq-awards-idv-migration.yml`
 
-Dispatch-only (no schedule/push), environment `bq-production` (required reviewer — **Eric must
-create this Environment in repo settings**; until it exists GitHub creates it unprotected on first
-use, so create it BEFORE the first dispatch), same concurrency group as the weekly ingest.
+Dispatch-only (no schedule/push), environment `bq-production` — **the Environment EXISTS
+(created by Eric, 2026-09-23): required reviewer `ecoffie`, deployment branch policy `main`**, so a
+dispatch waits for approval and only runs from `main` — plus the same concurrency group as the
+weekly ingest.
 Each run = ONE step with typed confirmation `IDV-MIGRATION-<step>`.
 
 | Step | Writes? | Gate | Notes |
 |---|---|---|---|
 | `preflight` | no | — | counts only |
 | `snapshot` | new clone table | — | `awards_clone_pre_idv_<YYYYMMDD_HHMM>`, `CREATE TABLE … CLONE`, expires 30d |
-| `ddl` | ALTER awards | clone < 24h AND clone rows == awards rows; `01` sha256 == validated | verifies 58 cols, rows + exact BIGNUMERIC Σobligation unchanged, else STOP |
+| `ddl` | ALTER awards | clone < 24h AND clone rows == awards rows; `01` EXECUTABLE-statement sha256 == the one validated 2026-09-23 (`53c68494…`; #1670 changed only comments, file sha c163e9c4→4f9825c6); live schema must be the typed 51-col shape | post-check vs canonical `AWARDS_COLUMNS` (58, names AND types — e.g. `ordering_period_end_date DATE`, nothing unknown), rows + exact BIGNUMERIC Σobligation unchanged, else STOP |
 | `verify` | no | — | identity fill, cohort completeness, Mech-Elec II |
 | `repull_window` | MERGE | same clone gate | `window_from >= 2026-01-20`, span <= 62 days; blank `window_to` = today (stamps clocks) |
 | `idv_fy_backfill` | MERGE (IDV rows) | same clone gate | one FY 2016..2025 per run; no rebuild, no clock stamp |

@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AWARDS_COLUMNS, AWARDS_LEGACY_COLUMNS } from './awards-schema';
 import {
   assertFreshCloneGate,
+  ddlPostCheck,
   expectedIdvMigrationConfirmation,
   IDV_DDL_FILE,
-  IDV_DDL_SHA256,
+  IDV_DDL_STATEMENT_SHA256,
+  ddlStatementText,
   IDV_MIGRATION_STEPS,
   IDV_MIGRATION_WRITE_STEPS,
   idvMigrationCloneTableId,
@@ -156,13 +159,21 @@ describe('fresh-clone write gate', () => {
 });
 
 describe('ddl runs only the validated bytes', () => {
-  it('01-ddl-add-columns.sql still hashes to the value executed in validation', () => {
+  it("01-ddl-add-columns.sql's executable statement still hashes to the one executed in validation", () => {
     const sql = readFileSync(join(root, IDV_DDL_FILE), 'utf8');
-    expect(createHash('sha256').update(sql).digest('hex')).toBe(IDV_DDL_SHA256);
+    expect(createHash('sha256').update(ddlStatementText(sql)).digest('hex')).toBe(IDV_DDL_STATEMENT_SHA256);
+  });
+
+  it('comment edits keep the pin; any change to the executed statement breaks it', () => {
+    const sql = readFileSync(join(root, IDV_DDL_FILE), 'utf8');
+    const h = (s: string) => createHash('sha256').update(ddlStatementText(s)).digest('hex');
+    expect(h(`-- a new comment\n${sql}\n-- trailing note\n`)).toBe(IDV_DDL_STATEMENT_SHA256);
+    expect(h(sql.replace('ordering_period_end_date DATE', 'ordering_period_end_date STRING'))).not.toBe(IDV_DDL_STATEMENT_SHA256);
+    expect(h(sql.replace('ALTER TABLE awards', 'ALTER TABLE awards_other'))).not.toBe(IDV_DDL_STATEMENT_SHA256);
   });
 
   it('the runner refuses on hash drift and resolves the unqualified table via the usaspending default dataset', () => {
-    expect(runner).toContain('sha !== IDV_DDL_SHA256');
+    expect(runner).toContain('sha !== IDV_DDL_STATEMENT_SHA256');
     expect(runner).toMatch(/defaultDataset: true, label: 'ddl_01'/);
   });
 });
@@ -176,5 +187,35 @@ describe('ingest arguments', () => {
     expect(ingestArgsForStep({ step: 'idv_fy_backfill', fiscalYear: 2024, window: null }))
       .toEqual(['--idv-only', '--from=2023-10-01', '--to=2024-09-30', '--apply']);
     expect(() => ingestArgsForStep({ step: 'ddl', fiscalYear: null, window: null })).toThrow();
+  });
+});
+
+describe('ddl post-check — typed, against the canonical schema (awards-schema.ts)', () => {
+  const live = (cols: readonly { target: string; type: string }[]) => cols.map((c) => ({ name: c.target, dataType: c.type }));
+
+  it('passes only for exactly the 58 canonical columns with their canonical types', () => {
+    expect(ddlPostCheck(live(AWARDS_COLUMNS)).ok).toBe(true);
+  });
+
+  it('fails on the untouched 51-column table (DDL did not land)', () => {
+    expect(ddlPostCheck(live(AWARDS_LEGACY_COLUMNS)).ok).toBe(false);
+  });
+
+  it('fails when ordering_period_end_date landed as STRING instead of DATE', () => {
+    const wrong = live(AWARDS_COLUMNS).map((c) => (c.name === 'ordering_period_end_date' ? { ...c, dataType: 'STRING' } : c));
+    const r = ddlPostCheck(wrong);
+    expect(r.ok).toBe(false);
+    expect(r.state.typeMismatches.join(' ')).toMatch(/ordering_period_end_date: live STRING/);
+  });
+
+  it('fails on a partial DDL and on an unknown extra column', () => {
+    expect(ddlPostCheck(live(AWARDS_COLUMNS.filter((c) => c.target !== 'idv_type_code'))).ok).toBe(false);
+    expect(ddlPostCheck([...live(AWARDS_COLUMNS), { name: 'surprise', dataType: 'STRING' }]).ok).toBe(false);
+  });
+
+  it('the runner reads names AND types through #1670\'s awardsColumnsQuery and uses the post-check for ddl + re-acquisition', () => {
+    expect(runner).toContain('awardsColumnsQuery(PROJECT, DATASET)');
+    expect(runner).not.toMatch(/SELECT column_name FROM/);
+    expect(runner.match(/ddlPostCheck\(await awardsColumns\(bq\)\)/g)?.length).toBe(2);
   });
 });
