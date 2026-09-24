@@ -31,6 +31,11 @@ export const SUBSCRIPTION_GRANTS: Record<CancellableProduct, { kv: GrantKey[]; f
 };
 const FLAG_FOR: Record<FlagKey, GrantKey> = { access_assassin_standard: 'ma', access_hunter_pro: 'ospro' };
 
+/** A subscription in one of these states has ENDED — a replayed checkout must not re-grant it. */
+export function isEndedSubscriptionStatus(status: string): boolean {
+  return status === 'canceled' || status === 'incomplete_expired';
+}
+
 /** Subscription statuses that are NOT an end of access (still paying or retrying). */
 export const NON_TERMINAL_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete']);
 

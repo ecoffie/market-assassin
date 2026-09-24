@@ -25,7 +25,7 @@ import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
-import { planCancellationRevocation, NON_TERMINAL_STATUSES, type CancellableProduct, type GrantKey } from '@/lib/billing/cancellation-revocation';
+import { planCancellationRevocation, isEndedSubscriptionStatus, NON_TERMINAL_STATUSES, type CancellableProduct, type GrantKey } from '@/lib/billing/cancellation-revocation';
 import { classifySpecialAccount } from '@/lib/admin/member-grants';
 import { getStaffRole } from '@/lib/api-auth';
 
@@ -534,7 +534,23 @@ export async function POST(request: NextRequest) {
       productName?.toLowerCase().includes('federal help center') ||
       productName?.toLowerCase().includes('fhc');
 
-    if (isAlertPro) {
+    // A delayed/replayed checkout for a subscription that has since ENDED must not re-grant
+    // (Stripe retries deliveries for days; a cancellation can land in between). Unknown status
+    // (lookup failed) still grants — a paying customer is never locked out on a read error.
+    let subscriptionEnded = false;
+    if ((isAlertPro || isFHCMembership) && session.mode === 'subscription' && session.subscription) {
+      try {
+        const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+        const current = await stripe.subscriptions.retrieve(subId);
+        subscriptionEnded = isEndedSubscriptionStatus(current.status);
+      } catch (err) {
+        console.error('[stripe-webhook] could not read subscription status — granting:', err);
+      }
+    }
+
+    if ((isAlertPro || isFHCMembership) && subscriptionEnded) {
+      console.log(`[stripe-webhook] replayed checkout for an ended subscription — not re-granting ${email}`);
+    } else if (isAlertPro) {
       // Alert Pro subscription - set user to daily frequency
       if (supabase) {
         await supabase
@@ -842,8 +858,17 @@ export async function POST(request: NextRequest) {
     const otherLiveSubscriptions: CancellableProduct[] = [];
     let attributionUncertain = false;
     try {
-      const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
-      for (const other of subs.data) {
+      // Payment links create a NEW Customer per checkout, so a re-subscription usually lives on a
+      // different customer object with the same email. Look across all of them, not just this one.
+      const customerIds = new Set<string>([customerId]);
+      for (const addr of new Set([customer.email, email])) {
+        for await (const c of stripe.customers.list({ email: addr, limit: 100 })) customerIds.add(c.id);
+      }
+      const allSubs: Stripe.Subscription[] = [];
+      for (const cid of customerIds) {
+        for await (const sub of stripe.subscriptions.list({ customer: cid, status: 'all', limit: 100 })) allSubs.push(sub);
+      }
+      for (const other of allSubs) {
         if (other.id === subscription.id || !NON_TERMINAL_STATUSES.has(other.status)) continue;
         for (const item of other.items.data) {
           const pid = typeof item.price.product === 'string' ? item.price.product : item.price.product?.id;
@@ -921,11 +946,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, action: 'none', reason: plan.reason, keep: plan.keep, cancelled });
     }
 
+    let kvApplyFailed = false;
     try {
       for (const key of plan.deleteKv) await kv.del(`${key}:${email}`);
       for (const { key, atMs } of plan.expireKvAt) await kv.expireat(`${key}:${email}`, Math.floor(atMs / 1000));
     } catch (kvError) {
-      console.error('[cancellation] KV error applying revocation plan:', kvError);
+      console.error('[cancellation] KV error applying revocation plan — will ask Stripe to retry:', kvError);
+      kvApplyFailed = true;
+    }
+    if (kvApplyFailed) {
+      // Non-2xx so Stripe redelivers; the plan is idempotent. Forget the event id so the retry is
+      // not swallowed by the in-memory dedup on this (warm) instance.
+      processedEvents.delete(event.id);
+      return NextResponse.json({ received: false, action: 'revocation_incomplete', cancelled }, { status: 500 });
     }
     if (supabase) {
       if (plan.clearFlags.length) {
