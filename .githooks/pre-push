@@ -34,6 +34,25 @@ if [ -L "$0" ]; then
   exit 1
 fi
 HOOK_DIR="$(cd -P "$(dirname "$0")" && pwd -P)"
+
+# 0) HARD BLOCK: core.hooksPath must be the supported RELATIVE `.githooks`.
+# Runs BEFORE the resolver on purpose: from a linked worktree the resolver
+# would refuse an absolute hooksPath anyway, but from the PRIMARY checkout an
+# absolute value passes it silently — so this is the only step that reports the
+# drift there, and it gives the clearest message in both places. DETECTION
+# ONLY: it never rewrites git config (Eric, 2026-09-23). It honours the
+# documented one-shot `git -c core.hooksPath="$PWD/.githooks" push` escape.
+# Checked against the cwd git gave us (the checkout being pushed).
+HOOKS_PATH_CHECK="$HOOK_DIR/../scripts/check-hooks-path.mjs"
+if [ ! -f "$HOOKS_PATH_CHECK" ]; then
+  echo "✗ pre-push gate: missing $HOOKS_PATH_CHECK — blocking." >&2
+  exit 1
+fi
+if ! node "$HOOKS_PATH_CHECK" --repo "$PWD"; then
+  echo "✗ pre-push gate: blocked — core.hooksPath drift (see above). Nothing was changed." >&2
+  exit 1
+fi
+
 if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR")"; then
   echo "✗ pre-push gate: blocked (see above) — refusing to report on a tree I cannot vouch for." >&2
   exit 1
@@ -90,6 +109,17 @@ if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1
 else
   echo -e "      ${RED}✗ template.html was edited but template-html.ts (the file the map SERVES) wasn't regenerated — push blocked${NC}"
   echo -e "      ${YEL}  run: node scripts/gen-template-html.mjs${NC}"
+  fail=1
+fi
+
+# 1d) HARD BLOCK: the core.hooksPath drift detector (step 0) must keep
+# detecting. Hermetic: disposable repos under a validated temp dir only.
+echo -e "  ${BOLD}1d/13${NC} core.hooksPath drift detector…"
+if bash tests/check-hooks-path.test.sh > /tmp/mindy-prepush-hookspath.log 2>&1; then
+  echo -e "      ${GREEN}✓ hooksPath detector regression passes${NC}"
+else
+  echo -e "      ${RED}✗ hooksPath detector regression — push blocked${NC}"
+  grep -aE "✗|FAIL" /tmp/mindy-prepush-hookspath.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 
