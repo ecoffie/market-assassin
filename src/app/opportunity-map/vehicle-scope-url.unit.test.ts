@@ -81,18 +81,58 @@ describe('wiring', () => {
     expect(MAP).toMatch(/syncDeepSelect\(\);\n.*\n\s*if\(typeof window\.__syncQueryUrl==='function'\)window\.__syncQueryUrl\(false,true\);/);
     expect(MAP).toContain("FILT.leadMax=''; FILT.valueRange='';");
   });
-  it('#1692 review: an off-band floor survives a Filters apply; a user choice or Filters Clear still clears it', () => {
-    expect(MAP).toContain("if(!ok&&s)el.setAttribute('data-offband',s); else el.removeAttribute('data-offband');");
-    expect(MAP).toContain("return e.value||e.getAttribute('data-offband')||'';");
-    expect(MAP).toMatch(/\['mfValueMin','mfValueMax','mfLead'\]\.forEach\(function\(id\)\{var e=document\.getElementById\(id\);if\(e\)e\.removeAttribute\('data-offband'\);\}\);/);
-    expect(MAP).toContain("e.addEventListener('change',function(){ e.removeAttribute('data-offband'); });");
+  describe('#1692 review: an applied value the Filters select has no band for is SHOWN, not hidden', () => {
+    // Execute the served helper against a minimal <select> (options, value, querySelector, appendChild).
+    type Opt = { value: string; textContent: string; attrs: Record<string, string>; setAttribute(k: string, v: string): void; remove(): void };
+    function mkSelect(bands: [string, string][]) {
+      const sel = {
+        options: [] as Opt[], _v: '',
+        get value() { return this._v; },
+        set value(v: string) { this._v = this.options.some((o) => o.value === v) ? v : ''; },
+        querySelector(q: string) { return q === 'option[data-custom]' ? this.options.find((o) => o.attrs['data-custom']) ?? null : null; },
+        appendChild(o: Opt) { this.options.push(o); },
+      };
+      const mk = (value: string, textContent: string): Opt => {
+        const o: Opt = { value, textContent, attrs: {}, setAttribute(k, v) { o.attrs[k] = v; }, remove() { sel.options.splice(sel.options.indexOf(o), 1); } };
+        return o;
+      };
+      for (const [v, t] of bands) sel.options.push(mk(v, t));
+      return { sel, mk };
+    }
+    const raw = between('window.__selectShow=function(el,v,label){', '  window.__vehicleScopeState=function(){');
+    const build = (mk: (v: string, t: string) => Opt) => new Function('document', raw.replace('window.__selectShow=', 'var f=') + '; return f;')(
+      { createElement: () => mk('', '') },
+    ) as (el: unknown, v: string, label: string) => void;
+    const LEAD: [string, string][] = [['', 'Any timeframe'], ['6', '6 months'], ['12', '12 months'], ['18', '18 months']];
+
+    it('off-band 60 → a visible "60 months (custom)" option is selected (a Filters apply reads 60)', () => {
+      const { sel, mk } = mkSelect(LEAD); build(mk)(sel, '60', '60 months (custom)');
+      expect(sel.value).toBe('60');
+      expect(sel.options.map((o) => o.textContent)).toContain('60 months (custom)');
+    });
+    it('choosing the blank option is a real change that clears it', () => {
+      const { sel, mk } = mkSelect(LEAD); build(mk)(sel, '60', '60 months (custom)');
+      expect(sel.value).not.toBe('');
+      sel.value = '';                                  // the user picks "Any timeframe" — the value really changes
+      expect(sel.value).toBe('');
+    });
+    it('a banded value or a reset removes the injected option; only one is ever injected', () => {
+      const { sel, mk } = mkSelect(LEAD); const show = build(mk);
+      show(sel, '60', '60 months (custom)'); show(sel, '48', '48 months (custom)');
+      expect(sel.options.filter((o) => o.attrs['data-custom'])).toHaveLength(1);
+      expect(sel.value).toBe('48');
+      show(sel, '12', 'x'); expect(sel.value).toBe('12'); expect(sel.options.some((o) => o.attrs['data-custom'])).toBe(false);
+      show(sel, '60', '60 months (custom)'); show(sel, '', ''); expect(sel.value).toBe(''); expect(sel.options).toHaveLength(4);
+    });
+    it('every path that set or cleared the old hidden mark now goes through the visible option', () => {
+      expect(MAP).not.toContain('data-offband');
+      expect(MAP).toContain("window.__selectShow(document.getElementById('mfLead'), FILT.leadMax||'', (FILT.leadMax||'')+' months (custom)');");
+      expect(MAP).toContain("['mfValueMin','mfValueMax','mfLead'].forEach(function(id){window.__selectShow(document.getElementById(id),'','');});");
+      expect(MAP).toContain("FILT.leadMax=(document.getElementById('mfLead')||{}).value||'';");
+    });
   });
-  it('an off-band window (leadMax=60) survives a Filters apply the same way', () => {
-    expect(MAP).toContain("if(FILT.leadMax&&_rLd.value!==String(FILT.leadMax))_rLd.setAttribute('data-offband',String(FILT.leadMax));");
-    expect(MAP).toContain("FILT.leadMax=_vb('mfLead');");
-  });
-  it('the writer emits whole dollars only (what the scope-link reader accepts)', () => {
-    expect(MAP).toContain("?String(Math.floor(parseFloat(String(FILT.valueRange).split('-')[0]))):''");
+  it('the writer emits whole dollars the reader accepts (1..999,999,999,999,999), else nothing', () => {
+    expect(MAP).toContain("return (isFinite(n)&&n>=1&&n<=999999999999999)?String(n):''; })()");
   });
   it('a scope fetches the Awarded horizon alone (no unscoped totals summed in)', () => {
     expect(MAP).toContain("if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }");

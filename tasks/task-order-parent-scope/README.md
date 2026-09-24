@@ -89,6 +89,16 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 | Unscoped hand-built `?minValue=` isn't rewritten by the pill | **Not changed.** Only reachable by hand; tool links always carry a scope |
 | `state`/`naics` survive the banner's Clear (URL and FILT agree) | **Pre-existing unmanaged market params, not changed** |
 
+### Third delta review (`8fcc3712..627ee6a6`): no blockers
+
+| Item | Status |
+|---|---|
+| **Should-fix.** The hidden `data-offband` mark kept the value applied, but the select still *showed* "No min" / "Any timeframe", and picking that option fired no change, so the value couldn't be cleared from its own select | **Fixed.** The hidden mark is replaced by a real visible "(custom)" option (`window.__selectShow`), so choosing the blank option genuinely clears it. Executed on a fake select in the unit test, and in the browser (`final-browser-evidence.json`) |
+| URL writer: a pill floor over 15 digits was still written | **Fixed.** The writer emits only 1…999,999,999,999,999 |
+| Found during the browser run: the scope banner covered the Filters panel footer | **Fixed.** z-index 1000, under `#ztop` (1001); hit-testing the Reset button returns the button |
+| `FILT` and the fetch keep a `1500.5` pill floor until reload (under $1 difference) | **Accepted** |
+| Pre-existing on `main`: the literal `\u2013` between Min and Max in the Filters panel (`route.ts:251`) | **Not changed.** Outside this PR |
+
 ## Reproducible demo (VCI / IMRI style)
 
 A management-consulting firm asks what management consulting is currently being ordered through OASIS+.

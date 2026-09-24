@@ -1634,11 +1634,22 @@ const VIEWPORT_JS = `<script>
     strategy:[] };
   // FILT is local to this script; the scope banner lives in another one. Publish read + clear here so
   // the banner never guesses (a bare \`typeof FILT\` there is always 'undefined').
+  // An applied value a Filters <select> has no band for (a scoped MCP link's $2.5M floor or 60-month
+  // window) gets a REAL, visible option, so the select shows what is applied and choosing the blank
+  // option is a genuine change that clears it (#1692 review). One injected option per select, replaced
+  // on the next call; removed as soon as a banded value (or blank) is set.
+  window.__selectShow=function(el,v,label){
+    if(!el)return; var s=(v!=null?String(v):''), inj=el.querySelector('option[data-custom]');
+    for(var i=0;i<el.options.length;i++){ var o=el.options[i]; if(o!==inj&&o.value===s){ if(inj)inj.remove(); el.value=s; return; } }
+    if(!s){ if(inj)inj.remove(); el.value=''; return; }
+    if(!inj){ inj=document.createElement('option'); inj.setAttribute('data-custom','1'); el.appendChild(inj); }
+    inj.value=s; inj.textContent=label; el.value=s;
+  };
   window.__vehicleScopeState=function(){ return { vehicle:FILT.vehicle||'', parent:FILT.parent||'', work:FILT.work||'' }; };
   // Clearing the scope also drops the window the scoped link carried, so FILT and the URL (which stops
   // writing leadMax once no scope remains) stay the same market after a reload.
   window.__clearVehicleScope=function(){ FILT.vehicle=''; FILT.parent=''; FILT.work=''; FILT.leadMax=''; FILT.valueRange='';
-    var ld=document.getElementById('mfLead'); if(ld){ ld.value=''; ld.removeAttribute('data-offband'); }
+    window.__selectShow(document.getElementById('mfLead'),'','');
     if(window.__valReflect)window.__valReflect(''); };
   // ── Ask-Mindy context bridge ────────────────────────────────────────────────
   // The Ask Mindy drawer runs in its OWN IIFE and can't see these locals. Publish a
@@ -3289,8 +3300,8 @@ const VIEWPORT_JS = `<script>
         leadMax: opp&&typeof FILT!=='undefined'&&FILT&&FILT.leadMax?String(FILT.leadMax):'',
         // The floor half of FILT.valueRange ("min-max"), written beside a scope so a reload keeps it.
         // Whole dollars, the only shape the scope-link reader accepts (a pill "1500.5" would not reload).
-        minValue: opp&&typeof FILT!=='undefined'&&FILT&&FILT.valueRange&&isFinite(parseFloat(String(FILT.valueRange).split('-')[0]))
-          ?String(Math.floor(parseFloat(String(FILT.valueRange).split('-')[0]))):''
+        minValue: (function(){ var n=(opp&&typeof FILT!=='undefined'&&FILT&&FILT.valueRange)?Math.floor(parseFloat(String(FILT.valueRange).split('-')[0])):NaN;
+          return (isFinite(n)&&n>=1&&n<=999999999999999)?String(n):''; })()
       };
       var next=window.__mapQueryUrl(cur,intent,!!dropContext);
       if(next===cur)return;
@@ -4020,19 +4031,16 @@ const VIEWPORT_JS = `<script>
       // Mirror the top-bar value pill's min/max into the deep-panel min–max PAIR (Zillow redesign PR3).
       // The selects only hold specific bands, so set a bound only when it exactly matches an option;
       // an off-band custom value from the pill leaves that select blank rather than lie.
-      var setIf=function(id,v){ var el=document.getElementById(id); if(!el)return; var s=(v!=null?String(v):'');
-        var ok=false; for(var i=0;i<el.options.length;i++){ if(el.options[i].value===s){ el.value=s; ok=true; break; } } if(!ok)el.value='';
-        // An off-band bound (e.g. a $2.5M floor from an MCP scoped link) leaves the select blank. Mark it,
-        // so readDeep keeps the APPLIED bound instead of reading the blank select as "cleared" (#1692 review).
-        if(!ok&&s)el.setAttribute('data-offband',s); else el.removeAttribute('data-offband'); };
+      // A bound with no band (e.g. a $2.5M floor from an MCP scoped link) is SHOWN as its own option,
+      // never left as a blank select that a Filters apply would read as "cleared" (#1692 review).
+      var setIf=function(id,v){ var n=(v!=null&&v!=='')?Number(v):null;
+        window.__selectShow(document.getElementById(id), v, n!=null&&isFinite(n)?('$'+n.toLocaleString('en-US')+' (custom)'):String(v)); };
       setIf('mfValueMin', minV);
       setIf('mfValueMax', maxV);
       // Keep the legacy hidden #mfValue in sync too (harmless mirror for any code still reading it).
       var sel=document.getElementById('mfValue'); if(sel){ var want=(minV!=null?String(minV):'')+'-'+(maxV!=null?String(maxV):'');
         var m=false; for(var j=0;j<sel.options.length;j++){ if(sel.options[j].value===want){ sel.value=want; m=true; break; } } if(!m)sel.value=''; }
     }
-    ['mfValueMin','mfValueMax','mfLead'].forEach(function(id){ var e=document.getElementById(id);
-      if(e)e.addEventListener('change',function(){ e.removeAttribute('data-offband'); }); });
     function applyClientOpenFilter(){
       // Compose with whatever the template's OWN pass(o) already checks (the legacy client
       // filter sheets — always-true today, see F defaults — plus any future addition) so this
@@ -4173,10 +4181,8 @@ const VIEWPORT_JS = `<script>
     FILT.noticeMulti=_checked('.mf-notice');
     // Value = a min–max PAIR now (Zillow). Compose the "min-max" string fetchView already expects.
     // Either bound alone is valid ("1000000-" = $1M+, "-5000000" = under $5M). Empty both → no filter.
-    // A blank select with a data-offband mark is an applied bound the bands cannot display — keep it.
-    var _vb=function(id){ var e=document.getElementById(id); if(!e)return ''; return e.value||e.getAttribute('data-offband')||''; };
-    var _vmin=_vb('mfValueMin');
-    var _vmax=_vb('mfValueMax');
+    var _vmin=(document.getElementById('mfValueMin')||{}).value||'';
+    var _vmax=(document.getElementById('mfValueMax')||{}).value||'';
     FILT.valueRange=(_vmin||_vmax)?(_vmin+'-'+_vmax):'';
     FILT.subAgency=(document.getElementById('mfSubAgency')||{}).value||'';
     FILT.country=(document.getElementById('mfCountry')||{}).value||'';
@@ -4185,7 +4191,7 @@ const VIEWPORT_JS = `<script>
     // Awarded-only recompete signals (contract_type buying-style, likelihood, expiring-within).
     FILT.sap=(document.getElementById('mfSap')||{}).value||'';
     FILT.likelihood=(document.getElementById('mfLikelihood')||{}).value||'';
-    FILT.leadMax=_vb('mfLead');   // value, or a marked off-band window (see __applySavedSearch)
+    FILT.leadMax=(document.getElementById('mfLead')||{}).value||'';
     // Open-only SAP-friendly BUYER (agency PO-share tier).
     FILT.sapBuyer=(document.getElementById('mfSapBuyer')||{}).value||'';
     // STRATEGY FILTER (Opportunity DNA) — the checked genome-strand boxes → FILT.strategy (array).
@@ -4232,7 +4238,7 @@ const VIEWPORT_JS = `<script>
     // Clear any open code-autocomplete lists too, or a stale dropdown survives a reset.
     ['mfNaicsAc','mfPscAc'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
     ['mfPosted','mfClosing','mfValue','mfValueMin','mfValueMax','mfCountry','mfSap','mfLikelihood','mfLead','mfSapBuyer'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
-    ['mfValueMin','mfValueMax','mfLead'].forEach(function(id){var e=document.getElementById(id);if(e)e.removeAttribute('data-offband');});
+    ['mfValueMin','mfValueMax','mfLead'].forEach(function(id){window.__selectShow(document.getElementById(id),'','');});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice,.mf-strategy').forEach(function(c){c.checked=false;});
@@ -4922,10 +4928,9 @@ const VIEWPORT_JS = `<script>
     var _rCl=document.getElementById('mfClosing'); if(_rCl)_rCl.value=FILT.closingDays||'';
     var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
     var _rLk=document.getElementById('mfLikelihood'); if(_rLk)_rLk.value=FILT.likelihood||'';
-    var _rLd=document.getElementById('mfLead'); if(_rLd){ _rLd.value=FILT.leadMax||'';
-      // A window the select cannot show (a scoped MCP link's leadMax=60) stays APPLIED: mark it so a
-      // Filters apply does not read the blank select as "Any timeframe" and shrink the market (#1692).
-      if(FILT.leadMax&&_rLd.value!==String(FILT.leadMax))_rLd.setAttribute('data-offband',String(FILT.leadMax)); else _rLd.removeAttribute('data-offband'); }
+    // A window the select has no band for (a scoped MCP link's leadMax=60) is shown as its own option,
+    // so a Filters apply keeps it and "Any timeframe" is a real choice that clears it (#1692).
+    window.__selectShow(document.getElementById('mfLead'), FILT.leadMax||'', (FILT.leadMax||'')+' months (custom)');
     var _rSb=document.getElementById('mfSapBuyer'); if(_rSb)_rSb.value=FILT.sapBuyer||'';
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
@@ -9114,7 +9119,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         // clear of the zoom control and the list panel; narrow screens span the width above the
         // floating Map/List button.
         var _narrow=window.innerWidth<700;
-        el.style.cssText='position:fixed;z-index:1200;'
+        // z 1000: above the map, BELOW the top bar's stacking context (#ztop z 1001), so the Filters
+        // panel (z 3000 inside #ztop) is never covered by the banner (measured on the built page).
+        el.style.cssText='position:fixed;z-index:1000;'
           +(_narrow?'left:12px;right:12px;bottom:92px;':'left:76px;bottom:48px;max-width:min(600px,calc(100vw - 460px));')
           +'background:#1e3a8a;color:#fff;border-radius:10px;padding:8px 12px;font:13px/1.4 system-ui,sans-serif;'
           +'box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;gap:10px;align-items:flex-start';

@@ -1,0 +1,152 @@
+{
+ "1_open": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": "2500000",
+   "maxValue": null,
+   "leadMax": "60"
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=2500000&leadMax=60",
+  "selects": [
+   "mfValueMin=2500000 \"$2,500,000 (custom)\"",
+   "mfLead=60 \"60 months (custom)\""
+  ],
+  "banner": true
+ },
+ "2_filters_apply": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": "2500000",
+   "maxValue": null,
+   "leadMax": "60"
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=2500000&leadMax=60",
+  "selects": [
+   "mfValueMin=2500000 \"$2,500,000 (custom)\"",
+   "mfLead=60 \"60 months (custom)\""
+  ],
+  "banner": true
+ },
+ "3_reload": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": "2500000",
+   "maxValue": null,
+   "leadMax": "60"
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=2500000&leadMax=60",
+  "selects": [
+   "mfValueMin=2500000 \"$2,500,000 (custom)\"",
+   "mfLead=60 \"60 months (custom)\""
+  ],
+  "banner": true
+ },
+ "4_user_picks_blank": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": null,
+   "maxValue": null,
+   "leadMax": null
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management%20consulting",
+  "selects": [
+   "mfValueMin= \"No min\"",
+   "mfLead= \"Any timeframe\""
+  ],
+  "banner": true
+ },
+ "5_reload_after_blank": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": null,
+   "maxValue": null,
+   "leadMax": null
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management%20consulting",
+  "selects": [
+   "mfValueMin= \"No min\"",
+   "mfLead= \"Any timeframe\""
+  ],
+  "banner": true
+ },
+ "6_filters_reset": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": null,
+   "maxValue": null,
+   "leadMax": null
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management%20consulting",
+  "selects": [
+   "mfValueMin= \"No min\"",
+   "mfLead= \"Any timeframe\""
+  ],
+  "banner": true
+ },
+ "7_filtered": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": "DC",
+   "minValue": "1000000",
+   "maxValue": null,
+   "leadMax": "60"
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&state=DC&minValue=1000000&leadMax=60",
+  "selects": [
+   "mfValueMin=1000000 \"$1M\"",
+   "mfLead=60 \"60 months (custom)\""
+  ],
+  "banner": true
+ },
+ "8_banner_clear": {
+  "fetch": {
+   "vehicle": null,
+   "state": "DC",
+   "minValue": null,
+   "maxValue": null,
+   "leadMax": null
+  },
+  "url": "?mode=recompete&state=DC",
+  "selects": [
+   "mfValueMin= \"No min\"",
+   "mfLead= \"Any timeframe\""
+  ],
+  "banner": false
+ },
+ "9_reload_after_clear": {
+  "fetch": {
+   "vehicle": null,
+   "state": "DC",
+   "minValue": null,
+   "maxValue": null,
+   "leadMax": null
+  },
+  "url": "?mode=recompete&state=DC",
+  "selects": [
+   "mfValueMin= \"No min\"",
+   "mfLead= \"Any timeframe\""
+  ],
+  "banner": false
+ },
+ "10_crafted_1-2": {
+  "fetch": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": null,
+   "maxValue": null,
+   "leadMax": null
+  },
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1-2",
+  "selects": [
+   "mfValueMin= \"No min\"",
+   "mfLead= \"Any timeframe\""
+  ],
+  "banner": true
+ }
+}
