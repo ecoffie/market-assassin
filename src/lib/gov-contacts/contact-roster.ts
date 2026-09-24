@@ -20,6 +20,7 @@ import { deriveSubAgencyEvidence } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
+import { withDodaacPrefix, dodaacPrefixOrExpr } from '@/lib/gov-contacts/dodaac-prefix';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
@@ -347,10 +348,11 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       for (const kw of targets.subTier) parts.push(`sub_tier.ilike.%${kw}%`);
       q = q.or(parts.join(','));
     }
+    // DoDAAC prefix via the shared, trigram-indexed predicate (dodaac-prefix.ts).
     if (validDodaac) {
-      q = q.ilike('solicitation_number', `${validDodaac}%`);
+      q = withDodaacPrefix(q, validDodaac);
     } else if (agencyDodaacCodes.length > 0) {
-      q = q.or(agencyDodaacCodes.map((c) => `solicitation_number.ilike.${c}%`).join(','));
+      q = q.or(dodaacPrefixOrExpr(agencyDodaacCodes));
     } else if (agency && resolved) {
       const kw = resolved.deptKeyword;
       q = kw.length >= 3 ? q.ilike('department_ind_agency', `%${kw}%`) : q.ilike('department_ind_agency', `%${agency}%`);

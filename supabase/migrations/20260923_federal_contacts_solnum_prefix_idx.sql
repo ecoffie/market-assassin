@@ -1,0 +1,28 @@
+-- migrate:no-transaction
+-- ── federal_contacts: make the DoDAAC-prefix office lookup indexable.
+--
+-- Every office-anchored contact surface (MCP search_federal_contacts + chat via
+-- contact-roster.ts, /api/app/federal-contacts, /api/app/contacts-map) filters
+--   solicitation_number ILIKE '<DODAAC>%'
+-- (one code, or an OR of up to 60 for an agency). The shared predicate lives in
+-- src/lib/gov-contacts/dodaac-prefix.ts.
+--
+-- federal_contacts (~298K rows, 391 MB) had NO index on solicitation_number, so each
+-- lookup was a parallel seq scan evaluating six placeholder-name NOT ILIKEs on every
+-- row, twice (page + count:'exact'). Under concurrency it crossed the 8s PostgREST
+-- statement_timeout and queryFederalContacts returned {contacts:[], degraded:true} —
+-- for W912PL, which has 182 real rows.
+--
+-- WHY TRIGRAM, NOT a btree:
+--   * The predicate must stay ILIKE — 1,554 rows carry a lower/mixed-case prefix, so a
+--     case-sensitive LIKE would silently drop real contacts.
+--   * A btree on upper(solicitation_number) text_pattern_ops is only usable by
+--     `upper(solicitation_number) LIKE 'W912PL%'`, an expression PostgREST cannot emit.
+--     Measured on a copy: with that btree, the ILIKE PostgREST sends still seq-scans.
+--   * pg_trgm 1.6 is already installed (public) and this table already carries three
+--     gin_trgm_ops indexes. ILIKE 'W912PL%' is served by a bitmap index scan with no
+--     query change. Measured on a copy: 3,459 ms → 5.9 ms (page + exact count), 12 MB.
+--
+-- CONCURRENTLY so contact syncs are not blocked while it builds.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fed_contacts_solnum_trgm
+  ON federal_contacts USING gin (solicitation_number gin_trgm_ops);

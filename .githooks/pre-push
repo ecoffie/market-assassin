@@ -34,6 +34,25 @@ if [ -L "$0" ]; then
   exit 1
 fi
 HOOK_DIR="$(cd -P "$(dirname "$0")" && pwd -P)"
+
+# 0) HARD BLOCK: core.hooksPath must be the supported RELATIVE `.githooks`.
+# Runs BEFORE the resolver on purpose: from a linked worktree the resolver
+# would refuse an absolute hooksPath anyway, but from the PRIMARY checkout an
+# absolute value passes it silently — so this is the only step that reports the
+# drift there, and it gives the clearest message in both places. DETECTION
+# ONLY: it never rewrites git config (Eric, 2026-09-23). It honours the
+# documented one-shot `git -c core.hooksPath="$PWD/.githooks" push` escape.
+# Checked against the cwd git gave us (the checkout being pushed).
+HOOKS_PATH_CHECK="$HOOK_DIR/../scripts/check-hooks-path.mjs"
+if [ ! -f "$HOOKS_PATH_CHECK" ]; then
+  echo "✗ pre-push gate: missing $HOOKS_PATH_CHECK — blocking." >&2
+  exit 1
+fi
+if ! node "$HOOKS_PATH_CHECK" --repo "$PWD"; then
+  echo "✗ pre-push gate: blocked — core.hooksPath drift (see above). Nothing was changed." >&2
+  exit 1
+fi
+
 if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR")"; then
   echo "✗ pre-push gate: blocked (see above) — refusing to report on a tree I cannot vouch for." >&2
   exit 1
@@ -90,6 +109,17 @@ if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1
 else
   echo -e "      ${RED}✗ template.html was edited but template-html.ts (the file the map SERVES) wasn't regenerated — push blocked${NC}"
   echo -e "      ${YEL}  run: node scripts/gen-template-html.mjs${NC}"
+  fail=1
+fi
+
+# 1d) HARD BLOCK: the core.hooksPath drift detector (step 0) must keep
+# detecting. Hermetic: disposable repos under a validated temp dir only.
+echo -e "  ${BOLD}1d/13${NC} core.hooksPath drift detector…"
+if bash tests/check-hooks-path.test.sh > /tmp/mindy-prepush-hookspath.log 2>&1; then
+  echo -e "      ${GREEN}✓ hooksPath detector regression passes${NC}"
+else
+  echo -e "      ${RED}✗ hooksPath detector regression — push blocked${NC}"
+  grep -aE "✗|FAIL" /tmp/mindy-prepush-hookspath.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 
@@ -315,6 +345,22 @@ else
   fail=1
 fi
 
+# 7b) HARD BLOCK: no NEW destructive writer of `usaspending.awards`. CREATE [OR REPLACE] TABLE /
+#     DROP / TRUNCATE / WRITE_TRUNCATE / bq load --replace / bq cp -f / RENAME / DROP COLUMN on the
+#     63M-row awards table rebuilds it from some other column list and data cut — every column the
+#     replacement does not carry is ERASED (the 7 IDV identity columns, 2026-09-23) and every weekly
+#     MERGE since the cut is rolled back, with no error. Only build-derived.sql (while it carries its
+#     awards-schema guard) and a fully-commented 99-rollback.sql are allowlisted.
+#     Baseline-gated: only NEW ones block. Self-test: --self-test.
+echo -e "  ${BOLD}7b/13${NC} awards destructive-writer audit…"
+if node scripts/audit-awards-schema-writers.mjs > /tmp/mindy-prepush-awardswriters.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new destructive writer of usaspending.awards${NC}"
+else
+  echo -e "      ${RED}✗ new destructive writer of usaspending.awards — push blocked${NC}"
+  cat /tmp/mindy-prepush-awardswriters.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 8) HARD BLOCK: no NEW persist path storing a QUERY-TIME NAICS expansion. Broadening
 #    codes for MATCHING is correct; STORING the broadened set rewrites the user's own
 #    choices. One "Professional Services" preset click (['541']) persisted all 51 codes
@@ -397,8 +443,8 @@ if [ ! -f .env.local ]; then
 elif npm run --silent verify:oracles > /tmp/mindy-prepush-oracles.log 2>&1; then
   echo -e "      ${GREEN}✓ all oracle checks passed (numbers reconcile with source)${NC}"
 else
-  echo -e "      ${YEL}⚠ an oracle check FAILED — a data regression may be shipping (NOT blocking):${NC}"
-  grep -E "FAIL|threw" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}⚠ an oracle check FAILED or was UNMEASURED — a data regression may be shipping (NOT blocking):${NC}"
+  grep -E "FAIL|threw|UNMEASURED" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
   echo -e "      ${YEL}  (review with: npm run verify:oracles — a transient DB/network blip can also cause this)${NC}"
 fi
 

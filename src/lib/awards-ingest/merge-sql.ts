@@ -1,96 +1,123 @@
 /**
  * MERGE staging → awards. Staging columns are STRING; every target type is explicit here.
+ *
+ * The column lists are DERIVED from the canonical schema (./awards-schema.ts) — never hand-typed
+ * here — so the MERGE, the additive DDL, the IDV backfill/rollback and the full rebuild
+ * (build-derived.sql) cannot drift apart. See awards-schema-parity.unit.test.ts.
  */
+import {
+  classifyAwardsSchema,
+  IDV_IDENTITY_REQUIRED,
+  mergeColumns,
+  mergeSelectExpr,
+  type LiveAwardsColumn,
+} from './awards-schema';
+
+export { IDV_IDENTITY_COLUMNS, idvIdentitySelectExpr, type IdvIdentityColumn } from './awards-schema';
+
+/**
+ * Decide from the LIVE target schema (names AND data types) whether the MERGE may write the IDV
+ * identity columns.
+ *
+ *   * none present            → 'absent'  (legacy 41-column MERGE) — ONLY while not required
+ *   * all 7 present, typed ok → 'present'
+ *   * partial                 → throws (a half-applied DDL is a config error, never worked around)
+ *   * any type mismatch       → throws (e.g. ordering_period_end_date STRING instead of DATE)
+ *   * a legacy column missing → throws (the MERGE would fail mid-run anyway; fail before it)
+ *   * required && absent      → throws — once IDV_IDENTITY_REQUIRED is flipped, the ingest must
+ *                               never silently fall back to 41 columns.
+ */
+export function resolveIdvIdentityColumnsMode(
+  live: readonly LiveAwardsColumn[],
+  opts: { required?: boolean } = {},
+): 'absent' | 'present' {
+  const state = classifyAwardsSchema(live, { required: opts.required ?? IDV_IDENTITY_REQUIRED });
+  if (!state.ok) {
+    throw new Error(`awards schema refused by the ingest: ${state.problems.join(' | ')}`);
+  }
+  // 'partial' is always a problem, so an ok state is exactly one of these two.
+  return state.idvMode === 'present' ? 'present' : 'absent';
+}
+
+/**
+ * Line layout of the legacy 41-column UPDATE / INSERT lists — kept so the generated statement is
+ * BYTE-identical to the one the scheduled weekly ingest has run since #1396 (pinned by
+ * __fixtures__/merge-sql-pre-1658.golden.sql). Layout is presentation only: `assertLayout` proves
+ * at module load that the flattened layout IS the schema-derived column list, in order, so a
+ * column added to awards-schema.ts without updating this layout fails immediately, loudly.
+ */
+const UPDATE_LAYOUT: readonly (readonly string[])[] = [
+  ['award_id', 'piid', 'mod_number', 'parent_piid'],
+  ['fiscal_year', 'action_date', 'pop_start_date', 'pop_end_date'],
+  ['obligation_amount', 'total_obligated'],
+  ['current_award_value', 'potential_award_value'],
+  ['recipient_uei', 'recipient_name', 'parent_uei', 'parent_name'],
+  ['cage_code', 'recipient_address', 'recipient_city'],
+  ['recipient_state', 'recipient_zip', 'recipient_country'],
+  ['awarding_agency_code', 'awarding_agency'],
+  ['awarding_sub_agency_code', 'awarding_sub_agency'],
+  ['awarding_office_code', 'awarding_office'],
+  ['funding_agency', 'funding_office'],
+  ['naics_code', 'naics_description'],
+  ['psc_code', 'psc_description'],
+  ['contract_pricing_type', 'set_aside'],
+  ['pop_state', 'pop_city', 'pop_country', 'description'],
+];
+const INSERT_LAYOUT: readonly (readonly string[])[] = [
+  ['txn_id', 'award_id', 'piid', 'mod_number', 'parent_piid', 'fiscal_year', 'action_date', 'pop_start_date', 'pop_end_date'],
+  ['obligation_amount', 'total_obligated', 'current_award_value', 'potential_award_value'],
+  ['recipient_uei', 'recipient_name', 'parent_uei', 'parent_name', 'cage_code', 'recipient_address', 'recipient_city'],
+  ['recipient_state', 'recipient_zip', 'recipient_country', 'awarding_agency_code', 'awarding_agency'],
+  ['awarding_sub_agency_code', 'awarding_sub_agency', 'awarding_office_code', 'awarding_office'],
+  ['funding_agency', 'funding_office', 'naics_code', 'naics_description', 'psc_code', 'psc_description'],
+  ['contract_pricing_type', 'set_aside', 'pop_state', 'pop_city', 'pop_country', 'description'],
+];
+
+function assertLayout(name: string, layout: readonly (readonly string[])[], expected: readonly string[]): void {
+  const flat = layout.flat();
+  if (flat.length !== expected.length || flat.some((c, i) => c !== expected[i])) {
+    throw new Error(`merge-sql ${name} layout drifted from awards-schema.ts: layout=[${flat.join(',')}] schema=[${expected.join(',')}]`);
+  }
+}
+const LEGACY_MERGE_TARGETS = mergeColumns({ idvIdentityColumns: false }).map((c) => c.target);
+assertLayout('INSERT', INSERT_LAYOUT, LEGACY_MERGE_TARGETS);
+assertLayout('UPDATE', UPDATE_LAYOUT, LEGACY_MERGE_TARGETS.filter((c) => c !== 'txn_id'));
 
 export function buildAwardsMergeSql(input: {
   awardsTable: string;
   stagingFq: string;
   startDate: string;
+  /** Write the IDV identity columns. Only true once the additive DDL has landed. */
+  idvIdentityColumns?: boolean;
 }): string {
   const { awardsTable, stagingFq, startDate } = input;
+  const idvOn = input.idvIdentityColumns === true;
+  const cols = mergeColumns({ idvIdentityColumns: idvOn });
+  const extra = cols.slice(LEGACY_MERGE_TARGETS.length); // the IDV columns (none when off)
+  const select = cols.map((c) => `          ${mergeSelectExpr(c)}`).join(',\n');
+  const update = UPDATE_LAYOUT.map((line) => line.map((c) => `${c}=S.${c}`).join(', ')).join(',\n        ')
+    + extra.map((c) => `,\n        ${c.target}=S.${c.target}`).join('');
+  const insertCols = INSERT_LAYOUT.map((line) => line.join(', ')).join(',\n        ')
+    + extra.map((c) => `, ${c.target}`).join('');
+  const insertVals = INSERT_LAYOUT.map((line) => line.map((c) => `S.${c}`).join(', ')).join(',\n        ')
+    + extra.map((c) => `, S.${c.target}`).join('');
 
   return `
       MERGE ${awardsTable} T
       USING (
         SELECT
-          CAST(contract_transaction_unique_key AS STRING) AS txn_id,
-          CAST(contract_award_unique_key AS STRING) AS award_id,
-          CAST(award_id_piid AS STRING) AS piid,
-          CAST(modification_number AS STRING) AS mod_number,
-          CAST(parent_award_id_piid AS STRING) AS parent_piid,
-          SAFE_CAST(action_date_fiscal_year AS INT64) AS fiscal_year,
-          SAFE_CAST(action_date AS DATE) AS action_date,
-          SAFE_CAST(period_of_performance_start_date AS DATE) AS pop_start_date,
-          SAFE_CAST(period_of_performance_current_end_date AS DATE) AS pop_end_date,
-          SAFE_CAST(federal_action_obligation AS FLOAT64) AS obligation_amount,
-          SAFE_CAST(total_dollars_obligated AS FLOAT64) AS total_obligated,
-          SAFE_CAST(current_total_value_of_award AS FLOAT64) AS current_award_value,
-          SAFE_CAST(potential_total_value_of_award AS FLOAT64) AS potential_award_value,
-          CAST(recipient_uei AS STRING) AS recipient_uei,
-          CAST(recipient_name AS STRING) AS recipient_name,
-          CAST(recipient_parent_uei AS STRING) AS parent_uei,
-          CAST(recipient_parent_name AS STRING) AS parent_name,
-          CAST(cage_code AS STRING) AS cage_code,
-          CAST(recipient_address_line_1 AS STRING) AS recipient_address,
-          CAST(recipient_city_name AS STRING) AS recipient_city,
-          CAST(recipient_state_code AS STRING) AS recipient_state,
-          CAST(recipient_zip_4_code AS STRING) AS recipient_zip,
-          CAST(recipient_country_code AS STRING) AS recipient_country,
-          CAST(awarding_agency_code AS STRING) AS awarding_agency_code,
-          CAST(awarding_agency_name AS STRING) AS awarding_agency,
-          CAST(awarding_sub_agency_code AS STRING) AS awarding_sub_agency_code,
-          CAST(awarding_sub_agency_name AS STRING) AS awarding_sub_agency,
-          CAST(awarding_office_code AS STRING) AS awarding_office_code,
-          CAST(awarding_office_name AS STRING) AS awarding_office,
-          CAST(funding_agency_name AS STRING) AS funding_agency,
-          CAST(funding_office_name AS STRING) AS funding_office,
-          CAST(naics_code AS STRING) AS naics_code,
-          CAST(naics_description AS STRING) AS naics_description,
-          CAST(product_or_service_code AS STRING) AS psc_code,
-          CAST(product_or_service_code_description AS STRING) AS psc_description,
-          CAST(type_of_contract_pricing AS STRING) AS contract_pricing_type,
-          CAST(type_of_set_aside AS STRING) AS set_aside,
-          CAST(primary_place_of_performance_state_code AS STRING) AS pop_state,
-          CAST(primary_place_of_performance_city_name AS STRING) AS pop_city,
-          CAST(primary_place_of_performance_country_code AS STRING) AS pop_country,
-          CAST(prime_award_base_transaction_description AS STRING) AS description
+${select}
         FROM \`${stagingFq}\`
         WHERE contract_transaction_unique_key IS NOT NULL
           AND contract_transaction_unique_key != ''
       ) S
       ON T.txn_id = S.txn_id AND T.action_date >= DATE_SUB(DATE('${startDate}'), INTERVAL 2 DAY)
       WHEN MATCHED THEN UPDATE SET
-        award_id=S.award_id, piid=S.piid, mod_number=S.mod_number, parent_piid=S.parent_piid,
-        fiscal_year=S.fiscal_year, action_date=S.action_date, pop_start_date=S.pop_start_date, pop_end_date=S.pop_end_date,
-        obligation_amount=S.obligation_amount, total_obligated=S.total_obligated,
-        current_award_value=S.current_award_value, potential_award_value=S.potential_award_value,
-        recipient_uei=S.recipient_uei, recipient_name=S.recipient_name, parent_uei=S.parent_uei, parent_name=S.parent_name,
-        cage_code=S.cage_code, recipient_address=S.recipient_address, recipient_city=S.recipient_city,
-        recipient_state=S.recipient_state, recipient_zip=S.recipient_zip, recipient_country=S.recipient_country,
-        awarding_agency_code=S.awarding_agency_code, awarding_agency=S.awarding_agency,
-        awarding_sub_agency_code=S.awarding_sub_agency_code, awarding_sub_agency=S.awarding_sub_agency,
-        awarding_office_code=S.awarding_office_code, awarding_office=S.awarding_office,
-        funding_agency=S.funding_agency, funding_office=S.funding_office,
-        naics_code=S.naics_code, naics_description=S.naics_description,
-        psc_code=S.psc_code, psc_description=S.psc_description,
-        contract_pricing_type=S.contract_pricing_type, set_aside=S.set_aside,
-        pop_state=S.pop_state, pop_city=S.pop_city, pop_country=S.pop_country, description=S.description
+        ${update}
       WHEN NOT MATCHED THEN INSERT (
-        txn_id, award_id, piid, mod_number, parent_piid, fiscal_year, action_date, pop_start_date, pop_end_date,
-        obligation_amount, total_obligated, current_award_value, potential_award_value,
-        recipient_uei, recipient_name, parent_uei, parent_name, cage_code, recipient_address, recipient_city,
-        recipient_state, recipient_zip, recipient_country, awarding_agency_code, awarding_agency,
-        awarding_sub_agency_code, awarding_sub_agency, awarding_office_code, awarding_office,
-        funding_agency, funding_office, naics_code, naics_description, psc_code, psc_description,
-        contract_pricing_type, set_aside, pop_state, pop_city, pop_country, description
+        ${insertCols}
       ) VALUES (
-        S.txn_id, S.award_id, S.piid, S.mod_number, S.parent_piid, S.fiscal_year, S.action_date, S.pop_start_date, S.pop_end_date,
-        S.obligation_amount, S.total_obligated, S.current_award_value, S.potential_award_value,
-        S.recipient_uei, S.recipient_name, S.parent_uei, S.parent_name, S.cage_code, S.recipient_address, S.recipient_city,
-        S.recipient_state, S.recipient_zip, S.recipient_country, S.awarding_agency_code, S.awarding_agency,
-        S.awarding_sub_agency_code, S.awarding_sub_agency, S.awarding_office_code, S.awarding_office,
-        S.funding_agency, S.funding_office, S.naics_code, S.naics_description, S.psc_code, S.psc_description,
-        S.contract_pricing_type, S.set_aside, S.pop_state, S.pop_city, S.pop_country, S.description
+        ${insertVals}
       )
     `;
 }

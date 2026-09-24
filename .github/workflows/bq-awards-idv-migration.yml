@@ -1,0 +1,109 @@
+# BQ awards — controlled IDV-foundation migration (PR #1658). DISPATCH-ONLY, inert until run.
+#
+# One step per dispatch, each behind:
+#   - environment `bq-production` (required-reviewer approval — configure in repo settings),
+#   - a typed confirmation `IDV-MIGRATION-<step>`,
+#   - for writing steps (ddl / repull_window / idv_fy_backfill): a CLONE of `awards` that is
+#     < 24h old AND row-count-identical to live `awards` (run `snapshot` first),
+#   - the SAME concurrency group as the weekly ingest, so the two can never overlap.
+# Order: preflight → snapshot → ddl → verify → (snapshot → repull_window)… → (snapshot → idv_fy_backfill)… → verify
+# Plan + rollback: tasks/idv-vehicle-foundation/README.md, 99-rollback.sql.
+name: BQ awards IDV migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: Migration step (one per run)
+        type: choice
+        required: true
+        default: preflight
+        options:
+          - preflight
+          - snapshot
+          - ddl
+          - verify
+          - repull_window
+          - idv_fy_backfill
+      confirmation:
+        description: Type exactly IDV-MIGRATION-<step>
+        type: string
+        required: true
+      fiscal_year:
+        description: idv_fy_backfill only — one fiscal year, 2016..2025
+        type: string
+        required: false
+        default: ''
+      window_from:
+        description: repull_window only — YYYY-MM-DD, >= 2026-01-20
+        type: string
+        required: false
+        default: ''
+      window_to:
+        description: repull_window only — YYYY-MM-DD (blank = today); span <= 62 days
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bq-awards-ingest
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: IDV migration step
+    runs-on: ubuntu-latest
+    environment: bq-production
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # Runs before GCP auth or any BigQuery/Supabase access. Never prints the confirmation.
+      - name: Fail-closed dispatch gate
+        env:
+          IDV_MIGRATION_STEP: ${{ inputs.step }}
+          IDV_MIGRATION_CONFIRMATION: ${{ inputs.confirmation }}
+          IDV_MIGRATION_FISCAL_YEAR: ${{ inputs.fiscal_year }}
+          IDV_MIGRATION_WINDOW_FROM: ${{ inputs.window_from }}
+          IDV_MIGRATION_WINDOW_TO: ${{ inputs.window_to }}
+          HAS_GCP_SA_JSON: ${{ secrets.GCP_SA_JSON != '' }}
+        run: |
+          set +x
+          ./node_modules/.bin/tsx scripts/validate-bq-awards-idv-migration-dispatch.ts
+
+      - uses: google-github-actions/auth@b7593ed2efd1c1617e1b0254da33b86225adb2a5 # v2.1.12
+        with:
+          credentials_json: ${{ secrets.GCP_SA_JSON }}
+
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+
+      - name: Run migration step
+        env:
+          IDV_MIGRATION_STEP: ${{ inputs.step }}
+          IDV_MIGRATION_CONFIRMATION: ${{ inputs.confirmation }}
+          IDV_MIGRATION_FISCAL_YEAR: ${{ inputs.fiscal_year }}
+          IDV_MIGRATION_WINDOW_FROM: ${{ inputs.window_from }}
+          IDV_MIGRATION_WINDOW_TO: ${{ inputs.window_to }}
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BQ_AWARDS_ACQUISITION_POLL_MINUTES: '120'
+        run: |
+          set +x
+          set -o pipefail
+          ./node_modules/.bin/tsx scripts/bq-awards-idv-migration.ts
+
+      - name: Cleanup temp files
+        if: always()
+        run: |
+          rm -rf "${{ runner.temp }}/bq-awards-ingest-work" 2>/dev/null || true

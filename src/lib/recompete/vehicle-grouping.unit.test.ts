@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { recompeteVehicleKey, groupRecompetesByVehicle } from './vehicle-grouping';
+import { resolveVehicleCeiling } from './vehicle-ceiling';
+import { MECH_ELEC_II_HOLDERS, MECH_ELEC_II_ORDERED_TO_DATE } from './__fixtures__/mech-elec-ii-holders';
 
 /**
  * Vehicle grouping collapses the N winners of ONE multiple-award IDIQ into ONE
@@ -85,9 +87,10 @@ describe('groupRecompetesByVehicle — collapse + rollup', () => {
     expect(groups[0].lead.incumbent_name).toBe('Beta LLC'); // $50M, the max
   });
 
-  it('sums combinedCeiling and takes the LATEST expiry across awardees', () => {
+  it('sums combinedCeiling for AWARD/order members and takes the LATEST expiry', () => {
     const groups = groupRecompetesByVehicle(idvAwardees);
-    expect(groups[0].combinedCeiling).toBe(100_000_000); // 30 + 50 + 20
+    expect(groups[0].combinedCeiling).toBe(100_000_000); // 30 + 50 + 20 — each order's own value
+    expect(groups[0].combinedCeilingBasis).toBe('sum_of_award_values');
     expect(groups[0].latestExpiry).toBe('2026-12-01');   // the max date
   });
 
@@ -122,5 +125,50 @@ describe('groupRecompetesByVehicle — collapse + rollup', () => {
 
   it('returns [] for empty input (no crash)', () => {
     expect(groupRecompetesByVehicle([])).toEqual([]);
+  });
+});
+
+describe('shared vehicle ceiling — Robins Mech-Elec II (FA850124R0001)', () => {
+  const bySolicitation = (r: { solicitation_identifier?: string | null }) => `SOL|${r.solicitation_identifier}`;
+
+  it('the PIID-shape key CANNOT group the DoD holders (4 holders → 4 vehicles) — the documented limit', () => {
+    const groups = groupRecompetesByVehicle(MECH_ELEC_II_HOLDERS);
+    expect(groups).toHaveLength(4);
+  });
+
+  it('a solicitation key groups all 4 holders into ONE vehicle', () => {
+    const groups = groupRecompetesByVehicle(MECH_ELEC_II_HOLDERS, { keyOf: bySolicitation });
+    expect(groups).toHaveLength(1);
+    expect(groups[0].incumbentCount).toBe(4);
+  });
+
+  it('represents the shared $95M ceiling ONCE — not $380M', () => {
+    const [g] = groupRecompetesByVehicle(MECH_ELEC_II_HOLDERS, { keyOf: bySolicitation });
+    expect(g.combinedCeiling).toBe(95_000_000);
+    expect(g.combinedCeiling).not.toBe(4 * 95_000_000);
+    expect(g.combinedCeilingBasis).toBe('shared_program_ceiling');
+  });
+
+  it('orders grouped with their parent IDV are consumption, never added to the ceiling', () => {
+    const order = { contract_id: 'CONT_AWD_FA850126F0047_9700_FA850124D0005_9700', potential_total_value: 4_524_529 };
+    expect(resolveVehicleCeiling([...MECH_ELEC_II_HOLDERS, order])).toEqual({ ceiling: 95_000_000, basis: 'shared_program_ceiling' });
+  });
+
+  it('differing holder ceilings → MAX with an explicit basis, never the sum', () => {
+    const rows = [
+      { ...MECH_ELEC_II_HOLDERS[0], potential_total_value: 95_000_000 },
+      { ...MECH_ELEC_II_HOLDERS[1], potential_total_value: 40_000_000 },
+    ];
+    expect(resolveVehicleCeiling(rows)).toEqual({ ceiling: 95_000_000, basis: 'holder_ceilings_differ_max_shown' });
+  });
+
+  it('holder IDVs with no reported ceiling → not_reported, never their $0 obligation', () => {
+    const rows = MECH_ELEC_II_HOLDERS.map((h) => ({ ...h, potential_total_value: 0 }));
+    expect(resolveVehicleCeiling(rows)).toEqual({ ceiling: 0, basis: 'shared_ceiling_not_reported' });
+  });
+
+  it('fixture reconciles: holder order obligations sum to the program ordered-to-date', () => {
+    const sum = MECH_ELEC_II_HOLDERS.reduce((n, h) => n + h.child_order_obligations, 0);
+    expect(sum).toBeCloseTo(MECH_ELEC_II_ORDERED_TO_DATE, 2);
   });
 });

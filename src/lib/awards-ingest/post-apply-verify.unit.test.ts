@@ -141,6 +141,57 @@ describe('post-apply verification', () => {
     ]);
   });
 
+  describe('awards schema (IDV identity columns) — 2026-09-23 schema protection', () => {
+    const healthy = (): AwardsIngestSanitizedSnapshot => ({
+      ...baseline(),
+      capturedAt: '2026-08-29T11:00:00.000Z',
+      awardsMaxActionDate: '2026-08-15',
+      awardsRowCount: 64_180_000,
+      recipientsMaxLastActionDate: '2026-08-15',
+      recipientsRollupMergedMaxLastActionDate: '2026-08-15',
+      hasV1ClockBlock: true,
+      mergedAt: '2026-08-29T10:30:00.000Z',
+      recipientsRebuiltAt: '2026-08-29T10:35:00.000Z',
+      freshnessStatus: 'healthy',
+      freshnessLegacyUnmeasured: false,
+    });
+
+    it('not required + 51 columns (today): reported, not a failure', () => {
+      const r = verifyPostApply(baseline(), { ...healthy(), awardsColumnCount: 51, awardsIdvIdentityMode: 'absent', awardsSchemaOk: true }, { idvRequired: false });
+      expect(r.ok).toBe(true);
+      expect(formatVerificationReport(r)).toMatch(/awards_column_count=51 idv_mode=absent/);
+    });
+
+    it('required + 51 columns → FAILS (column count and schema)', () => {
+      const r = verifyPostApply(baseline(), { ...healthy(), awardsColumnCount: 51, awardsIdvIdentityMode: 'absent', awardsSchemaOk: true }, { idvRequired: true });
+      expect(r.ok).toBe(false);
+      expect(r.checks.awardsColumnCountOk).toBe(false);
+      expect(r.failures.join(' ')).toMatch(/51 columns; ≥ 58 required/);
+    });
+
+    it('required + unmeasured schema → FAILS (unknown is not 58)', () => {
+      const r = verifyPostApply(baseline(), healthy(), { idvRequired: true });
+      expect(r.checks.awardsColumnCountOk).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+
+    it('present: ordering_period_end_date fill on recent IDV rows is enforced', () => {
+      const present = { ...healthy(), awardsColumnCount: 58, awardsIdvIdentityMode: 'present' as const, awardsSchemaOk: true };
+      expect(verifyPostApply(baseline(), { ...present, idvRecentRows: 1000, idvRecentOrderingEndFilled: 998 }, { idvRequired: true }).ok).toBe(true);
+      const thin = verifyPostApply(baseline(), { ...present, idvRecentRows: 1000, idvRecentOrderingEndFilled: 400 }, { idvRequired: true });
+      expect(thin.checks.idvOrderingEndFillOk).toBe(false);
+      expect(thin.failures.join(' ')).toMatch(/ordering_period_end_date \(400\/1000/);
+      // zero IDV rows flagged while the columns exist = the MERGE did not write them.
+      expect(verifyPostApply(baseline(), { ...present, idvRecentRows: 0, idvRecentOrderingEndFilled: 0 }, { idvRequired: false }).checks.idvOrderingEndFillOk).toBe(false);
+    });
+
+    it('a refused schema (type mismatch / partial) fails even when not required', () => {
+      const r = verifyPostApply(baseline(), { ...healthy(), awardsColumnCount: 54, awardsIdvIdentityMode: 'partial', awardsSchemaOk: false }, { idvRequired: false });
+      expect(r.checks.awardsSchemaTypesOk).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+  });
+
   it('report mentions MERGE is not rolled back on verification failure', () => {
     const result = verifyPostApply(baseline(), {
       ...baseline(),

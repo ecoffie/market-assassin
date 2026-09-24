@@ -40,6 +40,7 @@ import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
+import { withDodaacPrefix } from '@/lib/gov-contacts/dodaac-prefix';
 
 export const dynamic = 'force-dynamic';
 
@@ -344,7 +345,8 @@ async function buyersPins(params: {
   // Office (DoDAAC) — the solicitation_number prefix IS the office key here. Applied INSIDE
   // the query (before the 4000-row limit), never as a post-filter: a post-filter would rank
   // the whole corpus first and starve a single district of its own people.
-  if (isValidDodaac(params.office)) q = q.ilike('solicitation_number', `${params.office.toUpperCase()}%`);
+  // Shared trigram-indexed prefix predicate (src/lib/gov-contacts/dodaac-prefix.ts).
+  if (isValidDodaac(params.office)) q = withDodaacPrefix(q, params.office);
 
   const { data, count, error } = await q;
   if (error) throw error;

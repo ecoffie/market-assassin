@@ -1,0 +1,403 @@
+[
+ {
+  "files": {
+   "01": "c163e9c43da9a372f39022ad5b4a42c5a3f006cd6c4f0f91a10884f9a425302c",
+   "02": "e0fe2ec46626010df8166bcf64423dcb409b8500ab959486de3f73f0bd62da5a"
+  }
+ },
+ {
+  "label": "create session + TEMP copies",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "0341d31e3b41f85201b53a37028df2faa3e287a904d17566e765d685c9559191",
+  "sql": "\nCREATE TEMP TABLE awards\nPARTITION BY RANGE_BUCKET(fiscal_year, GENERATE_ARRAY(2015, 2030, 1))\nCLUSTER BY recipient_uei, recipient_name\nAS SELECT * FROM `market-assasin.usaspending.awards` WHERE fiscal_year >= 2024;\nCREATE TEMP TABLE awards_ingest_staging AS SELECT * FROM `market-assasin.usaspending.awards_ingest_staging`;\nSELECT 'copy_fidelity' AS probe,\n  (SELECT COUNT(*) FROM `market-assasin.usaspending.awards` WHERE fiscal_year >= 2024) AS prod_rows_fy24plus,\n  (SELECT COUNT(*) FROM awards) AS temp_rows,\n  (SELECT ROUND(SUM(obligation_amount), 2) FROM `market-assasin.usaspending.awards` WHERE fiscal_year >= 2024) AS prod_obl_fy24plus,\n  (SELECT ROUND(SUM(obligation_amount), 2) FROM awards) AS temp_obl,\n  (SELECT COUNT(*) FROM `market-assasin.usaspending.awards_ingest_staging`) AS prod_staging_rows,\n  (SELECT COUNT(*) FROM awards_ingest_staging) AS temp_staging_rows;",
+  "jobId": "cbdc3216-5d90-4fe4-9887-b04213a1d2cd",
+  "statementType": "SCRIPT",
+  "bytesProcessed": "14511724414",
+  "lastResult": [
+   {
+    "probe": "copy_fidelity",
+    "prod_rows_fy24plus": 17114105,
+    "temp_rows": 17114105,
+    "prod_obl_fy24plus": 2083313710470.93,
+    "temp_obl": 2083313710470.93,
+    "prod_staging_rows": 855543,
+    "temp_staging_rows": 855543
+   }
+  ],
+  "children": [
+   {
+    "statementType": "CREATE_TABLE_AS_SELECT",
+    "dmlAffected": null,
+    "bytes": "12095511853"
+   },
+   {
+    "statementType": "CREATE_TABLE_AS_SELECT",
+    "dmlAffected": null,
+    "bytes": "2005474041"
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "410738520",
+    "rows": [
+     {
+      "probe": "copy_fidelity",
+      "prod_rows_fy24plus": 17114105,
+      "temp_rows": 17114105,
+      "prod_obl_fy24plus": 2083313710470.93,
+      "temp_obl": 2083313710470.93,
+      "prod_staging_rows": 855543,
+      "temp_staging_rows": 855543
+     }
+    ]
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "BEFORE 01: base",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "4d91c91475abedfeda04d3caebb63828b7613e541caa456964089a0b9c091fc7",
+  "sql": "\nSELECT 'base' AS probe, COUNT(*) AS rows_total, ROUND(SUM(obligation_amount), 2) AS obligation_total,\n  (SELECT ARRAY_LENGTH(JSON_KEYS(TO_JSON(t), 1)) FROM awards t LIMIT 1) AS awards_columns\nFROM awards;",
+  "jobId": "1558043b-7016-4941-98a3-dd62ea68e330",
+  "statementType": "SELECT",
+  "bytesProcessed": "191973714",
+  "lastResult": [
+   {
+    "probe": "base",
+    "rows_total": 17114105,
+    "obligation_total": 2083313710470.93,
+    "awards_columns": 51
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "BEFORE 01: window full-row checksum",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "b7474b64ca0a6d86cf6178a918ec1efdab9419642bc0f8981ad1d5dd85a569e4",
+  "sql": "SELECT 'window_checksum_all_cols_pre_ddl' AS probe, COUNT(*) AS rows_in_window, CAST(BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(x))) AS STRING) AS legacy_checksum FROM (SELECT * FROM awards WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18') x;",
+  "jobId": "2ce6a187-3819-4582-b995-4ed43648742c",
+  "statementType": "SELECT",
+  "bytesProcessed": "2694692673",
+  "lastResult": [
+   {
+    "probe": "window_checksum_all_cols_pre_ddl",
+    "rows_in_window": 903491,
+    "legacy_checksum": "-8951510374347572432"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "BEFORE 01: mech-elec",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "52f3d5454927830b1e2d2baaac984fba5cb188c98f26595db440961fa34a2134",
+  "sql": "SELECT 'mech_elec_pre' AS probe, COUNT(DISTINCT IF(STARTS_WITH(award_id,'CONT_IDV_'), award_id, NULL)) AS holder_idvs_found_by_uei, COUNT(DISTINCT IF(parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005'), award_id, NULL)) AS orders, ROUND(SUM(IF(parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005'), obligation_amount, 0)), 2) AS order_obligations FROM awards WHERE recipient_uei IN ('LAA3W2UCHL23','PZNLVGANJ3U3','RZ53PAJUCNF4','TR1AV9J17C93') AND (piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005') OR parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005'));",
+  "jobId": "dffaaf96-8e7f-4e5b-8fb2-4d172e695b50",
+  "statementType": "SELECT",
+  "bytesProcessed": "96715935",
+  "lastResult": [
+   {
+    "probe": "mech_elec_pre",
+    "holder_idvs_found_by_uei": 4,
+    "orders": 26,
+    "order_obligations": 8655978
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "01 in BEGIN/ROLLBACK (attempt A)",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "6b40e61e87fbd867f1f52f48c8c98f125fe239236f106a060a7d58f02c8a63a9",
+  "sql": "BEGIN TRANSACTION;\n-- ─────────────────────────────────────────────────────────────────────────────────────────────\n-- 01 — ADDITIVE DDL: IDV vehicle identity columns on `awards`            ⛔ NOT EXECUTED\n-- ─────────────────────────────────────────────────────────────────────────────────────────────\n-- Adds 7 NULLABLE columns. Metadata-only in BigQuery: no rows rewritten, no bytes billed,\n-- existing columns / partitioning (action_date) / clustering (recipient_uei, recipient_name)\n-- unchanged. Every existing row reads NULL for the new columns = \"not loaded\", never a value.\n--\n-- Source of every column: the USASpending bulk-download contracts CSV the weekly ingest ALREADY\n-- downloads into `awards_ingest_staging` (same column names). No new data source.\n--\n-- Code coupling (src/lib/awards-ingest/merge-sql.ts `resolveIdvIdentityColumnsMode`):\n--   * before this DDL  → the ingest MERGE is byte-identical to today's 41-column statement\n--   * after this DDL   → the next ingest MERGE writes the 7 columns for its whole window\n--   * partial DDL      → the ingest REFUSES to run (never silently half-writes)\n--\n-- TARGET RESOLUTION: the table is written UNQUALIFIED (`awards`) and resolved by the job's DEFAULT\n-- DATASET, so the exact same bytes run against production and against a validation clone:\n--   production : bq --project_id=market-assasin query --nouse_legacy_sql --dataset_id=market-assasin:usaspending < <this file>\n--   validation : same file, default dataset = a scratch dataset holding a CLONE named `awards`\n-- Run (after Eric approves):\n--   bq --project_id=market-assasin query --nouse_legacy_sql --dataset_id=market-assasin:usaspending < tasks/idv-vehicle-foundation/01-ddl-add-columns.sql\n-- Verify:\n--   SELECT column_name, data_type FROM `market-assasin.usaspending.INFORMATION_SCHEMA.COLUMNS`\n--   WHERE table_name = 'awards' AND column_name IN ('solicitation_identifier','ordering_period_end_date',\n--     'award_or_idv_flag','idv_type_code','multiple_or_single_award_idv_code','parent_award_agency_id',\n--     'parent_award_single_or_multiple_code');   -- expect exactly 7 rows\n-- Rollback: 99-rollback.sql §A.\n\nALTER TABLE awards\n  ADD COLUMN IF NOT EXISTS solicitation_identifier STRING\n    OPTIONS (description = 'FPDS solicitation id as reported on THIS transaction (CSV solicitation_identifier). Groups the holder IDVs of one multiple-award program. Per-transaction; award-level value = latest transaction that reports it.'),\n  ADD COLUMN IF NOT EXISTS ordering_period_end_date DATE\n    OPTIONS (description = 'IDV last date to order as reported on THIS transaction (CSV ordering_period_end_date). The vehicle recompete signal; pop_end_date is NULL on IDV rows.'),\n  ADD COLUMN IF NOT EXISTS award_or_idv_flag STRING\n    OPTIONS (description = 'CSV award_or_idv_flag: IDV | AWARD.'),\n  ADD COLUMN IF NOT EXISTS idv_type_code STRING\n    OPTIONS (description = 'CSV idv_type_code (A GWAC, B IDC, C FSS, D BOA, E BPA) on IDV rows.'),\n  ADD COLUMN IF NOT EXISTS multiple_or_single_award_idv_code STRING\n    OPTIONS (description = 'CSV multiple_or_single_award_idv_code: M | S on IDV rows.'),\n  ADD COLUMN IF NOT EXISTS parent_award_agency_id STRING\n    OPTIONS (description = 'CSV parent_award_agency_id on orders. Canonical parent = CONT_IDV_<parent_piid>_<parent_award_agency_id>.'),\n  ADD COLUMN IF NOT EXISTS parent_award_single_or_multiple_code STRING\n    OPTIONS (description = 'CSV parent_award_single_or_multiple_code on orders: M | S.');\n\n\nSELECT 'base' AS probe, COUNT(*) AS rows_total, ROUND(SUM(obligation_amount), 2) AS obligation_total,\n  (SELECT ARRAY_LENGTH(JSON_KEYS(TO_JSON(t), 1)) FROM awards t LIMIT 1) AS awards_columns\nFROM awards;\nROLLBACK TRANSACTION;",
+  "ok": false,
+  "error": "Query error: DDL statements are not supported in a transaction, except for those creating or droping temporary tables or temporary functions. at [30:1]"
+ },
+ {
+  "label": "close the transaction attempt A left open",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "a8c8bad3237717aa5c67188f9e039c7204ea1d444e6294bbfe5e4e13dcd2ee3f",
+  "sql": "ROLLBACK TRANSACTION;",
+  "jobId": "3596155d-efe9-43a5-b188-890375f3780b",
+  "statementType": "ROLLBACK_TRANSACTION",
+  "bytesProcessed": "0",
+  "lastResult": [],
+  "ok": true
+ },
+ {
+  "label": "after attempt A: base",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "4d91c91475abedfeda04d3caebb63828b7613e541caa456964089a0b9c091fc7",
+  "sql": "\nSELECT 'base' AS probe, COUNT(*) AS rows_total, ROUND(SUM(obligation_amount), 2) AS obligation_total,\n  (SELECT ARRAY_LENGTH(JSON_KEYS(TO_JSON(t), 1)) FROM awards t LIMIT 1) AS awards_columns\nFROM awards;",
+  "jobId": "35a39cd0-fefc-442a-8309-7900fdee8421",
+  "statementType": "SELECT",
+  "bytesProcessed": "0",
+  "lastResult": [
+   {
+    "probe": "base",
+    "rows_total": 17114105,
+    "obligation_total": 2083313710470.93,
+    "awards_columns": 51
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "01 exact (attempt B, outside a transaction, on the TEMP copy)",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "c163e9c43da9a372f39022ad5b4a42c5a3f006cd6c4f0f91a10884f9a425302c",
+  "sql": "-- ─────────────────────────────────────────────────────────────────────────────────────────────\n-- 01 — ADDITIVE DDL: IDV vehicle identity columns on `awards`            ⛔ NOT EXECUTED\n-- ─────────────────────────────────────────────────────────────────────────────────────────────\n-- Adds 7 NULLABLE columns. Metadata-only in BigQuery: no rows rewritten, no bytes billed,\n-- existing columns / partitioning (action_date) / clustering (recipient_uei, recipient_name)\n-- unchanged. Every existing row reads NULL for the new columns = \"not loaded\", never a value.\n--\n-- Source of every column: the USASpending bulk-download contracts CSV the weekly ingest ALREADY\n-- downloads into `awards_ingest_staging` (same column names). No new data source.\n--\n-- Code coupling (src/lib/awards-ingest/merge-sql.ts `resolveIdvIdentityColumnsMode`):\n--   * before this DDL  → the ingest MERGE is byte-identical to today's 41-column statement\n--   * after this DDL   → the next ingest MERGE writes the 7 columns for its whole window\n--   * partial DDL      → the ingest REFUSES to run (never silently half-writes)\n--\n-- TARGET RESOLUTION: the table is written UNQUALIFIED (`awards`) and resolved by the job's DEFAULT\n-- DATASET, so the exact same bytes run against production and against a validation clone:\n--   production : bq --project_id=market-assasin query --nouse_legacy_sql --dataset_id=market-assasin:usaspending < <this file>\n--   validation : same file, default dataset = a scratch dataset holding a CLONE named `awards`\n-- Run (after Eric approves):\n--   bq --project_id=market-assasin query --nouse_legacy_sql --dataset_id=market-assasin:usaspending < tasks/idv-vehicle-foundation/01-ddl-add-columns.sql\n-- Verify:\n--   SELECT column_name, data_type FROM `market-assasin.usaspending.INFORMATION_SCHEMA.COLUMNS`\n--   WHERE table_name = 'awards' AND column_name IN ('solicitation_identifier','ordering_period_end_date',\n--     'award_or_idv_flag','idv_type_code','multiple_or_single_award_idv_code','parent_award_agency_id',\n--     'parent_award_single_or_multiple_code');   -- expect exactly 7 rows\n-- Rollback: 99-rollback.sql §A.\n\nALTER TABLE awards\n  ADD COLUMN IF NOT EXISTS solicitation_identifier STRING\n    OPTIONS (description = 'FPDS solicitation id as reported on THIS transaction (CSV solicitation_identifier). Groups the holder IDVs of one multiple-award program. Per-transaction; award-level value = latest transaction that reports it.'),\n  ADD COLUMN IF NOT EXISTS ordering_period_end_date DATE\n    OPTIONS (description = 'IDV last date to order as reported on THIS transaction (CSV ordering_period_end_date). The vehicle recompete signal; pop_end_date is NULL on IDV rows.'),\n  ADD COLUMN IF NOT EXISTS award_or_idv_flag STRING\n    OPTIONS (description = 'CSV award_or_idv_flag: IDV | AWARD.'),\n  ADD COLUMN IF NOT EXISTS idv_type_code STRING\n    OPTIONS (description = 'CSV idv_type_code (A GWAC, B IDC, C FSS, D BOA, E BPA) on IDV rows.'),\n  ADD COLUMN IF NOT EXISTS multiple_or_single_award_idv_code STRING\n    OPTIONS (description = 'CSV multiple_or_single_award_idv_code: M | S on IDV rows.'),\n  ADD COLUMN IF NOT EXISTS parent_award_agency_id STRING\n    OPTIONS (description = 'CSV parent_award_agency_id on orders. Canonical parent = CONT_IDV_<parent_piid>_<parent_award_agency_id>.'),\n  ADD COLUMN IF NOT EXISTS parent_award_single_or_multiple_code STRING\n    OPTIONS (description = 'CSV parent_award_single_or_multiple_code on orders: M | S.');\n",
+  "jobId": "ccbb0c6a-858a-4461-964f-b9128d295bd9",
+  "statementType": "ALTER_TABLE",
+  "bytesProcessed": "0",
+  "lastResult": [],
+  "ok": true
+ },
+ {
+  "label": "AFTER 01: base",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "4d91c91475abedfeda04d3caebb63828b7613e541caa456964089a0b9c091fc7",
+  "sql": "\nSELECT 'base' AS probe, COUNT(*) AS rows_total, ROUND(SUM(obligation_amount), 2) AS obligation_total,\n  (SELECT ARRAY_LENGTH(JSON_KEYS(TO_JSON(t), 1)) FROM awards t LIMIT 1) AS awards_columns\nFROM awards;",
+  "jobId": "4c487c28-e538-4395-82a2-40d0cbf8048d",
+  "statementType": "SELECT",
+  "bytesProcessed": "138114233",
+  "lastResult": [
+   {
+    "probe": "base",
+    "rows_total": 17114105,
+    "obligation_total": 2083313710470.93,
+    "awards_columns": 58
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "AFTER 01: window checksum (legacy cols)",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "97784858d64d3075e5dabb90092f138cf412646a76619d1eb9ecfeac184e3d8c",
+  "sql": "\nSELECT 'window_checksum_legacy_cols' AS probe, COUNT(*) AS rows_in_window,\n  CAST(BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(x))) AS STRING) AS legacy_checksum\nFROM (SELECT * EXCEPT (solicitation_identifier, ordering_period_end_date, award_or_idv_flag, idv_type_code, multiple_or_single_award_idv_code, parent_award_agency_id, parent_award_single_or_multiple_code) FROM awards WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18') x;",
+  "jobId": "8bcf5d5d-65bc-4906-a481-33e1473c90d4",
+  "statementType": "SELECT",
+  "bytesProcessed": "2694692673",
+  "lastResult": [
+   {
+    "probe": "window_checksum_legacy_cols",
+    "rows_in_window": 903491,
+    "legacy_checksum": "-8951510374347572432"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "AFTER 01: fill",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "10e0c6e641256e334ba16818022d91bf5a402a0f1c380788d1aecedd7622ba32",
+  "sql": "\nSELECT 'fill_window' AS probe,\n  COUNTIF(award_or_idv_flag IS NOT NULL) AS rows_with_flag,\n  COUNTIF(award_or_idv_flag = 'IDV') AS idv_rows,\n  COUNTIF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL) AS idv_rows_with_sol,\n  COUNTIF(award_or_idv_flag = 'IDV' AND ordering_period_end_date IS NOT NULL) AS idv_rows_with_ordering_end,\n  COUNTIF(award_or_idv_flag = 'IDV' AND multiple_or_single_award_idv_code IS NOT NULL) AS idv_rows_with_ms,\n  COUNT(DISTINCT IF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL, award_id, NULL)) AS idv_awards_with_sol,\n  COUNTIF(parent_award_agency_id IS NOT NULL) AS rows_with_parent_agency,\n  COUNTIF(solicitation_identifier IS NOT NULL OR ordering_period_end_date IS NOT NULL OR award_or_idv_flag IS NOT NULL\n    OR idv_type_code IS NOT NULL OR multiple_or_single_award_idv_code IS NOT NULL OR parent_award_agency_id IS NOT NULL\n    OR parent_award_single_or_multiple_code IS NOT NULL) AS rows_with_any_new_col\nFROM awards WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18';",
+  "jobId": "5b53f4fb-cd8f-412f-81c9-8444ebc75c21",
+  "statementType": "SELECT",
+  "bytesProcessed": "204915178",
+  "lastResult": [
+   {
+    "probe": "fill_window",
+    "rows_with_flag": 0,
+    "idv_rows": 0,
+    "idv_rows_with_sol": 0,
+    "idv_rows_with_ordering_end": 0,
+    "idv_rows_with_ms": 0,
+    "idv_awards_with_sol": 0,
+    "rows_with_parent_agency": 0,
+    "rows_with_any_new_col": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "02 in BEGIN/probes/ROLLBACK",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "641b81de013383b6473ce3bd3abc4f6ab2972003759154a0e6f73ad579a487fb",
+  "sql": "BEGIN TRANSACTION;\n-- ─────────────────────────────────────────────────────────────────────────────────────────────\n-- 02 — TIER A BACKFILL from the CURRENT staging load                     ⛔ NOT EXECUTED\n-- ─────────────────────────────────────────────────────────────────────────────────────────────\n-- PROVENANCE (measured read-only 2026-09-23):\n--   table     awards_ingest_staging\n--   load      last modified 2026-09-20T18:18:42Z (the weekly incremental that also MERGEd awards\n--             at 2026-09-20T18:18:56Z)\n--   contents  855,543 rows, action_date 2026-06-03 .. 2026-09-18, 72,024 IDV transaction rows\n--             (47,901 distinct IDVs; 41,836 with a solicitation id on ≥1 of those transactions)\n--   columns   solicitation_identifier, ordering_period_end_date, award_or_idv_flag,\n--             idv_type_code, multiple_or_single_award_idv_code, parent_award_agency_id,\n--             parent_award_single_or_multiple_code  (+ contract_transaction_unique_key as the key)\n--   match     every staging txn is present in awards (855,543/855,543 keys; 72,024/72,024 IDV txns)\n--\n-- REACH — be honest about it: this touches only transactions DATED in that window. It reaches\n-- 47,901 of 188,634 IDVs with activity since FY2024 (25.4%), and ZERO of the four Robins\n-- Mech-Elec II holders (none of them had an IDV modification in the window). Historical IDV\n-- identity needs 03 (re-acquisition from the same USASpending bulk endpoint).\n--\n-- REDUNDANT BY DESIGN: once 01 has landed, the next weekly ingest MERGE re-pulls this same\n-- window and writes these columns itself. Run 02 only if the columns are wanted before that run.\n-- It is guarded: the ASSERTs abort (writing nothing) if staging has been replaced by a later load.\n--\n-- Precondition: 01-ddl-add-columns.sql applied. Take the snapshot in README step 0 first.\n-- Scope of the write: only the 7 new columns; no existing column is touched.\n-- Dry-run of the source SELECT (below): 0.068 GiB. Target partitions: action_date 2026-06-01..2026-09-18.\n-- TARGET RESOLUTION: tables are UNQUALIFIED (`awards`, `awards_ingest_staging`) and resolve through\n-- the job's DEFAULT DATASET, so production and the validation clone run byte-identical text.\n-- Run (after Eric approves):\n--   bq --project_id=market-assasin query --nouse_legacy_sql --dataset_id=market-assasin:usaspending < tasks/idv-vehicle-foundation/02-backfill-from-current-staging.sql\n\nASSERT (SELECT COUNT(*) FROM awards_ingest_staging) = 855543\n  AS 'awards_ingest_staging is no longer the 2026-09-20 load (row count changed) — re-measure before backfilling';\nASSERT (SELECT CAST(MIN(SAFE_CAST(action_date AS DATE)) AS STRING) || '..' || CAST(MAX(SAFE_CAST(action_date AS DATE)) AS STRING)\n        FROM awards_ingest_staging) = '2026-06-03..2026-09-18'\n  AS 'awards_ingest_staging window changed — re-measure before backfilling';\n\nUPDATE awards T\nSET\n  solicitation_identifier              = S.solicitation_identifier,\n  ordering_period_end_date             = S.ordering_period_end_date,\n  award_or_idv_flag                    = S.award_or_idv_flag,\n  idv_type_code                        = S.idv_type_code,\n  multiple_or_single_award_idv_code    = S.multiple_or_single_award_idv_code,\n  parent_award_agency_id               = S.parent_award_agency_id,\n  parent_award_single_or_multiple_code = S.parent_award_single_or_multiple_code\nFROM (\n  SELECT\n    CAST(contract_transaction_unique_key AS STRING) AS txn_id,\n    CAST(NULLIF(solicitation_identifier, '') AS STRING) AS solicitation_identifier,\n    SAFE_CAST(NULLIF(ordering_period_end_date, '') AS DATE) AS ordering_period_end_date,\n    CAST(NULLIF(award_or_idv_flag, '') AS STRING) AS award_or_idv_flag,\n    CAST(NULLIF(idv_type_code, '') AS STRING) AS idv_type_code,\n    CAST(NULLIF(multiple_or_single_award_idv_code, '') AS STRING) AS multiple_or_single_award_idv_code,\n    CAST(NULLIF(parent_award_agency_id, '') AS STRING) AS parent_award_agency_id,\n    CAST(NULLIF(parent_award_single_or_multiple_code, '') AS STRING) AS parent_award_single_or_multiple_code\n  FROM awards_ingest_staging\n  WHERE IFNULL(contract_transaction_unique_key, '') != ''\n  -- UPDATE … FROM needs ≤1 source row per target row.\n  QUALIFY ROW_NUMBER() OVER (PARTITION BY contract_transaction_unique_key ORDER BY last_modified_date DESC) = 1\n) S\nWHERE T.txn_id = S.txn_id\n  AND T.action_date BETWEEN '2026-06-01' AND '2026-09-18';\n\n-- Verify (expect idv_rows_with_ordering_end = 72,024 and idv_rows_with_sol = 63,660):\n-- SELECT COUNTIF(award_or_idv_flag = 'IDV') AS idv_rows,\n--        COUNTIF(award_or_idv_flag = 'IDV' AND ordering_period_end_date IS NOT NULL) AS idv_rows_with_ordering_end,\n--        COUNTIF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL) AS idv_rows_with_sol\n-- FROM `market-assasin.usaspending.awards` WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18';\n\nSELECT 'dml_row_count' AS probe, @@row_count AS updated_rows;\n\nSELECT 'base' AS probe, COUNT(*) AS rows_total, ROUND(SUM(obligation_amount), 2) AS obligation_total,\n  (SELECT ARRAY_LENGTH(JSON_KEYS(TO_JSON(t), 1)) FROM awards t LIMIT 1) AS awards_columns\nFROM awards;\n\nSELECT 'window_checksum_legacy_cols' AS probe, COUNT(*) AS rows_in_window,\n  CAST(BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(x))) AS STRING) AS legacy_checksum\nFROM (SELECT * EXCEPT (solicitation_identifier, ordering_period_end_date, award_or_idv_flag, idv_type_code, multiple_or_single_award_idv_code, parent_award_agency_id, parent_award_single_or_multiple_code) FROM awards WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18') x;\n\nSELECT 'fill_window' AS probe,\n  COUNTIF(award_or_idv_flag IS NOT NULL) AS rows_with_flag,\n  COUNTIF(award_or_idv_flag = 'IDV') AS idv_rows,\n  COUNTIF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL) AS idv_rows_with_sol,\n  COUNTIF(award_or_idv_flag = 'IDV' AND ordering_period_end_date IS NOT NULL) AS idv_rows_with_ordering_end,\n  COUNTIF(award_or_idv_flag = 'IDV' AND multiple_or_single_award_idv_code IS NOT NULL) AS idv_rows_with_ms,\n  COUNT(DISTINCT IF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL, award_id, NULL)) AS idv_awards_with_sol,\n  COUNTIF(parent_award_agency_id IS NOT NULL) AS rows_with_parent_agency,\n  COUNTIF(solicitation_identifier IS NOT NULL OR ordering_period_end_date IS NOT NULL OR award_or_idv_flag IS NOT NULL\n    OR idv_type_code IS NOT NULL OR multiple_or_single_award_idv_code IS NOT NULL OR parent_award_agency_id IS NOT NULL\n    OR parent_award_single_or_multiple_code IS NOT NULL) AS rows_with_any_new_col\nFROM awards WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18';\n\nSELECT 'fill_outside_window' AS probe, COUNTIF(award_or_idv_flag IS NOT NULL OR solicitation_identifier IS NOT NULL) AS rows_with_new_cols_outside_window\nFROM awards WHERE action_date < '2026-06-01' OR action_date > '2026-09-18';\n\nSELECT 'mech_elec' AS probe,\n  COUNT(DISTINCT IF(STARTS_WITH(award_id, 'CONT_IDV_'), award_id, NULL)) AS holder_idvs_found_by_uei,\n  COUNT(DISTINCT IF(STARTS_WITH(award_id, 'CONT_IDV_') AND solicitation_identifier = 'FA850124R0001', award_id, NULL)) AS holder_idvs_groupable_by_solicitation,\n  COUNT(DISTINCT IF(STARTS_WITH(award_id, 'CONT_IDV_') AND ordering_period_end_date IS NOT NULL, award_id, NULL)) AS holder_idvs_with_ordering_end,\n  COUNT(DISTINCT IF(parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005'), award_id, NULL)) AS orders,\n  ROUND(SUM(IF(parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005'), obligation_amount, 0)), 2) AS order_obligations,\n  COUNTIF(parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005') AND parent_award_agency_id IS NOT NULL) AS order_txns_with_parent_agency,\n  COUNTIF(parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005')) AS order_txns\nFROM awards\nWHERE recipient_uei IN ('LAA3W2UCHL23','PZNLVGANJ3U3','RZ53PAJUCNF4','TR1AV9J17C93') AND (piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005') OR parent_piid IN ('FA850124D0002','FA850124D0003','FA850124D0004','FA850124D0005'));\nROLLBACK TRANSACTION;",
+  "jobId": "a5576f0a-6f96-4752-b2a9-8d733c404128",
+  "statementType": "SCRIPT",
+  "bytesProcessed": "6327177804",
+  "lastResult": [],
+  "children": [
+   {
+    "statementType": "BEGIN_TRANSACTION",
+    "dmlAffected": null,
+    "bytes": "0"
+   },
+   {
+    "statementType": "ASSERT",
+    "dmlAffected": null,
+    "bytes": "0"
+   },
+   {
+    "statementType": "ASSERT",
+    "dmlAffected": null,
+    "bytes": "10266516"
+   },
+   {
+    "statementType": "UPDATE",
+    "dmlAffected": "855561",
+    "bytes": "2962526104"
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "0",
+    "rows": [
+     {
+      "probe": "dml_row_count",
+      "updated_rows": 855561
+     }
+    ]
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "195903753",
+    "rows": [
+     {
+      "probe": "base",
+      "rows_total": 17114105,
+      "obligation_total": 2083313710470.92,
+      "awards_columns": 58
+     }
+    ]
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "2694692673",
+    "rows": [
+     {
+      "probe": "window_checksum_legacy_cols",
+      "rows_in_window": 903491,
+      "legacy_checksum": "-8951510374347572432"
+     }
+    ]
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "220331344",
+    "rows": [
+     {
+      "probe": "fill_window",
+      "rows_with_flag": 855561,
+      "idv_rows": 72024,
+      "idv_rows_with_sol": 63660,
+      "idv_rows_with_ordering_end": 72024,
+      "idv_rows_with_ms": 72007,
+      "idv_awards_with_sol": 41836,
+      "rows_with_parent_agency": 611191,
+      "rows_with_any_new_col": 855561
+     }
+    ]
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "145820356",
+    "rows": [
+     {
+      "probe": "fill_outside_window",
+      "rows_with_new_cols_outside_window": 0
+     }
+    ]
+   },
+   {
+    "statementType": "SELECT",
+    "dmlAffected": null,
+    "bytes": "97637058",
+    "rows": [
+     {
+      "probe": "mech_elec",
+      "holder_idvs_found_by_uei": 4,
+      "holder_idvs_groupable_by_solicitation": 0,
+      "holder_idvs_with_ordering_end": 0,
+      "orders": 26,
+      "order_obligations": 8655978,
+      "order_txns_with_parent_agency": 1,
+      "order_txns": 35
+     }
+    ]
+   },
+   {
+    "statementType": "ROLLBACK_TRANSACTION",
+    "dmlAffected": null,
+    "bytes": "0"
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "AFTER ROLLBACK of 02: fill",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "10e0c6e641256e334ba16818022d91bf5a402a0f1c380788d1aecedd7622ba32",
+  "sql": "\nSELECT 'fill_window' AS probe,\n  COUNTIF(award_or_idv_flag IS NOT NULL) AS rows_with_flag,\n  COUNTIF(award_or_idv_flag = 'IDV') AS idv_rows,\n  COUNTIF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL) AS idv_rows_with_sol,\n  COUNTIF(award_or_idv_flag = 'IDV' AND ordering_period_end_date IS NOT NULL) AS idv_rows_with_ordering_end,\n  COUNTIF(award_or_idv_flag = 'IDV' AND multiple_or_single_award_idv_code IS NOT NULL) AS idv_rows_with_ms,\n  COUNT(DISTINCT IF(award_or_idv_flag = 'IDV' AND solicitation_identifier IS NOT NULL, award_id, NULL)) AS idv_awards_with_sol,\n  COUNTIF(parent_award_agency_id IS NOT NULL) AS rows_with_parent_agency,\n  COUNTIF(solicitation_identifier IS NOT NULL OR ordering_period_end_date IS NOT NULL OR award_or_idv_flag IS NOT NULL\n    OR idv_type_code IS NOT NULL OR multiple_or_single_award_idv_code IS NOT NULL OR parent_award_agency_id IS NOT NULL\n    OR parent_award_single_or_multiple_code IS NOT NULL) AS rows_with_any_new_col\nFROM awards WHERE action_date BETWEEN '2026-06-01' AND '2026-09-18';",
+  "jobId": "db244595-8538-4535-a3de-9ea458fa5d2b",
+  "statementType": "SELECT",
+  "bytesProcessed": "0",
+  "lastResult": [
+   {
+    "probe": "fill_window",
+    "rows_with_flag": 0,
+    "idv_rows": 0,
+    "idv_rows_with_sol": 0,
+    "idv_rows_with_ordering_end": 0,
+    "idv_rows_with_ms": 0,
+    "idv_awards_with_sol": 0,
+    "rows_with_parent_agency": 0,
+    "rows_with_any_new_col": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "AFTER ROLLBACK of 02: base",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "4d91c91475abedfeda04d3caebb63828b7613e541caa456964089a0b9c091fc7",
+  "sql": "\nSELECT 'base' AS probe, COUNT(*) AS rows_total, ROUND(SUM(obligation_amount), 2) AS obligation_total,\n  (SELECT ARRAY_LENGTH(JSON_KEYS(TO_JSON(t), 1)) FROM awards t LIMIT 1) AS awards_columns\nFROM awards;",
+  "jobId": "75a1f502-2edb-48e8-83b8-99961d636a66",
+  "statementType": "SELECT",
+  "bytesProcessed": "0",
+  "lastResult": [
+   {
+    "probe": "base",
+    "rows_total": 17114105,
+    "obligation_total": 2083313710470.93,
+    "awards_columns": 58
+   }
+  ],
+  "ok": true
+ },
+ {
+  "label": "abort session (drops TEMP tables)",
+  "defaultDataset": null,
+  "session": "ChAKDm1hcmtldC1hc3Nhc2luEAEaJDM0M2FiNDM0LThkNTgtNDg4Ni05ZjBjLTVkMDdkNWY5NmMwNw==",
+  "sql_sha256": "ace1b5737483d39ee67298ab40bbaf9e793f636692c2d7cc2d2bcacd39f4fdc6",
+  "sql": "CALL BQ.ABORT_SESSION();",
+  "jobId": "2e54b6f5-4597-4fe7-ad5a-3d70967344ea",
+  "statementType": "SCRIPT",
+  "bytesProcessed": "0",
+  "lastResult": [],
+  "ok": true
+ }
+]

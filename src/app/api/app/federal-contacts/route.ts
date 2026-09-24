@@ -21,6 +21,7 @@ import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
+import { withDodaacPrefix, dodaacPrefixOrExpr } from '@/lib/gov-contacts/dodaac-prefix';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 
 export const dynamic = 'force-dynamic';
@@ -305,11 +306,12 @@ export async function GET(request: NextRequest) {
       .from('federal_contacts')
       .select('contact_fullname, contact_email, contact_phone, contact_title, role_category, solicitation_number, office, department_ind_agency')
       .limit(8000);
-    if (rosterCodes.length > 0) {
+    if (rosterCodes.length > 0 && dodaacPrefixOrExpr(rosterCodes)) {
       // DoD: need the DoDAAC in the solicitation number to decode the office.
+      // Shared trigram-indexed prefix predicate (dodaac-prefix.ts); '' = no valid code.
       rosterQuery = rosterQuery
         .not('solicitation_number', 'is', null)
-        .or(rosterCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(','));
+        .or(dodaacPrefixOrExpr(rosterCodes));
     } else {
       // Civilian: group by SAM's `office` column → require it, not a sol number.
       const agencyKeyword = facetAgency.replace(/department of|dept of|the|,/gi, '').trim().split(/\s+/)[0] || facetAgency;
@@ -477,15 +479,16 @@ export async function GET(request: NextRequest) {
   // Most precise path: an explicit office DoDAAC anchors directly on it. This is
   // how a USACE district card surfaces its own engineers instead of dept-wide DoD.
   if (validDodaac) {
-    q = q.ilike('solicitation_number', `${validDodaac}%`);
+    // Shared trigram-indexed prefix predicate (src/lib/gov-contacts/dodaac-prefix.ts).
+    q = withDodaacPrefix(q, validDodaac);
     anchoredByDodaac = true;
   }
   if (agency && !anchoredByDodaac) {
     const dodaacCodes = await dodaacCodesForAgency(agency);
-    if (dodaacCodes.length > 0) {
-      // solicitation_number STARTS WITH a 6-char DoDAAC. Match any of the
-      // sub-agency's codes. (PostgREST .or with ilike per code.)
-      const orExpr = dodaacCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(',');
+    // solicitation_number STARTS WITH a 6-char DoDAAC. Match any of the
+    // sub-agency's codes via the shared indexed predicate ('' = no valid code).
+    const orExpr = dodaacPrefixOrExpr(dodaacCodes);
+    if (orExpr) {
       q = q.or(orExpr);
       anchoredByDodaac = true;
     }
@@ -668,7 +671,7 @@ export async function GET(request: NextRequest) {
     // set. A valid DoDAAC anchors on the solicitation prefix (skipping the agency
     // keyword + office ILIKE, which would otherwise broaden/exclude wrongly).
     if (validDodaac) {
-      eq = eq.ilike('solicitation_number', `${validDodaac}%`);
+      eq = withDodaacPrefix(eq, validDodaac);
     } else if (agency) {
       const parentKeyword = subAgencyToParent(agency);
       const keyword = parentKeyword || agency.replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ').replace(/\s{2,}/g, ' ').trim();
