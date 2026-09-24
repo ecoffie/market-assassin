@@ -11,12 +11,15 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   resolveLegacyDestination, isLegacyCustomerPath, mapLegacyPanel, LEGACY_ROUTES, WORKSPACE_PATH,
-  ANONYMOUS_MA_COOKIE, workspaceUrl, sharedPasswordGraceOpen, SHARED_PASSWORD_GRACE_ENV,
+  workspaceUrl,
 } from './legacy-routes';
+import { getEmailFromRequest } from '../api-auth';
+import { existsSync } from 'node:fs';
 
-const resolve = (url: string, maCookie?: string, sharedPasswordGrace = false) => {
+// The resolver no longer reads any cookie: every visitor gets the same destination.
+const resolve = (url: string) => {
   const u = new URL(url, 'https://getmindy.ai');
-  return resolveLegacyDestination(u.pathname, u.searchParams, { maCookie, sharedPasswordGrace });
+  return resolveLegacyDestination(u.pathname, u.searchParams);
 };
 
 const SRC = join(__dirname, '../..');
@@ -117,7 +120,8 @@ describe('wiring — the proxy actually runs for every legacy route', () => {
     for (const r of LEGACY_ROUTES) expect(proxy).toContain(`'${r.path}'`);
   });
   it('the proxy calls the resolver with a temporary (307) redirect', () => {
-    expect(proxy).toMatch(/resolveLegacyDestination\(pathname, request\.nextUrl\.searchParams, \{\s*maCookie: request\.cookies\.get\('ma_access_email'\)/);
+    // Cookie-blind: the destination never depends on a cookie (the shared-password exception is gone).
+    expect(proxy).toMatch(/resolveLegacyDestination\(pathname, request\.nextUrl\.searchParams\)/);
     // The old "no cookie → /market-assassin-locked" branch is gone (superseded by the resolver).
     expect(code('proxy.ts')).not.toContain("'/market-assassin-locked', request.url");
     expect(proxy).toMatch(/NextResponse\.redirect\(new URL\(legacyDestination, request\.url\), 307\)/);
@@ -213,27 +217,23 @@ describe('standalone Market Assassin — retired into /app Market Research', () 
     expect(resolve(from)).toBe('/app?panel=research');
   });
 
-  it('an MA holder with an identity cookie (their email) is routed too — /app honours the ma: grant', () => {
-    expect(resolve('/federal-market-assassin', 'buyer@example.com')).toBe('/app?panel=research');
+  it('shared-password routes are GONE (no hard-coded fallback password left to leak)', () => {
+    expect(existsSync(join(SRC, 'app/api/verify-ma-password/route.ts'))).toBe(false);
+    expect(existsSync(join(SRC, 'app/api/verify-recompete-password/route.ts'))).toBe(false);
   });
 
-  it('the ANONYMOUS shared-password holder is routed to /app by DEFAULT — no indefinite exception', () => {
-    expect(resolve('/federal-market-assassin', ANONYMOUS_MA_COOKIE)).toBe('/app?panel=research');
+  it('no grace window exists — no env switch, no cookie exception', () => {
+    const lib = read('lib/mindy/legacy-routes.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(lib).not.toMatch(/LEGACY_SHARED_PASSWORD_ACCESS|keepFor|authorized-user/);
+    expect(read('proxy.ts')).not.toMatch(/sharedPasswordGrace/);
   });
 
-  it('only an explicitly OPENED grace window keeps the old tool, and only for that cookie', () => {
-    expect(resolve('/federal-market-assassin', ANONYMOUS_MA_COOKIE, true)).toBeNull();
-    expect(resolve('/federal-market-assassin', 'buyer@example.com', true)).toBe('/app?panel=research');
-    expect(resolve('/federal-market-assassin', undefined, true)).toBe('/app?panel=research');
-    // …and never on the dead gate / sales page.
-    expect(resolve('/market-assassin-locked', ANONYMOUS_MA_COOKIE, true)).toBe('/app?panel=research');
-  });
-
-  it('the grace switch is OFF unless the env says exactly "on"', () => {
-    expect(sharedPasswordGraceOpen({})).toBe(false);
-    for (const v of ['', 'off', 'true', '1', 'yes']) expect(sharedPasswordGraceOpen({ [SHARED_PASSWORD_GRACE_ENV]: v })).toBe(false);
-    expect(sharedPasswordGraceOpen({ [SHARED_PASSWORD_GRACE_ENV]: 'on' })).toBe(true);
-    expect(sharedPasswordGraceOpen({ [SHARED_PASSWORD_GRACE_ENV]: ' ON ' })).toBe(true);
+  it('the old anonymous cookie is NOT an identity; a real email still is', () => {
+    const req = (cookie?: string) => ({ cookies: { get: (k: string) => (k === 'ma_access_email' && cookie ? { value: cookie } : undefined) } }) as unknown as Parameters<typeof getEmailFromRequest>[0];
+    expect(getEmailFromRequest(req('authorized-user'))).toBeNull();
+    expect(getEmailFromRequest(req('authorized-user'), { userEmail: 'authorized-user' })).toBeNull();
+    expect(getEmailFromRequest(req('Buyer@Example.com'))).toBe('buyer@example.com');
+    expect(getEmailFromRequest(req(), { userEmail: 'a@b.co' })).toBe('a@b.co');
   });
 
   it('email prefill survives the MA hop', () => {

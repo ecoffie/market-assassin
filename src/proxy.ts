@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { resolveLegacyDestination, sharedPasswordGraceOpen } from '@/lib/mindy/legacy-routes';
+import { resolveLegacyDestination } from '@/lib/mindy/legacy-routes';
 
 /**
  * PROXY - ROUTE PROTECTION
@@ -25,10 +25,7 @@ import { resolveLegacyDestination, sharedPasswordGraceOpen } from '@/lib/mindy/l
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  const legacyDestination = resolveLegacyDestination(pathname, request.nextUrl.searchParams, {
-    maCookie: request.cookies.get('ma_access_email')?.value ?? null,
-    sharedPasswordGrace: sharedPasswordGraceOpen(),
-  });
+  const legacyDestination = resolveLegacyDestination(pathname, request.nextUrl.searchParams);
   if (legacyDestination) {
     return NextResponse.redirect(new URL(legacyDestination, request.url), 307);
   }
@@ -55,9 +52,8 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // Federal Market Assassin: retired to /app?panel=research by the resolver above. The only
-  // request that reaches here is an anonymous shared-password holder DURING an explicitly
-  // opened grace window (LEGACY_SHARED_PASSWORD_ACCESS=on) — see legacy-routes.ts.
+  // Federal Market Assassin: retired to /app?panel=research by the resolver above, for every
+  // visitor. The shared-password routes and their grace window are removed.
 
   return NextResponse.next();
 }
