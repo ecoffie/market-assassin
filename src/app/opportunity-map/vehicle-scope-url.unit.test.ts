@@ -14,7 +14,7 @@ const between = (a: string, b: string) => {
   const e = MAP.indexOf(b, s + a.length); expect(e, b).toBeGreaterThan(s);
   return MAP.slice(s, e);
 };
-type Intent = { q?: string; agency?: string; horizon?: string; vehicle?: string; parent?: string; work?: string; leadMax?: string };
+type Intent = { q?: string; agency?: string; horizon?: string; vehicle?: string; parent?: string; work?: string; leadMax?: string; minValue?: string };
 const mapQueryUrl: (s: string, i: Intent, d?: boolean) => string = new Function(
   cook(between('window.__mapQueryUrl=function(search,intent,dropContext){', 'window.__syncQueryUrl=function('))
     .replace('window.__mapQueryUrl=', 'var f=') + '; return f;',
@@ -37,6 +37,21 @@ describe('scope in the URL', () => {
     expect(mapQueryUrl('?mode=recompete&horizon=recompete&vehicle=OASIS%2B&leadMax=60', { horizon: 'recompete' }))
       .toBe('?mode=recompete');
   });
+  it('a scoped link writes its value floor, and a pill edit rewrites it', () => {
+    const s = '?mode=recompete&horizon=recompete&vehicle=OASIS%2B&minValue=1000000&leadMax=60';
+    expect(mapQueryUrl(s, { vehicle: 'OASIS+', horizon: 'recompete', leadMax: '60', minValue: '1000000' })).toBe(s);
+    expect(mapQueryUrl(s, { vehicle: 'OASIS+', horizon: 'recompete', leadMax: '60', minValue: '250000' }))
+      .toBe('?mode=recompete&horizon=recompete&vehicle=OASIS%2B&leadMax=60&minValue=250000');
+    expect(mapQueryUrl(s, { vehicle: 'OASIS+', horizon: 'recompete', leadMax: '60', minValue: '' }))
+      .toBe('?mode=recompete&horizon=recompete&vehicle=OASIS%2B&leadMax=60');
+  });
+  it('#1692 review 2: clearing the scope drops the floor it carried (reload cannot re-apply a cleared $1M floor)', () => {
+    expect(mapQueryUrl('?mode=recompete&horizon=recompete&vehicle=OASIS%2B&state=DC&minValue=1000000&leadMax=60', { horizon: 'recompete' }))
+      .toBe('?mode=recompete&state=DC');
+  });
+  it('a minValue with no scope is left exactly as it was (not this writer\'s key)', () => {
+    expect(mapQueryUrl('?minValue=5&q=x&horizon=recompete', { q: 'x', horizon: 'recompete' })).toBe('?minValue=5&q=x&horizon=recompete');
+  });
   it('a leadMax without a scope is left exactly as it was', () => {
     expect(mapQueryUrl('?leadMax=12&q=x&horizon=recompete', { q: 'x', horizon: 'recompete' })).toBe('?leadMax=12&q=x&horizon=recompete');
   });
@@ -51,9 +66,17 @@ describe('wiring', () => {
     expect(MAP).toMatch(/vehicle:'', parent:'', work:'' \};\n\s*for\(var k in FILT\)/);
     expect(MAP).toContain("if(FILT.vehicle)url+='&vehicle='+encodeURIComponent(FILT.vehicle);");
   });
-  it('a scoped link\'s value floor (MCP min_value) becomes the same FILT.valueRange the Value pill writes', () => {
-    expect(MAP).toContain("minValue=P('minValue');");
-    expect(MAP).toMatch(/if\(minValue&&\/\^\[0-9\]\{1,15\}.*\)f\.valueRange=minValue\+'-';/);
+  it('#1692 review 1: the minValue guard the BROWSER receives admits whole dollars only (executed, not grepped)', () => {
+    // Cook the template literal exactly as the page is served, then run the regex it emits.
+    const line = cook(MAP).split('\n').find((l) => l.includes("f.valueRange=minValue+'-'"))!;
+    const src = /if\(minValue&&\/(.+)\/\.test\(minValue\)\)/.exec(line)![1];
+    const guard = new RegExp(src);
+    for (const ok of ['1', '1000000', '999999999999999']) expect(guard.test(ok), ok).toBe(true);
+    for (const bad of ['1-2', '1e5', '12x3', '1.5', '-5', '1000000000000000', '']) expect(guard.test(bad), bad).toBe(false);
+  });
+  it('the Value pill keeps an intent link in step', () => {
+    expect(MAP).toMatch(/syncDeepSelect\(\);\n.*\n\s*if\(typeof window\.__syncQueryUrl==='function'\)window\.__syncQueryUrl\(false,true\);/);
+    expect(MAP).toContain("FILT.leadMax=''; FILT.valueRange='';");
   });
   it('a scope fetches the Awarded horizon alone (no unscoped totals summed in)', () => {
     expect(MAP).toContain("if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }");

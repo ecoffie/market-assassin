@@ -60,6 +60,7 @@ const ROWS: Row[] = [
   order('CONT_AWD_T12_7008_47QRCA25DZ999_-NONE-'),                                            // generated id, parent agency missing
   order('CONT_AWD_T13_7008_-NONE-_-NONE-', { contract_type: 'PURCHASE ORDER' }),              // NOT an order → not unattributed
   order('T14RAWPIID', { contract_type: 'BPA CALL' }),                                        // raw PIID order
+  order('CONT_AWD_T15_7008_-NONE-_4732'),                                                     // generated id, parent piid missing, agency present
   // Finding 2 — PIID ZZBIGPIID0001: 1,001 orders under 9700 inserted FIRST, then one under 4732.
   ...Array.from({ length: 1001 }, (_, i) => order(`CONT_AWD_B${String(i).padStart(4, '0')}_9700_ZZBIGPIID0001_9700`, { description: 'LOGISTICS' })),
   order('CONT_AWD_BLAST_7008_ZZBIGPIID0001_4732', { description: 'LOGISTICS' }),
@@ -126,6 +127,11 @@ describe('finding 1 — every scoped filter is APPLIED (narrows, echoed, same on
     ['state without state_scope', { state: 'VA' }, 'state'],
     ['state with recipient scope', { state: 'VA', state_scope: 'recipient' }, 'state'],
     ['state with both scope', { state: 'VA', state_scope: 'both' }, 'state'],
+    ['unknown state', { state: 'Atlantis', state_scope: 'pop' }, 'state'],
+    ['negative min_value', { min_value: -5 }, 'min_value'],
+    ['NaN min_value', { min_value: Number.NaN }, 'min_value'],
+    ['fractional min_value', { min_value: 1000.5 }, 'min_value'],
+    ['min_value the Map cannot carry', { min_value: 1e21 }, 'min_value'],
   ];
   for (const [name, input, filter] of refused) {
     it(`${name}: refused — nothing searched, reason named, never a broader result`, async () => {
@@ -136,18 +142,29 @@ describe('finding 1 — every scoped filter is APPLIED (narrows, echoed, same on
       expect(r.refused_filters?.map((f) => f.filter)).toContain(filter);
     });
   }
-  it('every scoped input key is either applied, refused, or a paging/scope control (no silent third class)', () => {
-    const SCOPE_OR_PAGING = new Set(['vehicle', 'parent_id', 'work', 'lead_months', 'limit', 'page', 'state_scope']);
-    const APPLIED = new Set(['naics', 'agency', 'state', 'min_value']);
-    const sample: Record<string, unknown> = {
-      naics: '541611', psc: 'R408', agency: 'X', state: 'VA', state_scope: 'recipient', min_value: 1, date_from: '2025-01-01',
-      date_to: '2026-01-01', search_type: 'idv', limit: 5, page: 1, vehicle: 'OASIS+', parent_id: '', work: 'x', lead_months: 12,
-    };
-    const refusedNames = new Set(refusedScopedFilters(sample as never).map((f) => f.filter));
-    for (const k of Object.keys(sample)) {
-      const classified = SCOPE_OR_PAGING.has(k) || APPLIED.has(k) || refusedNames.has(k) || (k === 'date_to' && refusedNames.has('date_from'));
-      expect(classified, `input "${k}" is neither applied nor refused`).toBe(true);
+  it('every PUBLISHED input of search_idv_contracts is classified (a new input fails here until it is)', async () => {
+    const { listMcpTools } = await import('@/lib/mcp/tool-registry');
+    const def = listMcpTools().find((t) => (t as { function?: { name?: string } }).function?.name === 'search_idv_contracts') as
+      { function: { parameters: { properties: Record<string, unknown> } } };
+    const published = Object.keys(def.function.parameters.properties).sort();
+    const SCOPE_OR_PAGING = ['vehicle', 'parent_id', 'work', 'lead_months', 'limit', 'page', 'state_scope'];
+    const APPLIED = ['naics', 'agency', 'state', 'min_value'];                  // proven to narrow above
+    const REFUSED_WHEN_SET: Record<string, unknown> = { psc: 'R408', date_from: '2025-01-01', date_to: '2026-01-01', search_type: 'idv' };
+    for (const [k, v] of Object.entries(REFUSED_WHEN_SET)) {
+      expect(refusedScopedFilters({ [k]: v } as never).map((f) => f.filter), k).toContain(k);
     }
+    expect(published).toEqual([...SCOPE_OR_PAGING, ...APPLIED, ...Object.keys(REFUSED_WHEN_SET)].sort());
+  });
+  it('min_value 0 is the legacy "no floor": not applied, not refused', async () => {
+    expect(refusedScopedFilters({ min_value: 0 } as never)).toEqual([]);
+    const r = await searchScopedTaskOrders({ ...BASE, min_value: 0 }, db);
+    expect(r.applied_filters.map((f) => f.filter)).not.toContain('min_value');
+  });
+  it('#1692 review 9: a state NAME is normalized once — query, echo and Map link all say the code', async () => {
+    const r = await searchScopedTaskOrders({ ...BASE, state: 'Virginia' }, db);
+    expect(r.applied_filters.find((f) => f.filter === 'state')?.value).toBe('VA');
+    expect(new URL(r.map_url!).searchParams.get('state')).toBe('VA');
+    expect(ids(r)).not.toContain(`CONT_AWD_T03_7008_${A}_4732`);
   });
 });
 
@@ -186,12 +203,12 @@ describe('finding 3 — generated award ids with a missing parent are unattribut
     const sqlIds = (viaSql.data ?? []).map((r) => String(r.contract_id)).sort();
     expect(viaSql.error).toBeNull();
     expect(sqlIds).toEqual(ROWS.filter(isUnattributedOrder).map((r) => String(r.contract_id)).sort());
-    expect(sqlIds).toEqual(['CONT_AWD_T11_7008_-NONE-_-NONE-', 'CONT_AWD_T12_7008_47QRCA25DZ999_-NONE-', 'T14RAWPIID']);
+    expect(sqlIds).toEqual(['CONT_AWD_T11_7008_-NONE-_-NONE-', 'CONT_AWD_T12_7008_47QRCA25DZ999_-NONE-', 'CONT_AWD_T15_7008_-NONE-_4732', 'T14RAWPIID']);
   });
   it('the scoped search counts them (the first version counted only the raw-PIID one)', async () => {
     const r = await searchScopedTaskOrders(BASE, db);
-    expect(r.unattributed_orders).toBe(3);
+    expect(r.unattributed_orders).toBe(4);
     // …and never admits them into the vehicle's result.
-    for (const id of ['CONT_AWD_T11_7008_-NONE-_-NONE-', 'CONT_AWD_T12_7008_47QRCA25DZ999_-NONE-', 'T14RAWPIID']) expect(ids(r)).not.toContain(id);
+    for (const id of ['CONT_AWD_T11_7008_-NONE-_-NONE-', 'CONT_AWD_T12_7008_47QRCA25DZ999_-NONE-', 'CONT_AWD_T15_7008_-NONE-_4732', 'T14RAWPIID']) expect(ids(r)).not.toContain(id);
   });
 });

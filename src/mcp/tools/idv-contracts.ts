@@ -9,7 +9,8 @@
  */
 import { searchIDVContracts, type IDVContract } from '@/lib/idv-search';
 import { mcpFlags } from '@/lib/mcp/flags';
-import { searchScopedTaskOrders, type ScopedTaskOrderResult, type ScopedTaskOrderRow } from '@/lib/vehicles/task-order-search';
+import { searchScopedTaskOrders, validMinValue, MAX_MIN_VALUE, type ScopedTaskOrderResult, type ScopedTaskOrderRow } from '@/lib/vehicles/task-order-search';
+import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export interface IdvContractsToolInput {
   naics?: string;
@@ -100,7 +101,12 @@ export function refusedScopedFilters(input: IdvContractsToolInput): { filter: st
   if (input.search_type === 'idv') out.push({ filter: 'search_type', reason: 'vehicle / parent_id scope TASK ORDERS; search_type:"idv" lists base vehicles. Omit search_type or pass "task".' });
   if (input.psc?.trim()) out.push({ filter: 'psc', reason: 'PSC cannot filter scoped orders: psc_code is populated on ~6% of this data and the Map\'s Awarded layer does not apply it. Use naics or a work subject.' });
   if (input.date_from?.trim() || input.date_to?.trim()) out.push({ filter: input.date_from?.trim() ? 'date_from' : 'date_to', reason: 'Scoped orders carry no action date; the window is the period-of-performance end (lead_months).' });
-  if (input.state?.trim() && input.state_scope !== 'pop') out.push({ filter: 'state', reason: 'In a scoped search state means PLACE OF PERFORMANCE only (recipient HQ state is not on this data). Pass state_scope:"pop".' });
+  // 0 is the legacy "no floor" default; anything else must be a floor the query AND the Map can apply.
+  if (input.min_value !== undefined && input.min_value !== 0 && validMinValue(input.min_value) == null) {
+    out.push({ filter: 'min_value', reason: `min_value must be a whole number of dollars between 1 and ${MAX_MIN_VALUE.toLocaleString('en-US')}.` });
+  }
+  if (input.state?.trim() && !normalizeStateCode(input.state)) out.push({ filter: 'state', reason: `"${input.state}" is not a US state or territory.` });
+  else if (input.state?.trim() && input.state_scope !== 'pop') out.push({ filter: 'state', reason: 'In a scoped search state means PLACE OF PERFORMANCE only (recipient HQ state is not on this data). Pass state_scope:"pop".' });
   return out;
 }
 

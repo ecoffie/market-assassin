@@ -7,7 +7,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const searchIDVContracts = vi.fn();
 const searchScopedTaskOrders = vi.fn();
 vi.mock('@/lib/idv-search', () => ({ searchIDVContracts: (...a: unknown[]) => searchIDVContracts(...a) }));
-vi.mock('@/lib/vehicles/task-order-search', () => ({ searchScopedTaskOrders: (...a: unknown[]) => searchScopedTaskOrders(...a) }));
+vi.mock('@/lib/vehicles/task-order-search', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/vehicles/task-order-search')>()),
+  searchScopedTaskOrders: (...a: unknown[]) => searchScopedTaskOrders(...a),
+}));
 
 import { idvContracts } from './idv-contracts';
 

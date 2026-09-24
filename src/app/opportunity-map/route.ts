@@ -1637,8 +1637,9 @@ const VIEWPORT_JS = `<script>
   window.__vehicleScopeState=function(){ return { vehicle:FILT.vehicle||'', parent:FILT.parent||'', work:FILT.work||'' }; };
   // Clearing the scope also drops the window the scoped link carried, so FILT and the URL (which stops
   // writing leadMax once no scope remains) stay the same market after a reload.
-  window.__clearVehicleScope=function(){ FILT.vehicle=''; FILT.parent=''; FILT.work=''; FILT.leadMax='';
-    var ld=document.getElementById('mfLead'); if(ld)ld.value=''; };
+  window.__clearVehicleScope=function(){ FILT.vehicle=''; FILT.parent=''; FILT.work=''; FILT.leadMax=''; FILT.valueRange='';
+    var ld=document.getElementById('mfLead'); if(ld)ld.value='';
+    if(window.__valReflect)window.__valReflect(''); };
   // ── Ask-Mindy context bridge ────────────────────────────────────────────────
   // The Ask Mindy drawer runs in its OWN IIFE and can't see these locals. Publish a
   // GETTER (not a snapshot) so it always reads the LIVE view: how many opps match in
@@ -3230,8 +3231,8 @@ const VIEWPORT_JS = `<script>
   window.__mapQueryUrl=function(search,intent,dropContext){
     intent=intent||{};
     var src=String(search||''), s=src.charAt(0)==='?'?src.slice(1):src;
-    var parts=s?s.split('&'):[], keep=[], cur={q:'',agency:'',horizon:'',vehicle:'',parent:'',work:'',leadMax:''};
-    var MANAGED={q:1,agency:1,horizon:1,vehicle:1,parent:1,work:1,leadMax:1};
+    var parts=s?s.split('&'):[], keep=[], cur={q:'',agency:'',horizon:'',vehicle:'',parent:'',work:'',leadMax:'',minValue:''};
+    var MANAGED={q:1,agency:1,horizon:1,vehicle:1,parent:1,work:1,leadMax:1,minValue:1};
     function dec(v){ try{ return decodeURIComponent(v.split('+').join(' ')).trim(); }catch(e){ return v; } }
     for(var i=0;i<parts.length;i++){
       var p=parts[i]; if(!p)continue;
@@ -3240,16 +3241,17 @@ const VIEWPORT_JS = `<script>
       keep.push(p);
     }
     var want={ q:String(intent.q||'').trim(), agency:String(intent.agency||'').trim(), horizon:'',
-      vehicle:String(intent.vehicle||'').trim(), parent:String(intent.parent||'').trim(), work:String(intent.work||'').trim(), leadMax:'' };
+      vehicle:String(intent.vehicle||'').trim(), parent:String(intent.parent||'').trim(), work:String(intent.work||'').trim(), leadMax:'', minValue:'' };
     // A parent/vehicle scope is discovery intent too: it carries its horizon and window so a reload or a
     // copied link reopens the SAME scoped market (leadMax is written only beside a scope).
     var _scoped=!!(want.vehicle||want.parent||want.work);
     if(want.q||want.agency||_scoped)want.horizon=String(intent.horizon||'').trim();
-    if(_scoped)want.leadMax=String(intent.leadMax||'').trim();
-    // A URL leadMax with no scope is not this writer's key — keep it exactly as it was.
-    if(!_scoped&&cur.leadMax&&!cur.vehicle&&!cur.parent&&!cur.work)want.leadMax=cur.leadMax;
+    if(_scoped){ want.leadMax=String(intent.leadMax||'').trim(); want.minValue=String(intent.minValue||'').trim(); }
+    // A URL leadMax / minValue with no scope is not this writer's key — keep it exactly as it was.
+    var _curScoped=!!(cur.vehicle||cur.parent||cur.work);
+    if(!_scoped&&!_curScoped){ want.leadMax=cur.leadMax; want.minValue=cur.minValue; }
     if(cur.q===want.q&&cur.agency===want.agency&&cur.horizon===want.horizon&&cur.vehicle===want.vehicle
-      &&cur.parent===want.parent&&cur.work===want.work&&cur.leadMax===want.leadMax)return src;
+      &&cur.parent===want.parent&&cur.work===want.work&&cur.leadMax===want.leadMax&&cur.minValue===want.minValue)return src;
     if(dropContext){
       var CTX={ss:1,opp:1,company:1,buyer:1,recompete:1,forecast:1,sh:1,src:1};
       keep=keep.filter(function(p){ return !CTX[p.split('=')[0]]; });
@@ -3261,6 +3263,7 @@ const VIEWPORT_JS = `<script>
     if(want.parent)keep.push('parent='+encodeURIComponent(want.parent).split('%2C').join(','));
     if(want.work)keep.push('work='+encodeURIComponent(want.work));
     if(want.leadMax)keep.push('leadMax='+encodeURIComponent(want.leadMax));
+    if(want.minValue)keep.push('minValue='+encodeURIComponent(want.minValue));
     return keep.length?('?'+keep.join('&')):'';
   };
   // onlyIfIntent: a keep-in-sync call (horizon toggle, agency picker, Filters apply, Clear all)
@@ -3283,7 +3286,9 @@ const VIEWPORT_JS = `<script>
         vehicle: opp&&typeof FILT!=='undefined'&&FILT&&FILT.vehicle?String(FILT.vehicle):'',
         parent: opp&&typeof FILT!=='undefined'&&FILT&&FILT.parent?String(FILT.parent):'',
         work: opp&&typeof FILT!=='undefined'&&FILT&&FILT.work?String(FILT.work):'',
-        leadMax: opp&&typeof FILT!=='undefined'&&FILT&&FILT.leadMax?String(FILT.leadMax):''
+        leadMax: opp&&typeof FILT!=='undefined'&&FILT&&FILT.leadMax?String(FILT.leadMax):'',
+        // The floor half of FILT.valueRange ("min-max"), written beside a scope so a reload keeps it.
+        minValue: opp&&typeof FILT!=='undefined'&&FILT&&FILT.valueRange?String(FILT.valueRange).split('-')[0]:''
       };
       var next=window.__mapQueryUrl(cur,intent,!!dropContext);
       if(next===cur)return;
@@ -4052,6 +4057,8 @@ const VIEWPORT_JS = `<script>
       setLabel();
       FILT.valueRange = (minV!=null||maxV!=null) ? ((minV!=null?minV:'')+'-'+(maxV!=null?maxV:'')) : '';
       syncDeepSelect();
+      // Keep an intent link in step (a scoped link carries minValue); a bare browse stays bare.
+      if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(false,true);
       pan.classList.remove('show');
       if(MODE==='recompete'){ fetchView(); }
       else { applyClientOpenFilter(); INVIEW=0; render(); } // client-side: recompute the shown count from the actual filtered rows, not the server's unfiltered totalInView
@@ -9013,7 +9020,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(leadMax&&/^[0-9]{1,2}$/.test(leadMax)&&+leadMax>=1&&+leadMax<=60)f.leadMax=leadMax;
       // A value floor on a scoped link (MCP min_value) → the same FILT.valueRange "min-" the Value pill
       // writes, so the Awarded fetch sends minValue exactly as the tool applied it. Digits only.
-      if(minValue&&/^[0-9]{1,15}(\.[0-9]+)?$/.test(minValue))f.valueRange=minValue+'-';
+      // Whole dollars only — the tool writes Math.round(min_value). No '.', '-', 'e': a '-' would be read
+      // by the valueRange split as a MAX ("1-2" → min 1, max 2), so the pattern admits digits alone.
+      if(minValue&&/^[0-9]{1,15}$/.test(minValue))f.valueRange=minValue+'-';
       // "Posted today / this week" tiles. Only values the #mfPosted select can actually hold —
       // otherwise the map would filter to a window the Filters panel shows as "Any time" and
       // Clear-all could not undo. 1 exists because the tile promises ONE day (see the option).

@@ -60,6 +60,23 @@ Live after the batch (`npm run verify:task-order-scope`, **25/25**):
 
 Browser (built app, `browser-evidence.json`): the filtered link, the base link and the ambiguous name each open, refresh and open in a fresh browser to the identical final Awarded fetch. Filtered: "4 opportunities · 2 not shown on map".
 
+### Delta review of the correction batch (independent reviewer, `dfa19cd0..11558dcc`)
+
+No blockers were found. Two should-fix items and the cheap nits are fixed at the final head; the rest are recorded below.
+
+| Item | Status |
+|---|---|
+| **Should-fix 1.** The Map's `minValue` guard lost its `\.` escape in the template literal. `?minValue=1-2` injected a max | **Fixed.** The guard now admits digits only (the tool sends whole dollars). The test executes the cooked regex the browser receives, and it goes red on the old guard |
+| **Should-fix 2.** `minValue` wasn't managed by the URL writer, so a cleared or edited floor came back on reload | **Fixed.** The writer manages `minValue` beside a scope, like `leadMax`. The Value pill syncs an intent link, and the banner's Clear drops the floor. Browser: Clear then reload keeps the floor cleared |
+| Negative, NaN, fractional or ≥ 1e15 `min_value` was silently dropped or disagreed with the Map | **Fixed.** Refused; 0 remains the legacy "no floor" |
+| The PIID ambiguity message miscounted past 21 agencies | **Fixed.** It now says "at least N" (the result was already refused as ambiguous) |
+| The `…_-NONE-_<agency>` shape wasn't covered | **Fixed.** Fixture added; the unattributed count is 4 |
+| The input-coverage test used a hand-written list | **Fixed.** Keys are now derived from the published tool schema, so a new input fails until it's classified |
+| `state:"Virginia"` echoed as `VIRGINIA` | **Fixed.** Normalized once to `VA` in the query, the echo and the Map link |
+| `contract_type` abbreviations `DO`/`PO` aren't order types | **Not changed.** This mirrors award-lineage's shared order-type list; there are 0 raw-PIID `DO` rows live. Recorded as a bound |
+| The harness routes `.or()` through the SQL twin's translator | **Accepted.** PostgREST parsing of the same strings is covered by the live oracle (25/25) |
+| `state`/`naics` are unmanaged URL params (pre-existing) | **Unchanged.** After Clear, the URL and FILT both keep `state=DC`, so they agree |
+
 ## Reproducible demo (VCI / IMRI style)
 
 A management-consulting firm asks what management consulting is currently being ordered through OASIS+.

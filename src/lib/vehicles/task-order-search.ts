@@ -23,6 +23,13 @@ import { applyMapsRecompeteFilters, mapsRecompeteRequest, type MapsRecompeteRequ
 import { parentScopeMeta } from '@/lib/recompete/recompete-map-paths';
 import { UNATTRIBUTED_ORDERS_OR, parentIdOf, recordedParent, workEvidence, workTerms } from './parent-scope';
 import { vehicleOfParent } from './registry';
+import { normalizeStateCode } from '@/lib/utils/us-states';
+
+/** Whole-dollar floor the Map can carry (digits only, ≤ 15). null = not a valid floor. */
+export const MAX_MIN_VALUE = 999_999_999_999_999;
+export function validMinValue(v: unknown): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= MAX_MIN_VALUE ? v : null;
+}
 
 export const MINDY_MAP_BASE = 'https://getmindy.ai/opportunity-map';
 export const DEFAULT_LEAD_MONTHS = 60;
@@ -107,8 +114,10 @@ export function scopedParams(input: ScopedTaskOrderInput & { parent?: string }):
   if (input.work?.trim()) out.work = input.work.trim();
   if (input.naics?.trim()) out.naics = input.naics.trim();
   if (input.agency?.trim()) out.agency = input.agency.trim();
-  if (input.state?.trim()) out.state = input.state.trim().toUpperCase();
-  if (typeof input.min_value === 'number' && Number.isFinite(input.min_value) && input.min_value > 0) out.minValue = String(input.min_value);
+  // Normalized ONCE here, so the query, the applied_filters echo and the Map link all say the same code.
+  if (input.state?.trim()) out.state = normalizeStateCode(input.state) ?? input.state.trim().toUpperCase();
+  const floor = validMinValue(input.min_value);
+  if (floor != null) out.minValue = String(floor);
   out.leadMax = String(lead);
   return out;
 }
@@ -202,7 +211,7 @@ export async function searchScopedTaskOrders(input: ScopedTaskOrderInput, db: Db
       const ags = await parentAgenciesForPiid(db, raw);
       if (ags == null) { bareReason = `Could not look up parent PIID ${raw} (database error) — pass the full id CONT_IDV_${raw}_<AGENCY>.`; break; }
       if (ags.length === 1) resolved.push(`CONT_IDV_${raw}_${ags[0]}`);
-      else if (ags.length > 1) { bareReason = `PIID ${raw} appears as a parent under ${ags.length} agencies (${ags.join(', ')}); pass one exact id: ${ags.map((a) => `CONT_IDV_${raw}_${a}`).join(' or ')}.`; break; }
+      else if (ags.length > 1) { bareReason = `PIID ${raw} appears as a parent under ${ags.length > MAX_PIID_AGENCIES ? 'at least ' : ''}${ags.length} agencies (${ags.join(', ')}); pass one exact id: ${ags.map((a) => `CONT_IDV_${raw}_${a}`).join(' or ')}.`; break; }
       else { bareReason = `No orders in the population record PIID ${raw} as their parent, so its agency cannot be established. Pass the full id CONT_IDV_${raw}_<AGENCY>.`; break; }
     }
     if (!bareReason) parent = resolved.join(',');
