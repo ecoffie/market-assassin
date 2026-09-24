@@ -65,7 +65,7 @@ Scanned `user_pipeline`, `pursuit_monitor_state`, `pursuit_change_log`, `pursuit
 - Reference census: **14** references to DHS rows, **0** of them to a starred twin.
 - `sync-forecasts` is enabled, so a real `--go` attempt **refused before writing anything**.
 
-**Republish after migration:** `scripts/proofs/dhs-republish.pglite.ts` executes the sync's exact upsert shape
+**Republish after migration:** `src/lib/forecasts/dhs-republish.pglite.unit.test.ts` (blocking in CI/pre-push, pinned `@electric-sql/pglite` 0.5.8) executes the sync's exact upsert shape
 (`ON CONFLICT (source_agency, external_id) DO UPDATE`, payload without `created_at`) in PGlite. A republished
 `*F2026073903` updates the canonical `F2026073903` row: 1 row, the same uuid, the same `created_at`, the new content.
 The negative control shows that the raw starred id would have created a second row. The two facts it relies on (the

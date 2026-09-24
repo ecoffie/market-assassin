@@ -37,7 +37,7 @@ describe('every live DHS ingest path uses the canonical identity', () => {
   });
 });
 
-describe('post-migration republish updates the canonical row (executed: scripts/proofs/dhs-republish.pglite.ts)', () => {
+describe('post-migration republish updates the canonical row (executed: dhs-republish.pglite.unit.test.ts)', () => {
   const route = readFileSync(join(process.cwd(), 'src/app/api/cron/sync-forecasts/route.ts'), 'utf8');
   it('the sync upserts on (source_agency, external_id)', () => {
     expect(route).toContain(".upsert(batch, { onConflict: 'source_agency,external_id' })");
