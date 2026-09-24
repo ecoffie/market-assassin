@@ -2503,10 +2503,18 @@ const VIEWPORT_JS = `<script>
     return entry.promise;
   }
   // PUBLIC entry point. Schedules; every call in the same tick is ONE round (see contract 1).
-  function fetchView(){
+  function fetchView(opts){
     if(!_fvT0)_fvT0=_nowMs();
+    // MAPS P1 (2026-09-24): every call that is not a pan/zoom settling is a USER ACTION — acknowledge it NOW
+    // (market-feedback.ts), and let one frame paint that acknowledgement before the dispatch work runs.
+    // Measured on the preview: the dispatch task (URL building, bbox reads, request setup) ran 100–400 ms
+    // before anything could paint, so an acknowledgement written inside it was seen only when it ended.
+    // A pan is marked at its source (moveend) and is never acknowledged here.
+    if(!(opts&&opts.pan)&&window.__mf)window.__mf.ack();
     if(_fvTimer)return;
-    _fvTimer=setTimeout(function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); },0);
+    var run=function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); };
+    if(typeof requestAnimationFrame==='function'&&!document.hidden){ _fvTimer=-1; requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); }); }
+    else _fvTimer=setTimeout(run,0);
   }
   function _fetchViewNow(t0){
     if(window.__suppressFetchView) return;
@@ -3292,7 +3300,7 @@ const VIEWPORT_JS = `<script>
   // moveend can fire, it exists). Saved un-debounced: a cheap localStorage write, and the last
   // moveend of a pan/zoom is the one that sticks.
   map.on('moveend',function(){ try{ if(typeof window.__saveMapView==='function')window.__saveMapView(); }catch(e){}
-    clearTimeout(t); t=setTimeout(fetchView,450); });
+    clearTimeout(t); t=setTimeout(function(){ fetchView({pan:true}); },450); });   // a pan/zoom — never acknowledged as an action (market-feedback.ts)
   // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
   // buckets collapse/expand, but the rows in hand are still valid — so re-run render() on the
   // current OPPS immediately for snappy cross-threshold expand/collapse. The moveend handler above
@@ -3398,8 +3406,11 @@ const VIEWPORT_JS = `<script>
     var v=zsi.value.trim();
     clearTimeout(t2);
     if(v===Q)return;
+    // The Enter EVENT only acknowledges; the commit runs as the next task so the acknowledgement can paint
+    // first. The search panel's intent handler is deferred the same way and runs AFTER this one (same order
+    // as before), so a parsed intent still replaces the raw text.
     if(window.__mf)window.__mf.ack();
-    Q=v; window.__syncQueryUrl(true); fetchView();
+    setTimeout(function(){ Q=v; window.__syncQueryUrl(true); fetchView(); },0);
   });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
@@ -9745,12 +9756,14 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // Submitting from the bar (Enter): parse intent FIRST. If it resolved, hand it to the global
   // applier (VIEWPORT_JS scope) which sets FILT + lights the chips + refetches, and reflect the
   // cleaned keyword in the box. Otherwise fall through to the normal keyword search.
-  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q);
+  // Enter: deferred one task (Maps P1) so the acknowledgement the Enter event writes can paint before the
+  // intent parse / filter apply / capture work. It still runs after the keyword commit (queued first).
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); setTimeout(function(){ if(q){ pushRecent(q);
         var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
         if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
           var zi=document.getElementById('zsearchInput'); if(zi)zi.value=(typeof window.__lastAppliedKeyword==='string'?window.__lastAppliedKeyword:intent.keyword); // reflect the ACTUAL applied keyword (Players keeps the agency word)
         } else { captureSearch(q); }
-      } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
+      } close(); },0); } if(e.key==='Escape'){ close(); input.blur(); } });
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
     var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();
     var act=el.getAttribute('data-act');

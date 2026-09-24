@@ -70,7 +70,9 @@ export const MARKET_FEEDBACK_CSS =
   // The header count is the ANSWER — while it describes the previous market, "Updating your market…" takes
   // its place (the count is faded out, never shown beside it).
   + '.sortrow{position:relative}'
-  + '.mfb-upd{position:absolute;left:0;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:14px;font-weight:600;color:var(--sub,#6b7787);opacity:0;pointer-events:none;transition:opacity .1s}'
+  // No left/right: an absolutely positioned element placed BEFORE the count takes its static position — exactly
+  // where the count starts — with no geometry read (a read here forced a full-page layout per action).
+  + '.mfb-upd{position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:14px;font-weight:600;color:var(--sub,#6b7787);opacity:0;pointer-events:none;transition:opacity .1s}'
   + '.mfb-upd i{display:none;width:12px;height:12px;border:2px solid #d9dcf5;border-top-color:#5b3fd6;border-radius:50%;animation:mfbSpin .7s linear infinite}'
   // Visible is the DEFAULT state; animations only animate FROM hidden. The page honours
   // prefers-reduced-motion with a global animation:none — which must leave everything visible, not stuck at 0.
@@ -243,12 +245,11 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
 
   // "Updating your market…" — sits exactly over the header count while the count describes the old market.
   function upd(){
-    var u=$('mfbUpd'); if(u){ u.style.left=(($('rescount')||{}).offsetLeft||0)+'px'; return u; }
+    var u=$('mfbUpd'); if(u)return u;
     var rc=$('rescount'); if(!rc||!rc.parentNode)return null;
     u=document.createElement('div'); u.id='mfbUpd'; u.className='mfb-upd'; u.setAttribute('aria-live','polite');
     u.innerHTML='<i></i><span>Updating your market\u2026</span>';
-    rc.parentNode.insertBefore(u,rc.nextSibling);
-    u.style.left=rc.offsetLeft+'px';
+    rc.parentNode.insertBefore(u,rc);
     return u;
   }
   // Mark (or unmark) everything that shows the CURRENT market as old: pins, shapes, the list and both counts.
@@ -301,8 +302,16 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
     var q=$('mfbBootQ'); if(q&&R)q.textContent=R.q?('“'+R.q+'”'):'';
   }
 
+  // All DOM writes happen in ONE flush per frame. The earliest any write can be seen is the next frame anyway,
+  // and writing inside the page's own tasks (which then read geometry) forced a full synchronous layout each time.
+  var frame=0;
   function apply(){
     clearTimeout(timer); timer=0;
+    if(frame)return;
+    if(typeof requestAnimationFrame==='function'&&!document.hidden){ frame=requestAnimationFrame(function(){ frame=0; flush(); }); }
+    else flush();
+  }
+  function flush(){
     var t=now(), v=mfView(R,t,T), e=R?t-R.t0:0;
     setFlag('bar',v.bar,function(on){ var b=$('mfbBar'); if(b)b.classList.toggle('on',on); });
     setFlag('stale',v.stale,setStale);
@@ -323,6 +332,7 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
     if(v.intel||v.bootIntel)marks.push(e+T.ROTATE-((e-(v.intel?T.RICH:T.BOOT_INTEL))%T.ROTATE));
     if(marks.length)timer=setTimeout(apply,Math.max(16,Math.min.apply(null,marks)-e+5));
   }
+  window.__mfFlushNow=function(){ if(frame){ cancelAnimationFrame(frame); frame=0; } flush(); };   // tests
   function endBoot(why){
     if(!bootLive)return; bootLive=false;
     mark('boot:off',why);

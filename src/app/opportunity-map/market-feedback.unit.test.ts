@@ -129,7 +129,10 @@ function page(withBoot = false) {
     + MARKET_FEEDBACK_MAP_HTML + '</div></div>'
     + MARKET_FEEDBACK_JS + '</body></html>';
   const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true });
-  const w = dom.window as unknown as Window & { __mf: Record<string, (...a: unknown[]) => void>; __mfLog: Array<{ ev: string }> };
+  const raw = dom.window as unknown as Window & { __mf: Record<string, (...a: unknown[]) => void>; __mfLog: Array<{ ev: string }>; __mfFlushNow: () => void };
+  // DOM writes are batched into one flush per frame; tests flush after every report to read the result.
+  const mf = new Proxy(raw.__mf, { get: (t, k: string) => (...a: unknown[]) => { const r = t[k](...a); raw.__mfFlushNow(); return r; } });
+  const w = { __mf: mf, __mfLog: raw.__mfLog, raw };
   return { w, d: dom.window.document };
 }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -176,6 +179,7 @@ describe('controller — newest action wins; cancelled work never reports', () =
     w.__mf.horizon(4, 'forecast', { s: 'unavailable', total: null });
     w.__mf.horizon(4, 'open', { s: 'error' });
     await wait(T.BRANDED + 60);
+    w.raw.__mfFlushNow();
     expect(d.getElementById('mfbPanel')!.classList.contains('on')).toBe(true);
     const rows = [...d.querySelectorAll('#mfbRows .mfb-row')].map((r) => [r.getAttribute('data-s'), r.textContent]);
     expect(rows).toEqual([
@@ -233,8 +237,15 @@ describe('wiring in route.ts', () => {
     expect(src).toMatch(/if\(isContactMode\(MODE\)\)\{\s*if\(window\.__mf\)window\.__mf\.idle\(\);/);
     expect(src).toContain('if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle();');
   });
-  it('Enter commits now and acknowledges in the same event', () => {
-    expect(src).toMatch(/if\(window\.__mf\)window\.__mf\.ack\(\);\s*Q=v; window\.__syncQueryUrl\(true\); fetchView\(\);/);
+  it('Enter acknowledges in the event itself and commits in the next task (the acknowledgement paints first)', () => {
+    expect(src).toMatch(/if\(window\.__mf\)window\.__mf\.ack\(\);\s*setTimeout\(function\(\)\{ Q=v; window\.__syncQueryUrl\(true\); fetchView\(\); \},0\);/);
+    // the search panel's intent handler is deferred the same way, so it still runs AFTER the raw commit
+    expect(src).toContain("input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); setTimeout(function(){ if(q){ pushRecent(q);");
+  });
+  it('every non-pan fetchView is acknowledged and yields a frame before dispatch; a pan is tagged at its source', () => {
+    expect(src).toContain("if(!(opts&&opts.pan)&&window.__mf)window.__mf.ack();");
+    expect(src).toContain("requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); });");
+    expect(src).toContain("t=setTimeout(function(){ fetchView({pan:true}); },450);");
   });
   it('the feedback script is injected BEFORE VIEWPORT_JS; the boot transition only on the full page (never ?embed=)', () => {
     expect(src).toContain('MARKET_FEEDBACK_JS + VIEWPORT_JS');
