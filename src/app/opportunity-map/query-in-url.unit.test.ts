@@ -1,17 +1,20 @@
 /**
- * ROW 8 (canonical discovery Phase A) — THE TYPED QUERY LIVES IN THE URL.
+ * ROW 8 (canonical discovery Phase A) — THE DISCOVERY INTENT LIVES IN THE URL.
  *
- * Before: the search box wrote Q in memory only. Reload or share, and the query was gone — while
- * the scope-link IIFE had read `?q=` since 2026-08-15, so the READ half existed with no writer.
+ * Contract (Eric 2026-09-24, Option 1 — "the horizon is part of the URL contract"):
+ *  · whenever explicit discovery intent is written (typed q, agency suggestion, …) the URL carries
+ *    { q, agency, horizon } — horizon = the EXACT set of active horizons, comma-joined, reusing the
+ *    scope link's existing `horizon` param;
+ *  · the URL is authoritative: any explicit intent stands the localStorage restore down (the veto —
+ *    equality of one field never authorizes restoring the rest), and memory can never add an
+ *    agency / NAICS / state / horizon the URL does not state;
+ *  · an explicit horizon set is applied EXACTLY — never the Open-only fallback;
+ *  · a legacy ?q= with no horizon gets the documented default policy (all three on,
+ *    window.__horizons init, Eric 2026-08-12) — never browser memory;
+ *  · legacy agency/naics links without q or horizon keep their existing behaviour.
  *
- * Rules this pins (CLAUDE.md "Record links vs market links" + "Return continuity"):
- *  · a URL WRITER only — never an applier, never called from fetchView or __applySavedSearch, so a
- *    boot restore cannot rewrite the link that booted it (the 5,416 → 0 class needs a LATE reader);
- *  · a user-typed query drops ?ss= and record ids (two appliers on reload / a record link carrying
- *    a filter that can delete its record) and keeps every market + attribution param verbatim;
- *  · `?q=` is a market link → the localStorage restore stands down, FULL STOP — even when the
- *    memory holds the same q (Eric vetoed a field-equality exception, 2026-09-23). One applier.
- *
+ * It is a URL WRITER only, called from user actions — never from fetchView / __applySavedSearch /
+ * setMapMode — and a toggle during a scope-link restore never rewrites the link being restored.
  * The client JS ships inside TS template literals, so these tests EXECUTE the extracted source.
  */
 import { describe, it, expect } from 'vitest';
@@ -26,136 +29,141 @@ const between = (a: string, b: string, from = 0) => {
   return MAP.slice(s, e);
 };
 
-type QueryUrl = (search: string, q: string, drop?: boolean) => string;
+type Intent = { q?: string; agency?: string; horizon?: string };
+type QueryUrl = (search: string, intent: Intent, drop?: boolean) => string;
 const mapQueryUrl: QueryUrl = new Function(
-  cook(between('window.__mapQueryUrl=function(search,q,dropContext){', 'window.__syncQueryUrl=function('))
+  cook(between('window.__mapQueryUrl=function(search,intent,dropContext){', 'window.__syncQueryUrl=function('))
     .replace('window.__mapQueryUrl=', 'var f=') + '; return f;',
 )();
+const ALL = 'open,recompete,forecast';
 
-describe('__mapQueryUrl — the URL carries the query, nothing else changes', () => {
-  it('adds q to a bare URL and removes it when the box is cleared', () => {
-    expect(mapQueryUrl('', 'fiber optic', true)).toBe('?q=fiber%20optic');
-    expect(mapQueryUrl('?q=fiber%20optic', '', true)).toBe('');
+describe('__mapQueryUrl — q + agency + horizon written together, nothing else changes', () => {
+  it('writes q with the exact active horizon set', () => {
+    expect(mapQueryUrl('', { q: 'fiber optic', horizon: ALL }, true)).toBe('?q=fiber%20optic&horizon=open,recompete,forecast');
+    expect(mapQueryUrl('', { q: 'janitorial', horizon: 'forecast' }, true)).toBe('?q=janitorial&horizon=forecast');
+    expect(mapQueryUrl('', { q: 'x', horizon: 'open,recompete' }, true)).toBe('?q=x&horizon=open,recompete');
   });
-  it('is a no-op (returns the SAME string) when the URL already says this query', () => {
-    // byte-identical → __syncQueryUrl skips replaceState entirely; also reads "+" as a space,
-    // the same decoding the scope-link IIFE uses.
-    expect(mapQueryUrl('?q=fiber+optic&utm_source=x', 'fiber optic', true)).toBe('?q=fiber+optic&utm_source=x');
-    expect(mapQueryUrl('?opp=abc', '', true)).toBe('?opp=abc');   // nothing typed → record link untouched
+  it('writes agency (the canonical agency input) with the horizon', () => {
+    expect(mapQueryUrl('', { agency: 'VETERANS AFFAIRS', horizon: 'recompete' }, true))
+      .toBe('?agency=VETERANS%20AFFAIRS&horizon=recompete');
+  });
+  it('no q and no agency → no horizon either (a bare browse is not a link)', () => {
+    expect(mapQueryUrl('?q=old&horizon=open', { q: '', agency: '', horizon: 'open' }, true)).toBe('');
+    expect(mapQueryUrl('', { horizon: ALL }, true)).toBe('');
+  });
+  it('returns the SAME string when the URL already says exactly this', () => {
+    const s = '?q=fiber+optic&utm_source=x&horizon=open,recompete,forecast';
+    expect(mapQueryUrl(s, { q: 'fiber optic', horizon: ALL }, true)).toBe(s);
+    expect(mapQueryUrl('?opp=abc', { q: '', horizon: ALL }, true)).toBe('?opp=abc');   // nothing typed → record link untouched
+  });
+  it('a horizon change alone rewrites the link', () => {
+    expect(mapQueryUrl('?q=x&horizon=open,recompete,forecast', { q: 'x', horizon: 'forecast' }, false)).toBe('?q=x&horizon=forecast');
   });
   it('keeps market params and attribution verbatim (raw encoding preserved)', () => {
-    expect(mapQueryUrl('?agency=DEPT%20OF%20DEFENSE&naics=541512&utm_source=li', 'cyber', true))
-      .toBe('?agency=DEPT%20OF%20DEFENSE&naics=541512&utm_source=li&q=cyber');
+    expect(mapQueryUrl('?naics=541512&utm_source=li', { q: 'cyber', horizon: 'open' }, true))
+      .toBe('?naics=541512&utm_source=li&q=cyber&horizon=open');
   });
-  it('a typed query drops ?ss= and record ids + share markers (no second applier, no filtered record link)', () => {
-    expect(mapQueryUrl('?ss=42&utm_source=alert', 'janitorial', true)).toBe('?utm_source=alert&q=janitorial');
-    expect(mapQueryUrl('?opp=313550655dcd4916a7700cb5c8f0ab68&src=share&sh=abc', 'roofing', true)).toBe('?q=roofing');
-    for (const k of ['company', 'buyer', 'recompete', 'forecast']) {
-      expect(mapQueryUrl(`?${k}=X1`, 'hvac', true)).toBe('?q=hvac');
-    }
+  it('a typed intent drops ?ss= and record ids + share markers', () => {
+    expect(mapQueryUrl('?ss=42&utm_source=alert', { q: 'janitorial', horizon: 'open' }, true)).toBe('?utm_source=alert&q=janitorial&horizon=open');
+    expect(mapQueryUrl('?opp=313550655dcd4916a7700cb5c8f0ab68&src=share&sh=abc', { q: 'roofing', horizon: 'open' }, true)).toBe('?q=roofing&horizon=open');
   });
-  it('without dropContext, context params are kept', () => {
-    expect(mapQueryUrl('?ss=42', 'x', false)).toBe('?ss=42&q=x');
-  });
-  it('replaces an existing q rather than appending a second one', () => {
-    expect(mapQueryUrl('?q=old&naics=236220', 'new term', true)).toBe('?naics=236220&q=new%20term');
-  });
-  it('round-trips through the scope-link reader', () => {
-    const P = (search: string, k: string) => {
-      const m = search.match(new RegExp('[?&]' + k + '=([^&]+)'));
-      return m ? decodeURIComponent(m[1].split('+').join(' ')).trim() : '';
-    };
-    for (const q of ['fiber optic', 'a&b = c', '"medical billing" -dental', 'Département']) {
-      expect(P(mapQueryUrl('?naics=1', q, true), 'q')).toBe(q);
-    }
+  it('without dropContext (keep-in-sync calls), context params are kept', () => {
+    expect(mapQueryUrl('?ss=42', { q: 'x', horizon: 'open' }, false)).toBe('?ss=42&q=x&horizon=open');
   });
 });
 
 /** Run __syncQueryUrl against fake globals. */
-function sync(search: string, Q: string, mode = 'open', drop = true) {
+function sync(search: string, st: { Q?: string; agency?: string; horizons?: Record<string, boolean>; mode?: string }, drop = true, onlyIfIntent = false) {
   const writes: string[] = [];
-  const src = cook(between('window.__syncQueryUrl=function(dropContext){', '\n  var zsi=document.getElementById'));
-  const win: Record<string, unknown> = { __mapQueryUrl: mapQueryUrl, __mapMode: mode };
+  const hz = between('var HZ_ORDER=', 'window.__mapQueryUrl=function(');
+  const src = cook(hz + between('window.__syncQueryUrl=function(dropContext,onlyIfIntent){', '\n  var zsi=document.getElementById'));
+  const win: Record<string, unknown> = { __mapQueryUrl: mapQueryUrl, __mapMode: st.mode || 'open', __horizons: st.horizons || { open: true, recompete: true, forecast: true } };
   const loc = { search, pathname: '/opportunity-map', hash: '' };
   const hist = { state: null, replaceState: (_s: unknown, _t: string, url: string) => { writes.push(url); } };
-  new Function('window', 'location', 'history', 'Q', src + '; window.__syncQueryUrl(' + drop + ');')(win, loc, hist, Q);
+  new Function('window', 'location', 'history', 'Q', 'FILT', src + `; window.__syncQueryUrl(${drop},${onlyIfIntent});`)(
+    win, loc, hist, st.Q ?? '', { agency: st.agency ?? '' });
   return writes;
 }
 
-describe('__syncQueryUrl — one replaceState, only when the URL would change', () => {
-  it('writes the typed query with replaceState (no reload, no history entry)', () => {
-    expect(sync('', 'fiber optic')).toEqual(['/opportunity-map?q=fiber%20optic']);
+describe('__syncQueryUrl — reads Q, FILT.agency and the ACTIVE horizons', () => {
+  it('typed query on each horizon set → q + that exact horizon', () => {
+    expect(sync('', { Q: 'janitorial', horizons: { open: true, recompete: false, forecast: false } })).toEqual(['/opportunity-map?q=janitorial&horizon=open']);
+    expect(sync('', { Q: 'janitorial', horizons: { open: false, recompete: true, forecast: false } })).toEqual(['/opportunity-map?q=janitorial&horizon=recompete']);
+    expect(sync('', { Q: 'janitorial', horizons: { open: false, recompete: false, forecast: true } })).toEqual(['/opportunity-map?q=janitorial&horizon=forecast']);
+    expect(sync('', { Q: 'janitorial' })).toEqual(['/opportunity-map?q=janitorial&horizon=open,recompete,forecast']);
+  });
+  it('agency filter is written with the horizon', () => {
+    expect(sync('', { agency: 'VETERANS AFFAIRS', horizons: { open: true, recompete: false, forecast: false } }))
+      .toEqual(['/opportunity-map?agency=VETERANS%20AFFAIRS&horizon=open']);
+  });
+  it('onlyIfIntent: a horizon toggle on a bare browse writes nothing; on an intent URL it updates', () => {
+    expect(sync('', { Q: '', horizons: { open: false, recompete: true, forecast: false } }, false, true)).toEqual([]);
+    expect(sync('?q=x&horizon=open', { Q: 'x', horizons: { open: false, recompete: true, forecast: false } }, false, true))
+      .toEqual(['/opportunity-map?q=x&horizon=recompete']);
   });
   it('writes nothing when the URL already agrees', () => {
-    expect(sync('?q=cyber', 'cyber')).toEqual([]);
+    expect(sync('?q=cyber&horizon=open,recompete,forecast', { Q: 'cyber' })).toEqual([]);
   });
-  it('Players / DLA carry no q — and drop a stale Opportunities one', () => {
-    expect(sync('', 'booz allen', 'companies')).toEqual([]);
-    expect(sync('?q=biggest%20va%20contractors', 'booz allen', 'companies')).toEqual(['/opportunity-map']);
-    expect(sync('', '5330', 'dla')).toEqual([]);
-  });
-  it('recompete (Awarded) is a restorable dataset and carries q', () => {
-    expect(sync('', 'janitorial', 'recompete')).toEqual(['/opportunity-map?q=janitorial']);
+  it('Players / DLA carry no Opportunities intent (and drop a stale one)', () => {
+    expect(sync('', { Q: 'booz allen', mode: 'companies' })).toEqual([]);
+    expect(sync('?q=biggest&horizon=open', { Q: 'booz allen', mode: 'companies' })).toEqual(['/opportunity-map']);
   });
   it('never rewrites an embedded host page', () => {
-    expect(sync('?embed=1', 'x')).toEqual([]);
+    expect(sync('?embed=1', { Q: 'x' })).toEqual([]);
   });
 });
 
-describe('wiring — only USER actions write the URL', () => {
-  it('the search box input handler syncs after setting Q', () => {
-    expect(MAP).toContain("Q=zsi.value.trim(); window.__syncQueryUrl(true); fetchView();");
+describe('wiring — only USER actions (and keep-in-sync for an existing intent URL) write the URL', () => {
+  it('search box input handler syncs after setting Q', () => {
+    expect(MAP).toContain('Q=zsi.value.trim(); window.__syncQueryUrl(true); fetchView();');
   });
   it('the search bar Enter path (__applySearchFilters) syncs the applied keyword', () => {
     const fn = between('window.__applySearchFilters = function(intent){', '// (Removed the header source badge');
     expect(fn.indexOf('window.__syncQueryUrl(true)')).toBeGreaterThan(fn.indexOf('Q=_kw;'));
   });
-  it('the saved-search picker and Start fresh sync; __applySavedSearch itself NEVER does', () => {
-    const restorer = between('window.__applySavedSearch=function(ss){', '// Clear all: reset the server filters');
-    expect(restorer).not.toContain('__syncQueryUrl');
+  it('toggleHorizon keeps an intent URL in sync — but never during a scope-link restore', () => {
+    const t = between('window.toggleHorizon=function(h){', '\n  };\n');
+    expect(t).toContain('if(!window.__urlRestoring&&typeof window.__syncQueryUrl===\'function\')window.__syncQueryUrl(false,true);');
+  });
+  it('agency picker commit, Filters Apply and Filters Clear keep an intent URL in sync', () => {
+    expect(between('    function commit(){', 'btn.onclick=function(e){')).toContain('window.__syncQueryUrl(false,true)');
+    expect(MAP).toMatch(/_apply\.onclick=function\(\)\{[^\n]*__syncQueryUrl\(false,true\)/);
+    expect(between('if(_mfclr)_mfclr.onclick=function(){', '\n  };')).toContain('__syncQueryUrl(false,true)');
+  });
+  it('saved-search picker and Start fresh sync; __applySavedSearch / fetchView / setMapMode never do', () => {
+    expect(between('window.__applySavedSearch=function(ss){', '// Clear all: reset the server filters')).not.toContain('__syncQueryUrl');
     expect(between("else if(act==='saved'){", "else { location.href='/opportunity-map/saved'; }")).toContain('window.__syncQueryUrl(true)');
     expect(between("x.textContent='Start fresh';", 'pill.appendChild(x);')).toContain('window.__syncQueryUrl(true)');
-  });
-  it('fetchView never writes the URL (a state-derived writer would race boot restores)', () => {
     expect(between('function fetchView(){', '// FOOT OF THE FEED')).not.toContain('__syncQueryUrl');
-  });
-  it('setMapMode does not write the URL (it runs inside restores and the Players gate)', () => {
     expect(between('window.setMapMode=function(mode){', 'function syncHorizonBarVis(mode){')).not.toContain('__syncQueryUrl');
   });
   it('no other history write exists on the page', () => {
-    const writes = MAP.match(/history\.(replaceState|pushState)\(/g) || [];
-    expect(writes).toHaveLength(1);
+    expect(MAP.match(/history\.(replaceState|pushState)\(/g) || []).toHaveLength(1);
   });
 });
 
-// ── RETURN CONTINUITY × ?q= ──────────────────────────────────────────────────
-// Eric (2026-09-23): "Any explicit discovery intent in the URL suppresses conflicting/restored
-// discovery memory. Equality of one field does not authorize restoring the rest of the remembered
-// market." A ?q= is explicit current intent; the memory is implicit prior intent.
+// ── READ SIDE: scope link + return continuity at boot ─────────────────────────
 
 const NOW = Date.now();
-const mem = (q: string | undefined, ageH = 2) => JSON.stringify({
-  mode: 'open', t: NOW - ageH * 3600 * 1000,
-  filters: { agency: 'NAVY', state: 'VA', naics: '541512', ...(q === undefined ? {} : { q }), horizons: { open: true, recompete: false, forecast: false } },
-});
+const mem = (filters: Record<string, unknown>, ageH = 2) => JSON.stringify({ mode: 'open', t: NOW - ageH * 3600 * 1000, filters });
+const PRESETS = [{ name: 'Department of Veterans Affairs', match: 'VETERANS AFFAIRS' }, { name: 'Department of Defense', match: 'DEFENSE' }, { name: 'Department of Energy', match: 'ENERGY' }];
 
-/** The scope-link IIFE, run against fakes: which filters does it hand __applySavedSearch? */
-function runScope(search: string, stored: string | null) {
-  const applied: unknown[] = [];
+type Applied = { mode: string; filters: Record<string, unknown> };
+/** The scope-link IIFE against fakes: what reaches __applySavedSearch, and which horizon is isolated. */
+function runScope(search: string, opts: { restoringSeen?: boolean[] } = {}) {
+  const applied: Applied[] = []; const isolated: string[] = [];
   const start = MAP.indexOf("  (function(){ try{\n    function P(k){ var m=(location.search||'')");
   const end = MAP.indexOf('\n  }catch(e){} })();', start) + '\n  }catch(e){} })();'.length;
-  const win: Record<string, unknown> = {
-    __applySavedSearch: (ss: unknown) => applied.push(ss),
-    __AGENCY_PRESETS: [], __mapMode: 'open',
-  };
-  const ls = { getItem: (k: string) => (k === 'mi_map_last_search' ? stored : null) };
+  const win: Record<string, unknown> = { __AGENCY_PRESETS: PRESETS, __mapMode: 'open' };
+  win.__applySavedSearch = (ss: Applied) => { applied.push(ss); opts.restoringSeen?.push(!!win.__urlRestoring); };
+  win.__isolateHorizon = (h: string) => isolated.push(h);
   new Function('location', 'localStorage', 'window', 'setTimeout', cook(MAP.slice(start, end)))(
-    { search }, ls, win, (f: () => void) => f(),
+    { search }, { getItem: () => null }, win, (f: () => void) => f(),
   );
-  return applied;
+  return { applied, isolated, restoringAfter: win.__urlRestoring };
 }
 
-/** The return-continuity restorer, run against fakes. */
+/** The return-continuity restorer against fakes. */
 function runRestore(search: string, stored: string | null) {
   const applied: unknown[] = [];
   const start = MAP.indexOf('  // ── RETURN CONTINUITY: pick up the market you left');
@@ -163,65 +171,91 @@ function runRestore(search: string, stored: string | null) {
   const end = MAP.indexOf(marker, start) + marker.length;
   const meaningful = new Function(cook(between('window.__mapStateMeaningful=function(f,mode){', 'function _rememberMapState()'))
     .replace('window.__mapStateMeaningful=', 'var m=') + '; return m;')();
-  const win: Record<string, unknown> = {
-    __applySavedSearch: (ss: unknown) => applied.push(ss), __mapStateMeaningful: meaningful,
-    __track: () => {}, __STATE_NAMES: {},
-  };
+  const win: Record<string, unknown> = { __applySavedSearch: (ss: unknown) => applied.push(ss), __mapStateMeaningful: meaningful, __track: () => {}, __STATE_NAMES: {} };
   const el = () => ({ style: { cssText: '' }, setAttribute() {}, appendChild() {}, remove() {}, textContent: '', onclick: null });
   const doc = { querySelector: () => ({ appendChild() {} }), createElement: () => el(), body: { appendChild() {} } };
-  const ls = { getItem: (k: string) => (k === 'mi_map_last_search' ? stored : null) };
   new Function('location', 'localStorage', 'window', 'document', 'setTimeout', cook(MAP.slice(start, end)))(
-    { search }, ls, win, doc, (f: () => void) => f(),
+    { search }, { getItem: (k: string) => (k === 'mi_map_last_search' ? stored : null) }, win, doc, (f: () => void) => f(),
   );
   return applied;
 }
 
-/** Boot both, in page order, exactly as the page runs them. */
-function boot(search: string, stored: string | null) {
-  const scope = runScope(search, stored);
-  const restore = runRestore(search, stored);
-  const all = [...scope, ...restore] as { filters: Record<string, unknown> }[];
-  return { scope, restore, all };
-}
-
-describe('explicit ?q= beats memory — no field-equality exception', () => {
-  it('?q= EQUAL to the remembered q restores NOTHING else (only q, no agency/NAICS/state)', () => {
-    const b = boot('?q=ai%20governance', mem('ai governance'));
-    expect(b.restore).toHaveLength(0);
-    expect(b.all).toHaveLength(1);
-    expect(b.all[0].filters).toEqual({ q: 'ai governance' });
+describe('each horizon round-trips through the URL (writer → reader)', () => {
+  for (const set of ['open', 'recompete', 'forecast', 'open,recompete', 'recompete,forecast', ALL]) {
+    it(`horizon=${set}`, () => {
+      const on = set.split(',');
+      const url = mapQueryUrl('', { q: 'janitorial', horizon: set }, true);
+      const { applied, isolated } = runScope(url);
+      expect(applied).toHaveLength(1);
+      expect(applied[0].filters.q).toBe('janitorial');
+      expect(applied[0].filters.horizons).toEqual({ open: on.includes('open'), recompete: on.includes('recompete'), forecast: on.includes('forecast') });
+      expect(isolated).toEqual([]);                    // exact set — never the Open-only fallback
+      expect(applied[0].mode).toBe('open');            // a horizon is not a dataset switch
+    });
+  }
+  it('agency + horizon round-trips (single and pipe-joined agencies)', () => {
+    let r = runScope(mapQueryUrl('', { agency: 'VETERANS AFFAIRS', horizon: 'recompete' }, true));
+    expect(r.applied[0].filters).toMatchObject({ agency: 'VETERANS AFFAIRS', horizons: { open: false, recompete: true, forecast: false } });
+    r = runScope(mapQueryUrl('', { agency: 'DEFENSE|ENERGY', horizon: 'open' }, true));
+    expect(r.applied[0].filters.agency).toBe('DEFENSE|ENERGY');
   });
-  it('the same with "+" encoding (what a typed URL looks like)', () => {
-    const b = boot('?q=ai+governance', mem('ai governance'));
-    expect(b.restore).toHaveLength(0);
-    expect(b.all[0].filters).toEqual({ q: 'ai governance' });
+  it('junk horizon tokens are ignored; an all-junk set falls back to the legacy default', () => {
+    expect(runScope('?q=x&horizon=forecast,bogus').applied[0].filters.horizons).toEqual({ open: false, recompete: false, forecast: true });
+    expect(runScope('?q=x&horizon=bogus').applied[0].filters.horizons).toEqual({ open: true, recompete: true, forecast: true });
   });
-  it('?q= different from memory → q only', () => {
-    const b = boot('?q=fiber', mem('roofing'));
-    expect(b.restore).toHaveLength(0);
-    expect(b.all[0].filters).toEqual({ q: 'fiber' });
-  });
-  it('no memory → q only', () => {
-    expect(boot('?q=fiber', null).all.map((x) => x.filters)).toEqual([{ q: 'fiber' }]);
-  });
-  it('q + another market param → exactly the URL, never the memory', () => {
-    const b = boot('?q=fiber&naics=236220', mem('fiber'));
-    expect(b.restore).toHaveLength(0);
-    expect(b.all[0].filters).toEqual({ q: 'fiber', naics: '236220' });
-  });
-  it('the exception machinery is gone from the served source', () => {
-    expect(MAP).not.toContain('__qLinkOwnSession');
-    expect(MAP).not.toContain('__qLinkDeferred');
+  it('the restore guard is set while the scope link applies, and cleared after', () => {
+    const seen: boolean[] = [];
+    const r = runScope('?q=x&horizon=open', { restoringSeen: seen });
+    expect(seen).toEqual([true]);
+    expect(r.restoringAfter).toBe(false);
   });
 });
 
-describe('single applier at boot (unchanged)', () => {
-  it('a record link: neither applies', () => {
-    expect(boot('?opp=313550655dcd4916a7700cb5c8f0ab68', mem('fiber')).all).toHaveLength(0);
+describe('legacy links', () => {
+  it('?q= with NO horizon → the documented default policy: all three on (not memory, not Open-only)', () => {
+    const { applied, isolated } = runScope('?q=janitorial');
+    expect(applied[0].filters).toEqual({ q: 'janitorial', horizons: { open: true, recompete: true, forecast: true } });
+    expect(isolated).toEqual([]);
+    // The policy it cites is the real init default.
+    expect(MAP).toContain('window.__horizons={open:true,recompete:true,forecast:true};');
   });
-  it('a bare visit: only the memory applies', () => {
-    const b = boot('', mem('fiber'));
-    expect(b.scope).toHaveLength(0);
-    expect(b.restore).toHaveLength(1);
+  it('agency/naics links without q or horizon keep their existing behaviour (Open isolation, no horizons key)', () => {
+    let r = runScope('?agency=Department%20of%20Defense');
+    expect(r.applied[0].filters).toEqual({ agency: 'DEFENSE' });
+    expect(r.isolated).toEqual(['open']);
+    r = runScope('?naics=541512');
+    expect(r.applied[0].filters).toEqual({ naics: '541512' });
+    expect(r.isolated).toEqual(['open']);
+  });
+  it('explicit ?mode=recompete still isolates Recompete (dataset link unchanged)', () => {
+    const r = runScope('?mode=recompete');
+    expect(r.applied[0].mode).toBe('recompete');
+    expect(r.isolated).toEqual(['recompete']);
+  });
+});
+
+describe('memory never adds what the URL does not state', () => {
+  const MEM = mem({ agency: 'VETERANS AFFAIRS', state: 'VA', naics: '541512', q: 'ai governance', horizons: { open: false, recompete: true, forecast: false } });
+  it('?q= EQUAL to the remembered q restores NOTHING else — the URL applies alone', () => {
+    const url = '?q=ai+governance&horizon=forecast';
+    expect(runRestore(url, MEM)).toHaveLength(0);
+    const { applied } = runScope(url);
+    expect(applied).toHaveLength(1);
+    expect(applied[0].filters).toEqual({ q: 'ai governance', horizons: { open: false, recompete: false, forecast: true } });
+  });
+  it('legacy ?q= (no horizon) equal to memory: default horizons, no remembered agency/state/naics/horizon', () => {
+    expect(runRestore('?q=ai+governance', MEM)).toHaveLength(0);
+    expect(runScope('?q=ai+governance').applied[0].filters).toEqual({ q: 'ai governance', horizons: { open: true, recompete: true, forecast: true } });
+  });
+  it('an explicit horizon alone stands memory down', () => {
+    expect(runRestore('?horizon=open', MEM)).toHaveLength(0);
+  });
+  it('the exception machinery is gone', () => {
+    expect(MAP).not.toContain('__qLinkOwnSession');
+    expect(MAP).not.toContain('__qLinkDeferred');
+  });
+  it('a bare visit still restores the memory; a record link restores nothing (unchanged)', () => {
+    expect(runRestore('', MEM)).toHaveLength(1);
+    expect(runRestore('?opp=313550655dcd4916a7700cb5c8f0ab68', MEM)).toHaveLength(0);
   });
 });
