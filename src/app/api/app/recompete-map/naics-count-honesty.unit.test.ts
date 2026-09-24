@@ -19,10 +19,9 @@ import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
  * reachable from a unit test without a live database. The browser-level contract test
  * (scripts/verify-filter-contract.mjs) covers the end-to-end assertion.
  */
-const SRC = readFileSync(
-  join(process.cwd(), 'src/app/api/app/recompete-map/route.ts'),
-  'utf8',
-);
+// The route's reads moved verbatim into recompete-map-paths.ts in Recompete Gate 2 — guard both files.
+const SRC = readFileSync(join(process.cwd(), 'src/app/api/app/recompete-map/route.ts'), 'utf8')
+  + readFileSync(join(process.cwd(), 'src/lib/recompete/recompete-map-paths.ts'), 'utf8');
 
 describe('recompete-map NAICS count honesty', () => {
   it('does not widen a full NAICS code to its 3-digit family', () => {
@@ -53,6 +52,6 @@ describe('recompete-map NAICS count honesty', () => {
     // The contract only holds if one function feeds both. If the count query stops going
     // through applyFilters, the two can drift apart again silently.
     expect(SRC).toMatch(/totalForFiltersHead\s*=\s*applyFilters\(/);
-    expect(SRC).toMatch(/applyFilters\(db\.from\('recompete_opportunities'\)\.select\(COLS/);
+    expect(SRC).toMatch(/applyFilters\(db\.from\('recompete_opportunities'\)\.select\(RECOMPETE_PIN_COLS/);
   });
 });

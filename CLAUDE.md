@@ -421,15 +421,27 @@ Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Hi
 
 ### Maps P0 — speed + correctness (PR #1684, 2026-09-24, awaiting merge + prod re-measure)
 Record: **`tasks/maps-p0-performance-2026-09-24.md`** (before/after tables + Recompete query-plan evidence);
-audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. Do NOT build P1/P2 transition UX until P0 is prod-measured.
+audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. P1/P2 feedback UX is STACKED on this branch (`feat/maps-p1-feedback`).
 - `fetchView()` only SCHEDULES; same-tick calls = one round; rounds are generation-numbered — a superseded
   response never paints (`newest-action-wins.unit.test.ts`, red on the pre-fix route). Never reintroduce a
   busy/pendingFetch queue.
 - Horizons paint as each resolves; a horizon loading for a NEW intent reads `loading` (never an old number).
 - Horizon cache: pins keyed by full URL, market truth by URL minus bbox (5-min TTL). A pan with a held intent
   sends `counts=0` (`map-counts-mode.ts`) → server omits market-wide fields (`countsSkipped:true`, never 0/null).
-- ⚠️ Recompete keyword search is 18–21 unindexed regexes evaluated ~5×/request (EXPLAIN in the record).
-  Trigram indexes are RECOMMENDED, NOT APPLIED — needs Eric's approval.
+- Recompete keyword cost was fixed separately: Gate 1 trigram indexes (applied) + Gate 2 compute-once (see below).
+
+### Recompete map performance — Gate 1 ✅ LIVE · Gate 2 designed, NOT deployed (2026-09-24)
+Records: **`tasks/recompete-gate1-2026-09-24.md`** (prod before/after) · **`tasks/recompete-compute-once-design-2026-09-24.md`**.
+- Gate 1 (#1686, `70bd0600`): page order expiry → `contract_id` (tie-break only; the old order gave up to 5 different
+  pages across valid plans) · follow-ons read candidates-first (`map-follow-ons.ts`) so a text index can never drive
+  them · six `idx_recompete_trgm_*` GIN indexes APPLIED + verified valid. Prod: software license 11.96 → 4.45 s,
+  ai governance 2.82 → 0.98 s; `scripts/recompete-replay.ts` byte-identical 7/7 before/after.
+- Gate 2: `discovery/sql.ts` (SQL twin of `apply.ts`, closed grammar, bind params only) + `maps-recompete-sql.ts`
+  (ONE materialized evaluation → total/unmapped/in-view/pins/follow-ons). Parity oracle `scripts/recompete-parity.ts`
+  = 48/48 byte-identical. **Not wired into the route** — deployment shape (server-side pg via pooler, shadow mode)
+  awaits approval. Never add an RPC that accepts SQL text.
+- ⚠️ `npm run migrate -- --go` applies EVERY pending file. `20260924_saved_search_forecast_watermark.sql` (#1683) is
+  pending and its PR says do not apply it. Use `--only a.sql,b.sql` to apply a subset.
 
 ### Opportunity Share Attribution — ✅ FROZEN 2026-09-23 (PR #1652, merge `e8c88086`)
 Record: **`docs/engineering/opportunity-share-attribution.md`** — read it; do NOT re-audit.
@@ -447,7 +459,7 @@ Records: **`tasks/canonical-discovery-phase-a-2026-09-22.md`**, **`tasks/canonic
 `src/lib/opportunities/maps-open-discovery.ts`, record `tasks/canonical-discovery-phase-c-maps-open-2026-09-22.md`)
 consume it, and Maps Recompete (Phase C2, ✅ production-accepted + FROZEN 2026-09-23 on `566c1fe9`, `src/lib/recompete/maps-recompete-discovery.ts`, record
 `tasks/canonical-discovery-phase-c2-maps-recompete-2026-09-22.md`), and Maps Forecast (Phase C3, ✅ production-accepted + FROZEN 2026-09-23 on `d131e272`, `src/lib/opportunities/maps-forecast-discovery.ts` — forecast-map AND forecasts/unplaced; record
-`tasks/canonical-discovery-phase-c3-maps-forecast-2026-09-23.md`).** Saved searches and alerts do NOT yet. `applyMapFilters` still runs the old search
+`tasks/canonical-discovery-phase-c3-maps-forecast-2026-09-23.md`).** Saved-search **Forecast** has a canonical engine that ships **OFF** behind `SAVED_SEARCH_FORECAST_CANONICAL='true'`: plan = `src/lib/saved-searches/forecast-discovery.ts` (same builder as Maps Forecast), newness = the **created_at watermark** + per-buyer gap boundaries + publisher alert floors (`forecast-watermark.ts`, `src/lib/forecasts/alert-floor.ts`, migration `20260924_saved_search_forecast_watermark.sql` — NOT applied). ⚠️ Never use `last_synced_at` or a row window for Forecast newness. Large intervals resume via (created_at, id) keyset progress in `forecast_pending` — pages must stay under PostgREST's 1,000-row response cap (a 1,000-row page silently dropped 1,018/2,018 rows). Bulk forecast loads are refused by the `agency_forecasts_floor_guard` trigger unless the publisher is suspended (`runPublisherBackfill` / `scripts/forecast-publisher-floor.ts`); only the 5 daily crons may declare `forecastWriterClient('daily_sync')`. A daily run over 500 new rows for a floored publisher writes ZERO new rows and quarantines them (`forecast_refused_loads` → `scripts/forecast-refused-load.ts`). Canonical sends take a CAS lease: at-least-once, never exactly-once (record §12.5). Emergency rollback = unset the flag: canonically-measured searches get NO legacy Forecasts, Open continues. Records `tasks/saved-search-forecast-migration-2026-09-23.md` + `tasks/saved-search-forecast-watermark-2026-09-24.md`; blocked on DHS identity (#1682). Saved-search Open and daily alerts are NOT migrated. `applyMapFilters` still runs the old search
 brain for callers that pass `search` — Maps Open blanks `search`/`agency` and never lets it interpret.
 - Pipeline (locked): raw → structured intent → concept classification → eligibility → horizon policy → ranking.
 - ⛔ Do not fix Maps/saved-search search locally — migrate the consumer. The **cross-surface gate**

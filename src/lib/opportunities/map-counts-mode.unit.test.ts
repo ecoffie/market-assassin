@@ -10,6 +10,7 @@ import { wantsMarketCounts } from './map-counts-mode';
 
 const q = (s: string) => new URLSearchParams(s);
 const api = (r: string) => readFileSync(join(__dirname, '../../app/api/app', r, 'route.ts'), 'utf8');
+const recompetePaths = () => readFileSync(join(__dirname, '../recompete/recompete-map-paths.ts'), 'utf8');
 
 describe('wantsMarketCounts', () => {
   it('only an explicit counts=0 skips market truth; every other caller is unchanged', () => {
@@ -23,7 +24,8 @@ describe('wantsMarketCounts', () => {
 describe('each Maps horizon route honors counts=0 without fabricating a number', () => {
   for (const r of ['opportunity-map', 'recompete-map', 'forecast-map']) {
     it(`${r}: uses the shared switch and flags the skip`, () => {
-      const src = api(r);
+      // Gate 2 (2026-09-24): the recompete reads + body builder live in recompete-map-paths.ts.
+      const src = r === 'recompete-map' ? api(r) + recompetePaths() : api(r);
       expect(src).toContain("import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';");
       expect(src).toContain('const withCounts = wantsMarketCounts(p);');
       expect(src).toContain('countsSkipped: true');
@@ -38,8 +40,8 @@ describe('each Maps horizon route honors counts=0 without fabricating a number',
     expect(src).toContain('totalForFilters: withCounts || earlyFiltered ?');
   });
   it('recompete-map runs its market counts CONCURRENTLY with the pins (no sequential phase) and skips them on a pan', () => {
-    const src = api('recompete-map');
-    expect(src).toContain('await Promise.all([countsP, Promise.all([viewQ, followOnQ])])');
+    const src = recompetePaths();
+    expect(src).toContain('await Promise.all([countsP, Promise.all([viewQ, followOnP])])');
     expect(src).toMatch(/const countsP = withCounts\s*\?\s*Promise\.all\(\[totalForFiltersHead, unmappedHead\]\)/);
   });
   it('forecast-map reads pins + counts + unplaced rows concurrently, not four serial round-trips', () => {

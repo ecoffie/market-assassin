@@ -156,8 +156,24 @@ function renderCard(o: AlertOpp, last: boolean, search: SavedSearchLite): string
   </table>${last ? '' : '<div style="height:20px;line-height:20px;font-size:0">&nbsp;</div>'}`;
 }
 
-export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject: string; html: string; text: string } {
-  const n = opps.length;
+/**
+ * `coverageNotices` — canonical coverage copy (forecastCoverageNotice, src/lib/saved-searches/
+ * forecast-discovery.ts), rendered verbatim under the headline. It states what could NOT be measured,
+ * so the count above it is never read as covering an agency Mindy has no forecast publisher for.
+ * Omitted/empty → the email is byte-identical to the legacy output.
+ */
+export function buildEmail(
+  search: SavedSearchLite,
+  opps: AlertOpp[],
+  coverageNotices: readonly string[] = [],
+  opts: { total?: number } = {},
+): { subject: string; html: string; text: string } {
+  // `total` — the real number of new matches when `opps` carries only the evidence rows (the canonical Forecast
+  // engine sends a count plus 3 examples, never thousands of cards). Omitted → legacy behaviour (opps.length).
+  const n = opts.total ?? opps.length;
+  const notices = coverageNotices.filter(Boolean);
+  const noticeHtml = notices.map((t) =>
+    `<p style="font:400 12.5px/1.5 ${FONT};color:#7c5a10;background:#fdf6e3;border:1px solid #f1e3b8;border-radius:8px;padding:9px 12px;margin:14px 0 0 0;">${esc(t)}</p>`).join('');
   const subject = `${n} new ${n === 1 ? 'match' : 'matches'} in “${search.name}”`;
 
   // ── MAP ALERT (2026-08-19 editorial reset) ────────────────────────────────────────
@@ -176,6 +192,12 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
   const EVIDENCE = 3;
   const shown = opps.slice(0, EVIDENCE);
   const href = mapHref(search);
+  // A caller-supplied `total` (the canonical Forecast interval summary) can be far larger than the rows rendered.
+  // Say plainly that the rows are examples, so 3 cards are never read as everything that is new. Legacy callers
+  // (no `total`) are unchanged.
+  const examplesNote = opts.total !== undefined && n > shown.length && shown.length > 0
+    ? `${shown.length === 1 ? 'This is 1 example' : `These are ${shown.length} examples`}, not the complete set of ${n.toLocaleString('en-US')} new matches.`
+    : '';
 
   const rows = shown.map((o) => {
     // URGENCY IS DATA, not decoration: a deadline inside 7 days is the single fact most
@@ -215,14 +237,15 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
       </table>
       <div style="height:1px;background:#e5e7eb;margin:12px 0 22px 0;"></div>
 
-      <div style="font:700 22px/1.3 ${FONT};color:#0f172a;margin:0;">${n} new ${n === 1 ? 'match' : 'matches'} in &ldquo;${esc(search.name)}&rdquo;</div>
+      <div style="font:700 22px/1.3 ${FONT};color:#0f172a;margin:0;">${n} new ${n === 1 ? 'match' : 'matches'} in &ldquo;${esc(search.name)}&rdquo;</div>${noticeHtml}
 
       <p style="margin:18px 0 0 0;">
         <a href="${href}" style="display:inline-block;background:#4f46e5;color:#ffffff;font:700 14px/1 ${FONT};padding:13px 24px;border-radius:8px;text-decoration:none;">Open updated map &rarr;</a>
       </p>
       <p style="font:400 12px/1.5 ${FONT};color:#94a3b8;margin:9px 0 0 0;">Your filters are restored exactly as you saved them.</p>
 
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin-top:26px;">
+      ${examplesNote ? `<p style="font:400 12.5px/1.5 ${FONT};color:#64748b;margin:26px 0 0 0;">${esc(examplesNote)}</p>` : ''}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin-top:${examplesNote ? 10 : 26}px;">
         ${rows}
       </table>
       ${n > EVIDENCE ? `<p style="font:600 13px/1.5 ${FONT};margin:16px 0 0 0;"><a href="${mapHref(search)}" style="color:#4f46e5;text-decoration:none;">See all ${n} &mdash; view all on the map &rarr;</a></p>` : ''}
@@ -234,7 +257,9 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
   </div>`;
 
   const text = `${n} new ${n === 1 ? 'match' : 'matches'} in "${search.name}"\n\n`
+    + notices.map((t) => `Note: ${t}\n\n`).join('')
     + `Open updated map (your filters restored): ${mapHref(search, undefined, '&')}\n\n`
+    + (examplesNote ? `${examplesNote}\n\n` : '')
     + shown.map((o) => {
       const due = o.response_deadline ? fmtDate(o.response_deadline) : '—';
       const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()];

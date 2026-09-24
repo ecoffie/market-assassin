@@ -43,9 +43,21 @@ export type SavedSearchAlertEvalCounts = {
   noMatches?: number;
   skippedNotDue?: number;
   skippedNoProfile?: number;
+  /** Canonical engine: another execution holds this row's send lease or moved its state first (send-claim.ts). */
+  skippedConcurrent?: number;
   failed?: number;
   failureClass?: SavedSearchAlertFailureClass;
+  /**
+   * Canonical Forecast engine only: the coverage state this evaluation measured. Tallied separately
+   * from noMatches so an unavailable horizon is never reported as "checked, nothing found".
+   */
+  forecastCoverage?: SavedSearchForecastCoverageState;
 };
+
+export type SavedSearchForecastCoverageState =
+  | 'covered' | 'partial' | 'unavailable' | 'needs_refinement' | 'baseline' | 'in_progress'
+  /** Legacy engine skipped Forecast delivery for a canonically-measured search (emergency rollback). */
+  | 'rollback_paused';
 
 export type SavedSearchAlertDueRow = {
   id: string;
@@ -57,6 +69,11 @@ export type SavedSearchAlertDueRow = {
   last_seen_notice_ids: string[];
   total_alerts_sent: number;
   last_alerted_at: string | null;
+  /** Canonical Forecast engine only (selected only when that engine runs). */
+  forecast_seen_through?: string | null;
+  forecast_gap_since?: Record<string, string> | null;
+  forecast_pending?: unknown;
+  forecast_alert_claim_until?: string | null;
 };
 
 export type SavedSearchAlertDrainResult = {
@@ -69,11 +86,14 @@ export type SavedSearchAlertDrainResult = {
   noMatches: number;
   skippedNotDue: number;
   skippedNoProfile: number;
+  skippedConcurrent: number;
   failed: number;
   remaining: number | null;
   batches: number;
   stopReason: SavedSearchAlertDrainStopReason;
   failuresByClass: Partial<Record<SavedSearchAlertFailureClass, number>>;
+  /** Canonical Forecast engine only; empty under the legacy engine. */
+  forecastCoverage: Partial<Record<SavedSearchForecastCoverageState, number>>;
   errorSummary?: string;
 };
 
@@ -120,6 +140,10 @@ function addCounts(
   results.noMatches += counts.noMatches ?? 0;
   results.skippedNotDue += counts.skippedNotDue ?? 0;
   results.skippedNoProfile += counts.skippedNoProfile ?? 0;
+  results.skippedConcurrent += counts.skippedConcurrent ?? 0;
+  if (counts.forecastCoverage) {
+    results.forecastCoverage[counts.forecastCoverage] = (results.forecastCoverage[counts.forecastCoverage] || 0) + 1;
+  }
   if (counts.failed) {
     results.failed += counts.failed;
     if (counts.failureClass) {
@@ -187,11 +211,13 @@ export async function runSavedSearchAlertDrain(opts: {
     noMatches: 0,
     skippedNotDue: 0,
     skippedNoProfile: 0,
+    skippedConcurrent: 0,
     failed: 0,
     remaining: null,
     batches: 0,
     stopReason: 'drained',
     failuresByClass: {},
+    forecastCoverage: {},
   };
 
   drain: while (true) {
