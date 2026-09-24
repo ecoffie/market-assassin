@@ -6,7 +6,7 @@
  */
 import { config } from 'dotenv';
 import { Client } from 'pg';
-config({ path: '.env.local' });
+config({ path: '.env.local', quiet: true });
 
 const arg = (n: string) => (process.argv.includes(n) ? process.argv[process.argv.indexOf(n) + 1] : null);
 const pct = (xs: number[], p: number) => {
