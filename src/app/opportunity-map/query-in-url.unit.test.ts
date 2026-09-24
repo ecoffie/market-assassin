@@ -9,8 +9,8 @@
  *    boot restore cannot rewrite the link that booted it (the 5,416 → 0 class needs a LATE reader);
  *  · a user-typed query drops ?ss= and record ids (two appliers on reload / a record link carrying
  *    a filter that can delete its record) and keeps every market + attribution param verbatim;
- *  · `?q=` is a market link → the localStorage restore stands down — EXCEPT when it is this
- *    visitor's own session (memory holds exactly that q), decided ONCE so only one applier runs.
+ *  · `?q=` is a market link → the localStorage restore stands down, FULL STOP — even when the
+ *    memory holds the same q (Eric vetoed a field-equality exception, 2026-09-23). One applier.
  *
  * The client JS ships inside TS template literals, so these tests EXECUTE the extracted source.
  */
@@ -129,41 +129,14 @@ describe('wiring — only USER actions write the URL', () => {
 });
 
 // ── RETURN CONTINUITY × ?q= ──────────────────────────────────────────────────
-
-const ownSession = new Function(
-  cook(between('window.__qLinkOwnSession=function(qs,raw,now){', '\n  (function(){ try{'))
-    .replace('window.__qLinkOwnSession=', 'var f=') + '; return f;',
-)() as (qs: string, raw: string, now: number) => boolean;
+// Eric (2026-09-23): "Any explicit discovery intent in the URL suppresses conflicting/restored
+// discovery memory. Equality of one field does not authorize restoring the rest of the remembered
+// market." A ?q= is explicit current intent; the memory is implicit prior intent.
 
 const NOW = Date.now();
-const mem = (q: string | undefined, ageH = 2, extra: Record<string, unknown> = {}) => JSON.stringify({
+const mem = (q: string | undefined, ageH = 2) => JSON.stringify({
   mode: 'open', t: NOW - ageH * 3600 * 1000,
-  filters: { agency: 'NAVY', state: 'VA', ...(q === undefined ? {} : { q }), horizons: { open: true, recompete: false, forecast: false }, ...extra },
-});
-
-describe('__qLinkOwnSession — a ?q= this visitor wrote', () => {
-  it('true only when the memory holds EXACTLY the URL query', () => {
-    expect(ownSession('?q=fiber%20optic', mem('fiber optic'), NOW)).toBe(true);
-    expect(ownSession('?q=fiber+optic&utm_source=x', mem('fiber optic'), NOW)).toBe(true);
-    expect(ownSession('?q=fiber', mem('fiber optic'), NOW)).toBe(false);   // a colleague's link
-    expect(ownSession('?q=fiber', mem(undefined), NOW)).toBe(false);
-  });
-  it('any other record/market param → an explicit link, never the memory', () => {
-    for (const p of ['naics=541512', 'agency=NAVY', 'ss=1', 'opp=abc', 'state=VA', 'mode=recompete', 'embed=1']) {
-      expect(ownSession(`?q=fiber&${p}`, mem('fiber'), NOW), p).toBe(false);
-    }
-  });
-  it('stale (>30d), undated or unreadable memory is not a session', () => {
-    expect(ownSession('?q=fiber', mem('fiber', 31 * 24), NOW)).toBe(false);
-    expect(ownSession('?q=fiber', JSON.stringify({ mode: 'open', filters: { q: 'fiber' } }), NOW)).toBe(false);
-    expect(ownSession('?q=fiber', '{not json', NOW)).toBe(false);
-    expect(ownSession('?q=fiber', '', NOW)).toBe(false);
-    expect(ownSession('', mem(''), NOW)).toBe(false);
-  });
-  it('compares against the 120-char slice _mapState stores', () => {
-    const long = 'x'.repeat(150);
-    expect(ownSession('?q=' + long, mem(long.slice(0, 120)), NOW)).toBe(true);
-  });
+  filters: { agency: 'NAVY', state: 'VA', naics: '541512', ...(q === undefined ? {} : { q }), horizons: { open: true, recompete: false, forecast: false } },
 });
 
 /** The scope-link IIFE, run against fakes: which filters does it hand __applySavedSearch? */
@@ -172,7 +145,6 @@ function runScope(search: string, stored: string | null) {
   const start = MAP.indexOf("  (function(){ try{\n    function P(k){ var m=(location.search||'')");
   const end = MAP.indexOf('\n  }catch(e){} })();', start) + '\n  }catch(e){} })();'.length;
   const win: Record<string, unknown> = {
-    __qLinkOwnSession: ownSession,
     __applySavedSearch: (ss: unknown) => applied.push(ss),
     __AGENCY_PRESETS: [], __mapMode: 'open',
   };
@@ -180,11 +152,11 @@ function runScope(search: string, stored: string | null) {
   new Function('location', 'localStorage', 'window', 'setTimeout', cook(MAP.slice(start, end)))(
     { search }, ls, win, (f: () => void) => f(),
   );
-  return { applied, deferred: win.__qLinkDeferred };
+  return applied;
 }
 
-/** The return-continuity restorer, run with the scope IIFE's decision. */
-function runRestore(search: string, stored: string | null, deferred: unknown) {
+/** The return-continuity restorer, run against fakes. */
+function runRestore(search: string, stored: string | null) {
   const applied: unknown[] = [];
   const start = MAP.indexOf('  // ── RETURN CONTINUITY: pick up the market you left');
   const marker = '\n  }catch(e){} })();';
@@ -193,9 +165,8 @@ function runRestore(search: string, stored: string | null, deferred: unknown) {
     .replace('window.__mapStateMeaningful=', 'var m=') + '; return m;')();
   const win: Record<string, unknown> = {
     __applySavedSearch: (ss: unknown) => applied.push(ss), __mapStateMeaningful: meaningful,
-    __qLinkOwnSession: ownSession, __track: () => {}, __STATE_NAMES: {},
+    __track: () => {}, __STATE_NAMES: {},
   };
-  if (deferred !== undefined) win.__qLinkDeferred = deferred;
   const el = () => ({ style: { cssText: '' }, setAttribute() {}, appendChild() {}, remove() {}, textContent: '', onclick: null });
   const doc = { querySelector: () => ({ appendChild() {} }), createElement: () => el(), body: { appendChild() {} } };
   const ls = { getItem: (k: string) => (k === 'mi_map_last_search' ? stored : null) };
@@ -205,44 +176,52 @@ function runRestore(search: string, stored: string | null, deferred: unknown) {
   return applied;
 }
 
-/** Boot both, in page order, sharing ONE window decision — exactly how the page runs them. */
+/** Boot both, in page order, exactly as the page runs them. */
 function boot(search: string, stored: string | null) {
-  const s = runScope(search, stored);
-  const r = runRestore(search, stored, s.deferred);
-  return { scope: s.applied, restore: r, total: s.applied.length + r.length };
+  const scope = runScope(search, stored);
+  const restore = runRestore(search, stored);
+  const all = [...scope, ...restore] as { filters: Record<string, unknown> }[];
+  return { scope, restore, all };
 }
 
-describe('exactly ONE applier at boot — never both', () => {
-  it('own session: the memory restores the WHOLE market, the scope link stands down', () => {
-    const b = boot('?q=fiber%20optic', mem('fiber optic'));
-    expect(b.total).toBe(1);
-    expect(b.scope).toHaveLength(0);
-    const f = (b.restore[0] as { filters: Record<string, unknown> }).filters;
-    expect(f).toMatchObject({ q: 'fiber optic', agency: 'NAVY', state: 'VA' });
-  });
-  it('a shared link (someone else\'s memory) applies ONLY the query — the link wins', () => {
-    const b = boot('?q=fiber%20optic', mem('roofing'));
-    expect(b.total).toBe(1);
+describe('explicit ?q= beats memory — no field-equality exception', () => {
+  it('?q= EQUAL to the remembered q restores NOTHING else (only q, no agency/NAICS/state)', () => {
+    const b = boot('?q=ai%20governance', mem('ai governance'));
     expect(b.restore).toHaveLength(0);
-    expect((b.scope[0] as { filters: Record<string, unknown> }).filters).toEqual({ q: 'fiber optic' });
+    expect(b.all).toHaveLength(1);
+    expect(b.all[0].filters).toEqual({ q: 'ai governance' });
   });
-  it('no memory at all → the query alone', () => {
-    const b = boot('?q=fiber', null);
-    expect(b.total).toBe(1);
-    expect((b.scope[0] as { filters: Record<string, unknown> }).filters).toEqual({ q: 'fiber' });
-  });
-  it('q + another market param is never own-session, even with a matching memory', () => {
-    const b = boot('?q=fiber&naics=541512', mem('fiber'));
-    expect(b.total).toBe(1);
+  it('the same with "+" encoding (what a typed URL looks like)', () => {
+    const b = boot('?q=ai+governance', mem('ai governance'));
     expect(b.restore).toHaveLength(0);
-    expect((b.scope[0] as { filters: Record<string, unknown> }).filters).toMatchObject({ q: 'fiber', naics: '541512' });
+    expect(b.all[0].filters).toEqual({ q: 'ai governance' });
   });
-  it('a record link still stands the memory down (unchanged)', () => {
-    expect(boot('?opp=313550655dcd4916a7700cb5c8f0ab68', mem('fiber')).total).toBe(0);
+  it('?q= different from memory → q only', () => {
+    const b = boot('?q=fiber', mem('roofing'));
+    expect(b.restore).toHaveLength(0);
+    expect(b.all[0].filters).toEqual({ q: 'fiber' });
   });
-  it('a bare visit still restores the memory (unchanged)', () => {
+  it('no memory → q only', () => {
+    expect(boot('?q=fiber', null).all.map((x) => x.filters)).toEqual([{ q: 'fiber' }]);
+  });
+  it('q + another market param → exactly the URL, never the memory', () => {
+    const b = boot('?q=fiber&naics=236220', mem('fiber'));
+    expect(b.restore).toHaveLength(0);
+    expect(b.all[0].filters).toEqual({ q: 'fiber', naics: '236220' });
+  });
+  it('the exception machinery is gone from the served source', () => {
+    expect(MAP).not.toContain('__qLinkOwnSession');
+    expect(MAP).not.toContain('__qLinkDeferred');
+  });
+});
+
+describe('single applier at boot (unchanged)', () => {
+  it('a record link: neither applies', () => {
+    expect(boot('?opp=313550655dcd4916a7700cb5c8f0ab68', mem('fiber')).all).toHaveLength(0);
+  });
+  it('a bare visit: only the memory applies', () => {
     const b = boot('', mem('fiber'));
-    expect(b.total).toBe(1);
+    expect(b.scope).toHaveLength(0);
     expect(b.restore).toHaveLength(1);
   });
 });

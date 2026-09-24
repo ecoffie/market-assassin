@@ -8862,40 +8862,13 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // a synthetic {mode, filters, bbox}. So URL params and saved-search JSON share ONE vocabulary
   // and one apply path; a second hand-rolled FILT write here is exactly the lib-duplicate drift
   // this codebase keeps getting bitten by. No bbox: a scope link should not move the viewport.
-  // ── ?q= THAT THIS VISITOR WROTE (row 8, 2026-09-23) ─────────────────────────────────
-  // The search bar now writes the query into the URL (window.__syncQueryUrl, VIEWPORT_JS). A
-  // ?q= is a MARKET link, so return continuity stands down for it — correct for a SHARED link.
-  // But the URL carries only the query, while this visitor's remembered market also holds the
-  // agency / NAICS / state / horizons they set around it. Without this, writing ?q= would make a
-  // plain reload WORSE than before (the memory used to bring all of it back).
-  //
-  // So: when the URL names ONLY a query, and this browser's own remembered market (fresh, same
-  // 30-day horizon) has EXACTLY that query, the link is this visitor's own session and the memory
-  // restores it — the URL's query is honoured verbatim, the memory adds only what the URL does not
-  // say. Anyone else opening the link (different or no memory) gets exactly ?q= — the link wins.
-  //
-  // ONE decision, ONE applier: the scope-link IIFE computes it first and stands down; the
-  // restorer reads the SAME decision (window.__qLinkDeferred) instead of re-deriving it, so the
-  // two can never both apply (the second-writer race this page has already paid for once).
-  window.__qLinkOwnSession=function(qs,raw,now){
-    try{
-      qs=String(qs||'');
-      var m=qs.match(/[?&]q=([^&]+)/); if(!m)return false;
-      var q=decodeURIComponent(m[1].split('+').join(' ')).trim(); if(!q)return false;
-      // Any OTHER record/market/embed param → an explicit link; the memory never overrides it.
-      if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return false;
-      var st=JSON.parse(raw||'null');
-      if(!st||typeof st!=='object'||!st.filters||typeof st.filters!=='object')return false;
-      var age=(typeof st.t==='number')?(now-st.t):null;
-      if(age==null||age<0||age>30*24*3600*1000)return false;
-      return String(st.filters.q||'')===q.slice(0,120);
-    }catch(e){ return false; }
-  };
+  // ⚠️ A ?q= written by the search bar (window.__syncQueryUrl) is an EXPLICIT market link like any
+  // other: it stands the RETURN CONTINUITY restorer down, even when this browser's memory holds the
+  // same q. Eric (2026-09-23): "Any explicit discovery intent in the URL suppresses conflicting/
+  // restored discovery memory. Equality of one field does not authorize restoring the rest of the
+  // remembered market." So a reload after typing restores the query only — by design.
   (function(){ try{
     function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
-    var _lsRaw=''; try{ _lsRaw=localStorage.getItem('mi_map_last_search')||''; }catch(e){}
-    window.__qLinkDeferred=!!window.__qLinkOwnSession(location.search||'',_lsRaw,Date.now());
-    if(window.__qLinkDeferred)return;   // the RETURN CONTINUITY restorer below owns this link
     var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
     // office + subAgency: both Filters controls got real PICKERS on 2026-08-17, but neither was
     // readable from a URL — measured on prod, ?office=SPE7M1 and ?subAgency=DEPT OF THE NAVY left
@@ -8997,13 +8970,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // A MARKET link (?ss= ?agency= ?naics= ?strategy= ...) already says which
     // market to open. Either way the URL is the more recent instruction and the
     // memory stands down. ?embed= is a host page's map, not this visitor's.
-    //
-    // ONE exception, decided ONCE by the scope-link IIFE above (window.__qLinkDeferred): a ?q=
-    // this visitor's own remembered market already holds verbatim — see __qLinkOwnSession.
+    // NO field-equality exception: a ?q= equal to the remembered q still stands the memory down
+    // (Eric 2026-09-23 — equality of one field never authorizes restoring the rest).
+    if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
     var raw=''; try{ raw=localStorage.getItem('mi_map_last_search')||''; }catch(e){ return; }
-    var ownQ=(typeof window.__qLinkDeferred==='boolean')?window.__qLinkDeferred
-      :(typeof window.__qLinkOwnSession==='function'&&window.__qLinkOwnSession(qs,raw,Date.now()));
-    if(!ownQ&&/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
     if(!raw)return;
     var st=null; try{ st=JSON.parse(raw); }catch(e){ return; }
     if(!st||typeof st!=='object')return;
@@ -9057,7 +9027,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           // Half-clearing (filters but not q, or filters but not horizons) would leave
           // the map narrowed with nothing on screen saying so.
           try{ window.__applySavedSearch({mode:'open',filters:{horizons:{open:true,recompete:false,forecast:false}}}); }catch(e){}
-          // …and the URL: a restored own-session ?q= would otherwise bring the query back on reload.
+          // …and the URL: a query typed since the restore would otherwise come back on reload.
           try{ if(window.__syncQueryUrl)window.__syncQueryUrl(true); }catch(e){}
           try{ pill.remove(); }catch(e){}
         };
