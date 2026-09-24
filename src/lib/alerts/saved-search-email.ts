@@ -156,8 +156,21 @@ function renderCard(o: AlertOpp, last: boolean, search: SavedSearchLite): string
   </table>${last ? '' : '<div style="height:20px;line-height:20px;font-size:0">&nbsp;</div>'}`;
 }
 
-export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject: string; html: string; text: string } {
+/**
+ * `coverageNotices` — canonical coverage copy (forecastCoverageNotice, src/lib/saved-searches/
+ * forecast-discovery.ts), rendered verbatim under the headline. It states what could NOT be measured,
+ * so the count above it is never read as covering an agency Mindy has no forecast publisher for.
+ * Omitted/empty → the email is byte-identical to the legacy output.
+ */
+export function buildEmail(
+  search: SavedSearchLite,
+  opps: AlertOpp[],
+  coverageNotices: readonly string[] = [],
+): { subject: string; html: string; text: string } {
   const n = opps.length;
+  const notices = coverageNotices.filter(Boolean);
+  const noticeHtml = notices.map((t) =>
+    `<p style="font:400 12.5px/1.5 ${FONT};color:#7c5a10;background:#fdf6e3;border:1px solid #f1e3b8;border-radius:8px;padding:9px 12px;margin:14px 0 0 0;">${esc(t)}</p>`).join('');
   const subject = `${n} new ${n === 1 ? 'match' : 'matches'} in “${search.name}”`;
 
   // ── MAP ALERT (2026-08-19 editorial reset) ────────────────────────────────────────
@@ -215,7 +228,7 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
       </table>
       <div style="height:1px;background:#e5e7eb;margin:12px 0 22px 0;"></div>
 
-      <div style="font:700 22px/1.3 ${FONT};color:#0f172a;margin:0;">${n} new ${n === 1 ? 'match' : 'matches'} in &ldquo;${esc(search.name)}&rdquo;</div>
+      <div style="font:700 22px/1.3 ${FONT};color:#0f172a;margin:0;">${n} new ${n === 1 ? 'match' : 'matches'} in &ldquo;${esc(search.name)}&rdquo;</div>${noticeHtml}
 
       <p style="margin:18px 0 0 0;">
         <a href="${href}" style="display:inline-block;background:#4f46e5;color:#ffffff;font:700 14px/1 ${FONT};padding:13px 24px;border-radius:8px;text-decoration:none;">Open updated map &rarr;</a>
@@ -234,6 +247,7 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
   </div>`;
 
   const text = `${n} new ${n === 1 ? 'match' : 'matches'} in "${search.name}"\n\n`
+    + notices.map((t) => `Note: ${t}\n\n`).join('')
     + `Open updated map (your filters restored): ${mapHref(search, undefined, '&')}\n\n`
     + shown.map((o) => {
       const due = o.response_deadline ? fmtDate(o.response_deadline) : '—';

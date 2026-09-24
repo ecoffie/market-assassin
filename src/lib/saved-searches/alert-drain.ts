@@ -45,7 +45,14 @@ export type SavedSearchAlertEvalCounts = {
   skippedNoProfile?: number;
   failed?: number;
   failureClass?: SavedSearchAlertFailureClass;
+  /**
+   * Canonical Forecast engine only: the coverage state this evaluation measured. Tallied separately
+   * from noMatches so an unavailable horizon is never reported as "checked, nothing found".
+   */
+  forecastCoverage?: SavedSearchForecastCoverageState;
 };
+
+export type SavedSearchForecastCoverageState = 'covered' | 'partial' | 'unavailable' | 'needs_refinement';
 
 export type SavedSearchAlertDueRow = {
   id: string;
@@ -74,6 +81,8 @@ export type SavedSearchAlertDrainResult = {
   batches: number;
   stopReason: SavedSearchAlertDrainStopReason;
   failuresByClass: Partial<Record<SavedSearchAlertFailureClass, number>>;
+  /** Canonical Forecast engine only; empty under the legacy engine. */
+  forecastCoverage: Partial<Record<SavedSearchForecastCoverageState, number>>;
   errorSummary?: string;
 };
 
@@ -120,6 +129,9 @@ function addCounts(
   results.noMatches += counts.noMatches ?? 0;
   results.skippedNotDue += counts.skippedNotDue ?? 0;
   results.skippedNoProfile += counts.skippedNoProfile ?? 0;
+  if (counts.forecastCoverage) {
+    results.forecastCoverage[counts.forecastCoverage] = (results.forecastCoverage[counts.forecastCoverage] || 0) + 1;
+  }
   if (counts.failed) {
     results.failed += counts.failed;
     if (counts.failureClass) {
@@ -192,6 +204,7 @@ export async function runSavedSearchAlertDrain(opts: {
     batches: 0,
     stopReason: 'drained',
     failuresByClass: {},
+    forecastCoverage: {},
   };
 
   drain: while (true) {
