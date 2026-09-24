@@ -22,8 +22,12 @@ describe('search is never dropped, and never waits behind a stale fetch', () => 
     expect(route).not.toContain('function afterFetch()');
   });
   it('fetchView only schedules, and the scheduled round always runs with the CURRENT state', () => {
-    expect(route).toContain('function fetchView(){');
-    expect(route).toContain('_fvTimer=setTimeout(function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); },0);');
+    expect(route).toContain('function fetchView(opts){');
+    // Maps P1: the scheduled run may wait one frame (so an acknowledgement paints first) — it still only
+    // schedules, and _fetchViewNow reads the state AT RUN TIME.
+    expect(route).toContain('var run=function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); };');
+    expect(route).toContain('requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); });');
+    expect(route).toContain('else _fvTimer=setTimeout(run,0);');
   });
   it('every response is generation-checked before it can paint', () => {
     expect(route).toContain('if(gen!==_fetchGen)return;');

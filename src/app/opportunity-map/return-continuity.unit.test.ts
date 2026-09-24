@@ -277,8 +277,12 @@ describe('only datasets __applySavedSearch can restore WHOLE are remembered', ()
     expect(stored).not.toContain('bbox');
   });
   it('the writer is hooked to fetchView, the one seam every state change funnels through', () => {
-    const at = MAP.indexOf('function fetchView(){');
-    expect(MAP.slice(at, at + 900)).toContain('window.__rememberMapState()');
+    const at = MAP.indexOf('function fetchView(opts){');
+    expect(at).toBeGreaterThan(0);
+    // the scheduler hands off to _fetchViewNow, whose first action is the memory write
+    const now = MAP.indexOf('function _fetchViewNow(t0){', at);
+    expect(now).toBeGreaterThan(at);
+    expect(MAP.slice(now, now + 900)).toContain('window.__rememberMapState()');
   });
 });
 
