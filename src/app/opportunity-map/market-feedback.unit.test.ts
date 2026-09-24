@@ -238,12 +238,16 @@ describe('wiring in route.ts', () => {
     expect(src).toContain('if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle();');
   });
   it('Enter acknowledges in the event itself and commits in the next task (the acknowledgement paints first)', () => {
-    expect(src).toMatch(/if\(window\.__mf\)window\.__mf\.ack\(\);\s*setTimeout\(function\(\)\{ Q=v; window\.__syncQueryUrl\(true\); fetchView\(\); \},0\);/);
+    expect(src).toMatch(/_actionNow\(\);\s*setTimeout\(function\(\)\{ Q=v; window\.__syncQueryUrl\(true\); fetchView\(\); \},0\);/);
     // the search panel's intent handler is deferred the same way, so it still runs AFTER the raw commit
     expect(src).toContain("input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); setTimeout(function(){ if(q){ pushRecent(q);");
   });
   it('every non-pan fetchView is acknowledged and yields a frame before dispatch; a pan is tagged at its source', () => {
-    expect(src).toContain("if(!(opts&&opts.pan)&&window.__mf)window.__mf.ack();");
+    expect(src).toContain("if(!(opts&&(opts.pan||opts.system)))_actionNow();");
+    expect(src).toContain("function _actionNow(){ _fetchGen++; if(window.__mf)window.__mf.ack(); }");
+    // boot/failsafe refetches are the SYSTEM, never acknowledged as the user's action
+    expect(src).toContain("function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }");
+    expect(src).toContain("if(window.__mapRefetch)window.__mapRefetch({system:true});   // a failsafe, not a user action");
     expect(src).toContain("requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); });");
     expect(src).toContain("t=setTimeout(function(){ fetchView({pan:true}); },450);");
   });

@@ -1772,7 +1772,8 @@ const VIEWPORT_JS = `<script>
     var b = (window.__drawBounds) ? window.__drawBounds : map.getBounds();
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
-  window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
+  // opts.system: a refetch the SYSTEM starts (boot view placement, failsafes) — never acknowledged as an action.
+  window.__mapRefetch = fetchViewLater; function fetchViewLater(opts){ try{ fetchView(opts); }catch(e){} }
   // Global bridge for the ?strategy= deep link. Same cross-block hazard as __applySearchFilters
   // below: the deep-link handler lives in DRAWER_JS, a SEPARATE <script> IIFE, so its guard
   // its "typeof readDeep === function" guard was ALWAYS false — readDeep/fetchView are locals,
@@ -2503,6 +2504,13 @@ const VIEWPORT_JS = `<script>
     return entry.promise;
   }
   // PUBLIC entry point. Schedules; every call in the same tick is ONE round (see contract 1).
+  // A USER ACTION supersedes whatever is in flight AT ONCE — not when its own round dispatches. The dispatch
+  // may now wait a task + a frame (so the acknowledgement paints first); measured on the preview, an older
+  // round's response landed in exactly that gap and painted query A's answer 3–606 ms after the user had
+  // asked for B. Bumping the generation here drops it. Identical in-flight requests are still JOINED by URL
+  // in _loadHorizon, so no work is wasted.
+  function _actionNow(){ _fetchGen++; if(window.__mf)window.__mf.ack(); }
+  window.__mapActionNow=_actionNow;
   function fetchView(opts){
     if(!_fvT0)_fvT0=_nowMs();
     // MAPS P1 (2026-09-24): every call that is not a pan/zoom settling is a USER ACTION — acknowledge it NOW
@@ -2510,7 +2518,7 @@ const VIEWPORT_JS = `<script>
     // Measured on the preview: the dispatch task (URL building, bbox reads, request setup) ran 100–400 ms
     // before anything could paint, so an acknowledgement written inside it was seen only when it ended.
     // A pan is marked at its source (moveend) and is never acknowledged here.
-    if(!(opts&&opts.pan)&&window.__mf)window.__mf.ack();
+    if(!(opts&&(opts.pan||opts.system)))_actionNow();
     if(_fvTimer)return;
     var run=function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); };
     if(typeof requestAnimationFrame==='function'&&!document.hidden){ _fvTimer=-1; requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); }); }
@@ -3409,7 +3417,7 @@ const VIEWPORT_JS = `<script>
     // The Enter EVENT only acknowledges; the commit runs as the next task so the acknowledgement can paint
     // first. The search panel's intent handler is deferred the same way and runs AFTER this one (same order
     // as before), so a parsed intent still replaces the raw text.
-    if(window.__mf)window.__mf.ack();
+    _actionNow();
     setTimeout(function(){ Q=v; window.__syncQueryUrl(true); fetchView(); },0);
   });
   var tg=document.getElementById('fscToggle');
@@ -8944,7 +8952,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Desktop is unaffected (body.m-map is a no-op there — the mobile chrome is display:none).
   // Scoped to ?src=alert ONLY: a normal mobile visit keeps its existing list-first default,
   // which is a deliberate small-screen choice, not a bug.
-  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); }
+  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
   function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
     var m=M();
@@ -8953,7 +8961,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(!c||!inUS(c.lat,c.lng)||(m.getZoom&&m.getZoom()<4)) conus();
     }
     releaseFit();
-    if(window.__mapRefetch)window.__mapRefetch();
+    if(window.__mapRefetch)window.__mapRefetch({system:true});   // a failsafe, not a user action
   },4000);
   var _done=false, _bootSrc='';
   // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.

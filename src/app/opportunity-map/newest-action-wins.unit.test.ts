@@ -106,6 +106,25 @@ describe('newest action wins — a superseded request never paints', () => {
   });
 });
 
+describe('an ACTION supersedes in-flight work at once — not when its own round dispatches (Maps P1)', () => {
+  it('A is in flight; the user acts for B; A answers BEFORE B dispatches — A must never paint', async () => {
+    // P1 lets the dispatch wait a task + a frame so the acknowledgement paints first. Measured on the preview,
+    // query A's response landed in that gap and painted 3–606 ms after the user had asked for B.
+    if (!SRC.includes('function _actionNow(')) return;   // pre-P1 route: no action-time supersede to test
+    const h = harness((url) => ({ pins: [{ tag: url.includes('q=A') ? 'A' : 'B' }], totalForFilters: 1, delay: url.includes('q=A') ? 40 : 30 }));
+    (h.ctx.window as Record<string, unknown>).__horizons = { open: true, recompete: false, forecast: false };
+    h.ctx.Q = 'A'; h.fetchView();
+    await sleep(10);                                                         // A dispatched, in flight
+    (h.ctx.window as { __mapActionNow: () => void }).__mapActionNow();       // the user presses Enter for B
+    await sleep(80);                                                         // A answers now — B not dispatched yet
+    expect(h.paints.some((p) => p.tags.includes('A'))).toBe(false);
+    h.ctx.Q = 'B'; h.fetchView();                                            // B's deferred commit
+    await sleep(200);
+    expect(h.paints.some((p) => p.tags.includes('A'))).toBe(false);
+    expect(h.paints.at(-1)!.tags).toEqual(['B']);
+  });
+});
+
 describe('progressive horizons — no horizon waits for the slowest', () => {
   it('Open paints as soon as it lands; Recompete joins later; the slow one reads "loading", never a number', async () => {
     const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 10, delay: horizonOf(url) === 'recompete' ? 700 : 10 }));
