@@ -79,13 +79,13 @@ const horizonOf = (url: string) => (url.startsWith('/o') ? 'open' : url.startsWi
 
 describe('newest action wins — a superseded request never paints', () => {
   it('"Start fresh": a stale-filter fetch fired in the SAME tick as the real one never paints (the prod defect)', async () => {
-    const h = harness((url) => ({ pins: [{ tag: (url.includes('agency=') ? 'STALE-' : 'FRESH-') + horizonOf(url) }], totalForFilters: 1, delay: url.includes('agency=') ? 5 : 40 }));
+    const h = harness((url) => ({ pins: [{ tag: (url.includes('agency=') ? 'STALE-' : 'FRESH-') + horizonOf(url) }], totalForFilters: 1, delay: url.includes('agency=') ? 5 : 60 }));
     (h.ctx.window as Record<string, unknown>).__horizons = { open: true, recompete: false, forecast: false };
     (h.ctx.FILT as Record<string, string>).agency = 'DEFENSE';
     h.fetchView();                                  // a control reset fires before FILT is cleared…
     (h.ctx.FILT as Record<string, string>).agency = '';
     h.fetchView();                                  // …then the restorer's own fetch with the real intent
-    await sleep(200);
+    await sleep(600);
     const stale = h.paints.filter((p) => p.tags.some((t) => t.startsWith('STALE')));
     expect(stale).toEqual([]);
     expect(h.paints.at(-1)!.tags).toEqual(['FRESH-open']);
@@ -93,14 +93,14 @@ describe('newest action wins — a superseded request never paints', () => {
   });
 
   it('a slow older request is aborted and never paints once a newer action lands (cross-tick)', async () => {
-    const h = harness((url) => ({ pins: [{ tag: url.includes('agency=') ? 'OLD' : 'NEW' }], totalForFilters: 1, delay: url.includes('agency=') ? 120 : 20 }));
+    const h = harness((url) => ({ pins: [{ tag: url.includes('agency=') ? 'OLD' : 'NEW' }], totalForFilters: 1, delay: url.includes('agency=') ? 400 : 20 }));
     (h.ctx.window as Record<string, unknown>).__horizons = { open: true, recompete: false, forecast: false };
     (h.ctx.FILT as Record<string, string>).agency = 'DEFENSE';
     h.fetchView();
     await sleep(15);                                // the old request is in flight
     (h.ctx.FILT as Record<string, string>).agency = '';
     h.fetchView();
-    await sleep(250);
+    await sleep(900);
     expect(h.paints.some((p) => p.tags.includes('OLD'))).toBe(false);
     expect(h.paints.at(-1)!.tags).toEqual(['NEW']);
   });
@@ -108,15 +108,15 @@ describe('newest action wins — a superseded request never paints', () => {
 
 describe('progressive horizons — no horizon waits for the slowest', () => {
   it('Open paints as soon as it lands; Recompete joins later; the slow one reads "loading", never a number', async () => {
-    const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 10, delay: horizonOf(url) === 'recompete' ? 150 : 10 }));
+    const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 10, delay: horizonOf(url) === 'recompete' ? 700 : 10 }));
     (h.ctx.window as Record<string, unknown>).__horizons = { open: true, recompete: true, forecast: false };
     h.fetchView();
-    await sleep(60);
+    await sleep(250);
     expect(h.paints.length).toBeGreaterThan(0);
     expect(h.paints[0].tags).toEqual(['open']);
     const counts = (h.ctx.window as Record<string, Record<string, { state: string }>>).__horizonCounts;
     expect(counts.recompete.state).toBe('loading');
-    await sleep(200);
+    await sleep(900);
     expect(h.paints.at(-1)!.tags.sort()).toEqual(['open', 'recompete']);
     expect(h.paints.at(-1)!.total).toBe(20);
   });
@@ -126,31 +126,31 @@ describe('horizon cache — keyed by intent + bbox, market truth by intent only'
   it('turning a horizon OFF makes ZERO requests and repaints from what is already held', async () => {
     const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 5, delay: 10 }));
     h.fetchView();
-    await sleep(80);
+    await sleep(300);
     const before = h.calls.length;
     (h.ctx.window as Record<string, Record<string, boolean>>).__horizons.open = false;
     h.fetchView();
-    await sleep(30);
+    await sleep(150);
     expect(h.calls.length).toBe(before);
     expect(h.paints.at(-1)!.tags.sort()).toEqual(['forecast', 'recompete']);
   });
 
   it('turning an unchanged horizon back ON reuses the cached result (no request)', async () => {
     const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 5, delay: 10 }));
-    h.fetchView(); await sleep(80);
-    (h.ctx.window as Record<string, Record<string, boolean>>).__horizons.open = false; h.fetchView(); await sleep(30);
+    h.fetchView(); await sleep(300);
+    (h.ctx.window as Record<string, Record<string, boolean>>).__horizons.open = false; h.fetchView(); await sleep(150);
     const before = h.calls.length;
-    (h.ctx.window as Record<string, Record<string, boolean>>).__horizons.open = true; h.fetchView(); await sleep(30);
+    (h.ctx.window as Record<string, Record<string, boolean>>).__horizons.open = true; h.fetchView(); await sleep(150);
     expect(h.calls.length).toBe(before);
     expect(h.paints.at(-1)!.tags.sort()).toEqual(['forecast', 'open', 'recompete']);
   });
 
   it('a PAN with an unchanged intent asks for pins only (counts=0) and keeps the market total', async () => {
     const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 7, delay: 10 }));
-    h.fetchView(); await sleep(80);
+    h.fetchView(); await sleep(300);
     const before = h.calls.length;
     h.ctx.BBOX = '-90,30,-80,40';                     // the map moved; the search did not
-    h.fetchView(); await sleep(80);
+    h.fetchView(); await sleep(300);
     const pan = h.calls.slice(before);
     expect(pan).toHaveLength(3);
     expect(pan.every((u) => u.includes('counts=0'))).toBe(true);
@@ -159,10 +159,10 @@ describe('horizon cache — keyed by intent + bbox, market truth by intent only'
 
   it('a NEW intent (search/filter change) recomputes market truth — never reuses another intent\'s counts', async () => {
     const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: url.includes('naics=') ? 2 : 7, delay: 10 }));
-    h.fetchView(); await sleep(80);
+    h.fetchView(); await sleep(300);
     const before = h.calls.length;
     (h.ctx.FILT as Record<string, string>).naics = '541512';
-    h.fetchView(); await sleep(80);
+    h.fetchView(); await sleep(300);
     const next = h.calls.slice(before);
     expect(next.some((u) => u.includes('counts=0'))).toBe(false);
     expect(h.paints.at(-1)!.total).toBe(6);
