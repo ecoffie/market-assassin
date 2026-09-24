@@ -20,6 +20,7 @@ import { mapsRecompeteRequest, mapsRecompeteDiscoveryMeta } from '@/lib/recompet
 import { readOld, readNew, buildRecompeteMapBody, compareReads, type MarketRead } from '@/lib/recompete/recompete-map-paths';
 import { computeOnceConfig, decide, forcedFromHeaders } from '@/lib/recompete/compute-once-mode';
 import { writeComputeOnceLog, recompeteParams } from '@/lib/recompete/compute-once-log';
+import { isComputeOnceBusy } from '@/lib/recompete/compute-once-pg';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
 
@@ -69,13 +70,15 @@ export async function GET(request: NextRequest) {
   let served: 'old' | 'new' | 'fallback' = d.serve;
   let read: MarketRead;
   let newError: string | null = null;
+  let newBusy = false;
   try {
     if (d.serve === 'new') {
       try {
         read = await readNew(recompeteReq, b);
       } catch (e) {
         newError = (e as Error).message;
-        console.error('[recompete-map] compute-once failed, serving PostgREST path:', newError);
+        newBusy = isComputeOnceBusy(e);
+        if (!newBusy) console.error('[recompete-map] compute-once failed, serving PostgREST path:', newError);
         served = 'fallback';
         read = await readOld(db, recompeteReq, b);
       }
@@ -99,7 +102,8 @@ export async function GET(request: NextRequest) {
       const oldMs = served === 'new' ? null : servedRead.ms;
       const newMs = served === 'new' ? servedRead.ms : null;
       if (served === 'fallback') {
-        await writeComputeOnceLog(db, { ...base, compared: false, outcome: 'new_error', old_ms: oldMs, new_ms: null, error: newError });
+        // new_busy = this instance's pool was saturated, so we did not queue (capacity, not a failure).
+        await writeComputeOnceLog(db, { ...base, compared: false, outcome: newBusy ? 'new_busy' : 'new_error', old_ms: oldMs, new_ms: null, error: newError });
         return;
       }
       if (!d.compare) {
@@ -112,6 +116,10 @@ export async function GET(request: NextRequest) {
       try {
         other = served === 'new' ? await readOld(db, recompeteReq, b) : await readNew(recompeteReq, b);
       } catch (e) {
+        if (isComputeOnceBusy(e)) {
+          await writeComputeOnceLog(db, { ...base, compared: false, outcome: 'skipped_busy', old_ms: oldMs, new_ms: newMs });
+          return;
+        }
         await writeComputeOnceLog(db, { ...base, compared: true, outcome: served === 'new' ? 'old_error' : 'new_error', old_ms: oldMs, new_ms: newMs, error: (e as Error).message });
         return;
       }
