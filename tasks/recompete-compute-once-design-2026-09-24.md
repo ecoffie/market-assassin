@@ -106,6 +106,29 @@ Unit tests: `src/lib/recompete/maps-recompete-sql.unit.test.ts`.
 
 The parity oracle stays as the pre-deploy gate for any change to `discovery/sql.ts`, `maps-recompete-sql.ts` or the surface spec.
 
+## Rollout implementation (approved 2026-09-24: shadow → canary → authority)
+- **Execution:** `src/lib/recompete/compute-once-pg.ts`.
+  - Server-side `pg` Pool (default 2 connections per instance) on the Supabase **transaction pooler** (:6543). `RECOMPETE_PG_URL` is used if set; otherwise it is derived from `DATABASE_URL`, and any host that is not a pooler is refused.
+  - Every execution runs in `BEGIN READ ONLY; SET LOCAL statement_timeout` (default 8 s).
+  - A connection that fails is destroyed, never returned to the pool.
+  - `recompeteOnePassSql()` runs **before any I/O**, so an unrecognized plan op throws before anything is queried (fail closed).
+- **Paths:** `src/lib/recompete/recompete-map-paths.ts`.
+  - `readOld` is the PostgREST reads, moved verbatim.
+  - `readNew` is compute-once.
+  - `buildRecompeteMapBody` is the **only** response builder.
+  - `compareReads` compares the market total, mapped, unmapped, in-view, ordered pin IDs, pin payloads, follow-on IDs, discovery status and the full response body.
+- **Control:** `src/lib/recompete/compute-once-mode.ts`.
+  - `RECOMPETE_COMPUTE_ONCE_MODE=off|shadow|canary|authority`, with `_SHADOW`, `_CANARY_PCT` and `_VERIFY` rates.
+  - **`off` is absolute.** That is the rollback.
+  - An operator can force a path for the controlled production sample with `x-recompete-force` plus `x-recompete-verify = CRON_SECRET`, compared in constant time.
+- **Route:**
+  - The decision is made per request.
+  - A compute-once failure falls back to `readOld` **for that request**, and the body is the same.
+  - The comparison, a both-sides re-read on any difference (so churn is classified rather than counted), and the log all run in `after()`.
+  - The user never waits for them and never sees a difference.
+  - `x-recompete-path: old|new|fallback` is operational metadata only.
+- **Evidence:** table `recompete_compute_once_log`, migration `20260924_recompete_compute_once_log.sql`, additive, RLS on, service-role only. It holds one row per request while the mode is not `off`: served path, both latencies, outcome and mismatch fields.
+
 ## What compute-once does not fix
 - For a 22–30k-contract market, a single regex evaluation is still ~1.4–2.6 s.
 - The next lever would be precomputing concept → contract matches, a materialized concept index maintained by the hourly sync. That is a separate track, with its own product decision about freshness.

@@ -187,8 +187,17 @@ describe('cross-surface query-plan gate', () => {
 
   it('Maps Recompete no longer interprets the query itself (route + adapter)', () => {
     const strip = (p: string) => readFileSync(p, 'utf8').replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
-    const route = strip(join(__dirname, '..', '..', 'app', 'api', 'app', 'recompete-map', 'route.ts'));
+    // route + its read paths (Gate 2 moved the reads verbatim into recompete-map-paths.ts)
+    const route = strip(join(__dirname, '..', '..', 'app', 'api', 'app', 'recompete-map', 'route.ts'))
+      + strip(join(__dirname, '..', 'recompete', 'recompete-map-paths.ts'));
     const adapter = strip(join(__dirname, '..', 'recompete', 'maps-recompete-discovery.ts'));
+    // The compute-once path must not interpret the query either: it only SERIALIZES the plan.
+    for (const f of [join(__dirname, 'sql.ts'), join(__dirname, '..', 'recompete', 'maps-recompete-sql.ts'), join(__dirname, '..', 'recompete', 'compute-once-pg.ts')]) {
+      const src = strip(f);
+      for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'buildSearchOr', 'applyMapFilters', 'naicsMatchConds', 'multiAgency', 'buildDiscoveryPlan']) {
+        expect(src, `${f}: ${legacy}`).not.toContain(legacy);
+      }
+    }
     for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'setAsideOrExpr', 'pscToNaicsCodes', 'agencyOrExpr', 'agencyIlikeConds',
       'multiAgency', 'naicsMatchConds', 'parseStateList', 'buildSearchOr', 'applyMapFilters', 'incumbent_name.ilike', "'period_of_performance_current_end', todayYmd"]) {
       expect(route, `route: ${legacy}`).not.toContain(legacy);

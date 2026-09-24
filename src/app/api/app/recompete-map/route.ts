@@ -14,18 +14,19 @@
  * upgrade automatically without another code change). Every pin carries `locPrecision` so the
  * UI never presents a state-centroid guess as an exact city.
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { mapsRecompeteRequest, applyMapsRecompeteFilters, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
-import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
-import { fetchFollowOnRows } from '@/lib/recompete/map-follow-ons';
+import { mapsRecompeteRequest, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
+import { readOld, readNew, buildRecompeteMapBody, compareReads, type MarketRead } from '@/lib/recompete/recompete-map-paths';
+import { computeOnceConfig, decide, forcedFromHeaders } from '@/lib/recompete/compute-once-mode';
+import { writeComputeOnceLog, recompeteParams } from '@/lib/recompete/compute-once-log';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
 
 export const dynamic = 'force-dynamic';
 
-const MAX_PINS = 1000;
-const COLS = RECOMPETE_PIN_COLS;
+// The pin cap, pin columns and page order live in recompete-map-paths.ts (MAX_PINS, RECOMPETE_PIN_COLS),
+// shared by both read paths.
 
 function sb() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); }
 
@@ -51,74 +52,84 @@ export async function GET(request: NextRequest) {
   // ⚠️ `?includePast=1` is retired: canonical Recompete policy is "not expired", no caller sent it, and
   // the table held 0 expired rows when this moved (measured 2026-09-22).
   const recompeteReq = mapsRecompeteRequest((k) => p.get(k));
-  // `mapped` splits the SAME market into the two halves of the map-truth disclosure: 'only' = rows the
-  // map can draw (every existing caller), 'none' = matching rows it CANNOT (map_lat IS NULL).
-  // ⚠️ This bound used to be hardcoded `.not('map_lat','is',null)`; an unmapped count built on it asked
-  // for `map_lat IS NOT NULL AND map_lat IS NULL` and silently reported 0 unmapped.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const applyFilters = (q: any, mapped: 'only' | 'none' = 'only') => applyMapsRecompeteFilters(q, recompeteReq, mapped);
+  const b = { west, south, east, north };
+  const db = sb();
 
+  // ── COMPUTE-ONCE ROLLOUT (Gate 2, 2026-09-24 — shadow → canary → authority) ─────────────────────
+  // readOld = the PostgREST multi-read path (unchanged, the rollback). readNew = ONE read-only statement
+  // generated from the SAME canonical plan (maps-recompete-sql.ts via compute-once-pg.ts). Both feed the
+  // SAME response builder, so presentation cannot drift. RECOMPETE_COMPUTE_ONCE_MODE=off (the default) is
+  // absolute: only readOld runs. Any compute-once failure — including a plan op the serializer does not
+  // recognize (fail closed) — falls back to readOld for THIS request. Comparisons and the rollout log run
+  // in after(): the user never waits for them and never sees a difference.
+  const cfg = computeOnceConfig();
+  const forced = forcedFromHeaders((h) => request.headers.get(h), process.env.CRON_SECRET);
+  const d = decide(cfg, { serve: Math.random(), compare: Math.random() }, forced);
+
+  let served: 'old' | 'new' | 'fallback' = d.serve;
+  let read: MarketRead;
+  let newError: string | null = null;
   try {
-    const db = sb();
-    const bbox = (q: ReturnType<typeof applyFilters>) =>
-      q.gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
-
-    const totalForFiltersHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
-    // THE MAP-TRUTH CONTRACT — rows matching the filters that the map CANNOT DRAW. Counted with the
-    // SAME filters plus `map_lat IS NULL`, so the client can disclose what it is not showing.
-    // Awarded carries 45,069 such rows (measured 2026-09-12), so omitting it made the merged pill
-    // under-report badly: with all three horizons on it said "477 not shown" (Open only) against a
-    // denominator that summed all three. Under-disclosure is the exact failure this contract forbids.
-    const unmappedHead = applyFilters(
-      db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }),
-      'none',
-    );
-    const [{ count: totalForFilters }, { count: unmappedForFilters }] =
-      await Promise.all([totalForFiltersHead, unmappedHead]);
-
-    // DETERMINISTIC PAGE (Gate 1, 2026-09-24): expiry date, then contract_id as a TIE-BREAKER ONLY.
-    // Expiry alone left WHICH tied contracts made the 1,000-pin cut up to the query plan — measured on
-    // prod: the "software license" page differed by 30 rows (all on the tied 2026-11-30 boundary)
-    // between a parallel index scan and a bitmap scan of the SAME rows. contract_id is unique
-    // (recompete_opportunities_contract_id_key), so the order is total under every plan.
-    const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
-      .order('period_of_performance_current_end', { ascending: true })
-      .order('contract_id', { ascending: true })
-      .limit(MAX_PINS);
-    // Captured FOLLOW-ONS always expire the LATEST (3-5yr out), so the expiry-ascending sort + the
-    // MAX_PINS cap systematically buries them behind nearer-term rows at a broad zoom — yet they're
-    // the FRESHEST intelligence (the winner of a just-recompeted contract). Fetch them separately
-    // (data_source='usaspending_followon', same filters+bbox) and merge in any the capped set missed,
-    // deduped by contract_id. Small set by construction, so no cap needed here (Eric 2026-07-28).
-    // Read in two planner-independent steps (map-follow-ons.ts): the follow-on candidates first, then
-    // the unchanged canonical plan on just those ids — a text index can never drive this read.
-    // Fail-soft as before: a follow-on failure must not take down the pins.
-    const followOnP = fetchFollowOnRows({
-      from: () => db.from('recompete_opportunities'),
-      applyPlan: (q) => applyFilters(q),
-      bbox, cols: COLS, cap: MAX_PINS,
-    }).catch((e: Error) => { console.error('[recompete-map] follow-ons failed (pins unaffected):', e.message); return []; });
-    const [{ data, count: totalInView, error }, followOns] =
-      await Promise.all([viewQ, followOnP]);
-    if (error) throw error;
-    const cid = (r: unknown) => String((r as { contract_id?: unknown }).contract_id ?? '');
-    const rows = data || [];
-    const seen = new Set(rows.map(cid));
-    const extraFollowOns = (followOns || []).filter((r: unknown) => !seen.has(cid(r)));
-    const pins = [...rows, ...extraFollowOns].map(toPin);
-    return NextResponse.json({
-      success: true, mode: 'recompete',
-      // Canonical discovery status + the recompete window actually applied. needs_positive_scope /
-      // needs_refinement mean "not a searchable market yet" — the counts are 0 by construction.
-      discovery: mapsRecompeteDiscoveryMeta(recompeteReq.plan),
-      totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
-      capped: (totalInView ?? 0) > (rows.length),
-      // null = UNKNOWN (the count failed), never 0 — a missing number must not read as
-      // "everything is mapped" (Bug Prevention Rule #11).
-      unmappedForFilters: unmappedForFilters ?? null,
-      pins,
-    });
+    if (d.serve === 'new') {
+      try {
+        read = await readNew(recompeteReq, b);
+      } catch (e) {
+        newError = (e as Error).message;
+        console.error('[recompete-map] compute-once failed, serving PostgREST path:', newError);
+        served = 'fallback';
+        read = await readOld(db, recompeteReq, b);
+      }
+    } else {
+      read = await readOld(db, recompeteReq, b);
+    }
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
+
+  if (cfg.mode !== 'off') {
+    const servedRead = read;
+    after(async () => {
+      const disc = mapsRecompeteDiscoveryMeta(recompeteReq.plan);
+      const base = {
+        mode: cfg.mode, served, forced: forced != null, params: recompeteParams((k) => p.get(k)), bbox: b,
+        plan_status: disc.status, plan_via: disc.via,
+        market_total: servedRead.total != null && servedRead.unmapped != null ? servedRead.total + servedRead.unmapped : null,
+        in_view: servedRead.inView, pins: servedRead.pins.length, follow_ons: servedRead.followOns.length,
+      };
+      const oldMs = served === 'new' ? null : servedRead.ms;
+      const newMs = served === 'new' ? servedRead.ms : null;
+      if (served === 'fallback') {
+        await writeComputeOnceLog(db, { ...base, compared: false, outcome: 'new_error', old_ms: oldMs, new_ms: null, error: newError });
+        return;
+      }
+      if (!d.compare) {
+        await writeComputeOnceLog(db, { ...base, compared: false, outcome: null, old_ms: oldMs, new_ms: newMs });
+        return;
+      }
+      // Run the OTHER path and compare. A difference is re-read on BOTH sides before it counts: two reads
+      // of a live table can straddle an hourly sync write, and that is churn, not a semantic mismatch.
+      let other: MarketRead;
+      try {
+        other = served === 'new' ? await readOld(db, recompeteReq, b) : await readNew(recompeteReq, b);
+      } catch (e) {
+        await writeComputeOnceLog(db, { ...base, compared: true, outcome: served === 'new' ? 'old_error' : 'new_error', old_ms: oldMs, new_ms: newMs, error: (e as Error).message });
+        return;
+      }
+      const oldRead = served === 'new' ? other : servedRead;
+      const newRead = served === 'new' ? servedRead : other;
+      let fields = compareReads(recompeteReq, oldRead, newRead);
+      let outcome: 'identical' | 'churn' | 'mismatch' = fields.length ? 'mismatch' : 'identical';
+      if (fields.length) {
+        try {
+          const [o2, n2] = await Promise.all([readOld(db, recompeteReq, b), readNew(recompeteReq, b)]);
+          const f2 = compareReads(recompeteReq, o2, n2);
+          if (!f2.length) outcome = 'churn'; else fields = f2;
+        } catch { /* keep the first comparison */ }
+      }
+      await writeComputeOnceLog(db, { ...base, compared: true, outcome, mismatch_fields: outcome === 'identical' ? null : fields, old_ms: oldRead.ms, new_ms: newRead.ms });
+    });
+  }
+
+  // Which path answered is operational metadata, never a difference — the body is the same either way.
+  return NextResponse.json(buildRecompeteMapBody(recompeteReq, read), { headers: { 'x-recompete-path': served } });
 }
