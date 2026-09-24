@@ -167,3 +167,46 @@ auto-merged). The Recompete product diff (all 12 non-CLAUDE files) is **byte-ide
 | -computers + SDVOSB / Forest Service (surface) | 3,484 / 2,456 | 3,478 / 2,454 |
 
 Everything else — janitorial 5,304, cyber 15,639, USDA 4,596, VA 16,257, multi-agency 20,853 / 881 — is unchanged.
+
+## 9. Production acceptance (2026-09-23) — ✅ FROZEN
+
+Merged via GitHub at accepted head `858c36d5` → merge commit **`566c1fe9`** (normal main deploy, no manual deploy).
+Production proven to serve it: the live `maps-account-build` stamp read `566c1fe96a6bcf5a599c2e9146b65912bc331b64`, with the
+Vercel commit status complete.
+
+Method: the live `https://getmindy.ai/api/app/recompete-map` (whole-world bbox) vs MCP's canonical recompete market —
+the production library query `applyRecompetePlan(buildDiscoveryPlan(…, MCP_POLICY))` run against the production DB at the
+same moment (no hosted MCP credits). Normalized on `contract_id`. Absolute counts are today's corpus (hourly sync).
+
+| fixture | live discovery | live drawable + unmapped = market | MCP canonical market | count | live pins | pins ⊂ MCP |
+|---|---|---|---|---|---|---|
+| janitorial | ok · industry_preset · 18mo | 3,875 + 1,429 = 5,304 | 5,304 | EXACT | 1,000 (capped) | yes |
+| cybersecurity | ok · industry_preset · 18mo | 11,157 + 4,505 = 15,662 | 15,662 | EXACT | 1,000 (capped) | yes |
+| SIEM | ok · industry_preset · 18mo | 11,157 + 4,505 = 15,662 | 15,662 | EXACT | 1,000 (capped) | yes |
+| ai governance | ok · text · 18mo | 3 + 2 = 5 | 5 | EXACT | 3 | IDENTICAL |
+| agency=USDA | ok · structured_only · 18mo | 3,408 + 1,195 = 4,603 | 4,603 | EXACT | 1,014 (cap + follow-ons) | yes |
+| agency=VA | ok · structured_only · 18mo | 12,972 + 3,302 = 16,274 | 16,274 | EXACT | 1,031 | yes |
+| agency=USDA\|VA | ok · structured_only · 18mo | 16,380 + 4,497 = 20,877 | 20,877 (= 4,603 + 16,274) | EXACT | 1,045 | yes |
+| 541512 -computers | ok · structured_only · 18mo | 3,489 + 754 = 4,243 | 4,243 | EXACT | 1,000 (capped) | yes |
+| -computers (naked) | needs_positive_scope | 0 + 0 = 0 | 0 | EXACT | 0 | IDENTICAL |
+| zzzxxyyqqq | ok · text | 0 + 0 = 0 | 0 | EXACT | 0 | IDENTICAL |
+
+**Full identity for the capped markets, through the live API:** the viewport was tiled (a capped tile is quartered until
+every tile is uncapped) and the union of live pin ids compared with MCP's full drawable set:
+janitorial 3,875 · cybersecurity 11,157 · SIEM 11,157 · USDA 3,408 · VA 12,972 · USDA|VA 16,380 · 541512 -computers 3,489 —
+**all IDENTICAL**, 0 live-only / 0 MCP-only (379 live calls).
+
+Separately verified:
+- **Market vs drawable stays disclosed:** every response carries `totalForFilters` (drawable) + `unmappedForFilters`,
+  and together they equal the MCP market exactly.
+- **The 1,000-pin cap is presentation-only:** capped responses report `capped=true` while `totalForFilters` keeps the full
+  drawable count; the extra pins above 1,000 are the follow-on merge.
+- **Maps Open unchanged:** 0 lines of diff in its files between production-proven `b3e37cf0` and `566c1fe9`; live Open still
+  returns its `discovery` block.
+- **Forecast unmigrated:** live `/api/app/forecast-map` returns no `discovery` block; gate registry `maps_forecast: pending`.
+- **Saved searches / alerts unmigrated:** #1649 touched no forecast-map, map-filters, saved-search or alert file; gate
+  registry `saved_searches` / `daily_alerts: pending`.
+
+Kept separate (not part of this freeze): the pre-existing set-aside checkbox vocabulary defect (§6.3).
+
+**Maps Recompete is frozen.** Reopen only for a production defect that breaks MCP parity. Next: Maps Forecast.
