@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { mapsRecompeteRequest, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
-import { readOld, readNew, buildRecompeteMapBody, compareReads, type MarketRead } from '@/lib/recompete/recompete-map-paths';
+import { readOld, readNew, buildRecompeteMapBody, compareReads, isOldDegradedOnly, type MarketRead } from '@/lib/recompete/recompete-map-paths';
 import { computeOnceConfig, decide, forcedFromHeaders } from '@/lib/recompete/compute-once-mode';
 import { writeComputeOnceLog, recompeteParams } from '@/lib/recompete/compute-once-log';
 import { isComputeOnceBusy } from '@/lib/recompete/compute-once-pg';
@@ -126,14 +126,17 @@ export async function GET(request: NextRequest) {
       const oldRead = served === 'new' ? other : servedRead;
       const newRead = served === 'new' ? servedRead : other;
       let fields = compareReads(recompeteReq, oldRead, newRead);
-      let outcome: 'identical' | 'churn' | 'mismatch' = fields.length ? 'mismatch' : 'identical';
+      let outcome: 'identical' | 'churn' | 'mismatch' | 'old_degraded' = fields.length ? 'mismatch' : 'identical';
+      let lastOld = oldRead, lastNew = newRead;
       if (fields.length) {
         try {
           const [o2, n2] = await Promise.all([readOld(db, recompeteReq, b), readNew(recompeteReq, b)]);
           const f2 = compareReads(recompeteReq, o2, n2);
-          if (!f2.length) outcome = 'churn'; else fields = f2;
+          if (!f2.length) outcome = 'churn'; else { fields = f2; lastOld = o2; lastNew = n2; }
         } catch { /* keep the first comparison */ }
       }
+      // Only an old-path LOST COUNT (null = unknown) explains the difference → old_degraded, not a mismatch.
+      if (outcome === 'mismatch' && isOldDegradedOnly(recompeteReq, lastOld, lastNew)) outcome = 'old_degraded';
       await writeComputeOnceLog(db, { ...base, compared: true, outcome, mismatch_fields: outcome === 'identical' ? null : fields, old_ms: oldRead.ms, new_ms: newRead.ms });
     });
   }

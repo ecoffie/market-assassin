@@ -110,3 +110,21 @@ export function compareReads(req: MapsRecompeteRequest, a: MarketRead, b: Market
   if (JSON.stringify(ba) !== JSON.stringify(bb)) out.push('response_body');
   return out;
 }
+
+/**
+ * A difference caused ONLY by the old path losing a count (PostgREST statement timeout → null = UNKNOWN)
+ * is old-path degradation, not a semantic mismatch. Measured in the 2026-09-24 shadow sample: under load
+ * the authenticator role's 8 s statement_timeout dropped the broad-list total on the old path while
+ * compute-once returned it. Strict test: the old side must carry a null count, and filling ONLY those
+ * nulls from the new side must make the two reads byte-identical. Anything else stays a mismatch.
+ */
+export function isOldDegradedOnly(req: MapsRecompeteRequest, oldRead: MarketRead, newRead: MarketRead): boolean {
+  if (oldRead.total != null && oldRead.unmapped != null && oldRead.inView != null) return false;
+  const filled: MarketRead = {
+    ...oldRead,
+    total: oldRead.total ?? newRead.total,
+    unmapped: oldRead.unmapped ?? newRead.unmapped,
+    inView: oldRead.inView ?? newRead.inView,
+  };
+  return compareReads(req, filled, newRead).length === 0;
+}

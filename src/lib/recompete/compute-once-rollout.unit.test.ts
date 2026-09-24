@@ -83,6 +83,14 @@ describe('comparison + the one response builder', () => {
     expect(compareReads(req, base, { ...base, pins: [row('A'), { ...row('B'), piid: 'X' }] })).toEqual(['pin_payload', 'response_body']);
     expect(compareReads(req, base, { ...base, followOns: [] })).toEqual(expect.arrayContaining(['follow_on_ids', 'response_body']));
   });
+  it('old_degraded ONLY when the old side lost a count and filling it makes the reads identical', async () => {
+    const { isOldDegradedOnly } = await import('./recompete-map-paths');
+    const n = { total: 5, unmapped: 2, inView: 1, pins: [{ contract_id: 'A' }], followOns: [], ms: 1 };
+    expect(isOldDegradedOnly(req, { ...n, total: null }, n)).toBe(true);
+    expect(isOldDegradedOnly(req, { ...n }, { ...n, total: 6 })).toBe(false);                       // no null → real
+    expect(isOldDegradedOnly(req, { ...n, total: null, pins: [{ contract_id: 'B' }] }, n)).toBe(false); // null + a pin diff → real
+    expect(isOldDegradedOnly(req, n, { ...n, total: null })).toBe(false);                            // new-side null is not old degradation
+  });
   it('a failed count is UNKNOWN on both paths — never rendered as 0 unmapped', () => {
     expect(buildRecompeteMapBody(req, { ...base, unmapped: null }).unmappedForFilters).toBeNull();
   });
