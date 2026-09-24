@@ -192,6 +192,12 @@ export function buildEmail(
   const EVIDENCE = 3;
   const shown = opps.slice(0, EVIDENCE);
   const href = mapHref(search);
+  // A caller-supplied `total` (the canonical Forecast interval summary) can be far larger than the rows rendered.
+  // Say plainly that the rows are examples, so 3 cards are never read as everything that is new. Legacy callers
+  // (no `total`) are unchanged.
+  const examplesNote = opts.total !== undefined && n > shown.length && shown.length > 0
+    ? `${shown.length === 1 ? 'This is 1 example' : `These are ${shown.length} examples`}, not the complete set of ${n.toLocaleString('en-US')} new matches.`
+    : '';
 
   const rows = shown.map((o) => {
     // URGENCY IS DATA, not decoration: a deadline inside 7 days is the single fact most
@@ -238,7 +244,8 @@ export function buildEmail(
       </p>
       <p style="font:400 12px/1.5 ${FONT};color:#94a3b8;margin:9px 0 0 0;">Your filters are restored exactly as you saved them.</p>
 
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin-top:26px;">
+      ${examplesNote ? `<p style="font:400 12.5px/1.5 ${FONT};color:#64748b;margin:26px 0 0 0;">${esc(examplesNote)}</p>` : ''}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin-top:${examplesNote ? 10 : 26}px;">
         ${rows}
       </table>
       ${n > EVIDENCE ? `<p style="font:600 13px/1.5 ${FONT};margin:16px 0 0 0;"><a href="${mapHref(search)}" style="color:#4f46e5;text-decoration:none;">See all ${n} &mdash; view all on the map &rarr;</a></p>` : ''}
@@ -252,6 +259,7 @@ export function buildEmail(
   const text = `${n} new ${n === 1 ? 'match' : 'matches'} in "${search.name}"\n\n`
     + notices.map((t) => `Note: ${t}\n\n`).join('')
     + `Open updated map (your filters restored): ${mapHref(search, undefined, '&')}\n\n`
+    + (examplesNote ? `${examplesNote}\n\n` : '')
     + shown.map((o) => {
       const due = o.response_deadline ? fmtDate(o.response_deadline) : '—';
       const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()];

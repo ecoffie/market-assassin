@@ -253,6 +253,34 @@ describe('high volume through the route — progress is durable, the email is on
   });
 });
 
+describe('high volume — the notification TOTAL is the complete interval count, never a page / seen-list / evidence count', () => {
+  it('1,237 new forecasts (> one 500-row page): ONE email reports 1,237, shows ≤ 3 examples and says they are examples', async () => {
+    state.search = search(FC);
+    const base = Date.parse('2026-09-23T12:00:00Z');
+    state.forecasts = Array.from({ length: 1_237 }, (_, i) => fc('DHS', new Date(base + i * 1000).toISOString()));
+    const r = await run();
+    expect(r.body.forecastCoverage).toEqual({ covered: 1 });
+    expect(state.sends).toHaveLength(1);
+    const m = state.sends[0];
+    // The complete interval count — not 500 (one keyset page), 3 (evidence), 1 (the stored Open seen list) or the batch.
+    expect(m.subject).toBe('1237 new matches in “My market”');
+    expect(m.html).toContain('1237 new matches');
+    expect(m.html).toContain('See all 1237');
+    expect(m.text).toContain('1237 new matches');
+    for (const wrong of ['500 new', '501 new', '3 new', '1 new', '1000 new']) expect(m.subject).not.toContain(wrong);
+    // ≤ 3 examples, disclosed as examples of the complete set.
+    expect((m.html.match(/\?opp=/g) || []).length).toBeLessThanOrEqual(3);
+    expect(m.html).toMatch(/These are 3 examples, not the complete set of 1,237 new matches/);
+    expect(m.text).toMatch(/These are 3 examples, not the complete set of 1,237 new matches/);
+    // State: the interval completed → watermark advances to the snapshot; Forecast ids never enter the Open seen list.
+    const p = state.updates[0].payload;
+    expect(p).toMatchObject({ forecast_seen_through: '2026-09-24T11:00:00.000Z', forecast_pending: null });
+    expect(p.last_seen_notice_ids ?? ['OPEN-OLD']).toEqual(['OPEN-OLD']);
+    persist(); state.sends = [];
+    expect((await run()).body.sent).toBe(0);                     // the same interval is never notified twice
+  });
+});
+
 describe('EMERGENCY ROLLBACK — canonical ON → OFF → ON', () => {
   it('rollback sends ZERO Forecast emails, Open continues, Forecast state untouched; canonical resumes from its watermark', async () => {
     // 1 · canonical ON: measures, advances W to S1.
