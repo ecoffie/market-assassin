@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { mapsRecompeteRequest, applyMapsRecompeteFilters, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
+import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
 
@@ -72,8 +73,15 @@ export async function GET(request: NextRequest) {
       db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }),
       'none',
     );
-    const [{ count: totalForFilters }, { count: unmappedForFilters }] =
-      await Promise.all([totalForFiltersHead, unmappedHead]);
+    // counts=0 (map-counts-mode.ts): the client already holds this intent's market total + unmapped
+    // count, so a pan runs ONLY the viewport reads. Measured 2026-09-24 (EXPLAIN ANALYZE): for a
+    // keyword plan each of these two head counts re-evaluates the whole regex filter over ~142k rows
+    // (ai governance 0.44 s + 0.32 s; cybersecurity 0.86 s + 0.64 s) — and they ran as a separate
+    // sequential phase BEFORE the pins. Now they also run CONCURRENTLY with the viewport reads.
+    const withCounts = wantsMarketCounts(p);
+    const countsP = withCounts
+      ? Promise.all([totalForFiltersHead, unmappedHead])
+      : Promise.resolve(null);
 
     const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
       .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
@@ -84,9 +92,11 @@ export async function GET(request: NextRequest) {
     // deduped by contract_id. Small set by construction, so no cap needed here (Eric 2026-07-28).
     const followOnQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS)))
       .eq('data_source', 'usaspending_followon').limit(MAX_PINS);
-    const [{ data, count: totalInView, error }, { data: followOns }] =
-      await Promise.all([viewQ, followOnQ]);
+    const [counts, [{ data, count: totalInView, error }, { data: followOns }]] =
+      await Promise.all([countsP, Promise.all([viewQ, followOnQ])]);
     if (error) throw error;
+    const totalForFilters = counts ? counts[0].count : null;
+    const unmappedForFilters = counts ? counts[1].count : null;
     const cid = (r: unknown) => String((r as { contract_id?: unknown }).contract_id ?? '');
     const rows = data || [];
     const seen = new Set(rows.map(cid));
@@ -97,11 +107,13 @@ export async function GET(request: NextRequest) {
       // Canonical discovery status + the recompete window actually applied. needs_positive_scope /
       // needs_refinement mean "not a searchable market yet" — the counts are 0 by construction.
       discovery: mapsRecompeteDiscoveryMeta(recompeteReq.plan),
-      totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
+      // counts=0 → the market-wide fields are OMITTED (never 0/null): the client holds them.
+      ...(withCounts ? {} : { countsSkipped: true }),
+      totalForFilters: withCounts ? (totalForFilters ?? 0) : undefined, totalInView: totalInView ?? pins.length,
       capped: (totalInView ?? 0) > (rows.length),
       // null = UNKNOWN (the count failed), never 0 — a missing number must not read as
       // "everything is mapped" (Bug Prevention Rule #11).
-      unmappedForFilters: unmappedForFilters ?? null,
+      unmappedForFilters: withCounts ? (unmappedForFilters ?? null) : undefined,
       pins,
     });
   } catch (e) {

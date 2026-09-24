@@ -78,7 +78,8 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
   it('the top price header is ALWAYS filled after the intel fetch (success AND failure), seeded from the pin est', () => {
     // Success path passes the pin est so the drawer number equals the pin/card.
     expect(src).toMatch(/fillMEstTop\(intel\.valueRange,_pinEst\)/);   // success path
-    expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null,_pinEst\)/); // failure path keeps the pin est
+    // failure path keeps the pin est (after the newest-action-wins guard: a stale drawer never repaints)
+    expect(src).toMatch(/catch\(function\(\)\{ if\(window\.__oppDrawerNid!==_drawerNid\)return; fillMEstTop\(null,_pinEst\)/);
     // And it seeds the hero IMMEDIATELY (before the intel fetch) when the pin already has an est.
     expect(src).toMatch(/if\(_pinEst>0\)fillMEstTop\(null,_pinEst\)/);
   });

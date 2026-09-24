@@ -332,6 +332,12 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // ⚡ The five reads below are INDEPENDENT of each other (each keys only on the opp already in
+  // hand). They used to be awaited one after another — similar → tracking → saved → views → family —
+  // so the drawer waited for the SUM (measured 2026-09-24 on prod data: ~140 + 180 + 200 + 320 + 550
+  // ms ≈ 1.4 s of serial DB round-trips, ~2.5 s end to end). Now they run concurrently and the drawer
+  // waits for the SLOWEST (the family sidecar, ~0.55 s). Every one keeps its own fail-soft contract.
+
   // Similar opportunities (the flywheel) — same NAICS 3-digit subsector OR same agency,
   // active, not this one, deadline soonest. Real opps only.
   const nowIso = new Date().toISOString();
@@ -343,75 +349,88 @@ export async function GET(request: NextRequest) {
     .limit(6);
   if (opp.naics) simQ = simQ.like('naics_code', `${String(opp.naics).slice(0, 3)}%`);
   else if (opp.department) simQ = simQ.eq('department', opp.department);
-  const { data: sim } = await simQ;
-  const similar = (sim || []).slice(0, 5).map((s: Record<string, unknown>) => ({
-    id: s.notice_id,
-    title: s.title,
-    agency: s.department,
-    naics: s.naics_code,
-    setAside: s.set_aside_description || (s.set_aside_code ? (SET_LABEL[setGroupKey(s.set_aside_code as string)] || s.set_aside_code) : ''),
-    deadline: s.response_deadline ? String(s.response_deadline).slice(0, 10) : null,
-    location: [s.pop_city, s.pop_state].filter(Boolean).join(', '),
-  }));
+  const similarP = (async () => {
+    const { data: sim } = await simQ;
+    return (sim || []).slice(0, 5).map((s: Record<string, unknown>) => ({
+      id: s.notice_id,
+      title: s.title,
+      agency: s.department,
+      naics: s.naics_code,
+      setAside: s.set_aside_description || (s.set_aside_code ? (SET_LABEL[setGroupKey(s.set_aside_code as string)] || s.set_aside_code) : ''),
+      deadline: s.response_deadline ? String(s.response_deadline).slice(0, 10) : null,
+      location: [s.pop_city, s.pop_state].filter(Boolean).join(', '),
+    }));
+  })();
 
   // Activity signal (the Zillow "N saves" analog): how many contractors are tracking THIS notice in
   // their pipeline. A real competition/popularity tell, not vanity. DISTINCT users, non-archived.
   // Fail-soft: on any error → null (the client shows the stat only when it's a real count ≥2, so a
   // null or a 0/1 simply omits it — never "0 tracking this", which reads worse than nothing).
-  let trackingCount: number | null = null;
-  try {
-    const { count, error: tcErr } = await db
-      .from('user_pipeline')
-      .select('user_email', { count: 'exact', head: true })
-      .eq('notice_id', opp.id)
-      .eq('is_archived', false);
-    if (!tcErr) trackingCount = count ?? 0;
-  } catch { /* fail-soft — trackingCount stays null */ }
+  const trackingP = (async (): Promise<number | null> => {
+    try {
+      const { count, error: tcErr } = await db
+        .from('user_pipeline')
+        .select('user_email', { count: 'exact', head: true })
+        .eq('notice_id', opp.id)
+        .eq('is_archived', false);
+      if (!tcErr) return count ?? 0;
+    } catch { /* fail-soft — trackingCount stays null */ }
+    return null;
+  })();
 
   // Market Activity — the Zillow "741 views · 27 saves" analog, all GROUNDED, all fail-soft.
   // saved = people who added this to FAVORITES (the heart / Save action → user_saved_opportunities,
   // UNIQUE(user_email, notice_id) — the real per-opp save count, distinct from the pipeline).
   // This is Zillow's "27 saves". (Pursuing is deferred — Eric: "keep views and saved, add pursuits
   // later".) Same {count,error} bound + coalesce-only-after-no-error pattern.
-  let savedCount: number | null = null;
-  try {
-    const { count, error: scErr } = await db
-      .from('user_saved_opportunities')
-      .select('user_email', { count: 'exact', head: true })
-      .eq('notice_id', opp.id);
-    if (!scErr) savedCount = count ?? 0;
-  } catch { /* fail-soft — savedCount stays null */ }
+  const savedP = (async (): Promise<number | null> => {
+    try {
+      const { count, error: scErr } = await db
+        .from('user_saved_opportunities')
+        .select('user_email', { count: 'exact', head: true })
+        .eq('notice_id', opp.id);
+      if (!scErr) return count ?? 0;
+    } catch { /* fail-soft — savedCount stays null */ }
+    return null;
+  })();
 
   // viewed = DISTINCT viewers of this opp. The listing_view event is logged by the map when the
   // drawer opens (event_type='page_view', metadata.action='listing_view', metadata.notice_id).
   // A head:true exact count would count EVENTS (re-opens double-count), so select user_email and
   // dedupe in JS — the real signal is "how many distinct contractors looked", not open-count.
   // Fail-soft to null; until the event accrues this is 0 (the client omits "0 viewed", never fakes it).
-  let viewCount: number | null = null;
-  try {
-    const { data: viewRows, error: vcErr } = await db
-      .from('user_engagement')
-      .select('user_email')
-      .eq('event_type', 'page_view')
-      .eq('metadata->>action', 'listing_view')
-      .eq('metadata->>notice_id', opp.id);
-    if (!vcErr) {
-      const uniq = new Set<string>();
-      for (const r of (viewRows || []) as Array<{ user_email?: string | null }>) {
-        if (r.user_email) uniq.add(String(r.user_email).toLowerCase());
+  const viewsP = (async (): Promise<number | null> => {
+    try {
+      const { data: viewRows, error: vcErr } = await db
+        .from('user_engagement')
+        .select('user_email')
+        .eq('event_type', 'page_view')
+        .eq('metadata->>action', 'listing_view')
+        .eq('metadata->>notice_id', opp.id);
+      if (!vcErr) {
+        const uniq = new Set<string>();
+        for (const r of (viewRows || []) as Array<{ user_email?: string | null }>) {
+          if (r.user_email) uniq.add(String(r.user_email).toLowerCase());
+        }
+        return uniq.size;
       }
-      viewCount = uniq.size;
-    }
-  } catch { /* fail-soft — viewCount stays null */ }
+    } catch { /* fail-soft — viewCount stays null */ }
+    return null;
+  })();
 
   // Family current truth — sidecar. The record (`opp`) stays the requested
   // notice when the caller passed a UUID. History/documents are not overwritten.
-  let family: Awaited<ReturnType<typeof resolveFamilyForQuery>> = null;
-  try {
-    family = await resolveFamilyForQuery(id, { client: db });
-  } catch (e) {
-    console.warn('[opportunity-detail] family sidecar failed:', e instanceof Error ? e.message : e);
-  }
+  const familyP = (async (): Promise<Awaited<ReturnType<typeof resolveFamilyForQuery>>> => {
+    try {
+      return await resolveFamilyForQuery(id, { client: db });
+    } catch (e) {
+      console.warn('[opportunity-detail] family sidecar failed:', e instanceof Error ? e.message : e);
+      return null;
+    }
+  })();
+
+  const [similar, trackingCount, savedCount, viewCount, family] =
+    await Promise.all([similarP, trackingP, savedP, viewsP, familyP]);
 
   return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount, savedCount, viewCount, family });
 }

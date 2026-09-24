@@ -1620,10 +1620,7 @@ const VIEWPORT_JS = `<script>
   // CONTACT_COLOR retained as the CURRENT-dataset accent (used where no row is in hand, e.g. the
   // buyer drawer accent); kept in sync with MODE by setMapMode.
   var CONTACT_COLOR=COMPANY_COLOR;
-  var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, busy=false, pendingFetch=false, t=null, t2=null, Q='';
-  // Called when a fetch finishes: if a request came in WHILE it was busy (e.g. a search query typed
-  // mid-fetch), run it now so the latest state always gets fetched. Deferred a tick so busy is false.
-  function afterFetch(){ if(pendingFetch){ pendingFetch=false; setTimeout(function(){ try{fetchView();}catch(e){} },0); } }
+  var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, t=null, t2=null, Q='';
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
@@ -1958,6 +1955,7 @@ const VIEWPORT_JS = `<script>
   function horizonCountLabel(c,fmt){
     if(!c) return '';
     if(c.state==='needs_scope') return '\u2014';
+    if(c.state==='loading') return '\u2026';   // still loading for THIS intent — no number yet, never the old one
     if(c.state==='unavailable') return 'n/a';
     if(c.state==='unknown') return '?';
     return fmt(c.total)+(c.state==='partial'?'*':'');
@@ -1970,7 +1968,8 @@ const VIEWPORT_JS = `<script>
       if(c.state==='needs_scope') return;   // not a coverage fact — rendered by needsScopeNote()
       var name=h==='forecast'?'Forecasts':(h==='recompete'?'Recompetes':'Open');
       var who=c.gaps&&c.gaps.length?' for '+c.gaps.join(', '):'';
-      if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
+      if(c.state==='loading') out.push(name+' loading\u2026');
+      else if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
       else if(c.state==='partial') out.push(name+' partial — not measured'+who);
       else if(c.state==='unknown') out.push(name+' count unavailable');
     });
@@ -2024,6 +2023,14 @@ const VIEWPORT_JS = `<script>
       var _hc=window.__horizonCounts||{}, _hz=window.__horizons||{};
       var _en=['open','recompete','forecast'].filter(function(h){ return _hz[h]!==false; });
       var _reported=_en.length>0 && _en.every(function(h){ return !!_hc[h]; });
+      // Some horizons still LOADING and none has found anything yet: that is not "0 results" —
+      // the answer is not in. Say so instead of printing a zero (or keeping the previous number).
+      if(_reported && _en.some(function(h){ return _hc[h].state==='loading'; })){
+        var _rcL=document.getElementById('rescount');
+        if(_rcL)_rcL.innerHTML='<span style="font-weight:700;color:var(--ink)">Searching\u2026</span> <span style="font-weight:400;color:var(--sub)">'+esc(window.__coverageNote||'')+'</span>';
+        var _mcL=document.getElementById('mapCount'); if(_mcL)_mcL.hidden=true;
+        return;
+      }
       if(_reported){
         var _unknown=_en.some(function(h){ return _hc[h].state==='unknown'; });
         var _rc0=document.getElementById('rescount');
@@ -2101,6 +2108,17 @@ const VIEWPORT_JS = `<script>
       var sz=map.getSize(); if(sz.x<50||sz.y<50)return; // map not laid out yet — try again next render
       var b=L.featureGroup(ms).getBounds(); if(!b||!b.isValid())return;
       _didAutoFit=true;
+      // Viewport-queried pins always lie INSIDE the current view. When they already span most of it,
+      // a fit barely changes what the user sees — but its programmatic moveend costs a whole extra
+      // fetch round (measured on prod 2026-09-24: a second full round at +8.6 s on a cold load).
+      // Fit only when the results sit in a clearly smaller part of the view (e.g. a search whose
+      // matches cluster in one region). The zoom floor below still applies either way.
+      try{
+        var vb=map.getBounds();
+        var fLat=(b.getNorth()-b.getSouth())/Math.max(1e-9,vb.getNorth()-vb.getSouth());
+        var fLng=(b.getEast()-b.getWest())/Math.max(1e-9,vb.getEast()-vb.getWest());
+        if(fLat>0.6&&fLng>0.6){ if(map.getZoom()<PIN_DOT_ZOOM)map.setZoom(PIN_DOT_ZOOM,{animate:false}); return; }
+      }catch(e){}
       map.fitBounds(b.pad(.12),{animate:false,maxZoom:9,padding:[40,40]});
       // ⚠️ FLOOR THE FIT AT THE PIN THRESHOLD. fitBounds had a maxZoom but no MINIMUM, and the
       // pins span the whole country — so it resolved to 4.5, below PIN_DOT_ZOOM (5), and the map
@@ -2385,12 +2403,109 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
   }
 
-  // Duplicate-viewport guard state (see the block inside fetchView). 2000ms comfortably
-  // covers the boot autofit's stray moveend (measured +2.6s apart, 450ms debounce) while
-  // staying far below any human pan/zoom cadence — a user who moves the map genuinely
-  // changes the bbox, so the signature differs and the window never applies.
-  var _lastFetchSig='', _lastFetchAt=0; var DUP_FETCH_MS=2600;
+  // ── MAPS P0 (2026-09-24): NEWEST ACTION WINS · PROGRESSIVE HORIZONS · HORIZON CACHE ──────────
+  // Measured on prod before this change (tasks/maps-latency-transition-audit-2026-09-24.md):
+  //   · "Start fresh" PAINTED THE OLD (DoD-filtered) RESULTS at 1.7 s, then the right ones at 3.2 s —
+  //     a busy/pendingFetch queue let a superseded request land, then ran the real one serially.
+  //   · Open/Recompete/Forecast rendered only after Promise.all — the slowest horizon (keyword
+  //     Recompete, 3–4 s) held back horizons that were ready in ~1–2 s.
+  //   · Toggling a horizon refetched EVERY enabled horizon: turning Open OFF cost a 1.6 s round to
+  //     hide pins already on screen.
+  //   · Every pan recomputed market-wide truth (whole-corpus counts) that the bbox never enters.
+  //
+  // The contract now:
+  //   1. fetchView() only SCHEDULES. Every call in the same tick collapses into ONE round (a restore
+  //      that resets four controls and toggles three horizons is one intent, not seven requests).
+  //   2. Each round takes a generation number. A response from an older generation NEVER paints, and
+  //      its in-flight request is aborted when the new round needs a different URL for that horizon.
+  //      An identical URL already in flight is JOINED, not restarted (boot's duplicate triggers).
+  //   3. Each horizon paints the moment it resolves. A horizon still loading shows its LAST result
+  //      only when that result describes the same intent (only the bbox moved); otherwise it
+  //      contributes nothing and its count reads "loading" — an old number never stands in for a
+  //      new answer.
+  //   4. HORIZON CACHE. Pins are keyed by horizon + the full request URL (= every input of the
+  //      canonical discovery plan + the Maps surface policy + the bbox). Market truth (totals,
+  //      unmapped, location-less forecast rows) is keyed by the same URL MINUS the bbox, and a pan
+  //      with a cached intent sends counts=0 (map-counts-mode.ts) so the server skips it.
+  //      Invalidation: any change to a request param (query, filter, horizon policy, profile scope,
+  //      mode, bbox for pins) is a different key; entries expire after HZ_TTL_MS (the plan also
+  //      depends on the date — fiscal-year policy — which a 5-minute TTL cannot straddle in any way
+  //      that matters); failed or aborted responses are never cached; window.__mapInvalidate()
+  //      drops everything.
+  //   5. Instrumentation: window.__mapPerf keeps the last 40 rounds —
+  //      action → dispatch → each horizon (source: cache | joined | network, ms) → first paint → settled.
+  var HZ_TTL_MS=5*60*1000, HZ_KEEP=8;
+  var _hzPins={open:[],recompete:[],forecast:[]};    // [{key:url, at, d}] — the raw pins response
+  var _hzTruth={open:[],recompete:[],forecast:[]};   // [{key:intentSig, at, t}] — market truth
+  var _hzInflight={};                                // horizon → {url, ctrl, promise}
+  var _lastPainted={};                               // horizon → {sig, d, t} last painted result
+  var _fetchGen=0, _fvTimer=0, _fvT0=0;
+  window.__mapPerf=window.__mapPerf||[];
+  window.__mapInvalidate=function(){ _hzPins={open:[],recompete:[],forecast:[]}; _hzTruth={open:[],recompete:[],forecast:[]}; };
+  function _nowMs(){ try{ return performance.now(); }catch(e){ return Date.now(); } }
+  // The request MINUS the bbox = the discovery intent (plan inputs + surface policy) for this horizon.
+  function _intentSig(url){ return String(url).replace(/([?&])bbox=[^&]*&?/,'$1').replace(/[?&]$/,''); }
+  function _cacheGet(list,key){
+    if(!list)return null; var now=Date.now();
+    for(var i=0;i<list.length;i++){ var e=list[i]; if(e.key===key){ if(now-e.at<HZ_TTL_MS)return e; list.splice(i,1); return null; } }
+    return null;
+  }
+  function _cachePut(list,e){
+    for(var i=list.length-1;i>=0;i--){ if(list[i].key===e.key)list.splice(i,1); }
+    list.unshift(e); if(list.length>HZ_KEEP)list.length=HZ_KEEP;
+  }
+  // Market truth of one COUNTED response — everything in it the bbox never enters.
+  function _truthOf(d){
+    return { discovery:d.discovery, totalForFilters:d.totalForFilters, unmappedForFilters:d.unmappedForFilters,
+      marketTotalForFilters:d.marketTotalForFilters, unplaced:d.unplaced||[], unplacedTotal:d.unplacedTotal||0 };
+  }
+  // Build a horizon part from a pins response + its market truth. Built fresh every paint (toRow is
+  // cheap), so cached objects are never mutated by render().
+  function _partFrom(m,dv,tt){
+    var d={}; for(var k in dv)d[k]=dv[k];
+    if(tt){ d.discovery=tt.discovery||d.discovery; d.totalForFilters=tt.totalForFilters; d.unmappedForFilters=tt.unmappedForFilters;
+      d.unplaced=tt.unplaced; d.unplacedTotal=tt.unplacedTotal; }
+    // total = totalForFilters (the REAL count for this horizon, NOT the 1,000 pin cap) — captured
+    // per-horizon so the Horizons dropdown can show the honest number, never the cap.
+    // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
+    // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
+    // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
+    // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
+    var hc=horizonCount(d);
+    return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:hc.total,count:hc,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
+  }
+  // Load ONE horizon for this round: cache → join an identical in-flight request → network.
+  // Resolves {d, t, src} on success, {failed:true} on error, {aborted:true} when superseded.
+  function _loadHorizon(m,url){
+    var sig=_intentSig(url);
+    var hit=_cacheGet(_hzPins[m],url), truth=_cacheGet(_hzTruth[m],sig);
+    if(hit&&truth)return Promise.resolve({d:hit.d,t:truth.t,src:'cache'});
+    var inf=_hzInflight[m];
+    if(inf&&inf.url===url)return inf.promise.then(function(r){ return r&&r.d?{d:r.d,t:r.t,src:'joined'}:r; });
+    if(inf){ try{ if(inf.ctrl)inf.ctrl.abort(); }catch(e){} delete _hzInflight[m]; }
+    var ctrl=null; try{ ctrl=new AbortController(); }catch(e){}
+    // Market truth already held for this exact intent → ask for the viewport pins only.
+    var reqUrl=url+(truth?'&counts=0':'');
+    var pr=fetch(reqUrl,ctrl?{signal:ctrl.signal}:undefined).then(function(r){return r.json();}).then(function(d){
+      if(!d||!d.success)return {failed:true};
+      var t=(truth&&d.countsSkipped)?truth.t:_truthOf(d);
+      if(!(truth&&d.countsSkipped))_cachePut(_hzTruth[m],{key:sig,at:Date.now(),t:t});
+      var dv={success:true,discovery:d.discovery,pins:d.pins||[],totalInView:d.totalInView,capped:d.capped};
+      _cachePut(_hzPins[m],{key:url,at:Date.now(),d:dv});
+      return {d:dv,t:t,src:'network'};
+    },function(err){ return (err&&err.name==='AbortError')?{aborted:true}:{failed:true}; });
+    var entry={url:url,ctrl:ctrl,promise:null};
+    entry.promise=pr.then(function(r){ if(_hzInflight[m]===entry)delete _hzInflight[m]; return r; });
+    _hzInflight[m]=entry;
+    return entry.promise;
+  }
+  // PUBLIC entry point. Schedules; every call in the same tick is ONE round (see contract 1).
   function fetchView(){
+    if(!_fvT0)_fvT0=_nowMs();
+    if(_fvTimer)return;
+    _fvTimer=setTimeout(function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); },0);
+  }
+  function _fetchViewNow(t0){
     if(window.__suppressFetchView) return;
     _trackMapView();
     // RETURN CONTINUITY — remember this market (debounced, local only). Placed here
@@ -2401,15 +2516,9 @@ const VIEWPORT_JS = `<script>
     // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
     // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
     if(typeof _clearFetchError==='function')_clearFetchError();
-    // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
-    // Eric 2026-07-28: "search doesn't work"). Mark a re-fetch pending; the in-flight fetch's
-    // completion re-runs fetchView() with the CURRENT state (Q, filters, bbox), so the latest search
-    // always wins. Previously an if-busy-return no-op'd, so a query typed mid-fetch never fired.
-    if(busy){ pendingFetch=true; return; }
-    pendingFetch=false;
     // ── Companies / Gov Buyers: 2 flat datasets, by location, both hitting contacts-map. ──
     if(isContactMode(MODE)){
-      busy=true;
+      var cgen=++_fetchGen;
       var em=_uemail(); var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
       // ── PLAYERS map: Companies + Gov Buyers COEXIST on ONE map (Eric 2026-07-31 — the same
@@ -2439,7 +2548,7 @@ const VIEWPORT_JS = `<script>
       }
       var P=window.__players||{companies:true,buyers:true};
       var _pen=['companies','buyers'].filter(function(t){return P[t]!==false;});
-      if(_pen.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
+      if(_pen.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
       var _anyDenied=false;
       Promise.all(_pen.map(function(t){
         return fetch(_buildContactUrl(t),{headers:ch}).then(function(r){return r.json();}).then(function(d){
@@ -2447,7 +2556,7 @@ const VIEWPORT_JS = `<script>
           return {t:t,pins:(d.pins||[]).map(function(p){return toRow(p,t);}),total:d.totalForFilters||0};
         }).catch(function(){return {t:t,pins:[],total:0};});
       })).then(function(parts){
-        busy=false; afterFetch();
+        if(cgen!==_fetchGen)return;   // superseded — never paints
         var merged=[],tot=0;
         window.__playerTotals=window.__playerTotals||{};
         ['companies','buyers'].forEach(function(k){ window.__playerTotals[k]=0; });
@@ -2464,10 +2573,9 @@ const VIEWPORT_JS = `<script>
         render();
         if(maybeJumpToSearch())return;
         maybeAutoFit();
-      }).catch(function(){ busy=false; afterFetch(); if(typeof _showFetchError==='function')_showFetchError(); });
+      }).catch(function(){ if(cgen!==_fetchGen)return; if(typeof _showFetchError==='function')_showFetchError(); });
       return;
     }
-    busy=true;
     // ── OPPORTUNITIES map: all enabled HORIZONS on ONE map at once (Eric 2026-07-31, the locked
     // map1_two_axis_pin_system decision — 4 categories coexist, color-distinguished; the picker
     // toggles which horizons show, it does NOT switch corpora). window.__horizons = which of
@@ -2563,111 +2671,114 @@ const VIEWPORT_JS = `<script>
     var _lensOn=false;
     try{ _lensOn=!!(document.querySelector('.mf-strategy:checked')); }catch(e){}
     if(_lensOn && _enabled.indexOf('open')>-1){ _enabled=['open']; }
-    if(_enabled.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
-    // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
-    // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
-    // map — it contributes nothing and the others still render (resilient).
-    // ── DUPLICATE-VIEWPORT GUARD (2026-08-18, Eric: "maps is lagging today") ──────────
-    // MEASURED ON PROD: one page load fired the THREE viewport endpoints
-    // (opportunity-map / recompete-map / forecast-map) **three times each** with a
-    // BYTE-IDENTICAL bbox, at +0ms / +2.6s / +5.4s — 13 API calls, network idle 15.3s.
-    // Individual calls were healthy (1.1-1.4s warm); the cost was doing the work 3x.
-    //
-    // CAUSE: finishBoot() calls fetchView(), then maybeAutoFit() moves the map
-    // PROGRAMMATICALLY, Leaflet fires 'moveend', and that handler refetches 450ms later
-    // — at the same bbox. _didAutoFit prevents an infinite fit-fetch loop but not these
-    // extra rounds. (The comment above maybeAutoFit already predicts the stray moveend.)
-    //
-    // ⚠️ DELIBERATELY NOT an if-busy-return. That exact shape once dropped a search typed
-    // mid-fetch ("search doesn't work", 2026-07-28) — which is why the busy path above sets
-    // pendingFetch instead. This guard skips ONLY a request whose URL set is byte-identical
-    // to the one just completed AND that lands inside a short window, so any real change
-    // (bbox, query, filter, horizon) produces a different signature and always fetches.
-    var _sig=_enabled.map(_buildOppUrl).join('|');
-    var _now=Date.now();
-    if(_sig===_lastFetchSig && (_now-_lastFetchAt)<DUP_FETCH_MS){
-      busy=false; afterFetch(); render(); return;   // identical view already in hand
-    }
-    _lastFetchSig=_sig; _lastFetchAt=_now;
-    Promise.all(_enabled.map(function(m){
-      return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,failed:true};
-        // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
-        // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
-        // total = totalForFilters (the REAL count for this horizon in view, NOT the 1,000 pin cap) —
-        // captured per-horizon so the Horizons dropdown can show the honest number, never the cap.
-        // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
-        // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
-        var hc=horizonCount(d);
-        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:hc.total,count:hc,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
-      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true};});
-    })).then(function(parts){
-      busy=false; afterFetch();
-      // If EVERY enabled horizon's fetch FAILED (network blip / mid-deploy chunk mismatch), this is
-      // NOT a genuine "0 opportunities" — do NOT blank a populated map to a fake "No opportunities
-      // match". Keep the last-good render and surface an honest retry banner. A real empty result
-      // (fetch succeeded, 0 rows) has failed=false on every part → falls through and renders 0.
-      // Show the retry banner ONLY when every horizon genuinely failed AND there is nothing already
-      // on screen to preserve. A superseded/aborted fetch (the auto-fit re-fetch racing the initial
-      // load) can resolve failed while the FIRST fetch already rendered 600 cards — in that case we
-      // must NOT cover a good map with a false "Couldn't load" banner. So gate on "map is empty now".
-      var _allFailed = parts.length>0 && parts.every(function(p){return p&&p.failed;});
-      var _haveRender = (typeof OPPS!=='undefined' && OPPS && OPPS.length>0);
-      if(_allFailed){ if(!_haveRender && typeof _showFetchError==='function')_showFetchError(); return; }
-      if(typeof _clearFetchError==='function')_clearFetchError();
-      var merged=[],tot=0,cap=false,inv=0;
-      // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
-      // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
-      window.__horizonTotals=window.__horizonTotals||{};
-      // Reset ONLY the horizons NOT enabled this pass (a hidden horizon contributes nothing → 0).
-      // An ENABLED horizon keeps its last-known total until a SUCCESSFUL part overwrites it below —
-      // so a superseded/aborted fetch (the auto-fit re-fetch racing the initial load) can't stomp a
-      // real count to 0. This was the "Open: 0 while Open returns 5,170" bug: the LAST open fetch was
-      // the aborted refetch → part.failed → total 0 → it overwrote the good 5,170. (Eric 2026-08-03.)
-      ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)window.__horizonTotals[k]=0; });
-      var unplacedRows=[], unplacedTot=0;
-      // MAP-TRUTH CONTRACT (Eric 2026-09-12): rows matching the filters that the map cannot
-      // draw. Summed across the ENABLED horizons so the disclosure describes this exact view.
-      // A horizon whose count is UNKNOWN (null) makes the whole line unknown rather than
-      // letting a missing number quietly read as zero (Bug Prevention Rule #11).
-      var unmappedTot=0, unmappedUnknown=false;
-      window.__horizonCounts=window.__horizonCounts||{};
-      ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)delete window.__horizonCounts[k]; });
-      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=(typeof p.total==='number'?p.total:0); inv+=p.inview; if(p.capped)cap=true;
-        if(p.m && !p.failed && p.count)window.__horizonCounts[p.m]=p.count;
-        // MAP-TRUTH: sum what each horizon says it could not draw.
-        // ⚠️ SUBTRACT forecast's unplaced rows that were ALREADY surfaced in the list — they are
-        // concat'd into OPPS and counted in TOTAL above, so counting them again as "not shown on
-        // map" would double-count the same rows. Only the ones we did NOT surface are hidden.
-        if(!p.failed){
-          if(p.unmappedTotal===null)unmappedUnknown=true;
-          else unmappedTot+=Math.max(0,(p.unmappedTotal||0)-(p.unplacedTotal||0));
-        }
-        // Only a SUCCESSFUL part writes its horizon total — a failed/superseded part preserves the
-        // prior value (never overwrites a real count with 0).
-        if(p.m && !p.failed)window.__horizonTotals[p.m]=p.total;
-        if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); } });
-      // Location-less forecast rows go at the END of the list (they can't be a pin, so map-first
-      // users see the mappable results first; the searcher still finds them below). They count
-      // toward the headline total so "N results" is honest about what the search returned.
-      OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
-      window.__unplacedForecastTotal=unplacedTot;
-      // Coverage: every enabled horizon unavailable → the empty feed/header must say so, never "0".
-      window.__coverageNote=coverageNote(window.__horizonCounts);
-      window.__coverageAllUnavailable=_enabled.length>0 && _enabled.every(function(k){ var c=window.__horizonCounts[k]; return c&&c.state==='unavailable'; });
-      // A query that cannot define a market (needs_positive_scope / needs_refinement) → the feed and
-      // header show the refinement text, never an empty map that reads as "0 results".
-      window.__needsScope=needsScopeNote(window.__horizonCounts,_enabled);
-      // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
-      // could not be established; the line says so rather than implying everything is mapped.
-      window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
-      if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
-      render();
-      _unplacedFoot();
-      if(maybeJumpToSearch())return;
-      maybeAutoFit();
-    }).catch(function(){busy=false; afterFetch(); if(typeof _showFetchError==='function')_showFetchError();});
+    if(_enabled.length===0){ _fetchGen++; OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
+    // Horizons no longer part of this view: their in-flight requests can never paint — abort them.
+    ['open','recompete','forecast'].forEach(function(k){
+      if(_enabled.indexOf(k)===-1&&_hzInflight[k]){ try{ if(_hzInflight[k].ctrl)_hzInflight[k].ctrl.abort(); }catch(e){} delete _hzInflight[k]; }
+    });
+    var gen=++_fetchGen;
+    var round={gen:gen,enabled:_enabled,parts:{},sigs:{},pending:_enabled.length,painted:false,paintTimer:0,
+      perf:{action:t0,dispatch:_nowMs(),horizons:{},firstPaint:null,settled:null}};
+    _enabled.forEach(function(m){
+      var url=_buildOppUrl(m); round.sigs[m]=_intentSig(url);
+      _loadHorizon(m,url).then(function(r){
+        if(gen!==_fetchGen)return;            // superseded — an older action never paints
+        if(!r||r.aborted)return;
+        round.parts[m]=r.failed?{m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true}:_partFrom(m,r.d,r.t);
+        if(!r.failed)_lastPainted[m]={sig:round.sigs[m],d:r.d,t:r.t};
+        round.pending--;
+        round.perf.horizons[m]={src:r.failed?'failed':r.src,ms:Math.round(_nowMs()-round.perf.action)};
+        // Parts that resolve in the same tick (cache hits) paint ONCE.
+        if(!round.paintTimer)round.paintTimer=setTimeout(function(){ round.paintTimer=0; _paintRound(round); },0);
+      });
+    });
   }
+  // Paint the CURRENT round with whatever horizons have resolved (contract 3).
+  function _paintRound(round){
+    if(round.gen!==_fetchGen)return;
+    var settled=round.pending===0;
+    var _enabled=round.enabled, parts=[], loading=[];
+    _enabled.forEach(function(m){
+      var p=round.parts[m];
+      if(p){ parts.push(p); return; }
+      // Still loading. Carry its last result ONLY if it answers the same intent (just an older bbox).
+      var lp=_lastPainted[m];
+      if(lp&&lp.sig===round.sigs[m]){ parts.push(_partFrom(m,lp.d,lp.t)); return; }
+      loading.push(m);
+    });
+    if(!parts.length)return;                  // nothing to show yet — keep the current screen
+    // If EVERY enabled horizon's fetch FAILED (network blip / mid-deploy chunk mismatch), this is
+    // NOT a genuine "0 opportunities" — do NOT blank a populated map to a fake "No opportunities
+    // match". Keep the last-good render and surface an honest retry banner. A real empty result
+    // (fetch succeeded, 0 rows) has failed=false on every part → falls through and renders 0.
+    // Show the retry banner ONLY when every horizon genuinely failed AND there is nothing already
+    // on screen to preserve. (A superseded fetch never reaches here — the generation check drops it.)
+    var _allFailed = parts.length>0 && parts.every(function(p){return p&&p.failed;});
+    var _haveRender = (typeof OPPS!=='undefined' && OPPS && OPPS.length>0);
+    if(_allFailed&&loading.length)return;     // the rest may still succeed — don't judge yet
+    if(_allFailed){ if(!_haveRender && typeof _showFetchError==='function')_showFetchError(); return; }
+    if(typeof _clearFetchError==='function')_clearFetchError();
+    var merged=[],tot=0,cap=false,inv=0;
+    // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
+    // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
+    window.__horizonTotals=window.__horizonTotals||{};
+    // Reset ONLY the horizons NOT enabled this pass (a hidden horizon contributes nothing → 0).
+    // An ENABLED horizon keeps its last-known total until a SUCCESSFUL part overwrites it below —
+    // so a failed fetch can't stomp a real count to 0 (the "Open: 0 while Open returns 5,170" bug).
+    ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)window.__horizonTotals[k]=0; });
+    var unplacedRows=[], unplacedTot=0;
+    // MAP-TRUTH CONTRACT (Eric 2026-09-12): rows matching the filters that the map cannot
+    // draw. Summed across the ENABLED horizons so the disclosure describes this exact view.
+    // A horizon whose count is UNKNOWN (null) makes the whole line unknown rather than
+    // letting a missing number quietly read as zero (Bug Prevention Rule #11). A horizon still
+    // LOADING is unknown too.
+    var unmappedTot=0, unmappedUnknown=loading.length>0;
+    window.__horizonCounts=window.__horizonCounts||{};
+    ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)delete window.__horizonCounts[k]; });
+    // A horizon still loading for a NEW intent has no number yet — say so, never keep its old one.
+    loading.forEach(function(k){ window.__horizonCounts[k]={total:null,state:'loading',gaps:[]}; });
+    parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=(typeof p.total==='number'?p.total:0); inv+=p.inview; if(p.capped)cap=true;
+      if(p.m && !p.failed && p.count)window.__horizonCounts[p.m]=p.count;
+      // MAP-TRUTH: sum what each horizon says it could not draw.
+      // ⚠️ SUBTRACT forecast's unplaced rows that were ALREADY surfaced in the list — they are
+      // concat'd into OPPS and counted in TOTAL above, so counting them again as "not shown on
+      // map" would double-count the same rows. Only the ones we did NOT surface are hidden.
+      if(!p.failed){
+        if(p.unmappedTotal===null)unmappedUnknown=true;
+        else unmappedTot+=Math.max(0,(p.unmappedTotal||0)-(p.unplacedTotal||0));
+      }
+      // Only a SUCCESSFUL part writes its horizon total — a failed part preserves the
+      // prior value (never overwrites a real count with 0).
+      if(p.m && !p.failed)window.__horizonTotals[p.m]=p.total;
+      if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); } });
+    // Location-less forecast rows go at the END of the list (they can't be a pin, so map-first
+    // users see the mappable results first; the searcher still finds them below). They count
+    // toward the headline total so "N results" is honest about what the search returned.
+    OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
+    window.__unplacedForecastTotal=unplacedTot;
+    window.__horizonsLoading=loading.slice();
+    // Coverage: every enabled horizon unavailable → the empty feed/header must say so, never "0".
+    window.__coverageNote=coverageNote(window.__horizonCounts);
+    window.__coverageAllUnavailable=_enabled.length>0 && _enabled.every(function(k){ var c=window.__horizonCounts[k]; return c&&c.state==='unavailable'; });
+    // A query that cannot define a market (needs_positive_scope / needs_refinement) → the feed and
+    // header show the refinement text, never an empty map that reads as "0 results".
+    window.__needsScope=needsScopeNote(window.__horizonCounts,_enabled);
+    // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
+    // could not be established; the line says so rather than implying everything is mapped.
+    window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
+    if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
+    render();
+    if(!round.painted){ round.painted=true; round.perf.firstPaint=Math.round(_nowMs()-round.perf.action); }
+    if(!settled)return;
+    // SETTLED — everything below may move the map (a new round), so it waits for the last horizon.
+    round.perf.settled=Math.round(_nowMs()-round.perf.action);
+    round.perf.dispatch=Math.round(round.perf.dispatch-round.perf.action);
+    try{ window.__mapPerf.push(round.perf); if(window.__mapPerf.length>40)window.__mapPerf.shift(); }catch(e){}
+    _unplacedFoot();
+    if(maybeJumpToSearch())return;
+    maybeAutoFit();
+  }
+
   // FOOT OF THE FEED: a standing link to the forecasts the map can never plot.
   //
   // Deliberately NOT merged into OPPS. render() does rows=OPPS.filter(pass) and then builds a
@@ -8003,9 +8114,18 @@ const DRAWER_JS = `<script>
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
     dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins();
-    body.innerHTML='<div class="oppload">Loading\\u2026</div>';
+    // DRAWER SHELL FROM THE ROW IN HAND (Maps P0, 2026-09-24). The drawer used to sit on a bare
+    // "Loading…" until opportunity-detail answered (measured 2.5–2.8 s on prod). The clicked pin
+    // already carries the listing's identity — title, buyer, due date, set-aside, NAICS, place and
+    // the SAME M-Estimate the card shows — so the drawer opens on that immediately and the detail
+    // fetch fills in the rest. Only facts the pin actually holds are shown; nothing is inferred.
+    body.innerHTML=_pin?oppShellHTML(_pin):'<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    var _drawerNid=String(nid); window.__oppDrawerNid=_drawerNid;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
+      // Newest action wins here too: a slower response for a listing the user has already moved
+      // off must never repaint the drawer over the one they are now reading.
+      if(window.__oppDrawerNid!==_drawerNid)return;
       if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
       // ── DLA/DIBBS bid: a supply RFQ, priced by NSN+quantity and quoted on DIBBS — NOT a SAM
       // notice. Render the DLA-specific drawer (NSN/item/qty/unit/PR/spec + price-to-quote) and RETURN
@@ -8026,6 +8146,7 @@ const DRAWER_JS = `<script>
       // Second, on-demand fetch for the reused-intelligence sections (fail-soft). Also carries
       // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
+        if(window.__oppDrawerNid!==_drawerNid)return;   // the user moved to another listing — don't paint over it
         var intel=(x&&x.success)?x.intel:{};
         // The HERO fills come FIRST, BEFORE the #intelBox guard (Eric 2026-08-04 bug: the hero
         // M-Estimate + M-Win stayed stuck on "Estimating…/Scoring…" because these fills sat AFTER
@@ -8048,9 +8169,20 @@ const DRAWER_JS = `<script>
         box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
         buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ fillMEstTop(null,_pinEst); fillMWinTop({grounded:false}); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
+      }).catch(function(){ if(window.__oppDrawerNid!==_drawerNid)return; fillMEstTop(null,_pinEst); fillMWinTop({grounded:false}); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
+    }).catch(function(){ if(window.__oppDrawerNid!==_drawerNid)return; body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
+  // The immediate drawer shell (see openOppDrawer). Reads ONLY fields the clicked pin carries.
+  function oppShellHTML(p){
+    function row(k,v){ return v?'<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line,#e6e9ef);font-size:13px"><span style="color:var(--sub)">'+esc(k)+'</span><span style="font-weight:600;text-align:right">'+esc(v)+'</span></div>':''; }
+    var est=(typeof p.est==='number'&&p.est>0)?('$'+Math.round(p.est).toLocaleString()):'';
+    return '<div class="oppshell" style="padding:22px 24px">'
+      +(p.agency?'<div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--sub)">'+esc(p.agency)+'</div>':'')
+      +'<h2 style="margin:6px 0 14px;font-size:20px;line-height:1.3">'+esc(p.title||'Opportunity')+'</h2>'
+      +row('Estimated value',est)+row('Response due',p.close||'')+row('Set-aside',(p.set&&p.set!=='None')?p.set:'')
+      +row('NAICS',p.naics||'')+row('Notice type',p.noticeType||'')+row('Place',p.loc||'')+row('Solicitation #',(p.sol&&p.sol!==p.nid)?p.sol:'')
+      +'<div class="oppload" style="padding:28px 0 8px">Loading full details\\u2026</div></div>';
+  }
 
   // ── Company (Contractor) detail ─────────────────────────────────────────────────────────
   // COMPOUND (GOS #9): the company drawer REPLICATES the opp drawer's shell (same action bar,
@@ -8770,12 +8902,21 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // Always the United States first (last US view / US IP state / CONUS). Fetch that bbox now.
     _bootSrc=bootPlace();
     if(_done)return; _done=true;
-    finishBoot();
     var em=decodeEmail();
     if(!em){
+      finishBoot();
       if(_bootSrc==='conus') geoState(function(st){ if(st)setStateView(st); ensureUS(); });
       return;
     }
+    // ONE BOOT ROUND (Maps P0, 2026-09-24). A signed-in visitor with no remembered view used to get
+    // TWO full discovery rounds: one at the IP/CONUS view immediately, then another after map-home
+    // moved the map to their home state. The view is not resolved until map-home answers, so the
+    // first fetch waits for it — bounded, so a slow map-home can never hold the map hostage. The
+    // URL / saved-search / remembered-market restorers run synchronously in this same script while
+    // fetches are suppressed, so the one round that follows already carries the final intent.
+    var _released=false;
+    function releaseBoot(){ if(_released)return; _released=true; finishBoot(); }
+    if(_bootSrc==='last') releaseBoot(); else setTimeout(releaseBoot,700);
     var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     var H={'x-mi-auth-token':tok,'x-user-email':em};
     fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
@@ -8783,7 +8924,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
         if(st){ window.__homeState=st; }
         if(st&&_bootSrc!=='last'){ setStateView(st); ensureUS(); }
-      }).catch(function(){});
+        releaseBoot();
+      }).catch(function(){ releaseBoot(); });
     // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
     fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
