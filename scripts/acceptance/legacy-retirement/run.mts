@@ -223,7 +223,7 @@ async function main() {
         body: JSON.stringify({ inputs: { naicsCode: '541512', businessType: 'Small Business', veteranStatus: 'Not Applicable', goodsOrServices: 'services' }, selectedAgencies: ['Department of Veterans Affairs'] }),
       });
       const gj = await gen.json().catch(() => ({}));
-      check('shared-password', 'the old anonymous cookie is no longer accepted as an identity for report generation', gen.status !== 200 || gj.accessTier !== 'free' || !!gj.error, { status: gen.status, accessTier: gj.accessTier, error: gj.error });
+      check('shared-password', 'the old anonymous cookie is no longer accepted as an identity for report generation', gen.status === 403 && gj.accessTier === undefined, { status: gen.status, accessTier: gj.accessTier, error: gj.error });
     }
 
     // ── C. Each legacy customer shape: legacy entry → REAL sign-in → Mindy. ──
