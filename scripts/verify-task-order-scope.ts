@@ -27,6 +27,7 @@ type Mods = {
   vehicleOfParent: typeof import('../src/lib/vehicles/registry')['vehicleOfParent'];
   vehicleCoverage: typeof import('../src/lib/vehicles/registry')['vehicleCoverage'];
   recordedParent: typeof import('../src/lib/vehicles/parent-scope')['recordedParent'];
+  isUnattributedOrder: typeof import('../src/lib/vehicles/parent-scope')['isUnattributedOrder'];
   parentIdOf: typeof import('../src/lib/vehicles/parent-scope')['parentIdOf'];
   workEvidence: typeof import('../src/lib/vehicles/parent-scope')['workEvidence'];
   workTerms: typeof import('../src/lib/vehicles/parent-scope')['workTerms'];
@@ -41,7 +42,7 @@ async function load(): Promise<Mods> {
   return {
     idvContracts: a.idvContracts, searchScopedTaskOrders: b.searchScopedTaskOrders, mapsRecompeteRequest: c.mapsRecompeteRequest,
     readOld: d.readOld, resolveVehicle: e.resolveVehicle, vehicleOfParent: e.vehicleOfParent, vehicleCoverage: e.vehicleCoverage,
-    recordedParent: f.recordedParent, parentIdOf: f.parentIdOf, workEvidence: f.workEvidence, workTerms: f.workTerms,
+    recordedParent: f.recordedParent, isUnattributedOrder: f.isUnattributedOrder, parentIdOf: f.parentIdOf, workEvidence: f.workEvidence, workTerms: f.workTerms,
   };
 }
 
@@ -206,6 +207,50 @@ async function main() {
     `Map API via the shared link: mapped ${read.total} + unmapped ${read.unmapped} = ${(read.total ?? 0) + (read.unmapped ?? 0)} · tool total ${a1.first.total}`);
   check('6.map_pins', JSON.stringify(mapPinIds) === JSON.stringify(toolOnMap), `Map pins (world bbox) == the tool's on-map orders: ${mapPinIds.length}`);
   evidence.map_agreement = { map_url: a1.first.map_url, map_mapped: read.total, map_unmapped: read.unmapped, map_pin_ids: mapPinIds };
+
+  // ── 8. Correction batch (#1692 review) ───────────────────────────────────────────
+  // 8a. Applied filters narrow the SAME result, are echoed, and the Map link agrees.
+  const stateCounts = new Map<string, number>();
+  for (const o of a1.rows) if (o.place_of_performance_state) stateCounts.set(o.place_of_performance_state, (stateCounts.get(o.place_of_performance_state) ?? 0) + 1);
+  const topState = [...stateCounts.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? 'VA';
+  const filtered = await M.searchScopedTaskOrders({ vehicle: 'OASIS+', work: WORK, lead_months: LEAD, state: topState, min_value: 1_000_000, limit: 100 });
+  const expectIds = a1.rows.filter((o) => o.place_of_performance_state === topState && (o.potential_total_value ?? 0) >= 1_000_000).map((o) => o.contract_id).sort();
+  const gotIds = filtered.orders.map((o) => o.contract_id).sort();
+  check('8.filters_applied', JSON.stringify(gotIds) === JSON.stringify(expectIds) && ['state', 'min_value'].every((f) => filtered.applied_filters.some((x) => x.filter === f)),
+    `state=${topState} (pop) + min_value=1,000,000 → ${gotIds.length} (JS subset of the 23: ${expectIds.length}); both echoed in applied_filters`);
+  const fParams = Object.fromEntries(new URL(filtered.map_url!).searchParams);
+  const fRead = await M.readOld(db, M.mapsRecompeteRequest((k) => fParams[k]), WORLD);
+  check('8.filters_map', (fRead.total ?? 0) + (fRead.unmapped ?? 0) === filtered.total && fParams.state === topState && fParams.minValue === '1000000',
+    `Map link carries state + minValue: mapped ${fRead.total} + unmapped ${fRead.unmapped} = tool ${filtered.total}`);
+  // 8b. Filters the scoped data cannot run are refused — nothing searched.
+  const refusals = await Promise.all([
+    { psc: 'R408' }, { date_from: '2025-01-01' }, { search_type: 'idv' as const }, { state: 'VA' }, { state: 'VA', state_scope: 'recipient' as const },
+  ].map((x) => M.idvContracts({ vehicle: 'OASIS+', work: WORK, ...x })));
+  check('8.filters_refused', refusals.every((r) => r.status === 'needs_refinement' && r._meta.total === null && (r.refused_filters?.length ?? 0) > 0),
+    `psc · date_from · search_type:idv · state (no scope) · state (recipient) → ${refusals.map((r) => r.refused_filters?.[0]?.filter).join(', ')} refused`);
+  // 8c. Unattributed orders, independent path: simple PostgREST filters (no regex) + the JS twin.
+  const { from: wFrom, to: wTo } = windowBounds();
+  const cand: Record<string, unknown>[] = [];
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await db.from('recompete_opportunities')
+      .select('contract_id, contract_type, description, naics_code, naics_description, psc_description, period_of_performance_current_end')
+      .range(off, off + 999) // paged: the loop reads until a short page
+      .in('contract_type', ['DELIVERY ORDER', 'BPA CALL', 'TASK ORDER']).is('quality_flag', null)
+      .gte('period_of_performance_current_end', wFrom).lte('period_of_performance_current_end', wTo)
+      .or('contract_id.not.like.CONT_AWD_*,contract_id.like.*-NONE-*').order('contract_id');
+    if (error) throw new Error(error.message);
+    cand.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  const unattrJs = cand.filter((r) => M.isUnattributedOrder(r as never) && M.workEvidence(r, WORK).every((e) => e.fields.length > 0)).length;
+  const genMissing = cand.filter((r) => String(r.contract_id).startsWith('CONT_AWD_') && M.isUnattributedOrder(r as never)).length;
+  check('8.unattributed_recount', unattrJs === a1.first.unattributed_orders,
+    `unattributed "${WORK}" orders: tool ${a1.first.unattributed_orders} · independent ${unattrJs} (generated ids with a missing parent among all window orders: ${genMissing})`);
+  evidence.correction_batch = {
+    filters: { state: topState, min_value: 1_000_000, ids: gotIds, applied_filters: filtered.applied_filters, map_url: filtered.map_url },
+    refused: refusals.map((r) => ({ refused: r.refused_filters, status: r.status })),
+    unattributed: { tool: a1.first.unattributed_orders, independent: unattrJs, generated_missing_parent_in_window: genMissing },
+  };
 
   // ── 7. Unfiltered task-order search unchanged ───────────────────────────────────────
   const legacy = await M.idvContracts({ naics: '541611', search_type: 'task', limit: 10 });

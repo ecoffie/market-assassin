@@ -25,7 +25,7 @@ Branch `feat/task-order-parent-vehicle-filter` · 2026-09-24 · no merge, deploy
 - **Work evidence comes from work fields only:** description · PSC title · the **official NAICS title** of `naics_code` (`src/data/naics-codes.json`, USASpending NAICS API). Every term must appear. Incumbent and agency names are deliberately not evidence ("FEMA" + "XYZ Consulting" is not management consulting). Each order reports which field carried each term.
 - **Map link:** `mode=recompete&horizon=recompete&vehicle|parent=…&work=…&leadMax=…`. The Awarded horizon is isolated so Open/Forecast totals can't be summed in. The params round-trip through the URL writer, survive reload, and are cleared by **Clear**. Saved searches reject the new keys (`validate-filters` allowlist), and alert scope already refuses Awarded mode. So a scoped search can never become an all-vehicles alert.
 
-## Acceptance — live, read-only (`npx tsx scripts/verify-task-order-scope.ts` → 21/21)
+## Acceptance — live, read-only (`npx tsx scripts/verify-task-order-scope.ts` → 21/21 at the first head; 25/25 after the correction batch)
 
 | # | Criterion | Result |
 |---|---|---|
@@ -42,6 +42,23 @@ Browser (built app, headless Chrome; `browser-evidence.json`, `screens/`):
 - **Refresh and a fresh browser:** identical URL, banner and final fetch.
 - **Clear:** the URL goes back to `?mode=recompete` and the next fetch is unscoped.
 - **Ambiguous "OASIS":** "Not searched: …", "Nothing searched yet" and no pins.
+
+## Correction batch (#1692 review)
+
+| Finding | Fix | Execution regression (PGlite, real rows) | Proven red on the old code |
+|---|---|---|---|
+| **Dropped filters.** psc, dates, `search_type:"idv"`, `state_scope`, `min_value` were accepted and ignored in scoped mode | naics · agency · `min_value` (`potential_total_value`) · `state` with `state_scope:"pop"` are applied in the query, echoed in `applied_filters`, and on the Map link (`minValue`). psc · dates · `search_type:"idv"` · recipient/both state are refused: `needs_refinement`, `refused_filters`, nothing searched | each applied filter removes exactly the one fixture row that fails it, and the Map (readOld + SQL twin, from the tool's link) returns the same ids; each refused input returns no rows and a null total; every input key is classified | refusal disabled + min_value unforwarded → 9 failing |
+| **Bare PIID > 1,000 rows.** The agency set came from a 1,000-row sample | one existence query per round, excluding the known agencies inside the query | 1,001 orders at 9700 inserted first, 1 at 4732: the old sample sees only 9700; the fix finds both → `unresolved` offering both exact ids; each exact id returns 1,001 / 1 | old sampler → 2 failing |
+| **Generated ids with missing parents.** `…_-NONE-_-NONE-` / `…_<piid>_-NONE-` orders were in neither number | `UNATTRIBUTED_ORDERS_OR` covers raw-PIID and missing-parent-slot orders (by contract_type), with a JS twin | SQL result == JS twin row by row; count 3 (was 1); never admitted into scope | old definition → 2 failing |
+
+Live after the batch (`npm run verify:task-order-scope`, **25/25**):
+- The original 21 checks are unchanged.
+- `state=DC` + `min_value=1,000,000` gives 6. That equals the JS subset of the 23, and the Map shows 4 mapped + 2 unmapped.
+- The five unsupported inputs are refused.
+- Unattributed orders: tool 11, independent recount 11 (0 generated-ID orders with a missing parent in the window today).
+- Measured: no parent PIID in the table currently appears under two agencies, so finding 2 has no live instance; the fixture carries it.
+
+Browser (built app, `browser-evidence.json`): the filtered link, the base link and the ambiguous name each open, refresh and open in a fresh browser to the identical final Awarded fetch. Filtered: "4 opportunities · 2 not shown on map".
 
 ## Reproducible demo (VCI / IMRI style)
 

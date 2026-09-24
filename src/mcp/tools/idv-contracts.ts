@@ -56,6 +56,10 @@ export interface IdvContractsToolResult {
     note: string;
   };
   map?: { url: string | null; mapped_total: number | null; unmapped_total: number | null; note: string };
+  /** Scoped searches: every filter applied and the field it ran on. */
+  applied_filters?: ScopedTaskOrderResult['applied_filters'];
+  /** Scoped searches: filters that cannot run on this data — the search was NOT run. */
+  refused_filters?: { filter: string; reason: string }[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: { grounded: boolean; degraded: boolean; count: number; total: number | null };
 }
@@ -86,16 +90,43 @@ function toScopedContract(r: ScopedTaskOrderRow): ScopedContract {
   };
 }
 
+/**
+ * Every tool input that the vehicle/parent-scoped search cannot honour on its data. A filter it cannot
+ * run is REFUSED (status needs_refinement, nothing searched) — never dropped: a dropped filter returns a
+ * broader market that reads as the narrower one the caller asked for.
+ */
+export function refusedScopedFilters(input: IdvContractsToolInput): { filter: string; reason: string }[] {
+  const out: { filter: string; reason: string }[] = [];
+  if (input.search_type === 'idv') out.push({ filter: 'search_type', reason: 'vehicle / parent_id scope TASK ORDERS; search_type:"idv" lists base vehicles. Omit search_type or pass "task".' });
+  if (input.psc?.trim()) out.push({ filter: 'psc', reason: 'PSC cannot filter scoped orders: psc_code is populated on ~6% of this data and the Map\'s Awarded layer does not apply it. Use naics or a work subject.' });
+  if (input.date_from?.trim() || input.date_to?.trim()) out.push({ filter: input.date_from?.trim() ? 'date_from' : 'date_to', reason: 'Scoped orders carry no action date; the window is the period-of-performance end (lead_months).' });
+  if (input.state?.trim() && input.state_scope !== 'pop') out.push({ filter: 'state', reason: 'In a scoped search state means PLACE OF PERFORMANCE only (recipient HQ state is not on this data). Pass state_scope:"pop".' });
+  return out;
+}
+
 async function scopedIdvContracts(input: IdvContractsToolInput): Promise<IdvContractsToolResult> {
   const queried: Record<string, string | number> = {};
-  for (const [k, v] of Object.entries({ vehicle: input.vehicle, parent_id: input.parent_id, work: input.work, naics: input.naics, agency: input.agency, state: input.state, lead_months: input.lead_months })) {
+  for (const [k, v] of Object.entries({
+    vehicle: input.vehicle, parent_id: input.parent_id, work: input.work, naics: input.naics, agency: input.agency,
+    state: input.state, state_scope: input.state_scope, min_value: input.min_value, psc: input.psc,
+    date_from: input.date_from, date_to: input.date_to, search_type: input.search_type, lead_months: input.lead_months,
+  })) {
     if (v !== undefined && v !== '') queried[k] = v as string | number;
+  }
+  const refused = refusedScopedFilters(input);
+  if (refused.length) {
+    return {
+      queried, search_type: 'task_orders', contracts: [], has_next_page: false, status: 'needs_refinement',
+      reason: `Not searched — ${refused.map((r) => `${r.filter}: ${r.reason}`).join(' ')}`,
+      refused_filters: refused,
+      _meta: { grounded: false, degraded: false, count: 0, total: null },
+    };
   }
   let r: ScopedTaskOrderResult | null = null;
   try {
     r = await searchScopedTaskOrders({
       vehicle: input.vehicle, parent_id: input.parent_id, work: input.work, naics: input.naics,
-      agency: input.agency, state: input.state, lead_months: input.lead_months, limit: input.limit, page: input.page,
+      agency: input.agency, state: input.state, min_value: input.min_value, lead_months: input.lead_months, limit: input.limit, page: input.page,
     });
   } catch (err) {
     console.error('[mcp:idv-contracts] scoped search failed:', err);
@@ -117,6 +148,7 @@ async function scopedIdvContracts(input: IdvContractsToolInput): Promise<IdvCont
     reason: r.reason,
     scope: r.scope,
     population: r.population,
+    applied_filters: r.applied_filters,
     coverage: {
       parent_orders_in_population: r.parent_orders_in_population,
       unattributed_orders: r.unattributed_orders,

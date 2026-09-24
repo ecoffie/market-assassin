@@ -812,7 +812,10 @@ const IDV_CONTRACTS_TOOL_DEF = {
       'a verified registry of parent IDVs by their awarding solicitation — "OASIS" alone is ambiguous and original ' +
       'OASIS is a different vehicle) or parent_id (exact CONT_IDV_<PIID>_<AGENCY>), optionally with work (e.g. ' +
       '"management consulting"). Scoped results cover ACTIVE orders, carry each order\'s parent id as evidence, and ' +
-      'return a shareable Map link with the same scope. status "unresolved" means nothing was searched — never ' +
+      'return a shareable Map link with the same scope. In a scoped search naics, agency, min_value and state (with ' +
+      'state_scope:"pop") apply and are echoed in applied_filters; psc, date_from/date_to, search_type:"idv" and ' +
+      'recipient-HQ state are REFUSED (status needs_refinement, refused_filters) rather than dropped. ' +
+      'status "unresolved" means nothing was searched — never ' +
       'report it as zero orders. Vehicle membership of an order says nothing about any company\'s eligibility.',
     parameters: {
       type: 'object',

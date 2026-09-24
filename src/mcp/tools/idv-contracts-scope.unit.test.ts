@@ -51,6 +51,14 @@ describe('scoped search', () => {
     const c = r.contracts[0] as { parent: { parent_id: string } };
     expect(c.parent.parent_id).toBe('CONT_IDV_47QRCA25DA002_4732');
   });
+  it('applied scoped filters reach the executed search unchanged (state only with state_scope pop)', async () => {
+    searchScopedTaskOrders.mockResolvedValue({ ...base, applied_filters: [] });
+    await idvContracts({ vehicle: 'OASIS+', work: 'w', naics: '541611', agency: 'DHS', state: 'VA', state_scope: 'pop', min_value: 1_000_000, lead_months: 24, limit: 7, page: 2 });
+    expect(searchScopedTaskOrders).toHaveBeenCalledWith({
+      vehicle: 'OASIS+', parent_id: undefined, work: 'w', naics: '541611', agency: 'DHS', state: 'VA',
+      min_value: 1_000_000, lead_months: 24, limit: 7, page: 2,
+    });
+  });
   it('unresolved is reported as unresolved with total null — never zero orders', async () => {
     searchScopedTaskOrders.mockResolvedValue({ ...base, status: 'unresolved', reason: 'ambiguous', total: null, mapped_total: null, unmapped_total: null, orders: [], map_url: null });
     const r = await idvContracts({ vehicle: 'OASIS' });

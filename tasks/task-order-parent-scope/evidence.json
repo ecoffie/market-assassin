@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-24T22:18:31.958Z",
+ "generated_at": "2026-09-24T22:43:41.816Z",
  "checks": [
   {
    "id": "registry.members",
@@ -100,6 +100,26 @@
    "id": "6.map_pins",
    "pass": true,
    "detail": "Map pins (world bbox) == the tool's on-map orders: 15"
+  },
+  {
+   "id": "8.filters_applied",
+   "pass": true,
+   "detail": "state=DC (pop) + min_value=1,000,000 → 6 (JS subset of the 23: 6); both echoed in applied_filters"
+  },
+  {
+   "id": "8.filters_map",
+   "pass": true,
+   "detail": "Map link carries state + minValue: mapped 4 + unmapped 2 = tool 6"
+  },
+  {
+   "id": "8.filters_refused",
+   "pass": true,
+   "detail": "psc · date_from · search_type:idv · state (no scope) · state (recipient) → psc, date_from, search_type, state, state refused"
+  },
+  {
+   "id": "8.unattributed_recount",
+   "pass": true,
+   "detail": "unattributed \"management consulting\" orders: tool 11 · independent 11 (generated ids with a missing parent among all window orders: 0)"
   },
   {
    "id": "7.unscoped_legacy_shape",
@@ -931,6 +951,100 @@
     "CONT_AWD_W50S6W25FA007_9700_47QRCA25DS218_4732",
     "CONT_AWD_W912CH26FA087_9700_47QRCA25DU100_4732"
    ]
+  },
+  "correction_batch": {
+   "filters": {
+    "state": "DC",
+    "min_value": 1000000,
+    "ids": [
+     "CONT_AWD_1331L526F13351298_1301_47QRCA25DS127_4732",
+     "CONT_AWD_1331L526F13501133_1301_47QRCA25DS230_4732",
+     "CONT_AWD_1331L526F13501172_1301_47QRCA25DA298_4732",
+     "CONT_AWD_693JJ326F00079N_6925_47QRCA25DSE54_4732",
+     "CONT_AWD_70RDA225FR0000056_7001_47QRCA25DSD83_4732",
+     "CONT_AWD_70Z02326FMER10004_7008_47QRCA25DU391_4732"
+    ],
+    "applied_filters": [
+     {
+      "filter": "vehicle",
+      "value": "OASIS+",
+      "basis": "parent IDV solicitation_identifier ∈ the vehicle's published solicitations (verified registry)"
+     },
+     {
+      "filter": "work",
+      "value": "management consulting",
+      "basis": "every term in description, PSC title or the official NAICS title of naics_code"
+     },
+     {
+      "filter": "state",
+      "value": "DC",
+      "basis": "place_of_performance_state"
+     },
+     {
+      "filter": "min_value",
+      "value": "1000000",
+      "basis": "potential_total_value >="
+     },
+     {
+      "filter": "lead_months",
+      "value": "60",
+      "basis": "period_of_performance_current_end between today and N months out"
+     }
+    ],
+    "map_url": "https://getmindy.ai/opportunity-map?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&state=DC&minValue=1000000&leadMax=60"
+   },
+   "refused": [
+    {
+     "refused": [
+      {
+       "filter": "psc",
+       "reason": "PSC cannot filter scoped orders: psc_code is populated on ~6% of this data and the Map's Awarded layer does not apply it. Use naics or a work subject."
+      }
+     ],
+     "status": "needs_refinement"
+    },
+    {
+     "refused": [
+      {
+       "filter": "date_from",
+       "reason": "Scoped orders carry no action date; the window is the period-of-performance end (lead_months)."
+      }
+     ],
+     "status": "needs_refinement"
+    },
+    {
+     "refused": [
+      {
+       "filter": "search_type",
+       "reason": "vehicle / parent_id scope TASK ORDERS; search_type:\"idv\" lists base vehicles. Omit search_type or pass \"task\"."
+      }
+     ],
+     "status": "needs_refinement"
+    },
+    {
+     "refused": [
+      {
+       "filter": "state",
+       "reason": "In a scoped search state means PLACE OF PERFORMANCE only (recipient HQ state is not on this data). Pass state_scope:\"pop\"."
+      }
+     ],
+     "status": "needs_refinement"
+    },
+    {
+     "refused": [
+      {
+       "filter": "state",
+       "reason": "In a scoped search state means PLACE OF PERFORMANCE only (recipient HQ state is not on this data). Pass state_scope:\"pop\"."
+      }
+     ],
+     "status": "needs_refinement"
+    }
+   ],
+   "unattributed": {
+    "tool": 11,
+    "independent": 11,
+    "generated_missing_parent_in_window": 0
+   }
   },
   "before_unscoped": {
    "note": "Before this change a task-order search could not be restricted to a vehicle: this is the only query shape available (NAICS 541611), and its orders sit under any parent.",

@@ -44,12 +44,16 @@ describe('scope in the URL', () => {
 
 describe('wiring', () => {
   it('the scope link reads vehicle/parent/work/leadMax and the continuity restorer stands down for them', () => {
-    expect(MAP).toContain("var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax');");
+    expect(MAP).toContain("var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax'), minValue=P('minValue');");
     expect(MAP).toMatch(/\|embed\|vehicle\|parent\|work\)=/);
   });
   it('the restorer whitelists the keys and the Awarded fetch sends them', () => {
     expect(MAP).toMatch(/vehicle:'', parent:'', work:'' \};\n\s*for\(var k in FILT\)/);
     expect(MAP).toContain("if(FILT.vehicle)url+='&vehicle='+encodeURIComponent(FILT.vehicle);");
+  });
+  it('a scoped link\'s value floor (MCP min_value) becomes the same FILT.valueRange the Value pill writes', () => {
+    expect(MAP).toContain("minValue=P('minValue');");
+    expect(MAP).toMatch(/if\(minValue&&\/\^\[0-9\]\{1,15\}.*\)f\.valueRange=minValue\+'-';/);
   });
   it('a scope fetches the Awarded horizon alone (no unscoped totals summed in)', () => {
     expect(MAP).toContain("if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }");

@@ -7349,3 +7349,9 @@ and still drops Dale Carnegie / dirty IT slivers.
 - 134 original-OASIS parent contracts in the table; none was counted as OASIS+.
 
 Scope: active orders (period of performance not ended), not the full history. A vehicle's orders say nothing about any company's eligibility or membership.
+
+*Update (same day, after review).* Every narrowing you add is either applied or refused, never silently ignored:
+- **Applied:** state (where the work happens), a minimum order value, NAICS and agency. The result lists which filters it used.
+- **Refused, with a plain reason:** filters the order data can't support, such as PSC codes or action dates.
+
+A bare contract number that appears under two agencies now asks which one you mean. Orders with no recorded parent contract are counted separately, never dropped. Live: OASIS+ management consulting in DC with a minimum order value of $1M returned 6 orders, and the Map showed the same 6.

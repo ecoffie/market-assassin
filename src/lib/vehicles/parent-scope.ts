@@ -126,12 +126,36 @@ export function parentPrefilterExpr(parents: ParentRef[]): string {
   }).join(',');
 }
 
+/** Award types that are ORDERS under a vehicle (mirrors award-lineage.ts ORDER_TYPES). */
+export const ORDER_CONTRACT_TYPES = ['DELIVERY ORDER', 'BPA CALL', 'TASK ORDER'] as const;
+
 /**
- * Rows whose parent is NOT recorded but whose award type says they ARE an order — they may belong to
- * the requested vehicle, and nothing can tell. Mirrors award-lineage.ts (contract_type fallback).
+ * The parent slot of a generated award id is MISSING: `…_-NONE-_-NONE-`, `…_<piid>_-NONE-` or
+ * `…_-NONE-_<agency>`. Such an id cannot match any parent scope (the scope needs a piid AND an agency).
+ */
+export const MISSING_PARENT_SLOT_RE = '_-NONE-(_[0-9A-Z]{4}|_-NONE-)?$';
+
+/**
+ * ORDERS whose parent is not fully recorded — they may belong to the requested vehicle and nothing can
+ * tell, so they are counted (never included, never denied). Two shapes, both of them orders by
+ * contract_type:
+ *   · a raw-PIID row (contract_id not a generated id) — the parent was never captured;
+ *   · a GENERATED id whose parent slot is missing (MISSING_PARENT_SLOT_RE). The first version counted
+ *     only the raw-PIID shape, so a delivery order stored as `CONT_AWD_X_9700_-NONE-_-NONE-` was
+ *     neither in scope nor unattributed — it vanished from both numbers.
+ * Written in the SQL twin's closed grammar (eq / match / not.match) so the same string executes on
+ * PostgREST and in SQL; isUnattributedOrder is its JS twin (the oracle recount).
  */
 export const UNATTRIBUTED_ORDERS_OR =
-  'and(contract_id.not.like.CONT_AWD_*,contract_type.in.("DELIVERY ORDER","BPA CALL","TASK ORDER"))';
+  `and(or(${ORDER_CONTRACT_TYPES.map((t) => `contract_type.eq."${t}"`).join(',')}),`
+  + `or(contract_id.not.match."^CONT_AWD_",contract_id.match."${MISSING_PARENT_SLOT_RE}"))`;
+
+export function isUnattributedOrder(row: { contract_id?: string | null; contract_type?: string | null }): boolean {
+  const type = String(row.contract_type ?? '').trim().toUpperCase();
+  if (!(ORDER_CONTRACT_TYPES as readonly string[]).includes(type)) return false;
+  const id = String(row.contract_id ?? '');
+  return !id.startsWith('CONT_AWD_') || new RegExp(MISSING_PARENT_SLOT_RE).test(id);
+}
 
 // ── Work subject ────────────────────────────────────────────────────────────────────────────────
 

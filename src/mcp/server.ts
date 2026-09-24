@@ -746,7 +746,8 @@ server.registerTool(
       'base vehicles you must be ON; search_type:"task" = the orders being placed through them. Filter by NAICS / ' +
       'PSC / agency / state / min value / date range. grounded=false when nothing matches. Restrict task orders to a ' +
       'vehicle (e.g. "OASIS+", verified registry only) or an exact parent_id (CONT_IDV_<PIID>_<AGENCY>), optionally ' +
-      'with a work subject; status "unresolved" means nothing was searched, never zero orders.',
+      'with a work subject; status "unresolved" means nothing was searched, never zero orders. Scoped searches apply ' +
+      'naics/agency/min_value/state(state_scope:"pop") and refuse psc, dates, search_type:"idv" and recipient-HQ state.',
     inputSchema: {
       naics: z.string().optional().describe('NAICS code.'),
       psc: z.string().optional().describe('Product/Service Code.'),

@@ -8956,7 +8956,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var posted=P('posted'), mode=P('mode'), horizon=P('horizon');
     // Parent-contract / vehicle scope (+ work subject and its window). Resolved SERVER-side against the
     // verified vehicle registry; an unknown/ambiguous name comes back as a refinement, never all orders.
-    var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax');
+    var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax'), minValue=P('minValue');
     if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency&&!vehicle&&!parent&&!work)return;   // nothing asked for -> leave the map alone
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
@@ -9011,6 +9011,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(work)f.work=work.slice(0,120);
       // The window is part of a scoped link (MCP defaults to 60 months). Only integers the API accepts.
       if(leadMax&&/^[0-9]{1,2}$/.test(leadMax)&&+leadMax>=1&&+leadMax<=60)f.leadMax=leadMax;
+      // A value floor on a scoped link (MCP min_value) → the same FILT.valueRange "min-" the Value pill
+      // writes, so the Awarded fetch sends minValue exactly as the tool applied it. Digits only.
+      if(minValue&&/^[0-9]{1,15}(\.[0-9]+)?$/.test(minValue))f.valueRange=minValue+'-';
       // "Posted today / this week" tiles. Only values the #mfPosted select can actually hold —
       // otherwise the map would filter to a window the Filters panel shows as "Any time" and
       // Clear-all could not undo. 1 exists because the tile promises ONE day (see the option).

@@ -34,11 +34,17 @@ export interface ScopedTaskOrderInput {
   work?: string;
   naics?: string;
   agency?: string;
+  /** Place-of-performance state (the only state this table carries). */
   state?: string;
+  /** Floor on potential_total_value — the amount each returned order shows. */
+  min_value?: number;
   lead_months?: number;
   limit?: number;
   page?: number;
 }
+
+/** Every filter the scoped search APPLIED, with the field it ran on — so none can be dropped silently. */
+export interface AppliedFilter { filter: string; value: string; basis: string }
 
 export interface ScopedTaskOrderRow {
   contract_id: string;
@@ -73,6 +79,8 @@ export interface ScopedTaskOrderResult {
   unmapped_total: number | null;
   parent_orders_in_population: number | null;
   unattributed_orders: number | null;
+  /** Receipt of every filter applied and the field it ran on. */
+  applied_filters: AppliedFilter[];
   page: number;
   limit: number;
   has_next_page: boolean;
@@ -100,8 +108,28 @@ export function scopedParams(input: ScopedTaskOrderInput & { parent?: string }):
   if (input.naics?.trim()) out.naics = input.naics.trim();
   if (input.agency?.trim()) out.agency = input.agency.trim();
   if (input.state?.trim()) out.state = input.state.trim().toUpperCase();
+  if (typeof input.min_value === 'number' && Number.isFinite(input.min_value) && input.min_value > 0) out.minValue = String(input.min_value);
   out.leadMax = String(lead);
   return out;
+}
+
+const FILTER_BASIS: Record<string, [string, string]> = {
+  vehicle: ['vehicle', 'parent IDV solicitation_identifier ∈ the vehicle\'s published solicitations (verified registry)'],
+  parent: ['parent_id', 'parent slot of contract_id (CONT_AWD_<piid>_<ag>_<parent piid>_<parent ag>)'],
+  work: ['work', 'every term in description, PSC title or the official NAICS title of naics_code'],
+  naics: ['naics', 'naics_code (canonical plan)'],
+  agency: ['agency', 'awarding agency / sub-agency identity (canonical plan)'],
+  state: ['state', 'place_of_performance_state'],
+  minValue: ['min_value', 'potential_total_value >='],
+  leadMax: ['lead_months', 'period_of_performance_current_end between today and N months out'],
+};
+
+/** The applied-filter receipt, derived from the SAME params the query and the Map link use. */
+export function appliedFilters(params: Record<string, string>): AppliedFilter[] {
+  return Object.entries(params).map(([k, v]) => {
+    const [filter, basis] = FILTER_BASIS[k] ?? [k, 'unknown'];
+    return { filter, value: v, basis };
+  });
 }
 
 /**
@@ -113,13 +141,36 @@ export function scopedMapUrl(params: Record<string, string>): string {
   return `${MINDY_MAP_BASE}?${u.toString().replace(/%2C/g, ',')}`;
 }
 
-/** Bare PIID → the parent agencies it appears under in the population (the agency slot is identity). */
-async function parentAgenciesForPiid(db: Db, piid: string): Promise<string[] | null> {
-  const safe = piid.replace(/[^0-9A-Z-]/g, '');
-  const { data, error } = await db.from('recompete_opportunities').select('contract_id')
-    .filter('contract_id', 'match', `^CONT_AWD_.+_[0-9A-Z]{4}_${safe.replace(/-/g, '\\-')}_[0-9A-Z]{4}$`).limit(1000);
-  if (error) { console.error('[task-order-search] piid agency lookup failed:', error.message); return null; }
-  return [...new Set((data ?? []).map((r: { contract_id: string }) => recordedParent(r.contract_id)?.agency).filter(Boolean) as string[])].sort();
+const MAX_PIID_AGENCIES = 20;
+
+/**
+ * Bare PIID → EVERY parent agency it appears under (the agency slot is part of the identity).
+ *
+ * ⚠️ Never derive a set of distinct values from a row sample. The first version read up to 1,000 rows
+ * and took their distinct agencies, so a PIID with more than 1,000 orders under one agency could hide a
+ * second agency past the cap and resolve — silently — to the wrong single parent. This asks one
+ * existence question per round instead: "is there any order under this PIID at an agency not yet
+ * found?" (limit 1, excluding the known agencies INSIDE the query), until the answer is no. Row count
+ * never matters. A cheap LIKE runs before the exact parent-slot regex (no contract_id index).
+ */
+export async function parentAgenciesForPiid(db: Db, piid: string): Promise<string[] | null> {
+  const safe = piid.toUpperCase().replace(/[^0-9A-Z-]/g, '');
+  if (!safe) return [];
+  const exact = `^CONT_AWD_.+_[0-9A-Z]{4}_${safe.replace(/-/g, '\\-')}_[0-9A-Z]{4}$`;
+  const found: string[] = [];
+  for (let round = 0; round <= MAX_PIID_AGENCIES; round++) {
+    let q = db.from('recompete_opportunities').select('contract_id')
+      .like('contract_id', `CONT_AWD_%_${safe}_%`)
+      .filter('contract_id', 'match', exact);
+    for (const ag of found) q = q.not('contract_id', 'like', `%_${safe}_${ag}`);
+    const { data, error } = await q.limit(1);
+    if (error) { console.error('[task-order-search] piid agency lookup failed:', error.message); return null; }
+    const ag = data?.[0] ? recordedParent(String(data[0].contract_id))?.agency : undefined;
+    if (!ag) break;
+    if (found.includes(ag)) { console.error('[task-order-search] piid agency lookup did not exclude', ag); return null; }
+    found.push(ag);
+  }
+  return found.sort();
 }
 
 async function headCount(q: PromiseLike<{ count: number | null; error: { message: string } | null }>): Promise<number | null> {
@@ -128,12 +179,12 @@ async function headCount(q: PromiseLike<{ count: number | null; error: { message
   return count ?? null; // null = UNKNOWN, never 0 (Bug Prevention Rule #11)
 }
 
-function base(req: MapsRecompeteRequest, status: ScopedStatus, reason: string | null, page: number, limit: number, mapUrl: string | null): ScopedTaskOrderResult {
+function base(req: MapsRecompeteRequest, status: ScopedStatus, reason: string | null, page: number, limit: number, mapUrl: string | null, applied: AppliedFilter[] = []): ScopedTaskOrderResult {
   return {
     status, reason, scope: parentScopeMeta(req.surface.parentScope, req.surface.work),
     population: `Active task/delivery orders in Mindy's Awarded table: period of performance not ended and ending within ${req.policy.recompete.windowMonths} months. Completed orders are not included.`,
     total: null, mapped_total: null, unmapped_total: null, parent_orders_in_population: null, unattributed_orders: null,
-    page, limit, has_next_page: false, orders: [], map_url: mapUrl,
+    applied_filters: applied, page, limit, has_next_page: false, orders: [], map_url: mapUrl,
   };
 }
 
@@ -162,11 +213,11 @@ export async function searchScopedTaskOrders(input: ScopedTaskOrderInput, db: Db
   const mapUrl = req.surface.parentScope.status === 'resolved' || req.surface.parentScope.status === 'none' ? scopedMapUrl(params) : null;
 
   if (req.surface.parentScope.status === 'unresolved') {
-    const r = base(req, 'unresolved', bareReason ?? req.surface.parentScope.reason, page, limit, null);
+    const r = base(req, 'unresolved', bareReason ?? req.surface.parentScope.reason, page, limit, null, []); // nothing was searched → nothing applied
     return r;
   }
   if (req.plan.status !== 'ok') {
-    return base(req, 'needs_refinement', req.plan.refinement ?? 'The query cannot define a market.', page, limit, null);
+    return base(req, 'needs_refinement', req.plan.refinement ?? 'The query cannot define a market.', page, limit, null, []);
   }
 
   const table = () => db.from('recompete_opportunities');
@@ -198,7 +249,7 @@ export async function searchScopedTaskOrders(input: ScopedTaskOrderInput, db: Db
     .order('contract_id', { ascending: true })
     .range((page - 1) * limit, page * limit - 1);
 
-  const out = base(req, 'ok', null, page, limit, mapUrl);
+  const out = base(req, 'ok', null, page, limit, mapUrl, appliedFilters(params));
   out.total = total; out.mapped_total = mapped; out.unmapped_total = unmapped;
   out.parent_orders_in_population = parentOrders; out.unattributed_orders = unattributed;
   if (error || total == null) {
