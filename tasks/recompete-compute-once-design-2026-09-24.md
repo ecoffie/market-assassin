@@ -1,6 +1,6 @@
 # Recompete performance Gate 2 — compute the canonical market ONCE (design + parity, 2026-09-24)
 
-Status: **design, implementation of the pure pieces, and the parity oracle. NOT wired into the route. NOT deployed.**
+Status: **deployed — AUTHORITY in production since 2026-09-24 (`1a58550e`).** Rollout evidence: `tasks/recompete-compute-once-rollout-2026-09-24.md`. (The sections below are the original design; "Deployment shape (proposed)" was approved as option A.)
 
 Preceded by Gate 1 (`tasks/recompete-gate1-2026-09-24.md`), which shipped deterministic pagination, planner-independent follow-ons and six trigram indexes.
 

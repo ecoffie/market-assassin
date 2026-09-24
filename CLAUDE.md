@@ -419,16 +419,22 @@ Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Hi
 - **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** write the 44,560-family fleet backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Lazy Family v1 only — persist on known-id / pursuit save / confirmed identity, never a fleet write.
 - **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
 
-### Recompete map performance — Gate 1 ✅ LIVE · Gate 2 designed, NOT deployed (2026-09-24)
-Records: **`tasks/recompete-gate1-2026-09-24.md`** (prod before/after) · **`tasks/recompete-compute-once-design-2026-09-24.md`**.
+### Recompete map performance — Gate 1 ✅ LIVE · Gate 2 compute-once ✅ AUTHORITY in prod (2026-09-24)
+Records: **`tasks/recompete-gate1-2026-09-24.md`** (prod before/after) · **`tasks/recompete-compute-once-design-2026-09-24.md`** · **`tasks/recompete-compute-once-rollout-2026-09-24.md`** (shadow/canary/authority evidence).
 - Gate 1 (#1686, `70bd0600`): page order expiry → `contract_id` (tie-break only; the old order gave up to 5 different
   pages across valid plans) · follow-ons read candidates-first (`map-follow-ons.ts`) so a text index can never drive
   them · six `idx_recompete_trgm_*` GIN indexes APPLIED + verified valid. Prod: software license 11.96 → 4.45 s,
   ai governance 2.82 → 0.98 s; `scripts/recompete-replay.ts` byte-identical 7/7 before/after.
 - Gate 2: `discovery/sql.ts` (SQL twin of `apply.ts`, closed grammar, bind params only) + `maps-recompete-sql.ts`
   (ONE materialized evaluation → total/unmapped/in-view/pins/follow-ons). Parity oracle `scripts/recompete-parity.ts`
-  = 48/48 byte-identical. **Not wired into the route** — deployment shape (server-side pg via pooler, shadow mode)
-  awaits approval. Never add an RPC that accepts SQL text.
+  = 48/48 byte-identical. Never add an RPC that accepts SQL text.
+- Gate 2 rollout (#1688/#1689/#1690, prod `1a58550e`): `RECOMPETE_COMPUTE_ONCE_MODE=off|shadow|canary|authority`
+  (now **authority**, `VERIFY=0.1`). Server-side `pg` on the Supabase transaction pooler (:6543), READ ONLY tx,
+  8 s timeout, pool max 2/instance, **never queues** (`ComputeOnceBusy` → PostgREST fallback). Shadow 270 identical /
+  0 unexplained; prod paired canonical suite 93/93 bodies identical, 30/31 faster (software license 5.54 → 2.44 s).
+  **`off` is the rollback** (absolute, proven live). The PostgREST path stays until acceptance sign-off. Outcome
+  `old_degraded` = the OLD path lost a count to PostgREST's `authenticator` 8 s timeout — not a compute-once diff.
+  Concept precomputation is a separate, unstarted track.
 - ⚠️ `npm run migrate -- --go` applies EVERY pending file. `20260924_saved_search_forecast_watermark.sql` (#1683) is
   pending and its PR says do not apply it. Use `--only a.sql,b.sql` to apply a subset.
 
