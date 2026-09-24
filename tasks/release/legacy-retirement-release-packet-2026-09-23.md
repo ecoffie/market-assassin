@@ -13,7 +13,7 @@ No command in this packet contains a secret — the scripts read `.env.local`.
 | **#1671** | `fix/retire-legacy-ma-interfaces` | **`57b74a38`** | Retire legacy entry points into `/app` (partial migration) |
 | **#1675** | `fix/cancellation-entitlement-attribution` | **`f37b7ab6`** | Cancellation revokes only attributable access |
 | **#1676** | `test/1675-webhook-proofs` → base #1675 | **`3814bf87`** | Route-level proofs for #1675 **+ 3 defect fixes** |
-| **#1679** | `security/remove-shared-password-routes` → base #1671 | **`7fbfc0fe`** | Remove both shared-password routes and the grace window. Production-build acceptance 131/131 on `ef12f32f` |
+| **#1679** | `security/remove-shared-password-routes` → base #1671 | **`7fbfc0fe`** | Remove both shared-password routes and the grace window. Production-build acceptance **131/131 on this head** (strict: old cookie → 403) |
 | this PR | `release-prep/legacy-retirement-2026-09-23` | see PR | Packet, manifest, dry-run scripts. Docs + scripts only. |
 
 ⚠️ **#1675 at `f37b7ab6` is not releasable alone.** The proofs in #1676 run against it and 3 of 19 fail —
