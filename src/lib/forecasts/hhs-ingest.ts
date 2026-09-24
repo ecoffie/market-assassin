@@ -4,7 +4,7 @@
  * Read-only by default: `apply: false` produces the full plan and writes nothing,
  * so the accounting and the semantic gate can both be inspected before mutation.
  */
-import { guardForecastInserts } from './writer';
+import { applyInsertGuard } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { HHS_FORECAST_URL, parseHhsForecast, hhsExternalId, hhsQuarter, hhsFy, hhsValueLabel, type HhsForecastRow } from './hhs-forecast';
 import {
@@ -16,6 +16,8 @@ import {
 export interface HhsIngestResult {
   /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
   insertRefused?: string;
+  /** Whether the refused new rows were saved to forecast_refused_loads (false = replay needs a re-fetch). */
+  insertQuarantined?: boolean;
   ok: boolean;
   failure?: string;
   upstreamTotal: number;
@@ -163,9 +165,14 @@ export async function runHhsIngest(
   result.applied = true;
   // BACKFILL SAFETY (src/lib/forecasts/writer.ts): a daily run may not create a bulk of NEW rows while the
   // publisher's alert floor is active — those would all read as "new" Forecasts. Updates still apply.
-  const insertGuard = await guardForecastInserts(sb, 'HHS', plan.toInsert.length);
-  if (!insertGuard.allow) result.insertRefused = insertGuard.reason;
-  const allowedInserts = insertGuard.allow ? plan.toInsert : [];
+  // ALL-OR-NOTHING: the guard runs BEFORE the first batch, over the whole run's new rows. A refused
+  // run inserts ZERO rows (never a partial prefix) and quarantines the full payload for replay.
+  const insertGuard = await applyInsertGuard(sb, 'HHS', plan.toInsert);
+  if (insertGuard.refused) {
+    result.insertRefused = insertGuard.refused.reason;
+    result.insertQuarantined = insertGuard.refused.quarantined;
+  }
+  const allowedInserts = insertGuard.allowed;
   result.insertAttempted = allowedInserts.length;
   for (let i = 0; i < allowedInserts.length; i += 500) {
     const batch = allowedInserts.slice(i, i + 500).map((r) => ({

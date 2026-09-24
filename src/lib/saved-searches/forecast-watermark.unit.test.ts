@@ -193,13 +193,59 @@ describe('high volume — bounded, resumable keyset processing', () => {
     expect(d.state).toEqual({ seenThrough: T('23T11:00:00'), gapSince: null, pending: null });
   });
 
-  it('100,000 new rows ALL with one identical created_at → the (created_at, id) keyset still visits each exactly once', async () => {
+  it('100,000 new rows ALL with one identical created_at, DEFAULT budget → 5 runs of ≤ 40 queries / ≤ 20,000 counted rows; each exactly once', async () => {
     const same = '2026-09-22T13:00:38.208123+00:00';
     const rows = Array.from({ length: 100_000 }, () => row('DHS', same));
-    const d = await drain(rows, W0, T('23T11:00:00'), { pageSize: 500, maxPages: 50 });
-    expect(d.runs).toBe(4); // 200 pages of 500 at 50/run → exactly 4 runs (look-ahead closes the last full page)
-    expect(d.last.res).toMatchObject({ kind: 'measured', count: 100_000 });
-    expect(d.seen.size).toBe(100_000); expect(d.dupes).toBe(0);
+    const seen = new Set<string>(); const dupes = { n: 0 };
+    const perRun: Array<{ queries: number; evidenceQueries: number; fetched: number; counted: number; kind: string }> = [];
+    let s = W0; let last;
+    do {
+      const before = seen.size;
+      last = await run(rows, ALL, s, T('23T11:00:00'), { seen, dupes });
+      const pages = last.db.queries.filter((q) => q.some(([m]) => m === 'order')).length;   // keyset page queries
+      perRun.push({ queries: pages, evidenceQueries: last.db.queries.length - pages, fetched: last.db.returned.reduce((a, b) => a + b, 0), counted: seen.size - before, kind: last.res.kind });
+      s = last.next;
+    } while (last.res.kind === 'in_progress');
+    // Reconciliation with the stated limit: FORECAST_MAX_PAGES_PER_RUN (40) × FORECAST_PAGE_SIZE (500) = 20,000 rows.
+    // Each page asks for 501 (one look-ahead row that is NOT counted and is re-read as the next page's first row).
+    expect(perRun).toEqual([
+      { queries: 40, evidenceQueries: 0, fetched: 40 * 501, counted: 20_000, kind: 'in_progress' },
+      { queries: 40, evidenceQueries: 0, fetched: 40 * 501, counted: 20_000, kind: 'in_progress' },
+      { queries: 40, evidenceQueries: 0, fetched: 40 * 501, counted: 20_000, kind: 'in_progress' },
+      { queries: 40, evidenceQueries: 0, fetched: 40 * 501, counted: 20_000, kind: 'in_progress' },
+      // run 5: the 40th page's look-ahead finds nothing → complete in this run; +1 query fetching the 3 evidence rows.
+      { queries: 40, evidenceQueries: 1, fetched: 39 * 501 + 500 + 3, counted: 20_000, kind: 'measured' },
+    ]);
+    expect(last.res).toMatchObject({ kind: 'measured', count: 100_000 });
+    expect(seen.size).toBe(100_000); expect(dupes.n).toBe(0);
+    // (The earlier "4 runs" figure came from a test override of maxPages: 50 → 25,000 rows/run. It was a test knob,
+    // not the production limit; production is 20,000 rows/run as asserted above.)
+  });
+
+  it('the run bound is TOTAL across segments: main + 2 gap segments share one 40-page / 20,000-row budget', async () => {
+    // A partial interval: DHS rows in the main (W, snapshot] window plus two buyers resuming older gap boundaries.
+    const rows = [
+      ...spread('VA', 15_000, T('22T12:00:00')), ...spread('HHS', 15_000, T('22T13:00:00')),   // main (W, snapshot]
+      ...spread('VA', 5_000, T('20T12:00:00')),                                                // VA gap segment
+      ...spread('HHS', 15_000, T('20T13:00:00')),                                              // HHS gap segment
+    ];
+    const filters = { agency: 'VETERANS AFFAIRS|HHS', horizons: { forecast: true } };
+    const st: ForecastWatermarkState = { seenThrough: T('22T11:00:00'), gapSince: { 'VETERANS AFFAIRS': T('20T11:00:00'), HHS: T('20T11:00:00') }, pending: null };
+    const seen = new Set<string>(); const dupes = { n: 0 };
+    let s = st; let last; let runs = 0;
+    do {
+      const before = seen.size;
+      last = await run(rows, filters, s, T('23T11:00:00'), { seen, dupes });
+      const pageQueries = last.db.queries.filter((q) => q.some(([m]) => m === 'order')).length;
+      expect(pageQueries).toBeLessThanOrEqual(40);
+      expect(seen.size - before).toBeLessThanOrEqual(20_000);
+      expect(last.db.returned.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(40 * 501 + 3);
+      s = last.next; runs++;
+    } while (last.res.kind === 'in_progress');
+    expect(runs).toBe(3);   // 50,000 rows across 3 segments / 20,000 per run → 20k + 20k + 10k
+    expect(seen.size).toBe(50_000); expect(dupes.n).toBe(0);
+    expect(last.res).toMatchObject({ count: 50_000 });
+    expect(last.res).toMatchObject({ kind: 'measured' });
   });
 
   it('a failure mid-interval keeps the last DURABLE progress; the retry neither drops nor double-counts', async () => {

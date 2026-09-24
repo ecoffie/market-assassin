@@ -70,13 +70,8 @@ export async function applyFloorChange(
   const { error: we } = await db.from('forecast_publisher_alert_floor')
     .upsert({ ...d.next, updated_at: new Date().toISOString() }, { onConflict: 'source_agency' });
   if (we) return { ok: false, error: `write floor: ${we.message}` };
-  const { error: le } = await db.from('forecast_publisher_alert_floor_log').insert({
-    source_agency: change.source_agency,
-    prev_state: prev?.state ?? null, prev_alertable_after: prev?.alertable_after ?? null,
-    new_state: d.next.state, new_alertable_after: d.next.alertable_after,
-    reason: change.reason, set_by: change.set_by,
-  });
-  if (le) return { ok: false, error: `write floor log: ${le.message}` };
+  // The history row is written by the database (trigger forecast_publisher_alert_floor_audit), so a floor change
+  // made by ANY path — this function, a script, or a raw UPDATE — is logged with its database user.
   return { ...d, wrote: true };
 }
 

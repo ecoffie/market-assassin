@@ -22,6 +22,11 @@ const state = {
   updates: [] as Array<{ id: unknown; payload: Row }>,
   forecastQueries: [] as Op[][],
   sends: [] as Array<{ to: string; subject: string; html: string; text: string }>,
+  claims: [] as Array<string | null>,
+  updateError: null as { message: string } | null,
+  saveFails: 0,
+  staleRow: null as Row | null,
+  sendGate: null as Promise<void> | null,
 };
 
 function builder(table: string) {
@@ -46,8 +51,27 @@ function builder(table: string) {
   b.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => {
     if (table === 'saved_searches') {
       if (mode === 'update') {
-        state.updates.push({ id: ops.find((o) => o[0] === 'eq' && o[1][0] === 'id')?.[1][1], payload });
-        return Promise.resolve({ error: null }).then(resolve, reject);
+        // Honour the write's filters against the one row, as PostgREST would (CAS semantics for send-claim.ts).
+        const row = state.search;
+        const ts = (v: unknown) => (v == null ? null : Date.parse(String(v)));
+        const matches = !!row && ops.every(([m, a]) => {
+          if (m === 'eq') return a[0] === 'id' ? row.id === a[1] : ts(row[a[0] as string]) === ts(a[1]) && row[a[0] as string] != null;
+          if (m === 'is') return row[a[0] as string] == null;
+          if (m === 'or') return String(a[0]).split(',').some((c) => {
+            const [col, op, ...rest] = c.split('.'); const v = rest.join('.');
+            return op === 'is' ? row[col] == null : op === 'lt' ? row[col] != null && ts(row[col])! < ts(v)! : false;
+          });
+          return true;
+        });
+        if (state.updateError) return Promise.resolve({ error: state.updateError, count: null }).then(resolve, reject);
+        const isClaimWrite = Object.keys(payload).length === 1 && 'forecast_alert_claim_until' in payload;
+        if (!isClaimWrite && state.saveFails > 0) { state.saveFails--; return Promise.resolve({ error: { message: 'connection reset' }, count: null }).then(resolve, reject); }
+        if (!matches) return Promise.resolve({ error: null, count: 0 }).then(resolve, reject);
+        const onlyClaim = Object.keys(payload).length === 1 && 'forecast_alert_claim_until' in payload;
+        if (onlyClaim) state.claims.push(payload.forecast_alert_claim_until as string | null);
+        else state.updates.push({ id: row.id, payload });
+        state.search = { ...row, ...payload };
+        return Promise.resolve({ error: null, count: 1 }).then(resolve, reject);
       }
       if (mode === 'count') return Promise.resolve({ count: 0, error: null }).then(resolve, reject);
       const sel = String(ops.find((o) => o[0] === 'select')?.[1][0] ?? '');
@@ -57,7 +81,9 @@ function builder(table: string) {
         return Promise.resolve({ data: [], error: null }).then(resolve, reject);
       }
       const excluded = ops.some((o) => o[0] === 'not' && o[1][0] === 'id');
-      return Promise.resolve({ data: excluded || !state.search ? [] : [state.search], error: null }).then(resolve, reject);
+      // A stale read models an overlapping execution that loaded the row before another run changed it.
+      const due = state.staleRow ?? state.search; state.staleRow = null;
+      return Promise.resolve({ data: excluded || !due ? [] : [due], error: null }).then(resolve, reject);
     }
     if (table === 'sam_opportunities') return Promise.resolve({ data: state.open, error: null }).then(resolve, reject);
     if (table === 'forecast_publisher_alert_floor') return Promise.resolve({ data: state.floors, error: null }).then(resolve, reject);
@@ -84,7 +110,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 vi.mock('@/lib/cron-self-report', () => ({ reportCronOutcome: vi.fn(async () => {}) }));
 vi.mock('@/lib/send-email', () => ({
-  sendEmail: vi.fn(async (m: { to: string; subject: string; html: string; text: string }) => { state.sends.push(m); return true; }),
+  sendEmail: vi.fn(async (m: { to: string; subject: string; html: string; text: string }) => { if (state.sendGate) await state.sendGate; state.sends.push(m); return true; }),
 }));
 
 const { GET } = await import('./route');
@@ -112,7 +138,7 @@ const forecastEmails = () => state.sends.filter((m) => /Forecast/.test(m.html));
 beforeEach(() => {
   Object.assign(state, {
     search: null, open: [], forecasts: [], forecastError: null, snapshot: '2026-09-24T11:00:00.000Z', columns: 'present',
-    rpcCalls: 0, selects: [], updates: [], forecastQueries: [], sends: [],
+    rpcCalls: 0, selects: [], updates: [], forecastQueries: [], sends: [], claims: [], updateError: null, saveFails: 0, staleRow: null, sendGate: null,
     floors: ['DOE', 'DHS', 'VA', 'HHS'].map((s) => ({ source_agency: s, state: 'active', alertable_after: '2026-09-01T00:00:00.000Z' })),
   });
   process.env.SAVED_SEARCH_FORECAST_CANONICAL = 'true';
@@ -321,5 +347,91 @@ describe('EMERGENCY ROLLBACK — canonical ON → OFF → ON', () => {
     process.env.SAVED_SEARCH_FORECAST_CANONICAL = '1';
     state.search = search(FC);
     expect((await run('?forecastEngine=canonical')).body.forecastEngine).toBe('legacy');
+  });
+});
+
+describe('DELIVERY GUARANTEES — overlapping runs, failure before send, save failure after send (send-claim.ts)', () => {
+  const newForecast = () => { state.search = search(FC); state.forecasts = [fc('DHS', '2026-09-24T02:00:00Z')]; };
+
+  it('overlap, lease held: run B evaluates the same interval while run A is sending → B skips, ONE email', async () => {
+    newForecast();
+    let open!: () => void;
+    state.sendGate = new Promise<void>((r) => { open = r; });
+    const a = run();
+    await vi.waitFor(() => expect(state.claims).toHaveLength(1));   // A holds the lease and is inside sendEmail
+    state.sendGate = null;
+    const b = await run();
+    expect(b.body.skippedConcurrent).toBe(1);
+    expect(b.body.sent).toBe(0);
+    open();
+    const ra = await a;
+    expect(ra.body.sent).toBe(1);
+    expect(forecastEmails()).toHaveLength(1);
+    expect(state.search!.forecast_alert_claim_until).toBeNull();   // cleared by A's state write
+  });
+
+  it('overlap, stale read: run B loaded the row before run A committed → B loses the compare-and-set, sends nothing, writes nothing', async () => {
+    newForecast();
+    const stale = { ...state.search! };
+    expect((await run()).body.sent).toBe(1);
+    const saved = { ...state.search! };
+    state.staleRow = stale;
+    const b = await run();
+    expect(b.body.skippedConcurrent).toBe(1);
+    expect(forecastEmails()).toHaveLength(1);
+    expect(state.search).toEqual(saved);   // A's newer watermark is not regressed
+  });
+
+  it('a slower run cannot regress the watermark with an EARLIER snapshot (no-send save is a CAS too)', async () => {
+    newForecast();
+    const stale = { ...state.search! };
+    expect((await run()).body.sent).toBe(1);
+    const saved = { ...state.search! };
+    state.forecasts = []; state.snapshot = '2026-09-24T10:00:00.000Z';   // B's snapshot is older and finds nothing
+    state.staleRow = stale;
+    const b = await run();
+    expect(b.body.skippedConcurrent).toBe(1);
+    expect(state.search!.forecast_seen_through).toBe(saved.forecast_seen_through);
+  });
+
+  it('failure before send (provider throws): no alert state changes, the lease is released, the next run delivers once', async () => {
+    newForecast();
+    const before = { ...state.search! };
+    const { sendEmail } = await import('@/lib/send-email');
+    vi.mocked(sendEmail).mockRejectedValueOnce(new Error('provider down'));
+    const a = await run();
+    expect(a.body.failuresByClass).toEqual({ email_send_failed: 1 });
+    expect(state.updates).toHaveLength(0);
+    expect(state.claims).toHaveLength(2);                 // claim, then release
+    expect(state.claims[1]).toBeNull();
+    expect({ ...state.search!, forecast_alert_claim_until: undefined }).toEqual({ ...before, forecast_alert_claim_until: undefined });
+    expect((await run()).body.sent).toBe(1);               // no loss: retried immediately
+    expect(forecastEmails()).toHaveLength(1);
+  });
+
+  it('send ok, first save fails: the retry saves it — one email, no duplicate', async () => {
+    newForecast(); state.saveFails = 1;
+    const a = await run();
+    expect(a.body.sent).toBe(1); expect(a.body.failed).toBe(0);
+    expect(state.search!.forecast_seen_through).toBe('2026-09-24T11:00:00.000Z');
+    expect((await run()).body.sent).toBe(0);
+    expect(forecastEmails()).toHaveLength(1);
+  });
+
+  it('send ok, save fails twice: reported; the lease blocks an immediate re-send; after it expires the SAME interval is re-sent (at-least-once)', async () => {
+    newForecast(); state.saveFails = 2;
+    const a = await run();
+    expect(a.body.sent).toBe(1);
+    expect(a.body.failuresByClass).toEqual({ state_update_failed: 1 });
+    expect(state.search!.forecast_seen_through).toBe(W);                   // state did not move
+    expect(state.search!.forecast_alert_claim_until).toBeTruthy();         // lease still held
+    const b = await run();
+    expect(b.body.skippedConcurrent).toBe(1);
+    expect(forecastEmails()).toHaveLength(1);                              // no duplicate while leased
+    state.search = { ...state.search!, forecast_alert_claim_until: '2026-01-01T00:00:00.000Z' };   // lease expired
+    const c = await run();
+    expect(c.body.sent).toBe(1);
+    expect(forecastEmails()).toHaveLength(2);                              // the documented duplicate — never a silent loss
+    expect(state.search!.forecast_seen_through).toBe('2026-09-24T11:00:00.000Z');
   });
 });

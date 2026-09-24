@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient } from '@/lib/forecasts/writer';
+import { sendOpsAlert } from '@/lib/ops-alert';
 import { runDojIngest } from '@/lib/forecasts/doj-ingest';
 
 export const runtime = 'nodejs';
@@ -30,6 +31,12 @@ export async function GET(request: NextRequest) {
     // A refused bulk of NEW rows is a FAILED run (ops must route it through a publisher backfill), never a quiet success.
     if (r.insertRefused) {
       console.error(`[forecast-sync] new-row guard refused inserts: ${r.insertRefused}`);
+      // The interval is NOT skipped silently: zero new rows were written, the payload is quarantined (or the alert
+      // says it is not), and operations must suspend → replay → reconcile → explicitly activate the floor.
+      await sendOpsAlert({
+        subject: 'Forecast sync — DOJ bulk of NEW rows refused (publisher floor active)',
+        html: `<p>${r.insertRefused}</p><p>${r.insertQuarantined ? 'Rows quarantined in forecast_refused_loads — replay with scripts/forecast-refused-load.ts.' : 'QUARANTINE FAILED — the rows must be re-fetched from the source during the backfill.'}</p>`,
+      }).catch(() => {});
       return NextResponse.json({ success: false, failure: `insert_refused: ${r.insertRefused}`, detail: r }, { status: 500 });
     }
 

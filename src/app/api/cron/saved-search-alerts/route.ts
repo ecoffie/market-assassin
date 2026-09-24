@@ -43,6 +43,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
 import { sendEmail } from '@/lib/send-email';
+import { claimSend, releaseClaim, saveEvaluation } from '@/lib/saved-searches/send-claim';
 import { buildEmail } from '@/lib/alerts/saved-search-email';
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
 import { toAlertRow, type ForecastRowForAlert } from '@/lib/alerts/forecast-alert-row';
@@ -91,7 +92,7 @@ const DUE_SELECT =
   'id, user_email, name, mode, filters, alert_frequency, last_seen_notice_ids, total_alerts_sent, last_alerted_at';
 // The watermark columns exist only after 20260924_saved_search_forecast_watermark.sql; the legacy engine
 // never selects them, so deploying this code before the migration cannot break the legacy cron.
-const DUE_SELECT_CANONICAL = `${DUE_SELECT}, forecast_seen_through, forecast_gap_since, forecast_pending`;
+const DUE_SELECT_CANONICAL = `${DUE_SELECT}, forecast_seen_through, forecast_gap_since, forecast_pending, forecast_alert_claim_until`;
 
 /**
  * EMERGENCY-ROLLBACK SAFETY. Whether the watermark columns exist decides what the LEGACY engine may do:
@@ -438,10 +439,21 @@ async function evaluateCanonicalForecast(
     return total ? { matched: 1, ...cov } : { noMatches: 1, ...cov };
   }
 
+  // DELIVERY GUARANTEES (src/lib/saved-searches/send-claim.ts): every write is a compare-and-set on the version this
+  // run read; a send is preceded by a lease. Overlapping runs send at most once per state; a failure before/at send
+  // changes nothing; a send whose state save fails twice is re-sent only after the lease expires (at-least-once).
   if (total === 0) {
-    const stamped = await stampSearchEvaluation(db, s.id, { ...openSeen, ...forecastState });
-    if (!stamped) return { failureClass: 'state_update_failed', ...cov };
+    const saved = await saveEvaluation(db, s, { ...openSeen, ...forecastState });
+    if (saved === 'concurrent') return { skippedConcurrent: 1, ...cov };
+    if (saved === 'error') return { failureClass: 'state_update_failed', ...cov };
     return { noMatches: 1, ...cov };
+  }
+
+  const claim = await claimSend(db, s);
+  if (!claim.claimed) {
+    if (claim.reason === 'concurrent') return { skippedConcurrent: 1, ...cov };
+    console.error('[saved-search-alerts] send claim failed:', claim.error);
+    return { matched: 1, failureClass: 'state_update_failed', ...cov };
   }
 
   const { subject, html, text } = buildEmail(s, fresh, coverageNotices, { total });
@@ -449,14 +461,21 @@ async function evaluateCanonicalForecast(
   try {
     ok = await sendEmail({ to: s.user_email, subject, html, text, emailType: 'saved_search_alert', eventSource: 'saved_search' });
   } catch {
+    await releaseClaim(db, s.id, claim.until).catch(() => {});
     return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed', ...cov };
   }
-  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected', ...cov };
+  if (!ok) {
+    await releaseClaim(db, s.id, claim.until).catch(() => {});
+    return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected', ...cov };
+  }
 
-  const stamped = await stampSearchEvaluation(db, s.id, {
-    ...openSeen, ...forecastState, total_alerts_sent: (s.total_alerts_sent || 0) + 1,
-  });
-  if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed', ...cov };
+  const after = { ...openSeen, ...forecastState, total_alerts_sent: (s.total_alerts_sent || 0) + 1 };
+  let saved = await saveEvaluation(db, s, after, { claim: claim.until });
+  if (saved !== 'saved') saved = await saveEvaluation(db, s, after, { claim: claim.until });   // one retry
+  if (saved !== 'saved') {
+    console.error(`[saved-search-alerts] ${s.id}: email sent but state not saved (${saved}) — lease held until ${claim.until}; the interval will be re-sent after it expires`);
+    return { matched: 1, sendAttempts: 1, sent: 1, failureClass: 'state_update_failed', ...cov };
+  }
   return { matched: 1, sendAttempts: 1, sent: 1, ...cov };
 }
 
@@ -545,6 +564,7 @@ export async function GET(request: NextRequest) {
       noMatches: results.noMatches,
       skippedNotDue: results.skippedNotDue,
       skippedNoProfile: results.skippedNoProfile,
+      skippedConcurrent: results.skippedConcurrent,
       failed: results.failed,
       remaining: results.remaining,
       batches: results.batches,

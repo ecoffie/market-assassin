@@ -43,6 +43,8 @@ export type SavedSearchAlertEvalCounts = {
   noMatches?: number;
   skippedNotDue?: number;
   skippedNoProfile?: number;
+  /** Canonical engine: another execution holds this row's send lease or moved its state first (send-claim.ts). */
+  skippedConcurrent?: number;
   failed?: number;
   failureClass?: SavedSearchAlertFailureClass;
   /**
@@ -71,6 +73,7 @@ export type SavedSearchAlertDueRow = {
   forecast_seen_through?: string | null;
   forecast_gap_since?: Record<string, string> | null;
   forecast_pending?: unknown;
+  forecast_alert_claim_until?: string | null;
 };
 
 export type SavedSearchAlertDrainResult = {
@@ -83,6 +86,7 @@ export type SavedSearchAlertDrainResult = {
   noMatches: number;
   skippedNotDue: number;
   skippedNoProfile: number;
+  skippedConcurrent: number;
   failed: number;
   remaining: number | null;
   batches: number;
@@ -136,6 +140,7 @@ function addCounts(
   results.noMatches += counts.noMatches ?? 0;
   results.skippedNotDue += counts.skippedNotDue ?? 0;
   results.skippedNoProfile += counts.skippedNoProfile ?? 0;
+  results.skippedConcurrent += counts.skippedConcurrent ?? 0;
   if (counts.forecastCoverage) {
     results.forecastCoverage[counts.forecastCoverage] = (results.forecastCoverage[counts.forecastCoverage] || 0) + 1;
   }
@@ -206,6 +211,7 @@ export async function runSavedSearchAlertDrain(opts: {
     noMatches: 0,
     skippedNotDue: 0,
     skippedNoProfile: 0,
+    skippedConcurrent: 0,
     failed: 0,
     remaining: null,
     batches: 0,

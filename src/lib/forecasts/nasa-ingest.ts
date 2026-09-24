@@ -7,7 +7,7 @@
  * NASA SourceID and nothing else — a title bridge that survived into runtime
  * would silently re-introduce the ambiguity it was built to escape.
  */
-import { guardForecastInserts } from './writer';
+import { applyInsertGuard } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import * as XLSX from 'xlsx';
@@ -21,6 +21,8 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 export interface NasaIngestResult {
   /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
   insertRefused?: string;
+  /** Whether the refused new rows were saved to forecast_refused_loads (false = replay needs a re-fetch). */
+  insertQuarantined?: boolean;
   ok: boolean; failure?: string; applied: boolean;
   rawUpstream: number; distinctSourceIds: number; rejectedNoIdentity: number; duplicateSourceIds: number;
   fingerprint: string | null; sourceLastModified: string | null; sourceEtag: string | null;
@@ -156,9 +158,14 @@ export async function runNasaIngest(
   r.applied = true;
   // BACKFILL SAFETY (src/lib/forecasts/writer.ts): a daily run may not create a bulk of NEW rows while the
   // publisher's alert floor is active — those would all read as "new" Forecasts. Updates still apply.
-  const insertGuard = await guardForecastInserts(sb, 'NASA', toInsert.length);
-  if (!insertGuard.allow) r.insertRefused = insertGuard.reason;
-  const allowedInserts = insertGuard.allow ? toInsert : [];
+  // ALL-OR-NOTHING: the guard runs BEFORE the first batch, over the whole run's new rows. A refused
+  // run inserts ZERO rows (never a partial prefix) and quarantines the full payload for replay.
+  const insertGuard = await applyInsertGuard(sb, 'NASA', toInsert);
+  if (insertGuard.refused) {
+    r.insertRefused = insertGuard.refused.reason;
+    r.insertQuarantined = insertGuard.refused.quarantined;
+  }
+  const allowedInserts = insertGuard.allowed;
   r.insertAttempted = allowedInserts.length;
   for (let i = 0; i < allowedInserts.length; i += 500) {
     const batch = allowedInserts.slice(i, i + 500).map((m) => ({

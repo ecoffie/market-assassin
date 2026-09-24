@@ -32,7 +32,7 @@
  * re-post of the same forecast updates rather than duplicates.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { forecastWriterClient, guardForecastInserts, countNewForecastRows } from '@/lib/forecasts/writer';
+import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import * as XLSX from 'xlsx';
@@ -289,14 +289,19 @@ export async function GET(request: NextRequest) {
     // BACKFILL SAFETY (src/lib/forecasts/writer.ts): per publisher, a daily run may not CREATE a bulk of new rows
     // while its alert floor is active. A refused publisher's rows are held back entirely (its updates wait for the
     // backfill that must handle the bulk) and the run reports an error; other publishers still sync.
+    // The decision is made per publisher over its FULL row set before the first upsert, so a refused publisher
+    // has zero rows written (no partial prefix from earlier batches) and its whole payload is quarantined.
     const refused: string[] = [];
+    const refusedSources = new Set<string>();
     for (const src of [...new Set(deduped.map((r) => String(r.source_agency)))]) {
-      const ids = deduped.filter((r) => r.source_agency === src).map((r) => String(r.external_id));
-      const nr = await countNewForecastRows(supabase, src, ids);
+      const srcRows = deduped.filter((r) => String(r.source_agency) === src);
+      const nr = await countNewForecastRows(supabase, src, srcRows.map((r) => String(r.external_id)));
       const g = 'error' in nr ? { allow: false as const, reason: `${src}: new-row count failed: ${nr.error}` } : await guardForecastInserts(supabase, src, nr.newRows);
-      if (!g.allow) refused.push(g.reason);
+      if (g.allow) continue;
+      refusedSources.add(src);
+      const q = await quarantineRefusedLoad(supabase, src, g.reason, 'error' in nr ? -1 : nr.newRows, srcRows);
+      refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
     }
-    const refusedSources = new Set(refused.map((r) => r.split(':')[0]));
     const writable = deduped.filter((r) => !refusedSources.has(String(r.source_agency)));
     if (refused.length) {
       failures.push(...refused.map((r) => `insert_refused: ${r}`));

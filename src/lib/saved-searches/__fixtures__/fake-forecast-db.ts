@@ -31,25 +31,6 @@ const MICROS = new WeakMap<FakeForecastRow, bigint>();
 const mu = (r: FakeForecastRow) => { let v = MICROS.get(r); if (v === undefined) { v = tsMicros(r.created_at); MICROS.set(r, v); } return v; };
 const litCache = new Map<string, bigint>();
 const lit = (s: string) => { let v = litCache.get(s); if (v === undefined) { v = tsMicros(s); litCache.set(s, v); } return v; };
-function term(row: FakeForecastRow, t: string): boolean | null {
-  if (t.startsWith('and(') && t.endsWith(')')) {
-    const parts = splitTop(t.slice(4, -1)).map((x) => term(row, x));
-    return parts.every((p) => p !== false);
-  }
-  if (t.startsWith('or(') && t.endsWith(')')) return splitTop(t.slice(3, -1)).some((x) => term(row, x) !== false);
-  let m = /^source_agency\.eq\.(.+)$/.exec(t); if (m) return row.source_agency === unq(m[1]);
-  m = /^source_agency\.in\.\((.*)\)$/.exec(t); if (m) return m[1].split(',').map(unq).includes(row.source_agency);
-  m = /^created_at\.gt\.(.+)$/.exec(t); if (m) return mu(row) > lit(m[1]);
-  m = /^created_at\.eq\.(.+)$/.exec(t); if (m) return mu(row) === lit(m[1]);
-  m = /^id\.gt\.(.+)$/.exec(t); if (m) return row.id > m[1];
-  if (t === 'id.is.null') return false;
-  return null; // not modelled → does not decide
-}
-function orMatches(row: FakeForecastRow, expr: string): boolean {
-  const parts = splitTop(expr).map((x) => term(row, x));
-  if (parts.every((p) => p === null)) return true;
-  return parts.some((p) => p === true);
-}
 /** Compile an .or() body once into closures — per-row parsing made the 100k-row tests crawl. */
 type Pred = (r: FakeForecastRow) => boolean | null;
 function compileTerm(t: string): Pred {
@@ -107,6 +88,8 @@ export const FAKE_SERVER_ROW_CAP = 1000;
 export function fakeForecastDb(corpus: () => FakeForecastRow[], opts: { failOn?: (call: number) => boolean } = {}) {
   let calls = 0;
   const queries: Array<Array<[string, unknown[]]>> = [];
+  /** Rows actually returned per agency_forecasts response (after the server cap) — the per-run read volume. */
+  const returned: number[] = [];
   const from = (table: string) => {
     const ops: Array<[string, unknown[]]> = [];
     queries.push(ops);
@@ -117,9 +100,11 @@ export function fakeForecastDb(corpus: () => FakeForecastRow[], opts: { failOn?:
       calls++;
       if (table !== 'agency_forecasts') return Promise.resolve({ data: [], error: null }).then(resolve);
       if (opts.failOn?.(calls)) return Promise.resolve({ data: null, error: { message: 'simulated statement timeout' } }).then(resolve);
-      return Promise.resolve({ data: applyForecastOps(corpus(), ops).slice(0, FAKE_SERVER_ROW_CAP), error: null }).then(resolve);
+      const data = applyForecastOps(corpus(), ops).slice(0, FAKE_SERVER_ROW_CAP);
+      returned.push(data.length);
+      return Promise.resolve({ data, error: null }).then(resolve);
     };
     return q;
   };
-  return { db: { from }, queries, calls: () => calls };
+  return { db: { from }, queries, returned, calls: () => calls };
 }

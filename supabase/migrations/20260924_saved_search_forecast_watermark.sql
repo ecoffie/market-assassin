@@ -21,6 +21,10 @@ ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS forecast_gap_since JSONB;
 --      watermark moves only when every segment is done. Bounded size; never a list of Forecasts.
 ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS forecast_pending JSONB;
 
+-- 2c · Send claim (canonical engine). Taken with a compare-and-set before an alert email is sent, so two overlapping
+--      cron executions cannot both send for the same state; cleared by the state write that follows the send.
+ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS forecast_alert_claim_until TIMESTAMPTZ;
+
 -- 3 · Publisher alert floors. Key = agency_forecasts.source_agency — the canonical publisher code Discovery
 --     resolves buyers to (resolveForecastAgencies().codes / child parentSourceAgency).
 --     A publisher WITHOUT a row, or with state 'suspended', is NOT alertable (fail closed): a new publisher's
@@ -49,8 +53,55 @@ CREATE TABLE IF NOT EXISTS forecast_publisher_alert_floor_log (
   logged_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE forecast_publisher_alert_floor_log ADD COLUMN IF NOT EXISTS db_user TEXT;
+
 ALTER TABLE forecast_publisher_alert_floor ENABLE ROW LEVEL SECURITY;
 ALTER TABLE forecast_publisher_alert_floor_log ENABLE ROW LEVEL SECURITY;
+-- Service-role / owner only. Supabase's default privileges grant new public tables to anon/authenticated; RLS already
+-- blocks them, and the explicit REVOKE removes the grant itself.
+REVOKE ALL ON forecast_publisher_alert_floor, forecast_publisher_alert_floor_log FROM anon, authenticated;
+
+-- Every floor change is logged BY THE DATABASE, whatever path made it (the floor script, runPublisherBackfill, or a raw
+-- UPDATE in the SQL editor), with the database user that made it.
+CREATE OR REPLACE FUNCTION forecast_publisher_alert_floor_audit()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  INSERT INTO forecast_publisher_alert_floor_log
+    (source_agency, prev_state, prev_alertable_after, new_state, new_alertable_after, reason, set_by, db_user)
+  VALUES (
+    COALESCE(NEW.source_agency, OLD.source_agency),
+    CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE OLD.state END,
+    CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE OLD.alertable_after END,
+    CASE WHEN TG_OP = 'DELETE' THEN 'deleted' ELSE NEW.state END,
+    CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE NEW.alertable_after END,
+    CASE WHEN TG_OP = 'DELETE' THEN 'row deleted' ELSE NEW.reason END,
+    CASE WHEN TG_OP = 'DELETE' THEN current_user ELSE NEW.set_by END,
+    current_user
+  );
+  RETURN COALESCE(NEW, OLD);
+END
+$$;
+DROP TRIGGER IF EXISTS forecast_publisher_alert_floor_audit ON forecast_publisher_alert_floor;
+CREATE TRIGGER forecast_publisher_alert_floor_audit
+  AFTER INSERT OR UPDATE OR DELETE ON forecast_publisher_alert_floor
+  FOR EACH ROW EXECUTE FUNCTION forecast_publisher_alert_floor_audit();
+
+-- 3b · Loads REFUSED by the daily-sync breaker (src/lib/forecasts/writer.ts). The source rows are kept here verbatim so
+--      the load can be replayed through the backfill lifecycle (scripts/forecast-refused-load.ts). Nothing is dropped.
+CREATE TABLE IF NOT EXISTS forecast_refused_loads (
+  id             BIGSERIAL PRIMARY KEY,
+  source_agency  TEXT NOT NULL,
+  refused_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reason         TEXT NOT NULL,
+  new_row_count  INTEGER NOT NULL,
+  rows           JSONB NOT NULL,
+  resolved_at    TIMESTAMPTZ,
+  resolution     TEXT
+);
+ALTER TABLE forecast_refused_loads ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON forecast_refused_loads FROM anon, authenticated;
 
 -- 4 · Snapshot time from the DATABASE clock (created_at is a DB default), lagged so rows written by a
 --     transaction still in flight at snapshot time cannot fall between two runs: they land in the next
@@ -73,6 +124,16 @@ CREATE INDEX IF NOT EXISTS idx_agency_forecasts_created_at ON agency_forecasts (
 --     Any other writer (a historical import, a backfill script, psql) is refused until the publisher is suspended
 --     (scripts/forecast-publisher-floor.ts --suspend / runPublisherBackfill). Upserts that only UPDATE an existing
 --     (source_agency, external_id) are never refused — they cannot create a new created_at.
+-- The floor lookup must see the row WHATEVER role is writing. forecast_publisher_alert_floor has RLS and no policies,
+-- so a plain SELECT inside the (invoker) trigger returns NOTHING for any role without BYPASSRLS — the guard would read
+-- "no floor" and FAIL OPEN (caught by floor-guard.pglite.unit.test.ts). The lookup therefore runs as the owner; the
+-- role check stays in the invoker trigger, where current_user is the real writer.
+CREATE OR REPLACE FUNCTION forecast_publisher_floor_state(p_source TEXT)
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$ SELECT state FROM public.forecast_publisher_alert_floor WHERE source_agency = p_source $$;
+
 CREATE OR REPLACE FUNCTION agency_forecasts_floor_guard()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -82,7 +143,7 @@ DECLARE
   writer      TEXT;
   hdrs        TEXT;
 BEGIN
-  SELECT state INTO floor_state FROM forecast_publisher_alert_floor WHERE source_agency = NEW.source_agency;
+  floor_state := forecast_publisher_floor_state(NEW.source_agency);
   IF floor_state IS NULL OR floor_state = 'suspended' THEN
     RETURN NEW;   -- no floor (not alertable) or suspended (a sanctioned load): nothing here can become an alert
   END IF;
@@ -96,13 +157,15 @@ BEGIN
       writer := hdrs::json ->> 'x-forecast-writer';
     END IF;
   END IF;
-  IF writer = 'daily_sync' THEN
+  -- The declaration is honoured ONLY for the service role (PostgREST sets current_user to the JWT role) or the table
+  -- owner. Any other role declaring daily_sync is refused — it is not an identity those roles can assume.
+  IF writer = 'daily_sync' AND current_user IN ('service_role', 'postgres') THEN
     RETURN NEW;
   END IF;
   RAISE EXCEPTION USING
     ERRCODE = 'P0001',
-    MESSAGE = format('agency_forecasts: refusing to create %s/%s while the %s alert floor is ACTIVE (writer=%s).',
-                     NEW.source_agency, NEW.external_id, NEW.source_agency, COALESCE(writer, 'undeclared')),
+    MESSAGE = format('agency_forecasts: refusing to create %s/%s while the %s alert floor is ACTIVE (writer=%s, role=%s).',
+                     NEW.source_agency, NEW.external_id, NEW.source_agency, COALESCE(writer, 'undeclared'), current_user),
     HINT = 'Historical/bulk loads must suspend the publisher first: scripts/forecast-publisher-floor.ts --suspend, load, reconcile, --activate (or runPublisherBackfill).';
 END
 $$;

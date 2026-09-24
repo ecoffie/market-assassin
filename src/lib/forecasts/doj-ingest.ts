@@ -4,7 +4,7 @@
  * Read-only by default (`apply: false`) so the accounting, the semantic gate and
  * the identity guards can all be inspected before anything mutates.
  */
-import { guardForecastInserts } from './writer';
+import { applyInsertGuard } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import { mapDojRow } from './doj-parse';
@@ -22,6 +22,8 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 export interface DojIngestResult {
   /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
   insertRefused?: string;
+  /** Whether the refused new rows were saved to forecast_refused_loads (false = replay needs a re-fetch). */
+  insertQuarantined?: boolean;
   ok: boolean;
   failure?: string;
   applied: boolean;
@@ -157,9 +159,14 @@ export async function runDojIngest(
   r.applied = true;
   // BACKFILL SAFETY (src/lib/forecasts/writer.ts): a daily run may not create a bulk of NEW rows while the
   // publisher's alert floor is active — those would all read as "new" Forecasts. Updates still apply.
-  const insertGuard = await guardForecastInserts(sb, 'DOJ', plan.toInsert.length);
-  if (!insertGuard.allow) r.insertRefused = insertGuard.reason;
-  const allowedInserts = insertGuard.allow ? plan.toInsert : [];
+  // ALL-OR-NOTHING: the guard runs BEFORE the first batch, over the whole run's new rows. A refused
+  // run inserts ZERO rows (never a partial prefix) and quarantines the full payload for replay.
+  const insertGuard = await applyInsertGuard(sb, 'DOJ', plan.toInsert);
+  if (insertGuard.refused) {
+    r.insertRefused = insertGuard.refused.reason;
+    r.insertQuarantined = insertGuard.refused.quarantined;
+  }
+  const allowedInserts = insertGuard.allowed;
   r.insertAttempted = allowedInserts.length;
   for (let i = 0; i < allowedInserts.length; i += 500) {
     const batch = allowedInserts.slice(i, i + 500).map((row) => ({

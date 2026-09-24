@@ -34,7 +34,7 @@ export const DAILY_SYNC_WRITERS = [
 /**
  * Max NEW rows one daily sync may create for one publisher whose floor is ACTIVE. Measured 2026-09-24: DHS, the only
  * publisher with a daily history (45 days), creates median 17 / p90 44 / max 759 rows a day — the 759 is its first
- * load. OPEN DECISION (record §4b): 500 is proposed, not ratified.
+ * load. 500 approved as the initial breaker 2026-09-24; exceeding it is all-or-nothing + quarantine (applyInsertGuard).
  */
 export const DAILY_SYNC_MAX_NEW_ROWS = 500;
 
@@ -90,3 +90,38 @@ export async function countNewForecastRows(
   }
   return { newRows: ids.length - existing };
 }
+
+/**
+ * The ONE place a daily writer decides which NEW rows it may create. All-or-nothing per publisher:
+ *   allowed  → every new row is returned to be inserted
+ *   refused  → NOTHING is returned (no partial insert of earlier pages/batches is possible, because the decision is
+ *              made over the full new-row set before the first write), the complete payload is quarantined in
+ *              forecast_refused_loads for replay (scripts/forecast-refused-load.ts), and the caller must fail the run
+ *              and alert operations. Updates to existing rows are unaffected.
+ * A quarantine write failure is reported — the run is failing anyway, and the source still holds the rows.
+ */
+export async function applyInsertGuard<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any, source: string, newRows: T[],
+): Promise<{ allowed: T[]; refused: null } | { allowed: []; refused: { reason: string; quarantined: boolean; quarantineError?: string } }> {
+  const g = await guardForecastInserts(db, source, newRows.length);
+  if (g.allow) return { allowed: newRows, refused: null };
+  const q = await quarantineRefusedLoad(db, source, g.reason, newRows.length, newRows);
+  return { allowed: [], refused: { reason: g.reason, ...q } };
+}
+
+/**
+ * Save a refused load so the publisher's interval is never silently skipped: the rows stay replayable from here
+ * (scripts/forecast-refused-load.ts) even if the upstream file changes before the backfill runs. `rows` may be the
+ * whole publisher payload (sync-forecasts holds back updates too); `newRowCount` is what tripped the breaker.
+ */
+export async function quarantineRefusedLoad(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any, source: string, reason: string, newRowCount: number, rows: unknown[],
+): Promise<{ quarantined: boolean; quarantineError?: string }> {
+  const { error } = await db.from('forecast_refused_loads').insert({
+    source_agency: source, reason, new_row_count: newRowCount, rows,
+  });
+  return error ? { quarantined: false, quarantineError: error.message } : { quarantined: true };
+}
+

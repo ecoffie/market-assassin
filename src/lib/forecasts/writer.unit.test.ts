@@ -1,7 +1,7 @@
 /**
  * Backfill safety — the writer contract (tasks/saved-search-forecast-watermark-2026-09-24.md §4b).
  * The database half (the agency_forecasts_floor_guard trigger) is executed against the real migration SQL by
- * scripts/proofs/forecast-floor-guard.pglite.mjs.
+ * src/lib/forecasts/floor-guard.pglite.unit.test.ts (blocking in CI and pre-push).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -78,8 +78,8 @@ describe('bypass detection — the daily-sync identity cannot be borrowed', () =
     expect(declares.sort()).toEqual([...DAILY_SYNC_WRITERS].sort());
   });
   it('nothing else sets the writer header or the SQL writer setting by hand', () => {
-    // The PGlite proof sets the header only against its own in-process database (never a real one).
-    const offenders = files.filter((p) => p !== 'src/lib/forecasts/writer.ts' && p !== 'scripts/proofs/forecast-floor-guard.pglite.mjs'
+    // (Test files are not scanned: floor-guard.pglite.unit.test.ts sets the header only on its in-process database.)
+    const offenders = files.filter((p) => p !== 'src/lib/forecasts/writer.ts'
       && (read(p).includes(FORECAST_WRITER_HEADER) || /app\.forecast_writer/.test(read(p))));
     expect(offenders).toEqual([]);
   });
@@ -91,13 +91,13 @@ describe('bypass detection — the daily-sync identity cannot be borrowed', () =
   });
   it('the four ingest libraries run the new-row guard before inserting', () => {
     for (const lib of ['hhs', 'doj', 'nasa', 'ssa']) {
-      expect(read(`src/lib/forecasts/${lib}-ingest.ts`), lib).toMatch(/guardForecastInserts\(sb, '[A-Z]+'/);
+      expect(read(`src/lib/forecasts/${lib}-ingest.ts`), lib).toMatch(/applyInsertGuard\(sb, '[A-Z]+'/);
     }
     expect(read('src/app/api/cron/sync-forecasts/route.ts')).toMatch(/guardForecastInserts\(supabase, src/);
   });
-  it('the database guard is in the migration (executed by scripts/proofs/forecast-floor-guard.pglite.mjs)', () => {
+  it('the database guard is in the migration (executed by floor-guard.pglite.unit.test.ts)', () => {
     const sql = read('supabase/migrations/20260924_saved_search_forecast_watermark.sql');
     expect(sql).toMatch(/CREATE TRIGGER agency_forecasts_floor_guard\s+BEFORE INSERT ON agency_forecasts/);
-    expect(sql).toMatch(/IF writer = 'daily_sync' THEN/);
+    expect(sql).toMatch(/IF writer = 'daily_sync' AND current_user IN \('service_role', 'postgres'\) THEN/);
   });
 });

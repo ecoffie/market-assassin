@@ -66,7 +66,9 @@ describe('runPublisherBackfill — suspended → load → reconcile → STOP (ex
     expect(states).toEqual(['suspended']);
     expect(out).toEqual({ result: 110, state: 'suspended_awaiting_activation', proposedFloor: '2026-09-24T02:00:00.123456+00:00' });
     expect(f.floors.get('SSA')).toMatchObject({ state: 'suspended' });
-    expect(f.log).toHaveLength(1); // only the suspend — activation is a separate explicit act
+    // The audit log is written by the DATABASE trigger (forecast_publisher_alert_floor_audit), so a raw UPDATE by any
+    // role is logged too — the app never writes it itself (executed by floor-guard.pglite.unit.test.ts).
+    expect(f.log).toHaveLength(0);
   });
   it('explicit activation afterwards uses the proposed floor exactly (microseconds kept)', () => {
     const d = decideFloorChange({ source_agency: 'SSA', state: 'suspended', alertable_after: null },
