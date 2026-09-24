@@ -27,6 +27,13 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 
 /** Whole-dollar floor the Map can carry (digits only, ≤ 15). null = not a valid floor. */
 export const MAX_MIN_VALUE = 999_999_999_999_999;
+
+/** "VA", "Virginia", "VA,MD" → "VA" / "VA,MD" (each code normalized; the plan ORs a list). null = any unknown. */
+export function normalizeStates(raw: string): string | null {
+  const codes = String(raw || '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => normalizeStateCode(x));
+  if (!codes.length || codes.some((c) => !c)) return null;
+  return [...new Set(codes as string[])].join(',');
+}
 export function validMinValue(v: unknown): number | null {
   return typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= MAX_MIN_VALUE ? v : null;
 }
@@ -115,7 +122,7 @@ export function scopedParams(input: ScopedTaskOrderInput & { parent?: string }):
   if (input.naics?.trim()) out.naics = input.naics.trim();
   if (input.agency?.trim()) out.agency = input.agency.trim();
   // Normalized ONCE here, so the query, the applied_filters echo and the Map link all say the same code.
-  if (input.state?.trim()) out.state = normalizeStateCode(input.state) ?? input.state.trim().toUpperCase();
+  if (input.state?.trim()) out.state = normalizeStates(input.state) ?? input.state.trim().toUpperCase();
   const floor = validMinValue(input.min_value);
   if (floor != null) out.minValue = String(floor);
   out.leadMax = String(lead);

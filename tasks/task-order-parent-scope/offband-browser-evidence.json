@@ -1,0 +1,42 @@
+{
+ "open": {
+  "last": {
+   "vehicle": "OASIS+",
+   "minValue": "2500000",
+   "leadMax": "60"
+  },
+  "search": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=2500000&leadMax=60"
+ },
+ "after_filters_apply": {
+  "last": {
+   "vehicle": "OASIS+",
+   "minValue": "2500000",
+   "leadMax": "60"
+  },
+  "search": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=2500000&leadMax=60"
+ },
+ "after_apply_reload": {
+  "last": {
+   "vehicle": "OASIS+",
+   "minValue": "2500000",
+   "leadMax": "60"
+  },
+  "search": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=2500000&leadMax=60"
+ },
+ "after_user_picks_12mo": {
+  "last": {
+   "vehicle": "OASIS+",
+   "minValue": "2500000",
+   "leadMax": "12"
+  },
+  "search": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management%20consulting&leadMax=12&minValue=2500000"
+ },
+ "after_filters_reset": {
+  "last": {
+   "vehicle": "OASIS+",
+   "minValue": null,
+   "leadMax": null
+  },
+  "search": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management%20consulting"
+ }
+}

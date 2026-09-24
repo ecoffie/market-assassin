@@ -9,8 +9,7 @@
  */
 import { searchIDVContracts, type IDVContract } from '@/lib/idv-search';
 import { mcpFlags } from '@/lib/mcp/flags';
-import { searchScopedTaskOrders, validMinValue, MAX_MIN_VALUE, type ScopedTaskOrderResult, type ScopedTaskOrderRow } from '@/lib/vehicles/task-order-search';
-import { normalizeStateCode } from '@/lib/utils/us-states';
+import { searchScopedTaskOrders, validMinValue, normalizeStates, MAX_MIN_VALUE, type ScopedTaskOrderResult, type ScopedTaskOrderRow } from '@/lib/vehicles/task-order-search';
 
 export interface IdvContractsToolInput {
   naics?: string;
@@ -105,7 +104,7 @@ export function refusedScopedFilters(input: IdvContractsToolInput): { filter: st
   if (input.min_value !== undefined && input.min_value !== 0 && validMinValue(input.min_value) == null) {
     out.push({ filter: 'min_value', reason: `min_value must be a whole number of dollars between 1 and ${MAX_MIN_VALUE.toLocaleString('en-US')}.` });
   }
-  if (input.state?.trim() && !normalizeStateCode(input.state)) out.push({ filter: 'state', reason: `"${input.state}" is not a US state or territory.` });
+  if (input.state?.trim() && !normalizeStates(input.state)) out.push({ filter: 'state', reason: `"${input.state}" is not a US state or territory (or a comma list of them).` });
   else if (input.state?.trim() && input.state_scope !== 'pop') out.push({ filter: 'state', reason: 'In a scoped search state means PLACE OF PERFORMANCE only (recipient HQ state is not on this data). Pass state_scope:"pop".' });
   return out;
 }

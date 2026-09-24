@@ -77,6 +77,18 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 | The harness routes `.or()` through the SQL twin's translator | **Accepted.** PostgREST parsing of the same strings is covered by the live oracle (25/25) |
 | `state`/`naics` are unmanaged URL params (pre-existing) | **Unchanged.** After Clear, the URL and FILT both keep `state=DC`, so they agree |
 
+### Second delta review (`11558dcc..8fcc3712`): no blockers
+
+| Item | Status |
+|---|---|
+| **Should-fix.** An off-band floor (e.g. $2.5M) was wiped by any Filters apply, in both the fetch and the URL | **Fixed.** A `data-offband` mark on the select keeps the applied value; a user choice or Reset clears it. The browser run (`offband-browser-evidence.json`) also found that a scoped link's `leadMax=60` shrank to the 18-month default the same way, now fixed with the same mark |
+| A pill floor of `1500.5` wrote a URL value the reader rejects | **Fixed.** The writer emits `Math.floor` whole dollars |
+| The guard test only undid doubled backslashes | **Fixed.** It evaluates the served line as a template literal. An injected single-escape regression (`1-234`) now goes red |
+| `state:"VA,MD"` was refused as "not a US state" | **Fixed.** Normalized per code and ORed (the plan supports lists); an unknown member is refused |
+| Pill apply on a record link strips `horizon` | **Pre-existing, not changed.** Filters apply and Reset already did this, and the record itself still opens |
+| Unscoped hand-built `?minValue=` isn't rewritten by the pill | **Not changed.** Only reachable by hand; tool links always carry a scope |
+| `state`/`naics` survive the banner's Clear (URL and FILT agree) | **Pre-existing unmanaged market params, not changed** |
+
 ## Reproducible demo (VCI / IMRI style)
 
 A management-consulting firm asks what management consulting is currently being ordered through OASIS+.

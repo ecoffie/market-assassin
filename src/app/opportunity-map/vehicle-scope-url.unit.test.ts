@@ -67,16 +67,32 @@ describe('wiring', () => {
     expect(MAP).toContain("if(FILT.vehicle)url+='&vehicle='+encodeURIComponent(FILT.vehicle);");
   });
   it('#1692 review 1: the minValue guard the BROWSER receives admits whole dollars only (executed, not grepped)', () => {
-    // Cook the template literal exactly as the page is served, then run the regex it emits.
-    const line = cook(MAP).split('\n').find((l) => l.includes("f.valueRange=minValue+'-'"))!;
+    // Evaluate the SOURCE line as the template literal it lives in — exactly what the page serves
+    // (a single \. would come out as '.', which a backslash-only "cook" would not reproduce).
+    const raw = MAP.split('\n').find((l) => l.includes("f.valueRange=minValue+'-'"))!;
+    expect(raw).not.toMatch(/`|\$\{/);   // a plain line: no backtick, no interpolation
+    const line = new Function('return `' + raw + '`;')() as string;
     const src = /if\(minValue&&\/(.+)\/\.test\(minValue\)\)/.exec(line)![1];
     const guard = new RegExp(src);
     for (const ok of ['1', '1000000', '999999999999999']) expect(guard.test(ok), ok).toBe(true);
-    for (const bad of ['1-2', '1e5', '12x3', '1.5', '-5', '1000000000000000', '']) expect(guard.test(bad), bad).toBe(false);
+    for (const bad of ['1-2', '1-234', '1e5', '12x3', '1.5', '1.500', '-5', '1000000000000000', '']) expect(guard.test(bad), bad).toBe(false);
   });
   it('the Value pill keeps an intent link in step', () => {
     expect(MAP).toMatch(/syncDeepSelect\(\);\n.*\n\s*if\(typeof window\.__syncQueryUrl==='function'\)window\.__syncQueryUrl\(false,true\);/);
     expect(MAP).toContain("FILT.leadMax=''; FILT.valueRange='';");
+  });
+  it('#1692 review: an off-band floor survives a Filters apply; a user choice or Filters Clear still clears it', () => {
+    expect(MAP).toContain("if(!ok&&s)el.setAttribute('data-offband',s); else el.removeAttribute('data-offband');");
+    expect(MAP).toContain("return e.value||e.getAttribute('data-offband')||'';");
+    expect(MAP).toMatch(/\['mfValueMin','mfValueMax','mfLead'\]\.forEach\(function\(id\)\{var e=document\.getElementById\(id\);if\(e\)e\.removeAttribute\('data-offband'\);\}\);/);
+    expect(MAP).toContain("e.addEventListener('change',function(){ e.removeAttribute('data-offband'); });");
+  });
+  it('an off-band window (leadMax=60) survives a Filters apply the same way', () => {
+    expect(MAP).toContain("if(FILT.leadMax&&_rLd.value!==String(FILT.leadMax))_rLd.setAttribute('data-offband',String(FILT.leadMax));");
+    expect(MAP).toContain("FILT.leadMax=_vb('mfLead');");
+  });
+  it('the writer emits whole dollars only (what the scope-link reader accepts)', () => {
+    expect(MAP).toContain("?String(Math.floor(parseFloat(String(FILT.valueRange).split('-')[0]))):''");
   });
   it('a scope fetches the Awarded horizon alone (no unscoped totals summed in)', () => {
     expect(MAP).toContain("if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }");

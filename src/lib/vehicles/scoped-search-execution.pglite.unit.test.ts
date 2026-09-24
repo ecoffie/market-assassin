@@ -160,6 +160,15 @@ describe('finding 1 — every scoped filter is APPLIED (narrows, echoed, same on
     const r = await searchScopedTaskOrders({ ...BASE, min_value: 0 }, db);
     expect(r.applied_filters.map((f) => f.filter)).not.toContain('min_value');
   });
+  it('a comma list of states is normalized per code and ORed (not refused)', async () => {
+    expect(refusedScopedFilters({ state: 'VA, Maryland', state_scope: 'pop' } as never)).toEqual([]);
+    const r = await searchScopedTaskOrders({ ...BASE, state: 'VA, Maryland' }, db);
+    expect(r.applied_filters.find((f) => f.filter === 'state')?.value).toBe('VA,MD');
+    expect(ids(r)).toContain(`CONT_AWD_T03_7008_${A}_4732`);          // the MD row is back
+    expect(refusedScopedFilters({ state: 'VA,Atlantis', state_scope: 'pop' } as never).map((f) => f.filter)).toContain('state');
+    const m = await mapFromLink(r.map_url!);
+    expect(m.onePass.ids).toEqual(ids(r));
+  });
   it('#1692 review 9: a state NAME is normalized once — query, echo and Map link all say the code', async () => {
     const r = await searchScopedTaskOrders({ ...BASE, state: 'Virginia' }, db);
     expect(r.applied_filters.find((f) => f.filter === 'state')?.value).toBe('VA');
