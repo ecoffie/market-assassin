@@ -203,7 +203,7 @@ enforces the cap. A regression test fails with both guards removed.
 | 2,018 rows at a 1,000-row page size (server cap) | exact, at page sizes 1,000 / 999 / 500 |
 | real SQL, production (02dc20b6, HHS onboarding window) | 2,018 rows over 11 resumed runs (100-row pages) = single pass = JS mirror; 0 missing, 0 repeated |
 
-### ❓ DECISION NEEDED — high-volume notification behaviour (not implemented as policy)
+### ✅ DECIDED 2026-09-24 — (a): one "N new matches" email with 3 examples per COMPLETED interval (was: decision needed)
 The engine emails **one count + 3 examples per completed interval**. It never sends thousands of cards. What it does not
 decide is whether a very large genuine interval should be emailed at all, or how it should be framed. Options:
 - **(a) As built:** "N new matches" plus 3 examples plus "See all N on the map". This is the existing template, with no
@@ -394,7 +394,7 @@ pages: count 2,018 = distinct 2,018 = mirror; missing 0, repeated
 | `saved-search-forecast-baseline.ts` | dry run | sets W (and G for uncovered buyers) where W IS NULL | refuses without the migration; backup first; idempotent; verifies 0 NULL left and Open state byte-identical; no email path; `--rollback <backup>` |
 | `forecast-publisher-floor.ts` | dry run | `--seed` (never overwrites), `--suspend`, `--activate` (+ an append-only log) | canonical codes only; reason and actor required; monotonic unless `--allow-rewind` |
 | `saved-search-forecast-watermark-replay.ts` | read-only | — | exits 1 on any mismatch, old-row alert, cutover alert, or lost genuine row |
-| `proofs/forecast-floor-guard.pglite.mjs` | in-process Postgres only | — | exits 1 on any failed expectation |
+| `forecast-refused-load.ts` | dry run / `--list` | replays a quarantined refused load through `runPublisherBackfill` (insert-only, stays SUSPENDED) | refuses a resolved load or a payload for another publisher; reconciles by read-back |
 
 ## 10. Cutover (proposed)
 
@@ -408,6 +408,70 @@ pages: count 2,018 = distinct 2,018 = mirror; missing 0, repeated
 | 6 | shadow | none (`?mode=preview&forecastEngine=canonical` after a 13:00 sync) | Forecast-new = rows created after the baseline only | — |
 | 7 | enable | `printf true \| vercel env add …` + fresh deploy | the first 11:00 run matches the shadow | **unset the flag → Forecast paused, Open continues (§7)** |
 
-## 11. Decisions for review
-1. High-volume notification behaviour (§5): (a) as built, (b) threshold summary, or (c) hold for review.
-2. Daily-sync breaker threshold: 500 new rows per publisher per run (§6).
+## 11. Decisions — resolved 2026-09-24
+1. High-volume notification: **(a)** one "N new matches" email with 3 examples per completed interval.
+2. Daily-sync breaker: **500 new rows per publisher per run**, all-or-nothing, with explicit operational recovery (§12.4).
+
+## 12. Round 5 — final review revision (2026-09-24)
+
+### 12.1 The per-run bound, reconciled
+The earlier "100,000 rows in 4 runs" came from a **test override** (`maxPages: 50` → 25,000 rows/run). Production is
+`FORECAST_MAX_PAGES_PER_RUN = 40` × `FORECAST_PAGE_SIZE = 500` = **20,000 counted rows per run**. The test now runs at
+the default budget and asserts per run (`forecast-watermark.unit.test.ts`):
+
+| run | page queries | rows fetched | rows counted | result |
+|---|---|---|---|---|
+| 1–4 | 40 | 20,040 (40 × 501: each page carries one look-ahead row, re-read as the next page's first) | 20,000 | in_progress |
+| 5 | 40 + 1 evidence query | 20,003 (39 × 501 + 500 + 3 evidence rows) | 20,000 | measured, count 100,000 |
+
+The budget is **total per run, shared across segments**: main + two gap segments (50,000 rows) drain in 3 runs with
+every run ≤ 40 page queries and ≤ 20,000 counted rows.
+
+### 12.2 PGlite proofs — in the repo, blocking
+`@electric-sql/pglite` **0.5.8** is a pinned devDependency (identical 9-line lockfile change in #1683 and #1682).
+`src/lib/forecasts/floor-guard.pglite.unit.test.ts` (14 tests) and `src/lib/forecasts/dhs-republish.pglite.unit.test.ts`
+(2 tests, #1682) execute the real SQL under `npm run test:unit`, so they block in CI (`decision-chain.yml` → Unit suite)
+and in pre-push. The `scripts/proofs/*` scripts are removed.
+
+### 12.3 Who can declare `daily_sync`: the database boundary
+- The declaration is a session setting or request header, so **any session can say it**. The trigger honours it only when
+  `current_user IN ('service_role','postgres')`. A non-privileged role that declares it is refused, even with table grants (tested).
+- **Found and fixed:** the trigger read the floor as the invoker. The floor table has RLS and no policies, so any role
+  without BYPASSRLS read "no floor" and **failed open**. The lookup is now `forecast_publisher_floor_state()`
+  (SECURITY DEFINER, pinned search_path). The role check stays in the invoker context. Pinned by a regression test.
+- Production grants (measured): agency_forecasts → postgres (owner) + service_role only. anon/authenticated have no grants on
+  agency_forecasts, the floor, its log, or `forecast_refused_loads` (REVOKE ALL is in the migration).
+- **Bypass boundary.** This is a safety interlock, not a security boundary against privileged operators. service_role (the
+  app key, BYPASSRLS) can declare daily_sync or suspend a floor. The owner can `ALTER TABLE … DISABLE TRIGGER`. supabase_admin
+  (a superuser) can do anything. What the database guarantees is attribution: every floor INSERT/UPDATE/DELETE, by any
+  path, is written to `forecast_publisher_alert_floor_log` with `db_user` by an AFTER trigger. The app no longer writes the log.
+
+### 12.4 The 500-row breaker: all-or-nothing, nothing skipped
+- `applyInsertGuard` decides over the run's **full** new-row set **before the first write**. A refused run returns
+  `allowed: []`, so there is no prefix from earlier batches. HHS/DOJ/NASA/SSA use it. `sync-forecasts` decides per publisher
+  before its first upsert and holds that publisher's whole payload (updates included).
+- Refused rows go verbatim to **`forecast_refused_loads`**. The route returns 500 and `sendOpsAlert` says whether the rows
+  were quarantined. If quarantine fails, the alert says the rows must be re-fetched from the source.
+- Updates to existing rows still apply in the four ingest libraries.
+- **Recovery:** `forecast-refused-load.ts --replay <id>` (suspend → insert-only replay → read-back reconcile → stays
+  suspended) → `forecast-publisher-floor.ts --activate <CODE> --after last` (bulk is historical, no alerts) **or**
+  `--after <prior floor>` (bulk is genuinely new, alerts). The publisher's interval is never silently skipped. It is
+  either quarantined or reported as not saved.
+- Proof: `insert-breaker.unit.test.ts` drives the real HHS ingest with 600 new rows (straddling the 500-row batch). Result:
+  0 inserted, the full payload quarantined, existing-row updates applied, the refusal reported. Ordering is also pinned at
+  every call site.
+
+### 12.5 Email delivery: the actual guarantees (not exactly-once)
+Implemented in `src/lib/saved-searches/send-claim.ts` for the **canonical** engine:
+
+| case | behaviour | guarantee |
+|---|---|---|
+| overlapping executions, same state | a CAS lease on `forecast_alert_claim_until` (version = `last_alerted_at`) is taken before sending; the loser skips (`skippedConcurrent`) | at most one email per state |
+| overlapping, stale read after the other committed | the CAS on `last_alerted_at` misses; the stale run writes nothing | no duplicate, no watermark regression |
+| failure before or at send (throw / rejected) | lease released, no state written | no loss: the next run retries |
+| send OK, state save fails once | retried once, succeeds | exactly one email |
+| send OK, save fails twice | `state_update_failed`, the lease stays (10 min) and blocks an immediate re-send; after expiry the SAME interval is re-sent | **at-least-once**: one duplicate possible, never a silent loss |
+
+The provider and the database are not transactional, so exactly-once is not claimed. The **legacy** engine (flag OFF)
+is unchanged and has none of these guarantees: overlapping legacy runs can both send. Route tests cover every row above,
+and mutation-tested (no CAS, no retry, no-send save without CAS) → each mutant fails.
