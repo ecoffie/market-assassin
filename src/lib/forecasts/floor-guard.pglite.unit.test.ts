@@ -52,6 +52,7 @@ beforeAll(async () => {
   await db.exec(`
     GRANT SELECT, INSERT, UPDATE ON agency_forecasts TO service_role, intruder;
     GRANT SELECT ON forecast_publisher_alert_floor TO service_role, intruder;
+    GRANT EXECUTE ON FUNCTION forecast_publisher_floor_state(TEXT) TO intruder;
     GRANT SELECT, INSERT, UPDATE ON forecast_publisher_alert_floor, forecast_publisher_alert_floor_log, forecast_refused_loads TO service_role;
     GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO service_role;
   `);
@@ -102,7 +103,7 @@ describe('agency_forecasts_floor_guard — who may CREATE rows while a floor is 
     expect(b.ok).toBe(false);
   });
   it('RLS cannot blind the guard: a role that cannot SELECT the floor still hits it (it used to read "no floor" → fail open)', async () => {
-    await db.exec(`CREATE ROLE blind; GRANT SELECT, INSERT ON agency_forecasts TO blind;`);
+    await db.exec(`CREATE ROLE blind; GRANT SELECT, INSERT ON agency_forecasts TO blind; GRANT EXECUTE ON FUNCTION forecast_publisher_floor_state(TEXT) TO blind;`);
     const r = await tryExec(`INSERT INTO agency_forecasts (source_agency, external_id) VALUES ('DHS','F7')`, 'SET LOCAL ROLE blind;');
     expect(r.ok).toBe(false);
     expect(!r.ok && r.error).toMatch(/refusing to create DHS\/F7 .*writer=undeclared, role=blind/);
@@ -121,6 +122,42 @@ describe('agency_forecasts_floor_guard — who may CREATE rows while a floor is 
     expect((await one<{ c: number }>(`SELECT count(*)::int AS c FROM agency_forecasts WHERE external_id LIKE 'H-%'`)).c).toBe(2519);
     await db.exec(`UPDATE forecast_publisher_alert_floor SET state='active', alertable_after = now(), reason='activate', set_by='proof' WHERE source_agency='DHS'`);
     expect((await tryExec(`INSERT INTO agency_forecasts (source_agency, external_id) VALUES ('DHS','F9')`)).ok).toBe(false);
+  });
+});
+
+describe('owner-rights function — search path, qualification, permissions', () => {
+  it('forecast_publisher_floor_state is SECURITY DEFINER with a pinned search_path (pg_temp last); triggers pin theirs too', async () => {
+    const r = await db.query<{ proname: string; prosecdef: boolean; proconfig: string[] | null }>(`SELECT proname, prosecdef, proconfig FROM pg_proc
+      WHERE proname IN ('forecast_publisher_floor_state','agency_forecasts_floor_guard','forecast_publisher_alert_floor_audit') ORDER BY proname`);
+    expect(r.rows.map((x) => [x.proname, x.prosecdef, x.proconfig])).toEqual([
+      ['agency_forecasts_floor_guard', false, ['search_path=public, pg_temp']],
+      ['forecast_publisher_alert_floor_audit', false, ['search_path=public, pg_temp']],
+      ['forecast_publisher_floor_state', true, ['search_path=public, pg_temp']],
+    ]);
+  });
+  it('anon / authenticated cannot EXECUTE it (not reachable via PostgREST /rpc); service_role can', async () => {
+    const q = async (role: string) => (await one<{ ok: boolean }>(`SELECT has_function_privilege('${role}', 'forecast_publisher_floor_state(text)', 'EXECUTE') AS ok`)).ok;
+    expect(await q('anon')).toBe(false);
+    expect(await q('authenticated')).toBe(false);
+    expect(await q('service_role')).toBe(true);
+  });
+  it('a writer without EXECUTE is refused (fail closed), never waved through', async () => {
+    await db.exec(`CREATE ROLE noexec; GRANT SELECT, INSERT ON agency_forecasts TO noexec;`);
+    const r = await tryExec(`INSERT INTO agency_forecasts (source_agency, external_id) VALUES ('DHS','F8')`, `SET LOCAL ROLE noexec; ${hdr('daily_sync')}`);
+    expect(r.ok).toBe(false);
+  });
+  it('a caller-controlled search_path cannot divert the audit row into a temp table', async () => {
+    const n0 = (await one<{ c: number }>(`SELECT count(*)::int AS c FROM public.forecast_publisher_alert_floor_log`)).c;
+    await db.exec(`BEGIN;
+      CREATE TEMP TABLE forecast_publisher_alert_floor_log (LIKE public.forecast_publisher_alert_floor_log INCLUDING DEFAULTS);
+      SET LOCAL search_path = pg_temp, public;
+      UPDATE public.forecast_publisher_alert_floor SET reason='diversion attempt', set_by='x' WHERE source_agency='DHS';
+      COMMIT;`);
+    const last = await one<{ reason: string; c: number }>(`SELECT reason, (SELECT count(*)::int FROM public.forecast_publisher_alert_floor_log) AS c FROM public.forecast_publisher_alert_floor_log ORDER BY id DESC LIMIT 1`);
+    const diverted = (await one<{ c: number }>(`SELECT count(*)::int AS c FROM pg_temp.forecast_publisher_alert_floor_log`)).c;
+    await db.exec(`DROP TABLE pg_temp.forecast_publisher_alert_floor_log`);   // PGlite is one session: don't shadow later tests
+    expect(last).toEqual({ reason: 'diversion attempt', c: n0 + 1 });
+    expect(diverted).toBe(0);
   });
 });
 

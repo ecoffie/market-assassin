@@ -63,12 +63,16 @@ REVOKE ALL ON forecast_publisher_alert_floor, forecast_publisher_alert_floor_log
 
 -- Every floor change is logged BY THE DATABASE, whatever path made it (the floor script, runPublisherBackfill, or a raw
 -- UPDATE in the SQL editor), with the database user that made it.
+-- search_path is PINNED and names are schema-qualified: an unpinned invoker trigger resolves names through the CALLER's
+-- search_path, so a session could create a temp table named forecast_publisher_alert_floor_log and divert its own audit
+-- row into it (pinned by floor-guard.pglite.unit.test.ts).
 CREATE OR REPLACE FUNCTION forecast_publisher_alert_floor_audit()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 BEGIN
-  INSERT INTO forecast_publisher_alert_floor_log
+  INSERT INTO public.forecast_publisher_alert_floor_log
     (source_agency, prev_state, prev_alertable_after, new_state, new_alertable_after, reason, set_by, db_user)
   VALUES (
     COALESCE(NEW.source_agency, OLD.source_agency),
@@ -133,21 +137,27 @@ RETURNS TEXT
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$ SELECT state FROM public.forecast_publisher_alert_floor WHERE source_agency = p_source $$;
+-- Owner-rights code is callable only by the roles that write agency_forecasts. Without this, PUBLIC (and so anon /
+-- authenticated through PostgREST /rpc) could execute it. A role lacking EXECUTE that tries to insert is refused by the
+-- resulting permission error (fail closed).
+REVOKE ALL ON FUNCTION forecast_publisher_floor_state(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION forecast_publisher_floor_state(TEXT) TO service_role;
 
 CREATE OR REPLACE FUNCTION agency_forecasts_floor_guard()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   floor_state TEXT;
   writer      TEXT;
   hdrs        TEXT;
 BEGIN
-  floor_state := forecast_publisher_floor_state(NEW.source_agency);
+  floor_state := public.forecast_publisher_floor_state(NEW.source_agency);
   IF floor_state IS NULL OR floor_state = 'suspended' THEN
     RETURN NEW;   -- no floor (not alertable) or suspended (a sanctioned load): nothing here can become an alert
   END IF;
-  IF EXISTS (SELECT 1 FROM agency_forecasts WHERE source_agency = NEW.source_agency AND external_id = NEW.external_id) THEN
+  IF EXISTS (SELECT 1 FROM public.agency_forecasts WHERE source_agency = NEW.source_agency AND external_id = NEW.external_id) THEN
     RETURN NEW;   -- the ON CONFLICT path of an upsert: an update, created_at is kept
   END IF;
   writer := NULLIF(current_setting('app.forecast_writer', true), '');

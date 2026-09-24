@@ -475,3 +475,21 @@ Implemented in `src/lib/saved-searches/send-claim.ts` for the **canonical** engi
 The provider and the database are not transactional, so exactly-once is not claimed. The **legacy** engine (flag OFF)
 is unchanged and has none of these guarantees: overlapping legacy runs can both send. Route tests cover every row above,
 and mutation-tested (no CAS, no retry, no-send save without CAS) → each mutant fails.
+
+### 12.6 Final security review (frozen round)
+- `forecast_publisher_floor_state(text)` (owner rights): `SECURITY DEFINER`, `SET search_path = public, pg_temp`
+  (pg_temp last), body schema-qualified (`public.forecast_publisher_alert_floor`), read-only (`STABLE`, one SELECT
+  returning a state string). **Fixed:** it had default PUBLIC EXECUTE, so anon and authenticated could call it via PostgREST
+  `/rpc` and read a publisher's floor state. It is now `REVOKE ALL … FROM PUBLIC, anon, authenticated; GRANT EXECUTE … TO
+  service_role`. A writer without EXECUTE is refused (fail closed, tested).
+- **Fixed:** the two invoker triggers resolved names through the CALLER's search_path. A session could create a temp
+  `forecast_publisher_alert_floor_log` and divert its own audit row into it. Both triggers now pin
+  `search_path = public, pg_temp` and schema-qualify every name. A test attempts the diversion. Removing the pin or
+  the REVOKE fails 3 tests (mutation-checked).
+- **Expired claim:** a worker whose lease expired cannot overwrite state. Its final save requires
+  `forecast_alert_claim_until = its own lease`, and a new claimant has replaced it (`send-claim.unit.test.ts`). It cannot
+  send late either: the lease (600s) exceeds the route's `maxDuration` (300s), so a holder with an expired lease has been
+  terminated (pinned by the same test).
+- Delivery remains **at-least-once**. Each time a send succeeds and its state save fails (after one retry), the same
+  interval is re-sent after the lease expires. If saving keeps failing, the duplicate REPEATS every 10 minutes (each run is reported
+  `state_update_failed`) until a save succeeds.
