@@ -31,6 +31,7 @@
  * onConflict 'source_agency,external_id', so re-running is idempotent and a
  * re-post of the same forecast updates rather than duplicates.
  */
+import { canonicalDhsExternalId } from '@/lib/forecasts/dhs-identity';
 import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
@@ -103,7 +104,8 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
       source_agency: 'DHS',
       source_type: 'api',
       source_url: DHS_API,
-      external_id: nn(clean(r.apfs_number)) || nn(clean(r.id)) || `DHS:${(title || '').slice(0, 60)}`,
+      // Canonical identity: the APFS number WITHOUT DHS's republish `*` — see src/lib/forecasts/dhs-identity.ts.
+      external_id: canonicalDhsExternalId(nn(clean(r.apfs_number)), nn(clean(r.id)), title),
       title: title || nn(clean(r.requirement)) || '(untitled forecast)',
       description: nn(clean(r.requirement)),
       bureau: nn(clean(r.organization)),
