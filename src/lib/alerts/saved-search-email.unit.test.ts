@@ -92,6 +92,28 @@ describe('buildEmail', () => {
     expect(html).toContain('view all on the map');
   });
 
+  it('high-volume Forecast summary (total > evidence): says the rows are EXAMPLES, not the complete set, in html AND text', () => {
+    // Eric 2026-09-24: one summary email per completed interval — the COMPLETE count plus up to 3 examples, and the
+    // reader must not mistake the 3 for everything that is new. `total` is the canonical Forecast engine's interval
+    // count; the rendered rows are evidence only.
+    const evidence = [opp({ notice_id: 'f1' }), opp({ notice_id: 'f2' }), opp({ notice_id: 'f3' })];
+    const { subject, html, text } = buildEmail({ id: 's1', name: 'Cyber' }, evidence, [], { total: 1237 });
+    expect(subject).toBe('1237 new matches in “Cyber”');
+    expect((html.match(/opportunity-map\?opp=/g) || []).length).toBe(3);
+    for (const body of [html, text]) {
+      expect(body).toMatch(/3 examples/i);
+      expect(body).toMatch(/not the complete set of 1,?237/i);
+    }
+    // Fewer than 3 examples still discloses, with the true number shown.
+    const two = buildEmail({ id: 's1', name: 'Cyber' }, evidence.slice(0, 2), [], { total: 9 });
+    expect(two.html).toMatch(/2 examples/i);
+    expect(two.text).toMatch(/not the complete set of 9/i);
+    // Everything is shown → no disclaimer (it would be false).
+    expect(buildEmail({ name: 'x' }, evidence, [], { total: 3 }).html).not.toMatch(/examples/i);
+    // Legacy callers (no total) are unchanged.
+    expect(buildEmail({ id: 's1', name: 'Cyber' }, Array.from({ length: 30 }, () => opp())).html).not.toMatch(/examples/i);
+  });
+
   it('text fallback lists each opp with agency/naics/set-aside/notice/due', () => {
     const { text } = buildEmail({ name: 'x' }, [opp({ set_aside_code: '8A', notice_type: 'Sources Sought' })]);
     expect(text).toContain('• Test Opportunity');

@@ -22,6 +22,7 @@
  * Identity is the source-native APP # (`SSA-<APP#>`). The recovered 12112026 edition is
  * provenance-repair EVIDENCE ONLY and must never participate in runtime ingestion.
  */
+import { applyInsertGuard } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 import * as xlsx from 'xlsx';
@@ -56,6 +57,10 @@ export type SsaFailure =
   | 'parse_failure' | 'source_schema_failure' | 'identity_failure' | 'receipt_mismatch';
 
 export interface SsaIngestResult {
+  /** Set when the daily-sync new-row guard refused this run's inserts (src/lib/forecasts/writer.ts). */
+  insertRefused?: string;
+  /** Whether the refused new rows were saved to forecast_refused_loads (false = replay needs a re-fetch). */
+  insertQuarantined?: boolean;
   ok: boolean; failure?: SsaFailure; failureDetail?: string; applied: boolean;
   discoveryUrl: string; selectedUrl?: string; selectedLabel?: string;
   fingerprint?: string; sourceLastModified?: string | null; sourceEtag?: string | null;
@@ -320,14 +325,25 @@ export async function runSsaIngest(
   // 6) apply
   let inserted = 0, insertFailed = 0, updated = 0, updateFailed = 0;
   const nowIso = new Date().toISOString();
-  for (const id of newIds) {
+  // BACKFILL SAFETY (src/lib/forecasts/writer.ts): no bulk of NEW rows while SSA's alert floor is active.
+  // ALL-OR-NOTHING: every new row is built first and guarded as ONE set before the first insert, so a
+  // refused run writes zero new rows and the full payload is quarantined for replay.
+  const newRows = newIds.map((id) => {
     const src = byId.get(id)!;
-    const { error } = await sb.from('agency_forecasts').insert({
+    return {
       source_agency: 'SSA', source_type: 'excel', source_url: pick.url, external_id: id,
       department: 'Social Security Administration', pop_country: 'USA', status: 'forecast',
       ...mapSourceRow(src), raw_data: src,
       created_at: nowIso, updated_at: nowIso, last_synced_at: nowIso,
-    });
+    };
+  });
+  const insertGuard = await applyInsertGuard(sb, 'SSA', newRows);
+  if (insertGuard.refused) {
+    result.insertRefused = insertGuard.refused.reason;
+    result.insertQuarantined = insertGuard.refused.quarantined;
+  }
+  for (const row of insertGuard.allowed) {
+    const { error } = await sb.from('agency_forecasts').insert(row);
     if (error) insertFailed++; else inserted++;
   }
   for (const [id, patch] of updates) {
@@ -350,7 +366,7 @@ export async function runSsaIngest(
     .select('*', { count: 'exact', head: true }).eq('source_agency', 'SSA');
 
   result.inserted = inserted; result.insertFailed = insertFailed;
-  result.insertAttempted = newIds.length; result.updateAttempted = updates.size;
+  result.insertAttempted = insertGuard.allowed.length; result.updateAttempted = updates.size;
   result.updated = updated; result.updateFailed = updateFailed;
   result.physicalRows = after ?? count;
   result.dataAdvanced = inserted > 0 || updated > 0;
