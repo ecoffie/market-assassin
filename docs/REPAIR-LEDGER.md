@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Maps client — canonical discovery row 8 (query in URL · agency suggestion · needs_positive_scope)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-23 | Maps / query in URL | The typed query is written to `?q=` by `history.replaceState` from USER actions only (never fetchView / `__applySavedSearch` / setMapMode); a typed query drops `?ss=` + record ids; `?q=` stands the memory down except when this browser's own fresh memory holds exactly that q — decided once (`__qLinkDeferred`) so one applier runs | `window.__syncQueryUrl=function(dropContext){` → `src/app/opportunity-map/route.ts` | `query-in-url.unit.test.ts` (28, incl. both-IIFE boot harness; removing the stand-down line → red); headless journey: type → URL `?q=janitorial`, reload restores it; own-session reload restores agency+q; fresh browser gets q only | PR open |
+| 2026-09-23 | Maps / agency suggestion | Agency rows were `data-act="run"` (typed the name as q). Now `data-act="agency"` → `__applyAgencySuggestion`: FILT.agency (preset needle or full name, no substring collapse), pill + badge, clears q | `window.__applyAgencySuggestion=function(name){` → `src/app/opportunity-map/route.ts` | `agency-suggestion-filter.unit.test.ts` (10); headless: "Department of Veterans Affairs" → requests carry `agency=VETERANS%20AFFAIRS`, 0 carry `q=veterans` | PR open |
+| 2026-09-23 | Maps / needs_positive_scope | `horizonCount` gains `needs_scope`; header "Nothing searched yet", feed shows the server refinement — never "0 results"; stale unplaced-forecast count no longer appended under a newer query | `function needsScopeNote(counts,enabled){` → `src/app/opportunity-map/route.ts` | `needs-positive-scope.unit.test.ts` (15, real prod response shapes); headless: `-computers` → refinement; `541512 -computers` → 13 results | PR open |
+
 ## Contacts — DoDAAC-prefix lookup indexed + degraded ≠ zero
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
