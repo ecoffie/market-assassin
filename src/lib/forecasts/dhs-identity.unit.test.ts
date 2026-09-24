@@ -36,3 +36,16 @@ describe('every live DHS ingest path uses the canonical identity', () => {
     expect(read('src/lib/forecasts/scrapers/dhs-apfs.ts')).toContain('canonicalDhsApfsNumber(');
   });
 });
+
+describe('post-migration republish updates the canonical row (executed: scripts/proofs/dhs-republish.pglite.ts)', () => {
+  const route = readFileSync(join(process.cwd(), 'src/app/api/cron/sync-forecasts/route.ts'), 'utf8');
+  it('the sync upserts on (source_agency, external_id)', () => {
+    expect(route).toContain(".upsert(batch, { onConflict: 'source_agency,external_id' })");
+  });
+  it('the DHS payload never carries created_at — an update keeps the original first-seen time', () => {
+    const start = route.indexOf('async function fetchDHS');
+    const body = route.slice(start, route.indexOf('\n}\n', start));
+    expect(body).toContain('canonicalDhsExternalId(');
+    expect(body).not.toMatch(/created_at/);
+  });
+});

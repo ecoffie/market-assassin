@@ -50,14 +50,36 @@ Scanned `user_pipeline`, `pursuit_monitor_state`, `pursuit_change_log`, `pursuit
   - Expected result: 1,738 DHS rows, 0 starred ids.
 - Tests: `dhs-identity.unit.test.ts`.
 
+## Migration assertions (added 2026-09-24 after review)
+`scripts/dhs-forecast-identity-migration.ts`:
+
+| mode | refuses / asserts |
+|---|---|
+| dry run | prints twins, renames, canonical collisions after twin handling, the reference census, and the `sync-forecasts` pause state |
+| `--go` | **refuses unless** the `sync-forecasts` cron_jobs row is `enabled=false`, `--expect-twins`/`--expect-renames` equal the live counts (reviewed or refreshed), and there are 0 collisions. Writes a backup first. **After** writing it asserts: rows = before − twins; 0 starred ids; reference count unchanged; no reference points to a deleted row; kept rows keep their uuid and `created_at`; no write errors |
+| `--check-resume --fix-sha <sha>` | gate before re-enabling the sync: 0 starred ids AND the serving production build (the `maps-account-build` stamp) contains the ingest fix |
+| `--verify-after-sync --since <iso>` | after the first resumed sync: 0 new starred rows, 0 duplicate canonical ids |
+
+**Measured on production 2026-09-24 (read only):**
+- 1,830 DHS rows, 346 starred. **92 twins, 254 renames, 0 collisions.**
+- Reference census: **14** references to DHS rows, **0** of them to a starred twin.
+- `sync-forecasts` is enabled, so a real `--go` attempt **refused before writing anything**.
+
+**Republish after migration:** `scripts/proofs/dhs-republish.pglite.ts` executes the sync's exact upsert shape
+(`ON CONFLICT (source_agency, external_id) DO UPDATE`, payload without `created_at`) in PGlite. A republished
+`*F2026073903` updates the canonical `F2026073903` row: 1 row, the same uuid, the same `created_at`, the new content.
+The negative control shows that the raw starred id would have created a second row. The two facts it relies on (the
+conflict key, and no `created_at` in the DHS payload) are pinned statically by `dhs-identity.unit.test.ts`.
+
 ## Run order (when approved; nothing run yet)
 The code and the data must change in ONE window. Old code would re-insert starred ids; new code before the migration
 would insert plain duplicates of group B, and those would carry new `created_at` values, i.e. false "new" rows.
-1. Disable the `sync-forecasts` `cron_jobs` row. Verify it with `enabled`, then confirm no run starts.
-2. Merge and deploy this PR, then verify the serving SHA.
-3. `scripts/dhs-forecast-identity-migration.ts` dry run. Confirm 92 / 254 / 0 / 0.
-4. `--go --sync-paused`. The backup file is written first. The post-check requires DHS rows = 1,738 and 0 starred ids.
-5. Re-enable `sync-forecasts`. After the next 13:00 UTC run, confirm 0 new DHS rows with a `*` and 0 duplicate canonical ids.
+1. Disable the `sync-forecasts` `cron_jobs` row, then confirm no run starts.
+2. Merge and deploy this PR.
+3. Dry run. Confirm the counts (92 / 254 / 0 collisions) or review the refreshed ones.
+4. `--go --expect-twins <N> --expect-renames <M>`. It refuses if the sync is running or the counts moved.
+5. `--check-resume --fix-sha <merge sha>`. It must print "safe to resume".
+6. Re-enable `sync-forecasts`. After its next run, `--verify-after-sync --since <resume time>`.
 
 **Rollback:**
 - Code: revert the PR.
