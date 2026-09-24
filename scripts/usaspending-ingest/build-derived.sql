@@ -18,6 +18,54 @@
 --
 -- Partitioning: fiscal_year (INT) — typical query filters by year window
 -- Clustering: recipient_uei, recipient_name — contractor-page lookups
+--
+-- ⛔ Step 1 is a DESTRUCTIVE REBUILD: `CREATE OR REPLACE TABLE awards AS SELECT …` recreates the
+-- table from THIS file's column list and the full-archive awards_raw. Any column of the live table
+-- that step 1 does not select is DROPPED with its data; any row the weekly MERGE added after the
+-- archive was cut is ROLLED BACK. The two ASSERTs in step 0 refuse both before anything is written.
+-- Column list, order and typing are owned by src/lib/awards-ingest/awards-schema.ts (AWARDS_COLUMNS,
+-- 58 columns) and asserted by src/lib/awards-ingest/awards-schema-parity.unit.test.ts.
+
+-- awards-schema-guard: v1
+-- 0a) Destructive-rebuild guard. Refuse if the LIVE awards table has any column this rebuild would
+--     not recreate (the NOT IN list == AWARDS_COLUMNS, asserted by the parity test). Before this
+--     guard, adding a column by DDL (e.g. the 7 IDV identity columns) and then running this file
+--     would have silently erased it. If this fires: add the column to awards-schema.ts AND to the
+--     step-1 SELECT below (the parity test will tell you exactly what is missing), never delete it.
+ASSERT NOT EXISTS (
+  SELECT column_name
+  FROM `market-assasin.usaspending.INFORMATION_SCHEMA.COLUMNS`
+  WHERE table_name = 'awards'
+    AND column_name NOT IN (
+      'txn_id', 'award_id', 'piid', 'mod_number', 'parent_piid', 'fiscal_year',
+      'action_date', 'pop_start_date', 'pop_end_date', 'obligation_amount', 'total_obligated', 'current_award_value',
+      'potential_award_value', 'recipient_uei', 'recipient_name', 'parent_uei', 'parent_name', 'cage_code',
+      'recipient_address', 'recipient_city', 'recipient_state', 'recipient_zip', 'recipient_country', 'awarding_agency_code',
+      'awarding_agency', 'awarding_sub_agency_code', 'awarding_sub_agency', 'awarding_office_code', 'awarding_office', 'funding_agency',
+      'funding_office', 'naics_code', 'naics_description', 'psc_code', 'psc_description', 'contract_pricing_type',
+      'set_aside', 'pop_state', 'pop_city', 'pop_country', 'description', 'exec_1_name',
+      'exec_1_amount', 'exec_2_name', 'exec_2_amount', 'exec_3_name', 'exec_3_amount', 'exec_4_name',
+      'exec_4_amount', 'exec_5_name', 'exec_5_amount', 'solicitation_identifier', 'ordering_period_end_date', 'award_or_idv_flag',
+      'idv_type_code', 'multiple_or_single_award_idv_code', 'parent_award_agency_id', 'parent_award_single_or_multiple_code'
+    )
+) AS 'awards has a column this rebuild would DROP — add it to awards-schema.ts AND build-derived.sql step 1 before rebuilding';
+
+-- 0b) Stale-archive guard. The weekly MERGE advances awards past the last full-archive cut. A
+--     rebuild from an OLDER awards_raw would replace the table with that older state and silently
+--     roll back every weekly MERGE since. Refuse unless the archive reaches at least as far as the
+--     live table. (Skipped only when awards does not exist yet — a first build has nothing to lose.)
+IF EXISTS (
+  SELECT 1 FROM `market-assasin.usaspending.INFORMATION_SCHEMA.TABLES` WHERE table_name = 'awards'
+) THEN
+  ASSERT (
+    SELECT MAX(action_date) FROM `market-assasin.usaspending.awards`
+  ) <= (
+    SELECT MAX(SAFE.PARSE_DATE('%Y-%m-%d', action_date))
+    FROM `market-assasin.usaspending.awards_raw`
+    WHERE recipient_uei IS NOT NULL
+      AND SAFE_CAST(action_date_fiscal_year AS INT64) BETWEEN 2015 AND 2030
+  ) AS 'awards_raw is OLDER than awards (MAX action_date) — rebuilding would roll back the weekly MERGEs; load a fresher archive first';
+END IF;
 
 -- 1) Typed awards table (the workhorse — every contractor query hits this)
 CREATE OR REPLACE TABLE `market-assasin.usaspending.awards`
@@ -76,7 +124,16 @@ SELECT
   highly_compensated_officer_4_name                                  AS exec_4_name,
   SAFE_CAST(highly_compensated_officer_4_amount AS FLOAT64)          AS exec_4_amount,
   highly_compensated_officer_5_name                                  AS exec_5_name,
-  SAFE_CAST(highly_compensated_officer_5_amount AS FLOAT64)          AS exec_5_amount
+  SAFE_CAST(highly_compensated_officer_5_amount AS FLOAT64)          AS exec_5_amount,
+  -- IDV vehicle identity (awards-schema.ts IDV_IDENTITY_COLUMNS). Byte-equal to the weekly MERGE's
+  -- idvIdentitySelectExpr() — asserted by awards-schema-parity.unit.test.ts.
+  CAST(NULLIF(solicitation_identifier, '') AS STRING) AS solicitation_identifier,
+  SAFE_CAST(NULLIF(ordering_period_end_date, '') AS DATE) AS ordering_period_end_date,
+  CAST(NULLIF(award_or_idv_flag, '') AS STRING) AS award_or_idv_flag,
+  CAST(NULLIF(idv_type_code, '') AS STRING) AS idv_type_code,
+  CAST(NULLIF(multiple_or_single_award_idv_code, '') AS STRING) AS multiple_or_single_award_idv_code,
+  CAST(NULLIF(parent_award_agency_id, '') AS STRING) AS parent_award_agency_id,
+  CAST(NULLIF(parent_award_single_or_multiple_code, '') AS STRING) AS parent_award_single_or_multiple_code
 FROM `market-assasin.usaspending.awards_raw`
 WHERE recipient_uei IS NOT NULL
   AND SAFE_CAST(action_date_fiscal_year AS INT64) BETWEEN 2015 AND 2030;

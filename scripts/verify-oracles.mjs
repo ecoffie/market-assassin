@@ -26,11 +26,13 @@
  *      instead of the cap-as-a-hard-total lie (the documented "9,450 total in database" bug).
  *  10. FORECAST MATCH — an Upcoming-Buys NAICS filter returns forecasts that ALL carry that exact
  *      code (no sibling-code leak), and a bogus NAICS returns 0 (honest miss, never fabricated).
+ *  11. AWARDS SCHEMA — live `usaspending.awards` columns/types match awards-schema.ts (the list the
+ *      MERGE, the IDV DDL and the destructive full rebuild all derive from).
  *
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
- *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match>
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema>
  */
 
 import { config } from 'dotenv';
@@ -499,6 +501,34 @@ if (want('forecast-match')) {
       `bogus rows=${bogus ?? 0}`);
   } catch (e) {
     record('forecast-match: real-vs-bogus NAICS', false, 'threw: ' + (e?.message || e));
+  }
+}
+
+// ── 11. AWARDS SCHEMA — the live `usaspending.awards` matches the canonical 58-column schema ─────
+// src/lib/awards-ingest/awards-schema.ts owns the column list every writer derives from. Reads
+// INFORMATION_SCHEMA.COLUMNS (names AND types; ~10 MiB). FAILS on a type mismatch, a missing
+// legacy column, a PARTIAL IDV DDL, or a live column the canonical schema does not know (the full
+// rebuild would drop it, and its guard would refuse to run). The 58-column requirement is enforced
+// only once IDV_IDENTITY_REQUIRED is flipped; before that the current state is REPORTED honestly.
+if (want('awards-schema')) {
+  try {
+    const { bqQuery } = await import('@/lib/bigquery/client');
+    const { awardsColumnsQuery, classifyAwardsSchema, AWARDS_COLUMNS, IDV_IDENTITY_REQUIRED } = await import('@/lib/awards-ingest');
+    const rows = await bqQuery({ query: awardsColumnsQuery() });
+    if (!rows || rows.length === 0) throw new Error('INFORMATION_SCHEMA returned 0 columns for awards');
+    const state = classifyAwardsSchema(rows.map((r) => ({ name: r.column_name, dataType: r.data_type })));
+    const problems = [...state.problems];
+    if (state.unknownColumns.length) {
+      problems.push(`live column(s) unknown to awards-schema.ts (a rebuild would DROP them): ${state.unknownColumns.join(', ')}`);
+    }
+    const pass = problems.length === 0;
+    record(`awards-schema: live awards matches the canonical schema (${IDV_IDENTITY_REQUIRED ? `${AWARDS_COLUMNS.length} required` : 'IDV not yet required'})`, pass,
+      `columns=${state.columnCount}/${AWARDS_COLUMNS.length}, idv=${state.idvMode}, required=${IDV_IDENTITY_REQUIRED}` +
+      (pass ? '' : ' — ' + problems.join(' | ')));
+  } catch (e) {
+    // Could not observe the schema — UNMEASURED, never a pass (and never "0 columns").
+    record('awards-schema: live awards schema unmeasured', false,
+      'BQ probe unavailable, schema NOT proven: ' + String(e?.message || e).slice(0, 160), 'unmeasured');
   }
 }
 

@@ -9,6 +9,7 @@ import {
 } from './cohort-completeness';
 import { resolveDenseFrontier, resolveIngestWindowStart, LAGGARD_CONTINUITY_SLACK_DAYS } from './ingest-window';
 import { buildAwardsMergeSql, IDV_IDENTITY_COLUMNS, resolveIdvIdentityColumnsMode } from './merge-sql';
+import { AWARDS_LEGACY_COLUMNS } from './awards-schema';
 
 /**
  * MEASURED 2026-09-23 (read-only BigQuery, 0.126 GiB): transactions per month in
@@ -162,10 +163,11 @@ describe('MERGE retains IDV vehicle identity (additive, schema-gated)', () => {
   });
 
   it('schema gate: none → absent, all → present, partial → refuses', () => {
-    const legacyCols = ['txn_id', 'award_id', 'piid', 'action_date'];
-    expect(resolveIdvIdentityColumnsMode(legacyCols)).toBe('absent');
-    expect(resolveIdvIdentityColumnsMode([...legacyCols, ...IDV_IDENTITY_COLUMNS.map((c) => c.target)])).toBe('present');
-    expect(() => resolveIdvIdentityColumnsMode([...legacyCols, 'solicitation_identifier'])).toThrow(/PARTIAL/);
+    const legacyCols = AWARDS_LEGACY_COLUMNS.map((c) => ({ name: c.target, dataType: c.type }));
+    const idvCols = IDV_IDENTITY_COLUMNS.map((c) => ({ name: c.target, dataType: c.type }));
+    expect(resolveIdvIdentityColumnsMode(legacyCols, { required: false })).toBe('absent');
+    expect(resolveIdvIdentityColumnsMode([...legacyCols, ...idvCols], { required: false })).toBe('present');
+    expect(() => resolveIdvIdentityColumnsMode([...legacyCols, idvCols[0]], { required: false })).toThrow(/PARTIAL/);
   });
 });
 

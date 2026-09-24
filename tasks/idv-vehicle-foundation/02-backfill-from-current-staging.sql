@@ -23,7 +23,8 @@
 --
 -- Precondition: 01-ddl-add-columns.sql applied. Take the snapshot in README step 0 first.
 -- Scope of the write: only the 7 new columns; no existing column is touched.
--- Dry-run of the source SELECT (below): 0.068 GiB. Target partitions: action_date 2026-06-01..2026-09-18.
+-- Dry-run of the source SELECT (below): 0.068 GiB. Target rows: action_date 2026-06-01..2026-09-18 (awards is
+-- partitioned RANGE_BUCKET(fiscal_year), not action_date — this bound selects rows, it does not prune partitions).
 -- TARGET RESOLUTION: tables are UNQUALIFIED (`awards`, `awards_ingest_staging`) and resolve through
 -- the job's DEFAULT DATASET, so production and the validation clone run byte-identical text.
 -- Run (after Eric approves):

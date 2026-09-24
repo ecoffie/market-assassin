@@ -2,7 +2,8 @@
 -- 01 — ADDITIVE DDL: IDV vehicle identity columns on `awards`            ⛔ NOT EXECUTED
 -- ─────────────────────────────────────────────────────────────────────────────────────────────
 -- Adds 7 NULLABLE columns. Metadata-only in BigQuery: no rows rewritten, no bytes billed,
--- existing columns / partitioning (action_date) / clustering (recipient_uei, recipient_name)
+-- existing columns / partitioning (RANGE_BUCKET(fiscal_year, 2015..2030) — NOT action_date; verified
+-- in INFORMATION_SCHEMA.TABLES.ddl 2026-09-23) / clustering (recipient_uei, recipient_name)
 -- unchanged. Every existing row reads NULL for the new columns = "not loaded", never a value.
 --
 -- Source of every column: the USASpending bulk-download contracts CSV the weekly ingest ALREADY
@@ -25,6 +26,12 @@
 --     'award_or_idv_flag','idv_type_code','multiple_or_single_award_idv_code','parent_award_agency_id',
 --     'parent_award_single_or_multiple_code');   -- expect exactly 7 rows
 -- Rollback: 99-rollback.sql §A.
+--
+-- ⚠️ After this lands, the FULL REBUILD (scripts/usaspending-ingest/build-derived.sql, CREATE OR
+-- REPLACE TABLE awards) must select these 7 columns or it would silently drop them. It does (see
+-- src/lib/awards-ingest/awards-schema.ts + awards-schema-parity.unit.test.ts), and its step-0 ASSERT
+-- refuses to run if the live table has any column outside the canonical 58. In the commit AFTER this
+-- DDL is verified, flip IDV_IDENTITY_REQUIRED to true in awards-schema.ts.
 
 ALTER TABLE awards
   ADD COLUMN IF NOT EXISTS solicitation_identifier STRING
