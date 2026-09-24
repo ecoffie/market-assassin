@@ -196,7 +196,16 @@ describe('cross-surface query-plan gate', () => {
     expect(route).toContain("from '@/lib/recompete/maps-recompete-discovery'");
     // One plan; all four reads (market total · unmapped · viewport pins · follow-ons) use it.
     expect(route.match(/mapsRecompeteRequest\(/g)).toHaveLength(1);
-    expect(route.match(/applyFilters\(\s*db\.from\('recompete_opportunities'\)/g)).toHaveLength(4);
+    // market total · unmapped · viewport pins read the table through applyFilters directly …
+    expect(route.match(/applyFilters\(\s*db\.from\('recompete_opportunities'\)/g)).toHaveLength(3);
+    // … and the follow-ons go through map-follow-ons.ts (Gate 1, planner-independent) with the SAME
+    // applyFilters as their only filter — that module never interprets search meaning itself.
+    expect(route).toContain('applyPlan: (q) => applyFilters(q),');
+    const followOns = strip(join(__dirname, '..', 'recompete', 'map-follow-ons.ts'));
+    for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'buildSearchOr', 'applyMapFilters', 'imatch', '.or(', 'ilike']) {
+      expect(followOns, `map-follow-ons: ${legacy}`).not.toContain(legacy);
+    }
+    expect(followOns).toContain('d.applyPlan(d.from().select(d.cols))');
     for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'setAsideOrExpr', 'agencyOrExpr', 'naicsMatchConds', 'incumbent_name']) {
       expect(adapter, `adapter: ${legacy}`).not.toContain(legacy);
     }
