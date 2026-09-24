@@ -597,6 +597,7 @@ async function handleRecompeteGet(request: NextRequest) {
       awardee_count: g.incumbentCount,
       awardees: g.incumbentNames.slice(0, 25),
       combined_ceiling: g.combinedCeiling,
+      combined_ceiling_basis: g.combinedCeilingBasis,
       vehicle_expiry: g.latestExpiry,
       vehicle_key: g.key,
       vocab: vocabByCode.get(naicsCode) || [],
