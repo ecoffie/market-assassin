@@ -61,4 +61,48 @@ It returns the same set by construction, in deterministic `contract_id` order, k
 - Oracle: `scripts/recompete-replay.ts` runs the route's own query code against the live database for all 7 fixtures. It fingerprints the market IDs, the market total, the unmapped total, the ordered page rows (full JSON) and the follow-on IDs.
 - **Baseline self-check:** two runs before the apply, taken back to back, came out byte-identical.
 
-Results after the apply: see below.
+## Production results (2026-09-24)
+
+**Timeline (UTC):**
+- 17:29 — prod baseline on the old code.
+- 17:43 — #1686 merged (`70bd0600`). Production serving it, verified by the `maps-account-build` stamp.
+- 17:45–17:49 — pre-index replay. It matched the 17:14 baseline hash for hash, so the data did not change in between.
+- 17:49:26–17:49:44 — `npm run migrate -- --go --only <six files>` applied 6 of 6, each "ok". `20260924_saved_search_forecast_watermark.sql` stayed pending.
+- 17:52 — post-index replay and latency.
+
+**Indexes, verified in `pg_index`:** all six `indisvalid` and `indisready`. Six ledger rows, `baselined=false`.
+
+| Index | Estimated size | Actual size |
+|---|---|---|
+| awarding_agency | ~8 MB | 8.4 MB |
+| awarding_sub_agency | ~10 MB | 11 MB |
+| description | ~28 MB | 29 MB |
+| incumbent_name | ~14 MB | 14 MB |
+| naics_description | ~1.3 MB | 1.3 MB |
+| psc_description | ~17 MB | 18 MB |
+
+Table indexes went from 173 MB to 255 MB.
+
+**Identity:** `scripts/recompete-replay.ts --compare`, post-index vs pre-index, is **✓ byte-identical on all 7 fixtures**: market IDs, market total, unmapped total, ordered page rows (full JSON) and follow-on IDs.
+
+**Production endpoint `GET /api/app/recompete-map`**, CONUS bbox:
+
+| Query | Before: old code, no indexes (median of 5) | Code deployed, no indexes (median of 3) | **After: code + indexes (median of 5)** | Change |
+|---|---|---|---|---|
+| ai governance | 2.82 s | 3.49 s | **0.98 s** | −65% |
+| cybersecurity | 3.19 s | 3.22 s | **1.46 s** | −54% |
+| janitorial | 0.85 s | 1.05 s | **0.81 s** | ≈ |
+| software license | 11.96 s | 11.09 s | **4.45 s** | −63% |
+| nonsense | 2.40 s | 2.64 s | **0.94 s** | −61% |
+| broad capability list | 8.71 s | 10.17 s | **4.53 s** | −48% |
+| NAICS 541512 | 0.97 s | 1.06 s | **0.72 s** | ≈ |
+
+**Follow-on read on the live indexed table** (EXPLAIN ANALYZE):
+- The old single read, which is no longer used, would now take **1,279 ms** for software license and **862 ms** for the broad list.
+- The new two-step read takes **73–78 ms flat** on every fixture.
+- So the Gate 1 fix is what keeps the indexes from regressing that read.
+
+**What is left:**
+- "Software license" and the broad list are still 4.4–4.5 s.
+- The regex recheck runs on 5–30k candidate rows, and it is evaluated about 4 times per request: the market total, the unmapped count, and the pins read, which counts twice.
+- That is Gate 2 (compute-once).
