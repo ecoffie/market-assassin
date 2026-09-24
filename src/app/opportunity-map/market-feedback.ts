@@ -365,8 +365,8 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
     // render() ran for this round (painted) and/or every horizon has reported (settled).
     paint:function(gen,o){
       if(!R||R.gen!==gen)return;
-      if(o.painted&&!R.painted){ R.painted=true; mark('painted'); }
-      if(o.painted&&o.pins>0){ R.useful=true; everUseful=true; }
+      if(o.painted&&!R.painted){ R.painted=true; mark('painted',{pins:o.pins}); }
+      if(o.painted&&o.pins>0&&!R.useful){ R.useful=true; everUseful=true; mark('useful',{pins:o.pins}); }
       if(o.settled&&!R.settled){ R.settled=true; mark('settled'); }
       apply();
     },
