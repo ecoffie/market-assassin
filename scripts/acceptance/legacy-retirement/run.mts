@@ -209,15 +209,12 @@ async function main() {
     // ── B. Shared password (MA): which URL/credential, does the source default still work,
     //       and can a normal customer wander into the old tool? ──
     if (!ONLY) {
-      const src = readFileSync(join(ROOT, 'src/app/api/verify-ma-password/route.ts'), 'utf8');
-      const fallback = (src.match(/MA_ACCESS_PASSWORD \|\| '([^']+)'/) || [])[1] || '';
-      const r = await fetch(`${BASE}/api/verify-ma-password`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: fallback }) });
-      const cookie = r.headers.get('set-cookie') || '';
-      check('shared-password', 'with MA_ACCESS_PASSWORD unset (as in production), the SOURCE-CODE default still issues the anonymous cookie', r.status === 200 && /ma_access_email=authorized-user/.test(cookie), { status: r.status, cookieIssued: /authorized-user/.test(cookie) });
-      const wrong = await fetch(`${BASE}/api/verify-ma-password`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'not-the-password' }) });
-      check('shared-password', 'a wrong password is refused', wrong.status === 401, { status: wrong.status });
+      for (const route of ['/api/verify-ma-password', '/api/verify-recompete-password']) {
+        const r = await fetch(`${BASE}${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'anything' }) });
+        check('shared-password', `${route} is REMOVED (404) and issues no cookie`, r.status === 404 && !/authorized-user/.test(r.headers.get('set-cookie') || ''), { status: r.status });
+      }
       const withCookie = await fetch(`${BASE}/federal-market-assassin`, { redirect: 'manual', headers: { cookie: 'ma_access_email=authorized-user' } });
-      check('shared-password', 'grace window CLOSED (default): the anonymous cookie is routed to /app like everyone else', withCookie.status === 307 && (withCookie.headers.get('location') || '').includes('/app?panel=research'), { status: withCookie.status, location: withCookie.headers.get('location') });
+      check('shared-password', 'a browser still holding the old anonymous cookie is routed to /app like everyone else', withCookie.status === 307 && (withCookie.headers.get('location') || '').includes('/app?panel=research'), { status: withCookie.status, location: withCookie.headers.get('location') });
       const identity = await fetch(`${BASE}/federal-market-assassin`, { redirect: 'manual', headers: { cookie: 'ma_access_email=buyer@acceptance.invalid' } });
       check('shared-password', 'a normal customer (identity cookie) cannot enter the old tool', identity.status === 307, { status: identity.status });
       // What the anonymous cookie actually buys in report generation: free tier only.
@@ -226,7 +223,7 @@ async function main() {
         body: JSON.stringify({ inputs: { naicsCode: '541512', businessType: 'Small Business', veteranStatus: 'Not Applicable', goodsOrServices: 'services' }, selectedAgencies: ['Department of Veterans Affairs'] }),
       });
       const gj = await gen.json().catch(() => ({}));
-      check('shared-password', 'the anonymous cookie resolves to FREE-tier reports (the same as a free Mindy account)', gen.status === 200 && gj.accessTier === 'free', { status: gen.status, accessTier: gj.accessTier, error: gj.error });
+      check('shared-password', 'the old anonymous cookie is no longer accepted as an identity for report generation', gen.status !== 200 || gj.accessTier !== 'free' || !!gj.error, { status: gen.status, accessTier: gj.accessTier, error: gj.error });
     }
 
     // ── C. Each legacy customer shape: legacy entry → REAL sign-in → Mindy. ──

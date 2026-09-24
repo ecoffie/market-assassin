@@ -67,17 +67,21 @@ export interface MIAuthResult {
  * Extract user email from cookie or request body.
  * Checks `ma_access_email` cookie first, then `userEmail` in body.
  */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function getEmailFromRequest(
   request: NextRequest,
   body?: Record<string, unknown>
 ): string | null {
-  // Check cookie first
+  // Only an email-shaped value is an identity. The retired shared-password route set this cookie
+  // to the literal `authorized-user`, which used to be accepted here as an "email" — one shared,
+  // anonymous identity (and one shared rate-limit bucket) for everyone holding the password.
   const cookieEmail = request.cookies.get('ma_access_email')?.value;
-  if (cookieEmail) return cookieEmail.toLowerCase();
+  if (cookieEmail && EMAIL_SHAPE.test(cookieEmail.trim())) return cookieEmail.trim().toLowerCase();
 
   // Fall back to request body
   const bodyEmail = body?.userEmail as string | undefined;
-  if (bodyEmail) return bodyEmail.toLowerCase();
+  if (typeof bodyEmail === 'string' && EMAIL_SHAPE.test(bodyEmail.trim())) return bodyEmail.trim().toLowerCase();
 
   return null;
 }

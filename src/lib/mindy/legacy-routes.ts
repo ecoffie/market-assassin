@@ -32,12 +32,11 @@
  * (Pro = all reports; MA Premium was 8). The standalone tool kept no server-side saved
  * reports (generate-on-demand; only a monthly usage counter), so no saved work moves.
  *
- * SHARED-PASSWORD HOLDERS — a bounded transition, not an exception. `/api/verify-ma-password`
- * grants an ANONYMOUS cookie (`ma_access_email=authorized-user`). That value is used as the
- * "email" for report generation, where it resolves to NO grants — so the old tool only ever gave
- * these holders FREE-tier reports, the same thing a free Mindy account gives. By default they are
- * routed to /app like everyone else. `LEGACY_SHARED_PASSWORD_ACCESS=on` opens an explicit, temporary
- * grace window (a release decision with a sunset — see the review packet); unset it to end it.
+ * SHARED PASSWORDS — REMOVED. `/api/verify-ma-password` and `/api/verify-recompete-password`
+ * (hard-coded fallback passwords, anonymous `authorized-user` cookie) are deleted, and there is no
+ * grace window. A browser still holding the old anonymous cookie is routed to /app like everyone
+ * else, and `getEmailFromRequest` no longer accepts a non-email cookie value as an identity. What
+ * that cookie ever bought was FREE-tier reports — the same thing a free Mindy account gives.
  *
  * Single-use report codes (`/access/<CODE>`) are redeemed inside Mindy as a report credit —
  * see src/app/access/[code]/page.tsx.
@@ -96,29 +95,10 @@ interface LegacyRoute {
   defaultPanel?: string;
   /** Force this panel regardless of the URL's own `panel` (a standalone tool's only job). */
   fixedPanel?: string;
-  /** Return true to leave the request alone (an access class /app cannot honour yet). */
-  keepFor?: (ctx: LegacyRequestContext) => boolean;
   /** A non-workspace destination (retired SALES pages go to /pricing, not /app). */
   target?: string;
 }
 
-export interface LegacyRequestContext {
-  /** Value of the legacy `ma_access_email` cookie, if any. */
-  maCookie?: string | null;
-  /** True only while the explicit shared-password grace window is open (env switch). */
-  sharedPasswordGrace?: boolean;
-}
-
-/** The env switch that opens the temporary shared-password grace window. */
-export const SHARED_PASSWORD_GRACE_ENV = 'LEGACY_SHARED_PASSWORD_ACCESS';
-export function sharedPasswordGraceOpen(env: Record<string, string | undefined> = process.env): boolean {
-  return (env[SHARED_PASSWORD_GRACE_ENV] || '').trim().toLowerCase() === 'on';
-}
-
-/** The anonymous shared-password cookie value set by /api/verify-ma-password. */
-export const ANONYMOUS_MA_COOKIE = 'authorized-user';
-const keepAnonymousMaHolder = (ctx: LegacyRequestContext) =>
-  ctx.sharedPasswordGrace === true && ctx.maCookie === ANONYMOUS_MA_COOKIE;
 
 /**
  * Every legacy customer entry point handled by the proxy. Exact paths only — a prefix match
@@ -129,7 +109,7 @@ export const LEGACY_ROUTES: readonly LegacyRoute[] = [
   { path: '/briefings/dashboard', defaultPanel: 'dashboard' },
   { path: '/bd-assist', defaultPanel: 'pipeline' },
   // Standalone Market Assassin — every entry point lands on Market Research in /app.
-  { path: '/federal-market-assassin', fixedPanel: MARKET_RESEARCH_PANEL, keepFor: keepAnonymousMaHolder },
+  { path: '/federal-market-assassin', fixedPanel: MARKET_RESEARCH_PANEL },
   { path: '/federal-market-assassin/success', fixedPanel: MARKET_RESEARCH_PANEL },
   { path: '/market-assassin-locked', fixedPanel: MARKET_RESEARCH_PANEL },
   { path: '/market-assassin', fixedPanel: MARKET_RESEARCH_PANEL },
@@ -175,11 +155,9 @@ export function mapLegacyPanel(raw: string | null | undefined): string | null {
 export function resolveLegacyDestination(
   pathname: string,
   searchParams: URLSearchParams,
-  ctx: LegacyRequestContext = {},
 ): string | null {
   const route = LEGACY_BY_PATH.get(normalizePath(pathname));
   if (!route) return null;
-  if (route.keepFor?.(ctx)) return null;
 
   const out = new URLSearchParams();
   if (route.target) {
