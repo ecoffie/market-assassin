@@ -101,18 +101,51 @@ export function mapsRecompeteRequest(get: Get, opts?: { ctx?: PlanContext }): Ma
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function applyMapsRecompeteFilters(query: any, req: MapsRecompeteRequest, mapped: 'only' | 'none' | 'any' = 'only'): any {
-  const s = req.surface;
   let q = applyRecompetePlan(query, req.plan);
-  if (mapped === 'only') q = q.not('map_lat', 'is', null);
-  else if (mapped === 'none') q = q.is('map_lat', null);
-  if (s.setAside) q = q.eq('set_aside_type', s.setAside);
-  if (s.subAgency) q = q.ilike('awarding_sub_agency', `%${s.subAgency}%`);
-  if (s.minValue != null) q = q.gte('potential_total_value', s.minValue);
-  if (s.maxValue != null) q = q.lte('potential_total_value', s.maxValue);
-  if (s.sap === 'friendly') q = q.in('contract_type', ['PURCHASE ORDER', 'BPA CALL']);
-  else if (s.sap === 'gated') q = q.eq('contract_type', 'DELIVERY ORDER');
-  if (s.likelihood === 'high') q = q.eq('recompete_likelihood', 'high');
+  for (const o of mapsRecompeteSurfaceOps(req.surface, mapped)) q = applySurfaceOp(q, o);
   return q;
+}
+
+/**
+ * The Maps SURFACE filters as data (Recompete Gate 2, 2026-09-24) — ONE definition consumed by both
+ * appliers: the PostgREST builder above (the same calls, in the same order, as before this was data)
+ * and the SQL twin (maps-recompete-sql.ts) that evaluates the market once. A surface filter added here
+ * reaches both paths; one added to only one of them is exactly the drift the parity oracle exists for.
+ */
+export type SurfaceOp =
+  | { op: 'notnull'; col: string }
+  | { op: 'isnull'; col: string }
+  | { op: 'eq'; col: string; val: string }
+  | { op: 'ilike'; col: string; val: string }
+  | { op: 'gte'; col: string; val: number }
+  | { op: 'lte'; col: string; val: number }
+  | { op: 'in'; col: string; vals: string[] };
+
+export function mapsRecompeteSurfaceOps(s: MapsRecompeteSurface, mapped: 'only' | 'none' | 'any'): SurfaceOp[] {
+  const out: SurfaceOp[] = [];
+  if (mapped === 'only') out.push({ op: 'notnull', col: 'map_lat' });
+  else if (mapped === 'none') out.push({ op: 'isnull', col: 'map_lat' });
+  if (s.setAside) out.push({ op: 'eq', col: 'set_aside_type', val: s.setAside });
+  if (s.subAgency) out.push({ op: 'ilike', col: 'awarding_sub_agency', val: `%${s.subAgency}%` });
+  if (s.minValue != null) out.push({ op: 'gte', col: 'potential_total_value', val: s.minValue });
+  if (s.maxValue != null) out.push({ op: 'lte', col: 'potential_total_value', val: s.maxValue });
+  if (s.sap === 'friendly') out.push({ op: 'in', col: 'contract_type', vals: ['PURCHASE ORDER', 'BPA CALL'] });
+  else if (s.sap === 'gated') out.push({ op: 'eq', col: 'contract_type', val: 'DELIVERY ORDER' });
+  if (s.likelihood === 'high') out.push({ op: 'eq', col: 'recompete_likelihood', val: 'high' });
+  return out;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applySurfaceOp(q: any, o: SurfaceOp): any {
+  switch (o.op) {
+    case 'notnull': return q.not(o.col, 'is', null);
+    case 'isnull': return q.is(o.col, null);
+    case 'eq': return q.eq(o.col, o.val);
+    case 'ilike': return q.ilike(o.col, o.val);
+    case 'gte': return q.gte(o.col, o.val);
+    case 'lte': return q.lte(o.col, o.val);
+    case 'in': return q.in(o.col, o.vals);
+  }
 }
 
 /** Additive `discovery` block on the API response (a blocked plan is never presented as a zero market). */

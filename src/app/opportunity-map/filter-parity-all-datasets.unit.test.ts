@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
+import { mapsRecompeteRequest, mapsRecompeteSurfaceOps } from '@/lib/recompete/maps-recompete-discovery';
 
 const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
@@ -291,17 +291,21 @@ describe('recompete-map route — new params backed by measured-populated column
     expect(recompeteOps({ state: 'FL,GA' })).toContainEqual({ op: 'or', expr: 'place_of_performance_state.eq.FL,place_of_performance_state.eq.GA' });
     const bad = recompeteOps({ state: 'ZZZZ' }).find((o) => o.op === 'or' && /place_of_performance_state/.test(o.expr));
     expect(bad, 'an unresolvable state must still narrow, never fall open').toBeTruthy();
-    expect(recomputeSrc).toContain("awarding_sub_agency', `%${s.subAgency}%`");
-    expect(recomputeSrc).toContain("potential_total_value', s.minValue");
-    expect(recomputeSrc).toContain("potential_total_value', s.maxValue");
+    // Surface filters are one shared spec since Recompete Gate 2 — assert the filter itself, not its text.
+    const surf = (p: Record<string, string>) => mapsRecompeteSurfaceOps(mapsRecompeteRequest((k) => p[k] ?? null).surface, 'only');
+    expect(surf({ subAgency: 'Navy' })).toContainEqual({ op: 'ilike', col: 'awarding_sub_agency', val: '%Navy%' });
+    expect(surf({ minValue: '1000' })).toContainEqual({ op: 'gte', col: 'potential_total_value', val: 1000 });
+    expect(surf({ maxValue: '5000' })).toContainEqual({ op: 'lte', col: 'potential_total_value', val: 5000 });
   });
 
   it('wires the SAP-friendly / likelihood / lead-time filters on real columns (2026-07-27)', () => {
     // contract_type: friendly = PO+BPA CALL (SB-winnable), gated = DELIVERY ORDER.
-    expect(recomputeSrc).toContain("contract_type', ['PURCHASE ORDER', 'BPA CALL']");
-    expect(recomputeSrc).toContain("contract_type', 'DELIVERY ORDER'");
+    const surf = (p: Record<string, string>) => mapsRecompeteSurfaceOps(mapsRecompeteRequest((k) => p[k] ?? null).surface, 'only');
+    expect(surf({ sap: 'friendly' })).toContainEqual({ op: 'in', col: 'contract_type', vals: ['PURCHASE ORDER', 'BPA CALL'] });
+    expect(surf({ sap: 'gated' })).toContainEqual({ op: 'eq', col: 'contract_type', val: 'DELIVERY ORDER' });
     // recompete_likelihood: only 'high' is a real narrowing value.
-    expect(recomputeSrc).toContain("recompete_likelihood', 'high'");
+    expect(surf({ likelihood: 'high' })).toContainEqual({ op: 'eq', col: 'recompete_likelihood', val: 'high' });
+    expect(surf({ likelihood: 'low' }).some((o) => o.col === 'recompete_likelihood')).toBe(false);
     // lead-time / expiring-within window. FM-U06 (2026-07-29): the stored lead_time_months is STALE
     // (often 0), so the filter now uses the LIVE relationship — PoP-end <= today + N months — matching
     // the shared queryExpiringContracts instead of the raw column.
