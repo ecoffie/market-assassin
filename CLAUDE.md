@@ -419,6 +419,18 @@ Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Hi
 - **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** write the 44,560-family fleet backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Lazy Family v1 only — persist on known-id / pursuit save / confirmed identity, never a fleet write.
 - **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
 
+### Maps P0 — speed + correctness (PR #1684, 2026-09-24, awaiting merge + prod re-measure)
+Record: **`tasks/maps-p0-performance-2026-09-24.md`** (before/after tables + Recompete query-plan evidence);
+audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. Do NOT build P1/P2 transition UX until P0 is prod-measured.
+- `fetchView()` only SCHEDULES; same-tick calls = one round; rounds are generation-numbered — a superseded
+  response never paints (`newest-action-wins.unit.test.ts`, red on the pre-fix route). Never reintroduce a
+  busy/pendingFetch queue.
+- Horizons paint as each resolves; a horizon loading for a NEW intent reads `loading` (never an old number).
+- Horizon cache: pins keyed by full URL, market truth by URL minus bbox (5-min TTL). A pan with a held intent
+  sends `counts=0` (`map-counts-mode.ts`) → server omits market-wide fields (`countsSkipped:true`, never 0/null).
+- ⚠️ Recompete keyword search is 18–21 unindexed regexes evaluated ~5×/request (EXPLAIN in the record).
+  Trigram indexes are RECOMMENDED, NOT APPLIED — needs Eric's approval.
+
 ### Opportunity Share Attribution — ✅ FROZEN 2026-09-23 (PR #1652, merge `e8c88086`)
 Record: **`docs/engineering/opportunity-share-attribution.md`** — read it; do NOT re-audit.
 SHARE → CLICK → SESSION → SIGNUP → ACTIVATION → PAID from first-party data (`user_engagement` +
