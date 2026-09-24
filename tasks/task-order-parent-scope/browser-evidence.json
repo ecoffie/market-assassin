@@ -1,0 +1,249 @@
+{
+ "1-open-shared-link": {
+  "url": "http://localhost:3107/opportunity-map?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "search_after": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution for Integrated Services Plus) · 237 verified parent contracts · work: management + consulting · active orders only",
+  "headline": [
+   "Opportunities",
+   "Opportunities",
+   "Opportunities",
+   "15 results",
+   "CONTRACT VALUE",
+   "Review Opportunity →"
+  ],
+  "calls": [
+   {
+    "ep": "/api/app/forecast-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 18381,
+    "unmapped": 13971,
+    "pins": 1000,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 102608,
+    "unmapped": 39346,
+    "pins": 1217,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/opportunity-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 7802,
+    "unmapped": 307,
+    "pins": 926,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": "OASIS+",
+    "work": "management consulting",
+    "leadMax": "60",
+    "total": 15,
+    "unmapped": 8,
+    "pins": 14,
+    "disc": "ok",
+    "vs": "resolved"
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 102608,
+    "unmapped": 39346,
+    "pins": 1218,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/opportunity-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 7802,
+    "unmapped": 307,
+    "pins": 926,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/forecast-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 18381,
+    "unmapped": 13971,
+    "pins": 1000,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": "OASIS+",
+    "work": "management consulting",
+    "leadMax": "60",
+    "total": 15,
+    "unmapped": 8,
+    "pins": 14,
+    "disc": "ok",
+    "vs": "resolved"
+   }
+  ],
+  "ctx": {
+   "count": 14
+  }
+ },
+ "2-refresh": {
+  "search_after": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution for Integrated Services Plus) · 237 verified parent contracts · work: management + consulting · active orders only"
+ },
+ "3-fresh-browser": {
+  "url": "http://localhost:3107/opportunity-map?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "search_after": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution for Integrated Services Plus) · 237 verified parent contracts · work: management + consulting · active orders only",
+  "headline": [
+   "Opportunities",
+   "Opportunities",
+   "Opportunities",
+   "15 results",
+   "CONTRACT VALUE",
+   "Review Opportunity →"
+  ],
+  "calls": [
+   {
+    "ep": "/api/app/forecast-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 18381,
+    "unmapped": 13971,
+    "pins": 1000,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/opportunity-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 7802,
+    "unmapped": 307,
+    "pins": 926,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 102608,
+    "unmapped": 39346,
+    "pins": 1217,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": "OASIS+",
+    "work": "management consulting",
+    "leadMax": "60",
+    "total": 15,
+    "unmapped": 8,
+    "pins": 14,
+    "disc": "ok",
+    "vs": "resolved"
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 102608,
+    "unmapped": 39346,
+    "pins": 1218,
+    "disc": "ok",
+    "vs": null
+   }
+  ],
+  "ctx": {
+   "count": 14
+  }
+ },
+ "5-after-clear": {
+  "search_after": "?mode=recompete",
+  "banner_visible": false
+ },
+ "4-ambiguous-OASIS": {
+  "url": "http://localhost:3107/opportunity-map?mode=recompete&horizon=recompete&vehicle=OASIS",
+  "search_after": "?mode=recompete&horizon=recompete&vehicle=OASIS",
+  "banner": "Not searched: \"OASIS\" can mean the original GSA OASIS vehicle (solicitation GS00Q-13-DR-0002, not registered here) or OASIS+ (a different vehicle). Say \"OASIS+\" for OASIS+.",
+  "headline": [
+   "Opportunities",
+   "Opportunities",
+   "Opportunities",
+   "Nothing searched yet · add what you sell"
+  ],
+  "calls": [
+   {
+    "ep": "/api/app/opportunity-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 7802,
+    "unmapped": 307,
+    "pins": 926,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 102608,
+    "unmapped": 39346,
+    "pins": 1217,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/forecast-map",
+    "vehicle": null,
+    "work": null,
+    "leadMax": null,
+    "total": 18381,
+    "unmapped": 13971,
+    "pins": 1000,
+    "disc": "ok",
+    "vs": null
+   },
+   {
+    "ep": "/api/app/recompete-map",
+    "vehicle": "OASIS",
+    "work": null,
+    "leadMax": null,
+    "total": null,
+    "unmapped": null,
+    "pins": 0,
+    "disc": "needs_refinement",
+    "vs": "unresolved"
+   }
+  ],
+  "ctx": {
+   "count": 0
+  }
+ }
+}

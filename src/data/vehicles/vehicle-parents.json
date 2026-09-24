@@ -1,0 +1,1198 @@
+{
+ "verified_at": "2026-09-24T21:47:46.529Z",
+ "source": "https://api.usaspending.gov/api/v2/awards/<parent_id>/ → latest_transaction_contract_data.solicitation_identifier",
+ "candidate_population": "distinct parent IDVs on orders in recompete_opportunities, parent agency in (4732, 4730, 4740)",
+ "candidates": 5778,
+ "unresolved_candidates": 2,
+ "vehicles": {
+  "oasis_plus": {
+   "members": [
+    {
+     "parent_id": "CONT_IDV_47QRCA24DH016_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "NIYAMIT, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DH017_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "INNOVATIVE CONSULTING & MANAGEMENT SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DH026_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "A3 CONSULTING LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DH057_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "GLOBAL DIMENSIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DH068_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "VELOS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DH081_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "SSI-VENESCO JV LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV006_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "IRONARCH TECHNOLOGY LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV008_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "ARCHIMEDES GLOBAL, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV020_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "CHIMERA ENTERPRISES INTERNATIONAL INCORPORATED"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV031_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "R & K ENTERPRISE SOLUTIONS INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV032_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "PLANATE MANAGEMENT GROUP LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV039_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "SHERPA 6 INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV053_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "STARLO INNOVATION, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV056_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "ADDX CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV062_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "FLATTER, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV067_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "SIERTEK, LTD."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV082_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "VECTOR SOLUTIONS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV095_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "CDS SERVICES INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV098_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "LEADER COMMUNICATIONS INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV118_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "KASTELLUM GROUP, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV128_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "STRATEGIC ALLIANCE BUSINESS GROUP LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV129_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "TDX LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV138_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "JAAW GROUP, LLC, THE"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV144_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "HARKCON, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV146_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "ONE FEDERAL SOLUTION CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV152_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "TEAM ESCALATE LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV165_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "TECHOP SOLUTIONS INTERNATIONAL, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV218_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "SAVVEE INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV231_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "TECHNICAL AND PROJECT ENGINEERING, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV234_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "THINKTEK LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV260_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "ACQUISITION SOLUTIONS EAGLES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV279_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "DICON LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DV311_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "SYNENSYS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW032_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "ITSC SECURE SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW048_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "MIRACORP INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW056_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "CYNTEL TECHNOLOGIES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW060_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "TPG-Z LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW181_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "ARCH SYSTEMS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW187_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "CHEVO LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW272_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "TLN WORLDWIDE ENTERPRISES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW279_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "GEMINI TECH SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW309_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "CHAINBRIDGE SOLUTIONS INCORPORATED"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA24DW351_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "D&G SUPPORT SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA002_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "AEC-WESTON JV, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA004_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ABACO INSIGHT SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA005_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "DNI EMERGING TECHNOLOGIES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA023_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "DYNAMIC GOVERNMENT RESOURCES 2 LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA024_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ACQCENTRIC, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA039_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "GREAT HILL SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA041_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ALEKNAGIK TECHNOLOGY, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA046_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "CAYUSE FEDERAL SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA047_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "D&G SUPPORT SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA052_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "NAVANCIO LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA053_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "AKIAK NS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA055_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "AKIMA GLOBAL LOGISTICS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA058_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "NODE.DIGITAL LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA069_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "HAYAT BROWN LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA074_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "SNOW EAGLE GROUP, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA081_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "AMIVERO LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA086_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "PUYENPA TECHNOLOGIES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA096_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ANALYTICA LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA097_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "SSI-VENESCO JV LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA120_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "RIVET OPERATIONS COMPANY LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA140_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ANTEAN TECHNOLOGY LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA144_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "VECTRONA-ITA SOLUTIONS II LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA145_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ARETE CONSULTING LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA158_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "METRO ACCOUNTING & PROFESSIONAL SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA172_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "LINDAHL REED, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA185_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "TDX LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA230_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "THE GEMINI 3 GROUP, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA235_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "CMENT - JEFFERSON SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA236_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "CHUGACH DYNAMIC SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA263_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "NAKUPUNA SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA265_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "KAPTIVATE LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA283_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "EAGLE GOVERNMENT SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA298_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "SUNSTONE TECHNICAL GROUP, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA301_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "THE BUILDING PEOPLE LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA312_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "SPECPRO SUSTAINMENT AND ENVIRONMENTAL, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA323_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "PRIME RESPONSE, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA338_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "MAXISOFT CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA369_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "ADVENT SVCS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DA393_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "TANAQ MANAGEMENT SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DH007_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "TEAMGOV, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DH008_4732",
+     "solicitation_identifier": "47QRCA23R0003",
+     "recipient_name": "SD SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS004_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "DYNAMIS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS014_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "AD & RESOURCES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS046_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "A3 MISSIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS062_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ACTUALIZED BUSINESS SOLUTIONS INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS098_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "FOUR SEASONS ENVIRONMENTAL INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS101_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "THOR SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS103_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "A2M CONSULTING, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS115_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "BODWE TECHNOLOGY SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS120_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "BOWHEAD INFORMATION TECHNOLOGY SERVICE LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS127_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "BREAKFORTH SOLUTIONS INCORPORATED"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS150_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "BRYCE SPACE AND TECHNOLOGY, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS151_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TOEROEK ASSOCIATES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS162_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "THE TOLLIVER GROUP, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS175_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "INNOVATIVE TECHNOLOGIES CORP"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS177_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TOTAL TECHNOLOGY, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS218_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CASTRO & COMPANY, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS230_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TRIDENT TECHNICAL SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS280_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ALEUT MANAGEMENT SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS300_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CHEROKEE STRATEGIC SOLUTIONS, L.L.C."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS302_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CHEVO LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS303_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "UNITED FACILITY SERVICES CORP"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS307_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CHICKASAW AEROSPACE, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS326_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "VECTOR CSP LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS330_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CICONIX, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS421_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "INTERNATIONAL DEVELOPMENT GROUP ADVISORY SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS439_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "VOIGT PETERS ASSOCIATES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS480_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ISYS, INCORPORATED"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS488_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "COVENANT PARK INTEGRATED INITIATIVES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS510_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "NEXTGEN FEDERAL SYSTEMS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS519_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "NEXTSTEP TECHNOLOGY INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS536_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "WITS SOLUTIONS INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS537_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "NIYAMIT, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS569_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CREDENCE MANAGEMENT SOLUTIONS LIMITED LIABILITY COMPANY"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS571_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SCRIBEDOC.COM, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS578_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CREEK TECHNOLOGIES COMPANY"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS601_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ADSYNC TECHNOLOGIES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS607_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "AKYTECH CONSULTING, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS623_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CONSTELLATION INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS641_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "HEARTLAND ENERGY PARTNERS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS645_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "OCT CONSULTING LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS646_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "INFINITY TECHNOLOGY SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS652_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ODYSSEY SYSTEMS CONSULTING GROUP, LTD."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS654_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "AMIVERO LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS682_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "LEADING SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS687_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "DAWSON MCG, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS692_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "DECISIONPOINT CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS693_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "NETWORK RUNNERS INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS697_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "NOVATEC SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS701_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "DEFTEC CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS712_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "PROTEGE HEALTH SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS734_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "J&M GLOBAL SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS757_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "JCTM LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS781_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "DRODEX INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS792_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "APOGEE ENGINEERING, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS810_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "THE MANHATTAN STRATEGY GROUP LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS817_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TFC CONSULTING INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS824_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TELESOLV CONSULTING INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS860_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "OMNI CONSULTING SOLUTIONS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS866_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "KL3, L.L.C."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS872_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TECHPRIDE-JPI JV, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS873_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TECHOP SOLUTIONS INTERNATIONAL, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS877_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TECHNOLOGY AND TELECOMMUNICATIONS CONSULTANTS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS878_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "TECHNOLOGIST INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS893_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "KONIAG SERVICES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS918_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "LEADER COMMUNICATIONS INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS948_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SIERTEK, LTD."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS977_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "THE MCCONNELL GROUP, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DS994_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "METRO ACCOUNTING & PROFESSIONAL SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSA27_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "GARUD TECHNOLOGY SERVICES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSA46_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "GCA PARTNERS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSA86_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "IGNITE FUELING INNOVATION, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSA92_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ASCENDING1-JV LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB01_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ASIR2TEK FEDERAL SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB17_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ASR INTERNATIONAL CORP."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB22_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ASRC FEDERAL ADMINISTRATIVE SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB29_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "GREAT HILL SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB51_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "HAMILTON ENTERPRISES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB53_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "HARKCON, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB71_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SWINGTECH CONSULTING INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB81_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "HUNATEK SYSTEM SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSB96_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "STARLO INNOVATION, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSC08_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SPIRAL SOLUTIONS & TECHNOLOGIES, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSC15_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SPECPRO-BB&E JV, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSC59_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "AYUDA AUXILIO SOLUTIONS JV LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSC61_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "B&P SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSC65_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SOFTWARE ENGINEERING SERVICES CORP"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSC93_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "BEN FITZGERALD REAL ESTATE SERVICES, L.L.C."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSD43_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "RIPPLE EFFECT COMMUNICATIONS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSD46_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "PROFESSIONAL SOLUTIONS1 LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSD83_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "RED CARROT INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSD98_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "R & K ENTERPRISE SOLUTIONS INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSE01_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "QUICK SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSE02_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "QUASARS-JPI JV LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSE54_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "GMG MANAGEMENT CONSULTING INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSE64_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "K2 SOLUTIONS INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSE68_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "MAINSAIL - OASIS JOINT VENTURE LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSF09_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "CONSTRUCTURE INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSF32_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "SYSCOM, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSF80_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "BANYAN COMMUNICATIONS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DSF85_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "MARCOM GROUP, INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU077_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "THE CNA CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU090_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "CREDENCE MANAGEMENT SOLUTIONS LIMITED LIABILITY COMPANY"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU100_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "DELOITTE CONSULTING LLP"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU125_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "ENERGY AND SECURITY GROUP, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU131_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "ERNST & YOUNG LLP"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU148_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "GREAT HILL SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU154_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "HENDALL INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU181_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "INTREPID LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU209_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "L3HARRIS TECHNOLOGIES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU237_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "NORTHROP GRUMMAN SYSTEMS CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU256_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "PERSONNEL DECISIONS RESEARCH INSTITUTES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU257_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "PHOENIX LOGISTICS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU272_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "RESEARCH TRIANGLE INSTITUTE"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU276_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "RIVERSIDE RESEARCH INSTITUTE"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU317_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "SUMMIT CONSULTING LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU356_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "ABT GLOBAL LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU391_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "EAGLE HARBOR, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU416_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "ITC FEDERAL, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU421_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "JAVA PRODUCTIONS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU424_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "KEARNEY & COMPANY, P.C."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU447_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "ASTRION GROUP, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU494_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "WESTAT, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU513_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "BUCHANAN & EDWARDS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU529_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "DLH, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU537_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "KNOWESIS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU541_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "MATHEMATICA INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU593_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "SYSTEMS PLANNING AND ANALYSIS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU620_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "BAE SYSTEMS TECHNOLOGY SOLUTIONS & SERVICES INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU635_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "MILLENNIUM LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU655_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "MODERN TECHNOLOGY SOLUTIONS, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU657_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "OST INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU675_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "CHEROKEE NATION STRATEGIC PROGRAMS, L.L.C."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU677_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "FORS MARSH GROUP LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DU719_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "DT GLOBAL INC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DV034_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "ADVANCED CONCEPTS ENTERPRISES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DV084_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "SANCORP CONSULTING, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DV101_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "HIVE GROUP, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DV106_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "ENPROVERA CORP"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DV116_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "B3H CORPORATION"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DV125_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "INTEGRATED FINANCE AND ACCOUNTING SOLUTIONS, LLC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DW006_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "LEADING SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DW082_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "STEEL POINT SOLUTIONS, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA25DW089_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "ADVANCED CONCEPTS ENTERPRISES, INC."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DA008_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "AKIMA SYSTEMS ENGINEERING LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DA010_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "BERING STRAITS PROFESSIONAL SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DA013_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "CHENEGA RELIABLE SERVICES LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DA016_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "CHEROKEE STRATEGIC SOLUTIONS, L.L.C."
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DA023_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "KONIAG PROFESSIONAL SERVICES, LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DA043_4732",
+     "solicitation_identifier": "47QRCA23R0002",
+     "recipient_name": "OLD HARBOR SOLUTIONS LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DSG04_4732",
+     "solicitation_identifier": "47QRCA23R0001",
+     "recipient_name": "ANALYTICX LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DU008_4732",
+     "solicitation_identifier": "47QRCA23R0006",
+     "recipient_name": "NATIONAL OPINION RESEARCH CENTER"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DV010_4732",
+     "solicitation_identifier": "47QRCA23R0004",
+     "recipient_name": "VENERGY GROUP LLC"
+    },
+    {
+     "parent_id": "CONT_IDV_47QRCA26DW022_4732",
+     "solicitation_identifier": "47QRCA23R0005",
+     "recipient_name": "NORTH STAR SERVICES GROUP LLC"
+    }
+   ]
+  }
+ }
+}

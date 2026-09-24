@@ -1630,7 +1630,15 @@ const VIEWPORT_JS = `<script>
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', office:'', state:'',
     naics:'', psc:'', fsc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
     subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'',
+    vehicle:'', parent:'', work:'',
     strategy:[] };
+  // FILT is local to this script; the scope banner lives in another one. Publish read + clear here so
+  // the banner never guesses (a bare \`typeof FILT\` there is always 'undefined').
+  window.__vehicleScopeState=function(){ return { vehicle:FILT.vehicle||'', parent:FILT.parent||'', work:FILT.work||'' }; };
+  // Clearing the scope also drops the window the scoped link carried, so FILT and the URL (which stops
+  // writing leadMax once no scope remains) stay the same market after a reload.
+  window.__clearVehicleScope=function(){ FILT.vehicle=''; FILT.parent=''; FILT.work=''; FILT.leadMax='';
+    var ld=document.getElementById('mfLead'); if(ld)ld.value=''; };
   // ── Ask-Mindy context bridge ────────────────────────────────────────────────
   // The Ask Mindy drawer runs in its OWN IIFE and can't see these locals. Publish a
   // GETTER (not a snapshot) so it always reads the LIVE view: how many opps match in
@@ -2530,6 +2538,12 @@ const VIEWPORT_JS = `<script>
         if(FILT.likelihood)url+='&likelihood='+encodeURIComponent(FILT.likelihood);
         if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
         if(FILT.valueRange){ var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1]; }
+        // Parent-contract / vehicle scope + work subject — resolved and applied SERVER-side inside every
+        // read (src/lib/vehicles/parent-scope.ts), so the headline, the unmapped count and the pins are
+        // the same scoped market the MCP task-order search returns.
+        if(FILT.vehicle)url+='&vehicle='+encodeURIComponent(FILT.vehicle);
+        if(FILT.parent)url+='&parent='+encodeURIComponent(FILT.parent);
+        if(FILT.work)url+='&work='+encodeURIComponent(FILT.work);
       }
       if(m==='forecast'){
         // Forecasts filter on q/naics/agency/state (applyForecastFilters). naics/state aren't added
@@ -2563,6 +2577,10 @@ const VIEWPORT_JS = `<script>
     var _lensOn=false;
     try{ _lensOn=!!(document.querySelector('.mf-strategy:checked')); }catch(e){}
     if(_lensOn && _enabled.indexOf('open')>-1){ _enabled=['open']; }
+    // A parent-contract / vehicle scope exists ONLY on the Awarded horizon (orders carry a parent;
+    // open notices and forecasts do not). Fetching the other horizons would SUM their unscoped totals
+    // into the headline — the same failure as the strategy lens above — so fetch Awarded alone.
+    if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }
     if(_enabled.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
     // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
     // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
@@ -2599,6 +2617,7 @@ const VIEWPORT_JS = `<script>
         // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
         // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
         var hc=horizonCount(d);
+        if(m==='recompete'){ window.__vehicleScope=d.vehicle_scope||null; if(typeof window.__renderVehicleScope==='function')window.__renderVehicleScope(); }
         return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:hc.total,count:hc,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
       }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true};});
     })).then(function(parts){
@@ -3211,17 +3230,26 @@ const VIEWPORT_JS = `<script>
   window.__mapQueryUrl=function(search,intent,dropContext){
     intent=intent||{};
     var src=String(search||''), s=src.charAt(0)==='?'?src.slice(1):src;
-    var parts=s?s.split('&'):[], keep=[], cur={q:'',agency:'',horizon:''};
+    var parts=s?s.split('&'):[], keep=[], cur={q:'',agency:'',horizon:'',vehicle:'',parent:'',work:'',leadMax:''};
+    var MANAGED={q:1,agency:1,horizon:1,vehicle:1,parent:1,work:1,leadMax:1};
     function dec(v){ try{ return decodeURIComponent(v.split('+').join(' ')).trim(); }catch(e){ return v; } }
     for(var i=0;i<parts.length;i++){
       var p=parts[i]; if(!p)continue;
       var k=p.split('=')[0];
-      if(k==='q'||k==='agency'||k==='horizon'){ if(!cur[k])cur[k]=dec(p.slice(k.length+1)); continue; }
+      if(MANAGED[k]){ if(!cur[k])cur[k]=dec(p.slice(k.length+1)); continue; }
       keep.push(p);
     }
-    var want={ q:String(intent.q||'').trim(), agency:String(intent.agency||'').trim(), horizon:'' };
-    if(want.q||want.agency)want.horizon=String(intent.horizon||'').trim();
-    if(cur.q===want.q&&cur.agency===want.agency&&cur.horizon===want.horizon)return src;
+    var want={ q:String(intent.q||'').trim(), agency:String(intent.agency||'').trim(), horizon:'',
+      vehicle:String(intent.vehicle||'').trim(), parent:String(intent.parent||'').trim(), work:String(intent.work||'').trim(), leadMax:'' };
+    // A parent/vehicle scope is discovery intent too: it carries its horizon and window so a reload or a
+    // copied link reopens the SAME scoped market (leadMax is written only beside a scope).
+    var _scoped=!!(want.vehicle||want.parent||want.work);
+    if(want.q||want.agency||_scoped)want.horizon=String(intent.horizon||'').trim();
+    if(_scoped)want.leadMax=String(intent.leadMax||'').trim();
+    // A URL leadMax with no scope is not this writer's key — keep it exactly as it was.
+    if(!_scoped&&cur.leadMax&&!cur.vehicle&&!cur.parent&&!cur.work)want.leadMax=cur.leadMax;
+    if(cur.q===want.q&&cur.agency===want.agency&&cur.horizon===want.horizon&&cur.vehicle===want.vehicle
+      &&cur.parent===want.parent&&cur.work===want.work&&cur.leadMax===want.leadMax)return src;
     if(dropContext){
       var CTX={ss:1,opp:1,company:1,buyer:1,recompete:1,forecast:1,sh:1,src:1};
       keep=keep.filter(function(p){ return !CTX[p.split('=')[0]]; });
@@ -3229,6 +3257,10 @@ const VIEWPORT_JS = `<script>
     if(want.q)keep.push('q='+encodeURIComponent(want.q));
     if(want.agency)keep.push('agency='+encodeURIComponent(want.agency));
     if(want.horizon)keep.push('horizon='+encodeURIComponent(want.horizon).split('%2C').join(','));
+    if(want.vehicle)keep.push('vehicle='+encodeURIComponent(want.vehicle));
+    if(want.parent)keep.push('parent='+encodeURIComponent(want.parent).split('%2C').join(','));
+    if(want.work)keep.push('work='+encodeURIComponent(want.work));
+    if(want.leadMax)keep.push('leadMax='+encodeURIComponent(want.leadMax));
     return keep.length?('?'+keep.join('&')):'';
   };
   // onlyIfIntent: a keep-in-sync call (horizon toggle, agency picker, Filters apply, Clear all)
@@ -3240,14 +3272,18 @@ const VIEWPORT_JS = `<script>
       var mode=window.__mapMode||'open';
       var cur=location.search||'';
       if(/[?&]embed=/.test(cur))return;          // a host page's map is not this visitor's URL
-      if(onlyIfIntent&&!/[?&](q|agency|horizon)=/.test(cur))return;
+      if(onlyIfIntent&&!/[?&](q|agency|horizon|vehicle|parent|work)=/.test(cur))return;
       // On Players / DLA the box and filters describe a different dataset: carry no Opportunities
       // intent (and drop a stale one), never a Players term that would reopen as an Opportunities query.
       var opp=(mode==='open'||mode==='recompete');
       var intent={
         q: opp&&typeof Q==='string'?Q:'',
         agency: opp&&typeof FILT!=='undefined'&&FILT&&FILT.agency?String(FILT.agency):'',
-        horizon: window.__activeHorizonParam()
+        horizon: window.__activeHorizonParam(),
+        vehicle: opp&&typeof FILT!=='undefined'&&FILT&&FILT.vehicle?String(FILT.vehicle):'',
+        parent: opp&&typeof FILT!=='undefined'&&FILT&&FILT.parent?String(FILT.parent):'',
+        work: opp&&typeof FILT!=='undefined'&&FILT&&FILT.work?String(FILT.work):'',
+        leadMax: opp&&typeof FILT!=='undefined'&&FILT&&FILT.leadMax?String(FILT.leadMax):''
       };
       var next=window.__mapQueryUrl(cur,intent,!!dropContext);
       if(next===cur)return;
@@ -4817,7 +4853,8 @@ const VIEWPORT_JS = `<script>
     if(window.__agencyReset)window.__agencyReset();
     FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', office:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
-      subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
+      subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'',
+      vehicle:'', parent:'', work:'' };
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
@@ -8917,7 +8954,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // ?horizon=forecast is a backward-compatible alias for ?mode=forecast (emitters used both).
     // When BOTH are present, explicit ?mode= wins.
     var posted=P('posted'), mode=P('mode'), horizon=P('horizon');
-    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency)return;   // nothing asked for -> leave the map alone
+    // Parent-contract / vehicle scope (+ work subject and its window). Resolved SERVER-side against the
+    // verified vehicle registry; an unknown/ambiguous name comes back as a refinement, never all orders.
+    var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax');
+    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency&&!vehicle&&!parent&&!work)return;   // nothing asked for -> leave the map alone
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
         if(++tries<40)return setTimeout(go,150); return;
@@ -8966,6 +9006,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // Sub-agency is a free-text ilike on sub_tier — the picker writes the exact stored name
       // ("DEPT OF THE NAVY"), and a partial ("NAVY") still matches, so no resolution step here.
       if(subAgency)f.subAgency=subAgency;
+      if(vehicle)f.vehicle=vehicle.slice(0,120);
+      if(parent)f.parent=parent.slice(0,2000);
+      if(work)f.work=work.slice(0,120);
+      // The window is part of a scoped link (MCP defaults to 60 months). Only integers the API accepts.
+      if(leadMax&&/^[0-9]{1,2}$/.test(leadMax)&&+leadMax>=1&&+leadMax<=60)f.leadMax=leadMax;
       // "Posted today / this week" tiles. Only values the #mfPosted select can actually hold —
       // otherwise the map would filter to a window the Filters panel shows as "Any time" and
       // Clear-all could not undo. 1 exists because the tile promises ONE day (see the option).
@@ -9027,6 +9072,54 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     })();
   }catch(e){} })();
 
+  // ── PARENT-CONTRACT / VEHICLE SCOPE BANNER ────────────────────────────────
+  // States HOW the Awarded layer is scoped, from the server's own vehicle_scope block (never a label
+  // the client invents): the vehicle, how many VERIFIED parent contracts it resolved to, and the work
+  // terms. An unresolved scope reads its reason — the feed already shows it as a refinement, not "0".
+  // Clear drops the scope from FILT and the URL together, so a reload cannot resurrect it.
+  window.__renderVehicleScope=function(){
+    try{
+      var vs=window.__vehicleScope, el=document.getElementById('vehicleScopeBar');
+      var st=(typeof window.__vehicleScopeState==='function')?window.__vehicleScopeState():{};
+      var active=!!(st.vehicle||st.parent||st.work);
+      if(!vs||!active){ if(el)el.style.display='none'; return; }
+      if(!el){
+        el=document.createElement('div'); el.id='vehicleScopeBar'; el.setAttribute('role','status');
+        // Placement measured on the built page: desktop sits on the MAP's left edge above the legend,
+        // clear of the zoom control and the list panel; narrow screens span the width above the
+        // floating Map/List button.
+        var _narrow=window.innerWidth<700;
+        el.style.cssText='position:fixed;z-index:1200;'
+          +(_narrow?'left:12px;right:12px;bottom:92px;':'left:76px;bottom:48px;max-width:min(600px,calc(100vw - 460px));')
+          +'background:#1e3a8a;color:#fff;border-radius:10px;padding:8px 12px;font:13px/1.4 system-ui,sans-serif;'
+          +'box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;gap:10px;align-items:flex-start';
+        var txt=document.createElement('span'); txt.id='vehicleScopeText'; txt.style.flex='1';
+        var btn=document.createElement('button'); btn.type='button'; btn.textContent='Clear';
+        btn.style.cssText='background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:6px;padding:2px 8px;cursor:pointer;font:inherit';
+        btn.onclick=function(){
+          if(typeof window.__clearVehicleScope==='function')window.__clearVehicleScope(); window.__vehicleScope=null;
+          if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(false,true);
+          window.__renderVehicleScope(); if(window.__mapRefetch)window.__mapRefetch();
+        };
+        el.appendChild(txt); el.appendChild(btn); document.body.appendChild(el);
+      }
+      var terms=(vs.work_terms||[]).join(' + '), msg='';
+      if(vs.status==='resolved'){
+        msg=(vs.kind==='vehicle'?'Awarded orders under '+vs.label+' · '+vs.parents_in_scope+' verified parent contract'+(vs.parents_in_scope===1?'':'s')
+          :'Awarded orders under parent '+vs.label)+(terms?' · work: '+terms:'')
+          +' · active orders only';
+        el.style.background='#1e3a8a';
+      } else if(vs.status==='unresolved'){
+        msg='Not searched: '+(vs.reason||'the vehicle or parent contract could not be established.');
+        el.style.background='#9a3412';
+      } else {
+        msg='Work: '+terms;
+      }
+      document.getElementById('vehicleScopeText').textContent=msg;
+      el.style.display='flex';
+    }catch(e){}
+  };
+
   // ── RETURN CONTINUITY: pick up the market you left ───────────────────────
   // The counterpart to __rememberMapState (VIEWPORT_JS). Hands the remembered
   // {mode, filters} to __applySavedSearch — the SAME restorer ?ss=, the in-map
@@ -9044,7 +9137,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // memory stands down. ?embed= is a host page's map, not this visitor's.
     // NO field-equality exception: a ?q= equal to the remembered q still stands the memory down
     // (Eric 2026-09-23 — equality of one field never authorizes restoring the rest).
-    if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
+    if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed|vehicle|parent|work)=/.test(qs))return;
     var raw=''; try{ raw=localStorage.getItem('mi_map_last_search')||''; }catch(e){ return; }
     if(!raw)return;
     var st=null; try{ st=JSON.parse(raw); }catch(e){ return; }

@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Task orders — parent-contract / vehicle scope (OASIS+) + shared Map link
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-24 | MCP search_idv_contracts / task orders | Task-order search could not be restricted to a vehicle: on main a `vehicle` argument is not in the schema, so it was dropped and the tool silently returned orders from every vehicle. Now `vehicle` (verified registry only) / `parent_id` (exact `CONT_IDV_<PIID>_<AGENCY>`) + `work` run the shared scoped search; unknown/ambiguous names and bad ids return `status: unresolved` with nothing searched; unscoped calls keep the USASpending path unchanged | `return scopedIdvContracts(input);` → `src/mcp/tools/idv-contracts.ts` | `idv-contracts-scope.unit.test.ts` (5); live oracle `scripts/verify-task-order-scope.ts` 21/21 | PR open |
+| 2026-09-24 | Vehicle membership registry | OASIS+ membership is the parent IDV's OWN recorded solicitation (`47QRCA23R0001`–`0006`, GSA-published), never a PIID prefix — original OASIS holders carry `47QRAD…` PIIDs under `GS00Q-13-DR-0002`. 5,778 candidate parents verified against USASpending; 237 OASIS+ members; 2 unreadable disclosed as unresolved | `if (!def) {` → `src/lib/vehicles/registry.ts` | `parent-scope.unit.test.ts` (original-OASIS row compiled under OASIS+ is still excluded); live: 134 original-OASIS parents in the table, 0 classified OASIS+ | PR open |
+| 2026-09-24 | Recompete map / parent + work scope | Parent scope and work subject are Maps SURFACE ops applied inside every read (PostgREST + SQL twin): a member-derived LIKE prefilter first, then the exact parent-slot regex (a 237-way regex alone hit the statement timeout); work terms match description / PSC title / the OFFICIAL NAICS title of `naics_code` (row `naics_description` is 0 of 142,000 filled). An unresolved scope answers `needs_refinement` and reads nothing. Scope isolates the Awarded horizon and round-trips through the URL | `out.push({ op: 'or', expr: parentPrefilterExpr(s.parentScope.parents) });` → `src/lib/recompete/maps-recompete-discovery.ts` | `scope-surfaces.unit.test.ts`, `vehicle-scope-url.unit.test.ts`; live: tool total 23 = Map mapped 15 + unmapped 8, pins identical, independent JS recount 23 | PR open |
+
 ## Maps client — canonical discovery row 8 (query in URL · agency suggestion · needs_positive_scope)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

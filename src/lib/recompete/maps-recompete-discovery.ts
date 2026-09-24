@@ -14,6 +14,7 @@
  */
 import { buildDiscoveryPlan, applyRecompetePlan, MAPS_POLICY, contextFor, type DiscoveryInput, type DiscoveryPlan, type PlanContext, type SurfacePolicy } from '@/lib/discovery';
 import { multiAgency } from '@/lib/opportunities/agency-match';
+import { parentPrefilterExpr, parentScopeExpr, resolveParentScope, workScopeExprs, workTerms, type ParentScope } from '@/lib/vehicles/parent-scope';
 
 type Get = (k: string) => string | null | undefined;
 
@@ -31,6 +32,14 @@ export interface MapsRecompeteSurface {
   maxValue: number | null;
   sap: '' | 'friendly' | 'gated';
   likelihood: '' | 'high';
+  /**
+   * Parent-contract / vehicle scope (`?vehicle=` or `?parent=`), resolved through the verified vehicle
+   * registry. Applied INSIDE every read (a surface op), so counts, pins and pages all see the same
+   * scoped market. `unresolved` → the route answers with a refinement and reads NOTHING.
+   */
+  parentScope: ParentScope;
+  /** Work subject (`?work=`): every term must appear in a WORK field (description/NAICS/PSC text). */
+  work: string;
 }
 
 export interface MapsRecompeteRequest {
@@ -56,6 +65,8 @@ export function mapsRecompeteSurfaceScope(s: MapsRecompeteSurface): string[] {
   if (s.setAside) out.push('setAside');
   if (s.subAgency) out.push('subAgency');
   if (s.sap) out.push('sap');
+  if (s.parentScope.status === 'resolved') out.push(s.parentScope.kind);
+  if (workTerms(s.work).length) out.push('work');
   return out;
 }
 
@@ -79,6 +90,8 @@ export function mapsRecompeteRequest(get: Get, opts?: { ctx?: PlanContext }): Ma
     maxValue: num(get('maxValue')),
     sap: sap === 'friendly' || sap === 'gated' ? sap : '',
     likelihood: t('likelihood').toLowerCase() === 'high' ? 'high' : '',
+    parentScope: resolveParentScope({ vehicle: t('vehicle'), parent: t('parent') }),
+    work: t('work'),
   };
   const agencies = multiAgency(get('agency') ?? '');
   const input: DiscoveryInput = {
@@ -119,7 +132,9 @@ export type SurfaceOp =
   | { op: 'ilike'; col: string; val: string }
   | { op: 'gte'; col: string; val: number }
   | { op: 'lte'; col: string; val: number }
-  | { op: 'in'; col: string; vals: string[] };
+  | { op: 'in'; col: string; vals: string[] }
+  /** A PostgREST logic list (the plan's own `or` grammar) — the SQL twin serializes it via opSql. */
+  | { op: 'or'; expr: string };
 
 export function mapsRecompeteSurfaceOps(s: MapsRecompeteSurface, mapped: 'only' | 'none' | 'any'): SurfaceOp[] {
   const out: SurfaceOp[] = [];
@@ -132,6 +147,14 @@ export function mapsRecompeteSurfaceOps(s: MapsRecompeteSurface, mapped: 'only' 
   if (s.sap === 'friendly') out.push({ op: 'in', col: 'contract_type', vals: ['PURCHASE ORDER', 'BPA CALL'] });
   else if (s.sap === 'gated') out.push({ op: 'eq', col: 'contract_type', val: 'DELIVERY ORDER' });
   if (s.likelihood === 'high') out.push({ op: 'eq', col: 'recompete_likelihood', val: 'high' });
+  // Parent scope: resolved → the anchored parent-slot match; unresolved → select NOTHING (the route
+  // short-circuits before reading, this is the belt to that brace — never "all vehicles").
+  if (s.parentScope.status === 'resolved') {
+    out.push({ op: 'or', expr: parentPrefilterExpr(s.parentScope.parents) });  // cheap superset, first
+    out.push({ op: 'or', expr: parentScopeExpr(s.parentScope.parents) });      // exact parent slot
+  }
+  else if (s.parentScope.status === 'unresolved') out.push({ op: 'or', expr: parentScopeExpr([]) });
+  for (const expr of workScopeExprs(s.work)) out.push({ op: 'or', expr });
   return out;
 }
 
@@ -145,6 +168,7 @@ function applySurfaceOp(q: any, o: SurfaceOp): any {
     case 'gte': return q.gte(o.col, o.val);
     case 'lte': return q.lte(o.col, o.val);
     case 'in': return q.in(o.col, o.vals);
+    case 'or': return q.or(o.expr);
   }
 }
 

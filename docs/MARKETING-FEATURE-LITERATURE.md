@@ -7333,3 +7333,19 @@ and still drops Dale Carnegie / dirty IT slivers.
 **SEO.** Internal measurement capability; no public page. Supports "share federal opportunities with teaming partners" positioning, which can now be backed by measured numbers once they accrue.
 
 **Proof.** Audit (2026-09-23): 94 shares by 31 users since Aug 4, with 0 attributable arrivals, signups or purchases; 574 of 1,327 accounts since Jul 6 carried any signup source. After: a real-browser acceptance run against a production build and the live database. One share was opened by four anonymous browsers, which became four accounts through the Google-, Microsoft-, email- and password-signup routes; one of them activated and paid. The funnel query attributed the $149.00 to that share, its opportunity and its sharer. It excluded a fake share id, a real id lifted onto another opportunity, and alert, briefing, saved-search and direct traffic. The activation and payment were inserted in a rolled-back transaction, and every synthetic row was deleted and re-counted to zero. Real numbers accrue from ship date; earlier shares cannot be attributed retroactively.
+
+## Task orders by vehicle — OASIS+ (2026-09-24)
+
+**What.** Mindy can now restrict a task-order search to one contract vehicle or one parent contract. Ask for management consulting under OASIS+ and every order returned was placed under a verified OASIS+ contract. Each one shows the parent contract it was ordered against, the OASIS+ pool that contract came from (Unrestricted, Total Small Business, 8(a), HUBZone, SDVOSB or WOSB), and the words in the order that make it management consulting. The same search opens on the Mindy Map with one link, and the count, the list, the pages and the map all agree. Ask for a vehicle Mindy cannot identify, and it says so instead of showing everything.
+
+**Why.** "What is flowing through the vehicle I hold (or want)?" is the first question a vehicle holder asks. Mindy previously had no way to answer it: a vehicle name typed into a task-order search was ignored, and the orders came back from every vehicle. The obvious shortcut, treating every GSA contract number that starts a certain way as OASIS+, would have mixed in the original OASIS vehicle. Its holders carry similar contract numbers, but it is a different vehicle.
+
+**SEO.** OASIS+ task orders / OASIS+ management consulting task orders / GSA OASIS+ pools small business 8(a) HUBZone SDVOSB WOSB unrestricted / task orders under a contract vehicle / OASIS vs OASIS+.
+
+**Proof.** 5,778 parent contracts checked against their own USASpending award records (the solicitation each was awarded under). 237 are OASIS+ holder contracts under GSA's six published OASIS+ solicitations (47QRCA23R0001–0006), and 2 could not be read and are shown as unknown. Measured live on 2026-09-24, read-only:
+- 285 active OASIS+ orders; 23 of them are management consulting.
+- An independent recount found the same 23.
+- The Map link shows 15 of those orders as pins, lists the 8 that have no location, and draws the same pins.
+- 134 original-OASIS parent contracts in the table; none was counted as OASIS+.
+
+Scope: active orders (period of performance not ended), not the full history. A vehicle's orders say nothing about any company's eligibility or membership.

@@ -807,7 +807,13 @@ const IDV_CONTRACTS_TOOL_DEF = {
       'Indefinite-Delivery Vehicles (IDIQ / GWAC / BPA) and the task orders flowing through them. search_type:"idv" ' +
       'returns the base vehicles you must be ON to compete; search_type:"task" returns the delivery/task orders being ' +
       'ordered through them (demand + typical order size). Filter by NAICS / PSC / agency / state / min value / date ' +
-      'range. grounded=false when nothing matches.',
+      'range. grounded=false when nothing matches. ' +
+      'To restrict TASK ORDERS to one vehicle or parent contract, pass vehicle (e.g. "OASIS+", resolved only through ' +
+      'a verified registry of parent IDVs by their awarding solicitation — "OASIS" alone is ambiguous and original ' +
+      'OASIS is a different vehicle) or parent_id (exact CONT_IDV_<PIID>_<AGENCY>), optionally with work (e.g. ' +
+      '"management consulting"). Scoped results cover ACTIVE orders, carry each order\'s parent id as evidence, and ' +
+      'return a shareable Map link with the same scope. status "unresolved" means nothing was searched — never ' +
+      'report it as zero orders. Vehicle membership of an order says nothing about any company\'s eligibility.',
     parameters: {
       type: 'object',
       properties: {
@@ -822,6 +828,10 @@ const IDV_CONTRACTS_TOOL_DEF = {
         search_type: { type: 'string', enum: ['idv', 'task'], description: '"idv" = base vehicles (default); "task" = task/delivery orders.' },
         limit: { type: 'number', description: 'Max results per page (default 25).' },
         page: { type: 'number', description: '1-based page number.' },
+        vehicle: { type: 'string', description: 'Task orders only: contract vehicle name, e.g. "OASIS+". Unknown or ambiguous names return status "unresolved".' },
+        parent_id: { type: 'string', description: 'Task orders only: exact parent contract id(s), CONT_IDV_<PIID>_<AGENCY>, comma-separated. A bare PIID is accepted only if exactly one agency carries it.' },
+        work: { type: 'string', description: 'With vehicle/parent_id: the work subject; every word must appear in the order description or its NAICS/PSC title.' },
+        lead_months: { type: 'number', description: 'With vehicle/parent_id: orders ending within N months (1-60, default 60).' },
       },
     },
   },
@@ -2301,6 +2311,10 @@ export async function runMcpTool(
       search_type: args.search_type === 'idv' || args.search_type === 'task' ? args.search_type : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
       page: typeof args.page === 'number' ? args.page : undefined,
+      vehicle: typeof args.vehicle === 'string' ? args.vehicle : undefined,
+      parent_id: typeof args.parent_id === 'string' ? args.parent_id : undefined,
+      work: typeof args.work === 'string' ? args.work : undefined,
+      lead_months: typeof args.lead_months === 'number' ? args.lead_months : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

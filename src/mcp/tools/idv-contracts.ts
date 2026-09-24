@@ -9,6 +9,7 @@
  */
 import { searchIDVContracts, type IDVContract } from '@/lib/idv-search';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { searchScopedTaskOrders, type ScopedTaskOrderResult, type ScopedTaskOrderRow } from '@/lib/vehicles/task-order-search';
 
 export interface IdvContractsToolInput {
   naics?: string;
@@ -24,18 +25,138 @@ export interface IdvContractsToolInput {
   search_type?: 'idv' | 'task';
   limit?: number;
   page?: number;
+  /**
+   * Restrict TASK ORDERS to a contract vehicle by name (e.g. "OASIS+"). Resolved only through the
+   * verified vehicle registry — an unknown/ambiguous name returns status "unresolved", never all vehicles.
+   */
+  vehicle?: string;
+  /** Restrict TASK ORDERS to exact parent contract id(s): CONT_IDV_<PIID>_<AGENCY> (comma list). */
+  parent_id?: string;
+  /** Work subject within a vehicle/parent scope — every word must appear in the order's work text. */
+  work?: string;
+  /** Scoped search window: orders ending within N months (1–60, default 60). */
+  lead_months?: number;
 }
+
+type ScopedContract = IDVContract & Pick<ScopedTaskOrderRow, 'parent' | 'work_evidence' | 'on_map'> & { contractId: string };
 
 export interface IdvContractsToolResult {
   queried: Record<string, string | number>;
   search_type: 'idv_contracts' | 'task_orders';
-  contracts: IDVContract[];
+  contracts: IDVContract[] | ScopedContract[];
   has_next_page: boolean;
+  /** Vehicle/parent-scoped searches only. */
+  status?: ScopedTaskOrderResult['status'];
+  reason?: string | null;
+  scope?: ScopedTaskOrderResult['scope'];
+  population?: string;
+  coverage?: {
+    parent_orders_in_population: number | null;
+    unattributed_orders: number | null;
+    note: string;
+  };
+  map?: { url: string | null; mapped_total: number | null; unmapped_total: number | null; note: string };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; count: number; total: number };
+  _meta: { grounded: boolean; degraded: boolean; count: number; total: number | null };
+}
+
+function toScopedContract(r: ScopedTaskOrderRow): ScopedContract {
+  return {
+    awardId: r.piid ?? '',
+    contractId: r.contract_id,
+    recipientName: r.recipient_name ?? '',
+    recipientUei: r.recipient_uei ?? '',
+    awardAmount: r.potential_total_value ?? 0,
+    description: r.description ?? '',
+    startDate: '',
+    endDate: r.period_end ?? '',
+    agency: r.agency ?? '',
+    subAgency: r.sub_agency ?? '',
+    naicsCode: r.naics_code ?? '',
+    naicsDescription: r.naics_description ?? '',
+    pscCode: '',
+    pscDescription: r.psc_description ?? '',
+    recipientState: '',
+    popState: r.place_of_performance_state ?? '',
+    generatedId: r.contract_id,
+    usaSpendingUrl: r.usaspending_url,
+    parent: r.parent,
+    work_evidence: r.work_evidence,
+    on_map: r.on_map,
+  };
+}
+
+async function scopedIdvContracts(input: IdvContractsToolInput): Promise<IdvContractsToolResult> {
+  const queried: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries({ vehicle: input.vehicle, parent_id: input.parent_id, work: input.work, naics: input.naics, agency: input.agency, state: input.state, lead_months: input.lead_months })) {
+    if (v !== undefined && v !== '') queried[k] = v as string | number;
+  }
+  let r: ScopedTaskOrderResult | null = null;
+  try {
+    r = await searchScopedTaskOrders({
+      vehicle: input.vehicle, parent_id: input.parent_id, work: input.work, naics: input.naics,
+      agency: input.agency, state: input.state, lead_months: input.lead_months, limit: input.limit, page: input.page,
+    });
+  } catch (err) {
+    console.error('[mcp:idv-contracts] scoped search failed:', err);
+  }
+  if (!r) {
+    return {
+      queried, search_type: 'task_orders', contracts: [], has_next_page: false, status: 'degraded',
+      reason: 'The scoped task-order search errored — retry; do not report zero orders.',
+      _meta: { grounded: false, degraded: true, count: 0, total: null },
+    };
+  }
+  const contracts = r.orders.map(toScopedContract);
+  const result: IdvContractsToolResult = {
+    queried,
+    search_type: 'task_orders',
+    contracts,
+    has_next_page: r.has_next_page,
+    status: r.status,
+    reason: r.reason,
+    scope: r.scope,
+    population: r.population,
+    coverage: {
+      parent_orders_in_population: r.parent_orders_in_population,
+      unattributed_orders: r.unattributed_orders,
+      note: 'parent_orders_in_population = the vehicle/parent\'s orders in this population before work/NAICS/agency/state filters. '
+        + 'unattributed_orders = orders matching the same work/filters whose parent contract is NOT recorded — they cannot be attributed to any vehicle, so they are neither included nor ruled out.',
+    },
+    map: {
+      url: r.map_url, mapped_total: r.mapped_total, unmapped_total: r.unmapped_total,
+      note: 'The Map link opens the Awarded layer with the same scope. The Map headline counts mapped orders (mapped_total); orders without a location (unmapped_total) are listed as not drawable. mapped_total + unmapped_total = total.',
+    },
+    _meta: { grounded: contracts.length > 0, degraded: r.status === 'degraded', count: contracts.length, total: r.total },
+  };
+  if (mcpFlags.aiHint) {
+    result._ai_hint = {
+      summary: r.status === 'ok'
+        ? `${r.total} active order(s) under ${r.scope && 'label' in r.scope ? r.scope.label : 'the requested parent'}; page ${r.page}.`
+        : `${r.status}: ${r.reason ?? ''}`,
+      how_to_use: 'Each order carries parent.parent_id (read from the award id) and, for vehicles, the verified solicitation it was awarded under. '
+        + 'Membership of a vehicle is NOT eligibility: never state that a company holds or can use a vehicle from this result.',
+      key_caveats: [
+        'Population is active orders ending within the window, not all historical orders.',
+        'status "unresolved" / "no_parent_orders" / "zero_matching_orders" are different facts — never report them as the same zero.',
+      ],
+    };
+  }
+  return result;
 }
 
 export async function idvContracts(input: IdvContractsToolInput): Promise<IdvContractsToolResult> {
+  // Vehicle / exact-parent scope → the shared scoped search (the same query the Map's Awarded layer
+  // runs). Without a scope the original USASpending path below runs unchanged.
+  if (input.vehicle?.trim() || input.parent_id?.trim()) return scopedIdvContracts(input);
+  if (input.work?.trim()) {
+    return {
+      queried: { work: input.work }, search_type: 'task_orders', contracts: [], has_next_page: false,
+      status: 'needs_refinement',
+      reason: '"work" narrows a vehicle- or parent-scoped task-order search. Pass vehicle (e.g. "OASIS+") or parent_id, or use naics/psc for an unscoped search.',
+      _meta: { grounded: false, degraded: false, count: 0, total: null },
+    };
+  }
   let res;
   let degraded = false;
   try {

@@ -744,7 +744,9 @@ server.registerTool(
     description:
       'Indefinite-Delivery Vehicles (IDIQ/GWAC/BPA) and the task orders flowing through them. search_type:"idv" = ' +
       'base vehicles you must be ON; search_type:"task" = the orders being placed through them. Filter by NAICS / ' +
-      'PSC / agency / state / min value / date range. grounded=false when nothing matches.',
+      'PSC / agency / state / min value / date range. grounded=false when nothing matches. Restrict task orders to a ' +
+      'vehicle (e.g. "OASIS+", verified registry only) or an exact parent_id (CONT_IDV_<PIID>_<AGENCY>), optionally ' +
+      'with a work subject; status "unresolved" means nothing was searched, never zero orders.',
     inputSchema: {
       naics: z.string().optional().describe('NAICS code.'),
       psc: z.string().optional().describe('Product/Service Code.'),
@@ -757,10 +759,14 @@ server.registerTool(
       search_type: z.enum(['idv', 'task']).optional().describe('"idv" = base vehicles (default); "task" = task orders.'),
       limit: z.number().int().min(1).max(100).optional().describe('Max results per page (default 25).'),
       page: z.number().int().min(1).optional().describe('1-based page number.'),
+      vehicle: z.string().optional().describe('Task orders only: vehicle name, e.g. "OASIS+". Unknown/ambiguous → status "unresolved".'),
+      parent_id: z.string().optional().describe('Task orders only: exact parent id(s) CONT_IDV_<PIID>_<AGENCY>, comma-separated.'),
+      work: z.string().optional().describe('With vehicle/parent_id: work subject; every word must appear in the order work text.'),
+      lead_months: z.number().int().min(1).max(60).optional().describe('With vehicle/parent_id: orders ending within N months (default 60).'),
     },
   },
-  async ({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page }) => {
-    const result = await idvContracts({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page });
+  async ({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page, vehicle, parent_id, work, lead_months }) => {
+    const result = await idvContracts({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page, vehicle, parent_id, work, lead_months });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

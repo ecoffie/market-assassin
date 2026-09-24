@@ -1,0 +1,991 @@
+{
+ "generated_at": "2026-09-24T22:18:31.958Z",
+ "checks": [
+  {
+   "id": "registry.members",
+   "pass": true,
+   "detail": "OASIS+ verified parent IDVs: 237 (candidates checked 5778, unresolved 2)"
+  },
+  {
+   "id": "1.membership",
+   "pass": true,
+   "detail": "23 orders, all under verified OASIS+ parents (solicitation 47QRCA23R0001–0006)"
+  },
+  {
+   "id": "1.work_evidence",
+   "pass": true,
+   "detail": "every order carries evidence for every work term (management, consulting)"
+  },
+  {
+   "id": "1.independent_recount",
+   "pass": true,
+   "detail": "tool total 23 · paged 23 · independent JS recount 23"
+  },
+  {
+   "id": "2.exact_parent",
+   "pass": true,
+   "detail": "CONT_IDV_47QRCA25DU100_4732: 10 orders, all recording that parent (vehicle-scope count for it: 10)"
+  },
+  {
+   "id": "2.bare_piid",
+   "pass": true,
+   "detail": "bare PIID resolves to the single agency carrying it → 10"
+  },
+  {
+   "id": "3.original_oasis",
+   "pass": true,
+   "detail": "134 original-OASIS parents in the table (GS00Q14OA…/47QRAD…); 0 classified OASIS+, 0 in the OASIS+ result"
+  },
+  {
+   "id": "3.unrelated_vehicle",
+   "pass": true,
+   "detail": "Robins Mech-Elec II (CONT_IDV_FA850124D0005_9700): 5 own orders, none in the OASIS+ result"
+  },
+  {
+   "id": "3.original_oasis_as_exact_parent",
+   "pass": true,
+   "detail": "CONT_IDV_47QRAD20D1103_4732 as an exact parent: 4 orders, vehicle evidence null (not OASIS+)"
+  },
+  {
+   "id": "4.unresolved:OASIS",
+   "pass": true,
+   "detail": "OASIS → unresolved: \"OASIS\" can mean the original GSA OASIS vehicle (solicitation GS00Q-13-DR-0002, not registered here) or OASIS+ (a different vehicle). Say \"OASIS+\" for OASIS+."
+  },
+  {
+   "id": "4.unresolved:Alliant 3",
+   "pass": true,
+   "detail": "Alliant 3 → unresolved: No authoritative mapping for vehicle \"Alliant 3\". Registered: OASIS+ (GSA One Acquisition Solution for Integrated Services Plus). Pass an exact parent contract id instead."
+  },
+  {
+   "id": "4.unresolved:CIO-SP4",
+   "pass": true,
+   "detail": "CIO-SP4 → unresolved: No authoritative mapping for vehicle \"CIO-SP4\". Registered: OASIS+ (GSA One Acquisition Solution for Integrated Services Plus). Pass an exact parent contract id instead."
+  },
+  {
+   "id": "4.unresolved:OASIS SB",
+   "pass": true,
+   "detail": "OASIS SB → unresolved: \"OASIS SB\" names an original-OASIS small-business pool, not OASIS+. Original OASIS is not registered here."
+  },
+  {
+   "id": "4.invalid_parent",
+   "pass": true,
+   "detail": "malformed id → unresolved"
+  },
+  {
+   "id": "5.no_parent_orders",
+   "pass": true,
+   "detail": "parent with no orders in population → no_parent_orders"
+  },
+  {
+   "id": "5.zero_matching",
+   "pass": true,
+   "detail": "OASIS+ has 285 orders; 0 match \"submarine hull welding\" → zero_matching_orders"
+  },
+  {
+   "id": "5.unattributed_reported",
+   "pass": true,
+   "detail": "orders matching \"management consulting\" whose parent is NOT recorded (cannot be attributed): 11"
+  },
+  {
+   "id": "6.pagination",
+   "pass": true,
+   "detail": "23 unique ids across pages of 7 == total 23; a second pass returns the identical order"
+  },
+  {
+   "id": "6.map_counts",
+   "pass": true,
+   "detail": "Map API via the shared link: mapped 15 + unmapped 8 = 23 · tool total 23"
+  },
+  {
+   "id": "6.map_pins",
+   "pass": true,
+   "detail": "Map pins (world bbox) == the tool's on-map orders: 15"
+  },
+  {
+   "id": "7.unscoped_legacy_shape",
+   "pass": true,
+   "detail": "unscoped search → legacy USASpending path, 10 orders, no scope fields"
+  }
+ ],
+ "evidence": {
+  "registry": {
+   "verified_at": "2026-09-24T21:47:46.529Z",
+   "source": "https://api.usaspending.gov/api/v2/awards/<parent_id>/ → latest_transaction_contract_data.solicitation_identifier",
+   "candidate_population": "distinct parent IDVs on orders in recompete_opportunities, parent agency in (4732, 4730, 4740)",
+   "candidates_checked": 5778,
+   "unresolved_candidates": 2,
+   "oasis_plus_members": 237
+  },
+  "oasis_plus_management_consulting": {
+   "request": {
+    "vehicle": "OASIS+",
+    "work": "management consulting",
+    "lead_months": 60
+   },
+   "status": "ok",
+   "total": 23,
+   "mapped_total": 15,
+   "unmapped_total": 8,
+   "parent_orders_in_population": 285,
+   "unattributed_orders": 11,
+   "map_url": "https://getmindy.ai/opportunity-map?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+   "population": "Active task/delivery orders in Mindy's Awarded table: period of performance not ended and ending within 60 months. Completed orders are not included.",
+   "orders": [
+    {
+     "contract_id": "CONT_AWD_W50S6W25FA007_9700_47QRCA25DS218_4732",
+     "piid": "W50S6W25FA007",
+     "recipient": "CASTRO & COMPANY, LLC",
+     "agency": "Department of Defense",
+     "period_end": "2026-09-28",
+     "parent_id": "CONT_IDV_47QRCA25DS218_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_HT001125FE011_9700_47QRCA25DU677_4732",
+     "piid": "HT001125FE011",
+     "recipient": "FORS MARSH GROUP LLC",
+     "agency": "Department of Defense",
+     "period_end": "2026-09-29",
+     "parent_id": "CONT_IDV_47QRCA25DU677_4732",
+     "parent_solicitation": "47QRCA23R0006",
+     "pool": "Unrestricted",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541690: Other Scientific and Technical Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_HT001426FE049_9700_47QRCA25DS330_4732",
+     "piid": "HT001426FE049",
+     "recipient": "CICONIX, LLC",
+     "agency": "Department of Defense",
+     "period_end": "2026-10-20",
+     "parent_id": "CONT_IDV_47QRCA25DS330_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_W912CH26FA087_9700_47QRCA25DU100_4732",
+     "piid": "W912CH26FA087",
+     "recipient": "DELOITTE CONSULTING LLP",
+     "agency": "Department of Defense",
+     "period_end": "2026-10-31",
+     "parent_id": "CONT_IDV_47QRCA25DU100_4732",
+     "parent_solicitation": "47QRCA23R0006",
+     "pool": "Unrestricted",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "description"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_FA701426F0012_9700_47QRCA24DW272_4732",
+     "piid": "FA701426F0012",
+     "recipient": "TLN WORLDWIDE ENTERPRISES, INC.",
+     "agency": "Department of Defense",
+     "period_end": "2026-12-22",
+     "parent_id": "CONT_IDV_47QRCA24DW272_4732",
+     "parent_solicitation": "47QRCA23R0005",
+     "pool": "WOSB",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_70T04026F7672N004_7013_47QRCA25DSA92_4732",
+     "piid": "70T04026F7672N004",
+     "recipient": "ASCENDING1-JV LLC",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-01-27",
+     "parent_id": "CONT_IDV_47QRCA25DSA92_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description",
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_70Z02326FMER10004_7008_47QRCA25DU391_4732",
+     "piid": "70Z02326FMER10004",
+     "recipient": "EAGLE HARBOR, LLC",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-02-10",
+     "parent_id": "CONT_IDV_47QRCA25DU391_4732",
+     "parent_solicitation": "47QRCA23R0006",
+     "pool": "Unrestricted",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description",
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541690: Other Scientific and Technical Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_HS002125FE093_9700_47QRCA25DSD46_4732",
+     "piid": "HS002125FE093",
+     "recipient": "PROFESSIONAL SOLUTIONS1 LLC",
+     "agency": "Department of Defense",
+     "period_end": "2027-02-12",
+     "parent_id": "CONT_IDV_47QRCA25DSD46_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_70RFP126FRE100008_7001_47QRCA25DV106_4732",
+     "piid": "70RFP126FRE100008",
+     "recipient": "ENPROVERA CORP",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-02-28",
+     "parent_id": "CONT_IDV_47QRCA25DV106_4732",
+     "parent_solicitation": "47QRCA23R0004",
+     "pool": "SDVOSB",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_15M10326FA4700311_1544_47QRCA26DW022_4732",
+     "piid": "15M10326FA4700311",
+     "recipient": "NORTH STAR SERVICES GROUP LLC",
+     "agency": "Department of Justice",
+     "period_end": "2027-03-21",
+     "parent_id": "CONT_IDV_47QRCA26DW022_4732",
+     "parent_solicitation": "47QRCA23R0005",
+     "pool": "WOSB",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_FA489025F0049_9700_47QRCA25DS877_4732",
+     "piid": "FA489025F0049",
+     "recipient": "TECHNOLOGY AND TELECOMMUNICATIONS CONSULTANTS, INC.",
+     "agency": "Department of Defense",
+     "period_end": "2027-05-19",
+     "parent_id": "CONT_IDV_47QRCA25DS877_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description",
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_1331L526F13501133_1301_47QRCA25DS230_4732",
+     "piid": "1331L526F13501133",
+     "recipient": "TRIDENT TECHNICAL SOLUTIONS, LLC",
+     "agency": "Department of Commerce",
+     "period_end": "2027-06-03",
+     "parent_id": "CONT_IDV_47QRCA25DS230_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_693JJ326F00079N_6925_47QRCA25DSE54_4732",
+     "piid": "693JJ326F00079N",
+     "recipient": "GMG MANAGEMENT CONSULTING INC.",
+     "agency": "Department of Transportation",
+     "period_end": "2027-06-21",
+     "parent_id": "CONT_IDV_47QRCA25DSE54_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description",
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_70Z02326FDPR10006_7008_47QRCA25DU421_4732",
+     "piid": "70Z02326FDPR10006",
+     "recipient": "JAVA PRODUCTIONS, INC.",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-06-23",
+     "parent_id": "CONT_IDV_47QRCA25DU421_4732",
+     "parent_solicitation": "47QRCA23R0006",
+     "pool": "Unrestricted",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541690: Other Scientific and Technical Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_70Z02326F83500001_7008_47QRCA24DV279_4732",
+     "piid": "70Z02326F83500001",
+     "recipient": "DICON LLC",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-07-16",
+     "parent_id": "CONT_IDV_47QRCA24DV279_4732",
+     "parent_solicitation": "47QRCA23R0004",
+     "pool": "SDVOSB",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_70Z02326FBOPS0001_7008_47QRCA25DS872_4732",
+     "piid": "70Z02326FBOPS0001",
+     "recipient": "TECHPRIDE-JPI JV, LLC",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-07-21",
+     "parent_id": "CONT_IDV_47QRCA25DS872_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_1331L526F13501172_1301_47QRCA25DA298_4732",
+     "piid": "1331L526F13501172",
+     "recipient": "SUNSTONE TECHNICAL GROUP, LLC",
+     "agency": "Department of Commerce",
+     "period_end": "2027-07-31",
+     "parent_id": "CONT_IDV_47QRCA25DA298_4732",
+     "parent_solicitation": "47QRCA23R0002",
+     "pool": "8(a)",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_70CMSD26FR0000070_7012_47QRCA25DV125_4732",
+     "piid": "70CMSD26FR0000070",
+     "recipient": "INTEGRATED FINANCE AND ACCOUNTING SOLUTIONS, LLC.",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-08-27",
+     "parent_id": "CONT_IDV_47QRCA25DV125_4732",
+     "parent_solicitation": "47QRCA23R0004",
+     "pool": "SDVOSB",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description",
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_1331L526F13351298_1301_47QRCA25DS127_4732",
+     "piid": "1331L526F13351298",
+     "recipient": "BREAKFORTH SOLUTIONS INCORPORATED",
+     "agency": "Department of Commerce",
+     "period_end": "2027-09-29",
+     "parent_id": "CONT_IDV_47QRCA25DS127_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_70CMSD26FR0000094_7012_47QRCA25DSB51_4732",
+     "piid": "70CMSD26FR0000094",
+     "recipient": "HAMILTON ENTERPRISES, LLC",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-09-29",
+     "parent_id": "CONT_IDV_47QRCA25DSB51_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_70RDA225FR0000056_7001_47QRCA25DSD83_4732",
+     "piid": "70RDA225FR0000056",
+     "recipient": "RED CARROT INC",
+     "agency": "Department of Homeland Security",
+     "period_end": "2027-09-29",
+     "parent_id": "CONT_IDV_47QRCA25DSD83_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": true
+    },
+    {
+     "contract_id": "CONT_AWD_49100426F0169_4900_47QRCA24DW309_4732",
+     "piid": "49100426F0169",
+     "recipient": "CHAINBRIDGE SOLUTIONS INCORPORATED",
+     "agency": "National Science Foundation",
+     "period_end": "2027-09-30",
+     "parent_id": "CONT_IDV_47QRCA24DW309_4732",
+     "parent_solicitation": "47QRCA23R0005",
+     "pool": "WOSB",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    },
+    {
+     "contract_id": "CONT_AWD_75P00125F80153_7570_47QRCA25DSF80_4732",
+     "piid": "75P00125F80153",
+     "recipient": "BANYAN COMMUNICATIONS, INC.",
+     "agency": "Department of Health and Human Services",
+     "period_end": "2027-12-29",
+     "parent_id": "CONT_IDV_47QRCA25DSF80_4732",
+     "parent_solicitation": "47QRCA23R0001",
+     "pool": "Total Small Business",
+     "work_evidence": [
+      {
+       "term": "management",
+       "fields": [
+        "psc_description"
+       ]
+      },
+      {
+       "term": "consulting",
+       "fields": [
+        "naics_title(541612: Human Resources Consulting Services)"
+       ]
+      }
+     ],
+     "on_map": false
+    }
+   ]
+  },
+  "exact_parent": {
+   "parent_id": "CONT_IDV_47QRCA25DU100_4732",
+   "total": 10,
+   "map_url": "https://getmindy.ai/opportunity-map?mode=recompete&horizon=recompete&parent=CONT_IDV_47QRCA25DU100_4732&leadMax=60",
+   "order_ids": [
+    "CONT_AWD_FA810025FB012_9700_47QRCA25DU100_4732",
+    "CONT_AWD_W912CH26FA087_9700_47QRCA25DU100_4732",
+    "CONT_AWD_70B04C25F00001307_7014_47QRCA25DU100_4732",
+    "CONT_AWD_FA489026F0045_9700_47QRCA25DU100_4732",
+    "CONT_AWD_70RDA225FR0000014_7001_47QRCA25DU100_4732",
+    "CONT_AWD_70B03C26F00000328_7014_47QRCA25DU100_4732",
+    "CONT_AWD_70B03C26F00000361_7014_47QRCA25DU100_4732",
+    "CONT_AWD_70B03C26F00000367_7014_47QRCA25DU100_4732",
+    "CONT_AWD_36C10X26F0043_3600_47QRCA25DU100_4732",
+    "CONT_AWD_70US0926F2GSA2290_7009_47QRCA25DU100_4732"
+   ]
+  },
+  "negative_controls": {
+   "original_oasis_parents_sampled": [
+    "CONT_IDV_47QRAD20D1103_4732",
+    "CONT_IDV_47QRAD20D3006_4732",
+    "CONT_IDV_47QRAD20DU140_4732",
+    "CONT_IDV_47QRAD19DU206_4732",
+    "CONT_IDV_47QRAD20D8141_4732",
+    "CONT_IDV_47QRAD18D000K_4732",
+    "CONT_IDV_GS00Q14OADS206_4732",
+    "CONT_IDV_GS00Q14OADU216_4732",
+    "CONT_IDV_GS00Q14OADS204_4732",
+    "CONT_IDV_47QRAD18D000T_4732",
+    "CONT_IDV_GS00Q14OADU210_4732",
+    "CONT_IDV_47QRAD18D000X_4732",
+    "CONT_IDV_47QRAD20D1146_4732",
+    "CONT_IDV_47QRAD20D3089_4732",
+    "CONT_IDV_47QRAD20D4032_4732",
+    "CONT_IDV_47QRAD20D6001_4732",
+    "CONT_IDV_47QRAD20D1135_4732",
+    "CONT_IDV_GS00Q14OADS144_4732",
+    "CONT_IDV_47QRAD20D8107_4732",
+    "CONT_IDV_47QRAD20D1082_4732",
+    "CONT_IDV_47QRAD20D1154_4732",
+    "CONT_IDV_47QRAD18D000H_4732",
+    "CONT_IDV_47QRAD18D0008_4732",
+    "CONT_IDV_GS00Q14OADU204_4732",
+    "CONT_IDV_GS00Q14OADU217_4732",
+    "CONT_IDV_GS00Q14OADU223_4732",
+    "CONT_IDV_47QRAD20D1149_4732",
+    "CONT_IDV_47QRAD20D8208_4732",
+    "CONT_IDV_47QRAD20D8202_4732",
+    "CONT_IDV_47QRAD20D8207_4732",
+    "CONT_IDV_47QRAD20D3120_4732",
+    "CONT_IDV_GS00Q14OADU417_4732",
+    "CONT_IDV_GS00Q14OADU405_4732",
+    "CONT_IDV_GS00Q14OADS430_4732",
+    "CONT_IDV_GS00Q14OADS621_4732",
+    "CONT_IDV_GS00Q14OADS616_4732",
+    "CONT_IDV_GS00Q14OADS619_4732",
+    "CONT_IDV_47QRAD20DU128_4732",
+    "CONT_IDV_GS00Q14OADS610_4732",
+    "CONT_IDV_GS00Q14OADU430_4732",
+    "CONT_IDV_GS00Q14OADU132_4732",
+    "CONT_IDV_47QRAD20D4005_4732",
+    "CONT_IDV_GS00Q14OADU108_4732",
+    "CONT_IDV_GS00Q14OADU309_4732",
+    "CONT_IDV_47QRAD20D8133_4732",
+    "CONT_IDV_GS00Q14OADU119_4732",
+    "CONT_IDV_47QRAD20DU104_4732",
+    "CONT_IDV_47QRAD20D1059_4732",
+    "CONT_IDV_GS00Q14OADU130_4732",
+    "CONT_IDV_47QRAD20D8127_4732",
+    "CONT_IDV_47QRAD20DU112_4732",
+    "CONT_IDV_47QRAD20D1089_4732",
+    "CONT_IDV_47QRAD20D8149_4732",
+    "CONT_IDV_47QRAD20D8156_4732",
+    "CONT_IDV_47QRAD20D3166_4732",
+    "CONT_IDV_47QRAD18D000Y_4732",
+    "CONT_IDV_47QRAD20D1175_4732",
+    "CONT_IDV_GS00Q14OADS723_4732",
+    "CONT_IDV_47QRAD20D8303_4732",
+    "CONT_IDV_47QRAD20D8174_4732",
+    "CONT_IDV_47QRAD18D000J_4732",
+    "CONT_IDV_47QRAD20D8154_4732",
+    "CONT_IDV_GS00Q14OADS417_4732",
+    "CONT_IDV_GS00Q14OADU616_4732",
+    "CONT_IDV_GS00Q14OADS608_4732",
+    "CONT_IDV_GS00Q14OADS732_4732",
+    "CONT_IDV_GS00Q14OADS721_4732",
+    "CONT_IDV_GS00Q14OADS411_4732",
+    "CONT_IDV_GS00Q14OADU614_4732",
+    "CONT_IDV_47QRAD20D8179_4732",
+    "CONT_IDV_47QRAD20D1016_4732",
+    "CONT_IDV_GS00Q14OADS437_4732",
+    "CONT_IDV_GS00Q14OADS609_4732",
+    "CONT_IDV_GS00Q14OADS708_4732",
+    "CONT_IDV_GS00Q14OADS737_4732",
+    "CONT_IDV_GS00Q14OADU425_4732",
+    "CONT_IDV_47QRAD20D1203_4732",
+    "CONT_IDV_47QRAD20D1169_4732",
+    "CONT_IDV_47QRAD20D1043_4732",
+    "CONT_IDV_47QRAD20D8152_4732",
+    "CONT_IDV_47QRAD20D1081_4732",
+    "CONT_IDV_47QRAD20D1198_4732",
+    "CONT_IDV_47QRAD20DU340_4732",
+    "CONT_IDV_47QRAD19D1002_4732",
+    "CONT_IDV_47QRAD20D8162_4732",
+    "CONT_IDV_47QRAD20D1002_4732",
+    "CONT_IDV_47QRAD20D3071_4732",
+    "CONT_IDV_47QRAD20DU344_4732",
+    "CONT_IDV_GS00Q14OADU122_4732",
+    "CONT_IDV_GS00Q14OADU116_4732",
+    "CONT_IDV_GS00Q14OADU113_4732",
+    "CONT_IDV_GS00Q14OADU109_4732",
+    "CONT_IDV_47QRAD20D1047_4732",
+    "CONT_IDV_47QRAD20D3144_4732",
+    "CONT_IDV_GS00Q14OADU330_4732",
+    "CONT_IDV_47QRAD20D1174_4732",
+    "CONT_IDV_47QRAD20D8123_4732",
+    "CONT_IDV_47QRAD20D1005_4732",
+    "CONT_IDV_47QRAD20D1128_4732",
+    "CONT_IDV_47QRAD20D1097_4732",
+    "CONT_IDV_47QRAD20D3047_4732",
+    "CONT_IDV_47QRAD20D3123_4732",
+    "CONT_IDV_GS00Q14OADU125_4732",
+    "CONT_IDV_GS00Q14OADS142_4732",
+    "CONT_IDV_47QRAD20D8194_4732",
+    "CONT_IDV_47QRAD20D1062_4732",
+    "CONT_IDV_GS00Q14OADU340_4732",
+    "CONT_IDV_GS00Q14OADS330_4732",
+    "CONT_IDV_GS00Q14OADU213_4732",
+    "CONT_IDV_GS00Q14OADU112_4732",
+    "CONT_IDV_GS00Q14OADU137_4732",
+    "CONT_IDV_GS00Q14OADU114_4732",
+    "CONT_IDV_47QRAD19DU208_4732",
+    "CONT_IDV_47QRAD20D1102_4732",
+    "CONT_IDV_47QRAD20D1052_4732",
+    "CONT_IDV_GS00Q14OADU343_4732",
+    "CONT_IDV_47QRAD20D6002_4732",
+    "CONT_IDV_47QRAD20D3081_4732",
+    "CONT_IDV_GS00Q14OADU142_4732",
+    "CONT_IDV_47QRAD20D1213_4732",
+    "CONT_IDV_GS00Q14OADS301_4732",
+    "CONT_IDV_47QRAD20D3141_4732",
+    "CONT_IDV_47QRAD20D3023_4732",
+    "CONT_IDV_47QRAD20D4024_4732",
+    "CONT_IDV_GS00Q14OADS613_4732",
+    "CONT_IDV_GS00Q14OADU422_4732",
+    "CONT_IDV_GS00Q14OADU604_4732",
+    "CONT_IDV_GS00Q14OADS702_4732",
+    "CONT_IDV_GS00Q14OADS704_4732",
+    "CONT_IDV_GS00Q14OADU707_4732",
+    "CONT_IDV_GS00Q14OADU406_4732",
+    "CONT_IDV_GS00Q14OADS722_4732",
+    "CONT_IDV_GS00Q14OADU325_4732",
+    "CONT_IDV_47QRAD20D8153_4732"
+   ],
+   "mech_elec": {
+    "parent": "CONT_IDV_FA850124D0005_9700",
+    "total": 5
+   }
+  },
+  "unresolved": [
+   {
+    "vehicle": "OASIS",
+    "status": "unresolved",
+    "reason": "\"OASIS\" can mean the original GSA OASIS vehicle (solicitation GS00Q-13-DR-0002, not registered here) or OASIS+ (a different vehicle). Say \"OASIS+\" for OASIS+.",
+    "total": null
+   },
+   {
+    "vehicle": "Alliant 3",
+    "status": "unresolved",
+    "reason": "No authoritative mapping for vehicle \"Alliant 3\". Registered: OASIS+ (GSA One Acquisition Solution for Integrated Services Plus). Pass an exact parent contract id instead.",
+    "total": null
+   },
+   {
+    "vehicle": "CIO-SP4",
+    "status": "unresolved",
+    "reason": "No authoritative mapping for vehicle \"CIO-SP4\". Registered: OASIS+ (GSA One Acquisition Solution for Integrated Services Plus). Pass an exact parent contract id instead.",
+    "total": null
+   },
+   {
+    "vehicle": "OASIS SB",
+    "status": "unresolved",
+    "reason": "\"OASIS SB\" names an original-OASIS small-business pool, not OASIS+. Original OASIS is not registered here.",
+    "total": null
+   }
+  ],
+  "missing_vs_zero": {
+   "ghost": {
+    "status": "no_parent_orders",
+    "reason": "The requested parent/vehicle has no orders in this population (active orders ending within the window). That is a coverage statement, not evidence that no orders exist."
+   },
+   "zero": {
+    "status": "zero_matching_orders",
+    "reason": "The parent/vehicle has 285 order(s) in this population; none match the work subject/filters.",
+    "parent_orders_in_population": 285
+   },
+   "unattributed_for_management_consulting": 11
+  },
+  "map_agreement": {
+   "map_url": "https://getmindy.ai/opportunity-map?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+   "map_mapped": 15,
+   "map_unmapped": 8,
+   "map_pin_ids": [
+    "CONT_AWD_1331L526F13501133_1301_47QRCA25DS230_4732",
+    "CONT_AWD_693JJ326F00079N_6925_47QRCA25DSE54_4732",
+    "CONT_AWD_70RDA225FR0000056_7001_47QRCA25DSD83_4732",
+    "CONT_AWD_70RFP126FRE100008_7001_47QRCA25DV106_4732",
+    "CONT_AWD_70T04026F7672N004_7013_47QRCA25DSA92_4732",
+    "CONT_AWD_70Z02326F83500001_7008_47QRCA24DV279_4732",
+    "CONT_AWD_70Z02326FDPR10006_7008_47QRCA25DU421_4732",
+    "CONT_AWD_70Z02326FMER10004_7008_47QRCA25DU391_4732",
+    "CONT_AWD_FA489025F0049_9700_47QRCA25DS877_4732",
+    "CONT_AWD_FA701426F0012_9700_47QRCA24DW272_4732",
+    "CONT_AWD_HS002125FE093_9700_47QRCA25DSD46_4732",
+    "CONT_AWD_HT001125FE011_9700_47QRCA25DU677_4732",
+    "CONT_AWD_HT001426FE049_9700_47QRCA25DS330_4732",
+    "CONT_AWD_W50S6W25FA007_9700_47QRCA25DS218_4732",
+    "CONT_AWD_W912CH26FA087_9700_47QRCA25DU100_4732"
+   ]
+  },
+  "before_unscoped": {
+   "note": "Before this change a task-order search could not be restricted to a vehicle: this is the only query shape available (NAICS 541611), and its orders sit under any parent.",
+   "orders": [
+    {
+     "award": "CONT_AWD_AIDOAATO1500007_7200_AIDOAAI1500004_7200",
+     "parent_id": "CONT_IDV_AIDOAAI1500004_7200",
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_AIDGPOI030500032_7200_AIDGPOI000500032_7200",
+     "parent_id": "CONT_IDV_AIDGPOI000500032_7200",
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_AIDOAATO1500009_7200_AIDOAAI1500004_7200",
+     "parent_id": "CONT_IDV_AIDOAAI1500004_7200",
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_HHSM500201300118C_7530_-NONE-_-NONE-",
+     "parent_id": null,
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_W91CRB11C0053_9700_-NONE-_-NONE-",
+     "parent_id": null,
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_HHSM500201300099C_7530_-NONE-_-NONE-",
+     "parent_id": null,
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_AIDOAATO1500010_7200_AIDOAAI1500004_7200",
+     "parent_id": "CONT_IDV_AIDOAAI1500004_7200",
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_73351020F0071_7300_73351019D0001_7300",
+     "parent_id": "CONT_IDV_73351019D0001_7300",
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_W90BRJ10C0001_9700_-NONE-_-NONE-",
+     "parent_id": null,
+     "oasis_plus": false
+    },
+    {
+     "award": "CONT_AWD_FA701407C0009_9700_-NONE-_-NONE-",
+     "parent_id": null,
+     "oasis_plus": false
+    }
+   ]
+  }
+ }
+}

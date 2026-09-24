@@ -18,7 +18,7 @@
  * `.order('contract_id')`. The follow-ons sort with COLLATE "C" because the live path
  * (map-follow-ons.ts) sorts them in JavaScript — code-unit order, which is what "C" is.
  */
-import { SqlParams, opsSql, type ColumnTypes, type SqlType } from '@/lib/discovery/sql';
+import { SqlParams, opSql, opsSql, type ColumnTypes, type SqlType } from '@/lib/discovery/sql';
 import { mapsRecompeteSurfaceOps, type MapsRecompeteRequest, type SurfaceOp } from './maps-recompete-discovery';
 import { FOLLOW_ON_SOURCE } from './map-follow-ons';
 
@@ -52,6 +52,8 @@ const q = (col: string) => {
 };
 
 function surfaceSql(o: SurfaceOp, p: SqlParams): string {
+  // A logic list is the plan's own grammar — serialized by the same (closed, throwing) translator.
+  if (o.op === 'or') return opSql({ op: 'or', expr: o.expr }, RECOMPETE_COLUMN_TYPES, p);
   const t = RECOMPETE_COLUMN_TYPES[o.col] as SqlType | undefined;
   if (!t) throw new Error(`maps-recompete-sql: surface column not on the whitelist: ${o.col}`);
   switch (o.op) {

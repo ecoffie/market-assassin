@@ -100,8 +100,11 @@ describe('the delayed __applySavedSearch path cannot touch an ?opp= link', () =>
     // exact-opportunity destination 1-2s after boot.
     const at = MAP.indexOf("var posted=P('posted'), mode=P('mode'), horizon=P('horizon');");
     expect(at).toBeGreaterThan(-1);
-    const guard = MAP.slice(at, at + 400);
-    expect(guard).toMatch(/if\(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency\)return;/);
+    const guard = MAP.slice(at, at + 700);
+    // vehicle / parent / work (parent-contract scope, 2026-09-24) are MARKET params — a record link
+    // (?opp=) still carries none of them, so it still bails here.
+    expect(guard).toMatch(/if\(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency&&!vehicle&&!parent&&!work\)return;/);
+    expect(guard).not.toMatch(/P\('opp'\)/);
   });
 
   it('"opp" is not one of the params that IIFE reads', () => {
