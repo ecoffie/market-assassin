@@ -151,6 +151,21 @@ describe('recompete-map route — every rollout mode', () => {
     expect(JSON.stringify(body)).toBe(JSON.stringify(off.body));
     expect(logged.at(-1)).toMatchObject({ served: 'fallback', outcome: 'new_error', error: 'pooler timeout' });
   });
+  it('CANARY: a saturated pool is NOT queued behind — the old path serves at once and it is logged as busy', async () => {
+    const busy = Object.assign(new Error('compute-once: pool busy'), { name: 'ComputeOnceBusy' });
+    pgMock.mockRejectedValue(busy);
+    const off = await call({});
+    const { res, body } = await call({ RECOMPETE_COMPUTE_ONCE_MODE: 'canary', RECOMPETE_COMPUTE_ONCE_CANARY_PCT: '100' });
+    expect(res.headers.get('x-recompete-path')).toBe('fallback');
+    expect(JSON.stringify(body)).toBe(JSON.stringify(off.body));
+    expect(logged.at(-1)).toMatchObject({ served: 'fallback', outcome: 'new_busy' });
+  });
+  it('SHADOW: a saturated pool SKIPS the comparison — never recorded as a compute-once error', async () => {
+    pgMock.mockRejectedValue(Object.assign(new Error('compute-once: pool busy'), { name: 'ComputeOnceBusy' }));
+    const { res } = await call({ RECOMPETE_COMPUTE_ONCE_MODE: 'shadow', RECOMPETE_COMPUTE_ONCE_SHADOW: '1' });
+    expect(res.headers.get('x-recompete-path')).toBe('old');
+    expect(logged.at(-1)).toMatchObject({ served: 'old', compared: false, outcome: 'skipped_busy' });
+  });
   it('AUTHORITY: compute-once serves; a sampled verification against the old path is logged', async () => {
     pgMock.mockResolvedValue(NEW_READ);
     const { res, body } = await call({ RECOMPETE_COMPUTE_ONCE_MODE: 'authority', RECOMPETE_COMPUTE_ONCE_VERIFY: '1' });

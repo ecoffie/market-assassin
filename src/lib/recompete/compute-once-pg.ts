@@ -25,14 +25,28 @@ export function computeOnceDbUrl(env: Record<string, string | undefined> = proce
   return u.toString();
 }
 
+/**
+ * Thrown when this instance's pool has no free connection. We never QUEUE behind a busy slot: the shadow
+ * sample (2026-09-24) showed two concurrent broad-market statements (~5 s each) holding both slots, and
+ * the next four requests waiting the full connect timeout before failing. Serving a user means falling
+ * back to PostgREST immediately instead; comparing means skipping. Bounded DB concurrency is the point.
+ */
+export class ComputeOnceBusy extends Error {
+  constructor() { super('compute-once: pool busy'); this.name = 'ComputeOnceBusy'; }
+}
+/** By name, not instanceof: a bundler or a test's module reset can hand the caller a different class copy. */
+export const isComputeOnceBusy = (e: unknown) => (e as { name?: string } | null)?.name === 'ComputeOnceBusy';
+
 let pool: Pool | null = null;
+let poolMax = 2;
 function getPool(): Pool {
   if (pool) return pool;
   const url = computeOnceDbUrl();
   if (!url) throw new Error('compute-once: no Supabase pooler URL configured');
+  poolMax = Math.max(1, Number(process.env.RECOMPETE_PG_POOL_MAX) || 2);
   pool = new Pool({
     connectionString: url,
-    max: Math.max(1, Number(process.env.RECOMPETE_PG_POOL_MAX) || 2),
+    max: poolMax,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 3_000,
     ssl: { rejectUnauthorized: false },
@@ -58,7 +72,9 @@ export async function runComputeOnce(req: MapsRecompeteRequest, opts: OnePassOpt
   let client: PoolClient | null = null;
   let broken: Error | undefined;
   try {
-    client = await getPool().connect();
+    const p = getPool();
+    if (p.totalCount >= poolMax && p.idleCount === 0) throw new ComputeOnceBusy();
+    client = await p.connect();
     await client.query(`BEGIN READ ONLY; SET LOCAL statement_timeout = '${Math.max(500, Math.floor(timeoutMs))}ms';`);
     const r = await client.query(text, values);
     await client.query('COMMIT');

@@ -10,7 +10,7 @@ export interface ComputeOnceLogRow {
   served: 'old' | 'new' | 'fallback';
   forced: boolean;
   compared: boolean;
-  outcome: 'identical' | 'churn' | 'mismatch' | 'new_error' | 'old_error' | null;
+  outcome: 'identical' | 'churn' | 'mismatch' | 'new_error' | 'old_error' | 'new_busy' | 'skipped_busy' | null;
   mismatch_fields?: ComparedField[] | null;
   params: Record<string, string>;
   bbox: { west: number; south: number; east: number; north: number };
