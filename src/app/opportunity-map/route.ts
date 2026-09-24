@@ -1837,6 +1837,8 @@ const VIEWPORT_JS = `<script>
     // double-apply the same word (AND together, narrowing further than intended).
     var _kw=(typeof intent.keyword==='string')?intent.keyword:'';
     Q=_kw; window.__lastAppliedKeyword=_kw; // the box reflects the ACTUAL applied keyword
+    // The query the search bar applied is the query the URL carries (row 8). A user action.
+    if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
     // Reflect the "Filters N" badge (count of active filter groups) so the applied search shows there too.
     if(applied){ try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.office,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
       var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
@@ -1847,6 +1849,47 @@ const VIEWPORT_JS = `<script>
       if(intent.state){ try{ var _c=window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[intent.state]; if(_c && typeof map!=='undefined')map.setView(_c,6,{animate:true}); }catch(e){} }
       fetchView(); }
     return applied;
+  };
+  // ── AN AGENCY SUGGESTION IS AN AGENCY FILTER (canonical discovery Phase A row 8) ─────────
+  // Picking "Department of Veterans Affairs" from the search suggestions used to type the NAME
+  // into the keyword box (data-act="run"), so the map searched q="Department of Veterans Affairs"
+  // — a TEXT query over titles/descriptions — while the Agency control still read "Agency". The
+  // user chose a BUYER; the canonical input for a buyer is the agency param, which the server
+  // resolves whole-term (src/lib/discovery/buyer.ts). So a suggestion now sets FILT.agency, lights
+  // the Agency control, clears the typed fragment (it was only the lookup text), and refetches.
+  //
+  // Value sent: the preset's match needle when the name IS a preset (so the Agency pill checks
+  // that row), otherwise the agency's full official name. Deliberately NO substring fallback onto
+  // a preset: "Department of the Army" must not collapse into the broader DEFENSE needle — the
+  // server's whole-name resolution is the authority, not a client guess.
+  window.__agencyNeedleFor=function(name){
+    var nm=String(name||'').trim(); if(!nm)return '';
+    var pres=window.__AGENCY_PRESETS||[];
+    for(var i=0;i<pres.length;i++){
+      var pn=String(pres[i].name||''), pm=String(pres[i].match||'');
+      if(pn.toLowerCase()===nm.toLowerCase()||(pm&&pm.toLowerCase()===nm.toLowerCase()))return pm||pn;
+    }
+    return nm;
+  };
+  window.__applyAgencySuggestion=function(name){
+    var needle=window.__agencyNeedleFor(name); if(!needle)return false;
+    FILT.agency=needle;
+    var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=needle;
+    // Preset → the picker checks its row + owns the label. Anything else → show the name honestly.
+    if(window.__agSetFromVal)window.__agSetFromVal(needle);
+    var isPreset=(window.__AGENCY_PRESETS||[]).some(function(p){ return p&&p.match===needle; });
+    if(!isPreset){ var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=String(name);
+      var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('hasfilt'); }
+    // The typed text was the lookup for this buyer, not a keyword to AND with it.
+    Q=''; var zi=document.getElementById('zsearchInput'); if(zi)zi.value='';
+    window.__lastAppliedKeyword='';
+    if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
+    try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.office,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
+      var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
+      var _mb=document.getElementById('moreBtn'); if(_mb)_mb.classList.toggle('hasfilt',_n>0); }catch(e){}
+    try{ if(window.__track)window.__track('tool_use','map_agency_suggestion',{agency:String(needle).slice(0,80)}); }catch(e){}
+    fetchView();
+    return true;
   };
   // (Removed the header source badge — Eric 2026-07-27: the data source does NOT belong in the
   // sidebar header. Zillow credits the source on the LISTING/detail, not the results header. Our
@@ -1898,8 +1941,14 @@ const VIEWPORT_JS = `<script>
   //   unavailable — discovery.coverage 'unestablished': no forecast publisher for any requested buyer
   //   unknown     — the count itself could not be established (null) — Bug Prevention Rule #11
   // This used to be total:d.totalForFilters||0, which printed "0" for an unavailable Forecast.
+  //   needs_scope — discovery.status needs_positive_scope / needs_refinement: the QUERY cannot
+  //                 define a market (e.g. "-computers" alone — an exclusion with nothing to
+  //                 exclude it FROM). Nothing was searched, so there is no count at all; the
+  //                 server's refinement text is what the user sees, never "0 results".
   function horizonCount(d){
     var disc=(d&&d.discovery)||{};
+    if(disc.status==='needs_positive_scope'||disc.status==='needs_refinement')
+      return {total:null,state:'needs_scope',status:disc.status,refinement:String(disc.refinement||''),gaps:[]};
     var gaps=(disc.coverage_gaps||[]).map(function(g){return g&&g.requested;}).filter(Boolean);
     if(disc.coverage==='unestablished') return {total:null,state:'unavailable',gaps:gaps};
     if(!d||typeof d.totalForFilters!=='number') return {total:null,state:'unknown',gaps:gaps};
@@ -1908,6 +1957,7 @@ const VIEWPORT_JS = `<script>
   // Short label for a horizon count (Horizons dropdown). Never '0' for unavailable/unknown.
   function horizonCountLabel(c,fmt){
     if(!c) return '';
+    if(c.state==='needs_scope') return '\u2014';
     if(c.state==='unavailable') return 'n/a';
     if(c.state==='unknown') return '?';
     return fmt(c.total)+(c.state==='partial'?'*':'');
@@ -1917,6 +1967,7 @@ const VIEWPORT_JS = `<script>
     var out=[];
     ['open','recompete','forecast'].forEach(function(h){
       var c=counts&&counts[h]; if(!c) return;
+      if(c.state==='needs_scope') return;   // not a coverage fact — rendered by needsScopeNote()
       var name=h==='forecast'?'Forecasts':(h==='recompete'?'Recompetes':'Open');
       var who=c.gaps&&c.gaps.length?' for '+c.gaps.join(', '):'';
       if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
@@ -1924,6 +1975,16 @@ const VIEWPORT_JS = `<script>
       else if(c.state==='unknown') out.push(name+' count unavailable');
     });
     return out.join(' · ');
+  }
+  // The refinement the canonical plan returned, when EVERY enabled horizon says the query cannot
+  // define a market; '' otherwise. One plan drives all three horizons, so they agree — the first
+  // non-empty refinement is THE message. A fallback sentence covers an older server with no text.
+  function needsScopeNote(counts,enabled){
+    var en=(enabled||[]).filter(function(h){ return counts&&counts[h]; });
+    if(!en.length||en.length!==(enabled||[]).length)return '';
+    if(!en.every(function(h){ return counts[h].state==='needs_scope'; }))return '';
+    for(var i=0;i<en.length;i++){ var r=counts[en[i]].refinement; if(r)return r; }
+    return 'This search only says what to leave out. Add what you do sell \u2014 a capability, NAICS, agency or state.';
   }
   function updateHeader(){
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
@@ -1940,6 +2001,15 @@ const VIEWPORT_JS = `<script>
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     // Every enabled horizon UNAVAILABLE (e.g. Forecast only, agency=NOAA): say so — never "0 results",
     // and never keep a stale prior count either.
+    // NEEDS A POSITIVE SCOPE (canonical discovery decision 5): an exclusion-only query ("-computers")
+    // searched nothing. Say what to add — never "0 results", never a stale prior count.
+    if(window.__needsScope){
+      var _rcN=document.getElementById('rescount');
+      // Short on the sort row; the feed below carries the server's full refinement sentence.
+      if(_rcN){ _rcN.innerHTML='<span style="font-weight:700;color:var(--ink)">Nothing searched yet</span> <span style="font-weight:400;color:var(--sub)">\\u00b7 add what you sell</span>'; }
+      var _mcN=document.getElementById('mapCount'); if(_mcN)_mcN.hidden=true;
+      return;
+    }
     if(window.__coverageAllUnavailable){
       var _rc=document.getElementById('rescount');
       if(_rc)_rc.innerHTML='<span style="font-weight:700;color:var(--ink)">Unavailable</span> <span style="font-weight:400;color:var(--sub)">'+esc(window.__coverageNote||'')+'</span>';
@@ -2585,6 +2655,9 @@ const VIEWPORT_JS = `<script>
       // Coverage: every enabled horizon unavailable → the empty feed/header must say so, never "0".
       window.__coverageNote=coverageNote(window.__horizonCounts);
       window.__coverageAllUnavailable=_enabled.length>0 && _enabled.every(function(k){ var c=window.__horizonCounts[k]; return c&&c.state==='unavailable'; });
+      // A query that cannot define a market (needs_positive_scope / needs_refinement) → the feed and
+      // header show the refinement text, never an empty map that reads as "0 results".
+      window.__needsScope=needsScopeNote(window.__horizonCounts,_enabled);
       // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
       // could not be established; the line says so rather than implying everything is mapped.
       window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
@@ -2661,6 +2734,8 @@ const VIEWPORT_JS = `<script>
     document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',window.__horizons[h]); });
     if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     if(window.__mapRefetch)window.__mapRefetch();
+    // Horizon is part of the URL intent: keep an existing q/agency link describing what is on.
+    if(!window.__urlRestoring&&typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(false,true);
   };
   // Isolate ONE horizon the same way a human turns the others off (the ?mode= scope-link
   // gold master). Typed share URLs (?recompete= / ?forecast= / ?opp=) must land in THAT
@@ -3093,8 +3168,94 @@ const VIEWPORT_JS = `<script>
   // cluster/expand feel instant and correct even when the debounced fetch returns identical data.
   // render() only rebuilds pins/feed from OPPS — it never triggers a fetch — so this is safe.
   map.on('zoomend',function(){ try{ if(typeof render==='function')render(); }catch(e){} });
+  // ── THE QUERY LIVES IN THE URL (canonical discovery Phase A row 8, 2026-09-23) ─────────
+  // A typed search used to exist only in memory: reload or share and the query was gone, while
+  // the scope-link IIFE (BOOT_VIEW_JS) has read ?q= since 2026-08-15. So the URL now carries the
+  // query the user typed, via history.replaceState (no reload, no history entry per keystroke).
+  //
+  // ⚠️ THIS IS A URL WRITER, NOT A STATE WRITER. It never applies anything: every URL reader in
+  // this page (scope link, ?ss=, ?opp=, return continuity, entry/attribution) reads location.search
+  // ONCE, synchronously at boot. Nothing re-reads it later, so a replaceState cannot race a restore
+  // the way the ?naics=&state= alert link did (the 5,416 → 0 incident). It is called only from
+  // USER actions (typing, the search bar's Enter, an agency suggestion, the saved-search picker,
+  // Start fresh) — never from fetchView and never from __applySavedSearch, so a boot restore can
+  // never rewrite the link that booted it.
+  //
+  // dropContext: when the USER changes the query, the page no longer shows the saved search or
+  // the one record the URL named. ?ss= / ?opp= (and the other record ids) are dropped, together
+  // with the share markers that only mean something beside a record — otherwise a reload would
+  // boot TWO appliers (?ss= and ?q=), and a record link would carry a query that can delete its
+  // record (docs/engineering/record-links-vs-market-links.md). Market params (agency, naics, …)
+  // and attribution (utm_*) are left exactly as they were.
+  //
+  // Only the two datasets return continuity restores whole (open · recompete) carry a query.
+  // Players/DLA searches are a different dataset and are not remembered either.
+  //
+  // THE DISCOVERY INTENT IN THE URL = { q, agency, horizon } (Eric 2026-09-24, Option 1: "the
+  // horizon is part of the URL contract"). A query or buyer without the horizon it was run on is
+  // not reproducible: the same q on Open-only vs all three horizons is a different result set.
+  //   · q       — the typed query (Q)
+  //   · agency  — FILT.agency (the canonical agency input; the scope link resolves it back)
+  //   · horizon — the ACTIVE horizons, exactly, comma-joined in canonical order
+  //               (horizon=open · horizon=open,recompete,forecast …). Reuses the scope link's
+  //               existing horizon param; a set is needed because more than one can be on.
+  // horizon is written only beside q/agency: a bare map carries no intent, so the URL stays bare
+  // and return continuity may restore the remembered market as before.
+  var HZ_ORDER=['open','recompete','forecast'];
+  window.__activeHorizonParam=function(){
+    var h=window.__horizons||{};
+    return HZ_ORDER.filter(function(k){ return h[k]!==false; }).join(',');
+  };
+  // Pure: rewrite a location.search so it carries exactly the intent for the three managed keys.
+  // Every other param keeps its raw encoding and order. Returns the SAME string when nothing changes.
+  window.__mapQueryUrl=function(search,intent,dropContext){
+    intent=intent||{};
+    var src=String(search||''), s=src.charAt(0)==='?'?src.slice(1):src;
+    var parts=s?s.split('&'):[], keep=[], cur={q:'',agency:'',horizon:''};
+    function dec(v){ try{ return decodeURIComponent(v.split('+').join(' ')).trim(); }catch(e){ return v; } }
+    for(var i=0;i<parts.length;i++){
+      var p=parts[i]; if(!p)continue;
+      var k=p.split('=')[0];
+      if(k==='q'||k==='agency'||k==='horizon'){ if(!cur[k])cur[k]=dec(p.slice(k.length+1)); continue; }
+      keep.push(p);
+    }
+    var want={ q:String(intent.q||'').trim(), agency:String(intent.agency||'').trim(), horizon:'' };
+    if(want.q||want.agency)want.horizon=String(intent.horizon||'').trim();
+    if(cur.q===want.q&&cur.agency===want.agency&&cur.horizon===want.horizon)return src;
+    if(dropContext){
+      var CTX={ss:1,opp:1,company:1,buyer:1,recompete:1,forecast:1,sh:1,src:1};
+      keep=keep.filter(function(p){ return !CTX[p.split('=')[0]]; });
+    }
+    if(want.q)keep.push('q='+encodeURIComponent(want.q));
+    if(want.agency)keep.push('agency='+encodeURIComponent(want.agency));
+    if(want.horizon)keep.push('horizon='+encodeURIComponent(want.horizon).split('%2C').join(','));
+    return keep.length?('?'+keep.join('&')):'';
+  };
+  // onlyIfIntent: a keep-in-sync call (horizon toggle, agency picker, Filters apply, Clear all)
+  // only rewrites a URL that ALREADY carries discovery intent — it never turns a bare browse into
+  // a link. User actions that CREATE intent (typing, Enter, agency suggestion, saved-search pick,
+  // Start fresh) pass onlyIfIntent=false.
+  window.__syncQueryUrl=function(dropContext,onlyIfIntent){
+    try{
+      var mode=window.__mapMode||'open';
+      var cur=location.search||'';
+      if(/[?&]embed=/.test(cur))return;          // a host page's map is not this visitor's URL
+      if(onlyIfIntent&&!/[?&](q|agency|horizon)=/.test(cur))return;
+      // On Players / DLA the box and filters describe a different dataset: carry no Opportunities
+      // intent (and drop a stale one), never a Players term that would reopen as an Opportunities query.
+      var opp=(mode==='open'||mode==='recompete');
+      var intent={
+        q: opp&&typeof Q==='string'?Q:'',
+        agency: opp&&typeof FILT!=='undefined'&&FILT&&FILT.agency?String(FILT.agency):'',
+        horizon: window.__activeHorizonParam()
+      };
+      var next=window.__mapQueryUrl(cur,intent,!!dropContext);
+      if(next===cur)return;
+      history.replaceState(history.state,'',location.pathname+next+(location.hash||''));
+    }catch(e){}
+  };
   var zsi=document.getElementById('zsearchInput');
-  if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
+  if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); window.__syncQueryUrl(true); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
   // Server-wired filter controls → write FILT + refetch (no client-side hide). scope=profile
@@ -3501,7 +3662,9 @@ const VIEWPORT_JS = `<script>
       // Mirror into the Filters-panel Agency input so a later Filters "Apply" (readDeep reads mfAgency)
       // doesn't wipe this selection. (Two controls, one FILT.agency.)
       var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=FILT.agency;
-      setLabel(); setOpen(false); fetchView();
+      setLabel(); setOpen(false);
+      if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(false,true);
+      fetchView();
     }
     btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
     if(hdr)hdr.onclick=function(e){ e.stopPropagation(); var A=allNames(), n=Object.keys(working).length;
@@ -4010,7 +4173,7 @@ const VIEWPORT_JS = `<script>
   var _apply=document.getElementById('mfApply');
   // readDeep() returns false when the NAICS box still holds unresolved text — keep the panel OPEN
   // and do NOT fetch, so the inline error is visible next to the field the user must fix.
-  if(_apply)_apply.onclick=function(){ if(readDeep()===false)return; _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
+  if(_apply)_apply.onclick=function(){ if(readDeep()===false)return; _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(false,true); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
     ['mfNaics','mfPsc','mfFsc','mfAgency','mfOffice','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
@@ -4022,7 +4185,7 @@ const VIEWPORT_JS = `<script>
     document.querySelectorAll('.mf-set,.mf-notice,.mf-strategy').forEach(function(c){c.checked=false;});
     syncSegPillUI(); // reflect the cleared hidden inputs back onto the segmented/pill controls
     if(window.__naicsChips)window.__naicsChips.clear();   // chips + pending text + error all go
-    if(readDeep()!==false)fetchView();
+    if(readDeep()!==false){ if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(false,true); fetchView(); }
   };
   // Wire the Zillow segmented controls (.mf-seg → a hidden checkbox) + single-select pill groups
   // (.mf-pillsel → a hidden select). Clicking a button sets the hidden input's value/checked and
@@ -8736,6 +8899,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // a synthetic {mode, filters, bbox}. So URL params and saved-search JSON share ONE vocabulary
   // and one apply path; a second hand-rolled FILT write here is exactly the lib-duplicate drift
   // this codebase keeps getting bitten by. No bbox: a scope link should not move the viewport.
+  // ⚠️ A ?q= written by the search bar (window.__syncQueryUrl) is an EXPLICIT market link like any
+  // other: it stands the RETURN CONTINUITY restorer down, even when this browser's memory holds the
+  // same q. Eric (2026-09-23): "Any explicit discovery intent in the URL suppresses conflicting/
+  // restored discovery memory. Equality of one field does not authorize restoring the rest of the
+  // remembered market." So a reload after typing restores the query only — by design.
   (function(){ try{
     function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
     var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
@@ -8769,6 +8937,14 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           if(mt2&&agency.toUpperCase().indexOf(mt2.toUpperCase())>=0){ needle=mt2; break; }
         }
         f.agency=needle||agency;
+        // A pipe-joined set (the URL writer emits FILT.agency verbatim) resolves per needle — the
+        // substring fallback above would otherwise collapse "DEFENSE|ENERGY" to DEFENSE alone.
+        if(agency.indexOf('|')>=0){
+          f.agency=agency.split('|').map(function(a){ a=a.trim(); if(!a)return '';
+            for(var k=0;k<pres.length;k++){ var n2=String(pres[k].name||''), m2=String(pres[k].match||'');
+              if(n2.toLowerCase()===a.toLowerCase()||m2.toLowerCase()===a.toLowerCase())return m2; }
+            return a; }).filter(Boolean).join('|');
+        }
       }
       if(naics)f.naics=naics;            // comma-joined, the shape FILT.naics already uses
       if(psc)f.psc=psc;
@@ -8802,16 +8978,43 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // works while doing nothing, the exact defect this file already warns about for ?posted=.
       // So an office link implies the Players/buyers dataset unless the URL names another mode.
       // mode is canonical; horizon is an alias when mode is absent.
-      var _horizonMode = (!mode && horizon && {recompete:1,forecast:1,open:1}[horizon]) ? horizon : '';
-      var _mode = mode || _horizonMode || (office ? 'companies' : (window.__mapMode||'open'));
+      // ── HORIZON IS PART OF THE URL CONTRACT (Eric 2026-09-24, Option 1) ─────────────────
+      // horizon= is the EXACT set of active horizons, comma-joined (horizon=forecast ·
+      // horizon=open,recompete,forecast). The search bar's URL writer (window.__syncQueryUrl) emits
+      // it beside every q/agency it writes, so reload and a copied link reopen the same horizons.
+      // An explicit set is applied EXACTLY (f.horizons → __applySavedSearch → toggleHorizon) — never
+      // the Open-only fallback below, and never browser memory (the restorer stands down on any
+      // horizon=). It no longer switches the DATASET mode: it names horizons on the Opportunities
+      // map (?mode= remains the dataset switch, and still wins for the mode when both are present).
+      var _hzSet=[];
+      if(horizon){
+        var _seen={};
+        horizon.split(',').forEach(function(h){ h=h.trim().toLowerCase(); if({open:1,recompete:1,forecast:1}[h]&&!_seen[h]){ _seen[h]=1; _hzSet.push(h); } });
+      }
+      if(_hzSet.length){
+        f.horizons={open:!!_seen.open,recompete:!!_seen.recompete,forecast:!!_seen.forecast};
+      } else if(q && !mode){
+        // LEGACY ?q= WITH NO HORIZON (links written before the contract): the documented default
+        // Maps horizon policy — ALL THREE ON (window.__horizons init, "Default: ALL THREE ON",
+        // Eric 2026-08-12) — set explicitly, never inherited from browser memory.
+        f.horizons={open:true,recompete:true,forecast:true};
+      }
+      var _mode = mode || (office ? 'companies' : (window.__mapMode||'open'));
       if(_mode==='buyers')_mode='companies';
       var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
       var DATASET={buyers:1,companies:1,grants:1};
       var applyScopeLink=function(){
-        window.__applySavedSearch({ mode:_mode, filters:f });
-        if(_mode&&HZ[_mode]&&typeof window.__isolateHorizon==='function'){
-          try{ window.__isolateHorizon(HZ[_mode]); }catch(e){}
-        }
+        // Horizon toggles during this restore must not rewrite the link being restored.
+        window.__urlRestoring=true;
+        try{
+          window.__applySavedSearch({ mode:_mode, filters:f });
+          // Legacy isolation (unchanged for agency/naics/… links without q or horizon): an explicit
+          // ?mode= isolates that horizon; otherwise the pre-existing _mode fallback applies. Skipped
+          // whenever the link states its horizons (f.horizons) — the URL is exact, not a fallback.
+          if(!f.horizons&&_mode&&HZ[_mode]&&typeof window.__isolateHorizon==='function'){
+            try{ window.__isolateHorizon(HZ[_mode]); }catch(e){}
+          }
+        } finally { window.__urlRestoring=false; }
       };
       // Players dataset links (?mode=buyers, ?company=, office-implied buyers) must intercept
       // BEFORE __applySavedSearch — otherwise filters fetch on Opportunities and the count sits
@@ -8839,6 +9042,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // A MARKET link (?ss= ?agency= ?naics= ?strategy= ...) already says which
     // market to open. Either way the URL is the more recent instruction and the
     // memory stands down. ?embed= is a host page's map, not this visitor's.
+    // NO field-equality exception: a ?q= equal to the remembered q still stands the memory down
+    // (Eric 2026-09-23 — equality of one field never authorizes restoring the rest).
     if(/[?&](ss|opp|company|buyer|recompete|forecast|strategy|agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|embed)=/.test(qs))return;
     var raw=''; try{ raw=localStorage.getItem('mi_map_last_search')||''; }catch(e){ return; }
     if(!raw)return;
@@ -8894,6 +9099,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           // Half-clearing (filters but not q, or filters but not horizons) would leave
           // the map narrowed with nothing on screen saying so.
           try{ window.__applySavedSearch({mode:'open',filters:{horizons:{open:true,recompete:false,forecast:false}}}); }catch(e){}
+          // …and the URL: a query typed since the restore would otherwise come back on reload.
+          try{ if(window.__syncQueryUrl)window.__syncQueryUrl(true); }catch(e){}
           try{ pill.remove(); }catch(e){}
         };
         pill.appendChild(x); host.appendChild(pill);
@@ -9197,7 +9404,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
         // "Run report" lives on each SAVED SEARCH card (/opportunity-map/saved),
         // beside "View on map", where the market is already defined.
         if(ags.length){ h+='<div class="zsp-h">Agencies</div>';
-          ags.slice(0,4).forEach(function(g){ var nm=g.name||g.shortName||''; if(!nm)return; var abbr=(g.shortName&&g.shortName!==nm)?g.shortName:''; h+='<button class="zsp-row" data-act="run" data-q="'+esc(nm)+'">'+ICON.bldg+'<span>'+esc(nm)+'</span>'+(abbr?'<span class="sub">'+esc(abbr)+'</span>':'')+'</button>'; }); }
+          ags.slice(0,4).forEach(function(g){ var nm=g.name||g.shortName||''; if(!nm)return; var abbr=(g.shortName&&g.shortName!==nm)?g.shortName:''; h+='<button class="zsp-row" data-act="agency" data-agency="'+esc(nm)+'">'+ICON.bldg+'<span>'+esc(nm)+'</span>'+(abbr?'<span class="sub">'+esc(abbr)+'</span>':'')+'</button>'; }); }
         if(res.length){ h+='<div class="zsp-h">Codes</div>';
           res.slice(0,6).forEach(function(x){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(x.code)+'"><span class="code">'+esc(x.type.toUpperCase())+' '+esc(x.code)+'</span><span class="sub">'+esc(x.name)+'</span></button>'; }); }
         if(!ags.length && !res.length){ h+='<div class="zsp-empty">Press Enter to search \\u201c'+esc(q)+'\\u201d across titles, agencies &amp; descriptions.</div>'; }
@@ -9230,6 +9437,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
       .then(function(d){
         if(!d||!d.success||!d.total) return;
         if(!panel || !panel.isConnected) return;
+        if((input.value||'').trim()!==q) return;   // never a stale query's count (see needs-positive-scope test)
         var b=document.createElement('button');
         b.className='zsp-row zsp-unplaced';
         b.setAttribute('data-act','unplaced');
@@ -9358,10 +9566,19 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+    // An agency suggestion is a BUYER, not a keyword: apply it as the agency filter (row 8).
+    // Falls back to the old keyword run only if the bridge is missing (a partial deploy).
+    else if(act==='agency'){ var an=el.getAttribute('data-agency')||'';
+      if(an && typeof window.__applyAgencySuggestion==='function' && window.__applyAgencySuggestion(an)){ close(); input.blur(); }
+      else runSearch(an); }
     else if(act==='unplaced'){ location.href='/opportunity-map/forecasts?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
-      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
+      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss);
+        // Picking a saved search is a user action: the URL now carries ITS query (or none), never
+        // the one typed before it. The restorer itself never writes the URL.
+        if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
+        close(); input.blur(); }
       else { location.href='/opportunity-map/saved'; } }
   });
   // Close on outside click.

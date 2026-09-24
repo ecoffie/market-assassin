@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Maps client — canonical discovery row 8 (query in URL · agency suggestion · needs_positive_scope)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-24 | Maps / discovery intent in URL | The URL carries the explicit discovery intent { q, agency, horizon } — horizon = the EXACT active set, comma-joined, reusing the scope link's horizon param (Eric: "the horizon is part of the URL contract"). Written by history.replaceState from user actions (typing, Enter, agency suggestion, saved-search pick, Start fresh) and kept in sync on an existing intent URL by horizon toggle / agency picker / Filters apply+clear — never from fetchView / __applySavedSearch / setMapMode, and never during a scope-link restore (__urlRestoring). Reader: an explicit horizon set is applied exactly (no Open-only fallback); a legacy ?q= with no horizon gets the documented default (all three on); legacy agency/naics links unchanged. Any explicit intent stands the localStorage restore down (no q-equality exception) | `window.__activeHorizonParam=function(){` → `src/app/opportunity-map/route.ts` | `query-in-url.unit.test.ts` (37; Open fallback on an explicit set → 7 red; legacy default removed → 3 red); headless on the preview per horizon: search → URL → reload → fresh browser identical q + horizon + count | PR open |
+| 2026-09-23 | Maps / agency suggestion | Agency rows were `data-act="run"` (typed the name as q). Now `data-act="agency"` → `__applyAgencySuggestion`: FILT.agency (preset needle or full name, no substring collapse), pill + badge, clears q | `window.__applyAgencySuggestion=function(name){` → `src/app/opportunity-map/route.ts` | `agency-suggestion-filter.unit.test.ts` (10); headless: "Department of Veterans Affairs" → requests carry `agency=VETERANS%20AFFAIRS`, 0 carry `q=veterans` | PR open |
+| 2026-09-23 | Maps / needs_positive_scope | `horizonCount` gains `needs_scope`; header "Nothing searched yet", feed shows the server refinement — never "0 results"; stale unplaced-forecast count no longer appended under a newer query | `function needsScopeNote(counts,enabled){` → `src/app/opportunity-map/route.ts` | `needs-positive-scope.unit.test.ts` (15, real prod response shapes); headless: `-computers` → refinement; `541512 -computers` → 13 results | PR open |
+
 ## Contacts — DoDAAC-prefix lookup indexed + degraded ≠ zero
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
