@@ -47,15 +47,20 @@ import { buildEmail } from '@/lib/alerts/saved-search-email';
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
 import { toAlertRow, type ForecastRowForAlert } from '@/lib/alerts/forecast-alert-row';
 import { reportCronOutcome } from '@/lib/cron-self-report';
-import { contextFor } from '@/lib/discovery';
 import {
-  fetchSavedSearchForecasts,
   forecastCoverageNotice,
   resolveForecastEngine,
   type ForecastEngine,
   type ForecastHorizonOutcome,
 } from '@/lib/saved-searches/forecast-discovery';
 import { decideSavedSearchAlert } from '@/lib/saved-searches/alert-decision';
+import {
+  evaluateForecastWatermark,
+  readForecastSnapshot,
+  readPublisherFloors,
+  stateFromRow,
+  stateToColumns,
+} from '@/lib/saved-searches/forecast-watermark';
 import {
   SAVED_SEARCH_ALERT_BATCH_SIZE,
   SAVED_SEARCH_ALERT_ROW_CEILING,
@@ -84,6 +89,9 @@ const MINDY_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai';
 const JOB_NAME = 'saved-search-alerts';
 const DUE_SELECT =
   'id, user_email, name, mode, filters, alert_frequency, last_seen_notice_ids, total_alerts_sent, last_alerted_at';
+// The watermark columns exist only after 20260924_saved_search_forecast_watermark.sql; the legacy engine
+// never selects them, so deploying this code before the migration cannot break the legacy cron.
+const DUE_SELECT_CANONICAL = `${DUE_SELECT}, forecast_seen_through, forecast_gap_since`;
 
 /**
  * Does this saved search want FORECASTS?
@@ -134,6 +142,10 @@ type PreviewRow = {
   forecastEngine?: ForecastEngine;
   forecastCoverage?: string;
   coverageNotices?: string[];
+  openNewCount?: number;
+  forecastNewCount?: number;
+  forecastWatermarkBefore?: string | null;
+  forecastWatermarkAfter?: string | null;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,9 +186,10 @@ function fetchDueSavedSearchBatch(
   dueFrequencies: readonly string[],
   excludeIds: readonly string[],
   limit: number,
+  select: string = DUE_SELECT,
 ) {
   return applyDueSavedSearchScope(
-    db.from('saved_searches').select(DUE_SELECT).limit(limit),
+    db.from('saved_searches').select(select).limit(limit),
     dueFrequencies,
     excludeIds,
   )
@@ -264,45 +277,28 @@ async function evaluateSavedSearch(
     opps = data || [];
   }
 
-  // Canonical Forecast coverage for this evaluation (canonical engine only). Travels with the counts
-  // and into the email so an unavailable/partial horizon is never read as a measured zero.
-  let forecastOutcome: ForecastHorizonOutcome | null = null;
+  // CANONICAL engine: the Forecast horizon runs on the created_at watermark, and last_seen_notice_ids
+  // becomes Open-only state. See evaluateCanonicalForecast.
+  if (doForecast && forecastEngine === 'canonical') {
+    return evaluateCanonicalForecast(db, s, opps, preview, previewRows);
+  }
 
   if (doForecast) {
     // Forecasts are the EARLIEST signal (6-18mo upstream) and the only corpus with no
     // push channel until now. Adapted into the same card shape so one email template
     // serves both — see src/lib/alerts/forecast-alert-row.ts.
-    if (forecastEngine === 'canonical') {
-      const fo = await fetchSavedSearchForecasts(db, s.filters, { ctx: contextFor(now) });
-      // A failed query is UNKNOWN: return before any state is stamped, exactly as the legacy engine.
-      if (fo.kind === 'failed') {
-        console.error('[saved-search-alerts] canonical forecast query failed:', fo.error);
-        return { failureClass: 'forecast_query_failed' };
-      }
-      forecastOutcome = fo;
-      if (fo.kind === 'measured') opps = opps.concat(fo.rows.map((r) => toAlertRow(r, MINDY_URL)));
-    } else {
-      try {
-        const fc = await fetchForecastMatches(db, s);
-        opps = opps.concat(fc.map((r) => toAlertRow(r, MINDY_URL)));
-      } catch {
-        return { failureClass: 'forecast_query_failed' };
-      }
+    try {
+      const fc = await fetchForecastMatches(db, s);
+      opps = opps.concat(fc.map((r) => toAlertRow(r, MINDY_URL)));
+    } catch {
+      return { failureClass: 'forecast_query_failed' };
     }
   }
-
-  const coverageNotice = forecastOutcome ? forecastCoverageNotice(forecastOutcome) : null;
-  const coverageNotices = coverageNotice ? [coverageNotice] : [];
-  const forecastCoverage: SavedSearchAlertEvalCounts['forecastCoverage'] = !forecastOutcome ? undefined
-    : forecastOutcome.kind === 'measured' ? (forecastOutcome.coverage === 'partial' ? 'partial' : 'covered')
-    : forecastOutcome.kind === 'unavailable' ? 'unavailable'
-    : forecastOutcome.kind === 'needs_refinement' ? 'needs_refinement' : undefined;
-  const cov = forecastCoverage ? { forecastCoverage } : {};
 
   // FIRST RUN (never alerted): snapshot the current matches as "seen" WITHOUT emailing —
   // else a brand-new saved search blasts every current match (200) as "new". Only opps
   // that appear AFTER this baseline are alerts. (Same pattern as pursuit-changes.)
-  // The rules live in decideSavedSearchAlert, shared by both Forecast engines.
+  // The rules live in decideSavedSearchAlert (Open under the canonical engine; Open + legacy Forecast here).
   const decision = decideSavedSearchAlert({
     lastAlertedAt: s.last_alerted_at,
     lastSeenIds: s.last_seen_notice_ids,
@@ -314,30 +310,27 @@ async function evaluateSavedSearch(
       const stamped = await stampSearchEvaluation(db, s.id, {
         last_seen_notice_ids: decision.nextSeen,
       });
-      if (!stamped) return { failureClass: 'state_update_failed', ...cov };
+      if (!stamped) return { failureClass: 'state_update_failed' };
     }
-    return { noMatches: 1, ...cov };
+    return { noMatches: 1 };
   }
 
   if (decision.action === 'no_new') {
     if (!preview) {
       const stamped = await stampSearchEvaluation(db, s.id, {});
-      if (!stamped) return { failureClass: 'state_update_failed', ...cov };
+      if (!stamped) return { failureClass: 'state_update_failed' };
     }
-    return { noMatches: 1, ...cov };
+    return { noMatches: 1 };
   }
 
   const fresh = decision.fresh;
 
   if (preview) {
-    previewRows.push({
-      email: s.user_email, name: s.name, newCount: fresh.length,
-      ...(forecastOutcome ? { forecastEngine, forecastCoverage, coverageNotices } : {}),
-    });
-    return { matched: 1, ...cov };
+    previewRows.push({ email: s.user_email, name: s.name, newCount: fresh.length });
+    return { matched: 1 };
   }
 
-  const { subject, html, text } = buildEmail(s, fresh, coverageNotices);
+  const { subject, html, text } = buildEmail(s, fresh);
   let ok = false;
   try {
     ok = await sendEmail({
@@ -345,15 +338,98 @@ async function evaluateSavedSearch(
       emailType: 'saved_search_alert', eventSource: 'saved_search',
     });
   } catch {
-    return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed', ...cov };
+    return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed' };
   }
 
-  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected', ...cov };
+  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected' };
 
   const cappedSeen = decision.nextSeenAfterSend;
   const stamped = await stampSearchEvaluation(db, s.id, {
     last_seen_notice_ids: cappedSeen,
     total_alerts_sent: (s.total_alerts_sent || 0) + 1,
+  });
+  if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed' };
+  return { matched: 1, sendAttempts: 1, sent: 1 };
+}
+
+/**
+ * CANONICAL engine for a Forecast-alerting search (SAVED_SEARCH_FORECAST_CANONICAL='true').
+ *
+ *   Forecast new = canonical plan ∧ covered publisher ∧ created_at ∈ (watermark, snapshot] ∧ > publisher floor.
+ *   Open new     = the existing decideSavedSearchAlert over last_seen_notice_ids — which now holds OPEN ids
+ *                  only (Forecast ids are never added), so neither horizon can evict the other's state.
+ *
+ * State moves in ONE update, and only when the run completed: after a successful send, or when there was
+ * nothing to send. A failed query / snapshot / floor read / send writes nothing. Unavailable and refused
+ * plans leave the Forecast watermark untouched. A NULL watermark baselines silently (safety net for new
+ * searches and missed migrations; production cutover uses scripts/saved-search-forecast-baseline.ts).
+ */
+async function evaluateCanonicalForecast(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  s: SavedSearch,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  openRows: any[],
+  preview: boolean,
+  previewRows: PreviewRow[],
+): Promise<SavedSearchAlertEvalCounts> {
+  // ONE immutable snapshot, taken at the start of the Forecast evaluation (DB clock, lagged).
+  const snap = await readForecastSnapshot(db);
+  if ('error' in snap) return { failureClass: 'forecast_query_failed' };
+  const fl = await readPublisherFloors(db);
+  if ('error' in fl) return { failureClass: 'forecast_query_failed' };
+  const before = stateFromRow(s);
+  const fo = await evaluateForecastWatermark(db, s.filters, before, { snapshot: snap.snapshot, floors: fl.floors });
+  if (fo.kind === 'failed') {
+    console.error('[saved-search-alerts] canonical forecast evaluation failed:', fo.error);
+    return { failureClass: 'forecast_query_failed' };
+  }
+
+  const forecastCoverage: SavedSearchAlertEvalCounts['forecastCoverage'] =
+    fo.kind === 'measured' ? (fo.coverage === 'partial' ? 'partial' : 'covered')
+    : fo.kind === 'unavailable' ? 'unavailable'
+    : fo.kind === 'needs_refinement' ? 'needs_refinement'
+    : 'baseline';
+  const cov = { forecastCoverage };
+  const notice = fo.kind === 'measured' || fo.kind === 'unavailable' || fo.kind === 'needs_refinement'
+    ? forecastCoverageNotice(fo as unknown as ForecastHorizonOutcome) : null;
+  const coverageNotices = notice ? [notice] : [];
+  // Forecast state: only a MEASURED run or a baseline moves it. Unavailable / refused → untouched.
+  const forecastState = fo.kind === 'measured' || fo.kind === 'baseline' ? stateToColumns(fo.nextState) : {};
+
+  const openDecision = decideSavedSearchAlert({ lastAlertedAt: s.last_alerted_at, lastSeenIds: s.last_seen_notice_ids, records: openRows });
+  const openFresh = openDecision.action === 'send' ? openDecision.fresh : [];
+  const openSeen = openDecision.action === 'baseline' ? { last_seen_notice_ids: openDecision.nextSeen }
+    : openDecision.action === 'send' ? { last_seen_notice_ids: openDecision.nextSeenAfterSend } : {};
+  const forecastFresh = fo.kind === 'measured' ? fo.rows.map((r) => toAlertRow(r, MINDY_URL)) : [];
+  const fresh = [...openFresh, ...forecastFresh];
+
+  if (preview) {
+    previewRows.push({
+      email: s.user_email, name: s.name, newCount: fresh.length, forecastEngine: 'canonical', forecastCoverage,
+      coverageNotices, openNewCount: openFresh.length, forecastNewCount: forecastFresh.length,
+      forecastWatermarkBefore: before.seenThrough, forecastWatermarkAfter: fo.kind === 'measured' || fo.kind === 'baseline' ? fo.nextState.seenThrough : before.seenThrough,
+    });
+    return fresh.length ? { matched: 1, ...cov } : { noMatches: 1, ...cov };
+  }
+
+  if (fresh.length === 0) {
+    const stamped = await stampSearchEvaluation(db, s.id, { ...openSeen, ...forecastState });
+    if (!stamped) return { failureClass: 'state_update_failed', ...cov };
+    return { noMatches: 1, ...cov };
+  }
+
+  const { subject, html, text } = buildEmail(s, fresh, coverageNotices);
+  let ok = false;
+  try {
+    ok = await sendEmail({ to: s.user_email, subject, html, text, emailType: 'saved_search_alert', eventSource: 'saved_search' });
+  } catch {
+    return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed', ...cov };
+  }
+  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected', ...cov };
+
+  const stamped = await stampSearchEvaluation(db, s.id, {
+    ...openSeen, ...forecastState, total_alerts_sent: (s.total_alerts_sent || 0) + 1,
   });
   if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed', ...cov };
   return { matched: 1, sendAttempts: 1, sent: 1, ...cov };
@@ -384,7 +460,9 @@ export async function GET(request: NextRequest) {
     rowCeiling: SAVED_SEARCH_ALERT_ROW_CEILING,
     timeBudgetMs: SAVED_SEARCH_ALERT_TIME_BUDGET_MS,
     fetchDueBatch: async ({ limit, excludeIds }) => {
-      const { data, error } = await fetchDueSavedSearchBatch(db, dueFrequencies, excludeIds, limit);
+      const { data, error } = await fetchDueSavedSearchBatch(
+        db, dueFrequencies, excludeIds, limit, forecastEngine === 'canonical' ? DUE_SELECT_CANONICAL : DUE_SELECT,
+      );
       return { rows: (data || []) as SavedSearch[], error };
     },
     countRemaining: async ({ excludeIds }) => {

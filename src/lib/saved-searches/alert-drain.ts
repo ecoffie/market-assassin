@@ -52,7 +52,7 @@ export type SavedSearchAlertEvalCounts = {
   forecastCoverage?: SavedSearchForecastCoverageState;
 };
 
-export type SavedSearchForecastCoverageState = 'covered' | 'partial' | 'unavailable' | 'needs_refinement';
+export type SavedSearchForecastCoverageState = 'covered' | 'partial' | 'unavailable' | 'needs_refinement' | 'baseline';
 
 export type SavedSearchAlertDueRow = {
   id: string;
@@ -64,6 +64,9 @@ export type SavedSearchAlertDueRow = {
   last_seen_notice_ids: string[];
   total_alerts_sent: number;
   last_alerted_at: string | null;
+  /** Canonical Forecast engine only (selected only when that engine runs). */
+  forecast_seen_through?: string | null;
+  forecast_gap_since?: Record<string, string> | null;
 };
 
 export type SavedSearchAlertDrainResult = {
