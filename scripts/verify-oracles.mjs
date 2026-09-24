@@ -26,11 +26,13 @@
  *      instead of the cap-as-a-hard-total lie (the documented "9,450 total in database" bug).
  *  10. FORECAST MATCH — an Upcoming-Buys NAICS filter returns forecasts that ALL carry that exact
  *      code (no sibling-code leak), and a bogus NAICS returns 0 (honest miss, never fabricated).
+ *  11. AWARDS SCHEMA — live `usaspending.awards` columns/types match awards-schema.ts (the list the
+ *      MERGE, the IDV DDL and the destructive full rebuild all derive from).
  *
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
- *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match>
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema>
  */
 
 import { config } from 'dotenv';
@@ -50,9 +52,14 @@ if (!url || !key) {
 const sb = createClient(url, key);
 
 const results = [];
-function record(name, pass, detail) {
-  results.push({ name, pass, detail });
-  if (!JSON_OUT) console.log((pass ? '\x1b[32m✓\x1b[0m ' : '\x1b[31m✗ FAIL\x1b[0m ') + name + '  \x1b[2m' + detail + '\x1b[0m');
+// status: 'pass' | 'fail' | 'unmeasured'. UNMEASURED = the check could not observe its surface
+// (e.g. a degraded/timed-out query). It is neither a pass nor a FAIL, and it is never rendered as
+// a zero — "0 people" from a timeout is the lie this state exists to prevent.
+function record(name, pass, detail, status = pass ? 'pass' : 'fail') {
+  results.push({ name, pass: status === 'pass', status, detail });
+  if (JSON_OUT) return;
+  const tag = status === 'pass' ? '\x1b[32m✓\x1b[0m ' : status === 'unmeasured' ? '\x1b[33m? UNMEASURED\x1b[0m ' : '\x1b[31m✗ FAIL\x1b[0m ';
+  console.log(tag + name + '  \x1b[2m' + detail + '\x1b[0m');
 }
 const want = (id) => !ONLY || ONLY === id;
 
@@ -65,15 +72,11 @@ const want = (id) => !ONLY || ONLY === id;
 if (want('contacts')) {
   try {
     const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const { classifyContactsRoster } = await import('@/lib/gov-contacts/contacts-oracle');
     const r = await queryFederalContacts({ dodaac: 'W912PL', limit: 10 });
-    const people = r.contacts || r.people || r.roster || [];
-    const emails = people.map((p) => (p.contact_email || p.email || '').toLowerCase()).filter(Boolean);
-    const usace = emails.filter((e) => e.includes('usace.army.mil')).length;
-    const deptWideFallback = emails.some((e) => /osd\.osbp|osd\.mil/i.test(e));
-    // Correct = a real roster (≥3), majority the district's own domain, and NO dept-wide leak.
-    const pass = people.length >= 3 && usace >= Math.ceil(people.length / 2) && !deptWideFallback;
-    record('contacts: W912PL → LA District USACE roster (not dept-wide DoD)', pass,
-      `${people.length} people, ${usace} @usace.army.mil, dept-wide-fallback=${deptWideFallback}`);
+    // A degraded roster (timeout/query error) is UNMEASURED — never "0 people".
+    const v = classifyContactsRoster(r);
+    record('contacts: W912PL → LA District USACE roster (not dept-wide DoD)', v.status === 'pass', v.detail, v.status);
   } catch (e) {
     record('contacts: W912PL → LA District USACE roster (not dept-wide DoD)', false, 'threw: ' + (e?.message || e));
   }
@@ -391,6 +394,30 @@ if (want('freshness')) {
     record('freshness: BQ awards unmeasured', true,
       'WARN; clocks unreadable, so the oracle cannot prove ingest_broken: ' + String(e?.message || e).slice(0, 120));
   }
+
+  // 8b. COMPLETENESS — the second derivation. MAX(action_date) stayed fresh (civilian agencies
+  // publish within days) while ~1.2M DoD transactions dated 2026-01-25..2026-05-03 were absent,
+  // so the check above printed healthy over a warehouse missing half of Robins Mech-Elec II's
+  // orders. This compares each SETTLED month per cohort (DoD / civilian) with the same month a
+  // year earlier; a settled month under 40% of its baseline is a hole and FAILS the oracle.
+  // Proven on the 2026-09-23 state: dod 2026-02/03/04 at 0.0% → FAIL (cohort-completeness.unit.test.ts).
+  try {
+    const { bqQuery, BQ_TABLES } = await import('@/lib/bigquery/client');
+    const { buildCohortMonthlyCountsSql, classifyCohortCompleteness, describeCohortHoles } = await import('@/lib/awards-ingest');
+    const asOf = new Date().toISOString().slice(0, 10);
+    const rows = await bqQuery({ query: buildCohortMonthlyCountsSql(BQ_TABLES.awards, asOf) });
+    const completeness = classifyCohortCompleteness(
+      rows.map((r) => ({ cohort: r.cohort, month: r.month, n: Number(r.n) })), asOf);
+    if (completeness.status === 'unmeasured') {
+      record('freshness: BQ awards cohort completeness unmeasured', true, 'WARN; ' + describeCohortHoles(completeness));
+    } else {
+      record(`freshness: BQ awards cohort completeness ${completeness.status}`,
+        completeness.status === 'complete', describeCohortHoles(completeness));
+    }
+  } catch (e) {
+    record('freshness: BQ awards cohort completeness unmeasured', true,
+      'WARN; BQ probe unavailable, completeness NOT proven: ' + String(e?.message || e).slice(0, 160));
+  }
 }
 
 // ── 9. RECOMPETE COUNT — the "N results" is a real count, and the 6000-cap FLOOR flags itself ──
@@ -477,13 +504,44 @@ if (want('forecast-match')) {
   }
 }
 
+// ── 11. AWARDS SCHEMA — the live `usaspending.awards` matches the canonical 58-column schema ─────
+// src/lib/awards-ingest/awards-schema.ts owns the column list every writer derives from. Reads
+// INFORMATION_SCHEMA.COLUMNS (names AND types; ~10 MiB). FAILS on a type mismatch, a missing
+// legacy column, a PARTIAL IDV DDL, or a live column the canonical schema does not know (the full
+// rebuild would drop it, and its guard would refuse to run). The 58-column requirement is enforced
+// only once IDV_IDENTITY_REQUIRED is flipped; before that the current state is REPORTED honestly.
+if (want('awards-schema')) {
+  try {
+    const { bqQuery } = await import('@/lib/bigquery/client');
+    const { awardsColumnsQuery, classifyAwardsSchema, AWARDS_COLUMNS, IDV_IDENTITY_REQUIRED } = await import('@/lib/awards-ingest');
+    const rows = await bqQuery({ query: awardsColumnsQuery() });
+    if (!rows || rows.length === 0) throw new Error('INFORMATION_SCHEMA returned 0 columns for awards');
+    const state = classifyAwardsSchema(rows.map((r) => ({ name: r.column_name, dataType: r.data_type })));
+    const problems = [...state.problems];
+    if (state.unknownColumns.length) {
+      problems.push(`live column(s) unknown to awards-schema.ts (a rebuild would DROP them): ${state.unknownColumns.join(', ')}`);
+    }
+    const pass = problems.length === 0;
+    record(`awards-schema: live awards matches the canonical schema (${IDV_IDENTITY_REQUIRED ? `${AWARDS_COLUMNS.length} required` : 'IDV not yet required'})`, pass,
+      `columns=${state.columnCount}/${AWARDS_COLUMNS.length}, idv=${state.idvMode}, required=${IDV_IDENTITY_REQUIRED}` +
+      (pass ? '' : ' — ' + problems.join(' | ')));
+  } catch (e) {
+    // Could not observe the schema — UNMEASURED, never a pass (and never "0 columns").
+    record('awards-schema: live awards schema unmeasured', false,
+      'BQ probe unavailable, schema NOT proven: ' + String(e?.message || e).slice(0, 160), 'unmeasured');
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────────────────────
-const failed = results.filter((r) => !r.pass);
+const failed = results.filter((r) => r.status === 'fail');
+const unmeasured = results.filter((r) => r.status === 'unmeasured');
 if (JSON_OUT) {
-  console.log(JSON.stringify({ ok: failed.length === 0, results }, null, 2));
+  console.log(JSON.stringify({ ok: failed.length === 0 && unmeasured.length === 0, failed: failed.length, unmeasured: unmeasured.length, results }, null, 2));
 } else {
   console.log('');
-  if (failed.length === 0) console.log(`\x1b[32m✓ all ${results.length} oracle checks passed\x1b[0m`);
-  else console.log(`\x1b[31m✗ ${failed.length}/${results.length} oracle checks FAILED\x1b[0m`);
+  if (failed.length > 0) console.log(`\x1b[31m✗ ${failed.length}/${results.length} oracle checks FAILED\x1b[0m`);
+  if (unmeasured.length > 0) console.log(`\x1b[33m? ${unmeasured.length}/${results.length} oracle checks UNMEASURED (could not observe — not a pass)\x1b[0m`);
+  if (failed.length === 0 && unmeasured.length === 0) console.log(`\x1b[32m✓ all ${results.length} oracle checks passed\x1b[0m`);
 }
-process.exit(failed.length === 0 ? 0 : 1);
+// 0 = every check measured and passed · 1 = a check FAILED · 3 = none failed but some were UNMEASURED.
+process.exit(failed.length > 0 ? 1 : unmeasured.length > 0 ? 3 : 0);

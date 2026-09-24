@@ -30,8 +30,10 @@ const mapSrc = readFileSync(
 
 describe('contacts-map: office filter matches the solicitation PREFIX, never the office column', () => {
   it('filters on solicitation_number, because federal_contacts.office is NULL on every row', () => {
+    // Via the shared, trigram-indexed predicate (src/lib/gov-contacts/dodaac-prefix.ts), which
+    // emits ilike('solicitation_number', `${CODE}%`) — pinned in dodaac-prefix.unit.test.ts.
     expect(
-      /ilike\('solicitation_number',\s*`\$\{params\.office\.toUpperCase\(\)\}%`\)/.test(routeSrc),
+      /withDodaacPrefix\(q,\s*params\.office\)/.test(routeSrc),
       'office must be matched as a solicitation_number prefix',
     ).toBe(true);
     // The trap: an `office` column filter would compile fine and return 0 forever.
@@ -45,7 +47,7 @@ describe('contacts-map: office filter matches the solicitation PREFIX, never the
     // A post-filter would rank the whole corpus first and starve a single district of its people
     // (the rank-then-filter class this repo already has a gate for).
     const buyers = routeSrc.slice(routeSrc.indexOf('async function buyersPins'));
-    const officeAt = buyers.indexOf("ilike('solicitation_number'");
+    const officeAt = buyers.indexOf('withDodaacPrefix(q, params.office)');
     const limitAt = buyers.indexOf('.limit(4000)');
     expect(officeAt, 'office filter must exist in buyersPins').toBeGreaterThan(-1);
     expect(limitAt, 'the 4000 limit must exist').toBeGreaterThan(-1);

@@ -36,6 +36,11 @@ jobs:
       - name: Unit suite
         run: npm run test:unit
 
+      # usaspending.awards must never be destructively rewritten by a new code path (the parity
+      # test in the unit suite pins the rebuild's column list; this pins WHO may rebuild).
+      - name: Awards destructive-writer audit
+        run: node scripts/audit-awards-schema-writers.mjs --self-test && node scripts/audit-awards-schema-writers.mjs
+
       - name: Maps account chrome (source)
         run: npm run verify:maps-account
 

@@ -1,0 +1,274 @@
+{
+  "measured_at": "2026-09-23T15:32:33.156Z",
+  "method": "read-only INFORMATION_SCHEMA.COLUMNS / INFORMATION_SCHEMA.TABLES (dry-run first); no data read, no DDL/DML",
+  "dry_run_bytes": {
+    "columns": "10485760",
+    "ddl": "10485760",
+    "tables": "10485760"
+  },
+  "table": "market-assasin.usaspending.awards",
+  "partition_by": "PARTITION BY RANGE_BUCKET(fiscal_year, GENERATE_ARRAY(2015, 2030, 1))",
+  "cluster_by": "CLUSTER BY recipient_uei, recipient_name",
+  "tables_present": [
+    "awards",
+    "awards_ingest_staging"
+  ],
+  "column_count": 51,
+  "columns": [
+    {
+      "ordinal_position": 1,
+      "name": "txn_id",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 2,
+      "name": "award_id",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 3,
+      "name": "piid",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 4,
+      "name": "mod_number",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 5,
+      "name": "parent_piid",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 6,
+      "name": "fiscal_year",
+      "data_type": "INT64"
+    },
+    {
+      "ordinal_position": 7,
+      "name": "action_date",
+      "data_type": "DATE"
+    },
+    {
+      "ordinal_position": 8,
+      "name": "pop_start_date",
+      "data_type": "DATE"
+    },
+    {
+      "ordinal_position": 9,
+      "name": "pop_end_date",
+      "data_type": "DATE"
+    },
+    {
+      "ordinal_position": 10,
+      "name": "obligation_amount",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 11,
+      "name": "total_obligated",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 12,
+      "name": "current_award_value",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 13,
+      "name": "potential_award_value",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 14,
+      "name": "recipient_uei",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 15,
+      "name": "recipient_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 16,
+      "name": "parent_uei",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 17,
+      "name": "parent_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 18,
+      "name": "cage_code",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 19,
+      "name": "recipient_address",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 20,
+      "name": "recipient_city",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 21,
+      "name": "recipient_state",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 22,
+      "name": "recipient_zip",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 23,
+      "name": "recipient_country",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 24,
+      "name": "awarding_agency_code",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 25,
+      "name": "awarding_agency",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 26,
+      "name": "awarding_sub_agency_code",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 27,
+      "name": "awarding_sub_agency",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 28,
+      "name": "awarding_office_code",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 29,
+      "name": "awarding_office",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 30,
+      "name": "funding_agency",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 31,
+      "name": "funding_office",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 32,
+      "name": "naics_code",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 33,
+      "name": "naics_description",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 34,
+      "name": "psc_code",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 35,
+      "name": "psc_description",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 36,
+      "name": "contract_pricing_type",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 37,
+      "name": "set_aside",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 38,
+      "name": "pop_state",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 39,
+      "name": "pop_city",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 40,
+      "name": "pop_country",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 41,
+      "name": "description",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 42,
+      "name": "exec_1_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 43,
+      "name": "exec_1_amount",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 44,
+      "name": "exec_2_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 45,
+      "name": "exec_2_amount",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 46,
+      "name": "exec_3_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 47,
+      "name": "exec_3_amount",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 48,
+      "name": "exec_4_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 49,
+      "name": "exec_4_amount",
+      "data_type": "FLOAT64"
+    },
+    {
+      "ordinal_position": 50,
+      "name": "exec_5_name",
+      "data_type": "STRING"
+    },
+    {
+      "ordinal_position": 51,
+      "name": "exec_5_amount",
+      "data_type": "FLOAT64"
+    }
+  ]
+}

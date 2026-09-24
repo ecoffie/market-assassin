@@ -20,7 +20,14 @@ export interface AwardDetail {
   // $ trajectory — obligated (spent) → ceiling (the real prize size)
   obligated: number;
   currentValue: number;
-  ceiling: number;                 // base_and_all_options_value — the potential max
+  ceiling: number;                 // award API `base_and_all_options` — the potential max (0 = not reported)
+  /**
+   * Which award-API field established `ceiling`. 'not_reported' means USASpending gave no
+   * ceiling and `ceiling` is 0 — callers must render "n/a", never "$0".
+   * 'obligated_fallback' is only ever used for a CONTRACT (never an IDV: an IDV obligates
+   * nothing itself, so its total_obligation is 0 and is not a ceiling).
+   */
+  ceilingSource?: AwardCeilingSource;
   // The parent vehicle (IDV) this task/order flows under — the gate to compete
   parentIdvId: string | null;
   parentIdvPiid: string | null;
@@ -45,6 +52,54 @@ export interface AwardDetail {
 }
 
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+
+export type AwardCeilingSource =
+  | 'base_and_all_options'
+  | 'base_exercised_options'
+  | 'obligated_fallback'
+  | 'not_reported';
+
+function positiveAmount(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Ceiling from a USASpending `/api/v2/awards/<id>/` payload.
+ *
+ * The award API's keys are `base_and_all_options` / `base_exercised_options`. This function
+ * previously read `base_and_all_options_value` / `base_exercised_options_val` — names that
+ * exist in the bulk-download CSV, NOT in this endpoint — so it always fell through to
+ * `total_obligation`. Measured 2026-09-22: every IDV reported ceiling 0 (FA850124D0005 is a
+ * $95,000,000 vehicle; FA857123D0004 is $63,446,220.63), and on every contract "ceiling"
+ * silently equalled obligated. The legacy names are still read second as a guard in case the
+ * payload shape changes back; neither is ever invented.
+ *
+ * Guard: an IDV obligates nothing itself (its orders do), so for an IDV `total_obligation` is 0
+ * and is never a ceiling — an IDV with no reported ceiling is 'not_reported', not "$0".
+ */
+export function resolveAwardCeiling(d: {
+  category?: unknown;
+  generated_unique_award_id?: unknown;
+  base_and_all_options?: unknown;
+  base_exercised_options?: unknown;
+  base_and_all_options_value?: unknown;
+  base_exercised_options_val?: unknown;
+  total_obligation?: unknown;
+}): { ceiling: number; ceilingSource: AwardCeilingSource } {
+  const allOptions = positiveAmount(d.base_and_all_options) ?? positiveAmount(d.base_and_all_options_value);
+  if (allOptions !== null) return { ceiling: allOptions, ceilingSource: 'base_and_all_options' };
+  const exercised = positiveAmount(d.base_exercised_options) ?? positiveAmount(d.base_exercised_options_val);
+  if (exercised !== null) return { ceiling: exercised, ceilingSource: 'base_exercised_options' };
+  const isIdv = String(d.category ?? '').toLowerCase() === 'idv'
+    || /^CONT_IDV_/i.test(String(d.generated_unique_award_id ?? ''));
+  if (!isIdv) {
+    const obligated = positiveAmount(d.total_obligation);
+    if (obligated !== null) return { ceiling: obligated, ceilingSource: 'obligated_fallback' };
+  }
+  return { ceiling: 0, ceilingSource: 'not_reported' };
+}
 
 const BASE = 'https://api.usaspending.gov/api/v2/awards';
 const SEARCH = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
@@ -98,9 +153,7 @@ export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail
     const loc = d.recipient?.location || {};
     const pop = d.period_of_performance || {};
     const obligated = Number(d.total_obligation || 0);
-    // Ceiling: base_and_all_options_value is the max potential; fall back to
-    // base_exercised_options, then obligated (Eric: ceiling sometimes null).
-    const ceiling = Number(d.base_and_all_options_value || d.base_exercised_options_val || d.total_obligation || 0);
+    const { ceiling, ceilingSource } = resolveAwardCeiling(d);
     return {
       awardId: d.piid || d.fain || d.uri || generatedId,
       generatedId,
@@ -113,6 +166,7 @@ export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail
       obligated,
       currentValue: Number(d.total_obligation || 0),
       ceiling,
+      ceilingSource,
       parentIdvId: d.parent_award?.generated_unique_award_id || null,
       parentIdvPiid: d.parent_award?.piid || null,
       popStart: pop.start_date || null,

@@ -1568,6 +1568,14 @@ function drawFeed(){
   const feed=document.getElementById('feed');
   // Unavailable is not "no matches": every enabled horizon has no forecast publisher for the buyer
   // asked (canonical coverage 'unestablished'). Say what is missing — never an empty-result state.
+  // Needs a positive scope: the query only said what to LEAVE OUT ("-computers"), so nothing was
+  // searched. Show the server's refinement — an empty feed here would read as "0 results".
+  if(!rows.length && window.__needsScope){
+    feed.innerHTML=`<div class="empty"><h4>Add what you sell to this search</h4>
+      <p>${esc(window.__needsScope)}</p>
+      <button onclick="var z=document.getElementById('zsearchInput');if(z){z.removeAttribute('readonly');z.focus();}">Edit search</button></div>`;
+    return;
+  }
   if(!rows.length && window.__coverageAllUnavailable){
     feed.innerHTML=`<div class="empty"><h4>Forecast coverage unavailable</h4>
       <p>${esc(window.__coverageNote||'We hold no forecasts from this buyer.')}. This is a coverage gap, not zero upcoming buys.</p>

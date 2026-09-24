@@ -433,9 +433,9 @@ SHARE → CLICK → SESSION → SIGNUP → ACTIVATION → PAID from first-party 
 Records: **`tasks/canonical-discovery-phase-a-2026-09-22.md`**, **`tasks/canonical-discovery-phase-b-2026-09-22.md`**.
 `src/lib/discovery/` is the ONE search-meaning layer. **MCP `find_opportunities` (Phase B) and Maps Open (Phase C,
 `src/lib/opportunities/maps-open-discovery.ts`, record `tasks/canonical-discovery-phase-c-maps-open-2026-09-22.md`)
-consume it, and Maps Recompete (Phase C2, `src/lib/recompete/maps-recompete-discovery.ts`, record
-`tasks/canonical-discovery-phase-c2-maps-recompete-2026-09-22.md`), and Maps Forecast (Phase C3, `src/lib/opportunities/maps-forecast-discovery.ts` — forecast-map AND forecasts/unplaced; record
-`tasks/canonical-discovery-phase-c3-maps-forecast-2026-09-23.md`).** Saved-search **Forecast** has a canonical engine (`src/lib/saved-searches/forecast-discovery.ts`, same builder as Maps Forecast) that ships **OFF** behind `SAVED_SEARCH_FORECAST_CANONICAL='true'` — blocked on the cutover re-baseline decision (1,934 old rows would alert as "new" on the first run); record `tasks/saved-search-forecast-migration-2026-09-23.md`. Saved-search Open and daily alerts are NOT migrated. `applyMapFilters` still runs the old search
+consume it, and Maps Recompete (Phase C2, ✅ production-accepted + FROZEN 2026-09-23 on `566c1fe9`, `src/lib/recompete/maps-recompete-discovery.ts`, record
+`tasks/canonical-discovery-phase-c2-maps-recompete-2026-09-22.md`), and Maps Forecast (Phase C3, ✅ production-accepted + FROZEN 2026-09-23 on `d131e272`, `src/lib/opportunities/maps-forecast-discovery.ts` — forecast-map AND forecasts/unplaced; record
+`tasks/canonical-discovery-phase-c3-maps-forecast-2026-09-23.md`).** Saved-search **Forecast** has a canonical engine (`src/lib/saved-searches/forecast-discovery.ts`, same builder as Maps Forecast) that ships **OFF** behind `SAVED_SEARCH_FORECAST_CANONICAL='true'` — blocked on the cutover re-baseline decision (1,934 old rows would alert as "new" on the first run); record `tasks/saved-search-forecast-migration-2026-09-23.md`. Saved-search Open and daily alerts do NOT yet. `applyMapFilters` still runs the old search
 brain for callers that pass `search` — Maps Open blanks `search`/`agency` and never lets it interpret.
 - Pipeline (locked): raw → structured intent → concept classification → eligibility → horizon policy → ranking.
 - ⛔ Do not fix Maps/saved-search search locally — migrate the consumer. The **cross-surface gate**
@@ -2262,6 +2262,13 @@ routes, both closed and both pinned:
 **Pushing from a worktree when the hook itself is being repaired:** use a one-command,
 checkout-local override — `git -c core.hooksPath="$PWD/.githooks" push`. Never
 `--no-verify`, and never rewrite the shared `core.hooksPath`; other sessions depend on it.
+
+**Drift detector (2026-09-23):** `npm run verify:hooks` (`scripts/check-hooks-path.mjs`) and
+pre-push **step 0** (before the resolver, so the primary checkout is caught too) FAIL on any
+`core.hooksPath` other than the relative `.githooks` — naming the value, its origin and the fix.
+It **only detects, never rewrites** config. **Never set an absolute `core.hooksPath`** (it was
+found hand-set 3× on 2026-09-23); fix with `npm run hooks:install`, and use `git -c` one-shot only.
+Regression: `tests/check-hooks-path.test.sh` (gate step 1d).
 
 ### ⛔ Rules for any test that CREATES or MUTATES git repositories
 
