@@ -35,6 +35,7 @@
     "rag:templates:dry-run": "node scripts/ingest-proposal-template-corpus.js",
     "rag:templates:apply": "node scripts/ingest-proposal-template-corpus.js --apply",
     "hooks:install": "git config core.hooksPath .githooks",
+    "verify:hooks": "node scripts/check-hooks-path.mjs",
     "prepush": "bash .githooks/pre-push",
     "audit:client-auth": "node scripts/audit-client-auth.mjs",
     "audit:email-sender": "node scripts/audit-email-sender.mjs",

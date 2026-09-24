@@ -2263,6 +2263,13 @@ routes, both closed and both pinned:
 checkout-local override — `git -c core.hooksPath="$PWD/.githooks" push`. Never
 `--no-verify`, and never rewrite the shared `core.hooksPath`; other sessions depend on it.
 
+**Drift detector (2026-09-23):** `npm run verify:hooks` (`scripts/check-hooks-path.mjs`) and
+pre-push **step 0** (before the resolver, so the primary checkout is caught too) FAIL on any
+`core.hooksPath` other than the relative `.githooks` — naming the value, its origin and the fix.
+It **only detects, never rewrites** config. **Never set an absolute `core.hooksPath`** (it was
+found hand-set 3× on 2026-09-23); fix with `npm run hooks:install`, and use `git -c` one-shot only.
+Regression: `tests/check-hooks-path.test.sh` (gate step 1d).
+
 ### ⛔ Rules for any test that CREATES or MUTATES git repositories
 
 Written after this test re-initialised the real repository as **bare**
