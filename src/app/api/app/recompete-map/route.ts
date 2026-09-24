@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { mapsRecompeteRequest, applyMapsRecompeteFilters, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
+import { fetchFollowOnRows } from '@/lib/recompete/map-follow-ons';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
 
@@ -75,17 +76,30 @@ export async function GET(request: NextRequest) {
     const [{ count: totalForFilters }, { count: unmappedForFilters }] =
       await Promise.all([totalForFiltersHead, unmappedHead]);
 
+    // DETERMINISTIC PAGE (Gate 1, 2026-09-24): expiry date, then contract_id as a TIE-BREAKER ONLY.
+    // Expiry alone left WHICH tied contracts made the 1,000-pin cut up to the query plan — measured on
+    // prod: the "software license" page differed by 30 rows (all on the tied 2026-11-30 boundary)
+    // between a parallel index scan and a bitmap scan of the SAME rows. contract_id is unique
+    // (recompete_opportunities_contract_id_key), so the order is total under every plan.
     const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
-      .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
+      .order('period_of_performance_current_end', { ascending: true })
+      .order('contract_id', { ascending: true })
+      .limit(MAX_PINS);
     // Captured FOLLOW-ONS always expire the LATEST (3-5yr out), so the expiry-ascending sort + the
     // MAX_PINS cap systematically buries them behind nearer-term rows at a broad zoom — yet they're
     // the FRESHEST intelligence (the winner of a just-recompeted contract). Fetch them separately
     // (data_source='usaspending_followon', same filters+bbox) and merge in any the capped set missed,
     // deduped by contract_id. Small set by construction, so no cap needed here (Eric 2026-07-28).
-    const followOnQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS)))
-      .eq('data_source', 'usaspending_followon').limit(MAX_PINS);
-    const [{ data, count: totalInView, error }, { data: followOns }] =
-      await Promise.all([viewQ, followOnQ]);
+    // Read in two planner-independent steps (map-follow-ons.ts): the follow-on candidates first, then
+    // the unchanged canonical plan on just those ids — a text index can never drive this read.
+    // Fail-soft as before: a follow-on failure must not take down the pins.
+    const followOnP = fetchFollowOnRows({
+      from: () => db.from('recompete_opportunities'),
+      applyPlan: (q) => applyFilters(q),
+      bbox, cols: COLS, cap: MAX_PINS,
+    }).catch((e: Error) => { console.error('[recompete-map] follow-ons failed (pins unaffected):', e.message); return []; });
+    const [{ data, count: totalInView, error }, followOns] =
+      await Promise.all([viewQ, followOnP]);
     if (error) throw error;
     const cid = (r: unknown) => String((r as { contract_id?: unknown }).contract_id ?? '');
     const rows = data || [];

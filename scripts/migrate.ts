@@ -6,6 +6,7 @@
  *   npm run migrate:baseline -- --go    # ONE TIME: adopt existing history, runs nothing
  *   npm run migrate                     # dry-run: show what WOULD apply
  *   npm run migrate -- --go             # apply pending migrations
+ *   npm run migrate -- --go --only a.sql,b.sql   # apply ONLY these pending files (others stay pending)
  *
  * ---------------------------------------------------------------------------
  * WHY THIS EXISTS
@@ -236,6 +237,17 @@ async function cmdStatus(client: Client) {
   console.log(`  the schema is complete — anything missed before baseline stays missed.\n`);
 }
 
+/** Files to APPLY exclusively: `--only a.sql,b.sql` (repeatable). Empty = every pending file. */
+function onlyList(): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === '--only' && process.argv[i + 1]) {
+      out.push(...process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean));
+    }
+  }
+  return out;
+}
+
 /**
  * Files to EXCLUDE from baseline: `--except a.sql,b.sql` (repeatable).
  *
@@ -326,7 +338,27 @@ async function cmdApply(client: Client, pooled: boolean) {
   }
 
   const applied = await ledger(client);
-  const { pending, drifted } = classify(files, applied);
+  const { pending: allPending, drifted } = classify(files, applied);
+  // --only: apply a named subset and leave every other pending file alone. Needed because pending is
+  // shared state — a merged migration another change explicitly marked "do not apply yet" would
+  // otherwise ride along with an unrelated --go. Every named file must exist AND be pending; a typo
+  // or an already-applied name stops the run rather than silently applying less than was asked.
+  const only = onlyList();
+  let pending = allPending;
+  if (only.length) {
+    const known = new Set(files.map((f) => f.version));
+    const pend = new Set(allPending.map((m) => m.version));
+    const bad = only.filter((v) => !known.has(v) || !pend.has(v));
+    if (bad.length) {
+      console.error(`\n✗ --only names ${bad.length} file(s) that are not pending migrations:`);
+      for (const v of bad) console.error(`    • ${v}${known.has(v) ? '  (already applied)' : '  (not in supabase/migrations/)'}`);
+      console.error(`  Nothing was applied.\n`);
+      process.exit(1);
+    }
+    pending = allPending.filter((m) => only.includes(m.version));
+    const held = allPending.filter((m) => !only.includes(m.version));
+    if (held.length) console.log(`\n  --only: ${held.length} other pending file(s) left pending: ${held.map((m) => m.version).join(', ')}`);
+  }
 
   if (drifted.length) {
     console.log(`\n⚠ ${drifted.length} applied migration(s) were edited on disk:`);
@@ -342,7 +374,8 @@ async function cmdApply(client: Client, pooled: boolean) {
   for (const m of pending) console.log(`  • ${m.version}${m.noTx ? '  [no-transaction]' : ''}`);
   if (!GO) {
     console.log(`\n  DRY RUN — nothing executed. To apply:\n`);
-    console.log(`      npm run migrate -- --go\n`);
+    // Echo --only back: a bare `--go` would apply EVERY pending file, not the subset shown above.
+    console.log(only.length ? `      npm run migrate -- --go --only ${only.join(',')}\n` : `      npm run migrate -- --go\n`);
     return;
   }
 
