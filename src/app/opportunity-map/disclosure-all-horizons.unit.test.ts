@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { mapsRecompeteRequest, mapsRecompeteSurfaceOps } from '@/lib/recompete/maps-recompete-discovery';
 
 const openSrc = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts'), 'utf8');
 // Since Phase C2 the Awarded filter contract (incl. the parameterised map_lat bound) lives in the
@@ -28,7 +29,9 @@ describe('every horizon reports what it cannot draw', () => {
   });
   it('Awarded reports unmappedForFilters (33,127 rows were invisible)', () => {
     expect(recompeteSrc).toContain('unmappedForFilters');
-    expect(recompeteSrc).toContain("is('map_lat', null)");
+    // Since Recompete Gate 2 the mapped bound is part of the shared surface spec (both appliers read it).
+    const surface = mapsRecompeteRequest(() => null).surface;
+    expect(mapsRecompeteSurfaceOps(surface, 'none')).toContainEqual({ op: 'isnull', col: 'map_lat' });
   });
 
   it('Awarded\'s unmapped query is NOT self-contradictory', () => {
@@ -41,8 +44,13 @@ describe('every horizon reports what it cannot draw', () => {
     //
     // The bound must therefore be PARAMETERISED, never appended by the caller.
     expect(recompeteSrc).toContain("mapped: 'only' | 'none' | 'any'");
-    expect(recompeteSrc).toContain("if (mapped === 'only') q = q.not('map_lat', 'is', null)");
-    expect(recompeteSrc).toContain("else if (mapped === 'none') q = q.is('map_lat', null)");
+    // Behavior, not text (Gate 2 made the bound data): 'only' and 'none' each carry exactly ONE bound,
+    // they are opposite, and 'any' (market truth) carries none — never both at once.
+    const surface = mapsRecompeteRequest(() => null).surface;
+    const bound = (m: 'only' | 'none' | 'any') => mapsRecompeteSurfaceOps(surface, m).filter((o) => o.col === 'map_lat');
+    expect(bound('only')).toEqual([{ op: 'notnull', col: 'map_lat' }]);
+    expect(bound('none')).toEqual([{ op: 'isnull', col: 'map_lat' }]);
+    expect(bound('any')).toEqual([]);
     // And the unmapped head must REQUEST 'none' rather than post-filtering a mapped-only query.
     const head = recompeteSrc.slice(recompeteSrc.indexOf('const unmappedHead'));
     expect(head.slice(0, 220)).toContain("'none'");

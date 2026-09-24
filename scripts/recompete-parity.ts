@@ -46,7 +46,7 @@ function suite(): Array<{ id: string; params: Params; bbox: BBox }> {
     return p;
   };
   // 1 · every canonical discovery fixture (the golden-plan + cross-surface set)
-  for (const f of FIXTURES) s.push({ id: `canon:${f.id}`, params: toParams(f.input as Record<string, unknown>), bbox: CONUS });
+  for (const f of FIXTURES) s.push({ id: `canon:${f.id}`, params: toParams(f.input as unknown as Record<string, unknown>), bbox: CONUS });
   // 2 · the Gate 1 acceptance queries not already in the canonical set
   s.push({ id: 'gate:broad capability list', params: { q: 'program management, training, technical writing, logistics, data analytics, systems engineering' }, bbox: CONUS });
   s.push({ id: 'gate:nonsense', params: { q: 'xqzvplk florbnax' }, bbox: CONUS });
