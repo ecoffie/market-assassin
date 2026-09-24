@@ -81,7 +81,7 @@ redirects it the same way #1671 does. Nothing purchased is deleted.
 **Build**
 - `/app?panel=planner` reusing the `src/app/planner` components.
 - The link table plus a migration: idempotent, applied with `npm run migrate`, verified through PostgREST.
-- After acceptance: `/planner/login` → `/app?panel=planner`. The shared `PLANNER_ACCESS_CODE` is retired in the same way as #1677: no indefinite exception.
+- After acceptance: `/planner/login` → `/app?panel=planner`. The shared `PLANNER_ACCESS_CODE` is retired in the same way as #1679: no indefinite exception.
 
 **Acceptance**
 - Link requires a valid planner credential; a wrong one → refused.

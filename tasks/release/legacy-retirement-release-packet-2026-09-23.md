@@ -13,7 +13,7 @@ No command in this packet contains a secret — the scripts read `.env.local`.
 | **#1671** | `fix/retire-legacy-ma-interfaces` | **`57b74a38`** | Retire legacy entry points into `/app` (partial migration) |
 | **#1675** | `fix/cancellation-entitlement-attribution` | **`f37b7ab6`** | Cancellation revokes only attributable access |
 | **#1676** | `test/1675-webhook-proofs` → base #1675 | **`3814bf87`** | Route-level proofs for #1675 **+ 3 defect fixes** |
-| **#1677** | `security/remove-shared-password-routes` → base #1671 | see PR | Remove both shared-password routes and the grace window |
+| **#1679** | `security/remove-shared-password-routes` → base #1671 | **`7fbfc0fe`** | Remove both shared-password routes and the grace window. Production-build acceptance 131/131 on `ef12f32f` |
 | this PR | `release-prep/legacy-retirement-2026-09-23` | see PR | Packet, manifest, dry-run scripts. Docs + scripts only. |
 
 ⚠️ **#1675 at `f37b7ab6` is not releasable alone.** The proofs in #1676 run against it and 3 of 19 fail —
@@ -34,7 +34,7 @@ intended view. The shared alert-preferences page is Mindy-branded.
 **What it deliberately does not do.**
 - Content Reaper, the Contractor Database and the Action Planner stay reachable. Their migration is the next batch (§6).
 - No billing, grant or preference change.
-- The shared-password routes still exist at this head. Their removal is #1677.
+- The shared-password routes still exist at this head. Their removal is #1679.
 
 **Evidence tied to heads** (all local; a fake identity provider = integration evidence, not production authentication proof):
 
@@ -188,7 +188,7 @@ The repair script refuses this session by design.
 4. S6, S7.
 5. Merge #1675+#1676 (independent of #1671).
 6. Merge #1671 → P0–P7.
-7. Merge #1677 → re-run the P1 smoke plus a 404 check on both password routes.
+7. Merge #1679 → re-run the P1 smoke plus a 404 check on both password routes.
 
 ---
 
@@ -200,7 +200,7 @@ unchanged access. S1 stops new sales only.
 ## 6. Shared passwords
 
 - **Grace window: OFF.** `LEGACY_SHARED_PASSWORD_ACCESS`, `MA_ACCESS_PASSWORD` and `RECOMPETE_*` are all absent from production (variable names checked read-only). The code default is off.
-- **Removal is prepared in #1677** (stacked on #1671):
+- **Removal is prepared in #1679** (stacked on #1671):
   - Both routes are deleted.
   - The grace/`keepFor` code is removed, so the legacy resolver ignores cookies.
   - `getEmailFromRequest` accepts only email-shaped values, so `authorized-user` is no longer an identity.
