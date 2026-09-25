@@ -26,6 +26,18 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Strategic evidence — shared reader: legislation reaches the customer
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-25 | get_agency_intel / legislative corpus | The living NDAA corpus (`institute_sources`, 29 rows, weekly, #1559 to #1644) was read by nothing — the only customer reader filtered `source='gao'` — while get_agency_intel served FY2026 NDAA claims from static JSON with `source_url: null`. New shared reader `getLegislativeEvidenceForAgency` returns measure, version, stage, law status and link, grouped into fiscal-year vehicles; `ENACTED_LAW` only for the enacted text (House-passed, Senate-reported and pre-enactment versions are `LEGISLATIVE_ACTIVITY_NOT_LAW`), committee reports `COMMITTEE_REPORT_LANGUAGE` (errata its own record, agency inherited from its bill); coverage from the control plane + discovery cursor (partial/unknown never reads complete); component queries answered at the ESTABLISHED parent department and labelled `parent_department`; bill text NOT_ESTABLISHED always. get_agency_intel returns it as `legislation`. No collector, no new tool, no migration. | `export async function getLegislativeEvidenceForAgency(` → `src/lib/strategic-intel/legislative-evidence.ts` | Prod data via real getAgencyIntel: Navy answered at parent_department DoD, FY2027 not_enacted (H.R. 8800 passed_chamber, S. 4784 reported), FY2026 enacted by S. 1071 PL 119-60, coverage complete; SOCOM not_established; VA empty. 18 unit tests; 2 mutations (House-passed as law, coverage forced complete) each go red | ACTIVE |
+
+## Strategic evidence — stale legacy GAO withheld from buyer intelligence
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-25 | Agency intel / legacy GovInfo GAO | The 445 `agency_intelligence` `gao_high_risk` rows are GovInfo testimonies published 1993-10-06 to 2000-09-27, all stamped `fiscal_year = 2026` (the fetcher wrote the FETCH year). 233 survived the attribution quarantine and reached `understand_customer` as undated `gao_reports`, so a 1998 testimony read as a current finding (VA 23, DoD 20, DHS 27, which did not exist before 2002). Currency is now judged by `publication_date` only (never `fiscal_year`); older than 5 years or undated is withheld and counted (`historicalGaoWithheld`); a served row always shows its GAO date. Rows are not deleted (`includeHistoricalGao` opt-in). Both read paths (`getAgencyIntelligence`, `getIntelligenceForBriefing`) inherit it. | `export function isCurrentLegacyGao(` → `src/lib/agency-intelligence/legacy-gao-currency.ts` | Prod data, local run: VA/DoD/DHS/Treasury served 0 (withheld 23/20/27/20); `understandCustomer({agency:'Department of Veterans Affairs'})` → 0 gao_reports, no 199x in output, withheld note present. `legacy-gao-currency.unit.test.ts` 10/10; neighbouring suites 1,180 pass | ACTIVE |
+
 ## Task orders — parent-contract / vehicle scope (OASIS+) + shared Map link
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

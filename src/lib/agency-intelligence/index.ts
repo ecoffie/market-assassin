@@ -16,6 +16,7 @@ import { batchVerify, quickVerify } from './verifier';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 import { isUnsupportedBudgetClaim, stripUnsupportedBudgetClaims } from '@/lib/strategic-intel/unsupported-budget-claim';
+import { isCurrentLegacyGao, legacyGaoDateLabel } from './legacy-gao-currency';
 
 // Type for static pain points JSON
 interface AgencyPainPointsData {
@@ -192,7 +193,7 @@ async function storeIntelligence(items: AgencyIntelligence[]): Promise<number> {
 export async function getAgencyIntelligence(
   agencyName: string,
   types?: string[],
-  opts: { includeUnsupportedAttribution?: boolean } = {},
+  opts: { includeUnsupportedAttribution?: boolean; includeHistoricalGao?: boolean } = {},
 ): Promise<AgencyIntelligence[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -255,7 +256,12 @@ export async function getAgencyIntelligence(
     return [];
   }
 
-  return data || [];
+  // ⚠️ A 1998 GAO testimony is not current buyer intelligence. Legacy GovInfo GAO
+  // rows are judged by their GOVERNMENT publication_date — never `fiscal_year`, which
+  // the fetcher stamped with the fetch year (all 445 read 2026). See legacy-gao-currency.ts.
+  // `includeHistoricalGao` is the explicit opt-in for historical research.
+  const rows = (data || []) as AgencyIntelligence[];
+  return opts.includeHistoricalGao ? rows : rows.filter((r) => isCurrentLegacyGao(r));
 }
 
 /**
@@ -300,7 +306,9 @@ export async function getIntelligenceForBriefing(
     return [];
   }
 
-  return data || [];
+  // The `fiscal_year` gate above cannot catch legacy GovInfo GAO: every such row is
+  // stamped with the FETCH year. Judge those by publication_date instead.
+  return ((data || []) as AgencyIntelligence[]).filter((r) => isCurrentLegacyGao(r));
 }
 
 /**
@@ -326,7 +334,13 @@ export interface UnifiedAgencyIntel {
   /** Display strings — sourced first, legacy labeled. Prefer painPointCitations. */
   painPoints: string[];
   priorities: string[];
-  gaoReports: string[];       // From database (gao_high_risk type) — LEGACY GovInfo path
+  gaoReports: string[];       // From database (gao_high_risk type) — LEGACY GovInfo path, CURRENT rows only
+  /**
+   * Legacy GovInfo GAO rows held for this agency but NOT served, because their government
+   * publication date is older than LEGACY_GAO_MAX_AGE_YEARS (or unknown). Reported so an
+   * empty `gaoReports` is never read as "GAO has found nothing about this agency".
+   */
+  historicalGaoWithheld?: number;
   spendingPatterns: string[]; // From database (contract_pattern type)
   sources: ('static' | 'database' | 'institute_gao')[];
   /** Structured citations from the shared sourced reader. */
@@ -392,7 +406,10 @@ export async function getUnifiedAgencyIntelligence(
   }
 
   // 3. Legacy agency_intelligence table (GovInfo GAOREPORTS etc.) — labeled, not authoritative
-  const dbRecords = await getAgencyIntelligence(agencyName);
+  const allDbRecords = await getAgencyIntelligence(agencyName, undefined, { includeHistoricalGao: true });
+  const dbRecords = allDbRecords.filter((r) => isCurrentLegacyGao(r));
+  const withheld = allDbRecords.length - dbRecords.length;
+  if (withheld > 0) result.historicalGaoWithheld = withheld;
   if (dbRecords.length > 0) {
     result.sources.push('database');
 
@@ -409,8 +426,9 @@ export async function getUnifiedAgencyIntelligence(
             evidence === 'no_title_evidence'
               ? ' [agency attribution UNRESOLVED — not corroborated by the report title]'
               : '';
+          // The government date is always shown: an undated GAO title reads as current.
           result.gaoReports.push(
-            `${gaoEntry} [LEGACY_GOVINFO — not living Institute]${attributionNote}`,
+            `${gaoEntry} (GAO, ${legacyGaoDateLabel(record)}) [LEGACY_GOVINFO — not living Institute]${attributionNote}`,
           );
         }
       } else if (record.intelligence_type === 'contract_pattern') {

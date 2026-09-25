@@ -53,6 +53,11 @@ describe('horizonCount keeps four meanings apart', () => {
     expect(lib.horizonCountLabel(c, fmt)).toBe('15*');
     expect(lib.coverageNote({ forecast: c })).toBe('Forecasts partial — not measured for NOAA');
   });
+  it('a FAILED horizon request → "couldn\u2019t load", never 0 and never "loading"', () => {
+    const c = { total: null, state: 'failed', gaps: [] };
+    expect(lib.horizonCountLabel(c, fmt)).toBe('!');
+    expect(lib.coverageNote({ open: c })).toBe('Open couldn\u2019t load');
+  });
   it('a failed count (null, coverage ok) → unknown, never 0', () => {
     const c = lib.horizonCount(COUNT_FAILED);
     expect(c.state).toBe('unknown');
@@ -65,7 +70,10 @@ describe('horizonCount keeps four meanings apart', () => {
 });
 
 describe('wiring — no null-to-zero coercion left on the horizon path', () => {
-  const fetchBlock = route.slice(route.indexOf('_enabled.map(function(m){'), route.indexOf('_unplacedFoot();'));
+  // The OPPORTUNITY horizon path only — the Players (contacts) branch shares _fetchViewNow but is a
+  // different dataset with its own count contract.
+  const _fb = route.slice(route.indexOf('function _partFrom('), route.indexOf('_unplacedFoot();'));
+  const fetchBlock = _fb.slice(0, _fb.indexOf('// ── Companies / Gov Buyers')) + _fb.slice(_fb.indexOf('// ── OPPORTUNITIES map'));
   it('the per-horizon fetch uses horizonCount, not `totalForFilters||0`', () => {
     expect(fetchBlock).toContain('var hc=horizonCount(d);');
     expect(fetchBlock).toContain('total:hc.total,count:hc,');

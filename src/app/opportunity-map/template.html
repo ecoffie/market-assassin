@@ -785,6 +785,9 @@ function refreshFacets(){
   }catch(e){}
 }
 let rows=[],markers=new Map(),selected=null;
+// Progressive rail (drawFeed): first screenful synchronously, the rest in frame-sized chunks.
+let _feedGen=0;
+const FEED_FIRST_PAINT=40, FEED_CHUNK=200;
 
 // ---------- filter sheets ----------
 const sheet=document.getElementById('sheet');
@@ -1512,9 +1515,13 @@ function render(){
     // allowed on purpose. mkPin/pinMoney are hoisted globals from PIN_JS.
     const _txt=(typeof pinFace==='function')?pinFace(o,map):((typeof pinMoney==='function')?pinMoney(o):'');
     const _approx=(o.locSrc==='office');
+    // Popup content is built when the popup OPENS, not for every pin on every repaint: building
+    // ~1,500 popups' HTML up front cost ~70 ms of each render (Maps P0, measured 2026-09-24) for
+    // popups nobody opens. Leaflet evaluates a function content on open; same HTML, same row.
+    const _pop=()=>popupHTML(o);
     const m=(typeof mkPin==='function')
-      ? mkPin(o,col,_txt,_approx).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true})
-      : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:col,fillOpacity:.95}).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});
+      ? mkPin(o,col,_txt,_approx).bindPopup(_pop,{maxWidth:300,closeButton:true})
+      : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:col,fillOpacity:.95}).bindPopup(_pop,{maxWidth:300,closeButton:true});
     m.on('click',()=>{
       // FUNNEL: pin_clicked — the second funnel step (map_open→pin_clicked→popup_open→…). Distinct
       // from popup_open: a pin click that fails to open a popup shows as pin_clicked WITHOUT a
@@ -1589,32 +1596,59 @@ function drawFeed(){
     return;
   }
   feed.innerHTML='';
-  rows.forEach(o=>{
+  // PROGRESSIVE RAIL (Maps P0, 2026-09-24). Building every card synchronously cost ~185 ms for
+  // ~1,500 rows (measured) — on EVERY repaint, including a horizon toggle that needs no network.
+  // The first screenful paints now; the rest append in frame-sized chunks. Same rows, same order,
+  // same card: only WHEN the off-screen cards are built changes. A newer drawFeed cancels an
+  // older one's remaining chunks (_feedGen), so two lists never interleave.
+  const list=rows, gen=++_feedGen;
+  const mk=o=>{
     const c=document.createElement('article');
     // data-sol = solicitation_number (the card's existing select/highlight key).
     // data-nid = the CANONICAL sam_opportunities.notice_id. They are different
     // values on 99.0% of open SAM rows, so anything keyed on the notice id
     // (the anonymous shortlist restore) must read data-nid, never data-sol.
     c.className='card';c.dataset.sol=o.sol;c.dataset.nid=o.nid||'';c.tabIndex=0;
+    if(selected&&o.sol===selected)c.classList.add('sel');   // a card built after select() still shows it
     c.innerHTML=cardHTML(o);
     c.onclick=()=>select(o.sol,true);
     c.onkeydown=e=>{if(e.key==='Enter')select(o.sol,true);};
     c.onmouseenter=()=>highlight(o.sol,true,true);
     c.onmouseleave=()=>highlight(o.sol,false,true);
-    feed.appendChild(c);
-  });
+    return c;
+  };
+  let i=0;
+  const chunk=n=>{
+    const f=document.createDocumentFragment(), end=Math.min(list.length,i+n);
+    for(;i<end;i++)f.appendChild(mk(list[i]));
+    // Keep the standing "forecasts with no mapped location" row LAST.
+    const foot=document.getElementById('unplacedFoot');
+    if(foot&&foot.parentNode===feed)feed.insertBefore(f,foot); else feed.appendChild(f);
+  };
+  chunk(FEED_FIRST_PAINT);
+  const more=()=>{ if(gen!==_feedGen||i>=list.length)return; chunk(FEED_CHUNK); if(i<list.length)requestAnimationFrame(more); };
+  if(i<list.length)requestAnimationFrame(more);
 }
 // Fetch-failure banner — a FAILED viewport fetch (network blip / mid-deploy chunk mismatch) must
 // NOT read as a genuine "No opportunities match". _showFetchError paints an honest retry state and
 // leaves any already-rendered cards in place; _clearFetchError removes it on the next good fetch.
 // (The live viewport JS in route.ts calls these when every enabled horizon's fetch failed.)
+// NOTHING rendered yet (first load — the full page no longer ships a placeholder list): a failure must not
+// read as a market of zero. Replace the feed's "No opportunities match" and the header's "0 results" with the
+// failure itself; the next good fetch re-renders both.
 function _showFetchError(){
   var feed=document.getElementById('feed'); if(!feed)return;
   if(document.getElementById('fetchErr'))return; // already shown — don't stack
+  var haveCards=!!feed.querySelector('.card');
   var b=document.createElement('div'); b.id='fetchErr'; b.className='empty';
   b.innerHTML='<h4>Couldn’t load this view</h4>'
-    +'<p>The map hit a network hiccup. Your results are still here — try again.</p>'
+    +(haveCards?'<p>The map hit a network hiccup. Your results are still here — try again.</p>'
+               :'<p>Mindy couldn’t reach the opportunity data. This is a loading error, not zero results — try again.</p>')
     +'<button onclick="if(window.__mapRefetch)window.__mapRefetch()">Retry</button>';
+  if(!haveCards){
+    feed.innerHTML='';
+    var rc=document.getElementById('rescount'); if(rc)rc.textContent='Results unavailable';
+  }
   feed.insertBefore(b, feed.firstChild);
 }
 function _clearFetchError(){ var e=document.getElementById('fetchErr'); if(e)e.remove(); }

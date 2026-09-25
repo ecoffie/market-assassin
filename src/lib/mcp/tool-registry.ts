@@ -444,8 +444,11 @@ const AGENCY_INTEL_TOOL_DEF = {
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
       'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
-      'points are curated intel, not an official statement. Returns grounded=false when no agency matches — ' +
-      'try the full name or a CGAC code; do not guess an agency.',
+      'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
+      'holds for the department — each bill and version with its stage and law status (enacted law vs House/' +
+      'Senate activity vs committee report) and a congress.gov link. Bill text is not held, so it cannot say ' +
+      'what a version requires. Returns grounded=false when no agency matches — try the full name or a CGAC ' +
+      'code; do not guess an agency.',
     parameters: {
       type: 'object',
       properties: {

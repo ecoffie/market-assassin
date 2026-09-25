@@ -134,7 +134,7 @@ describe('wiring — only USER actions (and keep-in-sync for an existing intent 
     expect(between('window.__applySavedSearch=function(ss){', '// Clear all: reset the server filters')).not.toContain('__syncQueryUrl');
     expect(between("else if(act==='saved'){", "else { location.href='/opportunity-map/saved'; }")).toContain('window.__syncQueryUrl(true)');
     expect(between("x.textContent='Start fresh';", 'pill.appendChild(x);')).toContain('window.__syncQueryUrl(true)');
-    expect(between('function fetchView(){', '// FOOT OF THE FEED')).not.toContain('__syncQueryUrl');
+    expect(between('function fetchView(opts){', '// FOOT OF THE FEED')).not.toContain('__syncQueryUrl');
     expect(between('window.setMapMode=function(mode){', 'function syncHorizonBarVis(mode){')).not.toContain('__syncQueryUrl');
   });
   it('no other history write exists on the page', () => {

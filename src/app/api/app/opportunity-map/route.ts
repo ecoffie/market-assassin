@@ -27,6 +27,7 @@ import { decorateWithEarlySignal, filterByEarlySignal, dodaacFromSolicitation } 
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
+import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -200,6 +201,10 @@ export async function GET(request: NextRequest) {
     // only (?sources=dla → "DLA only"). When SAM isn't wanted, skip its queries entirely so the
     // map shows purely the requested pipeline (Eric 2026-07-30, the top-bar Source filter).
     const includeSam = wantSamSources(p.get('sources'));
+    // MARKET TRUTH vs VIEWPORT (map-counts-mode.ts): `counts=0` = the client already holds this exact
+    // intent's market-wide counts, so skip every bbox-independent count (the paged distinct-listing
+    // walk, the unmapped head count, the DLA total). The viewport pins + totalInView still run.
+    const withCounts = wantsMarketCounts(p);
     // totalForFilters — the headline count, NO bbox (reconciles with the dashboard). It must count
     // UNIQUE LISTINGS, not raw rows (Eric 2026-08-04: the pins are deduped by solicitation, so a raw
     // row count would read "4,712 results" over fewer unique pins — a second trust gap). A PostgREST
@@ -295,8 +300,8 @@ export async function GET(request: NextRequest) {
 
     const samQueries = includeSam
       ? (() => {
-          const totalP = countUniqueListingsForFilters();
-          const unmappedP = countUnmappedForFilters();
+          const totalP = withCounts ? countUniqueListingsForFilters() : Promise.resolve(0);
+          const unmappedP = withCounts ? countUnmappedForFilters() : Promise.resolve(null);
           let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
             .not('map_lat', 'is', null)
             .gte('map_lat', south).lte('map_lat', north)
@@ -456,7 +461,11 @@ export async function GET(request: NextRequest) {
       // Canonical discovery status for the Open query. needs_positive_scope / needs_refinement mean
       // "not a searchable market yet" — the SAM counts are then 0 by construction, not market truth.
       discovery: mapsOpenDiscoveryMeta(openReq.plan),
-      totalForFilters: earlyFiltered ? merged.length : headlineTotal,
+      // counts=0 (map-counts-mode.ts): the market-wide fields below are OMITTED, never 0/null — the
+      // client already holds them for this exact intent. `early` totals are derived from the returned
+      // pins, not from a count query, so they always ship.
+      ...(withCounts || earlyFiltered ? {} : { countsSkipped: true }),
+      totalForFilters: withCounts || earlyFiltered ? (earlyFiltered ? merged.length : headlineTotal) : undefined,
       // In-view total = the UNIQUE listings we actually return (pins is already deduped) + DLA + SBIR,
       // NOT the raw pre-dedupe viewport count — so "N in view" matches the rendered rail/pins.
       totalInView: earlyFiltered
@@ -471,11 +480,11 @@ export async function GET(request: NextRequest) {
       // (APO/FPO + foreign place-of-performance the "Seoul, DC" guard refuses to pin to the US
       // buying office), so this never reaches zero even at ~95.7% coverage.
       // null = UNKNOWN (the count query failed), never 0 — see Bug Prevention Rule #11.
-      unmappedForFilters: earlyFiltered ? 0 : unmappedForFilters,
-      marketTotalForFilters:
+      unmappedForFilters: !withCounts && !earlyFiltered ? undefined : (earlyFiltered ? 0 : unmappedForFilters),
+      marketTotalForFilters: !withCounts && !earlyFiltered ? undefined : (
         earlyFiltered || unmappedForFilters == null
           ? null
-          : (earlyFiltered ? merged.length : headlineTotal) + unmappedForFilters,
+          : (earlyFiltered ? merged.length : headlineTotal) + unmappedForFilters),
       pins: merged,
     });
   } catch (e) {

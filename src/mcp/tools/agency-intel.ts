@@ -20,6 +20,10 @@ import {
   type ClaimProvenance,
 } from '@/lib/strategic-intel/sourced-pain-points';
 import { mcpFlags } from '@/lib/mcp/flags';
+import {
+  getLegislativeEvidenceForAgency,
+  type LegislativeEvidence,
+} from '@/lib/strategic-intel/legislative-evidence';
 
 export interface AgencyIntelInput {
   /** Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069". */
@@ -74,6 +78,12 @@ export interface AgencyIntelResult {
   } | null;
   /** Live USASpending obligations, labeled by spending.scope. */
   spending: AgencyIntelSpending | null;
+  /**
+   * Mindy's living legislative corpus for the department (NDAA-titled measures):
+   * measure → version → stage → law status → link. Source evidence, not interpretation.
+   * Statutory text is NOT held. Null only when the agency query was empty.
+   */
+  legislation: LegislativeEvidence | null;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -82,6 +92,8 @@ export interface AgencyIntelResult {
     spending_scope: SpendingScope;
     sourced_pain_points: number;
     legacy_pain_points: number;
+    legislation_status: LegislativeEvidence['status'] | 'not_applicable';
+    legislative_measures: number;
   };
 }
 
@@ -101,10 +113,12 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       command_spending: { status: 'NOT_APPLICABLE' },
       agency: null,
       spending: null,
+      legislation: null,
       _meta: {
         grounded: false, degraded: false, has_spending: false,
         spending_scope: 'NOT_ESTABLISHED',
         sourced_pain_points: 0, legacy_pain_points: 0,
+        legislation_status: 'not_applicable', legislative_measures: 0,
       },
     };
   }
@@ -203,6 +217,28 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
     }
   }
 
+  // Legislation: the department's held NDAA record. A component (Navy) is answered at
+  // its ESTABLISHED parent department and labelled parent_department — never
+  // attributed to the component. A failed corpus read is UNAVAILABLE, never "none".
+  let legislation: LegislativeEvidence;
+  try {
+    legislation = await getLegislativeEvidenceForAgency({
+      query: agencyQuery,
+      parentAgency: grain.established ? (grain.identity.parent || grain.identity.service) : null,
+    });
+  } catch (err) {
+    degraded = true;
+    console.error('[mcp:get_agency_intel] legislative evidence failed:', err);
+    legislation = {
+      status: 'unavailable', requested: agencyQuery, linked_agency: null, grain: null,
+      vehicles: [], other_measures: [], coverage: null,
+      not_established: ['Legislative corpus read failed — legislation is UNKNOWN for this call, not absent.'],
+      host_rules: ['Do not state that no legislation exists; the read failed.'],
+    };
+  }
+  const legislativeMeasures = legislation.vehicles.reduce((n, v) => n + v.measures.length, 0)
+    + legislation.other_measures.length;
+
   const grounded = !!resolved;
   const result: AgencyIntelResult = {
     queried: { agency: agencyQuery, ...(fiscalYear ? { fiscal_year: fiscalYear } : {}) },
@@ -225,6 +261,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
         }
       : null,
     spending,
+    legislation,
     _meta: {
       grounded,
       degraded,
@@ -232,6 +269,8 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       spending_scope: spending?.scope ?? grain.spendingScope,
       sourced_pain_points: sourcedCount,
       legacy_pain_points: legacyCount,
+      legislation_status: legislation.status,
+      legislative_measures: legislativeMeasures,
     },
   };
 
@@ -253,6 +292,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
         'LEGACY_MANUAL = static JSON; provenance unavailable.',
         'MINDY_INTERPRETATION = derived claim, not direct GAO wording.',
         'Never attribute PARENT_SERVICE totals to the requested command.',
+        'legislation: only ENACTED_LAW is law; bill/report text is not held — obey legislation.host_rules.',
       ],
     };
   }

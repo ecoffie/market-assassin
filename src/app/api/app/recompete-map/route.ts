@@ -20,6 +20,7 @@ import { mapsRecompeteRequest, mapsRecompeteDiscoveryMeta } from '@/lib/recompet
 import { readOld, readNew, buildRecompeteMapBody, unresolvedScopeBody, compareReads, isOldDegradedOnly, type MarketRead } from '@/lib/recompete/recompete-map-paths';
 import { computeOnceConfig, decide, forcedFromHeaders } from '@/lib/recompete/compute-once-mode';
 import { writeComputeOnceLog, recompeteParams } from '@/lib/recompete/compute-once-log';
+import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
 import { isComputeOnceBusy } from '@/lib/recompete/compute-once-pg';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
@@ -59,6 +60,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(unresolvedScopeBody(recompeteReq));
   }
   const b = { west, south, east, north };
+  // counts=0 (map-counts-mode.ts, Maps P0): a pan with a cached intent skips the market-wide counts.
+  const withCounts = wantsMarketCounts(p);
+  const ro = { counts: withCounts };
   const db = sb();
 
   // ── COMPUTE-ONCE ROLLOUT (Gate 2, 2026-09-24 — shadow → canary → authority) ─────────────────────
@@ -79,16 +83,16 @@ export async function GET(request: NextRequest) {
   try {
     if (d.serve === 'new') {
       try {
-        read = await readNew(recompeteReq, b);
+        read = await readNew(recompeteReq, b, ro);
       } catch (e) {
         newError = (e as Error).message;
         newBusy = isComputeOnceBusy(e);
         if (!newBusy) console.error('[recompete-map] compute-once failed, serving PostgREST path:', newError);
         served = 'fallback';
-        read = await readOld(db, recompeteReq, b);
+        read = await readOld(db, recompeteReq, b, ro);
       }
     } else {
-      read = await readOld(db, recompeteReq, b);
+      read = await readOld(db, recompeteReq, b, ro);
     }
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
@@ -119,7 +123,7 @@ export async function GET(request: NextRequest) {
       // of a live table can straddle an hourly sync write, and that is churn, not a semantic mismatch.
       let other: MarketRead;
       try {
-        other = served === 'new' ? await readOld(db, recompeteReq, b) : await readNew(recompeteReq, b);
+        other = served === 'new' ? await readOld(db, recompeteReq, b, ro) : await readNew(recompeteReq, b, ro);
       } catch (e) {
         if (isComputeOnceBusy(e)) {
           await writeComputeOnceLog(db, { ...base, compared: false, outcome: 'skipped_busy', old_ms: oldMs, new_ms: newMs });
@@ -135,7 +139,7 @@ export async function GET(request: NextRequest) {
       let lastOld = oldRead, lastNew = newRead;
       if (fields.length) {
         try {
-          const [o2, n2] = await Promise.all([readOld(db, recompeteReq, b), readNew(recompeteReq, b)]);
+          const [o2, n2] = await Promise.all([readOld(db, recompeteReq, b, ro), readNew(recompeteReq, b, ro)]);
           const f2 = compareReads(recompeteReq, o2, n2);
           if (!f2.length) outcome = 'churn'; else { fields = f2; lastOld = o2; lastNew = n2; }
         } catch { /* keep the first comparison */ }
@@ -147,5 +151,5 @@ export async function GET(request: NextRequest) {
   }
 
   // Which path answered is operational metadata, never a difference — the body is the same either way.
-  return NextResponse.json(buildRecompeteMapBody(recompeteReq, read), { headers: { 'x-recompete-path': served } });
+  return NextResponse.json(buildRecompeteMapBody(recompeteReq, read, ro), { headers: { 'x-recompete-path': served } });
 }

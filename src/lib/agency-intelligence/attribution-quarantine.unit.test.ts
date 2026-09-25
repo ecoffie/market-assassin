@@ -125,6 +125,9 @@ describe('no_title_evidence is never silently promoted to corroborated', () => {
     intelligence_type: 'gao_high_risk',
     title: 'Veterans Affairs: Programmatic and Management Challenges',
     source_name: 'GovInfo API',
+    // A CURRENT date, so these rows exercise the attribution labels. Undated or
+    // stale legacy GAO is withheld before labelling (legacy-gao-currency.unit.test.ts).
+    publication_date: '2025-01-15',
     attribution_evidence: evidence,
   });
 

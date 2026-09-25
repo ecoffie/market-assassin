@@ -429,7 +429,9 @@ server.registerTool(
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
       'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
-      'points are curated intel, not an official statement. grounded=false when no agency matches — do not guess.',
+      'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
+      'holds for the department — each bill and version with its stage and law status and a congress.gov link. ' +
+      'Bill text is not held. grounded=false when no agency matches — do not guess.',
     inputSchema: {
       agency: z
         .string()
