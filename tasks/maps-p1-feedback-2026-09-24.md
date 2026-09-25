@@ -8,9 +8,8 @@
 > - cold load: first useful pins 1.5–2.4 s;
 > - 0 stale paints.
 
-Branch `feat/maps-p1-feedback`, **stacked on P0 (#1684, not merged)** plus current `main`. The merge resolved one
-conflict: main's Gate 2 recompete route plus P0's `counts=0` pan contract, threaded through both read paths so a pan
-compares clean. No backend optimization, no Canonical Discovery change, no compute-once semantics change.
+Branch `feat/maps-p1-feedback`, rebased onto `main` after P0 (#1684) merged and was production-verified (`7ce3a668`).
+The diff against main is P1/P2 only. No backend optimization, no Canonical Discovery change, no compute-once semantics change.
 
 ## What ships
 | Part | Where |
@@ -108,7 +107,8 @@ compares clean. No backend optimization, no Canonical Discovery change, no compu
 9. Reduced motion left animated elements invisible → visible is the default state.
 
 ## Known limits (not fixed here)
-- **Cold load is pre-existing and slow.** `DOMContentLoaded` is ~8 s and the first round dispatches at ~7.5 s in this headless environment, on both builds. The overlay itself costs nothing measurable (14.26 s shipped vs 14.43 s with it removed, median). That is page-weight / blocking-script work, outside P1.
+- **Cold load.** The ~8 s figure was x86 Chrome under Rosetta. Natively, DCL is 0.7–1.1 s and first useful pins land at 1.5–2.4 s. The overlay reveals late because a parse-time timer shows it; the cause and the proposed bootstrap separation are in `tasks/maps-first-load-investigation-2026-09-25.md` (not implemented).
+- **A horizon can fail on the first request after a fresh deploy.** Measured twice on the preview: the Open API returned HTTP 500 after ~10.7 s on the first cold load following a deploy, then 200 in 3–5 s warm (3/3). That is the Open API, which this PR does not change. The page now says "Open couldn’t load" instead of "still loading Open" (fixed in `b144acbc`).
 - **Naming.** Progress rows say Open Now / Coming Back / Coming Soon (your copy, and FIND's); the Horizons dropdown and legend still say Open / Recompete / Forecast. One canonical name is needed. That's a product call, flagged rather than renamed here.
 - Forecast's row count is `totalForFilters` (mappable); the header adds location-less forecasts, as P0 already does.
 - Actions whose own handlers are slow (e.g. show Recompete after a heavy render) acknowledge only when that handler ends; the browser cannot paint mid-task.
