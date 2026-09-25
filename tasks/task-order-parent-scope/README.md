@@ -112,6 +112,12 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 | MCP and both Map paths must agree after counts load | unchanged | Live 26/26 (23 = 15 + 8; DC + $1M = 4 + 2). Browser filter change to $5M: Map "2 opportunities" = MCP 2 + 0 |
 | Shared links, refresh, filter changes, Clear | unchanged | Browser (`integration-browser-evidence.json`): open, refresh and a fresh browser are identical; Clear returns to `?mode=recompete`; ambiguous "OASIS" searches nothing |
 
+**Integration review: one blocker, fixed.** The reviewer confirmed risks 1–6 of the integration. The blocker predates the merge and was missed earlier:
+- A scoped link followed by the **DLA** tab painted the unscoped Awarded market as the DLA map.
+- Fix: the scope override now applies only on the Opportunities map.
+- Proof: the P0-harness test fails on the pre-fix route and passes after. In the browser (`dla-browser-evidence.json`), DLA sends only `sources=dla` requests and hides the banner; returning sends the scoped request and shows the banner again.
+- Carried over from `main`, not #1692: `recompete-map-paths.ts` turns a null counted total into `0` (`r.total ?? 0`). Reported separately, not changed here.
+
 Live data moved since the first head: OASIS+ has 284 orders in the window, and 10 are unattributed. Agreement holds on every path.
 
 ## Reproducible demo (VCI / IMRI style)

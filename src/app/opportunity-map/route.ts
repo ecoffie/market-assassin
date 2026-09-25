@@ -2724,7 +2724,10 @@ const VIEWPORT_JS = `<script>
     // open notices and forecasts do not). Fetching the other horizons would SUM their unscoped totals
     // into the headline — the same failure as the strategy lens above — so fetch Awarded alone. Set
     // BEFORE the P0 round below, so the other horizons' in-flight requests are aborted and never paint.
-    if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }
+    // Opportunities map only: DLA mode is its own single-endpoint map, and its URL builder never carries
+    // a scope — forcing Awarded there painted the UNSCOPED Awarded market as the DLA map (integration
+    // review, 2026-09-25). The scope stays in FILT and applies again when the user returns.
+    if(window.__mapMode!=='dla'&&(FILT.vehicle||FILT.parent||FILT.work)){ _enabled=['recompete']; }
     if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
     // Horizons no longer part of this view: their in-flight requests can never paint — abort them.
     ['open','recompete','forecast'].forEach(function(k){

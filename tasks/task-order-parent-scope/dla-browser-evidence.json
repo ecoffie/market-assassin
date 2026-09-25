@@ -1,0 +1,36 @@
+{
+ "scoped": {
+  "mode": "recompete",
+  "header": "15 results",
+  "banner": true
+ },
+ "dla": {
+  "mode": "dla",
+  "header": "65,242 results",
+  "banner": false,
+  "reqs": [
+   {
+    "ep": "opportunity",
+    "vehicle": null,
+    "sources": "dla"
+   },
+   {
+    "ep": "opportunity",
+    "vehicle": null,
+    "sources": "dla"
+   }
+  ]
+ },
+ "back": {
+  "mode": "open",
+  "header": "15 results",
+  "banner": true,
+  "reqs": [
+   {
+    "ep": "recompete",
+    "vehicle": "OASIS+",
+    "sources": null
+   }
+  ]
+ }
+}

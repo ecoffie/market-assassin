@@ -116,6 +116,31 @@ describe('1 — a scoped search loads ONLY Awarded; Open/Forecast never reach th
   });
 });
 
+describe('1b — DLA mode is its own map: a leftover scope never turns it into the Awarded market (integration review blocker)', () => {
+  it('scope set, DLA tab: DLA fetches its own endpoint, no Awarded request, no scope params, no banner', async () => {
+    const h = harness((url) => (hz(url) === 'recompete' ? { body: awarded(url, { pins: ['AWARDED'], total: 99, unmapped: 0 }), delay: 10 } : { body: { success: true, discovery: { status: 'ok' }, totalForFilters: 7, unmappedForFilters: 0, totalInView: 1, capped: false, pins: [{ tag: 'DLA' }] }, delay: 10 }));
+    h.FILT.vehicle = 'OASIS+'; h.FILT.work = 'management consulting';
+    h.fetchView(); await sleep(100);                                   // the scoped Opportunities map
+    expect(h.w.__vehicleScope).not.toBeNull();
+    const n = h.calls.length;
+    (h.ctx.window as Record<string, unknown>).__mapMode = 'dla';       // the user clicks the DLA tab (FILT untouched)
+    h.fetchView(); await sleep(150);
+    const dla = h.calls.slice(n);
+    expect(dla.length).toBeGreaterThan(0);
+    expect(dla.some((u) => hz(u) === 'recompete')).toBe(false);
+    expect(dla.some((u) => /[?&](vehicle|parent|work)=/.test(u))).toBe(false);
+    expect(h.paints.at(-1)).toEqual({ tags: ['DLA'], total: 7 });
+    expect(h.w.__vehicleScope).toBeNull();
+    (h.ctx.window as Record<string, unknown>).__mapMode = 'open';      // back to Opportunities: the scope is still the user's
+    const m = h.calls.length;
+    h.fetchView(); await sleep(150);
+    // Served from the P0 pins/truth cache (same scoped URL, within the TTL) — any request it does make is scoped.
+    expect(h.calls.slice(m).every((u) => hz(u) === 'recompete' && u.includes('vehicle=OASIS'))).toBe(true);
+    expect(h.paints.at(-1)).toEqual({ tags: ['AWARDED'], total: 99 });
+    expect(h.w.__vehicleScope).not.toBeNull();
+  });
+});
+
 describe('2 — cached counts belong to the EXACT scope and filters', () => {
   const totals: Record<string, number> = { 'OASIS+|management consulting': 15, 'OASIS+|program management': 40, 'CONT_IDV_X_4732|management consulting': 3, 'OASIS+|management consulting|1000000': 6 };
   const keyOf = (url: string) => { const q = new URL('http://x' + url).searchParams; return [q.get('vehicle') || q.get('parent'), q.get('work') || '', q.get('minValue') || ''].filter((x, i) => i < 2 || x).join('|'); };

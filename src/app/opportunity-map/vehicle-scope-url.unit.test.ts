@@ -135,6 +135,6 @@ describe('wiring', () => {
     expect(MAP).toContain("return (isFinite(n)&&n>=1&&n<=999999999999999)?String(n):''; })()");
   });
   it('a scope fetches the Awarded horizon alone (no unscoped totals summed in)', () => {
-    expect(MAP).toContain("if(FILT.vehicle||FILT.parent||FILT.work){ _enabled=['recompete']; }");
+    expect(MAP).toContain("if(window.__mapMode!=='dla'&&(FILT.vehicle||FILT.parent||FILT.work)){ _enabled=['recompete']; }");
   });
 });
