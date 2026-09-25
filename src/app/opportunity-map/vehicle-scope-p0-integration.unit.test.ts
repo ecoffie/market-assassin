@@ -197,6 +197,23 @@ describe('3 — counts=0 means "not supplied", never zero; the banner follows th
     expect(h.w.__vehicleScope?.label).toBe('C|');
     expect(h.banners).not.toContain('A|');                                             // A's late answer never painted the banner
   });
+  it('a FAILED count (null) reads "unknown" — not 0 — is not cached, and the next pan re-asks', async () => {
+    let fail = true;
+    const h = harness((url) => {
+      const body = awarded(url, { pins: ['S1'], total: 15, unmapped: 8 });
+      if (fail && !url.includes('counts=0')) { body.totalForFilters = null; body.unmappedForFilters = null; }
+      return { body, delay: 10 };
+    });
+    (h.ctx.window as Record<string, unknown>).__horizons = { open: false, recompete: true, forecast: false };
+    h.FILT.vehicle = 'OASIS+';
+    h.fetchView(); await sleep(100);
+    expect(h.w.__horizonCounts.recompete).toMatchObject({ state: 'unknown', total: null });
+    fail = false;                                                        // the database recovers
+    h.ctx.BBOX = '-95,25,-65,45'; h.fetchView({ pan: true }); await sleep(100);
+    expect(h.calls.at(-1)).not.toContain('counts=0');                    // unknown was never cached as truth
+    expect(h.w.__horizonCounts.recompete).toMatchObject({ state: 'ok', total: 15 });
+    expect(h.paints.at(-1)!.total).toBe(15);
+  });
   it('an UNRESOLVED scope reads as needs-refinement — no number, not 0', async () => {
     const h = harness(() => ({ body: { success: true, mode: 'recompete', discovery: { status: 'needs_refinement', refinement: 'ambiguous' }, vehicle_scope: { status: 'unresolved', label: 'OASIS' }, totalForFilters: null, totalInView: null, capped: false, unmappedForFilters: null, pins: [] }, delay: 10 }));
     (h.ctx.window as Record<string, unknown>).__horizons = { open: false, recompete: true, forecast: false };

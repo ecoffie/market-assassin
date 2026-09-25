@@ -133,7 +133,9 @@ export function buildRecompeteMapBody(req: MapsRecompeteRequest, r: MarketRead, 
     discovery: mapsRecompeteDiscoveryMeta(req.plan),
     // counts=0 → the market-wide fields are OMITTED (never 0/null): the client holds them.
     ...(withCounts ? {} : { countsSkipped: true }),
-    totalForFilters: withCounts ? (r.total ?? 0) : undefined, totalInView: r.inView ?? pins.length,
+    // A FAILED count is UNKNOWN (null), never 0 (Bug Prevention Rule #11): `?? 0` showed a timed-out scoped
+    // count as "0 orders" while MCP reported the same read as degraded (#1692).
+    totalForFilters: withCounts ? (r.total ?? null) : undefined, totalInView: r.inView ?? pins.length,
     capped: (r.inView ?? 0) > (rows.length),
     // null = UNKNOWN (the count failed), never 0 (Bug Prevention Rule #11).
     unmappedForFilters: withCounts ? (r.unmapped ?? null) : undefined,

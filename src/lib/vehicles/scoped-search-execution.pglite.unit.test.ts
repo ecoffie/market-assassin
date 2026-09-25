@@ -99,6 +99,43 @@ describe('baseline scope executes and the Map agrees (both read paths)', () => {
   });
 });
 
+describe('a FAILED scoped count is UNKNOWN on the Map and in MCP — never 0 (Bug Prevention Rule #11)', () => {
+  /** The same PGlite client, except every exact-count HEAD query fails (a statement timeout, say). */
+  function failingCounts() {
+    return { from: (t: string) => {
+      const b = db.from(t) as unknown as Record<string, unknown>;
+      const sel = b.select as (c?: string, o?: { count?: string; head?: boolean }) => unknown;
+      b.select = (c?: string, o?: { count?: string; head?: boolean }) => {
+        const q = sel.call(b, c, o) as Record<string, unknown>;
+        if (o?.head) (q as { then: unknown }).then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: null, count: null, error: { message: 'canceling statement due to statement timeout' } }).then(ok);
+        return q;
+      };
+      return b;
+    } };
+  }
+  it('Map body: totalForFilters is null (unknown), and the client reads it as "unknown", not 0', async () => {
+    const r = await searchScopedTaskOrders(BASE, db);
+    const params = Object.fromEntries(new URL(r.map_url!).searchParams);
+    const req = mapsRecompeteRequest((k) => params[k]);
+    const read = await readOld(failingCounts() as never, req, { west: -180, south: -90, east: 180, north: 90 }, { counts: true });
+    expect(read.total).toBeNull();                                  // the read path already says unknown…
+    const body = buildRecompeteMapBody(req, read, { counts: true }) as Record<string, unknown>;
+    expect(body.totalForFilters).toBeNull();                        // …and the wire must keep saying it
+    expect(body.totalForFilters).not.toBe(0);
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const route = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
+    const src = route.slice(route.indexOf('function horizonCount('), route.indexOf('function horizonCountLabel('));
+    const horizonCount = new Function(src + '; return horizonCount;')() as (d: unknown) => { total: number | null; state: string };
+    expect(horizonCount(JSON.parse(JSON.stringify(body)))).toMatchObject({ total: null, state: 'unknown' });
+  });
+  it('MCP for the same failure: degraded, total null — so Map and MCP agree on "unknown"', async () => {
+    const r = await searchScopedTaskOrders(BASE, failingCounts() as never);
+    expect(r.status).toBe('degraded');
+    expect(r.total).toBeNull();
+  });
+});
+
 describe('#1684 integration — a count-skipping read (counts=0) of a scoped link', () => {
   it('returns the SAME pins, omits the counts (never 0), and still carries the scope', async () => {
     const r = await searchScopedTaskOrders(BASE, db);

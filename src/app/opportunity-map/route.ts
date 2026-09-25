@@ -2515,7 +2515,9 @@ const VIEWPORT_JS = `<script>
     var pr=fetch(reqUrl,ctrl?{signal:ctrl.signal}:undefined).then(function(r){return r.json();}).then(function(d){
       if(!d||!d.success)return {failed:true};
       var t=(truth&&d.countsSkipped)?truth.t:_truthOf(d);
-      if(!(truth&&d.countsSkipped))_cachePut(_hzTruth[m],{key:sig,at:Date.now(),t:t});
+      // An UNKNOWN count (the count query failed → null) is not market truth: caching it would send counts=0 on
+      // every pan for HZ_TTL_MS and freeze the header at "unknown". Leave it uncached so the next round re-asks.
+      if(!(truth&&d.countsSkipped)&&horizonCount(d).state!=='unknown')_cachePut(_hzTruth[m],{key:sig,at:Date.now(),t:t});
       // vehicle_scope (#1692) rides with the pins: its cache key (the full URL) includes every scope param.
       var dv={success:true,discovery:d.discovery,pins:d.pins||[],totalInView:d.totalInView,capped:d.capped,vehicle_scope:d.vehicle_scope||null};
       _cachePut(_hzPins[m],{key:url,at:Date.now(),d:dv});

@@ -123,6 +123,13 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 - A URL sync in DLA/Players stripped the scope from the link, while the map re-applied it on return. The scope keys now come from `FILT` in every mode.
 - Proof: `vehicle-scope-modes.unit.test.ts` (5 tests fail on the pre-fix route) and `modes-browser-evidence.json`.
 
+**Release condition: can `r.total ?? 0` affect scoped results? Yes, so it's fixed here.**
+- `readOld` runs the scoped total as its own HEAD count. A failed or timed-out count is `null`, which the counted body turned into `0`: the Map showed "0 orders" while MCP reported `degraded`/null for the same read. The client also cached that 0 for pans.
+- Scoped counts did hit the statement timeout during this feature's development.
+- Fix: the body emits `null` (unknown), and an unknown count isn't cached as truth.
+- Regressions: the PGlite test fails with `?? 0`; the P0-harness test fails on the pre-fix route.
+- The sibling instances that don't touch scoped results are filed separately.
+
 Live data moved since the first head: OASIS+ has 284 orders in the window, and 10 are unattributed. Agreement holds on every path.
 
 ## Reproducible demo (VCI / IMRI style)
