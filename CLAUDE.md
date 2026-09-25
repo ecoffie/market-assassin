@@ -430,8 +430,16 @@ audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. ✅ Merged `7ce3a668
   sends `counts=0` (`map-counts-mode.ts`) → server omits market-wide fields (`countsSkipped:true`, never 0/null).
 - Recompete keyword cost was fixed separately: Gate 1 trigram indexes (applied) + Gate 2 compute-once (see below).
 
-### Maps P1/P2 — instant feedback + Building your market (PR #1693, on main after P0; awaiting review — do not merge)
-Record: **`tasks/maps-p1-feedback-2026-09-24.md`** (when each state appears, state matrix, before/after, acceptance).
+### Maps P1/P2 — instant feedback + Building your market (PR #1693) — ✅ PRODUCTION-PROVEN 2026-09-25
+Record: **`tasks/maps-p1-feedback-2026-09-24.md`** (states, matrix, production acceptance) · first load:
+`tasks/maps-first-load-investigation-2026-09-25.md`. Merge `24dbb20e`; future verification = serving SHA CONTAINS it
+(`git merge-base --is-ancestor 24dbb20e <serving-sha>`) + live behavior. Do not reopen for polish or another perf pass.
+Separate, unfixed: #1696 Open cold-start 500 · #1697 stale "Picked up where you left off" pill.
+- ⚠️ Building your market is CSS-revealed from the SERVER HTML (`.app mfb-booting`, 300 ms opacity animation) — never
+  bring back a JS reveal timer; it waited on the very scripts it covers. The 600-row placeholder `OPPS` ships ONLY for
+  `?embed=` (its whole content); the full page ships `OPPS=[]`.
+- ⚠️ Measure Maps timing with NATIVE arm64 Chrome (`arch -arm64 … --remote-debugging-port`). Node here is x64, so
+  Puppeteer's bundled Chrome runs under Rosetta and inflated every timing 5–40× (the "8 s cold load").
 - `market-feedback.ts` is PRESENTATION ONLY — VIEWPORT_JS reports round facts (`begin`/`horizon`/`paint`/`idle`); it
   never fetches or delays data. Thresholds live in `MF_TIMING` (0 bar · 300 spinner · 1 s panel · 3 s Mindy Intel).
 - ⚠️ A USER ACTION supersedes in-flight work AT ONCE (`_actionNow()` bumps `_fetchGen`) — the dispatch now yields a
