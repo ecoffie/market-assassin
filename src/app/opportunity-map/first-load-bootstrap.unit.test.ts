@@ -90,3 +90,35 @@ describe('Building your market: server-rendered, CSS-revealed', () => {
     expect(MARKET_FEEDBACK_CSS).toMatch(/prefers-reduced-motion:reduce\)\{[^}]*\.mfb-boot::after\{animation:none\}/);
   });
 });
+
+// Forced ALL-horizon failure on first load, measured on the preview (native Chrome, 2026-09-25): with no
+// placeholder list the header read "0 results" and the feed "No opportunities match / Clear all filters"
+// under the error banner — a loading failure presented as an empty market. EXECUTES the served function.
+import { JSDOM } from 'jsdom';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+function loadShowFetchError(bodyHtml: string) {
+  const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
+  const grab = (name: string) => { const s = tmpl.indexOf(`function ${name}(`); let d = 0; for (let i = tmpl.indexOf('{', s); i < tmpl.length; i++) { if (tmpl[i] === '{') d++; else if (tmpl[i] === '}' && --d === 0) return tmpl.slice(s, i + 1); } throw new Error(name); };
+  const dom = new JSDOM(`<body>${bodyHtml}<script>${grab('_showFetchError')}\n${grab('_clearFetchError')}</script></body>`, { runScripts: 'dangerously' });
+  return dom.window as unknown as Window & { _showFetchError: () => void };
+}
+describe('every horizon failed', () => {
+  it('with NOTHING rendered: never "0 results", never "No opportunities match"', () => {
+    const w = loadShowFetchError('<div id="rescount">0 results</div><div id="feed"><div class="empty"><h4>No opportunities match</h4></div></div>');
+    w._showFetchError();
+    const text = (w.document.getElementById('rescount')!.textContent || '') + ' ' + (w.document.getElementById('feed')!.textContent || '');   // rendered text only, not the <script>
+    expect(w.document.getElementById('rescount')!.textContent).toBe('Results unavailable');
+    expect(text).not.toContain('No opportunities match');
+    expect(text).not.toMatch(/\b0 results\b/);
+    expect(text).toContain('not zero results');
+    expect(text).not.toContain('Your results are still here');
+  });
+  it('with a market already on screen: keeps it, and says so', () => {
+    const w = loadShowFetchError('<div id="rescount">1,234 results</div><div id="feed"><div class="card">A</div></div>');
+    w._showFetchError();
+    expect(w.document.getElementById('rescount')!.textContent).toBe('1,234 results');
+    expect(w.document.querySelector('.card')).not.toBeNull();
+    expect(w.document.getElementById('feed')!.textContent).toContain('Your results are still here');
+  });
+});
