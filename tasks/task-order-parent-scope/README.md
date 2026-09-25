@@ -130,6 +130,10 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 - Regressions: the PGlite test fails with `?? 0`; the P0-harness test fails on the pre-fix route.
 - The sibling instances that don't touch scoped results are filed separately.
 
+**Review of the unknown-count fix: one blocker, fixed.** With the default Horizons setting (all on), the header built its "every horizon has reported" check from the Horizons toggles. A scoped round loads Awarded only, so a scoped "unknown" or genuine 0 kept the previous search's number.
+- Fix: the header now uses the horizons the painted round actually loaded (`window.__roundEnabled`).
+- Proof: P0-harness tests running the real `updateHeader` with default horizons fail on the pre-fix route. In the browser (`header-browser-evidence.json`), an unscoped "128,041 results" goes to "15 results" / "0 results" for the scoped links.
+
 Live data moved since the first head: OASIS+ has 284 orders in the window, and 10 are unattributed. Agreement holds on every path.
 
 ## Reproducible demo (VCI / IMRI style)

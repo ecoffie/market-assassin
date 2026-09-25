@@ -2047,7 +2047,12 @@ const VIEWPORT_JS = `<script>
     // is a number the user did not ask for. Opportunity horizons only; contacts keep their own path.
     if(!TOTAL && !(typeof isContactMode==='function'&&isContactMode(MODE))){
       var _hc=window.__horizonCounts||{}, _hz=window.__horizons||{};
-      var _en=['open','recompete','forecast'].filter(function(h){ return _hz[h]!==false; });
+      // The horizons the LAST PAINTED ROUND actually loaded — not the toggles. A vehicle scope (Awarded only)
+      // or a strategy lens (Open only) loads fewer horizons than are toggled on; judging "all reported" by
+      // the toggles never matched, so a scoped 0 / unknown fell through and kept the PREVIOUS search's
+      // number (#1692 review). The toggles are the fallback only before any round has painted.
+      var _en=(window.__roundEnabled&&window.__roundEnabled.length)?window.__roundEnabled.slice()
+        :['open','recompete','forecast'].filter(function(h){ return _hz[h]!==false; });
       var _reported=_en.length>0 && _en.every(function(h){ return !!_hc[h]; });
       // Some horizons still LOADING and none has found anything yet: that is not "0 results" —
       // the answer is not in. Say so instead of printing a zero (or keeping the previous number).
@@ -2733,7 +2738,7 @@ const VIEWPORT_JS = `<script>
     // a scope — forcing Awarded there painted the UNSCOPED Awarded market as the DLA map (integration
     // review, 2026-09-25). The scope stays in FILT and applies again when the user returns.
     if(window.__mapMode!=='dla'&&(FILT.vehicle||FILT.parent||FILT.work)){ _enabled=['recompete']; }
-    if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
+    if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); window.__roundEnabled=[]; OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
     // Horizons no longer part of this view: their in-flight requests can never paint — abort them.
     ['open','recompete','forecast'].forEach(function(k){
       if(_enabled.indexOf(k)===-1&&_hzInflight[k]){ try{ if(_hzInflight[k].ctrl)_hzInflight[k].ctrl.abort(); }catch(e){} delete _hzInflight[k]; }
@@ -2782,6 +2787,8 @@ const VIEWPORT_JS = `<script>
   // Paint the CURRENT round with whatever horizons have resolved (contract 3).
   function _paintRoundNow(round){
     if(round.gen!==_fetchGen)return;
+    // The horizons THIS round loads — the header's "every horizon has reported" test reads this (#1692).
+    window.__roundEnabled=round.enabled.slice();
     var settled=round.pending===0;
     var _enabled=round.enabled, parts=[], loading=[];
     _enabled.forEach(function(m){

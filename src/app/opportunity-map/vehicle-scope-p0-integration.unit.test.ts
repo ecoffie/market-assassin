@@ -49,17 +49,23 @@ function awarded(url: string, over: { pins: string[]; total: number; unmapped: n
   };
 }
 
-function harness(respond: (url: string) => { body: Body; delay: number }) {
+function harness(respond: (url: string) => { body: Body; delay: number }, opts: { dom?: boolean } = {}) {
   const calls: string[] = [];
   const paints: Array<{ tags: string[]; total: number }> = [];
   const banners: Array<string | null> = [];
+  const headers: string[] = [];
+  const els: Record<string, { innerHTML: string; hidden: boolean; textContent: string }> = {};
+  const el = (id: string) => (els[id] ||= { innerHTML: '', hidden: false, textContent: '' });
   const win: Record<string, unknown> = { __horizons: { open: true, recompete: true, forecast: true }, __mapMode: 'open' };
   win.__renderVehicleScope = () => { const vs = win.__vehicleScope as { label?: string } | null; banners.push(vs ? String(vs.label) : null); };
   const FILT: Record<string, unknown> = { agency: '', naics: '', state: '', setAside: '', setAsideMulti: '', vehicle: '', parent: '', work: '', leadMax: '', valueRange: '' };
   const ctx: Record<string, unknown> = {
     window: win, console, performance, Date, Math, JSON, String, Number, Array, Object, Promise, Error, URL,
     setTimeout, clearTimeout, AbortController,
-    document: { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null },
+    document: opts.dom
+      ? { querySelector: (q: string) => (q === '.brand' ? el('brand') : null), querySelectorAll: () => [], getElementById: (id: string) => (id === 'rescount' || id === 'mapCount' || id === 'sumline' ? el(id) : null) }
+      : { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null },
+    esc: (x: unknown) => String(x), setMapCount() {}, updateApplyCount() {},
     FILT, MODES: { open: { ep: '/o' }, recompete: { ep: '/r' }, forecast: { ep: '/f' } },
     MODE: 'open', Q: '', HIDE_FSC: false, OPPS: [], TOTAL: 0, CAPPED: false, INVIEW: 0,
     busy: false, pendingFetch: false, BBOX: '-80,30,-70,40',
@@ -67,7 +73,10 @@ function harness(respond: (url: string) => { body: Body; delay: number }) {
     isContactMode: () => false, _uemail: () => '', _trackMapView() {}, _clearFetchError() {}, _showFetchError() {},
     maybeJumpToSearch: () => false, maybeAutoFit() {}, _unplacedFoot() {},
     toRow: (p: { tag: string }) => ({ tag: p.tag }), unplacedToRow: (u: unknown) => u,
-    render() { paints.push({ tags: (ctx.OPPS as Array<{ tag: string }>).map((o) => o.tag), total: ctx.TOTAL as number }); },
+    render() {
+      paints.push({ tags: (ctx.OPPS as Array<{ tag: string }>).map((o) => o.tag), total: ctx.TOTAL as number });
+      if (opts.dom) { (ctx.__updateHeader as () => void)(); headers.push(el('rescount').innerHTML.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()); }
+    },
     fetch(url: string, init?: { signal?: AbortSignal }) {
       calls.push(url);
       const r = respond(url);
@@ -79,11 +88,11 @@ function harness(respond: (url: string) => { body: Body; delay: number }) {
   };
   win.window = win;
   vm.createContext(ctx);
-  const code = [extractFn(SRC, 'horizonCount'), extractFn(SRC, 'horizonCountLabel'), extractFn(SRC, 'coverageNote'), extractFn(SRC, 'needsScopeNote'), orchestrationBlock(SRC)]
+  const code = [...(opts.dom ? [extractFn(SRC, 'updateHeader')] : []), extractFn(SRC, 'horizonCount'), extractFn(SRC, 'horizonCountLabel'), extractFn(SRC, 'coverageNote'), extractFn(SRC, 'needsScopeNote'), orchestrationBlock(SRC)]
     .map(unTemplate).join('\n');
-  vm.runInContext(code + '\n;this.__fetchView=fetchView;', ctx);
+  vm.runInContext(code + '\n;this.__fetchView=fetchView;' + (opts.dom ? 'this.__updateHeader=updateHeader;' : ''), ctx);
   const w = win as { __horizonCounts: Record<string, { state: string; total: number | null }>; __vehicleScope: { label: string } | null };
-  return { ctx, FILT, calls, paints, banners, w, fetchView: ctx.__fetchView as (o?: { pan?: boolean }) => void };
+  return { ctx, FILT, calls, paints, banners, headers, w, fetchView: ctx.__fetchView as (o?: { pan?: boolean }) => void };
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hz = (url: string) => (url.startsWith('/o') ? 'open' : url.startsWith('/r') ? 'recompete' : 'forecast');
@@ -196,6 +205,33 @@ describe('3 — counts=0 means "not supplied", never zero; the banner follows th
     h.FILT.vehicle = 'C'; h.fetchView(); await sleep(300);                              // user moves on before A answers
     expect(h.w.__vehicleScope?.label).toBe('C|');
     expect(h.banners).not.toContain('A|');                                             // A's late answer never painted the banner
+  });
+  it('DEFAULT horizons (all on): a scoped FAILED count shows "?" — never the previous search\'s number', async () => {
+    let scopedFail = false;
+    const h = harness((url) => {
+      if (hz(url) !== 'recompete') return { ...other(url), delay: 5 };
+      const scoped = url.includes('vehicle=');
+      const body = awarded(url, { pins: scoped ? ['S1'] : ['BROAD'], total: scoped ? 15 : 128000, unmapped: 8 });
+      if (scoped && scopedFail) { body.totalForFilters = null; body.unmappedForFilters = null; }
+      return { body, delay: 5 };
+    }, { dom: true });
+    h.fetchView(); await sleep(120);                                    // unscoped market: a big headline
+    expect(h.headers.at(-1)).toMatch(/^1\d\d,\d{3} results/);
+    scopedFail = true; h.FILT.vehicle = 'OASIS+';
+    h.fetchView(); await sleep(150);                                    // horizons still ALL ON
+    expect(h.headers.at(-1)).toMatch(/^\? results/);
+    expect(h.headers.at(-1)).not.toMatch(/1\d\d,\d{3}/);
+  });
+  it('DEFAULT horizons (all on): a scoped search with 0 matches shows "0 results" — never the previous number', async () => {
+    const h = harness((url) => {
+      if (hz(url) !== 'recompete') return { ...other(url), delay: 5 };
+      const scoped = url.includes('vehicle=');
+      return { body: awarded(url, { pins: scoped ? [] : ['BROAD'], total: scoped ? 0 : 128000, unmapped: 0 }), delay: 5 };
+    }, { dom: true });
+    h.fetchView(); await sleep(120);
+    h.FILT.vehicle = 'OASIS+'; h.FILT.work = 'submarine hull welding';
+    h.fetchView(); await sleep(150);
+    expect(h.headers.at(-1)).toMatch(/^0 results/);
   });
   it('a FAILED count (null) reads "unknown" — not 0 — is not cached, and the next pan re-asks', async () => {
     let fail = true;
