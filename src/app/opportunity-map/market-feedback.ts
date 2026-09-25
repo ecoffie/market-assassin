@@ -70,7 +70,10 @@ export const MARKET_FEEDBACK_CSS =
   //    the marker pane + list added ~80 ms to every round — the next render rebuilt thousands of children
   //    inside faded layers; a veil over them is one composited layer and costs ~nothing).
   + '.mfb-veil{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .16s;will-change:opacity;background:rgba(255,255,255,.64)}'
-  + '.mapwrap>.mfb-veil{z-index:690}'
+  // z 450: above Leaflet's map pane (its own stacking context at 400 — every pin, shape, tile and popup is
+  // inside it), below the map's own controls (legend/Draw 500, count pill 510, "Picked up…" pill 600), this
+  // module's panel (640) and bar (650), and Leaflet's zoom controls (1000). Only the old MARKET is veiled.
+  + '.mapwrap>.mfb-veil{z-index:450}'
   + '.panel{position:relative}.panel>.mfb-veil{z-index:3}'
   // the count row stays ABOVE the list veil so "Updating your market…" is readable
   + '.sortrow{position:relative;z-index:4;background:#fff}'
