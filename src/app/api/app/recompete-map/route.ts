@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { mapsRecompeteRequest, mapsRecompeteDiscoveryMeta } from '@/lib/recompete/maps-recompete-discovery';
-import { readOld, readNew, buildRecompeteMapBody, compareReads, isOldDegradedOnly, type MarketRead } from '@/lib/recompete/recompete-map-paths';
+import { readOld, readNew, buildRecompeteMapBody, unresolvedScopeBody, compareReads, isOldDegradedOnly, type MarketRead } from '@/lib/recompete/recompete-map-paths';
 import { computeOnceConfig, decide, forcedFromHeaders } from '@/lib/recompete/compute-once-mode';
 import { writeComputeOnceLog, recompeteParams } from '@/lib/recompete/compute-once-log';
 import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
@@ -54,6 +54,11 @@ export async function GET(request: NextRequest) {
   // ⚠️ `?includePast=1` is retired: canonical Recompete policy is "not expired", no caller sent it, and
   // the table held 0 expired rows when this moved (measured 2026-09-22).
   const recompeteReq = mapsRecompeteRequest((k) => p.get(k));
+  // A parent/vehicle the registry cannot establish (unknown · ambiguous · no verified members · not an
+  // exact parent id) is answered with its reason and NO read — never widened to every vehicle's orders.
+  if (recompeteReq.surface.parentScope.status === 'unresolved') {
+    return NextResponse.json(unresolvedScopeBody(recompeteReq));
+  }
   const b = { west, south, east, north };
   // counts=0 (map-counts-mode.ts, Maps P0): a pan with a cached intent skips the market-wide counts.
   const withCounts = wantsMarketCounts(p);

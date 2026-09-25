@@ -1,0 +1,38 @@
+{
+ "filtered": {
+  "last": {
+   "vehicle": "OASIS+",
+   "state": "DC",
+   "minValue": "1000000",
+   "maxValue": null
+  },
+  "search": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60&state=DC&minValue=1000000"
+ },
+ "after_clear": {
+  "last": {
+   "vehicle": null,
+   "state": "DC",
+   "minValue": null,
+   "maxValue": null
+  },
+  "search": "?mode=recompete&state=DC",
+  "banner_visible": false
+ },
+ "after_clear_reload": {
+  "last": {
+   "vehicle": null,
+   "state": "DC",
+   "minValue": null,
+   "maxValue": null
+  },
+  "search": "?mode=recompete&state=DC"
+ },
+ "crafted": {
+  "last": {
+   "vehicle": "OASIS+",
+   "state": null,
+   "minValue": null,
+   "maxValue": null
+  }
+ }
+}

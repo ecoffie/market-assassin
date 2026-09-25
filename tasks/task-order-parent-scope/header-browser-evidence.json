@@ -1,0 +1,32 @@
+{
+ "matches": {
+  "unscopedHeader": "128,041 results",
+  "horizonsToggles": "{\"open\":true,\"recompete\":true,\"forecast\":true}",
+  "scopedHeader": "15 results",
+  "roundEnabled": [
+   "recompete"
+  ],
+  "counts": {
+   "recompete": {
+    "total": 15,
+    "state": "ok",
+    "gaps": []
+   }
+  }
+ },
+ "zero": {
+  "unscopedHeader": "128,041 results",
+  "horizonsToggles": "{\"open\":true,\"recompete\":true,\"forecast\":true}",
+  "scopedHeader": "0 results",
+  "roundEnabled": [
+   "recompete"
+  ],
+  "counts": {
+   "recompete": {
+    "total": 0,
+    "state": "ok",
+    "gaps": []
+   }
+  }
+ }
+}

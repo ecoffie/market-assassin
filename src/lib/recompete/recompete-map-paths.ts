@@ -12,6 +12,7 @@ import { applyMapsRecompeteFilters, mapsRecompeteDiscoveryMeta, type MapsRecompe
 import { RECOMPETE_PIN_COLS, toPin } from './map-pin';
 import { fetchFollowOnRows } from './map-follow-ons';
 import { runComputeOnce } from './compute-once-pg';
+import { parentIdOf, workTerms, type ParentScope } from '@/lib/vehicles/parent-scope';
 
 export const MAX_PINS = 1000;
 type Row = Record<string, unknown>;
@@ -79,6 +80,42 @@ export async function readNew(req: MapsRecompeteRequest, b: BBox, opts: ReadOpts
   return { total: withCounts ? r.total : null, unmapped: withCounts ? r.unmapped : null, inView: r.inView, pins: r.pins, followOns: r.followOns, ms: r.ms };
 }
 
+/**
+ * The parent/vehicle scope as the response states it — how the scope was established, never a bare
+ * label. null when the request carried no scope (the body is then byte-identical to before).
+ */
+export function parentScopeMeta(scope: ParentScope, work: string) {
+  const terms = workTerms(work);
+  if (scope.status === 'none') return terms.length ? { status: 'none' as const, work_terms: terms } : null;
+  if (scope.status === 'unresolved') {
+    return { status: 'unresolved' as const, kind: scope.kind, requested: scope.requested, reason_code: scope.reason_code, reason: scope.reason, candidates: scope.candidates ?? null, work_terms: terms };
+  }
+  const v = scope.vehicle;
+  return {
+    status: 'resolved' as const, kind: scope.kind, label: scope.label, requested: scope.requested,
+    parents_in_scope: scope.parents.length,
+    parent_ids: scope.kind === 'parent' ? scope.parents.map(parentIdOf) : undefined,
+    solicitations: v ? v.vehicle.solicitations : undefined,
+    membership: v ? { method: 'parent IDV solicitation_identifier ∈ vehicle solicitations (USASpending award record)', ...v.coverage } : undefined,
+    work_terms: terms,
+  };
+}
+
+/**
+ * An UNRESOLVED parent/vehicle scope: nothing was searched, so there is no count and no pin. Uses the
+ * canonical `needs_refinement` status the Map already renders as the refinement sentence (never "0").
+ */
+export function unresolvedScopeBody(req: MapsRecompeteRequest) {
+  const meta = parentScopeMeta(req.surface.parentScope, req.surface.work)!;
+  return {
+    success: true, mode: 'recompete',
+    discovery: { ...mapsRecompeteDiscoveryMeta(req.plan), status: 'needs_refinement', refinement: (meta as { reason?: string }).reason ?? '' },
+    vehicle_scope: meta,
+    totalForFilters: null, totalInView: null, capped: false, unmappedForFilters: null,
+    pins: [],
+  };
+}
+
 /** The user-visible payload — identical construction whichever path read the market. */
 export function buildRecompeteMapBody(req: MapsRecompeteRequest, r: MarketRead, opts: ReadOpts = {}) {
   const withCounts = opts.counts !== false;
@@ -89,16 +126,22 @@ export function buildRecompeteMapBody(req: MapsRecompeteRequest, r: MarketRead, 
   const seen = new Set(rows.map(cid));
   const extraFollowOns = r.followOns.filter((x) => !seen.has(cid(x)));
   const pins = [...rows, ...extraFollowOns].map(toPin);
+  const scopeMeta = parentScopeMeta(req.surface.parentScope, req.surface.work);
   return {
     success: true, mode: 'recompete',
     // Canonical discovery status + the recompete window actually applied.
     discovery: mapsRecompeteDiscoveryMeta(req.plan),
     // counts=0 → the market-wide fields are OMITTED (never 0/null): the client holds them.
     ...(withCounts ? {} : { countsSkipped: true }),
-    totalForFilters: withCounts ? (r.total ?? 0) : undefined, totalInView: r.inView ?? pins.length,
+    // A FAILED count is UNKNOWN (null), never 0 (Bug Prevention Rule #11): `?? 0` showed a timed-out scoped
+    // count as "0 orders" while MCP reported the same read as degraded (#1692).
+    totalForFilters: withCounts ? (r.total ?? null) : undefined, totalInView: r.inView ?? pins.length,
     capped: (r.inView ?? 0) > (rows.length),
     // null = UNKNOWN (the count failed), never 0 (Bug Prevention Rule #11).
     unmappedForFilters: withCounts ? (r.unmapped ?? null) : undefined,
+    // Additive, and only when the request carried a parent/vehicle/work scope. Present on counted AND
+    // count-skipped (counts=0) responses alike: the scope is a property of the request, not of the counts.
+    ...(scopeMeta ? { vehicle_scope: scopeMeta } : {}),
     pins,
   };
 }

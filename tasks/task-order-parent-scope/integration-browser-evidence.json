@@ -1,0 +1,78 @@
+{
+ "open": {
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "header": "14 of 15 opportunities · 8 not shown on map",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution fo",
+  "counts": "{\"recompete\":{\"total\":15,\"state\":\"ok\",\"gaps\":[]}}",
+  "endpoints": [
+   "recompete"
+  ],
+  "scopedReqs": 2,
+  "unscopedAfterScope": 0
+ },
+ "pan": {
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "header": "14 of 15 opportunities · 8 not shown on map",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution fo",
+  "counts": "{\"recompete\":{\"total\":15,\"state\":\"ok\",\"gaps\":[]}}",
+  "newReqs": [
+   {
+    "ep": "recompete",
+    "vehicle": "OASIS+",
+    "minValue": null,
+    "counts": "0",
+    "bbox": "-79.3597,36.3328,-74.2181,39.7283"
+   }
+  ],
+  "bannerHiddenSamples": 0,
+  "samples": 80
+ },
+ "refresh": {
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "header": "14 of 15 opportunities · 8 not shown on map",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution fo",
+  "counts": "{\"recompete\":{\"total\":15,\"state\":\"ok\",\"gaps\":[]}}"
+ },
+ "filtered": {
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60&state=DC&minValue=1000000",
+  "header": "4 opportunities · 2 not shown on map",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution fo",
+  "counts": "{\"recompete\":{\"total\":4,\"state\":\"ok\",\"gaps\":[]}}"
+ },
+ "filter_change": {
+  "url": "?mode=recompete&state=DC&horizon=recompete&vehicle=OASIS%2B&work=management%20consulting&leadMax=60&minValue=5000000",
+  "header": "2 opportunities",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution fo",
+  "counts": "{\"recompete\":{\"total\":2,\"state\":\"ok\",\"gaps\":[]}}",
+  "newReqs": [
+   {
+    "ep": "recompete",
+    "vehicle": "OASIS+",
+    "minValue": "5000000",
+    "counts": null,
+    "bbox": "-78.2831,38.1950,-75.7123,39.8697"
+   }
+  ]
+ },
+ "fresh": {
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&leadMax=60",
+  "header": "14 of 15 opportunities · 8 not shown on map",
+  "banner": "Awarded orders under OASIS+ (GSA One Acquisition Solution fo",
+  "counts": "{\"recompete\":{\"total\":15,\"state\":\"ok\",\"gaps\":[]}}"
+ },
+ "clear": {
+  "url": "?mode=recompete",
+  "header": "1,066 of 102,097 opportunities · 39,338 not shown on map",
+  "banner": null,
+  "counts": "{\"recompete\":{\"total\":102097,\"state\":\"ok\",\"gaps\":[]}}",
+  "newEndpoints": [
+   "recompete"
+  ]
+ },
+ "ambiguous": {
+  "url": "?mode=recompete&horizon=recompete&vehicle=OASIS",
+  "header": "Nothing searched yet · add what you sell",
+  "banner": "Not searched: \"OASIS\" can mean the original GSA OASIS vehicl",
+  "counts": "{\"recompete\":{\"total\":null,\"state\":\"needs_scope\",\"status\":\"needs_refinement\",\"refinement\":\"\\\"OASIS\\\" can mean the original GSA OASIS vehicle (solicitation GS00Q-13-DR-0002, not registered here) or OASIS+ (a different vehicle). Say \\\"OASIS+\\\" for OASIS+.\",\"gaps\":[]}}"
+ }
+}

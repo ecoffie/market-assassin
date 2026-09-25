@@ -299,6 +299,11 @@ export function conceptRegexes(c: Concept): { ci: string | null; cs: string | nu
   return { ci, cs };
 }
 
+/** One ordinary word as a whole-word, fully inflected regex — the same shape the text matcher builds. */
+export function wordRegex(word: string): string {
+  return `\\m${wordAlt(word.toLowerCase(), 'full')}\\M`;
+}
+
 export function phraseRegex(phrase: string): string {
   return `\\m${phrase.split(' ').filter(Boolean).map(reEscape).join('[-\\s]+')}\\M`;
 }

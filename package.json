@@ -51,6 +51,8 @@
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
     "verify:beginner-try": "npx tsx --tsconfig tsconfig.json scripts/verify-beginner-try.mjs",
+    "verify:task-order-scope": "tsx scripts/verify-task-order-scope.ts",
+    "vehicles:verify": "tsx scripts/verify-vehicle-parents.ts",
     "verify:oracles": "npx tsx --tsconfig tsconfig.json scripts/verify-oracles.mjs",
     "verify:ma-skills": "node scripts/verify-ma-skills.mjs",
     "ingest:awards": "npx tsx scripts/ingest-usaspending-awards.ts",
