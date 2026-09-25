@@ -99,6 +99,21 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 | `FILT` and the fetch keep a `1500.5` pill floor until reload (under $1 difference) | **Accepted** |
 | Pre-existing on `main`: the literal `\u2013` between Min and Max in the Filters panel (`route.ts:251`) | **Not changed.** Outside this PR |
 
+### Reconcile with Maps P0/P1 (#1684, #1693) — 2026-09-25
+
+`main` moved under the approved head `17676c87` (#1684: newest action wins, progressive horizons, horizon cache, counts=0 pans; #1693: transition feedback). Merged `main` into the branch (merge commit `f4ad3ace`) and **re-applied the scope inside the P0 engine**. The feature logic is unchanged; its earlier review still applies.
+
+| Integration risk | How it's handled | Proof |
+|---|---|---|
+| A scoped search must load Awarded only | `_enabled=['recompete']` is set before the P0 round, so Open/Forecast requests already in flight are aborted and never paint | P0-harness test: in-flight Open/Forecast never paint. Browser: only `recompete-map` is ever requested, with 0 unscoped requests after the scope applies |
+| Cached counts must belong to the exact scope and filters | The truth cache key is the URL minus the bbox. Every scope and filter param is in the URL; the pins cache key is the full URL | P0 harness: changing work, parent or a filter is a new counted request with its own total; returning to scope A gives A's counts. Browser: the filter change sent a counted request |
+| counts=0 means "not supplied", never zero | The server omits the counts (`countsSkipped`), and the client uses the cached truth for the same intent | PGlite + live check 9: a counts=0 read returns the same pins with the counts omitted, not 0. Browser: a pan sent one counts=0 request and the headline was unchanged |
+| The banner must stay correct through pans and progressive loading | It updates only from the current round's Awarded answer; a new scope hides it until its answer arrives; a superseded answer never sets it; `vehicle_scope` is carried on cached pins | P0 harness: the naive resolutions A/B/C fail 3/1/3 tests. Browser: banner visible in 80/80 samples during a pan |
+| MCP and both Map paths must agree after counts load | unchanged | Live 26/26 (23 = 15 + 8; DC + $1M = 4 + 2). Browser filter change to $5M: Map "2 opportunities" = MCP 2 + 0 |
+| Shared links, refresh, filter changes, Clear | unchanged | Browser (`integration-browser-evidence.json`): open, refresh and a fresh browser are identical; Clear returns to `?mode=recompete`; ambiguous "OASIS" searches nothing |
+
+Live data moved since the first head: OASIS+ has 284 orders in the window, and 10 are unattributed. Agreement holds on every path.
+
 ## Reproducible demo (VCI / IMRI style)
 
 A management-consulting firm asks what management consulting is currently being ordered through OASIS+.

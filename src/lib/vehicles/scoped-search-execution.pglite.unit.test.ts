@@ -29,7 +29,7 @@ import { createRecompeteDb, postgrestOver, type Row } from './__testing__/pglite
 import { searchScopedTaskOrders, parentAgenciesForPiid } from './task-order-search';
 import { idvContracts, refusedScopedFilters } from '@/mcp/tools/idv-contracts';
 import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
-import { readOld } from '@/lib/recompete/recompete-map-paths';
+import { readOld, buildRecompeteMapBody } from '@/lib/recompete/recompete-map-paths';
 import { recompeteOnePassSql } from '@/lib/recompete/maps-recompete-sql';
 import { RECOMPETE_PIN_COLS } from '@/lib/recompete/map-pin';
 import { isUnattributedOrder, UNATTRIBUTED_ORDERS_OR } from './parent-scope';
@@ -96,6 +96,27 @@ describe('baseline scope executes and the Map agrees (both read paths)', () => {
     expect(m.old.unmapped).toBe(r.unmapped_total);
     expect(m.onePass.ids).toEqual(ids(r));
     expect(m.old.pins.map((p) => String(p.contract_id)).sort()).toEqual(r.orders.filter((o) => o.on_map).map((o) => o.contract_id).sort());
+  });
+});
+
+describe('#1684 integration — a count-skipping read (counts=0) of a scoped link', () => {
+  it('returns the SAME pins, omits the counts (never 0), and still carries the scope', async () => {
+    const r = await searchScopedTaskOrders(BASE, db);
+    const params = Object.fromEntries(new URL(r.map_url!).searchParams);
+    const req = mapsRecompeteRequest((k) => params[k]);
+    const world = { west: -180, south: -90, east: 180, north: 90 };
+    const counted = buildRecompeteMapBody(req, await readOld(db, req, world, { counts: true }), { counts: true });
+    const skipped = buildRecompeteMapBody(req, await readOld(db, req, world, { counts: false }), { counts: false }) as Record<string, unknown>;
+    expect(counted.totalForFilters).toBe(r.mapped_total);
+    expect(counted.unmappedForFilters).toBe(r.unmapped_total);
+    expect(skipped.countsSkipped).toBe(true);
+    expect(skipped.totalForFilters).toBeUndefined();
+    expect(skipped.unmappedForFilters).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(skipped))).not.toHaveProperty('totalForFilters');   // omitted on the wire, not 0
+    expect(skipped.vehicle_scope).toEqual(counted.vehicle_scope);
+    expect((skipped.vehicle_scope as { status: string }).status).toBe('resolved');
+    const ids = (b: Record<string, unknown>) => (b.pins as Array<{ id?: string; contract_id?: string }>).map((p) => String(p.id ?? p.contract_id)).sort();
+    expect(ids(skipped)).toEqual(ids(counted as Record<string, unknown>));
   });
 });
 

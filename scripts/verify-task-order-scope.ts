@@ -23,6 +23,7 @@ type Mods = {
   searchScopedTaskOrders: typeof import('../src/lib/vehicles/task-order-search')['searchScopedTaskOrders'];
   mapsRecompeteRequest: typeof import('../src/lib/recompete/maps-recompete-discovery')['mapsRecompeteRequest'];
   readOld: typeof import('../src/lib/recompete/recompete-map-paths')['readOld'];
+  buildRecompeteMapBody: typeof import('../src/lib/recompete/recompete-map-paths')['buildRecompeteMapBody'];
   resolveVehicle: typeof import('../src/lib/vehicles/registry')['resolveVehicle'];
   vehicleOfParent: typeof import('../src/lib/vehicles/registry')['vehicleOfParent'];
   vehicleCoverage: typeof import('../src/lib/vehicles/registry')['vehicleCoverage'];
@@ -41,7 +42,7 @@ async function load(): Promise<Mods> {
   ]);
   return {
     idvContracts: a.idvContracts, searchScopedTaskOrders: b.searchScopedTaskOrders, mapsRecompeteRequest: c.mapsRecompeteRequest,
-    readOld: d.readOld, resolveVehicle: e.resolveVehicle, vehicleOfParent: e.vehicleOfParent, vehicleCoverage: e.vehicleCoverage,
+    readOld: d.readOld, buildRecompeteMapBody: d.buildRecompeteMapBody, resolveVehicle: e.resolveVehicle, vehicleOfParent: e.vehicleOfParent, vehicleCoverage: e.vehicleCoverage,
     recordedParent: f.recordedParent, isUnattributedOrder: f.isUnattributedOrder, parentIdOf: f.parentIdOf, workEvidence: f.workEvidence, workTerms: f.workTerms,
   };
 }
@@ -251,6 +252,16 @@ async function main() {
     refused: refusals.map((r) => ({ refused: r.refused_filters, status: r.status })),
     unattributed: { tool: a1.first.unattributed_orders, independent: unattrJs, generated_missing_parent_in_window: genMissing },
   };
+
+  // ── 9. #1684 integration: a count-skipping pan read of the same shared link ──────────
+  const pReq = M.mapsRecompeteRequest((k) => mapParams[k]);
+  const countedBody = M.buildRecompeteMapBody(pReq, await M.readOld(db, pReq, WORLD, { counts: true }), { counts: true }) as Record<string, unknown>;
+  const skippedBody = M.buildRecompeteMapBody(pReq, await M.readOld(db, pReq, WORLD, { counts: false }), { counts: false }) as Record<string, unknown>;
+  const pinIds = (b: Record<string, unknown>) => JSON.stringify((b.pins as Array<{ id?: string }>).map((x) => String(x.id)).sort());
+  check('9.counts_skipped_scope', skippedBody.countsSkipped === true && !('totalForFilters' in JSON.parse(JSON.stringify(skippedBody)))
+    && pinIds(skippedBody) === pinIds(countedBody) && JSON.stringify(skippedBody.vehicle_scope) === JSON.stringify(countedBody.vehicle_scope)
+    && countedBody.totalForFilters === a1.first.mapped_total && countedBody.unmappedForFilters === a1.first.unmapped_total,
+    `counts=0 read: same ${(skippedBody.pins as unknown[]).length} pins, counts omitted (not 0), vehicle_scope kept; counted read = tool (${countedBody.totalForFilters} + ${countedBody.unmappedForFilters})`);
 
   // ── 7. Unfiltered task-order search unchanged ───────────────────────────────────────
   const legacy = await M.idvContracts({ naics: '541611', search_type: 'task', limit: 10 });

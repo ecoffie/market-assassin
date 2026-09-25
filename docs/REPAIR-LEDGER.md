@@ -38,6 +38,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-09-25 | Agency intel / legacy GovInfo GAO | The 445 `agency_intelligence` `gao_high_risk` rows are GovInfo testimonies published 1993-10-06 to 2000-09-27, all stamped `fiscal_year = 2026` (the fetcher wrote the FETCH year). 233 survived the attribution quarantine and reached `understand_customer` as undated `gao_reports`, so a 1998 testimony read as a current finding (VA 23, DoD 20, DHS 27, which did not exist before 2002). Currency is now judged by `publication_date` only (never `fiscal_year`); older than 5 years or undated is withheld and counted (`historicalGaoWithheld`); a served row always shows its GAO date. Rows are not deleted (`includeHistoricalGao` opt-in). Both read paths (`getAgencyIntelligence`, `getIntelligenceForBriefing`) inherit it. | `export function isCurrentLegacyGao(` → `src/lib/agency-intelligence/legacy-gao-currency.ts` | Prod data, local run: VA/DoD/DHS/Treasury served 0 (withheld 23/20/27/20); `understandCustomer({agency:'Department of Veterans Affairs'})` → 0 gao_reports, no 199x in output, withheld note present. `legacy-gao-currency.unit.test.ts` 10/10; neighbouring suites 1,180 pass | ACTIVE |
 
+## Task orders × Maps P0/P1 — vehicle scope inside the new fetch engine (#1692 reconcile)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-25 | Maps / vehicle scope in the P0 fetch engine | #1692 merged with #1684/#1693. The scope isolation now runs BEFORE the P0 round (Open/Forecast in-flight requests aborted, never painted or counted); vehicle_scope rides on the cached pins response (key = full URL, scope included); the banner updates only from the CURRENT round's Awarded answer, hides while a new scope loads, survives pans; count-skipping (counts=0) responses omit counts (never 0) and still carry vehicle_scope | `// vehicle_scope (#1692) rides with the pins: its cache key (the full URL) includes every scope param.` → `src/app/opportunity-map/route.ts` | `vehicle-scope-p0-integration.unit.test.ts` runs the real P0 orchestration (naive resolutions A/B/C → 3/1/3 red); PGlite counts=0 read = same pins, counts omitted, scope kept; live oracle 26/26 (9.counts_skipped_scope); browser: pan sends one scoped counts=0 request, banner visible 80/80 samples, headline unchanged | PR open |
+
 ## Task orders — parent-contract / vehicle scope (OASIS+) + shared Map link
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
