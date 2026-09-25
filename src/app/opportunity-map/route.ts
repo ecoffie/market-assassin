@@ -15,6 +15,7 @@ import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
+import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
 
 export const dynamic = 'force-dynamic';
 
@@ -1771,7 +1772,8 @@ const VIEWPORT_JS = `<script>
     var b = (window.__drawBounds) ? window.__drawBounds : map.getBounds();
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
-  window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
+  // opts.system: a refetch the SYSTEM starts (boot view placement, failsafes) — never acknowledged as an action.
+  window.__mapRefetch = fetchViewLater; function fetchViewLater(opts){ try{ fetchView(opts); }catch(e){} }
   // Global bridge for the ?strategy= deep link. Same cross-block hazard as __applySearchFilters
   // below: the deep-link handler lives in DRAWER_JS, a SEPARATE <script> IIFE, so its guard
   // its "typeof readDeep === function" guard was ALWAYS false — readDeep/fetchView are locals,
@@ -1957,22 +1959,26 @@ const VIEWPORT_JS = `<script>
     if(c.state==='needs_scope') return '\u2014';
     if(c.state==='loading') return '\u2026';   // still loading for THIS intent — no number yet, never the old one
     if(c.state==='unavailable') return 'n/a';
+    if(c.state==='failed') return '!';        // this intent's request failed — never '0', never '…'
     if(c.state==='unknown') return '?';
     return fmt(c.total)+(c.state==='partial'?'*':'');
   }
   // One sentence for the header, or '' when every enabled horizon is fully measured.
   function coverageNote(counts){
-    var out=[];
+    var out=[], loadingNames=[];
     ['open','recompete','forecast'].forEach(function(h){
       var c=counts&&counts[h]; if(!c) return;
       if(c.state==='needs_scope') return;   // not a coverage fact — rendered by needsScopeNote()
       var name=h==='forecast'?'Forecasts':(h==='recompete'?'Recompetes':'Open');
       var who=c.gaps&&c.gaps.length?' for '+c.gaps.join(', '):'';
-      if(c.state==='loading') out.push(name+' loading\u2026');
+      // Horizons still loading: ONE short entry (the Updating panel carries per-horizon progress).
+      if(c.state==='loading') loadingNames.push(name);
       else if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
       else if(c.state==='partial') out.push(name+' partial — not measured'+who);
+      else if(c.state==='failed') out.push(name+' couldn\u2019t load');
       else if(c.state==='unknown') out.push(name+' count unavailable');
     });
+    if(loadingNames.length) out.unshift('still loading '+loadingNames.join(', '));
     return out.join(' · ');
   }
   // The refinement the canonical plan returned, when EVERY enabled horizon says the query cannot
@@ -2500,10 +2506,25 @@ const VIEWPORT_JS = `<script>
     return entry.promise;
   }
   // PUBLIC entry point. Schedules; every call in the same tick is ONE round (see contract 1).
-  function fetchView(){
+  // A USER ACTION supersedes whatever is in flight AT ONCE — not when its own round dispatches. The dispatch
+  // may now wait a task + a frame (so the acknowledgement paints first); measured on the preview, an older
+  // round's response landed in exactly that gap and painted query A's answer 3–606 ms after the user had
+  // asked for B. Bumping the generation here drops it. Identical in-flight requests are still JOINED by URL
+  // in _loadHorizon, so no work is wasted.
+  function _actionNow(){ _fetchGen++; if(window.__mf)window.__mf.ack(); }
+  window.__mapActionNow=_actionNow;
+  function fetchView(opts){
     if(!_fvT0)_fvT0=_nowMs();
+    // MAPS P1 (2026-09-24): every call that is not a pan/zoom settling is a USER ACTION — acknowledge it NOW
+    // (market-feedback.ts), and let one frame paint that acknowledgement before the dispatch work runs.
+    // Measured on the preview: the dispatch task (URL building, bbox reads, request setup) ran 100–400 ms
+    // before anything could paint, so an acknowledgement written inside it was seen only when it ended.
+    // A pan is marked at its source (moveend) and is never acknowledged here.
+    if(!(opts&&(opts.pan||opts.system)))_actionNow();
     if(_fvTimer)return;
-    _fvTimer=setTimeout(function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); },0);
+    var run=function(){ _fvTimer=0; var t0=_fvT0; _fvT0=0; _fetchViewNow(t0); };
+    if(typeof requestAnimationFrame==='function'&&!document.hidden){ _fvTimer=-1; requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); }); }
+    else _fvTimer=setTimeout(run,0);
   }
   function _fetchViewNow(t0){
     if(window.__suppressFetchView) return;
@@ -2518,6 +2539,7 @@ const VIEWPORT_JS = `<script>
     if(typeof _clearFetchError==='function')_clearFetchError();
     // ── Companies / Gov Buyers: 2 flat datasets, by location, both hitting contacts-map. ──
     if(isContactMode(MODE)){
+      if(window.__mf)window.__mf.idle();   // market-feedback.ts: the Players map has no horizon rounds
       var cgen=++_fetchGen;
       var em=_uemail(); var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
@@ -2671,7 +2693,7 @@ const VIEWPORT_JS = `<script>
     var _lensOn=false;
     try{ _lensOn=!!(document.querySelector('.mf-strategy:checked')); }catch(e){}
     if(_lensOn && _enabled.indexOf('open')>-1){ _enabled=['open']; }
-    if(_enabled.length===0){ _fetchGen++; OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
+    if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
     // Horizons no longer part of this view: their in-flight requests can never paint — abort them.
     ['open','recompete','forecast'].forEach(function(k){
       if(_enabled.indexOf(k)===-1&&_hzInflight[k]){ try{ if(_hzInflight[k].ctrl)_hzInflight[k].ctrl.abort(); }catch(e){} delete _hzInflight[k]; }
@@ -2687,14 +2709,31 @@ const VIEWPORT_JS = `<script>
         round.parts[m]=r.failed?{m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true}:_partFrom(m,r.d,r.t);
         if(!r.failed)_lastPainted[m]={sig:round.sigs[m],d:r.d,t:r.t};
         round.pending--;
+        // market-feedback.ts: this horizon's REAL request is done — its progress row may now say so.
+        // A failure is 'error', never a count; count states other than ok never become a number.
+        if(window.__mf){ var _c=round.parts[m].count||{}; window.__mf.horizon(gen,m,r.failed?{s:'error',src:'failed'}:{s:_c.state||'ok',total:_c.total,src:r.src}); }
         round.perf.horizons[m]={src:r.failed?'failed':r.src,ms:Math.round(_nowMs()-round.perf.action)};
         // Parts that resolve in the same tick (cache hits) paint ONCE.
         if(!round.paintTimer)round.paintTimer=setTimeout(function(){ round.paintTimer=0; _paintRound(round); },0);
       });
     });
+    // market-feedback.ts — acknowledge THIS round now. 'market' when any enabled horizon is asked a different
+    // intent than it last painted; 'pan' when only the bbox moved. stale = old content for a DIFFERENT intent
+    // is on screen (it must not read as this round's answer). Horizon results arrive asynchronously, so this
+    // always precedes them.
+    if(window.__mf){
+      var _intentChanged=false,_staleOnScreen=false;
+      _enabled.forEach(function(m){ var lp=_lastPainted[m]; if(!lp||lp.sig!==round.sigs[m])_intentChanged=true; if(lp&&lp.sig!==round.sigs[m])_staleOnScreen=true; });
+      window.__mf.begin({gen:gen,enabled:_enabled,kind:_intentChanged?'market':'pan',stale:_staleOnScreen,q:Q});
+    }
+  }
+  // Paint the CURRENT round, then tell market-feedback.ts what actually happened (painted? settled? pins?).
+  function _paintRound(round){
+    _paintRoundNow(round);
+    if(round.gen===_fetchGen&&window.__mf)window.__mf.paint(round.gen,{settled:round.pending===0,painted:!!round.painted,pins:(OPPS&&OPPS.length)||0});
   }
   // Paint the CURRENT round with whatever horizons have resolved (contract 3).
-  function _paintRound(round){
+  function _paintRoundNow(round){
     if(round.gen!==_fetchGen)return;
     var settled=round.pending===0;
     var _enabled=round.enabled, parts=[], loading=[];
@@ -2739,6 +2778,10 @@ const VIEWPORT_JS = `<script>
     loading.forEach(function(k){ window.__horizonCounts[k]={total:null,state:'loading',gaps:[]}; });
     parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=(typeof p.total==='number'?p.total:0); inv+=p.inview; if(p.capped)cap=true;
       if(p.m && !p.failed && p.count)window.__horizonCounts[p.m]=p.count;
+      // A FAILED horizon with no answer for this intent (still marked 'loading' by an earlier paint of
+      // this round) must say it failed. Left alone it read "still loading Open" forever after settle.
+      // A real count for the same intent (e.g. a failed pan) is kept — only 'loading' is replaced.
+      else if(p.m && p.failed){ var _pc=window.__horizonCounts[p.m]; if(!_pc||_pc.state==='loading')window.__horizonCounts[p.m]={total:null,state:'failed',gaps:[]}; }
       // MAP-TRUTH: sum what each horizon says it could not draw.
       // ⚠️ SUBTRACT forecast's unplaced rows that were ALREADY surfaced in the list — they are
       // concat'd into OPPS and counted in TOTAL above, so counting them again as "not shown on
@@ -3271,7 +3314,7 @@ const VIEWPORT_JS = `<script>
   // moveend can fire, it exists). Saved un-debounced: a cheap localStorage write, and the last
   // moveend of a pan/zoom is the one that sticks.
   map.on('moveend',function(){ try{ if(typeof window.__saveMapView==='function')window.__saveMapView(); }catch(e){}
-    clearTimeout(t); t=setTimeout(fetchView,450); });
+    clearTimeout(t); t=setTimeout(function(){ fetchView({pan:true}); },450); });   // a pan/zoom — never acknowledged as an action (market-feedback.ts)
   // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
   // buckets collapse/expand, but the rows in hand are still valid — so re-run render() on the
   // current OPPS immediately for snappy cross-threshold expand/collapse. The moveend handler above
@@ -3367,6 +3410,22 @@ const VIEWPORT_JS = `<script>
   };
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); window.__syncQueryUrl(true); fetchView(); },400); });
+  // ENTER COMMITS NOW (Maps P1, 2026-09-24). Typing still searches after a 400 ms pause, but Enter is an
+  // explicit "search this" — waiting out the debounce left ~0.5 s with no sign Mindy heard it. Flush the
+  // pending commit in the same event and acknowledge immediately (market-feedback.ts). The search panel's
+  // own Enter handler (intent → filters) runs after this in the same tick, and fetchView collapses
+  // same-tick calls into ONE round, so a parsed intent still wins.
+  if(zsi)zsi.addEventListener('keydown',function(e){
+    if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;
+    var v=zsi.value.trim();
+    clearTimeout(t2);
+    if(v===Q)return;
+    // The Enter EVENT only acknowledges; the commit runs as the next task so the acknowledgement can paint
+    // first. The search panel's intent handler is deferred the same way and runs AFTER this one (same order
+    // as before), so a parsed intent still replaces the raw text.
+    _actionNow();
+    setTimeout(function(){ Q=v; window.__syncQueryUrl(true); fetchView(); },0);
+  });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
   // Server-wired filter controls → write FILT + refetch (no client-side hide). scope=profile
@@ -5424,6 +5483,12 @@ const DRAWER_CSS = '<style>'
   + '.bf-k{color:var(--sub);font-size:13px}.bf-v{color:var(--ink);font-size:13px;font-weight:600;text-align:right}'
   + '.bf-ul{margin:0 0 6px;padding-left:18px}.bf-ul li{font-size:13.5px;color:var(--ink);margin-bottom:4px;line-height:1.4}'
   + '.intel-load{color:var(--faint);font-size:12.5px;padding:6px 0}'
+  // SECTION-LEVEL LOADING (Maps P1C, 2026-09-24): a section still on its way shows its own titled skeleton —
+  // never a drawer-wide "Loading…" that hides what is already known. Static under prefers-reduced-motion.
+  + '.osk{height:11px;border-radius:6px;margin:10px 0;background:linear-gradient(90deg,#eef1f5 25%,#f8f9fb 45%,#eef1f5 65%);background-size:300% 100%;animation:oskSh 1.3s ease-in-out infinite}'
+  + '@keyframes oskSh{0%{background-position:100% 0}100%{background-position:0 0}}'
+  + '.osk-err{display:flex;align-items:center;gap:10px;padding:14px 24px;color:#7f1d1d;font-size:13px}'
+  + '.osk-err button{border:1px solid #fecaca;background:#fff5f5;color:#991b1b;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer}'
   // SOW facts (Tier 1) — verbatim evidence quotes, so a user can verify each fact against the
   // solicitation's own words.
   + '.sow-quote{font-size:12.5px;font-style:italic;color:var(--sub);border-left:2px solid var(--line);padding:4px 0 4px 10px;margin-bottom:6px;line-height:1.4}'
@@ -7231,7 +7296,7 @@ const DRAWER_JS = `<script>
       + bidFactsSec(extra.bidFacts,o)           // 3. Opportunity intelligence: facts + agency/office + attachments (merged)
       + descSec(o)                              //    …summary  (heading inside Opportunity)
       + sowSec(o)                               //    …scope of work  (heading inside Opportunity)
-      + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>' // 4. Market + 5. Buyer + 6. roster (async, in order)
+      + '<div id="intelBox">'+secSkel('Market Intelligence',3)+secSkel('Buyer intelligence',2)+'</div>' // 4. Market + 5. Buyer + 6. roster (async, in order) — section skeletons until the intel fetch lands
       + solContactsSec(o)                       // 5. Buyer intelligence (cont.): the notice POC — sits WITH the roster (which appends into #intelBox above)
       + '<div id="xsellSub"></div>'             // 6. TEAMING — "who can help me win this?" (Eric 2026-08-04: once interested, the next thought is WHO can help, THEN what else is similar). Filled on-demand.
       + similarSec(extra.similar)               // 7. Related opportunities — AFTER Teaming (the "what else is similar?" browse row comes last, before the sticky bar)
@@ -7461,7 +7526,7 @@ const DRAWER_JS = `<script>
       + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
       + toBlock
       + histSec
-      + '<div id="rcIntelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
+      + '<div id="rcIntelBox">'+secSkel('Market Intelligence',3)+'</div>'   // section skeleton until the intel fetch lands (P1C)
       + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
       + '<div id="xsellOpen"></div>'              // "Ways to win": open bids in this NAICS+state (on-demand)
       + recompeteSimilarSec(o)                    // peer flywheel → other recompetes in this line/agency
@@ -7935,7 +8000,7 @@ const DRAWER_JS = `<script>
     // 6 (Related) fills via loadCrossSellOpen into #xsellOpen.
     return overview
       + fcPursueSec(o)                                                                       // 2. Should I pursue this?
-      + '<div id="fcOppBox"><div class="intel-load">Loading what they need\\u2026</div></div>'      // 3. Opportunity intelligence [async]
+      + '<div id="fcOppBox">'+secSkel('Opportunity intelligence',3)+'</div>'      // 3. Opportunity intelligence [async] — section skeleton (P1C)
       + '<div id="fcMktBox"></div>'                                                          // 4. Market intelligence [async]
       + '<div id="fcBuyerBox"></div>'                                                        // 5. Buyer intelligence + Contacts [async]
       + '<div id="xsellOpen"></div>'                                                         // 6. Related opportunities [async]
@@ -8126,7 +8191,7 @@ const DRAWER_JS = `<script>
       // Newest action wins here too: a slower response for a listing the user has already moved
       // off must never repaint the drawer over the one they are now reading.
       if(window.__oppDrawerNid!==_drawerNid)return;
-      if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
+      if(!(d&&d.success&&d.opp)){ var _rest=document.getElementById('oppShellRest'); if(_pin&&_rest){ _rest.innerHTML=oskErrHTML('the full details',nid); return; } body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
       // ── DLA/DIBBS bid: a supply RFQ, priced by NSN+quantity and quoted on DIBBS — NOT a SAM
       // notice. Render the DLA-specific drawer (NSN/item/qty/unit/PR/spec + price-to-quote) and RETURN
       // — skip the SAM intel/M-Estimate/cross-sell/roster fetches, none of which apply (Eric 2026-07-31).
@@ -8135,6 +8200,8 @@ const DRAWER_JS = `<script>
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
       if(d.opp.isDla){ try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount,savedCount:d.savedCount,viewCount:d.viewCount});
+      // "Should I pursue this?" fills from the M-Win fetch below (fillPursue) — until then it is loading, locally.
+      var _pb=document.getElementById('pursueBox'); if(_pb)_pb.innerHTML='<div aria-busy="true"><div class="osk" style="width:88%"></div><div class="osk" style="width:64%"></div></div>';
       buildTabs();
       // Seed the M-Estimate hero from the pin's est IMMEDIATELY (before the intel fetch), so the
       // drawer shows the SAME number as the pin/card instantly — no "Estimating…" flash, and no
@@ -8169,9 +8236,14 @@ const DRAWER_JS = `<script>
         box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
         buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ if(window.__oppDrawerNid!==_drawerNid)return; fillMEstTop(null,_pinEst); fillMWinTop({grounded:false}); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
-    }).catch(function(){ if(window.__oppDrawerNid!==_drawerNid)return; body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
+      }).catch(function(){ if(window.__oppDrawerNid!==_drawerNid)return; fillMEstTop(null,_pinEst); fillMWinTop({grounded:false}); fillPursue({grounded:false},d.opp&&d.opp.id,d.opp,null,_pin); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
+    }).catch(function(){ if(window.__oppDrawerNid!==_drawerNid)return; var _rest=document.getElementById('oppShellRest'); if(_pin&&_rest){ _rest.innerHTML=oskErrHTML('the full details',nid); return; } body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
+  // A section that is still loading: its REAL title + a skeleton, scoped to that section (Maps P1C).
+  function secSkel(title,lines,id){ var w=[92,76,84,62],h=''; for(var i=0;i<lines;i++)h+='<div class="osk" style="width:'+w[i%4]+'%"></div>'; return sec(title,'<div aria-busy="true">'+h+'</div>',id); }
+  // The detail fetch failed after the shell painted: keep every known fact, fail ONLY the pending part.
+  document.addEventListener('click',function(e){ var b=e.target&&e.target.closest&&e.target.closest('[data-osk-retry]'); if(!b)return; var n=b.getAttribute('data-osk-retry'); if(n&&window.openOppDrawer)window.openOppDrawer(n); });
+  function oskErrHTML(what,nid){ return '<div class="osk-err" role="alert"><span>Couldn\\u2019t load '+esc(what)+'.</span><button type="button" data-osk-retry="'+esc(String(nid))+'">Retry</button></div>'; }
   // The immediate drawer shell (see openOppDrawer). Reads ONLY fields the clicked pin carries.
   function oppShellHTML(p){
     function row(k,v){ return v?'<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line,#e6e9ef);font-size:13px"><span style="color:var(--sub)">'+esc(k)+'</span><span style="font-weight:600;text-align:right">'+esc(v)+'</span></div>':''; }
@@ -8181,7 +8253,9 @@ const DRAWER_JS = `<script>
       +'<h2 style="margin:6px 0 14px;font-size:20px;line-height:1.3">'+esc(p.title||'Opportunity')+'</h2>'
       +row('Estimated value',est)+row('Response due',p.close||'')+row('Set-aside',(p.set&&p.set!=='None')?p.set:'')
       +row('NAICS',p.naics||'')+row('Notice type',p.noticeType||'')+row('Place',p.loc||'')+row('Solicitation #',(p.sol&&p.sol!==p.nid)?p.sol:'')
-      +'<div class="oppload" style="padding:28px 0 8px">Loading full details\\u2026</div></div>';
+      +'</div>'
+      // What is still on its way, section by section — the same titles the full drawer will show.
+      +'<div id="oppShellRest">'+secSkel(ICON_TARGET+' Should I pursue this?',2)+secSkel('Opportunity intelligence',4)+secSkel('Market Intelligence',3)+secSkel('Buyer intelligence',2)+'</div>';
   }
 
   // ── Company (Contractor) detail ─────────────────────────────────────────────────────────
@@ -8884,7 +8958,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Desktop is unaffected (body.m-map is a no-op there — the mobile chrome is display:none).
   // Scoped to ?src=alert ONLY: a normal mobile visit keeps its existing list-first default,
   // which is a deliberate small-screen choice, not a bug.
-  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); }
+  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
   function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
     var m=M();
@@ -8893,7 +8967,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(!c||!inUS(c.lat,c.lng)||(m.getZoom&&m.getZoom()<4)) conus();
     }
     releaseFit();
-    if(window.__mapRefetch)window.__mapRefetch();
+    if(window.__mapRefetch)window.__mapRefetch({system:true});   // a failsafe, not a user action
   },4000);
   var _done=false, _bootSrc='';
   // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
@@ -9527,14 +9601,16 @@ const SEARCH_PANEL_JS = `<script>(function(){
       box.innerHTML=h; window.__zspSaved=list; maybeHint();
     }).catch(function(){ box.innerHTML=''; maybeHint(); });
   }
-  var acTimer=null;
+  var acTimer=null, acSeq=0;   // acSeq: a submit (Enter) invalidates every suggestion request still in flight
   function renderAutocomplete(q){
     clearTimeout(acTimer);
+    var mySeq=++acSeq;
     acTimer=setTimeout(function(){
       // Codes (NAICS/PSC) + agencies in parallel, both grounded in real data.
       var pCodes=fetch('/api/suggest-codes?q='+encodeURIComponent(q)+'&type=both').then(function(r){return r.json();}).catch(function(){return null;});
       var pAg=fetch('/api/agency-hierarchy?search='+encodeURIComponent(q)+'&limit=5').then(function(r){return r.json();}).catch(function(){return null;});
       Promise.all([pCodes,pAg]).then(function(a){
+        if(mySeq!==acSeq)return;   // superseded by a newer keystroke or by the submit — never reopen over the map
         var d=a[0]||{}, ad=a[1]||{};
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
@@ -9696,12 +9772,14 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // Submitting from the bar (Enter): parse intent FIRST. If it resolved, hand it to the global
   // applier (VIEWPORT_JS scope) which sets FILT + lights the chips + refetches, and reflect the
   // cleaned keyword in the box. Otherwise fall through to the normal keyword search.
-  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q);
+  // Enter: deferred one task (Maps P1) so the acknowledgement the Enter event writes can paint before the
+  // intent parse / filter apply / capture work. It still runs after the keyword commit (queued first).
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); acSeq++; /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);
         var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
         if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
           var zi=document.getElementById('zsearchInput'); if(zi)zi.value=(typeof window.__lastAppliedKeyword==='string'?window.__lastAppliedKeyword:intent.keyword); // reflect the ACTUAL applied keyword (Players keeps the agency word)
         } else { captureSearch(q); }
-      } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
+      } close(); },0); } if(e.key==='Escape'){ close(); input.blur(); } });
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
     var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();
     var act=el.getAttribute('data-act');
@@ -10006,39 +10084,45 @@ export async function GET(request: NextRequest) {
   const embed = reqUrl.searchParams.get('embed');
   // SHARE TRUTH: a shared `?opp=<notice_id>` must identify THAT opportunity to crawlers (Facebook,
   // LinkedIn, X, iMessage), which never run our JS. Started now so the one-row read overlaps the
-  // 600-opp load below; applied to <head> at the end. Embed is never a share target.
+  // rest of the page build; applied to <head> at the end. Embed is never a share target.
   const shareOppId = embed ? null : reqUrl.searchParams.get('opp');
   const shareHeadP: Promise<string | null> = isNoticeId(shareOppId)
     ? fetchOppShareRow(shareOppId)
         .then((row) => (row ? renderOppShareHead(buildOppShareMeta(row), reqUrl.origin) : null))
         .catch((e) => { console.error('[opportunity-map] share metadata read failed', shareOppId, e); return null; })
     : Promise.resolve(null);
+  // The 600-row list is the EMBED's content (no VIEWPORT_JS, no fetch rounds — these rows are all it shows).
+  // The full page never used it: its first fetch round replaces OPPS and the boot overlay hides it until then.
+  // Shipping it cost ~250 KB and a parse-time render → re-render → clear → chunked redraw BEFORE the first
+  // discovery request could go out (tasks/maps-first-load-investigation-2026-09-25.md). So: embed only.
   let opps: unknown[] = [];
-  try {
-    const rows = await getMapOpportunities(600);
-    opps = rows.map((o) => ({
-      src: 'SAM',
-      naics: o.naics,
-      cat: o.cat,
-      title: o.title,
-      agency: cleanAgency(o.agency),
-      set: SET_TO_EVC[o.set] ?? 'None',
-      loc: o.loc,
-      close: (o.close || '').slice(0, 10),
-      sol: o.sol,
-      nid: o.id,
-      uiLink: o.uiLink,
-      lat: o.lat,
-      lng: o.lng,
-      locSrc: o.locSrc,
-      // SOW card facts (Tier 1) — undefined when not yet computed or nothing found (never
-      // fabricated). brandNameOrEqual is the 🚩 warning pill; evalBasis is the Best Value/LPTA
-      // chip. Both cap-the-view: 2 highest-signal facts on the card, full set in the drawer.
-      brandNameOrEqual: o.brandNameOrEqual || false,
-      evalBasis: o.evalBasis || null,
-    }));
-  } catch {
-    opps = [];
+  if (embed) {
+    try {
+      const rows = await getMapOpportunities(600);
+      opps = rows.map((o) => ({
+        src: 'SAM',
+        naics: o.naics,
+        cat: o.cat,
+        title: o.title,
+        agency: cleanAgency(o.agency),
+        set: SET_TO_EVC[o.set] ?? 'None',
+        loc: o.loc,
+        close: (o.close || '').slice(0, 10),
+        sol: o.sol,
+        nid: o.id,
+        uiLink: o.uiLink,
+        lat: o.lat,
+        lng: o.lng,
+        locSrc: o.locSrc,
+        // SOW card facts (Tier 1) — undefined when not yet computed or nothing found (never
+        // fabricated). brandNameOrEqual is the 🚩 warning pill; evalBasis is the Best Value/LPTA
+        // chip. Both cap-the-view: 2 highest-signal facts on the card, full set in the drawer.
+        brandNameOrEqual: o.brandNameOrEqual || false,
+        evalBasis: o.evalBasis || null,
+      }));
+    } catch {
+      opps = [];
+    }
   }
   // ⚠️ ALL string-injection into the template MUST go through repl(), which uses a function
   // replacer so special $-patterns ($, $$, $&, $`, $', $1…) in injected scripts/CSS are inserted
@@ -10099,7 +10183,7 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + SETTINGS_DRAWER_CSS + '</style>' + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + SETTINGS_DRAWER_CSS + MARKET_FEEDBACK_CSS + '</style>' + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
@@ -10107,7 +10191,10 @@ export async function GET(request: NextRequest) {
       '.fscroll{display:flex;gap:7px;overflow:visible;padding-bottom:2px;scrollbar-width:none}');
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
-    html = repl(html, '<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML);
+    // MARKET_BOOT_HTML (market-feedback.ts): "Building your market" for the first market of this page load.
+    // In the HTML with .app already marked mfb-booting — no script runs first. A CSS animation reveals it after
+    // MF_TIMING.BOOT_REVEAL, so a fast entry never sees it and a slow parse cannot delay it.
+    html = repl(html, '<div class="app">', MARKET_BOOT_APP_OPEN + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
     html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);
@@ -10129,7 +10216,7 @@ export async function GET(request: NextRequest) {
       '<select class="sortsel" id="sort">\n        <option value="deadline">Deadline: soonest</option>\n        <option value="deadline-far">Deadline: latest</option>\n        <option value="value">Contract value: high to low</option>\n        <option value="az">Title: A–Z</option>\n      </select>',
       SORT_MENU_HTML);
     // Set-aside color legend on the map.
-    html = repl(html, '<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
+    html = repl(html, '<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML + MARKET_FEEDBACK_MAP_HTML);
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
     // pill (the Set-aside dropdown already covers every set-aside, SDVOSB included).
     html = repl(html, '<button class="clr" id="clrAll">Clear all</button>',
@@ -10257,7 +10344,8 @@ export async function GET(request: NextRequest) {
     // SETTINGS_DRAWER_HTML sits BEFORE LOGIN_MODAL_HTML for the same reason MOBILE_HTML does —
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
