@@ -337,7 +337,7 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
       var x=$('mfbErr'); if(x)x.hidden=!on;
       // Nothing is updating any more: the header must say the market on screen is the PREVIOUS one.
       var u=upd(); var sp=u&&u.querySelector('span');
-      if(sp)sp.textContent=on?'Not updated \u2014 showing your previous market':'Updating your market\u2026';
+      if(sp)sp.textContent=on?'Showing previous results':'Updating your market\u2026';
     });
     if(v.panel)paintRows();
     var pi=$('mfbIntel'); if(v.intel)intelFor(pi,T.RICH,e,R.enabled); else if(pi)pi.hidden=true;

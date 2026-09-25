@@ -199,7 +199,7 @@ describe('controller — newest action wins; cancelled work never reports', () =
     w.__mf.paint(5, { settled: true, painted: false, pins: 0 });
     expect(d.getElementById('mfbErr')!.hidden).toBe(false);
     expect((d.getElementById('mfbVeilList') as HTMLElement).style.opacity).toBe('1');
-    expect(d.getElementById('mfbUpd')!.textContent).toBe('Not updated \u2014 showing your previous market');
+    expect(d.getElementById('mfbUpd')!.textContent).toBe('Showing previous results');
   });
   it('ack() acknowledges before the round exists and keeps the ACTION time as t0', () => {
     const { w, d } = page();
