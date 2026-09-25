@@ -9595,14 +9595,16 @@ const SEARCH_PANEL_JS = `<script>(function(){
       box.innerHTML=h; window.__zspSaved=list; maybeHint();
     }).catch(function(){ box.innerHTML=''; maybeHint(); });
   }
-  var acTimer=null;
+  var acTimer=null, acSeq=0;   // acSeq: a submit (Enter) invalidates every suggestion request still in flight
   function renderAutocomplete(q){
     clearTimeout(acTimer);
+    var mySeq=++acSeq;
     acTimer=setTimeout(function(){
       // Codes (NAICS/PSC) + agencies in parallel, both grounded in real data.
       var pCodes=fetch('/api/suggest-codes?q='+encodeURIComponent(q)+'&type=both').then(function(r){return r.json();}).catch(function(){return null;});
       var pAg=fetch('/api/agency-hierarchy?search='+encodeURIComponent(q)+'&limit=5').then(function(r){return r.json();}).catch(function(){return null;});
       Promise.all([pCodes,pAg]).then(function(a){
+        if(mySeq!==acSeq)return;   // superseded by a newer keystroke or by the submit — never reopen over the map
         var d=a[0]||{}, ad=a[1]||{};
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
@@ -9766,7 +9768,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // cleaned keyword in the box. Otherwise fall through to the normal keyword search.
   // Enter: deferred one task (Maps P1) so the acknowledgement the Enter event writes can paint before the
   // intent parse / filter apply / capture work. It still runs after the keyword commit (queued first).
-  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); acSeq++; /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);
         var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
         if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
           var zi=document.getElementById('zsearchInput'); if(zi)zi.value=(typeof window.__lastAppliedKeyword==='string'?window.__lastAppliedKeyword:intent.keyword); // reflect the ACTUAL applied keyword (Players keeps the agency word)

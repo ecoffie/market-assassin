@@ -241,7 +241,7 @@ describe('wiring in route.ts', () => {
   it('Enter acknowledges in the event itself and commits in the next task (the acknowledgement paints first)', () => {
     expect(src).toMatch(/_actionNow\(\);\s*setTimeout\(function\(\)\{ Q=v; window\.__syncQueryUrl\(true\); fetchView\(\); \},0\);/);
     // the search panel's intent handler is deferred the same way, so it still runs AFTER the raw commit
-    expect(src).toContain("input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);");
+    expect(src).toContain("input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); acSeq++; /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);");
   });
   it('every non-pan fetchView is acknowledged and yields a frame before dispatch; a pan is tagged at its source', () => {
     expect(src).toContain("if(!(opts&&(opts.pan||opts.system)))_actionNow();");
