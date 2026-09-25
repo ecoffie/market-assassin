@@ -419,9 +419,9 @@ Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Hi
 - **⛔ Backfill blocked.** Do **not** write the 3,729-family targeted backfill. Do **not** write the 44,560-family fleet backfill. Do **not** build a `--go` writer. Do **not** attach remaining pipeline rows. Lazy Family v1 only — persist on known-id / pursuit save / confirmed identity, never a fleet write.
 - **PAE later.** Do not start. Do not remove FIND Open `active=true`. Do not auto-merge forecast/award/recompete.
 
-### Maps P0 — speed + correctness (PR #1684, 2026-09-24, awaiting merge + prod re-measure)
+### Maps P0 — speed + correctness (PR #1684, merged 2026-09-25)
 Record: **`tasks/maps-p0-performance-2026-09-24.md`** (before/after tables + Recompete query-plan evidence);
-audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. Do NOT build P1/P2 transition UX until P0 is prod-measured.
+audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. ✅ Merged `7ce3a668` + production-verified 2026-09-25 (1 boot round, pan `counts=0` 3/3, cached toggles 0 requests, Start Fresh 0 stale requests). P1/P2 feedback UX follows in #1693 — see the P1 entry below.
 - `fetchView()` only SCHEDULES; same-tick calls = one round; rounds are generation-numbered — a superseded
   response never paints (`newest-action-wins.unit.test.ts`, red on the pre-fix route). Never reintroduce a
   busy/pendingFetch queue.
@@ -429,6 +429,18 @@ audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. Do NOT build P1/P2 t
 - Horizon cache: pins keyed by full URL, market truth by URL minus bbox (5-min TTL). A pan with a held intent
   sends `counts=0` (`map-counts-mode.ts`) → server omits market-wide fields (`countsSkipped:true`, never 0/null).
 - Recompete keyword cost was fixed separately: Gate 1 trigram indexes (applied) + Gate 2 compute-once (see below).
+
+### Maps P1/P2 — instant feedback + Building your market (PR #1693, on main after P0; awaiting review — do not merge)
+Record: **`tasks/maps-p1-feedback-2026-09-24.md`** (when each state appears, state matrix, before/after, acceptance).
+- `market-feedback.ts` is PRESENTATION ONLY — VIEWPORT_JS reports round facts (`begin`/`horizon`/`paint`/`idle`); it
+  never fetches or delays data. Thresholds live in `MF_TIMING` (0 bar · 300 spinner · 1 s panel · 3 s Mindy Intel).
+- ⚠️ A USER ACTION supersedes in-flight work AT ONCE (`_actionNow()` bumps `_fetchGen`) — the dispatch now yields a
+  frame so the acknowledgement paints first, and without the bump an older round painted inside that gap.
+  System refetches pass `{system:true}`, pans `{pan:true}` — neither is acknowledged as an action.
+- ⚠️ Mark stale with INLINE writes + composited VEILS (z 450, over the map pane, under every control). Measured:
+  body/element classes forced 18–260 ms recalcs on a 3k-pin page; fading the content layers cost ~80 ms/round.
+- Visible is the DEFAULT state — the page's reduced-motion rule sets `animation:none`, so never reveal via animation.
+- Mindy Intel copy lives in `src/lib/maps/mindy-intel.ts` (sourced, horizon-scoped, no superlatives — tested).
 
 ### Recompete map performance — Gate 1 ✅ LIVE · Gate 2 designed, NOT deployed (2026-09-24)
 Records: **`tasks/recompete-gate1-2026-09-24.md`** (prod before/after) · **`tasks/recompete-compute-once-design-2026-09-24.md`**.

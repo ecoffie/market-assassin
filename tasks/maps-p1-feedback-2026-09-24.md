@@ -1,0 +1,113 @@
+# Maps P1/P2 — instant feedback, truthful horizon progress, Building your market (2026-09-24)
+
+> Never make the user wonder whether Mindy heard them, and never let an old answer masquerade as the new one.
+
+Branch `feat/maps-p1-feedback`, **stacked on P0 (#1684, not merged)** plus current `main`. The merge resolved one
+conflict: main's Gate 2 recompete route plus P0's `counts=0` pan contract, threaded through both read paths so a pan
+compares clean. No backend optimization, no Canonical Discovery change, no compute-once semantics change.
+
+## What ships
+| Part | Where |
+|---|---|
+| Feedback module (presentation only: never fetches, never delays data) | `src/app/opportunity-map/market-feedback.ts` |
+| Mindy Intel content system (sourced, horizon-scoped cards) | `src/lib/maps/mindy-intel.ts` |
+| Round facts reported by the fetch machinery | `route.ts` VIEWPORT_JS: `begin` / `horizon` / `paint` / `idle` |
+| A user action supersedes in-flight work at once | `route.ts` `_actionNow()` (generation bump + acknowledgement) |
+| Drawer section-level loading (P1C) | `route.ts` DRAWER_JS: `secSkel`, `oskErrHTML` |
+| Tests | `market-feedback.unit.test.ts` (33) + 1 behavioral case in `newest-action-wins.unit.test.ts` |
+
+## When each thing appears (all thresholds in `MF_TIMING`, measured from the ACTION)
+| State | Shows when |
+|---|---|
+| **Nothing** | A pan/zoom that settles in < 300 ms; a cached horizon toggle; any round that finishes before the next frame. A system refetch (boot view placement, the 4 s boot failsafe) is never acknowledged. |
+| **Subtle acknowledgement** | At the action (next frame) for any user action. A 2px bar starts at the top of the map. After 100–120 ms (so a fast answer never flashes), veils fade over the old map and list, and the header count is replaced by "Updating your market…". A pan gets the bar only, after 300 ms. |
+| **Local progress** | 300 ms – 1 s: a spinner beside "Updating your market…". |
+| **Updating your market panel** | ≥ 1 s while the round is unsettled. Bottom-center of the map, one row per enabled horizon, each marked done only when *its* request completed: Open Now / Coming Back / Coming Soon with the real count; `couldn't load` / `not covered` / `add what you sell` / `count unavailable` are states, never 0. |
+| **Building your market** | The first market of a page load (cold, warm, deep link, restored search). It is in the HTML, so the server-rendered placeholder list never reads as the user's market, and fades in after 250 ms (a fast entry never sees it). Stages: Understanding your market (done when the intent is dispatched), then one per enabled horizon. It leaves at the **first paint with pins**, not when every horizon is done. The remaining horizons continue in the Updating panel. It also leaves when the round settles, or after a 25 s failsafe. Nav and search stay usable underneath. |
+| **Mindy Intel** | ≥ 3 s in the Updating panel; ≥ 2.5 s in Building your market. Rotates every 8 s only while the wait continues. Unseen cards come first. A card about a horizon only appears while that horizon is shown. It never delays dismissal. |
+| **Failure** | Every horizon failed with the old market on screen: the old market stays veiled, the header reads "Showing previous results", and the note says "Couldn't update your market. Showing your previous results." with Retry. One horizon failed: its row reads `couldn't load`; the others paint. |
+
+## State-transition matrix
+| Trigger → | 0 ms | 100–120 ms | 300 ms | 1 s | 3 s | first paint with pins | settled | superseded by a newer action |
+|---|---|---|---|---|---|---|---|---|
+| Search / filter / agency / state / Start Fresh / uncached horizon | bar; generation bumped | veils + "Updating your market…" | spinner | Updating panel | + Mindy Intel | veils and label clear; panel continues | everything clears | older round can never paint; progress resets to the new round |
+| Cached horizon toggle | bar (usually settles in the same frame) | — | — | — | — | — | clears | same |
+| Pan / zoom | — | — | bar | — | — | — | clears | same |
+| System refetch (boot failsafe) | — | — | bar if slow | — | — | — | clears | same |
+| First market of a page load | overlay in HTML (hidden) | revealed at 250 ms | stages advance per real horizon | — | Intel at 2.5 s | overlay leaves | overlay leaves | stays until the newer round paints |
+| Every horizon failed | — | — | — | — | — | never | veils stay + "Showing previous results" + Retry | — |
+| `needs_positive_scope` / Forecast unavailable | as a search | | | rows: `add what you sell` / `not covered` | | | P0's explicit header and feed states (unchanged) | |
+| Players map / nothing enabled | `idle` clears everything | | | | | | | |
+| Opportunity drawer | shell: pin facts + titled section skeletons | | | | | detail replaces skeletons; intel sections fill locally | | detail failure: facts stay, local `Couldn't load the full details` + Retry |
+
+## Measurements (Vercel previews, same data, compute-once on both)
+- Baseline = `707e20a5` (P0 + main, no P1).
+- P1 = final `d8629011`.
+- Headless Chrome, 1440×900, two runs each. ms from the user's action.
+- Baseline "first visible change" = the first time anything changes; before P1, that is new data.
+
+| Journey | Baseline: first visible change | P1: acknowledgement | Baseline useful map | P1 useful map | P1 feedback shown |
+|---|---|---|---|---|---|
+| search "ai governance" | 1,647 / 1,637 | 116 / 236 | 1,646 / 1,636 | 1,188 / 1,500 | bar, label, spinner, panel |
+| search "software license" | 4,463 / 5,500 | 88 / 64 | 4,456 / 5,483 | 3,800 / 3,680 | + Mindy Intel |
+| broad capability list | 6,290 / 5,685 | 271 / 77 | 6,224 / 5,661 | 5,330 / 6,197 | + Mindy Intel |
+| USDA | 1,543 / 1,003 | 250 / 257 (in-page: 27 / 117) | 1,522 / 991 | 1,416 / 1,434 | panel |
+| Florida | 715 / 1,151 | 279 / 274 (in-page: 37 / 63) | 712 / 1,139 | 875 / 781 | panel |
+| hide Recompete (cached) | 1,247 / 544 | 426 / 364 (in-page: 11 / 53) | 1,184 / 506 | 841 / 720 | bar, label |
+| Start Fresh | 591 (cache) / 1,675 | 88 / 74 | 588 / 1,674 | 2,129 / 1,865 | panel |
+| rapid A→B | stale paints **1** | stale paints **0** (×4 runs) | | | |
+| pin → drawer | full shell 113–133, "Loading full details…" | skeleton shell 70–136 | detail 1.2–1.9 s | detail 1.9–2.7 s, full 3.3–3.5 s | section skeletons |
+| cold Maps load | 3.4–3.9 s (placeholder list) | Building your market at 1.4–1.9 s | 12.0–12.9 s | 13.1–15.1 s | boot → panel → Intel |
+| deep link ?q=cybersecurity | 3.5–3.7 s | overlay at 1.4–3.9 s | 9.0–9.5 s | 9.4–13.2 s | boot → panel |
+
+**Acknowledgement (in-page probe, first frame with the acknowledgement written and painted), final build:**
+- 8–118 ms for filter and horizon actions, most under 100 ms.
+- A search Enter is acknowledged in the Enter event; it paints once the browser renders the next frame (64–236 ms in the harness, which reads one frame late).
+- Misses of the 100 ms target: USDA once at 117 ms (the handler itself took 50 ms), and show-Recompete at 100 ms.
+
+**Does feedback slow the data?** Same-build A/B with the module disabled in-page:
+- Toggle medians of 20 rounds: 764–949 ms on vs 672–781 ms off.
+- Traced rounds had the opposite sign: on 333–703 ms vs off 635–950 ms.
+- The directly measured costs are an ~18 ms acknowledgement frame, a < 3 ms DOM flush, and the one-frame dispatch yield (by design, so the acknowledgement paints first).
+- Two costs found and removed along the way:
+  - class-based stale styling forced 130–260 ms page recalcs;
+  - fading the content layers cost ~80 ms per round. Replaced by inline writes and composited veils.
+- Round-to-round variance is dominated by P0's existing pin/card render (300–835 ms of script).
+
+## Browser acceptance (headless Chrome against the P1 preview)
+| Check | Result |
+|---|---|
+| cold / warm load | Building your market; leaves at first paint with pins; no placeholder list shown |
+| ai governance / software license / broad capability | acknowledged, truthful rows, Intel on long waits |
+| USDA / Florida / Start Fresh | acknowledged; panel at ≥ 1 s; Start Fresh never shows the stale DoD market as the answer |
+| Open → Recompete → Forecast; hide/show | cached switches settle in < 300 ms with no loader |
+| rapid A→B | **0 stale paints** (4 runs; baseline 1) |
+| pin → drawer | shell at 70–136 ms with section skeletons; failure keeps facts + local Retry |
+| deep link ?q= | Building your market with the query shown |
+| one horizon fails | its row `couldn't load`; others paint |
+| all fail | old market stays veiled, "Showing previous results", Retry |
+| `needs_positive_scope` (`-computers`) | unchanged explicit state; no feedback lingers |
+| Forecast unavailable (NOAA) | unchanged "Unavailable … not zero" |
+| reduced motion | overlay and states visible, no animation |
+
+## Defects found by acceptance and fixed in this branch
+1. Stale classes forced whole-page style recalcs (130–260 ms) → inline writes.
+2. The acknowledgement was written inside tasks that then read geometry, forcing synchronous layout. Fixed with a per-frame flush and a static-position label.
+3. The acknowledgement painted only after the dispatch work. Fixed: `fetchView` yields one frame and Enter defers its commit.
+4. **Stale paint:** the older round's response landed in that yield gap. Fixed: `_actionNow` bumps the generation at the action; the new test fails without it.
+5. The boot failsafe refetch was acknowledged as a user action → `{system:true}`.
+6. The panel covered the "Picked up…" pill → moved to bottom-center. The veil covered the panel → veil z 450.
+7. The suggestion dropdown reopened after submit (pre-existing race) → timer cleared + sequence guard.
+8. Fading the content layers made each render slower → veils.
+9. Reduced motion left animated elements invisible → visible is the default state.
+
+## Known limits (not fixed here)
+- **Cold load is pre-existing and slow.** `DOMContentLoaded` is ~8 s and the first round dispatches at ~7.5 s in this headless environment, on both builds. The overlay itself costs nothing measurable (14.26 s shipped vs 14.43 s with it removed, median). That is page-weight / blocking-script work, outside P1.
+- **Naming.** Progress rows say Open Now / Coming Back / Coming Soon (your copy, and FIND's); the Horizons dropdown and legend still say Open / Recompete / Forecast. One canonical name is needed. That's a product call, flagged rather than renamed here.
+- Forecast's row count is `totalForFilters` (mappable); the header adds location-less forecasts, as P0 already does.
+- Actions whose own handlers are slow (e.g. show Recompete after a heavy render) acknowledge only when that handler ends; the browser cannot paint mid-task.
+
+## Review previews (not production)
+- P1: `https://market-assassin-git-feat-maps-p1-feedback-eric-coffies-projects.vercel.app/opportunity-map`
+- Baseline: `https://market-assassin-ftv9lgtj6-eric-coffies-projects.vercel.app/opportunity-map`
+- Preview-only env: `RECOMPETE_COMPUTE_ONCE_MODE=authority`, scoped to branches `feat/maps-p1-feedback` and `perf/maps-p1-baseline` (the baseline also received it via CLI `-e`). Remove after review.
