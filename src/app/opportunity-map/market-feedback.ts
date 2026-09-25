@@ -282,15 +282,20 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
   var last={};
   function setFlag(key,on,fn){ if(last[key]===on)return; last[key]=on; fn(on); mark(key+(on?':on':':off')); }
 
+  // ONE card per rotation slot. The pick is made once per (round, slot) and pinned: re-picking on every
+  // re-render changed the card on each horizon event (measured in a real browser: five cards in 1.2 s),
+  // because showing a card marks it seen and "unseen first" then points at a different one.
   function intelFor(el,startAt,e,enabled){
     if(!el)return;
     var k=Math.max(0,Math.floor((e-startAt)/T.ROTATE));
+    var slot=(R?R.gen:'')+':'+k;
+    if(el.getAttribute('data-slot')===slot){ el.hidden=false; return; }
     var c=mfPickIntel(INTEL,enabled,seen,k);
     if(!c){ el.hidden=true; return; }
+    el.setAttribute('data-slot',slot);
     if(el.getAttribute('data-id')!==c.id){
       el.setAttribute('data-id',c.id);
       var p=el.querySelector('p'); if(p)p.textContent=c.text;
-      el.style.animation='none'; void el.offsetWidth; el.style.animation='';
       remember(c.id); mark('intel',c.id);
     }
     el.hidden=false;

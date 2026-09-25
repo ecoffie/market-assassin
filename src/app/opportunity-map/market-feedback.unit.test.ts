@@ -211,6 +211,20 @@ describe('controller — newest action wins; cancelled work never reports', () =
     const begin = w.__mfLog.find((x) => x.ev === 'begin') as unknown as { x: { kind: string } };
     expect(begin.x.kind).toBe('market');
   });
+  it('Mindy Intel shows ONE card per rotation slot — horizon events during the slot never swap it', async () => {
+    const { w, d } = page();
+    w.__mf.begin({ gen: 8, enabled: ['open', 'recompete', 'forecast'], kind: 'market', stale: true });
+    await wait(T.RICH + 60);
+    w.raw.__mfFlushNow();
+    const first = d.getElementById('mfbIntel')!.getAttribute('data-id');
+    expect(first).toBeTruthy();
+    // the real-browser defect: every horizon event re-picked a different card
+    w.__mf.horizon(8, 'forecast', { s: 'ok', total: 425 });
+    w.__mf.horizon(8, 'recompete', { s: 'ok', total: 5164 });
+    expect(d.getElementById('mfbIntel')!.getAttribute('data-id')).toBe(first);
+    expect(w.__mfLog.filter((x) => x.ev === 'intel')).toHaveLength(1);
+    w.__mf.paint(8, { settled: true, painted: true, pins: 3 });
+  });
   it('idle (Players map) clears everything and ends the boot transition', () => {
     const { w, d } = page(true);
     w.__mf.idle();
