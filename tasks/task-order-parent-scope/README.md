@@ -118,6 +118,11 @@ No blockers were found. Two should-fix items and the cheap nits are fixed at the
 - Proof: the P0-harness test fails on the pre-fix route and passes after. In the browser (`dla-browser-evidence.json`), DLA sends only `sources=dla` requests and hides the banner; returning sends the scoped request and shows the banner again.
 - Carried over from `main`, not #1692: `recompete-map-paths.ts` turns a null counted total into `0` (`r.total ?? 0`). Reported separately, not changed here.
 
+**DLA-fix verification: no blockers, two should-fix items of the same class, both fixed.**
+- The scope banner stayed over the Players map. It now renders only on the Opportunities map and is re-evaluated every round.
+- A URL sync in DLA/Players stripped the scope from the link, while the map re-applied it on return. The scope keys now come from `FILT` in every mode.
+- Proof: `vehicle-scope-modes.unit.test.ts` (5 tests fail on the pre-fix route) and `modes-browser-evidence.json`.
+
 Live data moved since the first head: OASIS+ has 284 orders in the window, and 10 are unattributed. Agreement holds on every path.
 
 ## Reproducible demo (VCI / IMRI style)

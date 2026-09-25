@@ -1,0 +1,93 @@
+{
+ "dla": {
+  "start": {
+   "mode": "recompete",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": true
+  },
+  "inMode": {
+   "mode": "dla",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": false,
+   "reqs": [
+    {
+     "ep": "opportunity",
+     "vehicle": null,
+     "sources": "dla"
+    },
+    {
+     "ep": "opportunity",
+     "vehicle": null,
+     "sources": "dla"
+    }
+   ]
+  },
+  "back": {
+   "mode": "open",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": true,
+   "reqs": [
+    {
+     "ep": "recompete",
+     "vehicle": "OASIS+",
+     "sources": null
+    },
+    {
+     "ep": "recompete",
+     "vehicle": "OASIS+",
+     "sources": null
+    }
+   ]
+  },
+  "reloadAfterReturn": {
+   "mode": "recompete",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": true,
+   "lastAwarded": {
+    "ep": "recompete",
+    "vehicle": "OASIS+",
+    "sources": null
+   }
+  }
+ },
+ "companies": {
+  "start": {
+   "mode": "recompete",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": true
+  },
+  "inMode": {
+   "mode": "companies",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": false,
+   "reqs": [
+    {
+     "ep": "contacts",
+     "vehicle": null,
+     "sources": null
+    },
+    {
+     "ep": "contacts",
+     "vehicle": null,
+     "sources": null
+    }
+   ]
+  },
+  "back": {
+   "mode": "open",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": true,
+   "reqs": []
+  },
+  "reloadAfterReturn": {
+   "mode": "recompete",
+   "url": "?mode=recompete&horizon=recompete&vehicle=OASIS%2B&work=management+consulting&minValue=1000000&leadMax=60",
+   "banner": true,
+   "lastAwarded": {
+    "ep": "recompete",
+    "vehicle": "OASIS+",
+    "sources": null
+   }
+  }
+ }
+}

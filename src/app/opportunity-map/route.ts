@@ -2549,6 +2549,9 @@ const VIEWPORT_JS = `<script>
   }
   function _fetchViewNow(t0){
     if(window.__suppressFetchView) return;
+    // Every round re-evaluates the scope banner for the CURRENT map mode — including the Players branch
+    // below, which returns before any Awarded round could update it (#1692 review).
+    if(typeof window.__renderVehicleScope==='function')window.__renderVehicleScope();
     _trackMapView();
     // RETURN CONTINUITY — remember this market (debounced, local only). Placed here
     // rather than on each control because every filter, search, sort, horizon and
@@ -3455,17 +3458,21 @@ const VIEWPORT_JS = `<script>
       // On Players / DLA the box and filters describe a different dataset: carry no Opportunities
       // intent (and drop a stale one), never a Players term that would reopen as an Opportunities query.
       var opp=(mode==='open'||mode==='recompete');
+      // The vehicle/parent/work scope (and its window/floor) is NOT a dataset term: it stays in FILT across
+      // DLA/Players and re-applies on return, so the link keeps it too. Gating it on opp stripped it during a
+      // DLA/Players sync and left a URL with no intent — no later sync could write it back (#1692 review).
+      var hasF=(typeof FILT!=='undefined'&&FILT);
       var intent={
         q: opp&&typeof Q==='string'?Q:'',
         agency: opp&&typeof FILT!=='undefined'&&FILT&&FILT.agency?String(FILT.agency):'',
         horizon: window.__activeHorizonParam(),
-        vehicle: opp&&typeof FILT!=='undefined'&&FILT&&FILT.vehicle?String(FILT.vehicle):'',
-        parent: opp&&typeof FILT!=='undefined'&&FILT&&FILT.parent?String(FILT.parent):'',
-        work: opp&&typeof FILT!=='undefined'&&FILT&&FILT.work?String(FILT.work):'',
-        leadMax: opp&&typeof FILT!=='undefined'&&FILT&&FILT.leadMax?String(FILT.leadMax):'',
+        vehicle: hasF&&FILT.vehicle?String(FILT.vehicle):'',
+        parent: hasF&&FILT.parent?String(FILT.parent):'',
+        work: hasF&&FILT.work?String(FILT.work):'',
+        leadMax: hasF&&FILT.leadMax?String(FILT.leadMax):'',
         // The floor half of FILT.valueRange ("min-max"), written beside a scope so a reload keeps it.
         // Whole dollars, the only shape the scope-link reader accepts (a pill "1500.5" would not reload).
-        minValue: (function(){ var n=(opp&&typeof FILT!=='undefined'&&FILT&&FILT.valueRange)?Math.floor(parseFloat(String(FILT.valueRange).split('-')[0])):NaN;
+        minValue: (function(){ var n=(hasF&&FILT.valueRange)?Math.floor(parseFloat(String(FILT.valueRange).split('-')[0])):NaN;
           return (isFinite(n)&&n>=1&&n<=999999999999999)?String(n):''; })()
       };
       var next=window.__mapQueryUrl(cur,intent,!!dropContext);
@@ -9338,7 +9345,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     try{
       var vs=window.__vehicleScope, el=document.getElementById('vehicleScopeBar');
       var st=(typeof window.__vehicleScopeState==='function')?window.__vehicleScopeState():{};
-      var active=!!(st.vehicle||st.parent||st.work);
+      // The scope describes the Opportunities map's Awarded layer only — DLA and Players ignore it, so the
+      // banner must not claim it there (#1692 review). It returns with the map mode.
+      var onOpp=(window.__mapMode==='open'||window.__mapMode==='recompete');
+      var active=onOpp&&!!(st.vehicle||st.parent||st.work);
       if(!vs||!active){ if(el)el.style.display='none'; return; }
       if(!el){
         el=document.createElement('div'); el.id='vehicleScopeBar'; el.setAttribute('role','status');
