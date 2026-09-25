@@ -75,7 +75,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 
 | Tool | What it answers |
 |---|---|
-| `get_agency_intel` | Agency identity, pain points, and live obligations |
+| `get_agency_intel` | Agency identity, pain points, live obligations, and the NDAA legislative record (stage + law status per version) |
 | `get_agency_spending_detail` | Sub-agency (component) breakdown + set-aside distribution |
 | `get_sba_goaling_share` | Statutory small-business goals vs. the agency's actual set-aside obligations — "is this a good small-business market?" |
 | `get_agency_budget_trends` | FY-over-FY discretionary budget-authority trend (growing / cut) |
