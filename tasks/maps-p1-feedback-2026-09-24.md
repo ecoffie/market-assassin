@@ -1,5 +1,7 @@
 # Maps P1/P2 — instant feedback, truthful horizon progress, Building your market (2026-09-24)
 
+> ✅ **PRODUCTION-PROVEN 2026-09-25** — merge `24dbb20e` (#1693) served by getmindy.ai; acceptance at the end of this record.
+
 > Never make the user wonder whether Mindy heard them, and never let an old answer masquerade as the new one.
 
 > ⚠️ **Correction (2026-09-25):** the absolute timings below were measured with x86 Chrome under Rosetta (Node is x64 here). Native arm64 Chrome is ~5–40× faster. Relative comparisons stand. Native numbers are in `tasks/maps-first-load-investigation-2026-09-25.md`:
@@ -117,3 +119,37 @@ The diff against main is P1/P2 only. No backend optimization, no Canonical Disco
 - P1: `https://market-assassin-git-feat-maps-p1-feedback-eric-coffies-projects.vercel.app/opportunity-map`
 - Baseline: `https://market-assassin-ftv9lgtj6-eric-coffies-projects.vercel.app/opportunity-map`
 - Preview-only env: `RECOMPETE_COMPUTE_ONCE_MODE=authority`, scoped to branches `feat/maps-p1-feedback` and `perf/maps-p1-baseline` (the baseline also received it via CLI `-e`). Remove after review.
+
+## Production acceptance (2026-09-25) — getmindy.ai serving `24dbb20e`
+Served HTML: full page 891,692 bytes with `let OPPS = [];`, `.app mfb-booting` in the server HTML, transform sweep,
+failed-horizon state and "not zero results" copy present. `?embed=1`: 600 rows, no overlay.
+
+**Cold load, native arm64 Chrome, 3 runs each (ms from navigation)**
+| CPU | First paint | Building your market visible | First discovery request | First useful pins |
+|---|---|---|---|---|
+| 1× | 528–700 | 959–1,134 | 545–709 | 1,253–1,463 (one run 3,245) |
+| 4× | 456–1,160 | 905–1,602 | 589–1,260 | 1,613–2,430 |
+
+Real desktop Chrome (Browser 1, `?q=ai governance`): DCL 313 ms, first discovery request 313 ms, first paint 612 ms,
+overlay dismissed at the first useful paint (1,998 ms — same instant), settled 4.2 s.
+
+**Actions (ms from the user's action)**
+| Action | Acknowledgement | First horizon | Useful | Settled |
+|---|---|---|---|---|
+| search ai governance | 26 | 1,001 | 1,050 | 2,038 |
+| search software license | 24 | 3,583 | 3,614 | 5,505 (Intel at 3,041) |
+| broad capability list | 41 | 5,948 | 6,114 | 17,150 |
+| agency USDA | 24 | 436 | 505 | 2,425 |
+| state Florida | 24 | 378 | 400 | 919 |
+| hide / show Recompete (cached) | 38 / 154 | — (0 requests) | 137 / 143 | 137 / 143 |
+| Open / Recompete / Forecast only | 44–56 | — (0 requests) | 37–53 | 37–53 |
+| rapid A→B | 37 | — | 139 | 139 — **stale paints 0** |
+| Start Fresh | 20 | 1,174 | 1,231 | 1,231 |
+| drawer | skeleton 11 | — | details 1,554 | full 1,861 |
+| deep link ?q=cybersecurity (load) | overlay 796 | 1,031 | 1,053 | 4,495 |
+
+**Truth states:** forced Open 500 → "Open couldn't load" (others paint); every horizon forced 500 → "Results unavailable /
+a loading error, not zero results"; `-computers` → needs_positive_scope on all three horizons ("Add what you sell");
+NOAA Forecast → "unavailable … — not zero". Reduced motion: overlay shown statically at first paint, no animation, leaves on
+useful. Mindy Intel appeared only on long waits and never delayed a paint (useful follows the first horizon by 31–63 ms).
+Console: no errors on normal loads, deep link, embed, needs-scope, NOAA; only the deliberately forced 500s.
