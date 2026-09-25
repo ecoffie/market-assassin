@@ -84,7 +84,7 @@ JS size and compile are **not** the problem: compile is 5–24 ms for the whole 
 | No placeholder | 4× | 1,185–1,256 | 953–997 | 1,658–1,769 |
 | No placeholder + shell visible in server HTML | 4× | **783–1,143 (= FCP)** | 926–1,298 | 1,652–2,050 |
 
-## Recommendation: the smallest bootstrap separation (not implemented; awaiting approval)
+## Recommendation: the smallest bootstrap separation (fixes 1–3 IMPLEMENTED 2026-09-25 — see the end)
 1. **Server-render the transition's visibility; no JS reveal.**
    - The overlay reveals itself with a compositor-driven CSS fade (opacity keyframes, about 300 ms delay, fill `both`), and `.app` carries `mfb-booting` in the server HTML.
    - It no longer depends on any script or timer, and the compositor runs the fade even while the parser is busy.
@@ -105,3 +105,28 @@ Out of scope: a general frontend rewrite, bundling or lazy-loading DRAWER_JS and
 - 4×: transition at first paint (0.8–1.1 s), first discovery 0.93–1.3 s, first useful pins 1.65–2.05 s.
 
 With the ~300 ms reveal delay, the transition appears about 0.3 s after first paint, and not at all on loads that finish sooner.
+
+## Implemented (2026-09-25, `e01288aa` + `dabe0e36`): fixes 1–3 only
+1. **CSS-first Building your market.** The overlay ships in the server HTML with `.app` already `mfb-booting`. No script reveals it: a compositor opacity animation (`mfbBootIn .24s ease-out 300ms both`) does. Visible is its static state, so reduced motion shows it at first paint. `.out` beats the animation, so a load that is useful sooner never shows it, and leaving has no minimum display time.
+2. **Placeholder list: embed only.** The full page ships `OPPS=[]` and skips the 600-row query. Page 1.11 MB → 891 KB. `?embed=1` still ships 600 rows (600 pins, 0 API calls).
+3. **Sweep on `transform`**, not `background-position`.
+
+Found by forced-failure acceptance and fixed (`dabe0e36`): with no placeholder, "every horizon failed" on first load read **"0 results"** + "No opportunities match". It now reads "Results unavailable" + "a loading error, not zero results" + Retry. Before this change, the same path showed the 600 placeholder rows as the user's market.
+
+### Before / after — native arm64 Chrome, same session, interleaved, 3 runs each (ms from navigation)
+Before = preview `d0eb4c34`, after = preview `e01288aa` (`dabe0e36` changes only the all-failed path).
+
+| | CPU | HTML received | First paint | Building your market visible | First discovery request | First useful pins |
+|---|---|---|---|---|---|---|
+| Before | 1× | 1,023–1,103 | 1,212–1,328 | 1,613–1,741 | 1,346–1,489 | 1,890–3,162 |
+| After | 1× | 365–452 (one outlier 2,776) | 524–684 | 958–1,112 | 539–700 | 1,758–2,238 |
+| Before | 4× | 765–902 | 1,012–1,224 | 1,923–2,158 | 1,859–2,304 | 2,544–3,166 |
+| After | 4× | 332–461 | 552–808 | 986–1,255 | 683–956 | 1,537–1,900 |
+
+Relative to HTML received (removes the server gain from not querying 600 rows):
+- first discovery request: 1× 323–386 → 167–248; 4× 1,015–1,402 → 330–495;
+- first useful pins: 1× 867–2,086 → 771–1,786; 4× 1,700–2,264 → 1,177–1,568;
+- first paint → overlay visible: 1× ~400–430 → ~430 (unchanged); 4× 891–961 → 434–447. The overlay now appears ~0.43 s after first paint at either CPU speed (300 ms delay + fade), no longer later on a slower machine.
+- main-thread work before the first discovery request: 1× 218–324 → 64–72 ms; 4× 1,121–1,447 → 203–245 ms.
+
+Real desktop Chrome (Browser 1), `dabe0e36`, `?q=janitorial`: DOMContentLoaded **368 ms** (was 708–934), overlay shown with the query, left at first useful pins (2.06 s), settled 3.0 s.
