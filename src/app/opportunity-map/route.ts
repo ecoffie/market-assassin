@@ -15,7 +15,7 @@ import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
-import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
+import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
 
 export const dynamic = 'force-dynamic';
 
@@ -10084,39 +10084,45 @@ export async function GET(request: NextRequest) {
   const embed = reqUrl.searchParams.get('embed');
   // SHARE TRUTH: a shared `?opp=<notice_id>` must identify THAT opportunity to crawlers (Facebook,
   // LinkedIn, X, iMessage), which never run our JS. Started now so the one-row read overlaps the
-  // 600-opp load below; applied to <head> at the end. Embed is never a share target.
+  // rest of the page build; applied to <head> at the end. Embed is never a share target.
   const shareOppId = embed ? null : reqUrl.searchParams.get('opp');
   const shareHeadP: Promise<string | null> = isNoticeId(shareOppId)
     ? fetchOppShareRow(shareOppId)
         .then((row) => (row ? renderOppShareHead(buildOppShareMeta(row), reqUrl.origin) : null))
         .catch((e) => { console.error('[opportunity-map] share metadata read failed', shareOppId, e); return null; })
     : Promise.resolve(null);
+  // The 600-row list is the EMBED's content (no VIEWPORT_JS, no fetch rounds — these rows are all it shows).
+  // The full page never used it: its first fetch round replaces OPPS and the boot overlay hides it until then.
+  // Shipping it cost ~250 KB and a parse-time render → re-render → clear → chunked redraw BEFORE the first
+  // discovery request could go out (tasks/maps-first-load-investigation-2026-09-25.md). So: embed only.
   let opps: unknown[] = [];
-  try {
-    const rows = await getMapOpportunities(600);
-    opps = rows.map((o) => ({
-      src: 'SAM',
-      naics: o.naics,
-      cat: o.cat,
-      title: o.title,
-      agency: cleanAgency(o.agency),
-      set: SET_TO_EVC[o.set] ?? 'None',
-      loc: o.loc,
-      close: (o.close || '').slice(0, 10),
-      sol: o.sol,
-      nid: o.id,
-      uiLink: o.uiLink,
-      lat: o.lat,
-      lng: o.lng,
-      locSrc: o.locSrc,
-      // SOW card facts (Tier 1) — undefined when not yet computed or nothing found (never
-      // fabricated). brandNameOrEqual is the 🚩 warning pill; evalBasis is the Best Value/LPTA
-      // chip. Both cap-the-view: 2 highest-signal facts on the card, full set in the drawer.
-      brandNameOrEqual: o.brandNameOrEqual || false,
-      evalBasis: o.evalBasis || null,
-    }));
-  } catch {
-    opps = [];
+  if (embed) {
+    try {
+      const rows = await getMapOpportunities(600);
+      opps = rows.map((o) => ({
+        src: 'SAM',
+        naics: o.naics,
+        cat: o.cat,
+        title: o.title,
+        agency: cleanAgency(o.agency),
+        set: SET_TO_EVC[o.set] ?? 'None',
+        loc: o.loc,
+        close: (o.close || '').slice(0, 10),
+        sol: o.sol,
+        nid: o.id,
+        uiLink: o.uiLink,
+        lat: o.lat,
+        lng: o.lng,
+        locSrc: o.locSrc,
+        // SOW card facts (Tier 1) — undefined when not yet computed or nothing found (never
+        // fabricated). brandNameOrEqual is the 🚩 warning pill; evalBasis is the Best Value/LPTA
+        // chip. Both cap-the-view: 2 highest-signal facts on the card, full set in the drawer.
+        brandNameOrEqual: o.brandNameOrEqual || false,
+        evalBasis: o.evalBasis || null,
+      }));
+    } catch {
+      opps = [];
+    }
   }
   // ⚠️ ALL string-injection into the template MUST go through repl(), which uses a function
   // replacer so special $-patterns ($, $$, $&, $`, $', $1…) in injected scripts/CSS are inserted
@@ -10186,9 +10192,9 @@ export async function GET(request: NextRequest) {
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
     // MARKET_BOOT_HTML (market-feedback.ts): "Building your market" for the first market of this page load.
-    // In the HTML — not added by JS — so it covers the server-rendered placeholder list from the first paint;
-    // it only becomes visible after MF_TIMING.BOOT_REVEAL, so a fast entry never sees it.
-    html = repl(html, '<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
+    // In the HTML with .app already marked mfb-booting — no script runs first. A CSS animation reveals it after
+    // MF_TIMING.BOOT_REVEAL, so a fast entry never sees it and a slow parse cannot delay it.
+    html = repl(html, '<div class="app">', MARKET_BOOT_APP_OPEN + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
     html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);

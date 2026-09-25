@@ -36,7 +36,7 @@ export const MF_TIMING = {
   LOCAL: 300,       // local spinner; a pan's bar
   BRANDED: 1000,    // "Updating your market…" panel with horizon progress
   RICH: 3000,       // Mindy Intel inside the Updating panel
-  BOOT_REVEAL: 250, // Building your market fades in after this (CSS animation-delay)
+  BOOT_REVEAL: 300, // Building your market fades in after this (CSS animation-delay; no script involved)
   BOOT_INTEL: 2500, // Mindy Intel inside Building your market
   ROTATE: 8000,     // next Intel card, only while still waiting
   FAILSAFE: 25000,  // Building your market can never outlive this, whatever else happens
@@ -121,19 +121,25 @@ export const MARKET_FEEDBACK_CSS =
   // (row 3, columns 2–3 on desktop; the single content cell on mobile). Nav, icon rail and search bar stay
   // usable: the user can change the query while the market builds.
   + '.app{position:relative}'
-  + '.mfb-boot{grid-area:3/2/4/4;position:absolute;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 30% 20%,rgba(91,63,214,.55),transparent 60%),linear-gradient(135deg,rgba(10,14,40,.9),rgba(33,20,84,.86));backdrop-filter:blur(3px) saturate(.7);-webkit-backdrop-filter:blur(3px) saturate(.7);color:#fff;opacity:0;transition:opacity .32s,transform .32s}'
-  // Revealed by the parse-time timer in MARKET_BOOT_HTML (class "in") — a CSS timer would be cancelled by
-  // the reduced-motion rule and leave the overlay invisible.
-  + '.mfb-boot.in{opacity:1}'
-  + '.mfb-boot.out{opacity:0!important;transform:scale(1.015);pointer-events:none}'
+  + '.mfb-boot{grid-area:3/2/4/4;position:absolute;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 30% 20%,rgba(91,63,214,.55),transparent 60%),linear-gradient(135deg,rgba(10,14,40,.9),rgba(33,20,84,.86));backdrop-filter:blur(3px) saturate(.7);-webkit-backdrop-filter:blur(3px) saturate(.7);color:#fff;overflow:hidden;animation:mfbBootIn .24s ease-out ' + MF_TIMING.BOOT_REVEAL + 'ms both;transition:opacity .16s}'
+  + '@keyframes mfbBootIn{from{opacity:0}to{opacity:1}}'
+  // CSS-FIRST (2026-09-25): no script reveals it. The server sends it in its initial state; the compositor
+  // runs the delayed fade even while the parser is busy with the page's inline scripts, so it can appear
+  // near first paint instead of after them. Visible is the STATIC state: the page's reduced-motion rule
+  // (animation:none) therefore shows it at once, statically, rather than leaving it stuck at 0.
+  // A load that is useful before BOOT_REVEAL adds .out first — the !important opacity beats the animation,
+  // so the overlay never appears. Leaving is immediate: no minimum display time, a 160 ms fade at most.
+  + '.mfb-boot.out{opacity:0!important;animation:none;pointer-events:none}'
   // While the first market builds, the server-rendered placeholder list (and its "600 results") is NOT the
   // user's market — hide it so it can never flash before the overlay reveals or read as the answer.
   //    Opacity, not visibility: visibility is inherited, so lifting it would restyle every pin at the
   //    exact moment the first market paints.
   + '.app.mfb-booting #feed,.app.mfb-booting #rescount,.app.mfb-booting #mapCount,.app.mfb-booting .leaflet-marker-pane{opacity:0!important}'
   + '.mfb-boot[hidden]{display:none}'
-  + '.mfb-boot::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,#8b7bff,#60a5fa,transparent);background-size:40% 100%;background-repeat:no-repeat;animation:mfbBootSweep 1.6s ease-in-out infinite}'
-  + '@keyframes mfbBootSweep{0%{background-position:-40% 0}100%{background-position:140% 0}}'
+  // Sweep on TRANSFORM (compositor thread): keeps moving while main-thread JavaScript is busy. The old
+  // background-position sweep froze exactly when the page was working hardest.
+  + '.mfb-boot::after{content:"";position:absolute;left:0;top:0;width:40%;height:2px;background:linear-gradient(90deg,transparent,#8b7bff,#60a5fa,transparent);transform:translateX(-100%);animation:mfbBootSweep 1.6s ease-in-out infinite;will-change:transform}'
+  + '@keyframes mfbBootSweep{from{transform:translateX(-100%)}to{transform:translateX(250%)}}'
   + '.mfb-boot-in{width:min(560px,calc(100% - 48px))}'
   + '.mfb-kicker{font-size:11px;font-weight:800;letter-spacing:.34em;text-transform:uppercase;color:#b9b0ff}'
   + '.mfb-title{margin-top:10px;font-size:clamp(30px,4.2vw,50px);line-height:1;font-weight:900;letter-spacing:-.01em;text-transform:uppercase}'
@@ -171,11 +177,9 @@ export const MARKET_BOOT_HTML =
   + stageRow('forecast', MF_HORIZON_STAGE.forecast, HORIZON_COLOR.forecast)
   + '</ol>'
   + '<div class="mfb-intel" id="mfbBootIntel" hidden><div class="mfb-intel-k">Mindy Intel</div><p></p></div>'
-  + '</div></div>'
-  // Parse-time: mark the page as booting (hides the placeholder list) and reveal the overlay after
-  // BOOT_REVEAL unless the market is already on screen. Runs before any other script on the page.
-  + '<script>(function(){try{var a=document.querySelector(".app");if(a)a.classList.add("mfb-booting");setTimeout(function(){var b=document.getElementById("mfbBoot");'
-  + 'if(b&&!b.hidden&&!b.classList.contains("out"))b.classList.add("in");},' + MF_TIMING.BOOT_REVEAL + ');}catch(e){}})();</script>';
+  + '</div></div>';
+/** The `.app` opening tag while the first market builds — server-rendered, so no script has to run first. */
+export const MARKET_BOOT_APP_OPEN = '<div class="app mfb-booting">';
 
 /** Bar + Updating panel + failure note — injected inside `.mapwrap`, right after `#map`. */
 export const MARKET_FEEDBACK_MAP_HTML =
@@ -365,7 +369,7 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
     if(!bootEl)return;
     var app=document.querySelector('.app'); if(app)app.classList.remove('mfb-booting');
     bootEl.classList.add('out');
-    setTimeout(function(){ bootEl.hidden=true; },340);
+    setTimeout(function(){ bootEl.hidden=true; },180);
   }
 
   var ackTimer=0;
