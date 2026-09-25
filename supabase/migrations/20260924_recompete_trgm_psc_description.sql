@@ -1,0 +1,22 @@
+-- migrate:no-transaction
+-- Recompete performance Gate 1 (2026-09-24) — trigram index 2/6.
+-- Record: tasks/recompete-gate1-2026-09-24.md · prototype: tasks/recompete-trgm-prototype-2026-09-24.md
+--
+--   index   idx_recompete_trgm_psc_description
+--   column  recompete_opportunities.psc_description  (gin, public.gin_trgm_ops — pg_trgm 1.6 lives in public)
+--   size    ~17 MB, measured on a full copy of the table (2026-09-24)
+--   existing equivalent: none on this column.
+--
+-- WHY: the canonical Recompete text matcher emits case-insensitive whole-word regexes (~* '\m…\M') over
+-- six text columns. No existing index can serve them, so every keyword read evaluated every regex on
+-- ~142k rows (EXPLAIN: 0.4–4 s per read). A trigram GIN index lets Postgres narrow to candidate rows
+-- first. Results are unchanged by construction (an index never changes WHAT matches) — proven
+-- byte-identical on 7 queries before/after on a rolled-back copy.
+--
+-- CONCURRENTLY: builds without blocking the hourly recompete sync's writes. One statement per file:
+-- the runner sends a file as one query, and CONCURRENTLY cannot run inside the implicit transaction a
+-- multi-statement query opens. Idempotent (IF NOT EXISTS). ⚠ A failed CONCURRENTLY build leaves an
+-- INVALID index that IF NOT EXISTS would then skip — verify pg_index.indisvalid after applying; if
+-- invalid: DROP INDEX CONCURRENTLY IF EXISTS public.idx_recompete_trgm_psc_description; then re-run.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_recompete_trgm_psc_description
+  ON public.recompete_opportunities USING gin (psc_description public.gin_trgm_ops);

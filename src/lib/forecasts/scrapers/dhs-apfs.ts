@@ -12,6 +12,7 @@
  * This scraper uses Puppeteer to handle the dynamic content.
  */
 
+import { canonicalDhsApfsNumber } from '../dhs-identity';
 import type { ForecastRecord, ScraperResult } from '../types';
 import { buildDeterministicExternalId, normalizeNaics, normalizeFY, normalizeSetAside, parseValueRange, sleep } from '../types';
 
@@ -207,7 +208,8 @@ function parseDHSAPIRecord(record: any): ForecastRecord | null {
   };
 
   const title = getField('Requirements Title') || getField('title') || getField('requirement');
-  const apfsNumber = getField('APFS Number') || getField('apfs_number') || getField('id');
+  // Canonical identity: strip DHS's republish `*` (src/lib/forecasts/dhs-identity.ts).
+  const apfsNumber = canonicalDhsApfsNumber(getField('APFS Number') || getField('apfs_number') || getField('id')) || undefined;
 
   // Skip if no meaningful data
   if (!title && !apfsNumber) {

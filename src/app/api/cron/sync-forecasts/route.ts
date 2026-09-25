@@ -31,8 +31,9 @@
  * onConflict 'source_agency,external_id', so re-running is idempotent and a
  * re-post of the same forecast updates rather than duplicates.
  */
+import { canonicalDhsExternalId } from '@/lib/forecasts/dhs-identity';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import * as XLSX from 'xlsx';
@@ -103,7 +104,8 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
       source_agency: 'DHS',
       source_type: 'api',
       source_url: DHS_API,
-      external_id: nn(clean(r.apfs_number)) || nn(clean(r.id)) || `DHS:${(title || '').slice(0, 60)}`,
+      // Canonical identity: the APFS number WITHOUT DHS's republish `*` — see src/lib/forecasts/dhs-identity.ts.
+      external_id: canonicalDhsExternalId(nn(clean(r.apfs_number)), nn(clean(r.id)), title),
       title: title || nn(clean(r.requirement)) || '(untitled forecast)',
       description: nn(clean(r.requirement)),
       bureau: nn(clean(r.organization)),
@@ -210,7 +212,8 @@ export async function GET(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  // Declares itself the DAILY SYNC to the agency_forecasts floor guard (src/lib/forecasts/writer.ts).
+  const supabase = forecastWriterClient('daily_sync');
 
   const dryRun = request.nextUrl.searchParams.get('dry_run') === '1';
 
@@ -285,9 +288,31 @@ export async function GET(request: NextRequest) {
     }
     if (normalized) console.log(`[${JOB_NAME}] normalized ${normalized} row(s) before upsert`);
 
+    // BACKFILL SAFETY (src/lib/forecasts/writer.ts): per publisher, a daily run may not CREATE a bulk of new rows
+    // while its alert floor is active. A refused publisher's rows are held back entirely (its updates wait for the
+    // backfill that must handle the bulk) and the run reports an error; other publishers still sync.
+    // The decision is made per publisher over its FULL row set before the first upsert, so a refused publisher
+    // has zero rows written (no partial prefix from earlier batches) and its whole payload is quarantined.
+    const refused: string[] = [];
+    const refusedSources = new Set<string>();
+    for (const src of [...new Set(deduped.map((r) => String(r.source_agency)))]) {
+      const srcRows = deduped.filter((r) => String(r.source_agency) === src);
+      const nr = await countNewForecastRows(supabase, src, srcRows.map((r) => String(r.external_id)));
+      const g = 'error' in nr ? { allow: false as const, reason: `${src}: new-row count failed: ${nr.error}` } : await guardForecastInserts(supabase, src, nr.newRows);
+      if (g.allow) continue;
+      refusedSources.add(src);
+      const q = await quarantineRefusedLoad(supabase, src, g.reason, 'error' in nr ? -1 : nr.newRows, srcRows);
+      refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+    }
+    const writable = deduped.filter((r) => !refusedSources.has(String(r.source_agency)));
+    if (refused.length) {
+      failures.push(...refused.map((r) => `insert_refused: ${r}`));
+      await sendOpsAlert({ subject: 'Forecast sync — bulk of NEW rows refused (publisher floor active)', html: `<p>${refused.map((r) => `<div>${r}</div>`).join('')}</p>` }).catch(() => {});
+    }
+
     let upserted = 0;
-    for (let i = 0; i < deduped.length; i += 500) {
-      const batch = deduped.slice(i, i + 500);
+    for (let i = 0; i < writable.length; i += 500) {
+      const batch = writable.slice(i, i + 500);
       const { error } = await supabase
         .from('agency_forecasts')
         .upsert(batch, { onConflict: 'source_agency,external_id' });

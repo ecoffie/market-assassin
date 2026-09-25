@@ -20,10 +20,25 @@ import { FIXTURES } from './__fixtures__/fixtures';
 import { mapsOpenRequest } from '@/lib/opportunities/maps-open-discovery';
 import { mapsRecompeteRequest } from '@/lib/recompete/maps-recompete-discovery';
 import { mapsForecastRequest } from '@/lib/opportunities/maps-forecast-discovery';
+import { savedSearchForecastRequest } from '@/lib/saved-searches/forecast-discovery';
 
 const CTX: PlanContext = { today: '2026-09-22', fiscalYear: 2026 };
 
-type Surface = { status: 'migrated' | 'pending'; toPlan?: (f: FindOpportunitiesInput) => DiscoveryPlan; note: string };
+type Surface = {
+  status: 'migrated' | 'pending';
+  toPlan?: (f: FindOpportunitiesInput) => DiscoveryPlan;
+  note: string;
+  /**
+   * A surface that migrated ONE horizon is gated on the shared interpretation plus that horizon only.
+   * Omitted = every horizon.
+   */
+  horizon?: 'forecast';
+  /**
+   * The MCP input the reference plan is built from, when the surface by contract never receives part of it.
+   * Omitted = the same input.
+   */
+  referenceInput?: (f: FindOpportunitiesInput) => FindOpportunitiesInput;
+};
 
 export const SURFACES: Record<string, Surface> = {
   mcp_find_opportunities: {
@@ -61,13 +76,26 @@ export const SURFACES: Record<string, Surface> = {
     } as Record<string, string | null | undefined>)[k] ?? null, { ctx: CTX }).plan,
     note: 'Phase C3: forecast-map + forecasts/unplaced → maps-forecast-discovery.ts.',
   },
-  saved_searches: { status: 'pending', note: 'Gate: scripts/discovery-saved-search-blast.ts sign-off first.' },
+  saved_searches_forecast: {
+    status: 'migrated',
+    horizon: 'forecast',
+    // The REAL saved-search adapter, fed a saved filter set shaped like the one the map writes. A saved
+    // PSC never reaches the Forecast builder (the map never sends psc to its Forecast horizon), so the
+    // reference is MCP for the same request without advanced.psc.
+    toPlan: (f) => savedSearchForecastRequest({
+      q: f.query, agency: f.agency, state: f.location, naics: f.advanced?.naics, psc: f.advanced?.psc,
+      horizons: { forecast: true },
+    }, CTX).plan,
+    referenceInput: (f) => ({ ...f, advanced: { ...f.advanced, psc: null } }),
+    note: 'Forecast horizon: cron/saved-search-alerts → saved-searches/forecast-discovery.ts (engine behind SAVED_SEARCH_FORECAST_CANONICAL).',
+  },
+  saved_searches_open: { status: 'pending', note: 'Open half still runs parseMapFilters/applyMapFilters in cron/saved-search-alerts.' },
   daily_alerts: { status: 'pending', note: 'Profile-keyword path audited separately first.' },
 };
 
 /** The part of a plan that is MEANING (must match across surfaces). Policy is excluded on purpose. */
-function meaning(p: DiscoveryPlan) {
-  return {
+function meaning(p: DiscoveryPlan, horizon?: 'forecast') {
+  const m = {
     status: p.status,
     intent: { ...p.intent },
     matcher: p.matcher,
@@ -86,7 +114,15 @@ function meaning(p: DiscoveryPlan) {
     forecast_filters: p.horizons.forecast.forecastFilters,
     forecast_query_ops: p.horizons.forecast.ops.filter((o) => !(o.op === 'or' && o.expr.startsWith('fiscal_year.is.null,'))),
     forecast_via: p.horizons.forecast.via,
+    forecast_coverage: p.horizons.forecast.coverage,
+    forecast_coverage_gaps: p.horizons.forecast.coverageGaps ?? null,
   };
+  if (horizon !== 'forecast') return m;
+  // Forecast-only surface: shared interpretation (a PSC is dropped by contract, so it is compared via the
+  // reference input) + the Forecast horizon. Open/Recompete belong to the surface's pending halves.
+  const { open_query_ops, recompete_query_ops, recompete_naics, recompete_via, ...rest } = m;
+  void open_query_ops; void recompete_query_ops; void recompete_naics; void recompete_via;
+  return rest;
 }
 
 const MCP_INPUTS: FindOpportunitiesInput[] = FIXTURES.map((f) => ({
@@ -118,7 +154,10 @@ describe('cross-surface query-plan gate', () => {
     const ref = SURFACES.mcp_find_opportunities.toPlan!;
     for (const [name, s] of Object.entries(SURFACES)) {
       if (s.status !== 'migrated' || name === 'mcp_find_opportunities') continue;
-      for (const input of MCP_INPUTS) expect(meaning(s.toPlan!(input)), `${name}: ${input.query}`).toEqual(meaning(ref(input)));
+      for (const input of MCP_INPUTS) {
+        expect(meaning(s.toPlan!(input), s.horizon), `${name}: ${input.query}`)
+          .toEqual(meaning(ref(s.referenceInput ? s.referenceInput(input) : input), s.horizon));
+      }
     }
   });
 
@@ -148,8 +187,17 @@ describe('cross-surface query-plan gate', () => {
 
   it('Maps Recompete no longer interprets the query itself (route + adapter)', () => {
     const strip = (p: string) => readFileSync(p, 'utf8').replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
-    const route = strip(join(__dirname, '..', '..', 'app', 'api', 'app', 'recompete-map', 'route.ts'));
+    // route + its read paths (Gate 2 moved the reads verbatim into recompete-map-paths.ts)
+    const route = strip(join(__dirname, '..', '..', 'app', 'api', 'app', 'recompete-map', 'route.ts'))
+      + strip(join(__dirname, '..', 'recompete', 'recompete-map-paths.ts'));
     const adapter = strip(join(__dirname, '..', 'recompete', 'maps-recompete-discovery.ts'));
+    // The compute-once path must not interpret the query either: it only SERIALIZES the plan.
+    for (const f of [join(__dirname, 'sql.ts'), join(__dirname, '..', 'recompete', 'maps-recompete-sql.ts'), join(__dirname, '..', 'recompete', 'compute-once-pg.ts')]) {
+      const src = strip(f);
+      for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'buildSearchOr', 'applyMapFilters', 'naicsMatchConds', 'multiAgency', 'buildDiscoveryPlan']) {
+        expect(src, `${f}: ${legacy}`).not.toContain(legacy);
+      }
+    }
     for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'setAsideOrExpr', 'pscToNaicsCodes', 'agencyOrExpr', 'agencyIlikeConds',
       'multiAgency', 'naicsMatchConds', 'parseStateList', 'buildSearchOr', 'applyMapFilters', 'incumbent_name.ilike', "'period_of_performance_current_end', todayYmd"]) {
       expect(route, `route: ${legacy}`).not.toContain(legacy);
@@ -157,7 +205,16 @@ describe('cross-surface query-plan gate', () => {
     expect(route).toContain("from '@/lib/recompete/maps-recompete-discovery'");
     // One plan; all four reads (market total · unmapped · viewport pins · follow-ons) use it.
     expect(route.match(/mapsRecompeteRequest\(/g)).toHaveLength(1);
-    expect(route.match(/applyFilters\(\s*db\.from\('recompete_opportunities'\)/g)).toHaveLength(4);
+    // market total · unmapped · viewport pins read the table through applyFilters directly …
+    expect(route.match(/applyFilters\(\s*db\.from\('recompete_opportunities'\)/g)).toHaveLength(3);
+    // … and the follow-ons go through map-follow-ons.ts (Gate 1, planner-independent) with the SAME
+    // applyFilters as their only filter — that module never interprets search meaning itself.
+    expect(route).toContain('applyPlan: (q) => applyFilters(q),');
+    const followOns = strip(join(__dirname, '..', 'recompete', 'map-follow-ons.ts'));
+    for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'buildSearchOr', 'applyMapFilters', 'imatch', '.or(', 'ilike']) {
+      expect(followOns, `map-follow-ons: ${legacy}`).not.toContain(legacy);
+    }
+    expect(followOns).toContain('d.applyPlan(d.from().select(d.cols))');
     for (const legacy of ['termOfArtNaicsCodes', 'resolveQueryIntent', 'setAsideOrExpr', 'agencyOrExpr', 'naicsMatchConds', 'incumbent_name']) {
       expect(adapter, `adapter: ${legacy}`).not.toContain(legacy);
     }
