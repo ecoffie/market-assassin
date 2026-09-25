@@ -5481,7 +5481,7 @@ const DRAWER_CSS = '<style>'
   // never a drawer-wide "Loading…" that hides what is already known. Static under prefers-reduced-motion.
   + '.osk{height:11px;border-radius:6px;margin:10px 0;background:linear-gradient(90deg,#eef1f5 25%,#f8f9fb 45%,#eef1f5 65%);background-size:300% 100%;animation:oskSh 1.3s ease-in-out infinite}'
   + '@keyframes oskSh{0%{background-position:100% 0}100%{background-position:0 0}}'
-  + '.osk-err{display:flex;align-items:center;gap:10px;padding:14px 0;color:#7f1d1d;font-size:13px}'
+  + '.osk-err{display:flex;align-items:center;gap:10px;padding:14px 24px;color:#7f1d1d;font-size:13px}'
   + '.osk-err button{border:1px solid #fecaca;background:#fff5f5;color:#991b1b;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer}'
   // SOW facts (Tier 1) — verbatim evidence quotes, so a user can verify each fact against the
   // solicitation's own words.
@@ -9766,7 +9766,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // cleaned keyword in the box. Otherwise fall through to the normal keyword search.
   // Enter: deferred one task (Maps P1) so the acknowledgement the Enter event writes can paint before the
   // intent parse / filter apply / capture work. It still runs after the keyword commit (queued first).
-  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); setTimeout(function(){ if(q){ pushRecent(q);
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);
         var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
         if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
           var zi=document.getElementById('zsearchInput'); if(zi)zi.value=(typeof window.__lastAppliedKeyword==='string'?window.__lastAppliedKeyword:intent.keyword); // reflect the ACTUAL applied keyword (Players keeps the agency word)

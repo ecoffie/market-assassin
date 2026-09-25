@@ -78,9 +78,10 @@ export const MARKET_FEEDBACK_CSS =
   // prefers-reduced-motion with a global animation:none — which must leave everything visible, not stuck at 0.
   + '@keyframes mfbIn{from{opacity:0}}@keyframes mfbSpin{to{transform:rotate(360deg)}}'
   // 3. The Updating panel — floats over the top of the map, never blocks it.
-  // Below the "N of M opportunities" map pill (top-left, ~14–46px) so the two never overlap; fixed width so the
-  // card does not jump when the Intel card joins it.
-  + '.mfb-panel{position:absolute;left:50%;top:60px;transform:translate(-50%,-6px);z-index:640;width:min(400px,calc(100% - 32px));box-sizing:border-box;background:rgba(255,255,255,.97);border:1px solid rgba(91,63,214,.18);border-radius:14px;box-shadow:0 10px 30px rgba(17,24,39,.14);padding:12px 16px 12px;opacity:0;transition:opacity .18s,transform .18s;pointer-events:none}'
+  // Bottom-center of the map: the top edge already carries the "N of M" pill (left), the "Picked up where you
+  // left off" pill (center) and Draw (right); the bottom has only the legend (left) and zoom (right). Fixed
+  // width so the card does not jump when the Intel card joins it.
+  + '.mfb-panel{position:absolute;left:50%;bottom:28px;transform:translate(-50%,6px);z-index:640;width:min(400px,calc(100% - 32px));box-sizing:border-box;background:rgba(255,255,255,.97);border:1px solid rgba(91,63,214,.18);border-radius:14px;box-shadow:0 10px 30px rgba(17,24,39,.14);padding:12px 16px 12px;opacity:0;transition:opacity .18s,transform .18s;pointer-events:none}'
   + '.mfb-panel.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}'
   + '.mfb-ph{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#1f1d3a;letter-spacing:.01em}'
   + '.mfb-ph .mfb-k{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#5b3fd6}'
@@ -102,7 +103,7 @@ export const MARKET_FEEDBACK_CSS =
   + '.mfb-intel-k{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#5b3fd6;margin-bottom:3px}'
   + '.mfb-intel p{margin:0;font-size:13px;line-height:1.45;color:#27264a}'
   // Update failed with the previous market still on screen: say so, never pretend.
-  + '.mfb-err{position:absolute;left:50%;top:60px;transform:translateX(-50%);z-index:641;background:#fff;border:1px solid #fecaca;border-radius:12px;box-shadow:0 8px 24px rgba(17,24,39,.12);padding:10px 14px;font-size:13px;color:#7f1d1d;display:flex;gap:10px;align-items:center}'
+  + '.mfb-err{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);z-index:641;background:#fff;border:1px solid #fecaca;border-radius:12px;box-shadow:0 8px 24px rgba(17,24,39,.12);padding:10px 14px;font-size:13px;color:#7f1d1d;display:flex;gap:10px;align-items:center}'
   + '.mfb-err button{border:1px solid #fecaca;background:#fff5f5;color:#991b1b;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer}'
   // 4. BUILDING YOUR MARKET — first entry only. Covers the map + list (the server-rendered placeholder list
   //    must not read as the user's market); the map stays faintly visible behind it.
@@ -317,7 +318,12 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
     setFlag('stale',v.stale,setStale);
     setFlag('local',v.local,function(on){ var u=upd(); if(u){ var i=u.querySelector('i'); if(i)i.style.display=on?'inline-block':'none'; } });
     setFlag('panel',v.panel,function(on){ var p=$('mfbPanel'); if(p)p.classList.toggle('on',on); });
-    setFlag('err',v.err,function(on){ var x=$('mfbErr'); if(x)x.hidden=!on; });
+    setFlag('err',v.err,function(on){
+      var x=$('mfbErr'); if(x)x.hidden=!on;
+      // Nothing is updating any more: the header must say the market on screen is the PREVIOUS one.
+      var u=upd(); var sp=u&&u.querySelector('span');
+      if(sp)sp.textContent=on?'Not updated \u2014 showing your previous market':'Updating your market\u2026';
+    });
     if(v.panel)paintRows();
     var pi=$('mfbIntel'); if(v.intel)intelFor(pi,T.RICH,e,R.enabled); else if(pi)pi.hidden=true;
     if(bootLive){

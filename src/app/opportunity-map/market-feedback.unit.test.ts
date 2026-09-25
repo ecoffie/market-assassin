@@ -196,6 +196,7 @@ describe('controller — newest action wins; cancelled work never reports', () =
     w.__mf.paint(5, { settled: true, painted: false, pins: 0 });
     expect(d.getElementById('mfbErr')!.hidden).toBe(false);
     expect((d.getElementById('feed') as HTMLElement).style.opacity).toBe('0.38');
+    expect(d.getElementById('mfbUpd')!.textContent).toBe('Not updated \u2014 showing your previous market');
   });
   it('ack() acknowledges before the round exists and keeps the ACTION time as t0', () => {
     const { w, d } = page();
@@ -240,7 +241,7 @@ describe('wiring in route.ts', () => {
   it('Enter acknowledges in the event itself and commits in the next task (the acknowledgement paints first)', () => {
     expect(src).toMatch(/_actionNow\(\);\s*setTimeout\(function\(\)\{ Q=v; window\.__syncQueryUrl\(true\); fetchView\(\); \},0\);/);
     // the search panel's intent handler is deferred the same way, so it still runs AFTER the raw commit
-    expect(src).toContain("input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); setTimeout(function(){ if(q){ pushRecent(q);");
+    expect(src).toContain("input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);");
   });
   it('every non-pan fetchView is acknowledged and yields a frame before dispatch; a pan is tagged at its source', () => {
     expect(src).toContain("if(!(opts&&(opts.pan||opts.system)))_actionNow();");
