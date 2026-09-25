@@ -14,6 +14,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
+import { LEGACY_GAO_MAX_AGE_YEARS } from '@/lib/agency-intelligence/legacy-gao-currency';
 import { getAgency } from '@/lib/agency-hierarchy/unified-search';
 import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
 
@@ -346,6 +347,14 @@ export async function understandCustomer(
       const intel =
         (await getUnifiedAgencyIntelligence(researchKey)) ||
         (key !== researchKey ? await getUnifiedAgencyIntelligence(key) : null);
+      // Stale legacy GAO is withheld upstream; say so, so an empty gao_reports is never
+      // read as "GAO has found nothing about this buyer".
+      const withheldGao = intel?.historicalGaoWithheld ?? 0;
+      const withheldNote = withheldGao > 0
+        ? ` ${withheldGao} legacy GovInfo GAO item(s) withheld as historical (published more than ` +
+          `${LEGACY_GAO_MAX_AGE_YEARS} years ago) — not current findings. No current GAO row here does not ` +
+          'establish that GAO has no current findings.'
+        : '';
       if (intel && (intel.painPoints.length || intel.priorities.length || intel.gaoReports.length)) {
         agencyBlock = {
           status: 'grounded',
@@ -357,7 +366,8 @@ export async function understandCustomer(
           sources: intel.sources || [],
           note:
             "Mindy curated intel (static + agency_intelligence DB) — research indication, NOT an official agency statement. " +
-            'Do not headline this as what the customer "actually cares about." Confirm material claims against primary sources before client-facing use.',
+            'Do not headline this as what the customer "actually cares about." Confirm material claims against primary sources before client-facing use.' +
+            withheldNote,
         };
       } else {
         agencyBlock = {
@@ -368,7 +378,7 @@ export async function understandCustomer(
           gao_reports: [],
           spending_patterns: [],
           sources: [],
-          note: `No pain points / priorities / GAO rows on file for "${researchKey || agencyName}".`,
+          note: `No pain points / priorities / GAO rows on file for "${researchKey || agencyName}".${withheldNote}`,
         };
       }
     } catch (err) {
