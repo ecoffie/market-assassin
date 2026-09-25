@@ -65,7 +65,10 @@ describe('horizonCount keeps four meanings apart', () => {
 });
 
 describe('wiring — no null-to-zero coercion left on the horizon path', () => {
-  const fetchBlock = route.slice(route.indexOf('_enabled.map(function(m){'), route.indexOf('_unplacedFoot();'));
+  // The OPPORTUNITY horizon path only — the Players (contacts) branch shares _fetchViewNow but is a
+  // different dataset with its own count contract.
+  const _fb = route.slice(route.indexOf('function _partFrom('), route.indexOf('_unplacedFoot();'));
+  const fetchBlock = _fb.slice(0, _fb.indexOf('// ── Companies / Gov Buyers')) + _fb.slice(_fb.indexOf('// ── OPPORTUNITIES map'));
   it('the per-horizon fetch uses horizonCount, not `totalForFilters||0`', () => {
     expect(fetchBlock).toContain('var hc=horizonCount(d);');
     expect(fetchBlock).toContain('total:hc.total,count:hc,');

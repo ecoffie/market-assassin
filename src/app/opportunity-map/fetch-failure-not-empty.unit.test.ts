@@ -12,9 +12,13 @@ const mapRoute = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 describe('Fetch failure is not a fake empty result', () => {
   it('a failed per-source fetch is TAGGED failed:true (distinct from a real empty result)', () => {
     // both the !success branch and the .catch on the opp fetch must stamp failed:true
-    const oppBlock = mapRoute.slice(mapRoute.indexOf('_enabled.map(function(m)'));
-    const failedTags = (oppBlock.match(/failed:true/g) || []).length;
-    expect(failedTags).toBeGreaterThanOrEqual(2); // !success return + .catch return
+    // Maps P0: _loadHorizon resolves {failed:true} on !success AND on a network error (an ABORT is
+    // {aborted:true} — superseded, never painted, never an error); the round turns it into a part.
+    const loader = mapRoute.slice(mapRoute.indexOf('function _loadHorizon('), mapRoute.indexOf('function fetchView(){'));
+    expect((loader.match(/failed:true/g) || []).length).toBeGreaterThanOrEqual(2); // !success + network error
+    expect(loader).toContain("(err&&err.name==='AbortError')?{aborted:true}:{failed:true}");
+    const round = mapRoute.slice(mapRoute.indexOf('function _fetchViewNow('), mapRoute.indexOf('function _paintRound('));
+    expect(round).toContain('failed:true');
   });
 
   it('when EVERY enabled horizon failed, the map does NOT blank — it shows the error, keeps last-good', () => {
@@ -32,11 +36,12 @@ describe('Fetch failure is not a fake empty result', () => {
     // the banner must NOT show. Gate: only show when nothing is currently on screen.
     expect(mapRoute).toMatch(/_haveRender\s*=\s*\(typeof OPPS!=='undefined' && OPPS && OPPS\.length>0\)/);
     // and a NEW attempt clears any stale banner up front, so a later good load self-heals
-    const fvIdx = mapRoute.indexOf('function fetchView(){');
-    const busyIdx = mapRoute.indexOf('if(busy){ pendingFetch=true; return; }', fvIdx);
+    // (Maps P0: the attempt starts in _fetchViewNow — the scheduled body of fetchView.)
+    const fvIdx = mapRoute.indexOf('function _fetchViewNow(');
+    const genIdx = mapRoute.indexOf('var gen=++_fetchGen;', fvIdx);
     const clearIdx = mapRoute.indexOf("if(typeof _clearFetchError==='function')_clearFetchError();", fvIdx);
-    expect(clearIdx).toBeGreaterThan(fvIdx);   // the clear is inside fetchView
-    expect(clearIdx).toBeLessThan(busyIdx);    // BEFORE the busy short-circuit, so every attempt clears
+    expect(clearIdx).toBeGreaterThan(fvIdx);   // the clear is inside the attempt
+    expect(clearIdx).toBeLessThan(genIdx);     // BEFORE the round starts, so every attempt clears
   });
 
   it('a genuine empty result (fetch OK, 0 rows) still falls through and renders 0 — no failed flag', () => {
@@ -50,8 +55,11 @@ describe('Fetch failure is not a fake empty result', () => {
     expect(successReturn).not.toContain('failed:true');
   });
 
-  it('the outer promise .catch surfaces the error too (never a silent blank)', () => {
-    expect(mapRoute).toMatch(/\}\)\.catch\(function\(\)\{busy=false; afterFetch\(\); if\(typeof _showFetchError==='function'\)_showFetchError\(\);\}\);/);
+  it('an all-failed round surfaces the error only once nothing else can still succeed (never a silent blank)', () => {
+    // Progressive horizons: while another horizon is still loading, an early failure is not judged.
+    expect(mapRoute).toContain('if(_allFailed&&loading.length)return;');
+    // the Players (contacts) path still surfaces a thrown fetch — for the CURRENT round only
+    expect(mapRoute).toContain("}).catch(function(){ if(cgen!==_fetchGen)return; if(typeof _showFetchError==='function')_showFetchError(); });");
   });
 
   it('the banner helpers exist in template.html and paint an honest retry, not "No opportunities match"', () => {

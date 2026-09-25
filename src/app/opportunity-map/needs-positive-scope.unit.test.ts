@@ -105,7 +105,7 @@ describe('wiring — header and feed render the refinement, never "0 results"', 
     expect(guard).toBeLessThan(row.indexOf('panel.appendChild(b)'));
   });
   it('the fetch merge publishes __needsScope from the per-horizon counts on every successful pass', () => {
-    const fetchBlock = route.slice(route.indexOf('_enabled.map(function(m){'), route.indexOf('_unplacedFoot();'));
+    const fetchBlock = route.slice(route.indexOf('function _partFrom('), route.indexOf('_unplacedFoot();'));
     expect(fetchBlock).toContain('window.__needsScope=needsScopeNote(window.__horizonCounts,_enabled);');
   });
   it('the feed shows the refinement BEFORE the generic "No opportunities match" empty state', () => {

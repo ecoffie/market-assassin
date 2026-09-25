@@ -91,6 +91,15 @@ describe('comparison + the one response builder', () => {
     expect(isOldDegradedOnly(req, { ...n, total: null, pins: [{ contract_id: 'B' }] }, n)).toBe(false); // null + a pin diff → real
     expect(isOldDegradedOnly(req, n, { ...n, total: null })).toBe(false);                            // new-side null is not old degradation
   });
+  it('counts=0 (a pan): market-wide fields are OMITTED with countsSkipped — never 0, never null', () => {
+    const body = buildRecompeteMapBody(req, { ...base, total: null, unmapped: null }, { counts: false }) as Record<string, unknown>;
+    expect(body.countsSkipped).toBe(true);
+    expect('totalForFilters' in body && body.totalForFilters !== undefined).toBe(false);
+    expect(body.unmappedForFilters).toBeUndefined();
+    expect(body.totalInView).toBe(2);
+    // a pan compares clean: both paths drop the counts
+    expect(compareReads(req, { ...base, total: null, unmapped: null }, { ...base, total: null, unmapped: null, ms: 9 })).toEqual([]);
+  });
   it('a failed count is UNKNOWN on both paths — never rendered as 0 unmapped', () => {
     expect(buildRecompeteMapBody(req, { ...base, unmapped: null }).unmappedForFilters).toBeNull();
   });

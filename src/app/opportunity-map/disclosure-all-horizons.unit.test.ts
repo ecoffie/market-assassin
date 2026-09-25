@@ -73,10 +73,17 @@ describe('Forecast counts unconditionally', () => {
   it('the COUNT is not gated behind includeUnplaced (only the ROWS are)', () => {
     // It used to sit inside `if (hasSearchKey && includeUnplaced==='1')`, so an unfiltered view
     // reported 0 unmapped forecasts when the truth was ~14,939.
-    const i = forecastSrc.indexOf('let unmappedForFilters');
-    const gate = forecastSrc.indexOf("p.get('includeUnplaced') === '1'");
+    // Maps P0 (2026-09-24): the reads run concurrently, so "before the gate" is now "not inside it".
+    // The unmapped count is gated ONLY on counts=0 (the client already holds it for this intent) —
+    // never on includeUnplaced / a search key.
+    const i = forecastSrc.indexOf('const unmappedP = withCounts');
+    const end = forecastSrc.indexOf('const unplacedP');
     expect(i).toBeGreaterThan(-1);
-    expect(i).toBeLessThan(gate);   // computed BEFORE the gate → unconditional
+    expect(end).toBeGreaterThan(i);
+    const def = forecastSrc.slice(i, end);
+    expect(def).toContain(".is('map_lat', null)");
+    expect(def).not.toContain('includeUnplaced');
+    expect(def).not.toContain('hasSearchKey');
   });
 });
 

@@ -30,7 +30,15 @@ export interface MarketRead {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = { from: (t: string) => any };
 
-export async function readOld(db: Db, req: MapsRecompeteRequest, b: BBox): Promise<MarketRead> {
+/**
+ * `counts: false` = Maps P0's `?counts=0` (map-counts-mode.ts): the client already holds this intent's
+ * market truth, so a pan skips the two bbox-independent head counts. total/unmapped come back null here
+ * and the body OMITS them (countsSkipped) — they never reach the user as 0 or unknown.
+ */
+export interface ReadOpts { counts?: boolean }
+
+export async function readOld(db: Db, req: MapsRecompeteRequest, b: BBox, opts: ReadOpts = {}): Promise<MarketRead> {
+  const withCounts = opts.counts !== false;
   const t0 = Date.now();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyFilters = (q: any, mapped: 'only' | 'none' = 'only') => applyMapsRecompeteFilters(q, req, mapped);
@@ -40,7 +48,7 @@ export async function readOld(db: Db, req: MapsRecompeteRequest, b: BBox): Promi
   const totalForFiltersHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
   // THE MAP-TRUTH CONTRACT — rows matching the filters that the map CANNOT DRAW (map_lat IS NULL).
   const unmappedHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }), 'none');
-  const [{ count: totalForFilters }, { count: unmappedForFilters }] = await Promise.all([totalForFiltersHead, unmappedHead]);
+  const countsP = withCounts ? Promise.all([totalForFiltersHead, unmappedHead]) : Promise.resolve(null);
 
   // DETERMINISTIC PAGE (Gate 1): expiry date, then contract_id as a tie-breaker only.
   const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(RECOMPETE_PIN_COLS, { count: 'exact' })))
@@ -53,21 +61,27 @@ export async function readOld(db: Db, req: MapsRecompeteRequest, b: BBox): Promi
     applyPlan: (q) => applyFilters(q),
     bbox, cols: RECOMPETE_PIN_COLS, cap: MAX_PINS,
   }).catch((e: Error) => { console.error('[recompete-map] follow-ons failed (pins unaffected):', e.message); return [] as Row[]; });
-  const [{ data, count: totalInView, error }, followOns] = await Promise.all([viewQ, followOnP]);
+  // The counts run CONCURRENTLY with the viewport reads (P0), not as a phase before them.
+  const [counts, [{ data, count: totalInView, error }, followOns]] = await Promise.all([countsP, Promise.all([viewQ, followOnP])]);
   if (error) throw error;
+  const totalForFilters = counts ? counts[0].count : null;
+  const unmappedForFilters = counts ? counts[1].count : null;
   return {
     total: totalForFilters ?? null, unmapped: unmappedForFilters ?? null, inView: totalInView ?? null,
     pins: (data || []) as Row[], followOns: followOns as Row[], ms: Date.now() - t0,
   };
 }
 
-export async function readNew(req: MapsRecompeteRequest, b: BBox, timeoutMs?: number): Promise<MarketRead> {
+export async function readNew(req: MapsRecompeteRequest, b: BBox, opts: ReadOpts = {}, timeoutMs?: number): Promise<MarketRead> {
   const r = await runComputeOnce(req, { bbox: b, cap: MAX_PINS, pinCols: RECOMPETE_PIN_COLS }, timeoutMs);
-  return { total: r.total, unmapped: r.unmapped, inView: r.inView, pins: r.pins, followOns: r.followOns, ms: r.ms };
+  // One pass computes the counts anyway; with counts:false they are dropped so both paths return the same shape.
+  const withCounts = opts.counts !== false;
+  return { total: withCounts ? r.total : null, unmapped: withCounts ? r.unmapped : null, inView: r.inView, pins: r.pins, followOns: r.followOns, ms: r.ms };
 }
 
 /** The user-visible payload — identical construction whichever path read the market. */
-export function buildRecompeteMapBody(req: MapsRecompeteRequest, r: MarketRead) {
+export function buildRecompeteMapBody(req: MapsRecompeteRequest, r: MarketRead, opts: ReadOpts = {}) {
+  const withCounts = opts.counts !== false;
   const cid = (x: unknown) => String((x as { contract_id?: unknown }).contract_id ?? '');
   const rows = r.pins;
   // Captured follow-ons expire the LATEST, so the capped expiry-ascending page buries them; merge in any
@@ -79,10 +93,12 @@ export function buildRecompeteMapBody(req: MapsRecompeteRequest, r: MarketRead) 
     success: true, mode: 'recompete',
     // Canonical discovery status + the recompete window actually applied.
     discovery: mapsRecompeteDiscoveryMeta(req.plan),
-    totalForFilters: r.total ?? 0, totalInView: r.inView ?? pins.length,
+    // counts=0 → the market-wide fields are OMITTED (never 0/null): the client holds them.
+    ...(withCounts ? {} : { countsSkipped: true }),
+    totalForFilters: withCounts ? (r.total ?? 0) : undefined, totalInView: r.inView ?? pins.length,
     capped: (r.inView ?? 0) > (rows.length),
     // null = UNKNOWN (the count failed), never 0 (Bug Prevention Rule #11).
-    unmappedForFilters: r.unmapped ?? null,
+    unmappedForFilters: withCounts ? (r.unmapped ?? null) : undefined,
     pins,
   };
 }
