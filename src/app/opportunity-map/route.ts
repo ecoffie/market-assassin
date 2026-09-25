@@ -1959,6 +1959,7 @@ const VIEWPORT_JS = `<script>
     if(c.state==='needs_scope') return '\u2014';
     if(c.state==='loading') return '\u2026';   // still loading for THIS intent — no number yet, never the old one
     if(c.state==='unavailable') return 'n/a';
+    if(c.state==='failed') return '!';        // this intent's request failed — never '0', never '…'
     if(c.state==='unknown') return '?';
     return fmt(c.total)+(c.state==='partial'?'*':'');
   }
@@ -1974,6 +1975,7 @@ const VIEWPORT_JS = `<script>
       if(c.state==='loading') loadingNames.push(name);
       else if(c.state==='unavailable') out.push(name+' unavailable'+who+' (no forecast publisher) — not zero');
       else if(c.state==='partial') out.push(name+' partial — not measured'+who);
+      else if(c.state==='failed') out.push(name+' couldn\u2019t load');
       else if(c.state==='unknown') out.push(name+' count unavailable');
     });
     if(loadingNames.length) out.unshift('still loading '+loadingNames.join(', '));
@@ -2776,6 +2778,10 @@ const VIEWPORT_JS = `<script>
     loading.forEach(function(k){ window.__horizonCounts[k]={total:null,state:'loading',gaps:[]}; });
     parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=(typeof p.total==='number'?p.total:0); inv+=p.inview; if(p.capped)cap=true;
       if(p.m && !p.failed && p.count)window.__horizonCounts[p.m]=p.count;
+      // A FAILED horizon with no answer for this intent (still marked 'loading' by an earlier paint of
+      // this round) must say it failed. Left alone it read "still loading Open" forever after settle.
+      // A real count for the same intent (e.g. a failed pan) is kept — only 'loading' is replaced.
+      else if(p.m && p.failed){ var _pc=window.__horizonCounts[p.m]; if(!_pc||_pc.state==='loading')window.__horizonCounts[p.m]={total:null,state:'failed',gaps:[]}; }
       // MAP-TRUTH: sum what each horizon says it could not draw.
       // ⚠️ SUBTRACT forecast's unplaced rows that were ALREADY surfaced in the list — they are
       // concat'd into OPPS and counted in TOTAL above, so counting them again as "not shown on

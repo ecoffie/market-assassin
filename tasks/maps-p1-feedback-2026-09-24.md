@@ -2,6 +2,12 @@
 
 > Never make the user wonder whether Mindy heard them, and never let an old answer masquerade as the new one.
 
+> ⚠️ **Correction (2026-09-25):** the absolute timings below were measured with x86 Chrome under Rosetta (Node is x64 here). Native arm64 Chrome is ~5–40× faster. Relative comparisons stand. Native numbers are in `tasks/maps-first-load-investigation-2026-09-25.md`:
+> - acknowledgement 10–49 ms for nearly every action (reset 145 ms, show Recompete 169 ms);
+> - drawer skeleton 10 ms;
+> - cold load: first useful pins 1.5–2.4 s;
+> - 0 stale paints.
+
 Branch `feat/maps-p1-feedback`, **stacked on P0 (#1684, not merged)** plus current `main`. The merge resolved one
 conflict: main's Gate 2 recompete route plus P0's `counts=0` pan contract, threaded through both read paths so a pan
 compares clean. No backend optimization, no Canonical Discovery change, no compute-once semantics change.

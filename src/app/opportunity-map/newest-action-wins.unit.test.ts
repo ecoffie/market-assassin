@@ -39,7 +39,7 @@ function orchestrationBlock(src: string): string {
   return afterFetch + src.slice(s, e);
 }
 
-type Resp = { pins: Array<{ tag: string }>; totalForFilters: number; delay: number };
+type Resp = { pins: Array<{ tag: string }>; totalForFilters: number; delay: number; fail?: boolean };
 function harness(respond: (url: string) => Resp) {
   const calls: string[] = [];
   const paints: Array<{ tags: string[]; total: number }> = [];
@@ -62,7 +62,7 @@ function harness(respond: (url: string) => Resp) {
       calls.push(url);
       const r = respond(url);
       return new Promise((resolve, reject) => {
-        const t = setTimeout(() => resolve({ json: async () => ({ success: true, discovery: {}, pins: r.pins, totalForFilters: r.totalForFilters, totalInView: r.pins.length, capped: false, unmappedForFilters: 0, ...(url.includes('counts=0') ? { countsSkipped: true, totalForFilters: undefined } : {}) }) }), r.delay);
+        const t = setTimeout(() => resolve({ json: async () => (r.fail ? { success: false } : { success: true, discovery: {}, pins: r.pins, totalForFilters: r.totalForFilters, totalInView: r.pins.length, capped: false, unmappedForFilters: 0, ...(url.includes('counts=0') ? { countsSkipped: true, totalForFilters: undefined } : {}) }) }), r.delay);
         init?.signal?.addEventListener('abort', () => { clearTimeout(t); const e = new Error('aborted'); e.name = 'AbortError'; reject(e); });
       });
     },
@@ -126,6 +126,24 @@ describe('an ACTION supersedes in-flight work at once — not when its own round
 });
 
 describe('progressive horizons — no horizon waits for the slowest', () => {
+  it('a horizon that FAILS after another painted reads "couldn\u2019t load" once settled — never "still loading", never 0', async () => {
+    // Measured on the P1 preview 2026-09-25: Recompete painted first (Open marked 'loading'), then Open's
+    // request failed. The failed part never replaced 'loading', so the header said "still loading Open"
+    // indefinitely after the round settled — an error masquerading as progress.
+    const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 7, delay: horizonOf(url) === 'open' ? 120 : 10, fail: horizonOf(url) === 'open' }));
+    (h.ctx.window as Record<string, unknown>).__horizons = { open: true, recompete: true, forecast: false };
+    h.fetchView();
+    await sleep(60);
+    const w = h.ctx.window as { __horizonCounts: Record<string, { state: string; total: number | null }>; __coverageNote: string; __horizonsLoading: string[] };
+    expect(w.__horizonCounts.open.state).toBe('loading');          // Recompete painted; Open genuinely pending
+    await sleep(400);
+    expect(w.__horizonsLoading).toEqual([]);
+    expect(w.__horizonCounts.open).toEqual({ total: null, state: 'failed', gaps: [] });
+    expect(w.__coverageNote).toBe('Open couldn\u2019t load');
+    expect(w.__coverageNote).not.toContain('loading');
+    expect(w.__horizonCounts.recompete.total).toBe(7);
+  });
+
   it('Open paints as soon as it lands; Recompete joins later; the slow one reads "loading", never a number', async () => {
     const h = harness((url) => ({ pins: [{ tag: horizonOf(url) }], totalForFilters: 10, delay: horizonOf(url) === 'recompete' ? 700 : 10 }));
     (h.ctx.window as Record<string, unknown>).__horizons = { open: true, recompete: true, forecast: false };

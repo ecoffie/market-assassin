@@ -53,6 +53,11 @@ describe('horizonCount keeps four meanings apart', () => {
     expect(lib.horizonCountLabel(c, fmt)).toBe('15*');
     expect(lib.coverageNote({ forecast: c })).toBe('Forecasts partial — not measured for NOAA');
   });
+  it('a FAILED horizon request → "couldn\u2019t load", never 0 and never "loading"', () => {
+    const c = { total: null, state: 'failed', gaps: [] };
+    expect(lib.horizonCountLabel(c, fmt)).toBe('!');
+    expect(lib.coverageNote({ open: c })).toBe('Open couldn\u2019t load');
+  });
   it('a failed count (null, coverage ok) → unknown, never 0', () => {
     const c = lib.horizonCount(COUNT_FAILED);
     expect(c.state).toBe('unknown');
