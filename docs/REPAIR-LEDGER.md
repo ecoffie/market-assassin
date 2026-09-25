@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Strategic evidence — shared reader: legislation reaches the customer
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-25 | get_agency_intel / legislative corpus | The living NDAA corpus (`institute_sources`, 29 rows, weekly, #1559 to #1644) was read by nothing — the only customer reader filtered `source='gao'` — while get_agency_intel served FY2026 NDAA claims from static JSON with `source_url: null`. New shared reader `getLegislativeEvidenceForAgency` returns measure, version, stage, law status and link, grouped into fiscal-year vehicles; `ENACTED_LAW` only for the enacted text (House-passed, Senate-reported and pre-enactment versions are `LEGISLATIVE_ACTIVITY_NOT_LAW`), committee reports `COMMITTEE_REPORT_LANGUAGE` (errata its own record, agency inherited from its bill); coverage from the control plane + discovery cursor (partial/unknown never reads complete); component queries answered at the ESTABLISHED parent department and labelled `parent_department`; bill text NOT_ESTABLISHED always. get_agency_intel returns it as `legislation`. No collector, no new tool, no migration. | `export async function getLegislativeEvidenceForAgency(` → `src/lib/strategic-intel/legislative-evidence.ts` | Prod data via real getAgencyIntel: Navy answered at parent_department DoD, FY2027 not_enacted (H.R. 8800 passed_chamber, S. 4784 reported), FY2026 enacted by S. 1071 PL 119-60, coverage complete; SOCOM not_established; VA empty. 18 unit tests; 2 mutations (House-passed as law, coverage forced complete) each go red | ACTIVE |
+
 ## Strategic evidence — stale legacy GAO withheld from buyer intelligence
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
