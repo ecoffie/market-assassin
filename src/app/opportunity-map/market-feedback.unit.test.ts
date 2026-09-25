@@ -142,8 +142,11 @@ describe('controller — newest action wins; cancelled work never reports', () =
     const { w, d } = page();
     w.__mf.begin({ gen: 1, enabled: ['open', 'recompete'], kind: 'market', stale: true, q: 'ai governance' });
     expect(d.getElementById('mfbBar')!.classList.contains('on')).toBe(true);
-    expect((d.querySelector('.leaflet-marker-pane') as HTMLElement).style.opacity).toBe('0.28');
-    expect((d.getElementById('feed') as HTMLElement).style.opacity).toBe('0.38');
+    // veils over the map and the list; the content layers themselves are never touched
+    expect((d.getElementById('mfbVeilMap') as HTMLElement).style.opacity).toBe('1');
+    expect((d.getElementById('mfbVeilList') as HTMLElement).style.opacity).toBe('1');
+    expect((d.querySelector('.leaflet-marker-pane') as HTMLElement).style.opacity).toBe('');
+    expect((d.getElementById('feed') as HTMLElement).style.opacity).toBe('');
     expect((d.getElementById('rescount') as HTMLElement).style.opacity).toBe('0');
     expect((d.getElementById('mapCount') as HTMLElement).style.opacity).toBe('0');
     expect(d.getElementById('mfbUpd')!.textContent).toBe('Updating your market…');
@@ -167,7 +170,7 @@ describe('controller — newest action wins; cancelled work never reports', () =
     w.__mf.begin({ gen: 3, enabled: ['open'], kind: 'market', stale: true });
     w.__mf.horizon(3, 'open', { s: 'ok', total: 27 });
     w.__mf.paint(3, { settled: true, painted: true, pins: 27 });
-    expect((d.getElementById('feed') as HTMLElement).style.opacity).toBe('');
+    expect((d.getElementById('mfbVeilList') as HTMLElement).style.opacity).toBe('0');
     expect((d.getElementById('rescount') as HTMLElement).style.opacity).toBe('');
     expect(d.getElementById('mfbBar')!.classList.contains('on')).toBe(false);
     expect(d.getElementById('mfbPanel')!.classList.contains('on')).toBe(false);
@@ -195,14 +198,14 @@ describe('controller — newest action wins; cancelled work never reports', () =
     w.__mf.horizon(5, 'open', { s: 'error' });
     w.__mf.paint(5, { settled: true, painted: false, pins: 0 });
     expect(d.getElementById('mfbErr')!.hidden).toBe(false);
-    expect((d.getElementById('feed') as HTMLElement).style.opacity).toBe('0.38');
+    expect((d.getElementById('mfbVeilList') as HTMLElement).style.opacity).toBe('1');
     expect(d.getElementById('mfbUpd')!.textContent).toBe('Not updated \u2014 showing your previous market');
   });
   it('ack() acknowledges before the round exists and keeps the ACTION time as t0', () => {
     const { w, d } = page();
     w.__mf.ack();
     expect(d.getElementById('mfbBar')!.classList.contains('on')).toBe(true);
-    expect((d.getElementById('feed') as HTMLElement).style.opacity).toBe('0.38');
+    expect((d.getElementById('mfbVeilMap') as HTMLElement).style.opacity).toBe('1');
     w.__mf.begin({ gen: 6, enabled: ['open'], kind: 'pan', stale: false });
     // an acknowledged action stays a market change even if the dispatch looked like a pan
     const begin = w.__mfLog.find((x) => x.ev === 'begin') as unknown as { x: { kind: string } };

@@ -66,7 +66,14 @@ export const MARKET_FEEDBACK_CSS =
   //    changes invalidate broadly); visibility (inherited) restyled every pin (~190 ms). An inline opacity
   //    write costs 0–3 ms, and with will-change the fade is composited instead of repainting every pin per
   //    frame. That cost matters: it delayed the very fetch it was acknowledging by ~0.5 s.
-  + '.mapwrap .leaflet-marker-pane,.mapwrap .leaflet-overlay-pane,#feed{will-change:opacity}'
+  //    VEILS, not content fades (measured A/B on a 3,112-pin / 3,113-card view, cached horizon toggle: fading
+  //    the marker pane + list added ~80 ms to every round — the next render rebuilt thousands of children
+  //    inside faded layers; a veil over them is one composited layer and costs ~nothing).
+  + '.mfb-veil{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .16s;will-change:opacity;background:rgba(255,255,255,.64)}'
+  + '.mapwrap>.mfb-veil{z-index:690}'
+  + '.panel{position:relative}.panel>.mfb-veil{z-index:3}'
+  // the count row stays ABOVE the list veil so "Updating your market…" is readable
+  + '.sortrow{position:relative;z-index:4;background:#fff}'
   // The header count is the ANSWER — while it describes the previous market, "Updating your market…" takes
   // its place (the count is faded out, never shown beside it).
   + '.sortrow{position:relative}'
@@ -253,13 +260,18 @@ export const MARKET_FEEDBACK_JS = '<script>(function(){'
     rc.parentNode.insertBefore(u,rc);
     return u;
   }
-  // Mark (or unmark) everything that shows the CURRENT market as old: pins, shapes, the list and both counts.
-  // Inline writes only (see the CSS note). Fading waits 100–120 ms so an answer that is already here never
-  // flashes; coming back is immediate.
+  // Mark (or unmark) everything that shows the CURRENT market as old: a veil over the map and one over the
+  // list (content untouched — see the CSS note), and both counts. Inline writes only. Fading waits 100–120 ms
+  // so an answer that is already here never flashes; coming back is immediate.
+  function veil(host,id){
+    var v=$(id); if(v)return v; if(!host)return null;
+    v=document.createElement('div'); v.id=id; v.className='mfb-veil'; v.setAttribute('aria-hidden','true');
+    host.appendChild(v); return v;
+  }
   function fade(el,op,delayMs){ if(!el)return; el.style.transition='opacity '+(op?'.22s':'.16s')+' ease '+(op?delayMs:0)+'ms'; el.style.opacity=op||''; }
   function setStale(on){
-    try{ var ps=document.querySelectorAll('.mapwrap .leaflet-marker-pane,.mapwrap .leaflet-overlay-pane'); for(var i=0;i<ps.length;i++)fade(ps[i],on?'.28':'',120); }catch(e){}
-    fade($('feed'),on?'.38':'',120);
+    fade(veil(document.querySelector('.mapwrap'),'mfbVeilMap'),on?'1':'0',120);
+    fade(veil(document.querySelector('.panel'),'mfbVeilList'),on?'1':'0',120);
     var mc=$('mapCount'); if(mc)mc.style.opacity=on?'0':'';
     fade($('rescount'),on?'0':'',100);
     var u=upd(); if(u){ u.style.transitionDelay=on?'100ms':'0ms'; u.style.opacity=on?'1':'0'; }
