@@ -1418,7 +1418,7 @@ function BriefingsDashboardContent() {
             </div>
             <div className="flex items-center gap-3 text-gray-500">
               <span className="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-gray-600 text-sm">—</span>
-              <span>AI Briefings, Forecasts, Grants <span className="text-purple-400">(Pro)</span></span>
+              <span>AI Briefings, Forecasts <span className="text-purple-400">(Pro)</span></span>
             </div>
           </div>
 
@@ -1527,7 +1527,7 @@ function BriefingsDashboardContent() {
           <div className="mt-8 p-6 bg-gradient-to-r from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl">
             <h3 className="text-lg font-semibold text-white mb-2">Want More Intelligence?</h3>
             <p className="text-gray-400 text-sm mb-4">
-              Upgrade to Mindy Pro for AI-powered daily briefings, forecasts, grants, and pipeline tracking.
+              Upgrade to Mindy Pro for AI-powered daily briefings, forecasts, and pipeline tracking.
             </p>
             <Link
               href="/market-intelligence"
@@ -1627,9 +1627,6 @@ function BriefingsDashboardContent() {
                     {l.label}
                   </a>
                 ))}
-                <button type="button" onClick={() => setActivePanel('grants')} className="text-sm text-purple-300 underline">
-                  Search Grants.gov funding announcements
-                </button>
               </div>
             </div>
           </div>

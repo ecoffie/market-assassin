@@ -1,6 +1,6 @@
 # Retirement of Mindy's DEDICATED SBIR/STTR search — final packet (2026-09-26)
 
-**Decision (Eric, 2026-09-26):** retire **Mindy's dedicated SBIR/STTR search** on every surface that offered it. This is **not** a retirement of all SBIR-related discovery: Grants.gov funding announcements, including agency SBIR/STTR FOAs, stay searchable in the Grants panel, a separate and supported source. Keep the
+**Decision (Eric, 2026-09-26):** retire **Mindy's dedicated SBIR/STTR search** on every surface that offered it. This is **not** a retirement of all SBIR-related discovery. The Grants panel (a separate Grants.gov path, including its SBIR/STTR chip) is left in place and out of scope. The notice does **not** recommend it for SBIR coverage, because its live health is unverified (separate investigation). Keep the
 shared NIH/SBIR libraries and all stored data. PR **#1710**. **Stop before merge/deploy.** No
 credits and no customer messages: Louis's proposed 105-credit correction remains a separate,
 unauthorized item.
@@ -13,7 +13,7 @@ closed #1708. No SBIR surface had a working source of OPEN topics:
 
 **One notice for every surface:** `src/lib/sbir/retired.ts` (`SBIR_SEARCH_RETIRED`,
 `sbirSearchRetiredMessage`, `sbirSearchRetiredBody`). It points users to SBIR.gov topics, DoD DSIP,
-and Mindy's Grants panel for SBIR funding announcements posted on Grants.gov.
+and Grants.gov, **directly**. It does not recommend Mindy's Grants chip: that is pending verification of the Grants.gov path.
 
 ## Surfaces
 
@@ -32,7 +32,7 @@ and Mindy's Grants panel for SBIR funding announcements posted on Grants.gov.
 
 | Item | Reason |
 |---|---|
-| Grants panel "SBIR/STTR" chip (`GrantsPanel.tsx`) | Different, **supported** source: Grants.gov search. Measured on production, `/api/grants?keyword=SBIR` → 22 **posted** announcements with future close dates (e.g. NIH REACH, close 11/10/2026; DARPA DSO BAA, close 08/27/2027). Open funding, not award history |
+| Grants panel "SBIR/STTR" chip (`GrantsPanel.tsx`) | A separate Grants.gov path, out of scope for this retirement and **not recommended** in the notice. A one-off production call returned posted announcements with future close dates, but a single response does not establish a healthy live feed (API access, ingestion, freshness, pagination, cache vs live). That verification is a separate investigation (`tasks/grants-gov-path-health-2026-09-26.md`) |
 | `src/lib/sbir/search.ts`, `dod-sbir.ts`, `sbir-map-pins.ts`, `src/lib/scrapers/apis/*` | shared libraries (instruction: preserve) |
 | `sync-dod-sbir` cron, `dod_sbir_topics`, `aggregated_opportunities`, logs | stored data and parked feeds (instruction: untouched) |
 | `src/mcp/tools/sbir.ts` | unregistered; nothing imports it |
@@ -47,9 +47,19 @@ So the retired `sbir_sttr` slice is now excluded at the fetch. Evidence:
 - **Read-only live run of the generator's exact fetch** (posted in the last 30 days, limit 25): before
   and after the change, 25 rows, **0** `sbir_sttr`. Today's newest 25 are all `nih_reporter/grant`, so
   current exposure is 0; the exclusion guards the day SBIR rows are among the newest.
-- `multisite-sbir-exclusion.unit.test.ts` (3): the filter is applied inside the query; other callers
-  are unchanged; the generator requests it. **Mutation:** removing it from the generator turns the
-  test red.
+- `multisite-sbir-exclusion.unit.test.ts` (3, **behavioural, end to end**). The REAL
+  `generateAIBriefing` runs the REAL `fetchMultisiteOpportunities` against an in-memory
+  `aggregated_opportunities` holding:
+  - an in-window `sbir_sttr` row;
+  - legitimate `grant`, `baa` and NIH `grant` rows;
+  - an out-of-window SBIR row.
+
+  Only the I/O is faked. It asserts that:
+  - (a) the fetch returns exactly the 3 legitimate rows and no `sbir_sttr`;
+  - (b) the **prompt the LLM receives** contains the kept titles and never the SBIR title;
+  - (c) a control shows the same fetch *without* the exclusion does return the SBIR row.
+
+  **Mutation:** removing the exclusion from the generator turns (a) and (b) red.
 
 **Flagged for decision (NOT changed — parked Research & Lab feed, not Mindy's dedicated SBIR search):**
 - the same run shows the generator feeds **NIH RePORTER `grant` rows** (funded projects) to the LLM
@@ -130,9 +140,9 @@ Verify **by name**, not by count. The catalog total can change for unrelated rea
 4. **Map:** `/api/app/opportunity-map?…&sources=sam,sbir` → `countsBySource.SBIR == 0`, no pin with
    `src=='SBIR'`. The served map HTML contains no `"SBIR"` entry in the source-filter list.
 5. **Market-scan:** `/api/market-scan?naics=541512` → `sbir.retired == true`, `sbirOpportunities == []`.
-6. **Panel (signed-in navigation):** signed in as a test/staff account on `/briefings`, there is no "SBIR/STTR" sidebar item; the Grants panel's SBIR/STTR chip still returns Grants.gov postings.
+6. **Panel (signed-in navigation):** signed in as a test/staff account on `/briefings`, there is no "SBIR/STTR" sidebar item; the Grants panel is otherwise unchanged.
 6b. **Briefings:** after release, the next `briefing_precompute_runs` row still shows the generator reaching its fetch. If the LLM path is repaired, a saved template contains no `reporter.nih.gov/project-details` link labelled as an SBIR opportunity.
 7. **Unrelated tools still work:** e.g. `get_balance`, `search_grants`, `find_opportunities` on MCP;
-   the Grants panel "SBIR/STTR" chip still returns Grants.gov postings.
+   the Grants panel is unchanged (its SBIR/STTR chip is left in place, not recommended).
 8. **Tool Map artifact:** update the claude.ai artifact so no entry is named `search_sbir`. It is
    deliberately not done before deploy.

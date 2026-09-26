@@ -75,6 +75,21 @@ describe('other customer-facing surfaces', () => {
   });
 });
 
+describe('the notice points to official sources, not to an unverified Mindy path', () => {
+  it('names SBIR.gov, DoD DSIP and Grants.gov directly and links all three', () => {
+    const m = sbirSearchRetiredMessage();
+    expect(m).toMatch(/SBIR\.gov/);
+    expect(m).toMatch(/DSIP/);
+    expect(m).toMatch(/Grants\.gov/);
+    expect(SBIR_SEARCH_RETIRED.links.map((l) => new URL(l.url).hostname).sort()).toEqual(['www.dodsbirsttr.mil', 'www.grants.gov', 'www.sbir.gov']);
+  });
+  it('does not recommend Mindy\'s Grants panel/chip as SBIR coverage (its live health is unverified)', () => {
+    expect(sbirSearchRetiredMessage()).not.toMatch(/Grants panel|Mindy'?s Grants/i);
+    expect(code('src/app/briefings/page.tsx')).not.toMatch(/setActivePanel\('grants'\)\}[^\n]*\n[^\n]*Grants\.gov funding/);
+    expect(read('src/app/api/app/chat/route.ts')).toMatch(/Do not describe Mindy's grants results as SBIR\/STTR coverage/);
+  });
+});
+
 describe('one notice, every surface; shared code and data kept', () => {
   it('MCP retirement reuses the shared notice', () => {
     expect(RETIRED_TOOLS.search_sbir).toMatchObject({

@@ -8,8 +8,9 @@
  * RePORTER project pages (funded awards, whose close_date is the project END); NIH RePORTER itself is
  * an award index. Every "SBIR opportunity" Mindy showed was award history.
  *
- * Scope: Mindy's dedicated SBIR search only — NOT all SBIR-related discovery. Grants.gov funding
- * announcements (incl. agency SBIR/STTR FOAs) stay searchable in the Grants panel, a separate source.
+ * Scope: Mindy's dedicated SBIR search only — NOT all SBIR-related discovery. The Grants panel (a
+ * separate Grants.gov path) is left in place but is NOT recommended here: its health as a live SBIR/STTR
+ * source is unverified (separate investigation). The notice points users to the official sites directly.
  * This file retires the SEARCH, not the data: `src/lib/sbir/*` libraries, the `dod_sbir_topics` and
  * `aggregated_opportunities` tables, their sync crons (parked feeds) and all logs are kept untouched.
  * To restore any SBIR surface you need a working open-topic source first (investigation record §7).
@@ -21,10 +22,11 @@ export const SBIR_SEARCH_RETIRED = {
   reason:
     'Mindy does not currently provide a reliable source of OPEN SBIR/STTR topics, so its dedicated SBIR/STTR search has been withdrawn rather than show award history in their place.',
   instead:
-    'For open SBIR/STTR topics and deadlines, use SBIR.gov (sbir.gov/topics) or the DoD SBIR/STTR portal (DSIP) directly. Agency SBIR/STTR funding announcements posted on Grants.gov remain searchable in Mindy\'s Grants panel.',
+    'For open SBIR/STTR topics, deadlines and agency funding announcements, go directly to SBIR.gov (sbir.gov/topics), the DoD SBIR/STTR portal (DSIP) or Grants.gov.',
   links: [
     { label: 'SBIR.gov topics', url: 'https://www.sbir.gov/topics' },
     { label: 'DoD SBIR/STTR (DSIP)', url: 'https://www.dodsbirsttr.mil/topics-app/' },
+    { label: 'Grants.gov', url: 'https://www.grants.gov/search-grants' },
   ],
 };
 
