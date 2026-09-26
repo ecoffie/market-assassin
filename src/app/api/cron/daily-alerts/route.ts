@@ -13,7 +13,6 @@ import {
 import { searchGrantsByNAICS, scoreGrant, GrantOpportunity, GRANT_RELEVANCE_THRESHOLD } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
-import { getVocabularyForCodes } from '@/lib/market/vocabulary';
 import Anthropic from '@anthropic-ai/sdk';
 import { getCapabilityVector } from '@/lib/alerts/capability-vector';
 import { fetchHiddenMatchPool, findHiddenMatches, type HiddenMatch } from '@/lib/alerts/hidden-match';
@@ -665,26 +664,20 @@ async function runDailyAlertJob(options?: {
         // Get user keywords
         const userKeywords = user.keywords || [];
 
-        // VOCABULARY EXPANSION (flag: VOCAB_ALERT_EXPANSION) — widen the match with
-        // the REAL buyer work-words for the user's NAICS (naics_vocabulary, mined
-        // from award text). An opp whose title/description uses a buyer-word the
-        // user never typed as a keyword now matches. Top 5 highest-weight terms
-        // only (keeps the OR query small + avoids generic noise), and NOT for
-        // default-only profiles (would inject generic 5415xx terms for everyone).
-        // Flows through the EXISTING keyword OR-match in sam-gov.ts — no matcher
-        // change. Fails soft: any error → the user's own keywords, unchanged.
-        let vocabTerms: string[] = [];
-        const usingDefaults = (user.naics_codes || []).length === 0;
-        if (process.env.VOCAB_ALERT_EXPANSION === 'on' && !usingDefaults) {
-          try {
-            const vocab = await getVocabularyForCodes(userNaics, { limit: 5 });
-            const have = new Set(userKeywords.map((k: string) => k.toLowerCase()));
-            vocabTerms = vocab.map((t) => t.term).filter((t) => !have.has(t.toLowerCase())).slice(0, 5);
-          } catch { /* vocab unavailable — degrade to the user's own keywords */ }
-        }
-        const matchKeywords = [...userKeywords, ...vocabTerms];
+        // VOCABULARY TERMS NO LONGER ADMIT ROWS (2026-09-26).
+        //
+        // VOCAB_ALERT_EXPANSION appended the top-5 mined buyer words for the user's
+        // NAICS to the keyword list. Under Contract D keywords only PREFER inside the
+        // NAICS/PSC market, so those words never widened recall — they only chose
+        // which market rows counted as "keyword hits". Measured on live profiles:
+        // a fire-alarm/security firm's alert led with three "Berlin Roof Replacement"
+        // notices (vocab "roof"), a medical-linen firm's only row was "Residential
+        // Reentry Services" (vocab "reentry"), an AI firm carried "renal disease".
+        // A term the user never typed may not decide what they are shown as a match.
+        // The flag is inert until someone decides whether vocab earns a rank-only role.
+        const matchKeywords = userKeywords;
 
-        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords${vocabTerms.length ? ` +${vocabTerms.length} vocab [${vocabTerms.join(', ')}]` : ''}`);
+        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords`);
 
         // Get recently sent opportunity IDs for deduplication
         const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);

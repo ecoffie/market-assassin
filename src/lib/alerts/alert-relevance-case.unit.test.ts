@@ -139,3 +139,14 @@ describe('unrelated profiles — the fix does not only work for one customer', (
     expect(a.rank).toBeGreaterThan(b.rank);
   });
 });
+
+describe('daily-alerts admission uses only the user\'s own keywords', () => {
+  it('mined vocabulary terms do not reach the keyword filter', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/app/api/cron/daily-alerts/route.ts', 'utf8');
+    // "roof" admitted three Berlin Roof Replacement notices for a fire-alarm firm;
+    // "reentry" admitted Residential Reentry Services for a medical-linen firm.
+    expect(src).not.toMatch(/getVocabularyForCodes/);
+    expect(src).toMatch(/const matchKeywords = userKeywords;/);
+  });
+});
