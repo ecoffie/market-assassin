@@ -36,7 +36,18 @@ PRs: **#1706** (Part 2, the root fix). **#1704** (Part 1, Open count→pins reus
 It is not a boot duplicate. With a view that frames the results, 3 consecutive warm loads showed a single round each.
 
 ## Production after #1706
-(filled in after the merge deploy; see the #1696 closing comment)
+Merge `9ee7bb85`. The live page serves `__layoutMoveNeedsFetch`, `__mapSyncSize` and settled-only `maybeAutoFit`.
+
+| fixture | discovery rounds | requests per horizon | Open | settled | DB peak / heavy >1 s |
+|---|---|---|---|---|---|
+| fresh, `?q=software license` | **1** | 1 | 200, 4.8 s | 5.54 s | 8 / 6 |
+| warm reload | **1** | 1 | 200, 6.3 s | 7.25 s | 6 / 6 |
+| restored market | **1** | 1 | **200**, 4.7 s (was **500**) | 4.95 s | 6 / 6 |
+| default market | **1** | 1 | 200, 2.0 s | 2.38 s | 8 / 0 |
+
+- 0 aborts in every fixture; Recompete and Forecast return 200 throughout.
+- On production: pan → pins-only · zoom → pins-only · layout grow → pins-only · layout shrink → 0 requests.
+- #1696 closed with this evidence.
 
 ## #1704 — kept DRAFT (possible resilience fallback, not merged)
 Measured against main + Part 2:

@@ -434,7 +434,13 @@ audit: `tasks/maps-latency-transition-audit-2026-09-24.md`. ✅ Merged `7ce3a668
 Record: **`tasks/maps-p1-feedback-2026-09-24.md`** (states, matrix, production acceptance) · first load:
 `tasks/maps-first-load-investigation-2026-09-25.md`. Merge `24dbb20e`; future verification = serving SHA CONTAINS it
 (`git merge-base --is-ancestor 24dbb20e <serving-sha>`) + live behavior. Do not reopen for polish or another perf pass.
-Separate, unfixed: #1696 Open cold-start 500 · #1697 stale "Picked up where you left off" pill.
+#1696 (Open 500) ✅ FIXED by #1706 (`9ee7bb85`, production-proven 2026-09-26): it was a DUPLICATE BOOT ROUND, not a cold start.
+- ⚠️ A client abort does NOT cancel the PostgREST/Postgres statement (`authenticator` statement_timeout=8s), so every duplicate round is real DB load. Remove duplicates at the source; never rely on the abort.
+- A `moveend` with the same centre and zoom is a LAYOUT move (`layout-move.ts`) and fetches only newly exposed area.
+- Auto-fit waits for the round to settle.
+- Diagnose boot with `window.__mapBootTrace`; `__mapPerf` only records SETTLED rounds.
+- Record: `tasks/maps-boot-round-1696-2026-09-26.md`. #1704 (Open count→pins reuse) is kept DRAFT as a resilience fallback; do not merge without production concurrency evidence.
+- #1697 (stale resume pill) is fixed by #1703.
 - ⚠️ Building your market is CSS-revealed from the SERVER HTML (`.app mfb-booting`, 300 ms opacity animation) — never
   bring back a JS reveal timer; it waited on the very scripts it covers. The 600-row placeholder `OPPS` ships ONLY for
   `?embed=` (its whole content); the full page ships `OPPS=[]`.
