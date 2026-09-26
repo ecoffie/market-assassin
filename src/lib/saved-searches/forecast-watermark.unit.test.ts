@@ -220,7 +220,11 @@ describe('high volume — bounded, resumable keyset processing', () => {
     expect(seen.size).toBe(100_000); expect(dupes.n).toBe(0);
     // (The earlier "4 runs" figure came from a test override of maxPages: 50 → 25,000 rows/run. It was a test knob,
     // not the production limit; production is 20,000 rows/run as asserted above.)
-  });
+    // TIMEOUT (this test only): the full 100,000-row workload takes ~22s in isolation but ~53s when the
+    // whole suite runs in parallel on a loaded machine — past the global 45s testTimeout, which blocked
+    // the pre-push gate on a timeout, never an assertion. 90s gives headroom WITHOUT shrinking the
+    // workload or touching any assertion; the global timeout stays 45s for every other test.
+  }, 90_000);
 
   it('the run bound is TOTAL across segments: main + 2 gap segments share one 40-page / 20,000-row budget', async () => {
     // A partial interval: DHS rows in the main (W, snapshot] window plus two buyers resuming older gap boundaries.
