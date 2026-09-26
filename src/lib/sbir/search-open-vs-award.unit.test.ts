@@ -41,6 +41,8 @@ function deps(over: Partial<SbirDeps> = {}): SbirDeps {
     now: () => NOW,
     sleep: async () => {},
     nihTimeoutMs: 2_000,
+    nihRetryDelayMs: 0,
+    nihMinAttemptMs: 0,
     dbTimeoutMs: 2_000,
     ...over,
   };

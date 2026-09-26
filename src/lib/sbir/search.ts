@@ -32,6 +32,8 @@ const NIH_API = 'https://api.reporter.nih.gov/v2/projects/search';
 export const NIH_TIMEOUT_MS = 8_000;
 export const DB_TIMEOUT_MS = 5_000;
 const NIH_RETRY_DELAY_MS = 750;
+/** A retry is only started if at least this much of the budget remains AFTER the backoff. */
+const NIH_MIN_ATTEMPT_MS = 500;
 
 const PHASE_CODES: Record<string, string[]> = {
   '1': ['R43', 'R41'], // SBIR + STTR Phase I
@@ -90,6 +92,8 @@ export interface SbirSourceReport {
   rows: number;
   ms: number;
   attempts?: number;
+  /** NIH only: the single budget that bounded every attempt, the backoff and the body read. */
+  budget_ms?: number;
   /** Upstream HTTP status / error class — diagnosable in-band, not only in a log that expires. */
   detail?: string;
 }
@@ -120,7 +124,10 @@ export interface SbirDeps {
   db: SbirDb;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
+  /** ONE budget for the whole NIH operation: every attempt, the backoff and the body read. */
   nihTimeoutMs: number;
+  nihRetryDelayMs: number;
+  nihMinAttemptMs: number;
   dbTimeoutMs: number;
 }
 
@@ -181,6 +188,8 @@ function defaultDeps(): SbirDeps {
     now: () => new Date(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     nihTimeoutMs: NIH_TIMEOUT_MS,
+    nihRetryDelayMs: NIH_RETRY_DELAY_MS,
+    nihMinAttemptMs: NIH_MIN_ATTEMPT_MS,
     dbTimeoutMs: DB_TIMEOUT_MS,
   };
 }
@@ -211,11 +220,35 @@ function isAbort(err: unknown): boolean {
   return name === 'AbortError' || name === 'TimeoutError';
 }
 
+/**
+ * Settle `p`, or reject with the budget's reason the moment `signal` aborts — whichever is first.
+ * Passing the signal to fetch is not enough on its own: a body read, an injected fetch or a sleep
+ * may ignore it. Racing guarantees the operation ends at the deadline whatever the callee does.
+ */
+function bounded<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    p.then(
+      (v) => { signal.removeEventListener('abort', onAbort); resolve(v); },
+      (e) => { signal.removeEventListener('abort', onAbort); reject(e); },
+    );
+  });
+}
+
 async function fetchNih(
   deps: SbirDeps, keyword: string, agency: string, phase: string, limit: number,
 ): Promise<{ rows: SbirOpportunity[]; report: SbirSourceReport }> {
   const started = Date.now();
-  const deadline = started + deps.nihTimeoutMs;
+  const budgetMs = deps.nihTimeoutMs;
+  // ONE deadline for the entire operation — first attempt, backoff, retry and response-body read.
+  // It is not per attempt: a slow 429 followed by a hung retry still ends at `budgetMs`.
+  const ctl = new AbortController();
+  const timer = setTimeout(
+    () => ctl.abort(Object.assign(new Error(`NIH budget ${budgetMs}ms exhausted`), { name: 'TimeoutError' })),
+    budgetMs,
+  );
   const year = deps.now().getUTCFullYear();
   const criteria: Record<string, unknown> = {
     fiscal_years: [year, year + 1],
@@ -224,35 +257,37 @@ async function fetchNih(
   if (keyword) criteria.advanced_text_search = { operator: 'and', search_field: 'all', search_text: keyword };
   if (agency) criteria.agencies = [agency];
   const body = JSON.stringify({ criteria, offset: 0, limit, sort_field: 'award_notice_date', sort_order: 'desc' });
-  const report = (status: SbirSourceStatus, rows: number, attempts: number, detail?: string): SbirSourceReport => ({
-    source: 'nih_reporter', kind: 'award_history', status, rows, ms: Date.now() - started, attempts, ...(detail ? { detail } : {}),
-  });
-
   let attempts = 0;
   let lastDetail = '';
-  while (attempts < 2) {
-    attempts++;
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) return { rows: [], report: report('timeout', 0, attempts - 1, `budget ${deps.nihTimeoutMs}ms exhausted; ${lastDetail}`.trim()) };
-    try {
-      const res = await deps.fetch(NIH_API, {
+  const report = (status: SbirSourceStatus, rows: number, detail?: string): SbirSourceReport => ({
+    source: 'nih_reporter', kind: 'award_history', status, rows, ms: Date.now() - started,
+    attempts, budget_ms: budgetMs, ...(detail ? { detail } : {}),
+  });
+
+  try {
+    while (attempts < 2) {
+      attempts++;
+      const res = await bounded(deps.fetch(NIH_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
-        signal: AbortSignal.timeout(remaining),
-      });
+        signal: ctl.signal,
+      }), ctl.signal);
       if (!res.ok) {
         lastDetail = `HTTP ${res.status}`;
         console.error('[sbir:nih] returned', res.status, `(attempt ${attempts})`);
-        // One retry, only for throttling / server-side failure, only if the budget allows it.
-        if ((res.status === 429 || res.status >= 500) && attempts < 2 && deadline - Date.now() > NIH_RETRY_DELAY_MS + 500) {
-          await deps.sleep(NIH_RETRY_DELAY_MS);
+        const remaining = budgetMs - (Date.now() - started);
+        // One retry, only for throttling / server-side failure, and only if the backoff PLUS a
+        // useful attempt still fit inside the same budget.
+        if ((res.status === 429 || res.status >= 500) && attempts < 2 && remaining > deps.nihRetryDelayMs + deps.nihMinAttemptMs) {
+          await bounded(deps.sleep(deps.nihRetryDelayMs), ctl.signal);
           continue;
         }
-        return { rows: [], report: report('error', 0, attempts, lastDetail) };
+        return { rows: [], report: report('error', 0, lastDetail) };
       }
+      // The body read is inside the budget too.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await res.json();
+      const data: any = await bounded(res.json(), ctl.signal);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows: SbirOpportunity[] = (data.results || []).map((p: any) => {
         const org = p.organization || {};
@@ -276,17 +311,19 @@ async function fetchNih(
           url: p.project_num ? `https://reporter.nih.gov/project-details/${p.project_num}` : undefined,
         };
       });
-      return { rows, report: report(rows.length ? 'ok' : 'empty', rows.length, attempts) };
-    } catch (err) {
-      if (isAbort(err)) {
-        console.error(`[sbir:nih] timed out after ${Date.now() - started}ms (attempt ${attempts})`);
-        return { rows: [], report: report('timeout', 0, attempts, `no response within ${deps.nihTimeoutMs}ms`) };
-      }
-      console.error('[sbir:nih] fetch failed:', err);
-      return { rows: [], report: report('error', 0, attempts, (err as Error)?.message || 'fetch failed') };
+      return { rows, report: report(rows.length ? 'ok' : 'empty', rows.length) };
     }
+    return { rows: [], report: report('error', 0, lastDetail) };
+  } catch (err) {
+    if (ctl.signal.aborted || isAbort(err)) {
+      console.error(`[sbir:nih] budget exhausted after ${Date.now() - started}ms (attempt ${attempts})`);
+      return { rows: [], report: report('timeout', 0, `no complete response within the ${budgetMs}ms budget${lastDetail ? `; last: ${lastDetail}` : ''}`) };
+    }
+    console.error('[sbir:nih] fetch failed:', err);
+    return { rows: [], report: report('error', 0, (err as Error)?.message || 'fetch failed') };
+  } finally {
+    clearTimeout(timer);
   }
-  return { rows: [], report: report('error', 0, attempts, lastDetail) };
 }
 
 async function fetchMultisite(

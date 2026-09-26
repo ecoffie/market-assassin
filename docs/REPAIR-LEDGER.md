@@ -26,11 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
-## 2026-09-26 — search_sbir: open topics vs award history
+## 2026-09-26 — search_sbir: result-classification + failure-reporting repair (does NOT restore an open-topic source)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
-| 2026-09-26 | MCP search_sbir | Awards (NIH RePORTER + the 42/42 `nih_reporter` multisite rows) were returned in `opportunities` with an `endDate`, and the only "these are awards" statement lived in default-OFF `_ai_hint`. Split into `open_topics` / `award_history` (awards never carry `close_date`), per-source `sources[]` status (`unavailable` ≠ `empty`; empty DoD cache is reported, not zeroed), unconditional `coverage.statement`, NIH 8 s budget + one 429/5xx retry, DB abort signals. Fixed multisite selecting nonexistent `set_aside_type` (every multisite call errored since #158) and PostgREST `.or()` keyword sanitizing. Default source `nih` → `all`. Record: tasks/sbir-reed-investigation-2026-09-26.md | `record_kind: 'award_history'` → `src/lib/sbir/search.ts` | search-open-vs-award.unit.test.ts (15) + sbir-coverage.unit.test.ts (5); live read-only oracle `scripts/verify-sbir-search.ts` passes (multisite `error` → `ok`/`empty`) | 🟡 PR |
+| 2026-09-26 | MCP search_sbir | Awards (NIH RePORTER + the 42/42 `nih_reporter` multisite rows) were returned in `opportunities` with an `endDate`, and the only "these are awards" statement lived in default-OFF `_ai_hint`. Split into `open_topics` / `award_history` (awards never carry `close_date`), per-source `sources[]` status (`unavailable` ≠ `empty`; empty DoD cache is reported, not zeroed), unconditional `coverage.statement`, ONE 8 s NIH budget for the whole operation (attempts + backoff + body read, one 429/5xx retry only if it fits the remainder), DB abort signals. Fixed multisite selecting nonexistent `set_aside_type` (every multisite call errored since #158) and PostgREST `.or()` keyword sanitizing. Default source `nih` → `all`. Record: tasks/sbir-reed-investigation-2026-09-26.md | `record_kind: 'award_history'` → `src/lib/sbir/search.ts` | search-open-vs-award (15) + search-nih-budget (7, mutation-proven) + sbir-coverage (5) + sbir-open-request (2) unit tests; live read-only oracle `scripts/verify-sbir-search.ts` passes (multisite `error` → `ok`/`empty`) | 🟡 PR |
 
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 

@@ -8,7 +8,7 @@
  * presented funded NIH projects as "open SBIR opportunities" (Reed Analytics, 2026-09). Nothing
  * that decides whether a row is biddable may depend on an optional narration layer.
  */
-import { searchSbir, type SbirOpportunity, type SbirSource, type SbirSourceReport } from '@/lib/sbir/search';
+import { searchSbir, type SbirDeps, type SbirOpportunity, type SbirSource, type SbirSourceReport } from '@/lib/sbir/search';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SbirToolInput {
@@ -53,10 +53,12 @@ function coverageStatement(openCount: number, established: boolean, sources: Sbi
   );
 }
 
-export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> {
+/** `deps` exists for tests only — production callers pass one argument. */
+export async function sbirSearch(input: SbirToolInput, deps?: SbirDeps): Promise<SbirToolResult> {
   const phase = input.phase || 'all';
   const source = input.source || 'all';
-  const res = await searchSbir({ keyword: input.keyword, agency: input.agency, phase, source, limit: input.limit });
+  const query = { keyword: input.keyword, agency: input.agency, phase, source, limit: input.limit };
+  const res = deps ? await searchSbir(query, deps) : await searchSbir(query);
   const openCount = res.open_topics.length;
   const awardCount = res.award_history.length;
   const grounded = openCount + awardCount > 0;
