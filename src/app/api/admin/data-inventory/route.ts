@@ -412,7 +412,12 @@ export async function GET(request: NextRequest) {
       key: 'bq_awards', label: 'Federal award transactions (USASpending warehouse)', kind: 'source_corpus',
       stored: bqAwards, unit: 'award transactions',
       uniqueContribution: bqAwards,
-      freshness: fresh({ asOf: bqAwardsBuilt, cadenceHours: 24 * 7, basis: 'data_sources.bq_awards.last_built (weekly ingest; recency guarded by verify:oracles freshness)' }),
+      freshness: fresh({
+        asOf: bqAwardsBuilt, cadenceHours: 24 * 7,
+        basis: 'data_sources.bq_awards.last_built (weekly ingest)',
+        // Not measured here: a per-agency/month cohort check needs a BigQuery scan.
+        detail: 'RECENCY ONLY — not completeness. Per-agency monthly cohort completeness is checked by `npm run verify:oracles -- --only freshness`, which can fail while this reads CURRENT.',
+      }),
       surface: { state: 'customer_readable', tools: ['get_contractor_award_history', 'find_capable_contractors'], app: ['/awards pages', 'Contractor pages'] },
       upstreams: ['usaspending'], provenance: 'USASpending contract award TRANSACTIONS in BigQuery — transaction grain (each modification is a row, keyed by txn_id), so this is not a count of distinct awards. Contractor companies and the buying-office directory are derived from it.',
     },
