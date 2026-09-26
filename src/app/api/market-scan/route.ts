@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { AWARD_HISTORY_SOURCES } from '@/lib/research/award-history';
 import {
   industryNames,
   naicsExpansion,
@@ -715,7 +716,9 @@ async function fetchSbirOpportunities(
       .from('aggregated_opportunities')
       .select('*')
       .eq('status', 'active')
-      .in('source', ['nih_reporter', 'nsf_sbir', 'sbir_gov'])
+      // nih_reporter is FUNDED-project history (src/lib/research/award-history.ts), never an open
+      // SBIR opportunity — excluded here. Only solicitation sources may populate this list.
+      .in('source', ['nsf_sbir', 'sbir_gov'].filter((s) => !AWARD_HISTORY_SOURCES.includes(s)))
       .order('posted_date', { ascending: false })
       .limit(25);
 

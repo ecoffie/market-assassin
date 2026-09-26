@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — Funded NIH RePORTER projects labeled award history, never open opportunities
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | Multisite / briefings / market-scan | 1,516 `nih_reporter` rows are funded-project pages (close_date = project END; 1,487 active + future) and were fed to the AI briefing prompt as "R&D opportunities" and to `/api/market-scan` as SBIR opportunities. Shared classifier `src/lib/research/award-history.ts`; the multisite pipeline excludes award-history sources by default INSIDE the query, labels every row `recordKind`, and never exposes a project end as `closeDate`; market-scan drops `nih_reporter`. No stored data/scraper/cron change. Record: tasks/nih-reporter-award-history-2026-09-26.md | `AWARD_HISTORY_SOURCES` → `src/lib/research/award-history.ts` | award-history.unit (4: real pipeline + real generator prompt), market-scan award-history.unit (1: real GET); mutations: default exclusion removed → 2 red, deadline kept → 1 red, pre-fix source list → 1 red | 🟡 PR |
+
+---
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
