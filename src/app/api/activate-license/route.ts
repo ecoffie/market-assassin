@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Opportunity Hunter Pro',
           tier: 'pro',
-          accessUrl: '/opportunity-hunter',
+          accessUrl: '/app?panel=research',
           cookieName: 'access_hunter_pro',
           cookieValue: 'true',
         });
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Content Reaper',
           tier: 'standard',
-          accessUrl: '/content-generator-product',
+          accessUrl: '/content-generator',
           cookieName: 'access_content_standard',
           cookieValue: 'true',
         });
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Content Reaper - Full Fix',
           tier: 'full_fix',
-          accessUrl: '/content-generator-product',
+          accessUrl: '/content-generator',
           cookieName: 'access_content_full_fix',
           cookieValue: 'true',
         });
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Federal Market Assassin',
           tier: 'standard',
-          accessUrl: '/federal-market-assassin',
+          accessUrl: '/app?panel=research',
           cookieName: 'access_assassin_standard',
           cookieValue: 'true',
         });
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: 'Federal Market Assassin - Premium',
           tier: 'premium',
-          accessUrl: '/federal-market-assassin',
+          accessUrl: '/app?panel=research',
           cookieName: 'access_assassin_premium',
           cookieValue: 'true',
         });
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       if (profile.access_recompete) {
         products.push({
           name: 'Recompete Tracker',
-          accessUrl: '/recompete',
+          accessUrl: '/app?panel=recompetes',
           cookieName: 'access_recompete',
           cookieValue: 'true',
         });
@@ -139,12 +139,12 @@ export async function POST(request: NextRequest) {
 
       for (const purchase of purchases) {
         const tierToCookie: Record<string, { name: string; cookie: string; url: string }> = {
-          'hunter_pro': { name: 'Opportunity Hunter Pro', cookie: 'access_hunter_pro', url: '/opportunity-hunter' },
-          'content_standard': { name: 'Content Reaper', cookie: 'access_content_standard', url: '/content-generator-product' },
-          'content_full_fix': { name: 'Content Reaper - Full Fix', cookie: 'access_content_full_fix', url: '/content-generator-product' },
-          'assassin_standard': { name: 'Federal Market Assassin', cookie: 'access_assassin_standard', url: '/federal-market-assassin' },
-          'assassin_premium': { name: 'Federal Market Assassin - Premium', cookie: 'access_assassin_premium', url: '/federal-market-assassin' },
-          'recompete': { name: 'Recompete Tracker', cookie: 'access_recompete', url: '/recompete' },
+          'hunter_pro': { name: 'Opportunity Hunter Pro', cookie: 'access_hunter_pro', url: '/app?panel=research' },
+          'content_standard': { name: 'Content Reaper', cookie: 'access_content_standard', url: '/content-generator' },
+          'content_full_fix': { name: 'Content Reaper - Full Fix', cookie: 'access_content_full_fix', url: '/content-generator' },
+          'assassin_standard': { name: 'Federal Market Assassin', cookie: 'access_assassin_standard', url: '/app?panel=research' },
+          'assassin_premium': { name: 'Federal Market Assassin - Premium', cookie: 'access_assassin_premium', url: '/app?panel=research' },
+          'recompete': { name: 'Recompete Tracker', cookie: 'access_recompete', url: '/app?panel=recompetes' },
           'contractor_db': { name: 'Federal Contractor Database', cookie: 'access_contractor_db', url: '/contractor-database' },
         };
 
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: isPremium ? 'Federal Market Assassin - Premium' : 'Federal Market Assassin',
           tier: maAccess.tier,
-          accessUrl: '/federal-market-assassin',
+          accessUrl: '/app?panel=research',
           cookieName: isPremium ? 'access_assassin_premium' : 'access_assassin_standard',
           cookieValue: 'true',
         });
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
         products.push({
           name: isFullFix ? 'Content Reaper - Full Fix' : 'Content Reaper',
           tier: cgAccess.tier,
-          accessUrl: '/content-generator-product',
+          accessUrl: '/content-generator',
           cookieName: isFullFix ? 'access_content_full_fix' : 'access_content_standard',
           cookieValue: 'true',
         });
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
       if (hasOhPro) {
         products.push({
           name: 'Opportunity Hunter Pro',
-          accessUrl: '/opportunity-hunter',
+          accessUrl: '/app?panel=research',
           cookieName: 'access_hunter_pro',
           cookieValue: 'true',
         });
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
       if (hasRecompete) {
         products.push({
           name: 'Recompete Tracker',
-          accessUrl: '/recompete',
+          accessUrl: '/app?panel=recompetes',
           cookieName: 'access_recompete',
           cookieValue: 'true',
         });

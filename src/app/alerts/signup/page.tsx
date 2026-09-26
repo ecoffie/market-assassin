@@ -422,7 +422,7 @@ function AlertSignupContent() {
                 </li>
               </ul>
               <Link
-                href="/briefings"
+                href="/app"
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all"
               >
                 Go to Your Dashboard
@@ -497,7 +497,7 @@ function AlertSignupContent() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/opportunity-hunter"
+                href="/app?panel=research"
                 className="text-slate-400 hover:text-white text-sm flex items-center justify-center gap-1 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,7 +506,7 @@ function AlertSignupContent() {
                 Search opportunities now
               </Link>
               <Link
-                href="/briefings"
+                href="/app"
                 className="text-slate-400 hover:text-white text-sm flex items-center justify-center gap-1 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -534,7 +534,7 @@ function AlertSignupContent() {
               </div>
               <span className="text-white font-semibold">GovCon Giants</span>
             </Link>
-            <Link href="/briefings?recover=1" className="text-slate-400 hover:text-white text-sm">
+            <Link href="/app" className="text-slate-400 hover:text-white text-sm">
               Already signed up?
             </Link>
           </div>

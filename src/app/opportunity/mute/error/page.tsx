@@ -29,17 +29,17 @@ function ErrorContent() {
 
         <div className="space-y-3">
           <Link
-            href="/briefings"
+            href="/app"
             className="block w-full bg-violet-600 hover:bg-violet-700 text-white py-3 px-6 rounded-lg font-semibold transition"
           >
             Go to Dashboard
           </Link>
 
           <Link
-            href="/briefings"
+            href="/app"
             className="block w-full bg-slate-800 hover:bg-slate-700 text-white py-3 px-6 rounded-lg font-semibold transition"
           >
-            Back to Briefings
+            Back to Mindy
           </Link>
         </div>
       </div>

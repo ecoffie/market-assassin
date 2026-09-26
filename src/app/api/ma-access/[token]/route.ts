@@ -19,11 +19,12 @@ export async function GET(
     const tokenData = await kv.get<MAAccessToken>(`matoken:${token}`);
 
     if (!tokenData) {
-      return NextResponse.redirect(new URL('/market-assassin-locked?error=invalid', request.url));
+      return NextResponse.redirect(new URL('/app?panel=research', request.url));
     }
 
-    // Create response that redirects to Market Assassin
-    const response = NextResponse.redirect(new URL('/federal-market-assassin', request.url));
+    // Market Assassin is part of the /app workspace now (legacy-routes.ts): an `ma:` grant is
+    // Pro there. The cookie is still set so nothing that reads it regresses.
+    const response = NextResponse.redirect(new URL('/app?panel=research', request.url));
 
     // Set the access cookie
     response.cookies.set('ma_access_email', tokenData.email, {
@@ -39,6 +40,6 @@ export async function GET(
     return response;
   } catch (error) {
     console.error('Error processing MA access link:', error);
-    return NextResponse.redirect(new URL('/market-assassin-locked?error=failed', request.url));
+    return NextResponse.redirect(new URL('/app?panel=research', request.url));
   }
 }

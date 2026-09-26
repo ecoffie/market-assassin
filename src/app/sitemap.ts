@@ -65,7 +65,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // is worth asserting again. Reservation on file in that layout: copy wrapped
     // around a checkout widget may still not earn indexation on its own merits.
     { url: `${SITE_URL}/market-intelligence`,   lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
-    { url: `${SITE_URL}/opportunity-hunter`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    // /opportunity-hunter stays OUT since 2026-09-23: the legacy tool redirects into
+    // /app?panel=research (legacy-routes.ts); a redirecting URL does not belong in a sitemap.
     // /expiring-contracts stays OUT: it 308-redirects to `/` (retired product,
     // next.config.ts). Google reported it "Page with redirect", canonical `/`.
     //

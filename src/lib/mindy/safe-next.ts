@@ -17,7 +17,8 @@
  *   - must start with a single "/"           → rejects https://evil.com
  *   - must NOT start with "//" or "/\"       → rejects protocol-relative //evil.com
  *   - must NOT contain a backslash           → rejects /\evil.com
- *   - must NOT re-enter the legacy app       → the whole point is to stop landing in /app
+ *   - must NOT be a retired surface          → /app/onboarding, /briefings (not /app itself —
+ *                                             /app is current since 2026-09-23, PR #1671)
  * Anything failing these becomes the fallback rather than an error: a bad `next` should send
  * the user somewhere sensible, never to an attacker's site and never to a dead end.
  */
@@ -47,7 +48,10 @@ export function safeNext(raw: string | null | undefined, fallback: string = DEFA
   if (!v.startsWith('/')) return fallback;                          // absolute/external URL
   if (v.startsWith('//') || v.startsWith('/\\')) return fallback;   // protocol-relative
   if (v.includes('\\')) return fallback;                            // backslash tricks
-  if (/^\/+app(\/|\?|#|$)/i.test(v)) return fallback;               // never re-enter the legacy app
+  // Retired surfaces only. `/app` itself is the CURRENT workspace (decision on PR #1671,
+  // 2026-09-23), so an explicit `next=/app…` is honoured; the retired profile builder and the
+  // pre-/app dashboard are still refused. The FALLBACK is unchanged (never /app).
+  if (/^\/+(app\/onboarding|briefings)(\/|\?|#|$)/i.test(v)) return fallback;
   if (hasControlChars(v)) return fallback;
   return v;
 }

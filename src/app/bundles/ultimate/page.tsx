@@ -84,7 +84,7 @@ export default function UltimateBundlePage() {
           description: 'The full 8-report Market Assassin experience with unlimited generations, enhanced report depth, and all strategic intelligence reports unlocked. Pair it with lifetime MI for ongoing daily execution.',
           price: 497,
           icon: '🎯',
-          link: '/market-assassin',
+          link: '/app?panel=research',
           features: [
             'All 8 strategic reports',
             'Unlimited report generations',

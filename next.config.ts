@@ -408,6 +408,11 @@ const nextConfig: NextConfig = {
       // Redirecting any of those five would break people who paid. Their now-dead
       // buy-buttons are cosmetic and should be stripped in a separate, surgical pass.
       //
+      // UPDATE 2026-09-23: /federal-market-assassin (and its /market-assassin-locked gate) IS
+      // now retired to /app?panel=research — but only after proving entitlement parity: /app
+      // counts any `ma:` grant as Pro and Pro includes every report. See
+      // src/lib/mindy/legacy-routes.ts (anonymous shared-password holders are the one exception).
+      //
       // 308 (permanent) — these products are not coming back.
       ...[
         '/store',
@@ -415,7 +420,8 @@ const nextConfig: NextConfig = {
         '/bundles/pro',
         '/content-generator-product',   // the SALES page; /content-generator is the tool
         '/expiring-contracts',
-        '/market-assassin',             // the SALES page; /federal-market-assassin is the tool
+        // '/market-assassin' (the SALES page) moved to src/lib/mindy/legacy-routes.ts
+        // 2026-09-23: it now lands on Market Research in /app (every host), not the homepage.
         // NOT '/market-assassin-locked' — it looks like a sales page but is the ACCESS GATE.
         // Verified 2026-07-28: proxy.ts redirects unentitled users there, the tool itself
         // router.replace()s there in 3 places, and /api/ma-access/[token] sends both its

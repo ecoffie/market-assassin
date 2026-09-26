@@ -874,7 +874,7 @@ function FederalMarketAssassinContent() {
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 text-center">Related Intel</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Link
-              href="/briefings"
+              href="/app"
               className="p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-purple-500/50 transition-colors group"
             >
               <div className="flex items-center gap-3 mb-2">
@@ -884,7 +884,7 @@ function FederalMarketAssassinContent() {
               <p className="text-sm text-slate-400">Daily briefs, weekly deep dives, and pursuit guidance tailored to your profile.</p>
             </Link>
             <Link
-              href="/briefings"
+              href="/app?panel=forecasts"
               className="p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-violet-500/50 transition-colors group"
             >
               <div className="flex items-center gap-3 mb-2">

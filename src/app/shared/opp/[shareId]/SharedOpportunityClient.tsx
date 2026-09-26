@@ -117,7 +117,7 @@ export default function SharedOpportunityClient() {
           <h1 className="text-xl font-bold text-white mb-2">Opportunity Not Found</h1>
           <p className="text-gray-400 mb-6">This share link may have expired or doesn't exist.</p>
           <Link
-            href="/briefings"
+            href="/app"
             className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
           >
             Get Your Own Briefings

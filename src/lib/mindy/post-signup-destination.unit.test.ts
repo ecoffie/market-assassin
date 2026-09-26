@@ -57,12 +57,21 @@ describe('known intent is preserved', () => {
 });
 
 describe('legacy destinations are never a valid outcome', () => {
-  it.each(['/app', '/app/onboarding', '/app?panel=settings', '/briefings', '/briefings?email=x', '//app', '/APP/onboarding'])(
+  it.each(['/app/onboarding', '/briefings', '/briefings?email=x', '//app', '/APP/onboarding'])(
     'refuses %s as a next', (bad) => {
       const r = resolvePostSignupDestination({ next: bad });
       expect(r.path).toBe(WELCOME_PATH);
       expect(r.path).not.toMatch(/\/(app|briefings)\b/);
     });
+
+  it.each(['/app', '/app?panel=settings'])(
+    'honours an explicit %s — /app is the current workspace (PR #1671)', (ok) => {
+      expect(resolvePostSignupDestination({ next: ok }).path).toBe(ok);
+    });
+
+  it('with NO next, a new account still goes to the intent router, never /app', () => {
+    expect(resolvePostSignupDestination({}).path).toBe(WELCOME_PATH);
+  });
 
   it('refuses a legacy purchase destination too', () => {
     expect(postSignupPath({ intent: 'purchase', purchaseNext: '/app/onboarding' })).toBe(WELCOME_PATH);
@@ -74,7 +83,8 @@ describe('legacy destinations are never a valid outcome', () => {
   });
 
   it('isLegacyDestination identifies the retired estate', () => {
-    expect(isLegacyDestination('/app')).toBe(true);
+    expect(isLegacyDestination('/app')).toBe(false);
+    expect(isLegacyDestination('/app/onboarding')).toBe(true);
     expect(isLegacyDestination('/briefings')).toBe(true);
     expect(isLegacyDestination('/opportunity-map')).toBe(false);
     expect(isLegacyDestination('/alerts/preferences')).toBe(false);

@@ -58,10 +58,16 @@ export default function MarketAssassinLockedPage() {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Use window.location for full page reload to ensure cookie is sent
-        window.location.href = '/federal-market-assassin';
+        window.location.href = '/app?panel=research';
         return;
       } else {
-        setError('No access found for this email. Please purchase below.');
+        // No legacy `ma:` grant. That is every Mindy Pro buyer — market research is part of
+        // their workspace, not this retired standalone tool. Telling them "No access found,
+        // please purchase" after they paid is the dead end this replaces
+        // (src/lib/mindy/legacy-routes.ts). `email` only pre-fills /app's sign-in.
+        setRedirecting(true);
+        window.location.href = `/app?panel=research&email=${encodeURIComponent(email)}`;
+        return;
       }
     } catch (err) {
       console.error('Verification error:', err);
@@ -89,7 +95,7 @@ export default function MarketAssassinLockedPage() {
 
         {/* Already have access section */}
         <div className="border border-slate-700 rounded-xl p-4 mb-8 bg-slate-900/50">
-          <p className="text-slate-400 text-sm mb-3 text-center">Already purchased? Enter your email to access:</p>
+          <p className="text-slate-400 text-sm mb-3 text-center">Already a customer (Market Assassin or Mindy)? Enter your email to continue:</p>
           <form onSubmit={handleVerifyAccess} className="flex gap-2">
             <input
               ref={emailRef}
@@ -109,7 +115,7 @@ export default function MarketAssassinLockedPage() {
             <p className="text-red-400 text-sm mt-3 text-center">{error}</p>
           )}
           {redirecting && (
-            <p className="text-green-400 text-sm mt-3 text-center">Access verified! Redirecting...</p>
+            <p className="text-green-400 text-sm mt-3 text-center">Redirecting…</p>
           )}
         </div>
 

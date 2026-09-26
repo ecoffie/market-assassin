@@ -91,7 +91,7 @@ function MarketIntelligenceContent() {
 
           // Redirect to briefings with setup flag
           setRedirecting(true);
-          window.location.href = '/briefings?setup=true';
+          window.location.href = '/app?panel=settings';
         }
       } catch {
         setError('Failed to verify invitation. Please try again or contact support.');
@@ -128,7 +128,7 @@ function MarketIntelligenceContent() {
         persistAccessEmail(email);
         setRedirecting(true);
         await new Promise((resolve) => setTimeout(resolve, 120));
-        window.location.href = '/briefings';
+        window.location.href = '/app';
         return;
       }
 
@@ -413,20 +413,8 @@ function MarketIntelligenceContent() {
           </p>
         </div>
 
-        {/* Ultimate Bundle callout — keeps the existing copy
-            but moves it under the new pricing card. */}
-        <div className="mt-6 bg-surface/50 border border-hairline rounded-xl p-4 text-center">
-          <p className="text-muted text-xs mb-1">Planning to go all-in?</p>
-          <p className="text-white text-sm mb-2">
-            The <span className="text-purple-400 font-medium">Ultimate Bundle ($1,497)</span> includes lifetime Mindy AI access.
-          </p>
-          <Link
-            href="/bundles/ultimate"
-            className="text-purple-400 hover:text-purple-300 text-xs font-medium"
-          >
-            Compare with Ultimate →
-          </Link>
-        </div>
+        {/* Ultimate Bundle callout removed 2026-09-23 (PR #1671): the bundle is a retired legacy
+            product; /bundles/ultimate now redirects to /pricing. */}
       </div>
 
       {/* Pro vs. Team vs. Enterprise tier-card section removed
@@ -506,13 +494,9 @@ function MarketIntelligenceContent() {
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ Shared</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ Shared</td>
               </tr>
-              {/* Content Reaper */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Content Reaper</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
-              </tr>
+              {/* Content Reaper row removed 2026-09-23 (PR #1671): Pro buyers are rejected by the
+                  Content Reaper tool (it checks the contentgen: grant only), and /app has no
+                  equivalent yet — an open migration gap, not a Pro feature. */}
               {/* FHC Training */}
               <tr className="border-b border-surface hover:bg-surface/30">
                 <td className="py-2.5 px-3 text-ink-soft">FHC Training</td>
@@ -660,7 +644,7 @@ function MarketIntelligenceContent() {
               ← Back to Tools
             </Link>
             <span className="mx-4">•</span>
-            <Link href="/briefings" className="text-muted hover:text-white">
+            <Link href="/app" className="text-muted hover:text-white">
               View Dashboard
             </Link>
             <span className="mx-4">•</span>

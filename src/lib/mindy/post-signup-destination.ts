@@ -18,7 +18,9 @@
  *     explicit MCP intent    -> /mcp/setup
  *     explicit purchase      -> the preserved checkout destination
  *     no / invalid intent    -> /welcome   (the intent ROUTER, not onboarding)
- *     /app, /app/onboarding, /briefings and friends are NEVER a valid fallback
+ *     /app, /app/onboarding, /briefings and friends are NEVER a valid FALLBACK
+ *     (an explicit `next=/app…` IS honoured since 2026-09-23 — /app is the current
+ *     workspace, PR #1671; /app/onboarding and /briefings stay refused)
  *
  * ⚠️ Fixing the five call sites separately is how they drifted in the first place. Every
  * one of them must call this, so the next entry path added inherits the rule instead of
@@ -35,11 +37,10 @@ export const WELCOME_PATH = '/welcome';
 export const MCP_SETUP_PATH = '/mcp/setup';
 
 /**
- * Surfaces a newly created account may never be sent to, even if something upstream asks.
- * `safeNext()` already rejects `/app`; this widens it to the rest of the legacy estate so a
- * stale link or a hand-written `?next=/briefings` cannot reintroduce the old experience.
+ * Retired surfaces a newly created account may never be sent to, even if something upstream
+ * asks — the retired profile builder and the pre-/app dashboard. `/app` itself is current.
  */
-const LEGACY_DESTINATION = /^\/+(app|briefings)(\/|\?|#|$)/i;
+const LEGACY_DESTINATION = /^\/+(app\/onboarding|briefings)(\/|\?|#|$)/i;
 
 export type SignupIntent = 'maps' | 'mcp' | 'purchase' | 'unknown';
 

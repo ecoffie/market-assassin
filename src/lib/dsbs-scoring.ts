@@ -364,19 +364,19 @@ function getCrossSells(sections: SectionScore[], overallScore: number): CrossSel
   const naicsSection = sections.find(s => s.key === 'naics');
   if ((perfSection && perfSection.percentage < 50) || (naicsSection && naicsSection.percentage < 60)) {
     sells.push({
-      product: 'Market Assassin',
-      price: 'from $297',
+      product: 'Mindy Market Research',
+      price: 'free to start',
       reason: 'Discover which agencies spend the most in your NAICS and get strategic reports to target the right buyers',
-      url: '/market-assassin',
+      url: '/app?panel=research',
     });
   }
 
   if (naicsSection && naicsSection.percentage < 70) {
     sells.push({
-      product: 'Opportunity Hunter',
+      product: 'Mindy Market Research',
       price: 'Free',
       reason: 'See which agencies are actively buying in your NAICS codes right now',
-      url: '/opportunity-hunter',
+      url: '/app?panel=research',
     });
   }
 

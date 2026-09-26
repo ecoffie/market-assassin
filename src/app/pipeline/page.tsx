@@ -24,7 +24,7 @@ function PipelineRedirect() {
 
   useEffect(() => {
     const email = searchParams.get('email');
-    const redirectUrl = email ? `/briefings?email=${encodeURIComponent(email)}` : '/briefings';
+    const redirectUrl = email ? `/app?panel=pipeline&email=${encodeURIComponent(email)}` : '/app?panel=pipeline';
     router.replace(redirectUrl);
   }, [router, searchParams]);
 

@@ -53,10 +53,14 @@ describe('safeNext — rejects anything that could leave the site', () => {
   });
 });
 
-describe('safeNext — never sends a NEW user back into the legacy /app', () => {
-  // The entire point of item 4: a signup that started in Maps must not finish in /app.
-  for (const p of ['/app', '/app?panel=vault', '/app/onboarding', '//app', '/App?panel=x']) {
+describe('safeNext — refuses RETIRED surfaces; /app itself is current (PR #1671, 2026-09-23)', () => {
+  // A signup that started in Maps carries a Maps `next`, so it still never finishes in /app —
+  // the fallback below is unchanged. What changed: an EXPLICIT next=/app… is honoured.
+  for (const p of ['/app/onboarding', '/APP/onboarding?x=1', '/briefings', '/briefings?email=x', '//app']) {
     it(`rejects ${p}`, () => expect(safeNext(p)).toBe(DEFAULT_POST_AUTH_PATH));
+  }
+  for (const p of ['/app', '/app?panel=vault', '/App?panel=x']) {
+    it(`honours an explicit ${p}`, () => expect(safeNext(p)).toBe(p));
   }
   it('does NOT reject a path that merely starts with the letters "app"', () => {
     expect(safeNext('/application-status')).toBe('/application-status');
@@ -77,7 +81,8 @@ describe('isSafeNext / withNext', () => {
   it('isSafeNext agrees with safeNext', () => {
     expect(isSafeNext('/opportunity-map/pursuits')).toBe(true);
     expect(isSafeNext('https://evil.com')).toBe(false);
-    expect(isSafeNext('/app')).toBe(false);
+    expect(isSafeNext('/app')).toBe(true);
+    expect(isSafeNext('/app/onboarding')).toBe(false);
     expect(isSafeNext('')).toBe(false);
   });
   it('withNext appends only a safe next, and encodes it', () => {
@@ -86,7 +91,7 @@ describe('isSafeNext / withNext', () => {
   });
   it('withNext leaves the url untouched for an unsafe or absent next', () => {
     expect(withNext('/x', 'https://evil.com')).toBe('/x');
-    expect(withNext('/x', '/app')).toBe('/x');
+    expect(withNext('/x', '/app/onboarding')).toBe('/x');
     expect(withNext('/x', null)).toBe('/x');
   });
 });

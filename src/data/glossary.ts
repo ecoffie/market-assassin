@@ -606,7 +606,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     related: ['expiring-contracts', 'past-performance', 'capture-manager'],
     productLink: {
       label: 'See expiring contracts in your NAICS',
-      href: '/recompete',
+      href: '/opportunity-map?mode=recompete',
     },
   },
   {

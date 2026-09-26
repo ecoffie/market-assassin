@@ -315,7 +315,7 @@ export default function SetAsidesIndexPage() {
             <Link href="/blog/how-to-find-federal-contracts" className="text-slate-400 hover:text-purple-300 transition">
               How to find federal contracts
             </Link>
-            <Link href="/recompete" className="text-slate-400 hover:text-purple-300 transition">
+            <Link href="/opportunity-map?mode=recompete" className="text-slate-400 hover:text-purple-300 transition">
               Expiring contracts
             </Link>
           </div>
