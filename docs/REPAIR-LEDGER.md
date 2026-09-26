@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — Grants cache: stale rows reconciled only after a proven-complete ingest
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | Grants map / grants_cache | Ingest only upserted, so 103 unlisted grants stayed actionable on the map. Now: per-status completeness evidence (hitCount consistent & >0, unique==hitCount exact, no degraded page/error/cap), RUN-level completeness gates `absent_since`; breaker at 20%; records never deleted, restored when seen; `source_status` only from a well-formed fetchOpportunity answer (outage → unconfirmed); map + grants-map hide absent-unconfirmed and confirmed-gone, show confirmed-live, report `hidden` counts; safe no-op without the migration (`20260926_grants_cache_reconcile.sql`, NOT applied). Record: tasks/grants-cache-reconcile-2026-09-26.md | `export function runIsComplete` → `src/lib/grants/reconcile.ts` | reconcile.unit (23) + reconcile-read-path.unit (5); mutations M1–M5 each red; read-only prod dry run: complete 925/925 + 611/611, would hide 103 actionable (breaker 6.3%), sample 20/20 archived | 🟡 PR |
+
+---
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

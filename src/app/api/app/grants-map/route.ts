@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getGrantsViewportPins } from '@/lib/opportunities/map-data';
+import { GRANTS_VISIBLE_OR, isMissingSchemaError } from '@/lib/grants/reconcile';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -39,15 +40,40 @@ export async function GET(request: NextRequest) {
     // Best-effort — on a count error, fall back to the in-view count, never a fabricated 0.
     let totalForFilters = pins.length;
     const todayIso = new Date().toISOString().slice(0, 10);
-    const { count, error: countErr } = await sb()
-      .from('grants_cache')
-      .select('opp_number', { count: 'exact', head: true })
-      .not('map_lat', 'is', null)
-      .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`);
+    const OPEN_OR = `close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`;
+    const countVisible = (withReconcile: boolean) => {
+      let q = sb().from('grants_cache').select('opp_number', { count: 'exact', head: true })
+        .not('map_lat', 'is', null).or(OPEN_OR);
+      if (withReconcile) q = q.or(GRANTS_VISIBLE_OR);
+      return q;
+    };
+    let reconcileApplied = true;
+    let { count, error: countErr } = await countVisible(true);
+    if (countErr && isMissingSchemaError(countErr)) {
+      reconcileApplied = false;
+      ({ count, error: countErr } = await countVisible(false));
+    }
     if (countErr) {
       console.error('[grants-map] totalForFilters count failed:', countErr.message);
     } else if (count != null) {
       totalForFilters = count;
+    }
+
+    // Transparency: what the absence filter is holding back (null = unknown, never a fabricated 0).
+    let hidden: { notInLatestSnapshotUnconfirmed: number | null; confirmedGone: number | null } | null = null;
+    if (reconcileApplied) {
+      const [pending, gone] = await Promise.all([
+        sb().from('grants_cache').select('opp_number', { count: 'exact', head: true })
+          .not('map_lat', 'is', null).or(OPEN_OR).not('absent_since', 'is', null).is('source_status', null),
+        sb().from('grants_cache').select('opp_number', { count: 'exact', head: true })
+          .not('map_lat', 'is', null).or(OPEN_OR).not('absent_since', 'is', null).in('source_status', ['closed', 'archived', 'not_found']),
+      ]);
+      if (pending.error) console.error('[grants-map] hidden-pending count failed:', pending.error.message);
+      if (gone.error) console.error('[grants-map] hidden-gone count failed:', gone.error.message);
+      hidden = {
+        notInLatestSnapshotUnconfirmed: pending.error ? null : pending.count,
+        confirmedGone: gone.error ? null : gone.count,
+      };
     }
 
     return NextResponse.json({
@@ -56,6 +82,10 @@ export async function GET(request: NextRequest) {
       totalForFilters,
       totalInView: pins.length,
       capped: pins.length >= MAX_PINS,
+      // Grants hidden because the latest COMPLETE Grants.gov snapshot no longer lists them (pending
+      // source confirmation) or the source confirmed them closed/archived/not found. null = the
+      // reconcile migration is not applied (no filter active).
+      hidden,
       pins,
     });
   } catch (e) {

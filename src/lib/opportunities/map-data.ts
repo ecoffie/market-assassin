@@ -4,6 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { GRANTS_VISIBLE_OR, effectiveGrantStatus, isMissingSchemaError } from '@/lib/grants/reconcile';
 import { naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from './map-filters';
 import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
@@ -690,28 +691,39 @@ export async function getGrantsViewportPins(
 ): Promise<MapOpp[]> {
   const sb = getReadClient();
   const todayIso = new Date().toISOString().slice(0, 10);
-  const { data, error } = await sb
-    .from('grants_cache')
-    .select('opp_number, title, agency, agency_code, status, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source')
-    .not('map_lat', 'is', null)
-    .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
-    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
-    // Actionable only: a future/rolling deadline (posted still open) OR a forecasted grant (not yet
-    // open → no close_date). Expired POSTED grants (past close_date) are dropped as noise.
-    .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`)
+  const BASE_COLS = 'opp_number, title, agency, agency_code, status, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source';
+  const query = (withReconcile: boolean) => {
+    let q = sb
+      .from('grants_cache')
+      .select(withReconcile ? `${BASE_COLS}, absent_since, source_status` : BASE_COLS)
+      .not('map_lat', 'is', null)
+      .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
+      .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+      // Actionable only: a future/rolling deadline (posted still open) OR a forecasted grant (not yet
+      // open → no close_date). Expired POSTED grants (past close_date) are dropped as noise.
+      .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`);
+    // Reconcile (src/lib/grants/reconcile.ts): hide rows absent from the latest PROVEN-COMPLETE snapshot
+    // unless the source has since confirmed them live. Hidden rows are preserved, never deleted.
+    if (withReconcile) q = q.or(GRANTS_VISIBLE_OR);
     // Order by posted/open date DESC (newest first) — NOT close_date. Forecasted grants have no
     // close_date, so a close_date sort dumped ALL 502 of them past the 1,000-pin cap → they never
     // rendered on a wide viewport. posted_date is populated for both statuses, so newest-first keeps
     // posted + forecasted interleaved and both visible. (The card still shows the deadline.)
-    .order('posted_date', { ascending: false, nullsFirst: false })
-    .limit(limit);
+    return q.order('posted_date', { ascending: false, nullsFirst: false }).limit(limit);
+  };
+  let { data, error } = await query(true);
+  if (error && isMissingSchemaError(error)) {
+    // Reconcile migration not applied yet → today's behaviour exactly (never an error, never hiding).
+    console.warn('[grants-map] reconcile columns missing — serving without the absence filter');
+    ({ data, error } = await query(false));
+  }
   if (error) throw new Error(`getGrantsViewportPins: ${error.message}`);
 
   const out: MapOpp[] = [];
-  for (const r of (data || []) as Array<Record<string, unknown>>) {
+  for (const r of (data || []) as unknown as Array<Record<string, unknown>>) {
     const oppNumber = String(r.opp_number ?? '').trim();
     if (!oppNumber) continue;
-    const forecasted = String(r.status || '') === 'forecasted';
+    const forecasted = effectiveGrantStatus(r) === 'forecasted';
     out.push({
       id: 'gr-' + oppNumber,
       title: String(r.title || 'Federal grant'),
