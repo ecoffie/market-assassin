@@ -78,6 +78,99 @@ cp -R .vercel .claude/worktrees/<slug>/.vercel   # from the main checkout
 cwd. A green READY is not proof — grep the live URL for a string that exists only
 on the feature branch. Full rule: `.cursor/rules/ship-after-fix.mdc`.
 
+### ⛔ A PRODUCTION deploy must come from `origin/main` — gated by `npm run guard:prod-deploy`
+
+Linking `.vercel` correctly is necessary and **not sufficient**. On **2026-09-21T01:47:09Z**,
+20 seconds after PR #1597 was squash-merged, `vercel --prod` ran from the correctly-linked
+**feature-branch** worktree (`fix/cyrus-freshness-provenance` @ `dece7dba`). It built the
+branch tree, went READY at 01:53:16Z, and took all four production aliases (`getmindy.ai`,
+`mcp.getmindy.ai`, `mi.govcongiants.com`, `tools.govcongiants.org`) away from the legitimate
+git build of the merge commit that had started 20 seconds earlier.
+
+**The branch head was not stale in any way a human would notice** — it was the exact head that
+had just been reviewed and merged. What it lacked was the work merged *around* it (#1595,
+#1596, #1598). One of those was load-bearing: #1595 had taught `api/cron/snapshot-multisite`
+to accept the dispatcher's `Authorization: Bearer $CRON_SECRET`, and its migration had already
+stripped the inline `?password=` workaround out of `cron_jobs.route` in the live DB. So the
+enabled daily job had **no working auth path left**. Measured: correct bearer → **401** on the
+branch build, **400** ("missing source", i.e. auth passed) on restored main.
+
+Nothing failed loudly. The build was green, the aliases were Ready, and the Cyrus acceptance
+suite run against it passed **33/33** — because it only exercised the Cyrus code, which *was*
+present. **A green build proves the tree you uploaded compiles. It cannot tell you that you
+uploaded the wrong tree.**
+
+`npm run deploy` runs **`npm run guard:prod-deploy` first**, then `deploy:checks`, then the
+guard **again with `--final`** immediately before upload. The guard refuses unless the
+checkout is:
+
+1. **linked to the right project** — `.vercel/project.json` present *in this directory*,
+   matching projectName **and `projectId` and `orgId`**. The name is a human label that can
+   be stale or hand-edited; the IDs are what the API routes on. **Never overridable.**
+2. **git-verifiable** — every git fact must be readable. A git command that errors makes the
+   checkout UNKNOWN, and **unknown is not permission**. **Fails closed, never overridable.**
+   A failed `git fetch` is the same class: staleness becomes unknowable, which is the exact
+   condition the guard exists to detect.
+3. **on `main`** — not a feature branch, not detached.
+4. **exactly `origin/main`** — 0 behind (the incident above) and 0 ahead (unpushed,
+   unreviewed code).
+5. **clean** — no modified tracked files, **and nothing extra that would be uploaded**.
+   `.vercelignore` records that the CLI "uploads the working directory and does NOT honour
+   `.gitignore`", so **both untracked AND gitignored** paths are deployable content unless
+   `.vercelignore` excludes them.
+   ⚠️ **`git status --porcelain` lists only the untracked half — it hides exactly what
+   `.gitignore` covers**, which here was the larger and more sensitive half: `.env.local`
+   and two `.env.local.*-backup` files, none excluded by `.vercelignore`. The enumeration
+   uses `--ignored`, so **"git says clean" is not evidence that nothing extra ships**.
+   ⚠️ **A `!` negation RE-INCLUDES** — it is an exception, not an exclusion. Matching only
+   the broader exclusion above it would report "excluded" for a path that ships, and git
+   collapses an untracked directory into ONE entry, so a single re-included child makes the
+   whole directory uploadable. A negation that can't be evaluated means *nothing* is claimed
+   as excluded. `.vercelignore` was extended (additively — every prior entry kept) so the
+   intentional exclusions are explicit.
+
+Emergency hatch: `ALLOW_NONMAIN_PROD_DEPLOY="<reason>"` waives 3–5 and prints them as
+warnings. The reason must be a real sentence — `=1` is rejected, because a bypass nobody can
+read later is how this recurs. Rules 1–2 are never waivable.
+
+⚠️ **`predeploy` was renamed to `deploy:checks`, and must never be re-added.** npm runs a
+`pre<name>` script **automatically** before `<name>`, so a script literally called
+`predeploy` ran the whole multi-minute suite *before* the guard, and then a second time
+inside the chain — the guard was never fail-fast and the suite ran twice. Measured, not
+assumed. Pinned by `npm lifecycle ordering` tests.
+
+⚠️ **The recheck is not redundant.** `deploy:checks` takes minutes; `main` can move while it
+runs. A gate that only fires at the start of a long pipeline is validating a checkout that
+no longer exists by the time anything uploads.
+
+### ⚠️ A bare `vercel --prod` BYPASSES all of this
+
+The guard only runs if something runs it. `vercel --prod`, `vercel deploy --prod`,
+`vercel promote` and `vercel alias set` all go straight to the API — and `promote`/`alias`
+change what production serves **without building anything**. The 2026-09-21 incident was
+recorded as `source: cli`, `actor: cursor-cli`: exactly that path.
+
+This is a **credential/permission** boundary, not a code one, and **none of it is applied
+yet**. Options and a recommendation are in
+**`docs/engineering/production-deploy-boundary.md`**. Until one is adopted, the honest
+statement is: *production deploys are conventionally gated, not enforced* — do not describe
+the boundary as enforced in any runbook. A local shell alias shim is deliberately **not**
+shipped: it is defeated by a different shell, a non-interactive process, or any agent
+spawning the binary, and a boundary people believe in but which does not hold is worse than
+a known gap.
+
+**Prefer `vercel promote <deployment>` over rebuilding.** To fix a bad alias, promote the
+existing Ready build of the right commit — that is how this incident was resolved (promoted
+`dpl_EBUSQ57JWB5TJtzafJWkJQYaF1sj`, main @ `1262c59e`).
+
+⚠️ **A squash merge breaks ancestry checks.** `#1597` was squashed, so `dece7dba` is *not* an
+ancestor of `1262c59e` and `git merge-base --is-ancestor` fails on a perfectly good release.
+Verify a squashed feature by **content equivalence** (`git diff --quiet <head> <squash> -- <paths>`)
+against the **squash commit**, never by feature-head ancestry.
+
+Guard: `scripts/guard-prod-deploy.mjs` (`--final`, `--json`, `--no-fetch`, `--self-test`) ·
+tests `src/lib/deploy/prod-deploy-guard.unit.test.ts`.
+
 ---
 
 ## 🎯 Current priority order — READ BEFORE PICKING UP WORK
