@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — precompute-briefings reports failure when every generation attempt fails
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | Briefings / cron truth | 88 consecutive daily runs (06-30 → 09-26) generated 0 templates (every LLM provider 404 model_not_found) while the route answered 200 success:true and `cron_job_runs` logged 86× success/200. Now: all attempts failed → **502** with attempted/succeeded/failed + provider errors, one `tool_errors` row, runs-table VERDICT line + completed_at; partial → 200 `partial:true`; nothing-to-do stays 200. An all-failed invocation no longer self-chains (was up to profiles+5 failing links/night). Model config NOT touched. Record: tasks/precompute-failure-reporting-2026-09-26.md | `return v === 'all_failed' ? 502 : 200;` → `src/lib/briefings/precompute-outcome.ts` | precompute-outcome.unit.test.ts (7, real route handler; mutation: always-200 → red, chain-after-fail → red) | 🟡 PR |
+
+---
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
