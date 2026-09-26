@@ -545,6 +545,13 @@ const OPPS = __OPPS_JSON__;
 
 </script>
 <script>
+// BOOT TRACE (#1696): what the first seconds of a Maps load actually did — every size change, moveend,
+// discovery round, horizon request and abort, in page time. Always on, bounded (200 events), local
+// only. window.__mapPerf records only rounds that SETTLE, so a superseded boot round never appeared in
+// it — which is how a duplicate round (and its orphaned Postgres work) stayed invisible.
+window.__mapBootTrace=window.__mapBootTrace||[];
+window.__btrace=function(type,data){ try{ var e={t:Math.round(performance.now()),type:type}; if(data)for(var k in data)e[k]=data[k];
+  var a=window.__mapBootTrace; a.push(e); if(a.length>200)a.shift(); }catch(_){} };
 // TODAY = the viewer's ACTUAL local date, anchored to noon so day-diff math (daysOut / postedAgo /
 // "closes today") never crosses a boundary due to time-of-day. This WAS hardcoded to 2026-07-21 (a
 // prototype build-time date) — which made every card compute "days left" / "posted N days ago"
@@ -933,7 +940,9 @@ function resize(){
   if(h>0)mapEl.style.height=h+'px';
   else mapEl.style.height=Math.max(400,window.innerHeight-0)+'px'; // last-resort fallback
   if(w>0)mapEl.style.width=w+'px';
+  var _s0=map.getSize();
   map.invalidateSize({animate:false});
+  var _s1=map.getSize(); if(_s0.x!==_s1.x||_s0.y!==_s1.y)window.__btrace('resize',{from:_s0.x+'x'+_s0.y,to:_s1.x+'x'+_s1.y});
 }
 [0,50,120,250,450,800,1400].forEach(t=>setTimeout(resize,t));
 /* Zillow opens to YOUR area, not the whole world (Eric 2026-08-04). The boot fitView() fit all

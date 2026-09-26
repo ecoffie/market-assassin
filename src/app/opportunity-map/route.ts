@@ -2513,10 +2513,11 @@ const VIEWPORT_JS = `<script>
     if(hit&&truth)return Promise.resolve({d:hit.d,t:truth.t,src:'cache'});
     var inf=_hzInflight[m];
     if(inf&&inf.url===url)return inf.promise.then(function(r){ return r&&r.d?{d:r.d,t:r.t,src:'joined'}:r; });
-    if(inf){ try{ if(inf.ctrl)inf.ctrl.abort(); }catch(e){} delete _hzInflight[m]; }
+    if(inf){ try{ window.__btrace&&window.__btrace('abort',{m:m}); if(inf.ctrl)inf.ctrl.abort(); }catch(e){} delete _hzInflight[m]; }
     var ctrl=null; try{ ctrl=new AbortController(); }catch(e){}
     // Market truth already held for this exact intent → ask for the viewport pins only.
     var reqUrl=url+(truth?'&counts=0':'');
+    try{ window.__btrace&&window.__btrace('request',{m:m,counts:!truth}); }catch(e){}
     var pr=fetch(reqUrl,ctrl?{signal:ctrl.signal}:undefined).then(function(r){return r.json();}).then(function(d){
       if(!d||!d.success)return {failed:true};
       var t=(truth&&d.countsSkipped)?truth.t:_truthOf(d);
@@ -2748,6 +2749,7 @@ const VIEWPORT_JS = `<script>
     });
     if(_enabled.indexOf('recompete')===-1&&window.__vehicleScope){ window.__vehicleScope=null; if(window.__renderVehicleScope)window.__renderVehicleScope(); }
     var gen=++_fetchGen;
+    try{ window.__btrace&&window.__btrace('round',{gen:gen,enabled:_enabled.join(','),bbox:bbox()}); }catch(e){}
     var round={gen:gen,enabled:_enabled,parts:{},sigs:{},pending:_enabled.length,painted:false,paintTimer:0,
       perf:{action:t0,dispatch:_nowMs(),horizons:{},firstPaint:null,settled:null}};
     _enabled.forEach(function(m){
@@ -3371,6 +3373,7 @@ const VIEWPORT_JS = `<script>
   // moveend can fire, it exists). Saved un-debounced: a cheap localStorage write, and the last
   // moveend of a pan/zoom is the one that sticks.
   map.on('moveend',function(){ try{ if(typeof window.__saveMapView==='function')window.__saveMapView(); }catch(e){}
+    try{ window.__btrace&&window.__btrace('moveend',{bbox:map.getBounds().toBBoxString(),z:map.getZoom(),size:map.getSize().x+'x'+map.getSize().y}); }catch(e){}
     clearTimeout(t); t=setTimeout(function(){ fetchView({pan:true}); },450); });   // a pan/zoom — never acknowledged as an action (market-feedback.ts)
   // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
   // buckets collapse/expand, but the rows in hand are still valid — so re-run render() on the
@@ -9061,7 +9064,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Desktop is unaffected (body.m-map is a no-op there — the mobile chrome is display:none).
   // Scoped to ?src=alert ONLY: a normal mobile visit keeps its existing list-first default,
   // which is a deliberate small-screen choice, not a bug.
-  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
+  function finishBoot(){ try{ window.__btrace&&window.__btrace('boot-release',{bbox:(M()&&M().getBounds().toBBoxString())||''}); }catch(e){} releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
   function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
     var m=M();
