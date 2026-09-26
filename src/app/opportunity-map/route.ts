@@ -2410,7 +2410,10 @@ const VIEWPORT_JS = `<script>
   }
   var _render=render; render=function(){
     if(isContactMode(MODE)){ renderContacts(); updateHeader(); maybeAutoFit(); return; }
-    _render(); updateHeader(); maybeAutoFit();
+    // #1696: never auto-fit a PARTIAL round. The first horizon to paint (e.g. Open) moved the map to ITS pins
+    // while Recompete/Forecast were still loading — a navigate moveend that aborted them and started a second
+    // full round (their Postgres work runs on regardless). _paintRoundNow already fits once the round settles.
+    _render(); updateHeader(); if(!(window.__horizonsLoading&&window.__horizonsLoading.length))maybeAutoFit();
     try{ if(typeof selected!=='undefined' && selected){ var mm=markers.get(selected); if(mm && !mm.isPopupOpen()) mm.openPopup(); } }catch(e){}
   };
   // Zillow: the popup stays through refetches (closeOnClick:false) but closes when the user

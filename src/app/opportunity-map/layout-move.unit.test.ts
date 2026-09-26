@@ -73,3 +73,17 @@ describe('wiring', () => {
     expect(routeSrc).toContain('LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS');
   });
 });
+
+describe('auto-fit waits for the round to settle (#1696 second boot trigger)', () => {
+  it('the render wrapper does not auto-fit while any horizon of the round is still loading', () => {
+    const w = routeSrc.slice(routeSrc.indexOf('var _render=render; render=function(){'), routeSrc.indexOf('var _render=render; render=function(){') + 900);
+    expect(w).toContain('if(!(window.__horizonsLoading&&window.__horizonsLoading.length))maybeAutoFit();');
+    expect(w).not.toMatch(/_render\(\); updateHeader\(\); maybeAutoFit\(\);/);
+  });
+  it('the settled paint still auto-fits (the one place a round may move the map)', () => {
+    const p = routeSrc.slice(routeSrc.indexOf('function _paintRoundNow(round){'));
+    const settledAt = p.indexOf('if(!settled)return;');
+    expect(settledAt).toBeGreaterThan(-1);
+    expect(p.indexOf('maybeAutoFit();', settledAt)).toBeGreaterThan(settledAt);
+  });
+});
