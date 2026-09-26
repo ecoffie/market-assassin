@@ -552,18 +552,17 @@ const SBIR_TOOL_DEF = {
   function: {
     name: 'search_sbir',
     description:
-      'SBIR/STTR OPEN TOPICS and AWARD HISTORY, returned in SEPARATE lists. open_topics = topics you can still ' +
-      'propose to (deadline today or later; DoD SBIR/STTR topic cache). award_history = projects NIH already ' +
-      'FUNDED (who won what) — never biddable, never a deadline. coverage.statement says whether open topics ' +
-      'could be established at all; sources[] reports each source as ok/empty/error/timeout/unavailable. ' +
-      'Default source=all. Filter by keyword / agency / phase.',
+      'SBIR/STTR small-business R&D opportunities from NIH RePORTER (awarded projects — competitive intel on ' +
+      'who won what) + a multisite aggregate of open notices. source="nih" = awarded NIH projects; ' +
+      'source="multisite"/"all" = open notices. Filter by keyword / agency / phase. Returns title, agency, ' +
+      'phase, amount, organization, dates. grounded=false when nothing matches — try source="all".',
     parameters: {
       type: 'object',
       properties: {
         keyword: { type: 'string', description: 'Search term, e.g. "machine learning" or "vaccine".' },
         agency: { type: 'string', description: 'NIH institute (NCI, NIAID, …) or broad agency (NSF, DOD, …).' },
         phase: { type: 'string', enum: ['1', '2', 'all'], description: 'SBIR/STTR phase (default all).' },
-        source: { type: 'string', enum: ['nih', 'dod', 'multisite', 'all'], description: 'all (default) = everything, labeled; dod = open DoD SBIR/STTR topics; nih = awarded NIH projects (history only); multisite = aggregated rows, each labeled open_topic or award_history.' },
+        source: { type: 'string', enum: ['nih', 'dod', 'multisite', 'all'], description: 'Data source: nih=awarded NIH projects; dod=open DoD SBIR/STTR topics; multisite=open notices; all.' },
         limit: { type: 'number', description: 'Max results (default 25, max 50).' },
       },
     },

@@ -1,4 +1,10 @@
 /**
+ * ⛔ RETIRED 2026-09-26 — NOT REGISTERED. `search_sbir` is withdrawn from MCP (PR #1710 adds it to
+ * RETIRED_TOOLS in src/lib/mcp/retired-tools.ts; stale calls get a `tool_retired` answer, 0 credits).
+ * This wrapper is kept only as the reference implementation of the classification + failure-reporting
+ * repair documented in tasks/sbir-reed-investigation-2026-09-26.md. Do not register it again without
+ * a working open-topic source AND removing the name from RETIRED_TOOLS in the same change.
+ *
  * MCP tool: search_sbir — SBIR/STTR open topics AND award history, in SEPARATE lists.
  *
  * Wraps src/lib/sbir/search.ts. credits: 5. `_meta` always ships; `_ai_hint` OFF by default.

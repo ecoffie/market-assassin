@@ -1,5 +1,18 @@
 # search_sbir — Reed Analytics failed SBIR search (evidence packet, 2026-09-26)
 
+
+> **⛔ STATUS UPDATE (2026-09-26): `search_sbir` is RETIRED from MCP — PR #1710.** Eric changed direction:
+> the tool is withdrawn rather than repaired. This PR (#1708) therefore **no longer touches
+> `tool-registry.ts` or `src/mcp/server.ts`**, so merging it cannot republish the tool. What it keeps:
+> - the library-level classification and failure-reporting repair in `src/lib/sbir/search.ts`, which
+>   the MCP surface no longer calls;
+> - its tests;
+> - the unregistered wrapper (now headed RETIRED);
+> - this evidence packet.
+>
+> The billing-policy proposal P3 is moot for the retired tool. The 105-credit correction (P1) stays a
+> separate, unauthorized item.
+
 **Release scope: a RESULT-CLASSIFICATION and FAILURE-REPORTING repair.** It does **not**
 restore an open-topic source. After it ships, `search_sbir` still cannot return a single open
 SBIR/STTR topic. What changes is that it now says so, labels award history as award history, and

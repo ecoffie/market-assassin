@@ -26,7 +26,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
-## 2026-09-26 — search_sbir: result-classification + failure-reporting repair (does NOT restore an open-topic source)
+## 2026-09-26 — search_sbir library: result-classification + failure-reporting repair (tool itself RETIRED in #1710; this does NOT restore an open-topic source)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
