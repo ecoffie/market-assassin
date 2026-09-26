@@ -15,7 +15,7 @@ export type MIPanel =
   | 'contacts'       // CRM & relationships (Pro tier)
   | 'content'        // Content Reaper
   | 'planner'        // Action Planner
-  | 'sbir'           // SBIR/STTR
+  | 'sbir'           // SBIR/STTR — RETIRED 2026-09-26: no nav item; kept so a residual path renders the retired notice
   | 'grants';        // Federal grants
 
 // Tier definitions for access control
@@ -100,13 +100,6 @@ const navigation: NavSection[] = [
         panel: 'contractors',
         icon: '🏢',
         description: 'Prime contractor DB',
-        tier: 'pro',
-      },
-      {
-        name: 'SBIR/STTR',
-        panel: 'sbir',
-        icon: '🔬',
-        description: 'R&D funding opportunities',
         tier: 'pro',
       },
       {

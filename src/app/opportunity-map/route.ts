@@ -2650,10 +2650,10 @@ const VIEWPORT_JS = `<script>
     // Parameterized on m so the same builder serves every horizon (was hardcoded to global MODE).
     function _buildOppUrl(m){
       // DLA MODE = its own map (sources=dla only → getDibbsViewportPins) + the FSC supply-class filter.
-      // Opportunities (open) = SAM + DIBBS + SBIR union (the market-research map). The old top-bar
+      // Opportunities (open) = SAM (+ DIBBS in DLA mode). The SBIR source was RETIRED 2026-09-26. The old top-bar
       // Source dropdown that used to narrow Open to "DLA only" is GONE — DLA is a mode now, not a source.
       var _dla=(window.__mapMode==='dla');
-      var _sources=_dla?'dla':'sam,sbir';   // Opportunities no longer folds DLA in — it's its own map
+      var _sources=_dla?'dla':'sam';   // Opportunities no longer folds DLA in — it's its own map. SBIR/STTR retired 2026-09-26 (src/lib/sbir/retired.ts).
       var url=MODES[m].ep+'?bbox='+bbox()+((m==='open'||_dla)?('&status=active&sources='+_sources+((HIDE_FSC&&!_dla)?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
       // DLA mode: the FSC supply-class filter (the dropdown that replaced Industry in this mode).
       if(_dla){ var _fsc=(window.__fscFilter||[]).join(','); if(_fsc)url+='&fsc='+encodeURIComponent(_fsc); return url; }

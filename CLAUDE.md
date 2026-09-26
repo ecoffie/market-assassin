@@ -713,7 +713,7 @@ export type MIPanel =
   | 'contacts'       // CRM & relationships (Pro tier)
   | 'content'        // Content Reaper
   | 'planner'        // Action Planner
-  | 'sbir'           // SBIR/STTR
+  | 'sbir'           // SBIR/STTR — RETIRED 2026-09-26 (no nav item; residual path shows the retired notice)
   | 'grants';        // Federal grants
 ```
 
@@ -725,7 +725,7 @@ export type MIPanel =
 | **Daily Alerts** | Simple list (no AI) | ✅ |
 | **AI Briefings** | ❌ | Daily + Weekly + Pursuit |
 | **Forecasts** | ❌ | 7,700+ |
-| **SBIR/STTR** | ❌ | ✅ |
+| ~~**SBIR/STTR**~~ | — | RETIRED 2026-09-26 (`src/lib/sbir/retired.ts`) |
 | **Grants** | ❌ | ✅ |
 | **Pipeline** | ❌ | ✅ |
 | **CRM/Contacts** | ❌ | ✅ |
@@ -741,7 +741,7 @@ export type MIPanel =
 | `src/components/bd-assist/PipelineBoard.tsx` | Pipeline panel component |
 | `src/components/bd-assist/ContactsPanel.tsx` | Contacts panel component |
 | `src/components/bd-assist/ForecastsPanel.tsx` | Forecasts panel component |
-| `src/components/briefings/SbirPanel.tsx` | SBIR/STTR panel component |
+| ~~`src/components/briefings/SbirPanel.tsx`~~ | REMOVED 2026-09-26 — SBIR/STTR search retired (`src/lib/sbir/retired.ts`) |
 | `src/components/briefings/GrantsPanel.tsx` | Grants panel component |
 
 ### Implementation Pattern
@@ -1474,7 +1474,7 @@ The daily-alerts cron is nominally "PAID TIER ONLY," but the tier check is **OFF
 | API | Purpose | Auth Required |
 |-----|---------|---------------|
 | `/api/grants` | Grants.gov search wrapper | No |
-| `/api/sbir` | NIH RePORTER + Multisite SBIR/STTR | No |
+| `/api/sbir` | **RETIRED 2026-09-26 — answers 410** (`src/lib/sbir/retired.ts`) | No |
 
 **New Components:**
 - `src/components/briefings/GrantsPanel.tsx` — Grants search UI

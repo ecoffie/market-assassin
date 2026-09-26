@@ -176,7 +176,6 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   get_current_acquisition_intelligence: { title: 'Current Acquisition Intelligence (what changed · what to do)' },
   match_company_to_pathways: { title: 'Pathway Fit (doors your company can walk through)' },
   understand_customer: { title: 'Understand This Customer (Opportunity · Agency · Emphasize)' },
-  search_sbir: { title: 'Search SBIR' },
 };
 
 /** Fallback title for a tool added to the registry but not yet in TOOL_META. */

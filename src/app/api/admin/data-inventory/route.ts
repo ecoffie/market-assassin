@@ -526,7 +526,7 @@ export async function GET(request: NextRequest) {
         { label: 'Grants.gov research slice', count: c.resGrantsGov, note: e.resGrantsGov ? `last advanced ${e.resGrantsGov.slice(0, 10)}` : undefined },
         { label: 'DARPA BAA', count: c.resDarpa, note: e.resDarpa ? `last advanced ${e.resDarpa.slice(0, 10)}` : undefined },
         { label: 'NSF SBIR/STTR', count: c.resNsf, note: (c.resNsf ?? 0) === 0 ? 'contributes 0 rows — never written' : undefined },
-        { label: 'view: SBIR / STTR (opportunity_type) — what search_sbir reads', count: c.resTypeSbir, note: 'subset of the above, not additive' },
+        { label: 'view: SBIR / STTR (opportunity_type) — read by the RETIRED search_sbir', count: c.resTypeSbir, note: 'subset of the above, not additive; no customer surface since 2026-09-26' },
         { label: 'view: grant-type', count: c.resTypeGrant, note: 'subset, not additive' },
         { label: 'view: BAA', count: c.resTypeBaa, note: 'subset, not additive' },
       ],
@@ -539,7 +539,9 @@ export async function GET(request: NextRequest) {
         instances: researchInstances,
         schedules: schedules(CRON_JOBS.research),
       },
-      surface: { state: 'customer_readable', tools: ['search_sbir'], app: ['Market scan'] },
+      // Mindy's dedicated SBIR/STTR search was RETIRED 2026-09-26 (src/lib/sbir/retired.ts): search_sbir, the
+      // in-app SBIR panel, /api/sbir and market-scan's SBIR section no longer serve this corpus. Rows are kept.
+      surface: { state: 'withheld', tools: [], note: "Mindy's dedicated SBIR/STTR search retired 2026-09-26 (search_sbir, SBIR panel, /api/sbir, market-scan SBIR). Still read internally as R&D input by the AI briefing generator (sbir_sttr excluded), which currently saves no templates." },
       upstreams: researchUpstreams, provenance: 'Research/lab funding that never posts to SAM.gov, mirrored into one store. Only sources with rows count as contributing.',
     },
     {
@@ -555,7 +557,7 @@ export async function GET(request: NextRequest) {
           : undefined,
         schedules: schedules(CRON_JOBS.dodSbir),
       },
-      surface: { state: 'customer_readable', tools: ['search_sbir'], note: (c.dodSbir ?? 0) === 0 ? 'wired to search_sbir, currently contributes nothing' : undefined },
+      surface: { state: 'withheld', tools: [], note: 'was wired to search_sbir, RETIRED 2026-09-26 (src/lib/sbir/retired.ts); no customer surface. The table has never held a row.' },
       upstreams: ['sbir_gov'], provenance: 'SBIR.gov DoD topics API mirrored into dod_sbir_topics.',
     },
     {

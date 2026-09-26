@@ -214,8 +214,8 @@ export default function AgenciesIndexPage() {
             Stop checking 12 portals. Let Mindy do it.
           </h2>
           <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
-            Mindy aggregates SAM.gov, agency forecast portals, NIH RePORTER,
-            SBIR/STTR, and dozens of agency-specific bid boards into one daily
+            Mindy aggregates SAM.gov, agency forecast portals,
+            and dozens of agency-specific bid boards into one daily
             briefing — matched to your NAICS codes.
           </p>
           <Link
