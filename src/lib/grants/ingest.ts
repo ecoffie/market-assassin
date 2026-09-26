@@ -16,6 +16,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { searchGrants } from './search';
 import { grantsHqFor } from './grants-hq';
 import { geocodeCity } from '@/lib/geo/city-geocode';
+import {
+  statusCompleteness, runIsComplete, probeReconcileSchema, reconcileAbsentGrants, confirmAbsentGrants, grantsGovIdFromUrl,
+  type StatusCompleteness, type ReconcileResult, type ConfirmResult, type ReconcileOptions,
+} from './reconcile';
 
 /** Statuses we keep on the map — actionable only. Order is the fetch order. */
 export const GRANT_INGEST_STATUSES: Array<'posted' | 'forecasted'> = ['posted', 'forecasted'];
@@ -27,6 +31,12 @@ export interface IngestGrantsOptions {
   pageSize?: number;
   /** Timestamp to stamp synced_at with — pass in (scripts/crons can't call Date.now in some ctxs). */
   nowIso?: string;
+  /** Max absent rows to confirm against fetchOpportunity this run (bounded; 0 disables). */
+  confirmLimit?: number;
+  /** Reconcile safety options (breaker). The cron never overrides the breaker. */
+  reconcile?: ReconcileOptions;
+  /** Injectable fetch for the confirmation step (tests). */
+  fetchImpl?: typeof fetch;
 }
 
 export interface IngestGrantsResult {
@@ -36,6 +46,14 @@ export interface IngestGrantsResult {
   upserted: number;
   perStatus: Record<string, number>;
   degraded: boolean;   // an upstream Grants.gov fetch errored mid-run (partial data)
+  /** Per-status completeness evidence (expected hitCount vs unique fetched, pages, errors). */
+  completeness: Record<string, StatusCompleteness>;
+  /** Every status proven complete → the only condition under which reconcile may mark absence. */
+  complete: boolean;
+  /** Whether the reconcile migration is applied (columns + runs table). Without it: upsert-only. */
+  schema: { columns: boolean; runsTable: boolean };
+  reconcile: ReconcileResult;
+  confirm: ConfirmResult | null;
 }
 
 const clean = (s?: string | null) => (s == null ? null : String(s).replace(/\x00/g, '').trim() || null);
@@ -65,12 +83,25 @@ export async function ingestGrants(
   const perStatus: Record<string, number> = {};
   let placed = 0, unplaced = 0, degraded = false;
 
+  type Evidence = { hitCounts: number[]; pages: number; unique: Set<string>; degraded: boolean; error: string | null; capped: boolean };
+  const evidence: Record<string, Evidence> = {};
+
   for (const status of GRANT_INGEST_STATUSES) {
     let n = 0;
+    const ev: Evidence = { hitCounts: [], pages: 0, unique: new Set<string>(), degraded: false, error: null, capped: false };
+    evidence[status] = ev;
+    let exhausted = false;
     for (let offset = 0; offset < maxPerStatus; offset += pageSize) {
-      const res = await searchGrants({ status, limit: pageSize, offset }).catch(() => null);
-      if (!res || res.degraded) { degraded = true; break; }   // upstream blip — keep what we have
-      if (res.grants.length === 0) break;
+      let res: Awaited<ReturnType<typeof searchGrants>> | null = null;
+      try {
+        res = await searchGrants({ status, limit: pageSize, offset });
+      } catch (e) {
+        ev.error = (e as Error).message || 'fetch threw';
+      }
+      if (!res || res.degraded) { degraded = true; ev.degraded = true; break; }   // upstream blip — keep what we have
+      ev.pages++;
+      ev.hitCounts.push(res.total); // unfiltered search → `total` is Grants.gov's hitCount
+      if (res.grants.length === 0) { exhausted = true; break; }
       for (const g of res.grants) {
         const oppNumber = clean(g.oppNumber);
         if (!oppNumber) continue;
@@ -94,26 +125,91 @@ export async function ingestGrants(
           map_loc_source: geo ? 'agency_hq' : null,
           synced_at: nowIso,
         });
+        ev.unique.add(oppNumber);
         n++;
       }
-      if (res.grants.length < pageSize) break; // last page
+      if (res.grants.length < pageSize) { exhausted = true; break; } // last page
     }
+    if (!exhausted && !ev.degraded && !ev.error) ev.capped = true;
     perStatus[status] = n;
+  }
+
+  const completeness: Record<string, StatusCompleteness> = {};
+  for (const [status, ev] of Object.entries(evidence)) {
+    completeness[status] = statusCompleteness({
+      status, hitCounts: ev.hitCounts, pages: ev.pages, fetchedUnique: ev.unique.size,
+      degraded: ev.degraded, error: ev.error, capped: ev.capped,
+    });
+  }
+
+  // Migration probe: without the reconcile columns the upsert must stay byte-for-byte the old shape.
+  const schema = await probeReconcileSchema(db).catch(() => ({ columns: false, runsTable: false }));
+
+  // Rows absent BEFORE this run (to count restorations). Only meaningful with the columns present.
+  const previouslyAbsent = new Set<string>();
+  if (schema.columns) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from('grants_cache').select('opp_number').not('absent_since', 'is', null).order('opp_number').range(from, from + 999);
+      if (error) { console.error('[grants:ingest] previously-absent read failed:', error.message); break; }
+      for (const r of (data || []) as Array<{ opp_number: string }>) previouslyAbsent.add(r.opp_number);
+      if (!data || data.length < 1000) break;
+    }
   }
 
   // Dedupe by opp_number BEFORE upsert — ON CONFLICT can't touch a row twice in one statement, and
   // a grant could theoretically appear under two fetches. Keep the last occurrence.
   const byId = new Map<string, Record<string, unknown>>();
   for (const r of rows) byId.set(r.opp_number as string, r);
-  const deduped = [...byId.values()];
+  const deduped = [...byId.values()].map((r) =>
+    // Seen in this snapshot → last_seen_at now, and any earlier absence is cleared (restored).
+    schema.columns ? { ...r, last_seen_at: nowIso, absent_since: null, superseded_by: null } : r,
+  );
 
   let upserted = 0;
+  let upsertFailed = false;
   for (let i = 0; i < deduped.length; i += 500) {
     const chunk = deduped.slice(i, i + 500);
     const { error } = await db.from('grants_cache').upsert(chunk, { onConflict: 'opp_number' });
-    if (error) { console.error(`[grants:ingest] upsert failed (${chunk.length}): ${error.message}`); degraded = true; continue; }
+    if (error) { console.error(`[grants:ingest] upsert failed (${chunk.length}): ${error.message}`); degraded = true; upsertFailed = true; continue; }
     upserted += chunk.length;
   }
 
-  return { fetched: rows.length, placed, unplaced, upserted, perStatus, degraded };
+  // A failed upsert chunk means some SEEN rows were not refreshed — treat the run as incomplete.
+  const complete = runIsComplete(completeness) && !upsertFailed;
+
+  let reconcile: ReconcileResult;
+  if (!schema.columns) {
+    reconcile = { ran: false, reason: 'reconcile migration not applied (grants_cache columns missing) — upsert-only', markedAbsent: 0, actionableMarkedAbsent: 0, superseded: 0, restored: 0 };
+  } else {
+    // Stable identity: Grants.gov opportunity id → the number it is listed under in THIS snapshot.
+    const seenIds = new Map<string, string>();
+    for (const r of byId.values()) { const gid = grantsGovIdFromUrl(r.url); if (gid) seenIds.set(gid, r.opp_number as string); }
+    reconcile = await reconcileAbsentGrants(db, { complete, seen: new Set(byId.keys()), previouslyAbsent, nowIso, seenIds }, opts.reconcile)
+      .catch((e) => ({ ran: false, reason: `reconcile error: ${(e as Error).message}`, markedAbsent: 0, actionableMarkedAbsent: 0, superseded: 0, restored: 0 }));
+    if (!complete && reconcile.reason?.startsWith('run not proven complete')) {
+      const why = Object.entries(completeness).filter(([, c]) => !c.complete).map(([st, c]) => `${st}: ${c.reason}`);
+      if (upsertFailed) why.push('upsert: a chunk failed');
+      reconcile = { ...reconcile, reason: `run not proven complete — nothing marked absent (${why.join('; ')})` };
+    }
+  }
+
+  let confirm: ConfirmResult | null = null;
+  if (schema.columns) {
+    confirm = await confirmAbsentGrants(db, { limit: opts.confirmLimit ?? 40, nowIso, fetchImpl: opts.fetchImpl })
+      .catch((e) => { console.error('[grants:confirm] failed:', (e as Error).message); return null; });
+  }
+
+  // Persist the run's evidence (best-effort; missing table → logged skip, never fails the ingest).
+  if (schema.runsTable) {
+    const { error } = await db.from('grants_ingest_runs').insert({
+      started_at: nowIso, complete, degraded,
+      per_status: completeness, reconcile, confirm,
+      error: upsertFailed ? 'one or more upsert chunks failed' : null,
+    });
+    if (error) console.error('[grants:ingest] run record insert failed:', error.message);
+  } else {
+    console.warn('[grants:ingest] grants_ingest_runs missing — run evidence not persisted (migration not applied)');
+  }
+
+  return { fetched: rows.length, placed, unplaced, upserted, perStatus, degraded, completeness, complete, schema, reconcile, confirm };
 }

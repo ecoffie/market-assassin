@@ -1,0 +1,119 @@
+{
+  "measuredAt": "2026-09-26T22:38:57.051Z",
+  "complete": true,
+  "completeness": {
+    "posted": {
+      "expected": 925,
+      "fetchedUnique": 925,
+      "pages": 10,
+      "degraded": false,
+      "error": null,
+      "complete": true,
+      "reason": null
+    },
+    "forecasted": {
+      "expected": 611,
+      "fetchedUnique": 611,
+      "pages": 7,
+      "degraded": false,
+      "error": null,
+      "complete": true,
+      "reason": null
+    }
+  },
+  "cache": {
+    "rows": 2227,
+    "tracked": 2227,
+    "actionableBefore": 1639
+  },
+  "wouldMarkAbsent": 691,
+  "wouldMarkAbsentActionable": 103,
+  "wouldMarkAbsentOnMap": 103,
+  "breaker": {
+    "fraction": 0.2,
+    "trips": false
+  },
+  "reconcileWouldRun": true,
+  "confirmationSample": [
+    {
+      "opp": "22-537",
+      "source": "archived"
+    },
+    {
+      "opp": "22-570",
+      "source": "archived"
+    },
+    {
+      "opp": "22-605",
+      "source": "archived"
+    },
+    {
+      "opp": "22-606",
+      "source": "archived"
+    },
+    {
+      "opp": "22-622",
+      "source": "archived"
+    },
+    {
+      "opp": "22-627",
+      "source": "archived"
+    },
+    {
+      "opp": "23-519",
+      "source": "archived"
+    },
+    {
+      "opp": "23-611",
+      "source": "archived"
+    },
+    {
+      "opp": "23-612",
+      "source": "archived"
+    },
+    {
+      "opp": "23-621",
+      "source": "archived"
+    },
+    {
+      "opp": "24-539",
+      "source": "archived"
+    },
+    {
+      "opp": "24-543",
+      "source": "archived"
+    },
+    {
+      "opp": "24-551",
+      "source": "archived"
+    },
+    {
+      "opp": "24-560",
+      "source": "archived"
+    },
+    {
+      "opp": "24-562",
+      "source": "archived"
+    },
+    {
+      "opp": "24-563",
+      "source": "archived"
+    },
+    {
+      "opp": "24-602",
+      "source": "archived"
+    },
+    {
+      "opp": "25-509",
+      "source": "archived"
+    },
+    {
+      "opp": "25-538",
+      "source": "archived"
+    },
+    {
+      "opp": "CDC-RFA-CK-26-0197",
+      "source": "archived"
+    }
+  ]
+}

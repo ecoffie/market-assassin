@@ -4,6 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { applyGrantsVisibility, effectiveGrantStatus, grantVerification, isMissingSchemaError, type GrantVerification } from '@/lib/grants/reconcile';
 import { naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from './map-filters';
 import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
@@ -199,6 +200,14 @@ export type MapOpp = {
   // shows it WITHOUT the ≈ glyph, unlike an open opp's modeled M-Estimate. '' when the agency
   // published no value (2.4%) → the card shows an honest "Estimate pending", never a fabricated one.
   estRange?: string;
+  // Grants only (src/lib/grants/reconcile.ts): what this pin can honestly say about itself — 'listed' in the
+  // latest snapshot, or absent from it and unverified / confirmed live / ambiguous not-found. Never 'closed':
+  // source-confirmed closed/archived rows are not returned as pins at all.
+  verification?: GrantVerification;
+  /** Grants only: earlier Grants.gov numbers of THIS grant (rows superseded by it). The old records are
+   *  kept in grants_cache with superseded_by → this number, so a search or saved pursuit under the old
+   *  number can be resolved to the current listing. */
+  formerly?: string[];
 };
 
 /**
@@ -690,28 +699,56 @@ export async function getGrantsViewportPins(
 ): Promise<MapOpp[]> {
   const sb = getReadClient();
   const todayIso = new Date().toISOString().slice(0, 10);
-  const { data, error } = await sb
-    .from('grants_cache')
-    .select('opp_number, title, agency, agency_code, status, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source')
-    .not('map_lat', 'is', null)
-    .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
-    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
-    // Actionable only: a future/rolling deadline (posted still open) OR a forecasted grant (not yet
-    // open → no close_date). Expired POSTED grants (past close_date) are dropped as noise.
-    .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`)
+  const BASE_COLS = 'opp_number, title, agency, agency_code, status, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source';
+  const query = (withReconcile: boolean) => {
+    let q = sb
+      .from('grants_cache')
+      .select(withReconcile ? `${BASE_COLS}, absent_since, source_status, superseded_by` : BASE_COLS)
+      .not('map_lat', 'is', null)
+      .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
+      .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+      // Actionable only: a future/rolling deadline (posted still open) OR a forecasted grant (not yet
+      // open → no close_date). Expired POSTED grants (past close_date) are dropped as noise.
+      .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`);
+    // Reconcile (src/lib/grants/reconcile.ts): hide ONLY source-confirmed closed/archived rows and renumbered
+    // duplicates. Absent-but-unverified / lookup-failed / ambiguous not_found rows stay visible (labelled).
+    if (withReconcile) q = applyGrantsVisibility(q);
     // Order by posted/open date DESC (newest first) — NOT close_date. Forecasted grants have no
     // close_date, so a close_date sort dumped ALL 502 of them past the 1,000-pin cap → they never
     // rendered on a wide viewport. posted_date is populated for both statuses, so newest-first keeps
     // posted + forecasted interleaved and both visible. (The card still shows the deadline.)
-    .order('posted_date', { ascending: false, nullsFirst: false })
-    .limit(limit);
+    return q.order('posted_date', { ascending: false, nullsFirst: false }).limit(limit);
+  };
+  let { data, error } = await query(true);
+  if (error && isMissingSchemaError(error)) {
+    // Reconcile migration not applied yet → today's behaviour exactly (never an error, never hiding).
+    console.warn('[grants-map] reconcile columns missing — serving without the absence filter');
+    ({ data, error } = await query(false));
+  }
   if (error) throw new Error(`getGrantsViewportPins: ${error.message}`);
 
+  // Preserve references: for each visible grant, the older numbers that were superseded by it.
+  const formerly = new Map<string, string[]>();
+  const rowsRead = (data || []) as unknown as Array<Record<string, unknown>>;
+  if (rowsRead.length && 'superseded_by' in rowsRead[0]) {
+    const sols = rowsRead.map((r) => String(r.opp_number ?? '').trim()).filter(Boolean);
+    for (let i = 0; i < sols.length; i += 200) {
+      const { data: prev, error: prevErr } = await sb.from('grants_cache')
+        .select('opp_number, superseded_by').in('superseded_by', sols.slice(i, i + 200));
+      // Degrade to no back-references (never an error on the map); the old rows are still kept.
+      if (prevErr) { console.error('[grants-map] formerly lookup failed:', prevErr.message); break; }
+      for (const p of (prev || []) as Array<{ opp_number: string; superseded_by: string }>) {
+        formerly.set(p.superseded_by, [...(formerly.get(p.superseded_by) || []), p.opp_number]);
+      }
+    }
+  }
+
   const out: MapOpp[] = [];
-  for (const r of (data || []) as Array<Record<string, unknown>>) {
+  for (const r of rowsRead) {
     const oppNumber = String(r.opp_number ?? '').trim();
     if (!oppNumber) continue;
-    const forecasted = String(r.status || '') === 'forecasted';
+    const forecasted = effectiveGrantStatus(r) === 'forecasted';
+    const withReconcileRows = 'absent_since' in r;
     out.push({
       id: 'gr-' + oppNumber,
       title: String(r.title || 'Federal grant'),
@@ -729,6 +766,8 @@ export async function getGrantsViewportPins(
       src: 'GRANTS',
       locSrc: 'office',                // always agency-HQ approximate (never a real PoP)
       est: Number(r.award_ceiling) || 0,
+      ...(withReconcileRows ? { verification: grantVerification(r) } : {}),
+      ...(formerly.has(oppNumber) ? { formerly: formerly.get(oppNumber)!.sort() } : {}),
     });
   }
   return out;

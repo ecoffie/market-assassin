@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — Grants cache: stale rows reconciled only after a proven-complete ingest
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | Grants map / grants_cache | Ingest only upserted, so 103 unlisted grants stayed actionable on the map. Now: per-status completeness evidence (hitCount consistent & >0, unique==hitCount exact, no degraded page/error/cap), RUN-level completeness gates `absent_since`; breaker at 20%; records never deleted, restored when seen; `source_status` only from a well-formed fetchOpportunity answer (outage → unconfirmed); REVISED after review blocker: absence NEVER hides — absent/unverified, failed-lookup and ambiguous not_found rows stay VISIBLE (labelled `verification`); only source-confirmed closed/archived are hidden, plus `superseded_by` duplicates (same Grants.gov id re-listed under a new number — all 17 measured "live but missing" rows); grants-map reports `hidden` vs `visibleUncertain`; safe no-op without the migration (`20260926_grants_cache_reconcile.sql`, NOT applied). Record: tasks/grants-cache-reconcile-2026-09-26.md | `export function runIsComplete` → `src/lib/grants/reconcile.ts` | reconcile.unit (23) + reconcile-read-path.unit (6) + PAR-26-120 regression (7); mutations: old hide-on-absence rule → 7 red, no identity → 1, not_found-as-closed → 4, failed-lookup-as-not_found → 2; negative test (distinct grants, similar titles → never merged) + 5 replacement-proof declines + `formerly` back-reference (mutations: id-only 5 red, no id-match 1, no map check 1, no formerly 1); read-only prod dry run (all 103 classified, complete 925/925 + 611/611): 97 hidden (17 duplicate copies, each with its live replacement visible; 80 confirmed closed/archived), 6 unresolved retained & marked unverified; 17/17 duplicates independently confirmed by Grants.gov fetchOpportunity naming the new number | 🟡 PR |
+
+---
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

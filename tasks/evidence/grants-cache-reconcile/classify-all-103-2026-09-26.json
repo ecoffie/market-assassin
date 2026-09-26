@@ -1,0 +1,933 @@
+{
+ "measured_at": "2026-09-26T22:54:26.859Z",
+ "today": "2026-09-26",
+ "rows": [
+  {
+   "opp_number": "PAR-26-120",
+   "cached_status": "forecasted",
+   "synced": "2026-09-25",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PD-22-1529",
+   "cached_status": "posted",
+   "synced": "2026-09-25",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-124",
+   "cached_status": "forecasted",
+   "synced": "2026-09-25",
+   "http": 200,
+   "source_status": "forecast",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-24-7791",
+   "cached_status": "posted",
+   "synced": "2026-09-25",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-073",
+   "cached_status": "forecasted",
+   "synced": "2026-09-25",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-126",
+   "cached_status": "forecasted",
+   "synced": "2026-09-25",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "23-612",
+   "cached_status": "posted",
+   "synced": "2026-09-24",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "FR-CRS-23-005",
+   "cached_status": "posted",
+   "synced": "2026-09-23",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-24-110Z",
+   "cached_status": "posted",
+   "synced": "2026-09-22",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "NM-PMO1726",
+   "cached_status": "posted",
+   "synced": "2026-09-22",
+   "http": 200,
+   "source_status": "UNCONFIRMED",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "23-519",
+   "cached_status": "posted",
+   "synced": "2026-09-18",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-18-7607",
+   "cached_status": "posted",
+   "synced": "2026-09-18",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-18-1517",
+   "cached_status": "posted",
+   "synced": "2026-09-18",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-18-7564",
+   "cached_status": "posted",
+   "synced": "2026-09-18",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "22-627",
+   "cached_status": "posted",
+   "synced": "2026-09-17",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "22-606",
+   "cached_status": "posted",
+   "synced": "2026-09-17",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "RFA-DK-27-102",
+   "cached_status": "forecasted",
+   "synced": "2026-09-17",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "22-605",
+   "cached_status": "posted",
+   "synced": "2026-09-17",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-602",
+   "cached_status": "posted",
+   "synced": "2026-09-16",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-560",
+   "cached_status": "posted",
+   "synced": "2026-09-16",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "IVV-FT-OPP-07282026150823",
+   "cached_status": "posted",
+   "synced": "2026-09-09",
+   "http": 200,
+   "source_status": "UNCONFIRMED",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "IVV-FT-OPP-07282026160054",
+   "cached_status": "posted",
+   "synced": "2026-09-09",
+   "http": 200,
+   "source_status": "UNCONFIRMED",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "OFOP0003762",
+   "cached_status": "posted",
+   "synced": "2026-09-09",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "HHS-2026-IHS-ETHIC-0001",
+   "cached_status": "forecasted",
+   "synced": "2026-09-05",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "HHS-2025-IHS-ALZ-0001",
+   "cached_status": "forecasted",
+   "synced": "2026-09-05",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PAR-25-228",
+   "cached_status": "posted",
+   "synced": "2026-09-04",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-98-1680",
+   "cached_status": "posted",
+   "synced": "2026-09-04",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-98-1670",
+   "cached_status": "posted",
+   "synced": "2026-09-04",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-98-1610",
+   "cached_status": "posted",
+   "synced": "2026-09-04",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-25-229",
+   "cached_status": "posted",
+   "synced": "2026-09-04",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1650",
+   "cached_status": "posted",
+   "synced": "2026-09-04",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "FOR-AI-27-017",
+   "cached_status": "forecasted",
+   "synced": "2026-09-03",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "FOR-RFA-AG-26-024",
+   "cached_status": "forecasted",
+   "synced": "2026-09-01",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "W911NF26RA009",
+   "cached_status": "forecasted",
+   "synced": "2026-09-01",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "VPL-01-23",
+   "cached_status": "posted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-114",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-104",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "RFA-CA-25-033",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "RFA-NS-26-011",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-069",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-25-454",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PAR-26-051",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "FOR-RFA-AG-26-012",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-093",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-043",
+   "cached_status": "forecasted",
+   "synced": "2026-08-31",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-563",
+   "cached_status": "posted",
+   "synced": "2026-08-29",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "22-622",
+   "cached_status": "posted",
+   "synced": "2026-08-29",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-551",
+   "cached_status": "posted",
+   "synced": "2026-08-28",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "22-537",
+   "cached_status": "posted",
+   "synced": "2026-08-26",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "22-570",
+   "cached_status": "posted",
+   "synced": "2026-08-26",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-07-5376",
+   "cached_status": "posted",
+   "synced": "2026-08-22",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "23-611",
+   "cached_status": "posted",
+   "synced": "2026-08-21",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-539",
+   "cached_status": "posted",
+   "synced": "2026-08-21",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-543",
+   "cached_status": "posted",
+   "synced": "2026-08-21",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "25-538",
+   "cached_status": "posted",
+   "synced": "2026-08-20",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "25-509",
+   "cached_status": "posted",
+   "synced": "2026-08-20",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "NOAA-NESDISPO-STAR-2024-27967",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "not_found",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PD-25-342Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-25-058Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-19-073Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-19-072Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-19-006Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-030",
+   "cached_status": "forecasted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-19-1630",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-19-7479",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PAR-26-027",
+   "cached_status": "forecasted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "posted",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-27-066",
+   "cached_status": "forecasted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-229Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-22-7569",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-19-088Y",
+   "cached_status": "posted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PAR-26-128",
+   "cached_status": "forecasted",
+   "synced": "2026-08-19",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "23-621",
+   "cached_status": "posted",
+   "synced": "2026-08-18",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "RFA-NS-26-009",
+   "cached_status": "forecasted",
+   "synced": "2026-08-18",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "P16AS00337",
+   "cached_status": "posted",
+   "synced": "2026-08-14",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "P16AS00322",
+   "cached_status": "posted",
+   "synced": "2026-08-14",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "P16AS00333",
+   "cached_status": "posted",
+   "synced": "2026-08-14",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "P12AC10113",
+   "cached_status": "posted",
+   "synced": "2026-08-14",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "P11AT80708",
+   "cached_status": "posted",
+   "synced": "2026-08-14",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "P11AT80752",
+   "cached_status": "posted",
+   "synced": "2026-08-14",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1415",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1417",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PD-23-7644",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "P17AS00001",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1403",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-5345",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-5342",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1491",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1401",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1407",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": true
+  },
+  {
+   "opp_number": "PD-20-1440",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-20-7909",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1443",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1179",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-7643",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-7236",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-1406",
+   "cached_status": "posted",
+   "synced": "2026-08-13",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "HRSA-27-029",
+   "cached_status": "forecasted",
+   "synced": "2026-08-12",
+   "http": 200,
+   "source_status": "not_found",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "R26AS00016",
+   "cached_status": "posted",
+   "synced": "2026-08-11",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "HHS-2026-ACL-AOD-TBSG-0019",
+   "cached_status": "forecasted",
+   "synced": "2026-08-06",
+   "http": 200,
+   "source_status": "not_found",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "R25AS00280",
+   "cached_status": "posted",
+   "synced": "2026-08-03",
+   "http": 200,
+   "source_status": "closed",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "CDC-RFA-CK-26-0197",
+   "cached_status": "forecasted",
+   "synced": "2026-08-03",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "PD-23-5115",
+   "cached_status": "posted",
+   "synced": "2026-07-31",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  },
+  {
+   "opp_number": "24-562",
+   "cached_status": "posted",
+   "synced": "2026-07-31",
+   "http": 200,
+   "source_status": "archived",
+   "err": "",
+   "in_early12": false
+  }
+ ]
+}
