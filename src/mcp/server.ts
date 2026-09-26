@@ -538,14 +538,14 @@ server.registerTool(
     title: 'Search SBIR/STTR',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'SBIR/STTR small-business R&D from NIH RePORTER (awarded projects — who won what) + a multisite aggregate ' +
-      'of open notices. source="nih" = awarded NIH projects; source="multisite"/"all" = open notices. Filter by ' +
-      'keyword / agency / phase. grounded=false when nothing matches — try source="all".',
+      'SBIR/STTR OPEN TOPICS and AWARD HISTORY in separate lists. open_topics = still biddable (deadline today ' +
+      'or later). award_history = projects NIH already FUNDED — never biddable. coverage.statement says whether ' +
+      'open topics could be established; sources[] reports each source ok/empty/error/timeout/unavailable.',
     inputSchema: {
       keyword: z.string().optional().describe('Search term, e.g. "machine learning".'),
       agency: z.string().optional().describe('NIH institute (NCI, NIAID) or broad agency (NSF, DOD).'),
       phase: z.enum(['1', '2', 'all']).optional().describe('SBIR/STTR phase (default all).'),
-      source: z.enum(['nih', 'dod', 'multisite', 'all']).optional().describe('Data source: nih=awarded NIH projects; dod=open DoD SBIR/STTR topics; multisite=open notices; all.'),
+      source: z.enum(['nih', 'dod', 'multisite', 'all']).optional().describe('all (default) = everything, labeled; dod = open DoD topics; nih = awarded NIH projects (history only); multisite = aggregated rows, labeled.'),
       limit: z.number().int().min(1).max(50).optional().describe('Max results (default 25).'),
     },
   },
