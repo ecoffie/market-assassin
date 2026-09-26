@@ -67,6 +67,16 @@ So the retired `sbir_sttr` slice is now excluded at the fetch. Evidence:
 - the cron reports `success` while generation fails 100% — the *dead operation reported as success*
   class.
 
+## Current `main` merged in (2026-09-26) — inventory retirement
+
+After #1710 branched, `main` gained #1709 (data-inventory truth). That PR's inventory named `search_sbir`
+as the customer surface of `research_funding` and `dod_sbir_topics`, and its test requires every named
+tool to exist. With current `main`, #1710 therefore failed `inventory-truth`, independent of #1713.
+
+`main` is now merged in, and both corpora are `withheld` with `tools: []`. The notes say the search
+was retired, and that the research corpus is still read internally by the AI briefing generator,
+with `sbir_sttr` excluded. Rows are kept.
+
 ## #1708 — closed unmerged
 
 The instruction: keep #1708 only for repairs that retained consumers still need.
