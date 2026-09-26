@@ -36,6 +36,8 @@ import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { runMeteredTool } from '@/lib/mcp/metered';
 import { maybeAutoRecharge } from '@/lib/mcp/autorecharge';
 import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
+import { matchRetiredToolCall, retiredToolJsonRpcResponse } from '@/lib/mcp/retired-tools';
+import { logCall } from '@/lib/mcp/credits';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -275,8 +277,34 @@ const baseHandler = createMcpHandler(
  * Returning undefined makes withMcpAuth answer 401 with a WWW-Authenticate
  * challenge whose resource_metadata points clients at the OAuth flow.
  */
+/**
+ * Stale clients calling a RETIRED tool (retired-tools.ts) get a clear "retired, 0 credits" result
+ * here — after auth, before the SDK. The tool is not registered, so without this the SDK would
+ * answer a bare "Tool not found" protocol error. Nothing is run and nothing is debited; the call is
+ * logged as 'retired' so stale clients are visible. Any other request passes through untouched.
+ */
+async function answerRetiredToolCalls(req: Request): Promise<Response> {
+  if (req.method !== 'POST') return baseHandler(req);
+  let body: unknown;
+  try {
+    body = await req.clone().json();
+  } catch {
+    return baseHandler(req);
+  }
+  const match = matchRetiredToolCall(body);
+  if (!match) return baseHandler(req);
+  const identity = (req as Request & { auth?: { extra?: { userEmail?: string; keyId?: string | null } } }).auth?.extra;
+  if (identity?.userEmail) {
+    await logCall({ userEmail: identity.userEmail, toolName: match.name, status: 'retired', creditsCharged: 0, apiKeyId: identity.keyId ?? null });
+  }
+  return new Response(JSON.stringify(retiredToolJsonRpcResponse(match)), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 const handler = withMcpAuth(
-  baseHandler,
+  answerRetiredToolCalls,
   async (_req, bearerToken) => {
     // 1) OAuth access token (keyless).
     const claims = verifyAccessToken(bearerToken);

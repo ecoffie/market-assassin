@@ -32,7 +32,6 @@ import { getAgencyIntel } from '@/mcp/tools/agency-intel';
 import { getLegislationStatus } from '@/mcp/tools/legislation-status';
 import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
-import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
 import { lookupSolicitationTool } from '@/mcp/tools/lookup-solicitation';
@@ -116,7 +115,6 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   // 8 — PATHWAY FIT: two-sided match of CAI doors to company public record.
   match_company_to_pathways: 8,
   search_grants: 5,
-  search_sbir: 5,
   search_idv_contracts: 5,
   search_past_contracts: 5,
   get_keyword_coverage: 5,
@@ -542,28 +540,6 @@ const FORECASTS_TOOL_DEF = {
         fiscal_year: { type: 'string', description: 'Fiscal year, "FY2026" or "2026".' },
         keyword: { type: 'string', description: 'Free-text over title + description.' },
         limit: { type: 'number', description: 'Max results (default 25, max 200).' },
-      },
-    },
-  },
-};
-
-const SBIR_TOOL_DEF = {
-  type: 'function' as const,
-  function: {
-    name: 'search_sbir',
-    description:
-      'SBIR/STTR small-business R&D opportunities from NIH RePORTER (awarded projects — competitive intel on ' +
-      'who won what) + a multisite aggregate of open notices. source="nih" = awarded NIH projects; ' +
-      'source="multisite"/"all" = open notices. Filter by keyword / agency / phase. Returns title, agency, ' +
-      'phase, amount, organization, dates. grounded=false when nothing matches — try source="all".',
-    parameters: {
-      type: 'object',
-      properties: {
-        keyword: { type: 'string', description: 'Search term, e.g. "machine learning" or "vaccine".' },
-        agency: { type: 'string', description: 'NIH institute (NCI, NIAID, …) or broad agency (NSF, DOD, …).' },
-        phase: { type: 'string', enum: ['1', '2', 'all'], description: 'SBIR/STTR phase (default all).' },
-        source: { type: 'string', enum: ['nih', 'dod', 'multisite', 'all'], description: 'Data source: nih=awarded NIH projects; dod=open DoD SBIR/STTR topics; multisite=open notices; all.' },
-        limit: { type: 'number', description: 'Max results (default 25, max 50).' },
       },
     },
   },
@@ -1930,7 +1906,6 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     AGENCY_INTEL_TOOL_DEF,
     GRANTS_TOOL_DEF,
     FORECASTS_TOOL_DEF,
-    SBIR_TOOL_DEF,
     FIND_OPPORTUNITIES_TOOL_DEF,
     LOOKUP_SOLICITATION_TOOL_DEF,
     CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF,
@@ -1999,7 +1974,6 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_intel' ||
     name === 'search_grants' ||
     name === 'get_agency_forecasts' ||
-    name === 'search_sbir' ||
     name === 'find_opportunities' ||
     name === 'lookup_solicitation' ||
     name === 'get_current_acquisition_intelligence' ||
@@ -2211,18 +2185,6 @@ export async function runMcpTool(
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
-
-  if (name === 'search_sbir') {
-    const result = (await sbirSearch({
-      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
-      agency: typeof args.agency === 'string' ? args.agency : undefined,
-      phase: args.phase === '1' || args.phase === '2' || args.phase === 'all' ? args.phase : undefined,
-      source: args.source === 'nih' || args.source === 'dod' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
-      limit: typeof args.limit === 'number' ? args.limit : undefined,
-    })) as unknown as Record<string, unknown>;
-    return { result, credits };
-  }
-
 
   if (name === 'understand_customer') {
     const result = (await understandCustomerTool({
