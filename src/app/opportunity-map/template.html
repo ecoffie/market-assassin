@@ -945,6 +945,7 @@ function resize(){
   var _s1=map.getSize(); if(_s0.x!==_s1.x||_s0.y!==_s1.y)window.__btrace('resize',{from:_s0.x+'x'+_s0.y,to:_s1.x+'x'+_s1.y});
 }
 [0,50,120,250,450,800,1400].forEach(t=>setTimeout(resize,t));
+window.__mapSyncSize=resize;   // #1696: boot syncs the map to its container before the first discovery round
 /* Zillow opens to YOUR area, not the whole world (Eric 2026-08-04). The boot fitView() fit all
    markers — including global outliers — so the map opened at world zoom. BOOT_VIEW_JS now owns the
    initial view (centers on the signed-in user's home state, else CONUS); this load handler only

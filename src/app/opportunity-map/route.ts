@@ -16,6 +16,7 @@ import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } f
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
 import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
+import { LAYOUT_MOVE_JS } from './layout-move';
 
 export const dynamic = 'force-dynamic';
 
@@ -2569,6 +2570,8 @@ const VIEWPORT_JS = `<script>
     // RESUME PROVENANCE (#1697) — same seam, same reason: the "Picked up where you left off" pill
     // leaves on the first round whose market is no longer the restored one.
     try{ if(window.__checkResumeProvenance)window.__checkResumeProvenance(); }catch(e){}
+    // #1696: the bbox this round asks for — a later LAYOUT move inside it needs no new round (layout-move.ts).
+    try{ window.__lastRoundBox=bbox().split(',').map(Number); }catch(e){ window.__lastRoundBox=null; }
     // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
     // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
     if(typeof _clearFetchError==='function')_clearFetchError();
@@ -3372,8 +3375,27 @@ const VIEWPORT_JS = `<script>
   // BOOT_VIEW_JS, which is injected after this block — hence the typeof guard; by the time a
   // moveend can fire, it exists). Saved un-debounced: a cheap localStorage write, and the last
   // moveend of a pan/zoom is the one that sticks.
+  // #1696 — a LAYOUT move is not navigation (layout-move.ts). When only the container size changed (centre
+  // and zoom unchanged), the move starts a round only if it exposed area the last round did not ask for —
+  // and never before boot releases (the release round reads the view as it is then). A layout move also
+  // leaves a pending pan fetch alone. Real pans and zooms take the unchanged path below.
+  var _lastMoveView=null;
   map.on('moveend',function(){ try{ if(typeof window.__saveMapView==='function')window.__saveMapView(); }catch(e){}
-    try{ window.__btrace&&window.__btrace('moveend',{bbox:map.getBounds().toBBoxString(),z:map.getZoom(),size:map.getSize().x+'x'+map.getSize().y}); }catch(e){}
+    var kind='navigate';
+    try{
+      var _z=map.getZoom(), _p=map.project(map.getCenter(),_z), _v={x:_p.x,y:_p.y,z:_z};
+      if(window.__mapMoveKind)kind=window.__mapMoveKind(_lastMoveView,_v);
+      _lastMoveView=_v;
+    }catch(e){}
+    var skip=false;
+    if(kind==='layout'&&window.__layoutMoveNeedsFetch){
+      try{
+        var _b=map.getBounds(), _view=[_b.getWest(),_b.getSouth(),_b.getEast(),_b.getNorth()];
+        skip=!!window.__drawBounds || !window.__layoutMoveNeedsFetch(!window.__suppressFetchView, window.__lastRoundBox||null, _view);
+      }catch(e){ skip=false; }
+    }
+    try{ window.__btrace&&window.__btrace('moveend',{kind:kind,skip:skip,bbox:map.getBounds().toBBoxString(),z:map.getZoom(),size:map.getSize().x+'x'+map.getSize().y}); }catch(e){}
+    if(skip)return;
     clearTimeout(t); t=setTimeout(function(){ fetchView({pan:true}); },450); });   // a pan/zoom — never acknowledged as an action (market-feedback.ts)
   // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
   // buckets collapse/expand, but the rows in hand are still valid — so re-run render() on the
@@ -9064,8 +9086,16 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Desktop is unaffected (body.m-map is a no-op there — the mobile chrome is display:none).
   // Scoped to ?src=alert ONLY: a normal mobile visit keeps its existing list-first default,
   // which is a deliberate small-screen choice, not a bug.
-  function finishBoot(){ try{ window.__btrace&&window.__btrace('boot-release',{bbox:(M()&&M().getBounds().toBBoxString())||''}); }catch(e){} releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
-  function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
+  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
+  // #1696: resolve the layout BEFORE the first round. The container settles early, but the Leaflet map kept
+  // an older size until the template's next resize() tick — AFTER release — so round 1 read a stale bbox and
+  // the catch-up resize fired a second full round. Sync first (the resulting moveend is a layout move before
+  // release, which never fetches), then release: round 1 reads the settled view. Every release path
+  // (map-home answered, anonymous boot, the 4 s failsafe) goes through here.
+  function releaseFit(){
+    try{ if(typeof window.__mapSyncSize==='function')window.__mapSyncSize(); }catch(e){}
+    try{ window.__btrace&&window.__btrace('boot-release',{bbox:(M()&&M().getBounds().toBBoxString())||''}); }catch(e){}
+    window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
     var m=M();
     if(m){
@@ -10537,7 +10567,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
