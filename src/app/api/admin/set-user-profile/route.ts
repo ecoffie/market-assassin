@@ -1,3 +1,4 @@
+import { KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isKnownNaicsCode, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
@@ -58,7 +59,11 @@ export async function POST(request: NextRequest) {
     update.naics_codes = persist.codes;
   }
   if (Array.isArray(body.keywords)) {
-    update.keywords = Array.from(new Set(body.keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean))).slice(0, 30);
+    const kws = Array.from(new Set(body.keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean)));
+    if (kws.length > KEYWORD_MAX_COUNT) {
+      return NextResponse.json({ success: false, error: keywordLimitError(kws.length) }, { status: 400 });
+    }
+    update.keywords = kws;
   }
   // PSC only written when a psc_codes column exists — guarded so a missing column
   // doesn't fail the whole write. Try it; on column error, retry without it.

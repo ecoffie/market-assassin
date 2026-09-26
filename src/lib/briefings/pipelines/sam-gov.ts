@@ -10,17 +10,21 @@
 
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { CURATED_EXACT_CODES } from '@/lib/utils/naics-expansion';
-import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import { sanitizeKeywords, distinctiveKeywords } from '@/lib/market/keyword-sanitize';
 import {
   filterMarketToSavedIndustry,
   keywordIncludeTerms,
   preferDistinctiveInOpenMarket,
-  scoreContractDKeywords,
+  keywordEvidence,
+  scoreKeywordEvidence,
+  hasKeywordSupport,
+  type KeywordEvidence,
   type OpenKeywordOutcome,
 } from '@/lib/alerts/open-contract-d';
+import { matchProfileAgencies } from '@/lib/alerts/agency-match';
 // Aliased: this file already has a LOCAL classifyNoticeType (summary buckets).
 // This is the authoritative RESPONDABILITY classifier ('bid'|'response'|'none').
-import { classifyNoticeType as classifyRespondability } from '@/lib/utils/notice-type';
+import { classifyNoticeType as classifyRespondability, type Respondability } from '@/lib/utils/notice-type';
 
 // Initialize Supabase client for cached opportunities.
 // READ REPLICA (Resilience Phase 1): this module ONLY reads sam_opportunities
@@ -117,8 +121,24 @@ interface SAMSearchResult {
   keywordMatchCount?: number;
   distinctiveMatchCount?: number;
   openKeywordOutcome?: OpenKeywordOutcome;
+  /** Rows of the NAICS/PSC market examined before keyword preference (keyword profiles only). */
+  marketRowsScanned?: number;
+  /** True when the market exceeded MAX_PREFER_SCAN_ROWS — keyword matches past it were not examined. */
+  scanTruncated?: boolean;
   fetchedAt: string;
 }
+
+/**
+ * Bound on how much of a NAICS/PSC market is read to find keyword matches.
+ * Keyword preference used to run on the first `limit` (200) rows ordered by
+ * deadline, so any match past row 200 was discarded before it was ever checked —
+ * on one real profile (780-row market) 57 of 78 keyword matches. Reading the
+ * whole market fixes that; this cap only exists so a pathological market cannot
+ * turn one alert into an unbounded scan, and hitting it is reported
+ * (`scanTruncated`), never silent.
+ */
+export const MAX_PREFER_SCAN_ROWS = 4000;
+const PREFER_SCAN_PAGE = 1000;
 
 interface SAMNoticeSummary {
   totalMatched: number;
@@ -592,48 +612,60 @@ function isVAOpportunity(opportunity: SAMOpportunity): boolean {
   return /VETERANS AFFAIRS|\bVA\b/.test(agency);
 }
 
+export interface OpportunityScoreProfile {
+  naics_codes: string[];
+  agencies: string[];
+  keywords: string[];
+  business_description?: string | null;
+  setAsides?: string[];
+  business_type?: string | null;
+}
+
+/** Why a notice was selected and ranked — rendered in the alert, never recomputed there. */
+export interface OpportunityMatchEvidence {
+  naics: 'exact' | 'related' | null;
+  keywords: KeywordEvidence;
+  /** Profile agencies that name this buyer (anchored — see lib/alerts/agency-match). */
+  agencies: string[];
+  /** 'keyword' = at least one distinctive keyword found; 'market_only' = NAICS/PSC market with no keyword support. */
+  basis: 'keyword' | 'market_only';
+  stage: { label: string | null; respondability: Respondability };
+}
+
 /**
- * Score an opportunity for relevance to user's profile.
- *
- * Set-aside and agency ranking follow the rules in
- * docs/TODO-mindy-app-completion.md §5 ("Profile And Ranking Quality"):
- * - Boost Total Small Business / SB-friendly matches for users with any cert
- * - Penalize special set-asides (SDVOSB/VOSB/8a/WOSB/EDWOSB/HUBZone/Tribal)
- *   when the user doesn't hold that certification
- * - Downrank VA opportunities for non-veteran profiles (Sources Sought/RFI/
- *   Special Notice exempt — they stay visible as research signals)
+ * Stage penalty on the RANK only (not the displayed score). A Special Notice
+ * ("MTCCS II Ceiling Increase"), Presolicitation or Award has nothing to submit,
+ * so it must never outrank work the user can bid or respond to.
  */
-export function scoreOpportunity(
+const NOT_RESPONDABLE_RANK_PENALTY = 40;
+
+export function scoreOpportunityDetailed(
   opportunity: SAMOpportunity,
-  userProfile: {
-    naics_codes: string[];
-    agencies: string[];
-    keywords: string[];
-    business_description?: string | null;
-    setAsides?: string[];
-    business_type?: string | null;
-  }
-): number {
+  userProfile: OpportunityScoreProfile,
+): { score: number; rank: number; evidence: OpportunityMatchEvidence } {
   let score = 0;
 
   // NAICS match (highest weight)
+  let naics: OpportunityMatchEvidence['naics'] = null;
   if (userProfile.naics_codes.includes(opportunity.naicsCode)) {
     score += 40;
-  } else if (userProfile.naics_codes.some(n =>
+    naics = 'exact';
+  } else if (opportunity.naicsCode && userProfile.naics_codes.some(n =>
     opportunity.naicsCode.startsWith(n) || n.startsWith(opportunity.naicsCode)
   )) {
     score += 20; // Partial NAICS match
+    naics = 'related';
   }
 
-  // Agency match
-  const oppAgency = `${opportunity.department} ${opportunity.subTier}`.toLowerCase();
-  if (userProfile.agencies.some(a => oppAgency.includes(a.toLowerCase()))) {
-    score += 30;
-  }
+  // Agency match — anchored identity, never a substring ("NIST" ⊄ "ADMINISTRATION").
+  const agencies = matchProfileAgencies(userProfile.agencies, opportunity.department, opportunity.subTier);
+  if (agencies.length > 0) score += 30;
+
+  // Keyword evidence — title ≫ description, capped so boilerplate cannot stack.
+  const kw = keywordEvidence(opportunity.title, opportunity.description, userProfile.keywords);
+  score += scoreKeywordEvidence(kw);
 
   const oppText = `${opportunity.title} ${opportunity.description}`;
-  score += scoreContractDKeywords(oppText, userProfile.keywords);
-
   // Business description semantic-lite ranking.
   // Structured filters still decide inclusion; this only nudges ordering.
   const descriptionTerms = extractDescriptionTerms(userProfile.business_description);
@@ -663,8 +695,9 @@ export function scoreOpportunity(
     // No specific cert required — small Total Small Business / SBA / SBP bonus
     if (isTotalSmallBusiness(opportunity) && userCerts.size > 0) {
       score += 15;
-    } else if (opportunity.setAside) {
-      // Generic set-aside (e.g. Full and Open with preference) — small nudge
+    } else if (opportunity.setAside && !/^none$/i.test(opportunity.setAside)) {
+      // Generic set-aside (e.g. Full and Open with preference) — small nudge.
+      // 'NONE' is SAM's literal for NO set-aside and earns nothing.
       score += 5;
     }
   } else {
@@ -682,7 +715,42 @@ export function scoreOpportunity(
     score -= 15;
   }
 
-  return Math.max(0, Math.min(score, 100)); // Clamp to [0, 100]
+  const stage = classifyRespondability(opportunity.noticeType, opportunity.title);
+  const rank = score - (stage.respondability === 'none' ? NOT_RESPONDABLE_RANK_PENALTY : 0);
+
+  return {
+    // Displayed score stays 0–100. Ordering uses the UNCLAMPED rank: clamping
+    // was what tied 6 of 7 notices at 100 and left the order to the deadline.
+    score: Math.max(0, Math.min(score, 100)),
+    rank,
+    evidence: {
+      naics,
+      keywords: kw,
+      agencies,
+      basis: hasKeywordSupport(kw) ? 'keyword' : 'market_only',
+      stage: { label: stage.label, respondability: stage.respondability },
+    },
+  };
+}
+
+/**
+ * Score an opportunity for relevance to user's profile (0–100, for display).
+ *
+ * Set-aside and agency ranking follow the rules in
+ * docs/TODO-mindy-app-completion.md §5 ("Profile And Ranking Quality"):
+ * - Boost Total Small Business / SB-friendly matches for users with any cert
+ * - Penalize special set-asides (SDVOSB/VOSB/8a/WOSB/EDWOSB/HUBZone/Tribal)
+ *   when the user doesn't hold that certification
+ * - Downrank VA opportunities for non-veteran profiles (Sources Sought/RFI/
+ *   Special Notice exempt — they stay visible as research signals)
+ *
+ * Sort by scoreOpportunityDetailed().rank, not this: the clamp makes ties.
+ */
+export function scoreOpportunity(
+  opportunity: SAMOpportunity,
+  userProfile: OpportunityScoreProfile,
+): number {
+  return scoreOpportunityDetailed(opportunity, userProfile).score;
 }
 
 // Helper functions
@@ -917,31 +985,64 @@ export async function fetchSamOpportunitiesFromCache(
     // Explicit columns (not select('*')) — avoids pulling the wide raw_data JSONB
     // (~50KB/row) into memory on this hot per-user query. These are exactly the
     // fields the mapper below reads.
-    const query = applySamCacheFilters(
-      supabase
-        .from('sam_opportunities')
-        .select(
-          'notice_id, title, solicitation_number, naics_code, psc_code, description, ' +
-          'department, sub_tier, office, posted_date, response_deadline, archive_date, ' +
-          'set_aside_code, set_aside_description, notice_type, active, ' +
-          'pop_city, pop_state, pop_zip, pop_country, ui_link, last_modified'
-        )
-        .order('response_deadline', { ascending: true })
-        .limit(limit),
-      params
-    );
+    const COLUMNS =
+      'notice_id, title, solicitation_number, naics_code, psc_code, description, ' +
+      'department, sub_tier, office, posted_date, response_deadline, archive_date, ' +
+      'set_aside_code, set_aside_description, notice_type, active, ' +
+      'pop_city, pop_state, pop_zip, pop_country, ui_link, last_modified';
 
-    const { data, error } = await query;
+    // FILTER BEFORE LIMIT. When keywords will be preferred inside a NAICS/PSC
+    // market, read the whole (bounded) market first; the `limit` is applied
+    // AFTER preference below. Without keywords, the old single capped query is
+    // unchanged — there is nothing to prefer, so the first `limit` rows are the answer.
+    const scanWholeMarket =
+      distinctiveKeywords(keywords).length > 0 && keywordIncludeTerms(keywords, naicsCodes, pscCodes).length === 0
+      && (naicsCodes.length > 0 || pscCodes.length > 0);
 
-    if (error) {
-      console.error('[SAM Cache] Query error:', error);
-      return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+    const rows: SAMCacheOpportunityRow[] = [];
+    let scanTruncated = false;
+    if (scanWholeMarket) {
+      for (let from = 0; from < MAX_PREFER_SCAN_ROWS; from += PREFER_SCAN_PAGE) {
+        const { data, error } = await applySamCacheFilters(
+          supabase
+            .from('sam_opportunities')
+            .select(COLUMNS)
+            .order('response_deadline', { ascending: true })
+            .order('notice_id', { ascending: true }) // stable paging across equal deadlines
+            .range(from, from + PREFER_SCAN_PAGE - 1),
+          params
+        );
+        if (error) {
+          console.error('[SAM Cache] Query error:', error);
+          return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+        }
+        const page = (data || []) as SAMCacheOpportunityRow[];
+        rows.push(...page);
+        if (page.length < PREFER_SCAN_PAGE) break;
+        if (from + PREFER_SCAN_PAGE >= MAX_PREFER_SCAN_ROWS) scanTruncated = true;
+      }
+      if (scanTruncated) {
+        console.warn(`[SAM Cache] market exceeds ${MAX_PREFER_SCAN_ROWS} rows — keyword preference examined the first ${rows.length} by deadline`);
+      }
+    } else {
+      const { data, error } = await applySamCacheFilters(
+        supabase
+          .from('sam_opportunities')
+          .select(COLUMNS)
+          .order('response_deadline', { ascending: true })
+          .limit(limit),
+        params
+      );
+      if (error) {
+        console.error('[SAM Cache] Query error:', error);
+        return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+      }
+      rows.push(...((data || []) as SAMCacheOpportunityRow[]));
     }
 
-    console.log(`[SAM Cache] Found ${data?.length || 0} opportunities from database`);
+    console.log(`[SAM Cache] Found ${rows.length} opportunities from database${scanWholeMarket ? ' (full market scan for keyword preference)' : ''}`);
 
     // Transform database records to SAMOpportunity interface
-    const rows = (data || []) as SAMCacheOpportunityRow[];
     const opportunities: SAMOpportunity[] = rows.map(row => ({
       noticeId: row.notice_id,
       title: row.title,
@@ -1009,6 +1110,8 @@ export async function fetchSamOpportunitiesFromCache(
       keywordMatchCount: preferred.distinctiveMatchCount,
       distinctiveMatchCount: preferred.distinctiveMatchCount,
       openKeywordOutcome: preferred.outcome,
+      marketRowsScanned: scanWholeMarket ? rows.length : undefined,
+      scanTruncated: scanWholeMarket ? scanTruncated : undefined,
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {

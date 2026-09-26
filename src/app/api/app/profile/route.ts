@@ -6,7 +6,7 @@ import { normalizeNAICSForPersist } from '@/lib/utils/naics-expansion';
 import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
-import { sanitizeKeywords } from '@/lib/keywords/sanitize';
+import { sanitizeKeywords, KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
 import {
   mergePrioritiesIntoAggregated,
   prioritiesFromAggregated,
@@ -135,9 +135,18 @@ export async function POST(request: NextRequest) {
     // and capped the ARRAY but never checked an individual string's length, so
     // a pasted capability list stored as one 1,600-char "keyword". 30 stays the
     // cap for this onboarding path.
-    const { keywords: safeKeywords, dropped: droppedKw } = sanitizeKeywords(keywords, { max: 30 });
+    const { keywords: safeKeywords, dropped: droppedKw, overLimit: overKw } = sanitizeKeywords(keywords);
     if (droppedKw.length) {
       console.warn(`[profile] dropped ${droppedKw.length} unsplittable keyword blob(s) for ${email}`);
+    }
+    // Reject over the shared limit — never keep the first N and report success.
+    // (This path used its own silent cap of 30.)
+    if (overKw.length > 0) {
+      const submitted = safeKeywords.length + overKw.length;
+      return NextResponse.json(
+        { error: keywordLimitError(submitted), code: 'keyword_limit', submitted, max: KEYWORD_MAX_COUNT },
+        { status: 400 },
+      );
     }
 
     // Only update fields that were provided

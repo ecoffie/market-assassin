@@ -25,8 +25,23 @@
  */
 export const KEYWORD_MAX_LEN = 60;
 
-/** Cap on the stored array (matches the existing keywords/add behaviour). */
-export const KEYWORD_MAX_COUNT = 40;
+/**
+ * Cap on the stored array — the ONE limit every keyword writer enforces.
+ *
+ * This was 40 in two writers and 30 in two others, and every one of them
+ * enforced it with a silent `.slice()`. A customer (2026-09-24) entered 53
+ * keywords in Settings; the last 13 were discarded with a success response and
+ * he believed all 53 were live. Over-limit saves are now REJECTED, never
+ * truncated — see keywordLimitError(). 60 admits the largest real list we have
+ * on record with headroom; daily alerts match keywords in memory against the
+ * saved NAICS market, so the count does not grow the SQL query.
+ */
+export const KEYWORD_MAX_COUNT = 60;
+
+/** The message every writer returns when a save is over the limit. Nothing is written. */
+export function keywordLimitError(submitted: number, max: number = KEYWORD_MAX_COUNT): string {
+  return `You entered ${submitted} keywords; the limit is ${max}. Nothing was saved — remove ${submitted - max} and save again.`;
+}
 
 /**
  * Split on every separator a human might paste: comma, newline, semicolon,
@@ -55,13 +70,14 @@ export function sanitizeKeyword(raw: unknown): string[] {
 
 /**
  * Sanitize a whole incoming keyword array: split blobs, dedupe, cap.
+ * Anything past the cap is returned in `overLimit` so the caller can reject.
  * Returns both the clean list and what was dropped, so callers can log or
  * surface it instead of silently discarding a user's input.
  */
 export function sanitizeKeywords(
   incoming: unknown,
   opts: { max?: number } = {},
-): { keywords: string[]; dropped: string[] } {
+): { keywords: string[]; dropped: string[]; overLimit: string[] } {
   const max = opts.max ?? KEYWORD_MAX_COUNT;
   const list = Array.isArray(incoming) ? incoming : [];
   const dropped: string[] = [];
@@ -77,6 +93,8 @@ export function sanitizeKeywords(
     out.push(...parts);
   }
 
-  const deduped = Array.from(new Set(out)).slice(0, max);
-  return { keywords: deduped, dropped };
+  const unique = Array.from(new Set(out));
+  // Reported, not hidden: a caller that stores `keywords` while `overLimit` is
+  // non-empty is discarding the user's input and must reject instead.
+  return { keywords: unique.slice(0, max), dropped, overLimit: unique.slice(max) };
 }

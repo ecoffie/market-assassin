@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
-import { sanitizeKeywords, KEYWORD_MAX_COUNT } from '@/lib/keywords/sanitize';
+import { sanitizeKeywords, KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
 
 /**
  * POST /api/app/keywords/add  { email, keywords: string[] }
@@ -12,7 +12,8 @@ import { sanitizeKeywords, KEYWORD_MAX_COUNT } from '@/lib/keywords/sanitize';
  * Market Research Sport mode: their own words are the strongest search signal, so
  * we capture them into the profile instead of throwing them away after one report.
  *
- * Lowercases + dedupes; caps the stored array at 40 so a power user can't bloat it.
+ * Lowercases + dedupes. A merge that would exceed KEYWORD_MAX_COUNT is REJECTED
+ * (nothing written) instead of silently dropping the newest keywords.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     // This route previously validated only the array (dedupe + cap 40) and
     // never an individual string, so a 1,604-char paste stored as one keyword
     // and silently degraded that user's matching. See lib/keywords/sanitize.
-    const { keywords: clean, dropped } = sanitizeKeywords(incoming);
+    const { keywords: clean, dropped } = sanitizeKeywords(incoming, { max: Number.POSITIVE_INFINITY });
     if (dropped.length) {
       console.warn(`[keywords/add] dropped ${dropped.length} unsplittable blob(s) for ${email}: ${dropped.map((d) => `${d.slice(0, 40)}…`).join(' | ')}`);
     }
@@ -56,8 +57,16 @@ export async function POST(request: NextRequest) {
 
     // Sanitize the EXISTING array too: a row written before this guard can
     // already hold a blob, and a plain merge would carry it forward forever.
-    const { keywords: existing } = sanitizeKeywords(cur?.keywords);
-    const merged = Array.from(new Set([...existing, ...clean])).slice(0, KEYWORD_MAX_COUNT);
+    // `max: Infinity` here: an existing row is never trimmed on read — trimming it
+    // would silently delete keywords the user already saved.
+    const { keywords: existing } = sanitizeKeywords(cur?.keywords, { max: Number.POSITIVE_INFINITY });
+    const merged = Array.from(new Set([...existing, ...clean]));
+    if (merged.length > KEYWORD_MAX_COUNT && merged.length > existing.length) {
+      return NextResponse.json(
+        { error: keywordLimitError(merged.length), code: 'keyword_limit', submitted: merged.length, max: KEYWORD_MAX_COUNT },
+        { status: 400 },
+      );
+    }
     const added = merged.length - existing.length;
     if (added <= 0) {
       return NextResponse.json({ success: true, added: 0, total: merged.length });
