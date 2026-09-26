@@ -873,6 +873,7 @@ async function measureObservation(sb: Sb) {
     (async () => {
       try {
         const res = await readAllPages<{ snapshot_date: string; value: number }>(
+          // truncation-ok: read through readAllPages (.range pages until a short page proves exhaustion; unexhausted → null)
           () => sb.from('daily_metric_snapshots').select('snapshot_date, value')
             .eq('metric_key', 'recompete_changes_total').order('snapshot_date', { ascending: true }),
           { maxRows: 20_000 },
@@ -911,6 +912,7 @@ async function measureObservation(sb: Sb) {
   const readSnapshot = async (date: string): Promise<RankRow[] | null> => {
     try {
       const res = await readAllPages<RankRow>(
+        // truncation-ok: read through readAllPages (.range pages until a short page proves exhaustion; unexhausted → null)
         () => sb.from('leaderboard_snapshots').select('slug, recipient_uei, recipient_name, rank')
           .eq('snapshot_date', date).order('slug', { ascending: true }).order('recipient_uei', { ascending: true }),
         { maxRows: 50_000 },
