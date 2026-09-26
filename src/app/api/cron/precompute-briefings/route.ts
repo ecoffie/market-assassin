@@ -22,6 +22,7 @@ import { generateAIBriefing } from '@/lib/briefings/delivery/ai-briefing-generat
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 import { hashNaicsProfile, naicsProfileKey } from '@/lib/briefings/naics-profile-hash';
+import { precomputeVerdict, precomputeHttpStatus, shouldSelfChain, summarizeErrors } from '@/lib/briefings/precompute-outcome';
 
 // Each (possibly self-chained) invocation needs room to finish one ~52s briefing
 // generation. force-dynamic so it never gets statically optimized/cached.
@@ -85,6 +86,7 @@ function getSupabase() {
   const today = new Date().toISOString().split('T')[0];
   let templatesGenerated = 0;
   let templatesFailed = 0;
+  let attempted = 0;
   const errors: string[] = [];
 
   console.log('[PrecomputeBriefings] Starting template generation...');
@@ -169,6 +171,7 @@ function getSupabase() {
         console.log(`[PrecomputeBriefings] Out of runway (${Date.now() - startTime}ms) — stopping; ${templatesGenerated} done this run, rest resume next tick.`);
         break;
       }
+      attempted++;
       try {
         console.log(`[PrecomputeBriefings] Generating template for profile with ${profile.user_count} users: ${profile.naics_profile.slice(0, 50)}...`);
 
@@ -226,7 +229,15 @@ function getSupabase() {
     const elapsed = Date.now() - startTime;
     const remaining = allProfiles.length - existingHashes.size - templatesGenerated;
 
-    // Log run stats
+    // NO EXECUTION ≠ SUCCESS. Every started attempt failing is a FAILED run (non-2xx), with the
+    // counts and the provider errors in the body — not `success: true` (88 silent days, 2026-06-30 →
+    // 09-26). See src/lib/briefings/precompute-outcome.ts for the verdict table.
+    const verdict = precomputeVerdict({ pending: profilesToProcess.length, attempted, succeeded: templatesGenerated, failed: templatesFailed });
+    const chain = shouldSelfChain({ stoppedEarly, remaining, verdict });
+    const errorSummary = summarizeErrors(errors);
+
+    // Log run stats. completed_at marks that the day's run ENDED — either every template exists, or
+    // the chain stopped because all attempts failed (the verdict line says which).
     await getSupabase().from('briefing_precompute_runs').upsert({
       run_date: today,
       briefing_type: 'daily',
@@ -234,12 +245,23 @@ function getSupabase() {
       templates_generated: existingHashes.size + templatesGenerated,
       templates_failed: templatesFailed,
       total_users_covered: users?.length || 0,
-      completed_at: remaining === 0 ? new Date().toISOString() : null,
+      completed_at: remaining === 0 || verdict === 'all_failed' ? new Date().toISOString() : null,
       total_duration_ms: elapsed,
-      error_messages: errors.length > 0 ? errors : null,
+      error_messages: errors.length > 0
+        ? [`VERDICT ${verdict}: attempted=${attempted} succeeded=${templatesGenerated} failed=${templatesFailed}`, ...errors]
+        : null,
     }, { onConflict: 'run_date,briefing_type' });
 
-    console.log(`[PrecomputeBriefings] Complete: ${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`);
+    console.log(`[PrecomputeBriefings] ${verdict}: attempted ${attempted}, ${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`);
+
+    if (verdict === 'all_failed') {
+      await logToolError({
+        tool: ToolNames.BRIEFINGS,
+        errorType: ErrorTypes.API_ERROR,
+        errorMessage: `precompute-briefings: all ${attempted} generation attempt(s) failed. First: ${errorSummary[0] ?? 'unknown'}`,
+        requestPath: '/api/cron/precompute-briefings',
+      }).catch(() => {});
+    }
 
     // SELF-CHAIN: the dispatcher only ticks hourly and each run does ~1 profile,
     // so waiting for the next tick would take ~49 hours to warm the full set.
@@ -247,7 +269,9 @@ function getSupabase() {
     // (fire-and-forget) so the backlog drains in a chain of <55s runs that
     // completes minutes after the 2 AM start, well before the 7 AM send. Guard
     // with ?chain=1 depth so a bug can't loop forever (cap at totalProfiles+5).
-    if (stoppedEarly && remaining > 0) {
+    // An invocation whose every attempt FAILED does not chain: re-firing into the same provider
+    // failure only repeats it (up to totalProfiles+5 links a night).
+    if (chain) {
       const chainDepth = parseInt(request.nextUrl.searchParams.get('chain') || '0', 10);
       if (chainDepth < allProfiles.length + 5) {
         const origin = request.nextUrl.origin;
@@ -263,7 +287,13 @@ function getSupabase() {
     }
 
     return NextResponse.json({
-      success: true,
+      success: verdict !== 'all_failed',
+      verdict,
+      partial: verdict === 'partial',
+      attempted,
+      succeeded: templatesGenerated,
+      failed: templatesFailed,
+      chained: chain,
       stoppedEarly,
       templatesGenerated,
       templatesFailed,
@@ -271,10 +301,10 @@ function getSupabase() {
       templatesExisting: existingHashes.size,
       templatesRemaining: remaining,
       totalUsers: users?.length,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: errorSummary.length > 0 ? errorSummary : undefined,
       elapsed,
       estimatedCompletion: remaining > 0 ? `~${remaining} more cron ticks needed (1 profile/run)` : 'Done!',
-    });
+    }, { status: precomputeHttpStatus(verdict) });
 
   } catch (error) {
     console.error('[PrecomputeBriefings] Fatal error:', error);
