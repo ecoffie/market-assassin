@@ -100,3 +100,18 @@ export function applyMapsOpenFilters(query: any, req: MapsOpenRequest): any {
 export function mapsOpenDiscoveryMeta(plan: DiscoveryPlan) {
   return { version: plan.version, status: plan.status, refinement: plan.refinement, via: plan.horizons.open.via };
 }
+
+/**
+ * Does this Open plan evaluate a REGEX (`imatch` / `match`) against the corpus? (#1696)
+ *
+ * Cost signal only — never meaning. A text/buyer/exclusion predicate is a `~*` over title,
+ * description, sow_text, department and solicitation_number: ~1.1 s of DB CPU per pass over the
+ * ~8.7k open rows (description/sow_text are TOASTed and detoasted per reference). The route uses
+ * this to evaluate that predicate ONCE per request instead of once for the headline count and
+ * again for the viewport. Both strategies return identical rows; see maps-open-viewport.ts.
+ */
+export function openPlanScansText(req: MapsOpenRequest): boolean {
+  return (req.plan.horizons.open.ops as Array<{ expr?: unknown }>).some(
+    (o) => typeof o.expr === 'string' && /\.i?match\./.test(o.expr),
+  );
+}

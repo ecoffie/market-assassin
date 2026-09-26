@@ -21,7 +21,8 @@ import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
 import { multiVal } from '@/lib/opportunities/map-filters';
-import { mapsOpenRequest, applyMapsOpenFilters, mapsOpenDiscoveryMeta } from '@/lib/opportunities/maps-open-discovery';
+import { mapsOpenRequest, applyMapsOpenFilters, mapsOpenDiscoveryMeta, openPlanScansText } from '@/lib/opportunities/maps-open-discovery';
+import { selectViewportFromWalk, type WalkRow } from '@/lib/opportunities/maps-open-viewport';
 import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/canonical-listing';
 import { decorateWithEarlySignal, filterByEarlySignal, dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
@@ -172,6 +173,7 @@ export async function GET(request: NextRequest) {
         opps: merged,
       });
     } catch (e) {
+      console.error('[opportunity-map] legacy list failed:', (e as { code?: string })?.code ?? '', (e as Error)?.message ?? e);
       return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
     }
   }
@@ -226,11 +228,19 @@ export async function GET(request: NextRequest) {
     // NOT a hand-written SQL RPC. The same adapter builds the viewport query; re-expressing those
     // predicates in SQL would fork the definition of "what matches" and drift (the exact class the
     // filters oracle and the cross-surface discovery gate guard).
-    async function countUniqueListingsForFilters(): Promise<number> {
+    // #1696: `cols` widens the walk with map_lat/map_lng/response_deadline when the viewport is
+    // derived from it (maps-open-viewport.ts) — same predicates, same pages, only more columns.
+    // `firstPageCols` (a superset of `cols`) lets the first page carry the pin columns, so a
+    // filtered set that fits on one page needs no second round trip.
+    async function walkFilteredRows(
+      cols: string,
+      onCount?: (rawFilteredCount: number | null) => void,
+      firstPageCols: string = cols,
+    ): Promise<WalkRow[]> {
       const PAGE = 1000;
       const pageQuery = (from: number, withCount: boolean) => {
         let q = db.from('sam_opportunities')
-          .select('solicitation_number, notice_id', withCount ? { count: 'exact' } : undefined)
+          .select(from === 0 ? firstPageCols : cols, withCount ? { count: 'exact' } : undefined)
           .not('map_lat', 'is', null)
           .order('notice_id', { ascending: true })
           .range(from, from + PAGE - 1);
@@ -240,8 +250,8 @@ export async function GET(request: NextRequest) {
 
       const { data: first, count, error: firstErr } = await pageQuery(0, true);
       if (firstErr) throw firstErr;
-      const keyRows: Array<{ solicitation_number: string | null; notice_id: string | null }> =
-        [...((first ?? []) as Array<{ solicitation_number: string | null; notice_id: string | null }>)];
+      onCount?.(count ?? null);
+      const keyRows: WalkRow[] = [...((first ?? []) as unknown as WalkRow[])];
 
       // count is the RAW filtered row count (pre-dedupe) — it sizes the pagination only; the
       // returned number is still countDistinctListings over the real keys. A null count means
@@ -252,23 +262,26 @@ export async function GET(request: NextRequest) {
           const { data: page, error: pErr } = await pageQuery(from, false);
           if (pErr) throw pErr;
           if (!page || !page.length) break;
-          keyRows.push(...(page as typeof keyRows));
+          keyRows.push(...(page as unknown as WalkRow[]));
           if (page.length < PAGE) break;
         }
-        return countDistinctListings(keyRows);
+        return keyRows;
       }
 
-      if (keyRows.length >= count) return countDistinctListings(keyRows);
+      if (keyRows.length >= count) return keyRows;
 
       const offsets: number[] = [];
       for (let from = PAGE; from < count; from += PAGE) offsets.push(from);
       const pages = await Promise.all(offsets.map(async (from) => {
         const { data: page, error: pErr } = await pageQuery(from, false);
         if (pErr) throw pErr;
-        return (page ?? []) as typeof keyRows;
+        return (page ?? []) as unknown as WalkRow[];
       }));
       for (const page of pages) keyRows.push(...page);
-      return countDistinctListings(keyRows);
+      return keyRows;
+    }
+    async function countUniqueListingsForFilters(): Promise<number> {
+      return countDistinctListings(await walkFilteredRows('solicitation_number, notice_id'));
     }
     /**
      * THE MAP-TRUTH CONTRACT (Eric 2026-09-12, `map-truth-disclosure.ts`):
@@ -298,18 +311,53 @@ export async function GET(request: NextRequest) {
       return count ?? null;
     }
 
-    const samQueries = includeSam
+    const buildViewQuery = () => {
+      let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
+        .not('map_lat', 'is', null)
+        .gte('map_lat', south).lte('map_lat', north)
+        .gte('map_lng', west).lte('map_lng', east)
+        .order('response_deadline', { ascending: true })
+        .limit(MAX_PINS);
+      viewQ = applyFilters(viewQ);
+      return viewQ;
+    };
+    // #1696 — ONE regex pass per request. When the plan evaluates a regex (text / buyer /
+    // exclusion) and market counts are wanted, the viewport is derived from the headline walk
+    // instead of re-running the same `~*` scan (maps-open-viewport.ts owns the exact semantics).
+    // Without a regex the two scans are index-cheap and keep running in parallel as before.
+    const deriveViewport = includeSam && withCounts && openPlanScansText(openReq);
+    async function derivedSamQueries() {
+      const unmappedP = countUnmappedForFilters();
+      // The walk's first page carries the exact RAW filtered count. Above MAX_PINS rows the
+      // viewport MAY be capped, and a capped LIMIT picks among rows tied on the boundary deadline
+      // in Postgres scan order — which JS cannot reproduce. So above MAX_PINS today's viewport
+      // query runs, started the moment page 0 lands, beside the remaining pages. At or below
+      // MAX_PINS page 0 IS the whole filtered set, already carrying the pin columns: the viewport
+      // is that set ∩ bbox, and the second regex pass never runs.
+      // ⚠️ PostgREST builders are LAZY thenables — `.then()` is what sends the request. Without it
+      // the fallback would not start until awaited after the walk, i.e. serially.
+      type ViewResult = { data: unknown[] | null; count: number | null; error: unknown };
+      let legacyViewP: PromiseLike<ViewResult> | null = null;
+      const rows = await walkFilteredRows(
+        'solicitation_number, notice_id, map_lat, map_lng, response_deadline',
+        (rawCount) => { if (rawCount == null || rawCount > MAX_PINS) legacyViewP = buildViewQuery().then((r: ViewResult) => r); },
+        PIN_COLS, // page 0 only — a superset of the walk columns
+      );
+      if (legacyViewP) return [countDistinctListings(rows), await legacyViewP, await unmappedP] as const;
+      const { ids, totalInView: inView } = selectViewportFromWalk(rows, { west, south, east, north }, MAX_PINS);
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const r of rows as unknown as Record<string, unknown>[]) byId.set(String(r.notice_id), r);
+      const viewRows = ids.map((id) => byId.get(id)).filter((r): r is Record<string, unknown> => !!r);
+      return [countDistinctListings(rows), { data: viewRows, count: inView, error: null }, await unmappedP] as const;
+    }
+
+    const samQueries = deriveViewport
+      ? derivedSamQueries()
+      : includeSam
       ? (() => {
           const totalP = withCounts ? countUniqueListingsForFilters() : Promise.resolve(0);
           const unmappedP = withCounts ? countUnmappedForFilters() : Promise.resolve(null);
-          let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
-            .not('map_lat', 'is', null)
-            .gte('map_lat', south).lte('map_lat', north)
-            .gte('map_lng', west).lte('map_lng', east)
-            .order('response_deadline', { ascending: true })
-            .limit(MAX_PINS);
-          viewQ = applyFilters(viewQ);
-          return Promise.all([totalP, viewQ, unmappedP]);
+          return Promise.all([totalP, buildViewQuery(), unmappedP]);
         })()
       : Promise.resolve([0, { data: [], count: 0, error: null }, 0] as const);
 
@@ -488,6 +536,10 @@ export async function GET(request: NextRequest) {
       pins: merged,
     });
   } catch (e) {
+    // #1696: the reason used to live only in the response body. PostgREST errors are plain
+    // objects ({ message, code }); 57014 = statement_timeout — a failure, never an empty market.
+    const err = e as { message?: string; code?: string; cause?: unknown };
+    console.error('[opportunity-map] viewport failed:', err?.code ?? '', err?.message ?? e, err?.cause ?? '');
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
 }

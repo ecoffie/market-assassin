@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — #1696 Maps Open cold-start 500: one regex pass per request
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | Maps Open (`/api/app/opportunity-map`) | **The first Open after a deploy returned HTTP 500 after ~10.7 s: `canceling statement due to statement timeout` (57014).** Not cold-specific. 4 concurrent Opens failed 4/4 on WARM production too (8.4 s). A text query is a `~*` over title/description/sow_text/department/solicitation_number, ~1 s of CPU per pass on a 2-core DB. Every Open with market counts ran it TWICE (headline-count walk + viewport). A cold page load aborts its first Open round and re-fires with a settled bbox, but the aborted request's statements keep running, so passes pile up past PostgREST's 8 s `authenticator` statement_timeout. **Fix:** when the plan evaluates a regex and the walk's first page shows the raw filtered set ≤ 1,000 rows, page 0 carries the pin columns and the viewport is derived from it (set ∩ bbox, deadline ASC NULLS LAST, µs precision), so the second pass never runs. Above 1,000 rows the viewport query still runs unchanged (a capped LIMIT breaks deadline ties in scan order, which JS cannot reproduce). The route now logs the 500 reason (code + message) instead of only returning it in the body. | `openPlanScansText(openReq)` → `src/app/api/app/opportunity-map/route.ts`; `selectViewportFromWalk` → `src/lib/opportunities/maps-open-viewport.ts` | Live parity vs `main` handler, 14 cases exact (text, buyer, exclusion, legit zero, capped, pan, default map, no-regex). Load: 4 concurrent 4/4 500 → 4/4 200 (~5.2 s); 6 concurrent 6/6 500 → 6/6 200 (~7.6 s). `one-regex-pass.unit.test.ts` (2 guards red on `main`, green after). `scripts/acceptance/open-cold-start-1696.mts` on a cold preview. KNOWN COST: text queries matching > 1,000 rows are +0.6–1.3 s (the viewport query now starts after page 0). | IN REVIEW |
+
 ## Strategic evidence — shared reader: legislation reaches the customer
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
