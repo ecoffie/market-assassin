@@ -5,9 +5,29 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 63** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 64** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 63.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 64.
+
+---
+
+## September 2026 — get_legislation_status (catalog 63 → 64)
+
+**New tool:** `get_legislation_status` (5 credits, scan-class). Status + document metadata for the
+NDAA bills Mindy stores (`institute_sources`, weekly Congress collector, read through the shared
+legislative reader from #1699). One input, `query` ("FY2027 NDAA", "H.R. 8800", "PL 119-60",
+"S. Rept. 119-127"), resolved deterministically — no title similarity. Stages come only from stored
+version codes: reported is not passed, passed is not law, only a public-law record is law; House and
+Senate bills are never merged; committee reports and errata stay separate records. "Latest stored
+action", never history (no action history or votes are collected). Absence follows coverage:
+complete → `NOT_FOUND_IN_COVERED_CORPUS` with scope; partial / unknown / another Congress →
+`NOT_ESTABLISHED`. Content questions return status + `content_status: NOT_HELD` — Mindy holds no
+bill text.
+
+**Why it exists:** a fresh claude.ai host with Mindy on answered "What is the status of the FY2027
+NDAA?" from web search. So the fix also adds a LEGISLATION routing line inside the first ~1,500 chars
+of the served connector instructions, and hand-off clauses on `get_regulatory_demand`,
+`get_agency_intel` and `get_current_acquisition_intelligence`.
 
 ---
 

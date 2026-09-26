@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Legislation status tool + routing (get_legislation_status v1)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | MCP / legislation status + host routing | A fresh claude.ai host with Mindy on answered "What is the status of the FY2027 NDAA?" from web search. New tool get_legislation_status (5 cr) reads the stored NDAA corpus through the shared reader: deterministic identity (FY / H.R. / S. / PL / report), stages only from the 10 held version codes (reported is not passed, passed is not law, only a public-law record is law, unknown codes stay OTHER), House and Senate bills never merged, reports and errata separate, latest stored action only, absence per coverage (complete gives NOT_FOUND_IN_COVERED_CORPUS, partial or unknown or another Congress gives NOT_ESTABLISHED), content questions return NOT_HELD. A LEGISLATION routing line now sits at char 121 of the served connector instructions (host-visible top), ahead of the solicitation classes and Potato P2; hand-off clauses added to get_regulatory_demand, get_agency_intel and get_current_acquisition_intelligence on both transports. No collector change. | `LEGISLATION (check FIRST, before the solicitation classes)` → `src/lib/mcp/potato-journey.ts` | 22 fixture tests + 14 routing/boundary tests; 5 mutations each go red; production-data run of 21 queries | IN REVIEW |
+
 ## Strategic evidence — shared reader: legislation reaches the customer
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

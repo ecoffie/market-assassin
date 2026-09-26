@@ -85,7 +85,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
   {
     id: 'agency',
     label: 'Agency & Award Intelligence',
-    blurb: "The buyer's pain points and priorities, its spending and budget trend, and the fine print of one award.",
+    blurb: "The buyer's pain points and priorities, its spending and budget trend, the fine print of one award, and where its NDAA stands in Congress.",
     tools: [
       'get_agency_intel',
       'understand_customer',
@@ -93,6 +93,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'get_agency_spending_detail',
       'get_sba_goaling_share',
       'get_award_detail',
+      'get_legislation_status',
     ],
   },
   {
