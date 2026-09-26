@@ -22,7 +22,7 @@ const TABLES: Record<string, Row[]> = {
     { id: 'baa-1', source: 'darpa_baa', opportunity_type: 'baa', status: 'active', posted_date: daysAgo(3),
       title: 'KEEP-BAA Defense Sciences Office-wide BAA', agency: 'DARPA' },
     { id: 'nihgrant-1', source: 'nih_reporter', opportunity_type: 'grant', status: 'active', posted_date: daysAgo(4),
-      title: 'KEEP-NIH-GRANT Clinical Data Provenance', agency: 'NIH' },
+      title: 'AWARD-NIH-GRANT Clinical Data Provenance', agency: 'NIH', source_url: 'https://reporter.nih.gov/project-details/9' },
     { id: 'sbir-old', source: 'nih_reporter', opportunity_type: 'sbir_sttr', status: 'active', posted_date: daysAgo(90),
       title: 'OLD-SBIR outside the 30-day window', agency: 'NIH' },
   ],
@@ -97,7 +97,10 @@ describe('AI briefing generator — retired SBIR rows excluded, legitimate R&D r
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [params, result] = fetchSpy.mock.calls[0] as [Record<string, unknown>, { opportunities: { id: string; opportunityType: string }[] }];
     const ids = result.opportunities.map((o) => o.id).sort();
-    expect(ids).toEqual(['baa-1', 'grant-1', 'nihgrant-1']); // every legitimate in-window row survives
+    // Legitimate OPEN rows survive; the retired sbir_sttr row AND the funded NIH grant (award history, #1713)
+    // are both excluded from the briefing's R&D input.
+    expect(ids).toEqual(['baa-1', 'grant-1']);
+    expect(result.opportunities.some((o) => o.id === 'nihgrant-1')).toBe(false);
     expect(result.opportunities.some((o) => o.opportunityType === 'sbir_sttr')).toBe(false);
     expect(params.excludeOpportunityTypes).toEqual(['sbir_sttr']);
   });
@@ -111,11 +114,22 @@ describe('AI briefing generator — retired SBIR rows excluded, legitimate R&D r
     expect(prompt).toContain('KEEP-GRANT');
     expect(prompt).toContain('KEEP-BAA');
     expect(prompt).not.toContain('RETIRED-SBIR-ROW');
+    expect(prompt).not.toContain('AWARD-NIH-GRANT');
   });
 
-  it('control: the same fetch WITHOUT the exclusion would have let the SBIR row in (the test can fail)', async () => {
+  it('control: an explicit NIH request without the SBIR exclusion DOES return the SBIR row — labelled award history, no deadline (the test can fail)', async () => {
     const { fetchMultisiteOpportunities } = await vi.importActual<typeof import('../pipelines/multisite')>('../pipelines/multisite');
-    const r = await fetchMultisiteOpportunities({ postedFrom: daysAgo(30), limit: 25 });
-    expect(r.opportunities.map((o) => o.id)).toContain('sbir-1');
+    const r = await fetchMultisiteOpportunities({ postedFrom: daysAgo(30), limit: 25, sources: ['nih_reporter'] });
+    const sbir = r.opportunities.find((o) => o.id === 'sbir-1');
+    expect(sbir).toBeDefined();
+    expect(sbir).toMatchObject({ recordKind: 'award_history' });
+    expect(sbir?.closeDate).toBeUndefined();
+  });
+
+  it('control: the SBIR exclusion still applies on an explicit NIH request; the NIH grant stays, labelled award history', async () => {
+    const { fetchMultisiteOpportunities } = await vi.importActual<typeof import('../pipelines/multisite')>('../pipelines/multisite');
+    const r = await fetchMultisiteOpportunities({ postedFrom: daysAgo(30), limit: 25, sources: ['nih_reporter'], excludeOpportunityTypes: ['sbir_sttr'] });
+    expect(r.opportunities.map((o) => o.id)).toEqual(['nihgrant-1']);
+    expect(r.opportunities[0]).toMatchObject({ recordKind: 'award_history' });
   });
 });
