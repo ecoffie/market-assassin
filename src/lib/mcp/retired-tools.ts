@@ -15,6 +15,8 @@
  * registered again. To bring a tool back, remove it from this list in the same change.
  */
 
+import { SBIR_SEARCH_RETIRED } from '@/lib/sbir/retired';
+
 export interface RetiredTool {
   retired_on: string; // YYYY-MM-DD
   /** Plain-English reason shown to the caller. */
@@ -30,9 +32,9 @@ export const RETIRED_TOOLS: Readonly<Record<string, RetiredTool>> = {
   // award history in a field named `opportunities`. The shared NIH/DoD libraries and stored data
   // are kept (src/lib/sbir/*); only the published tool is withdrawn.
   search_sbir: {
-    retired_on: '2026-09-26',
-    reason: 'Mindy does not currently provide a reliable source of OPEN SBIR/STTR topics, so this tool has been withdrawn rather than return award history in their place.',
-    instead: 'For open SBIR/STTR topics and deadlines, use SBIR.gov (sbir.gov/topics) or the DoD SBIR/STTR portal (DSIP) directly.',
+    retired_on: SBIR_SEARCH_RETIRED.retired_on,
+    reason: SBIR_SEARCH_RETIRED.reason,
+    instead: SBIR_SEARCH_RETIRED.instead,
   },
 };
 

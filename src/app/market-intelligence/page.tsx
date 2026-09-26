@@ -492,9 +492,9 @@ function MarketIntelligenceContent() {
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Forecasts + SBIR + Grants */}
+              {/* Forecasts + Grants (SBIR/STTR search retired 2026-09-26) */}
               <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Forecasts, SBIR, Grants</td>
+                <td className="py-2.5 px-3 text-ink-soft">Forecasts, Grants</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>

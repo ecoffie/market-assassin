@@ -74,7 +74,7 @@ async function naicsGroup() {
 
     const bbox = 'bbox=-125,24,-66,50';
     const [open, rc, fc] = await Promise.all([
-      json(`/api/app/opportunity-map?${bbox}&status=active&sources=sam,sbir&q=${code}`),
+      json(`/api/app/opportunity-map?${bbox}&status=active&sources=sam&q=${code}`),
       json(`/api/app/recompete-map?${bbox}&q=${code}`),
       json(`/api/app/forecast-map?${bbox}&q=${code}&includeUnplaced=1`),
     ]);

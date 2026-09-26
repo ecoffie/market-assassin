@@ -24,9 +24,13 @@ default-off `_ai_hint`. Investigation: `tasks/sbir-reed-investigation-2026-09-26
   (`isError:false`, "No credits were charged"), logged in `mcp_call_log` as status `retired` with
   0 credits; it never reaches `runMcpTool` or the debit. `src/lib/mcp/retired-tools.ts` is the list;
   a test fails if a retired name is ever registered again.
-- **Kept (not deleted):** `src/lib/sbir/*` (NIH RePORTER + DoD normalization), the in-app SBIR panel
-  and `/api/sbir`, all stored data (`aggregated_opportunities`, `dod_sbir_topics`), the unregistered
-  `src/mcp/tools/sbir.ts` wrapper, and the parked specialty feeds (untouched).
+- **Retired with it (same PR):** the in-app SBIR panel + sidebar item, `/api/sbir` (now 410), the
+  Opportunity Map SBIR source and `/api/market-scan`'s SBIR section — one shared notice
+  (`src/lib/sbir/retired.ts`).
+- **Kept (not deleted):** `src/lib/sbir/*` (NIH RePORTER + DoD normalization), all stored data
+  (`aggregated_opportunities`, `dod_sbir_topics`), the unregistered `src/mcp/tools/sbir.ts` wrapper, and
+  the parked specialty feeds (untouched). The Grants panel's Grants.gov search (incl. its SBIR chip) is a
+  different, supported source and stays.
 - **To restore an open-topic tool:** a separate product decision + a working open-topic source — see
   the investigation record §7. Remove the name from `RETIRED_TOOLS` in the same change.
 

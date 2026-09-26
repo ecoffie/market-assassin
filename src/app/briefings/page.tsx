@@ -9,7 +9,7 @@ import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
 import OnboardingWizard from '@/components/briefings/OnboardingWizard';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
 import ForecastsPanel from '@/components/bd-assist/ForecastsPanel';
-import SbirPanel from '@/components/briefings/SbirPanel';
+import { SBIR_SEARCH_RETIRED, sbirSearchRetiredMessage } from '@/lib/sbir/retired';
 import GrantsPanel from '@/components/briefings/GrantsPanel';
 import ShareButton from '@/components/briefings/ShareButton';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
@@ -1418,7 +1418,7 @@ function BriefingsDashboardContent() {
             </div>
             <div className="flex items-center gap-3 text-gray-500">
               <span className="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-gray-600 text-sm">—</span>
-              <span>AI Briefings, Forecasts, SBIR/STTR <span className="text-purple-400">(Pro)</span></span>
+              <span>AI Briefings, Forecasts, Grants <span className="text-purple-400">(Pro)</span></span>
             </div>
           </div>
 
@@ -1527,7 +1527,7 @@ function BriefingsDashboardContent() {
           <div className="mt-8 p-6 bg-gradient-to-r from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl">
             <h3 className="text-lg font-semibold text-white mb-2">Want More Intelligence?</h3>
             <p className="text-gray-400 text-sm mb-4">
-              Upgrade to Mindy Pro for AI-powered daily briefings, forecasts, SBIR/STTR intel, and pipeline tracking.
+              Upgrade to Mindy Pro for AI-powered daily briefings, forecasts, grants, and pipeline tracking.
             </p>
             <Link
               href="/market-intelligence"
@@ -1614,14 +1614,24 @@ function BriefingsDashboardContent() {
           </div>
         )}
 
-        {/* SBIR Panel */}
+        {/* SBIR/STTR search — RETIRED 2026-09-26 (src/lib/sbir/retired.ts). No nav entry points remain;
+            this notice covers any residual path (an old tab mapping or a persisted panel). */}
         {activePanel === 'sbir' && (
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white mb-2">SBIR/STTR Opportunities</h2>
-              <p className="text-gray-400">Small business R&D funding from NIH, NSF, DOD, and other federal agencies.</p>
+          <div className="max-w-3xl mx-auto px-4 py-8">
+            <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-6">
+              <h2 className="text-xl font-semibold text-white mb-2">SBIR/STTR search has been retired</h2>
+              <p className="text-gray-300 text-sm mb-4">{sbirSearchRetiredMessage()}</p>
+              <div className="flex flex-wrap gap-3">
+                {SBIR_SEARCH_RETIRED.links.map((l) => (
+                  <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-300 underline">
+                    {l.label}
+                  </a>
+                ))}
+                <button type="button" onClick={() => setActivePanel('grants')} className="text-sm text-purple-300 underline">
+                  Search Grants.gov funding announcements
+                </button>
+              </div>
             </div>
-            <SbirPanel email={email} />
           </div>
         )}
 
@@ -1771,7 +1781,6 @@ function BriefingsDashboardContent() {
               onTabChange={(tab) => {
                 // Map old tabs to new panels
                 if (tab === 'forecasts') setActivePanel('forecasts');
-                else if (tab === 'sbir') setActivePanel('sbir');
                 else if (tab === 'grants') setActivePanel('grants');
               }}
             />

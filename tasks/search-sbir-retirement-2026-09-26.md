@@ -1,118 +1,124 @@
-# `search_sbir` retirement — record (2026-09-26)
+# SBIR/STTR search retirement — final packet (2026-09-26)
 
-**Decision (Eric, 2026-09-26):** retire the SBIR search tool. The published MCP name is
-**`search_sbir`** (title "Search SBIR"; hosted edge `mcp.getmindy.ai/mcp`; 5 credits). Nothing else
-was published under an SBIR name.
+**Decision (Eric, 2026-09-26):** retire SBIR/STTR search on every customer-facing surface. Keep the
+shared NIH/SBIR libraries and all stored data. PR **#1710**. **Stop before merge/deploy.** No
+credits and no customer messages: Louis's proposed 105-credit correction remains a separate,
+unauthorized item.
 
-**Why:** the Reed Analytics investigation (PR #1708, `tasks/sbir-reed-investigation-2026-09-26.md`)
-established that the tool could not return OPEN SBIR/STTR topics:
+**Why:** investigation packet `tasks/sbir-reed-investigation-2026-09-26.md`, carried here from the
+closed #1708. No SBIR surface had a working source of OPEN topics:
 - the DoD topic cache never received a row;
-- the "multisite" source errored on every call;
-- the default returned funded NIH projects in `opportunities`, and the only caveat was in the
-  default-off `_ai_hint`.
+- the multisite `sbir_sttr` slice is 42/42 NIH RePORTER award pages;
+- NIH RePORTER is itself an award index.
 
-**Scope: withdrawal only.** No merge, no deploy, no production-data change, no credits, no customer
-message. Louis's proposed 105-credit correction is a **separate** item and is not authorized here.
+**One notice for every surface:** `src/lib/sbir/retired.ts` (`SBIR_SEARCH_RETIRED`,
+`sbirSearchRetiredMessage`, `sbirSearchRetiredBody`). It points users to SBIR.gov topics, DoD DSIP,
+and Mindy's Grants panel for SBIR funding announcements posted on Grants.gov.
 
-## What changed
+## Surfaces
 
-| Surface | Change |
+| Surface | Before (production, measured 2026-09-26) | After (this branch) |
+|---|---|---|
+| MCP `search_sbir` (hosted `mcp.getmindy.ai/mcp`) | listed; 5 credits; default returned NIH awards as `opportunities` | absent from `tools/list`, catalogs and pricing. A stale call gets `tool_retired` (`isError:false`), logged `retired`, 0 credits, never dispatched |
+| In-app SBIR panel (`/briefings`, sidebar "SBIR/STTR") | Pro nav item → `SbirPanel` → `/api/sbir` | nav item removed and `SbirPanel.tsx` deleted; the stats-bar tab mapping removed. Any residual `activePanel='sbir'` renders the retired notice with links |
+| `/api/sbir` (GET/POST) | **HTTP 200.** `?keyword=cybersecurity` → 5 NIH RePORTER awards, e.g. "AmblyoGo … Occlusion Dose Monitor", `endDate` 2028-05-31 | **HTTP 410** with the shared JSON notice (`code: sbir_search_retired`), `Cache-Control: no-store`. Reads nothing |
+| Opportunity Map SBIR source | client asked `sources=sam,sbir`; `countsBySource.SBIR = 0` (empty cache — latent); "SBIR/STTR" option in the "Where it came from" filter | server ignores `sources=…,sbir` (accepted, contributes nothing); client asks `sources=sam`; SBIR removed from the source filter (`template.html`, `template-html.ts` regenerated) |
+| `/api/market-scan` | `includeSbir` defaulted ON → multisite NIH rows returned as `sbirOpportunities` (no UI caller; directly callable) | never fetched; `sbirOpportunities: []` plus `sbir: { retired: true, … }`; "NIH RePORTER" dropped from `dataSources` |
+| Mindy Chat system prompt | claimed "…grants, SBIR/STTR" under OPPORTUNITIES; tools come from `listMcpTools()` | claim removed. A new line says SBIR/STTR open-topic search is not available, where to go instead, and never to present awards as open topics. `search_sbir` is already absent from its tool list |
+| Marketing / upgrade copy | `/market-intelligence` "Forecasts, SBIR, Grants"; `/agencies` "…NIH RePORTER, SBIR/STTR…"; `/briefings` upsell "SBIR/STTR intel" | SBIR claims removed |
+
+## Kept on purpose (and why)
+
+| Item | Reason |
 |---|---|
-| `src/lib/mcp/tool-registry.ts` | `SBIR_TOOL_DEF`, `listMcpTools` entry, `isMcpTool` name, `runMcpTool` dispatch, `TOOL_CREDITS` row and the wrapper import removed |
-| `src/lib/mcp/tool-schemas.ts` | `TOOL_META` title removed |
-| `src/app/mcp/tools/tool-groups.ts` | removed from "Opportunity Discovery" |
-| `src/mcp/server.ts` (stdio) | registration + import removed |
-| `docs/mcp-tool-catalog.json` | 64 → 63 (via `audit-tool-catalog-drift.mjs --update`) |
-| `docs/marketing/MCP-WHITEPAPER.md` + `.docx` | row removed, counts 64 → 63, source line corrected; `.docx` regenerated |
-| `docs/MCP-CHANGELOG.md` | retirement entry, count 63 |
-| `src/mcp/README.md`, `scripts/mcp-smoke.mjs` | references removed |
-| `docs/DATA-SOURCES-REGISTRY.md` | SBIR row marked RETIRED; kept libraries/data listed |
-| **New** `src/lib/mcp/retired-tools.ts` | the retired list + the stale-call answer |
-| `src/lib/mcp/metered.ts` | a retired name is refused **before** pricing/balance/debit and logged `retired` |
-| `src/app/mcp/[transport]/route.ts` | after auth, before the SDK: a single `tools/call` for a retired name gets the `tool_retired` result, logged `retired`, 0 credits |
-| `src/lib/mcp/credits.ts`, `src/app/mcp/usage-charts.tsx` | `retired` call status + its label on the usage page |
+| Grants panel "SBIR/STTR" chip (`GrantsPanel.tsx`) | Different, **supported** source: Grants.gov search. Measured on production, `/api/grants?keyword=SBIR` → 22 **posted** announcements with future close dates (e.g. NIH REACH, close 11/10/2026; DARPA DSO BAA, close 08/27/2027). Open funding, not award history |
+| `src/lib/sbir/search.ts`, `dod-sbir.ts`, `sbir-map-pins.ts`, `src/lib/scrapers/apis/*` | shared libraries (instruction: preserve) |
+| `sync-dod-sbir` cron, `dod_sbir_topics`, `aggregated_opportunities`, logs | stored data and parked feeds (instruction: untouched) |
+| `src/mcp/tools/sbir.ts` | unregistered; nothing imports it |
+| Informational mentions: NASA SBIR tip on `/agencies/[slug]`, the `budget-intel` keyword list, the `potato-journey` jargon list, `engagement.SBIR_SEARCH` / `surface-registry` ids | not search entry points. The analytics ids keep historical events readable |
 
-**Routing / recommendations:** no other tool description, the connector instructions, or the P2
-host rules recommended `search_sbir`. `potato-journey.ts` names "SBIR" only in a
-do-not-use-this-jargon list, which is unrelated and unchanged.
+**Observed, not changed (no evidence of customer exposure):** the AI briefing generator's multisite
+fetch has no type filter, so the 42 active NIH `sbir_sttr` rows *could* enter its prompt as "R&D
+opportunities".
+- Scanned 230 stored templates (daily 06-08→06-29; weekly/pursuit to 09-28): **0** SBIR/NIH mentions.
+- Daily templates have not been generated since 2026-06-29.
+- Recommended follow-up, if briefings resume: exclude `opportunity_type='sbir_sttr'` there.
 
-## Stale clients
+## #1708 — closed unmerged
 
-A cached client calling `search_sbir` on the hosted edge receives:
+The instruction: keep #1708 only for repairs that retained consumers still need.
 
-```
-search_sbir was retired on 2026-09-26 and is no longer available. Mindy does not currently provide a
-reliable source of OPEN SBIR/STTR topics, so this tool has been withdrawn rather than return award
-history in their place. For open SBIR/STTR topics and deadlines, use SBIR.gov (sbir.gov/topics) or
-the DoD SBIR/STTR portal (DSIP) directly. No credits were charged for this call.
-```
+| #1708 change | Retained consumer after this PR |
+|---|---|
+| `src/lib/sbir/search.ts` classification / budget / sanitizer | **none** — the only importer is the unregistered `src/mcp/tools/sbir.ts`, which nothing imports |
+| wrapper + its tests | none (tool retired) |
+| `scripts/verify-sbir-search.ts` | none |
 
-- The response carries `isError:false`, the same contract as the commercial refusals: hosts treat
-  `isError` as a crash and retry.
-- `structuredContent.error` = `{ code: 'tool_retired', tool, retired_on, credits_charged: 0 }`.
-- The call is logged in `mcp_call_log` as `status='retired'`, `credits_charged=0`.
-- It never reaches `runMcpTool` or the debit.
+So #1708 is **closed unmerged**. Its branch `fix/sbir-open-topics-vs-award-history` is kept for
+reference, and its evidence packet is carried into this PR. The multisite `set_aside_type` bug also
+existed in the old `/api/sbir`, which is now replaced by the 410.
 
-**Edge cases:**
-- **Unauthenticated calls** still get 401. The retired answer is not a bypass.
-- **JSON-RPC batches** fall to the SDK, which answers "Tool not found". Still uncharged: an
-  unregistered tool never reaches `runMeteredTool`.
-- **The local stdio server** (dev only, no billing) answers "Tool search_sbir not found".
+## Verification — MCP, stale calls, panel and direct API together
 
-## Kept (not deleted, not changed)
-
-- **Libraries:** `src/lib/sbir/search.ts` (NIH RePORTER + multisite + DoD reads),
-  `src/lib/sbir/dod-sbir.ts`, `src/lib/sbir/sbir-map-pins.ts`.
-- **In-app surfaces:** the SBIR panel and `/api/sbir`.
-- **The unregistered wrapper** `src/mcp/tools/sbir.ts`, kept as #1708's reference implementation.
-- **Stored data:** `aggregated_opportunities`, `dod_sbir_topics`, `mcp_call_log`,
-  `user_search_history`, `mcp_credit_ledger`.
-- **The parked specialty feeds** and the `sync-dod-sbir` cron.
-- **The investigation evidence** in PR #1708.
-
-## Evidence (at this head)
-
-- `retired-tools.unit.test.ts` (5, **real registry**): `search_sbir` is absent from `listMcpTools`,
-  `isMcpTool`, `mcpRegistrationList`, `TOOL_CREDITS`, the tool groups, `server.ts`, the catalog JSON,
-  the whitepaper, the README and the smoke script. The matcher only fires on a single `tools/call`
-  for a retired name, and there is no prototype-key leak.
-- `route.retired-tool.unit.test.ts` (5, **real mcp-handler + SDK**, mocked auth/dispatch):
-  - `tools/list` omits `search_sbir` but lists `find_opportunities`, `search_grants`,
-    `get_balance`, `get_winning_playbook` (and more than 50 tools);
-  - a stale call returns the retired result with the request id, logs `retired`/0, and
-    `runMeteredTool` is **not called**;
-  - an unrelated tool (`get_balance`) still dispatches;
-  - unauthenticated → 401;
+**A. Unit / integration (real handlers where possible):**
+- `sbir-search-retirement.unit.test.ts` (14):
+  - the **real `/api/sbir` handler** answers 410 with the shared body for GET and POST, and contains
+    no data access;
+  - `SbirPanel.tsx` is deleted and not imported; there is no sidebar item; no `setActivePanel('sbir')`;
+    the residual notice renders; upsell copy is clean;
+  - the map gate is permanently off, the client stops requesting `sbir`, and the SBIR facet is gone
+    in both the template and the generated file;
+  - market-scan never fetches SBIR; chat and marketing copy are clean;
+  - the MCP entry reuses the shared notice; shared libraries still exist.
+- `route.retired-tool.unit.test.ts` (5, **real mcp-handler + SDK**):
+  - `tools/list` omits `search_sbir`;
+  - a stale call returns `tool_retired`, is logged `retired`/0, and `runMeteredTool` is **not called**;
+  - an unrelated tool still dispatches;
+  - an unauthenticated call → 401;
   - a batch never dispatches.
-- `metered.unit.test.ts`: a retired name returns `tool_retired` without calling `getBalance`,
-  `runMcpTool` or `debitCredits`, and logs `retired`/0.
-- **Mutation-proven:**
-  - removing the transport intercept turns the stale-call test red;
-  - re-adding the name to a tool group turns the discovery test red;
-  - both restored → green.
-- **Stdio discovery** (server started, `tools/list`): 55 tools, `search_sbir` absent,
-  `search_grants` present.
-- **Gates:** `tsc` clean, catalog drift OK (63), ledger audit clean. Full suites and the pre-push
-  gate results are recorded in the PR.
+- `retired-tools.unit.test.ts` (5, real registry) and the `metered.unit.test.ts` retired case (no
+  balance read, no run, no debit).
+- `sbir-map-pins.unit.test.ts`: updated from "opt-in on `?sources=sbir`" to "accepted but
+  permanently off". The fail-soft merge invariant is unchanged.
+- **Mutation-proven** earlier on this branch: removing the transport intercept turns the stale-call
+  test red; re-grouping the name turns the discovery test red.
 
-## Reconciling #1708
+**B. Local running app on this branch** (`next dev --webpack`, production data read-only; captured
+in the session log):
+- `GET /api/sbir?keyword=zero trust` → **410** + notice; `POST /api/sbir` → **410** + notice.
+- `GET /api/app/opportunity-map?bbox=CONUS&status=active&sources=sam,sbir` → 200, 961 pins, all SAM;
+  `countsBySource {SAM:961, DLA:0, SBIR:0}`.
+- `GET /api/market-scan?naics=541512` → 200; `sbirOpportunities: 0`; `sbir.retired: true`;
+  0 SBIR/NIH rows in `rankedOpportunities`.
+- **Panel in a browser:** unauthenticated `/briefings` redirects to `/alerts/signup`, so the sidebar
+  cannot render without signing in. I did not sign in: that would write to the production database
+  from a local server. The panel is therefore verified by the source-level tests in (A), **not** a
+  rendered screenshot.
 
-- #1708 is rebased so it **no longer touches** `tool-registry.ts` or `server.ts`. Its SBIR tool
-  description and registration edits are dropped, so merging it cannot republish the tool.
-- #1708 keeps the library repair, its tests and the evidence packet. Its wrapper change stays
-  unregistered and gains a RETIRED header.
-- Both PRs add a row at the top of `docs/REPAIR-LEDGER.md`. Whichever merges second needs a
-  trivial ledger-only conflict resolution: keep both rows.
-- Independently, `retired-tools.unit.test.ts` fails CI if any later merge re-registers
-  `search_sbir`.
+**C. Stdio discovery** (earlier on this branch): 55 tools, `search_sbir` absent.
 
-## After merge + deploy (not done here — stop before merge/deploy)
+**Gates at the pushed head:** recorded in the PR (tsc, test suites, catalog drift, template sync,
+silent-failure gate, ledger audit, pre-push gate).
 
-1. **Live discovery:** `tools/list` on `mcp.getmindy.ai/mcp` must not contain `search_sbir`, and
-   `GET /api/mcp/catalog` must show 63 tools.
-2. **Live stale call** with a test account: the `tool_retired` text; a new `mcp_call_log` row
-   `status='retired'`, `credits_charged=0`; **no** new `mcp_credit_ledger` row.
-3. **Live unrelated tool** (`get_balance`, `search_grants`) still works.
-4. **Update the claude.ai Tool Map artifact** (the fourth catalog surface) to 63 tools. It is not
-   updated before deploy because the tool is still live in production until then.
-5. The 105-credit correction for Louis stays a separate, unauthorized item.
+## After release (NOT done — stop before merge/deploy)
+
+Verify **by name**, not by count. The catalog total can change for unrelated reasons.
+1. **MCP discovery:** `tools/list` on `https://mcp.getmindy.ai/mcp` — assert no tool is **named**
+   `search_sbir`. `GET https://getmindy.ai/api/mcp/catalog` — assert no entry **named**
+   `search_sbir`. (Do not rely on "63 tools".)
+2. **MCP stale call** (test account): `tools/call search_sbir` → the text contains "retired on
+   2026-09-26" and "No credits were charged". Then check:
+   - a new `mcp_call_log` row for that account with `tool_name='search_sbir'`, `status='retired'`,
+     `credits_charged=0`;
+   - **no** new `mcp_credit_ledger` row;
+   - the balance is unchanged.
+3. **Direct API:** `curl -i https://getmindy.ai/api/sbir?keyword=cybersecurity` → `410` and
+   `"code":"sbir_search_retired"` (before release this returned 200 with NIH awards).
+4. **Map:** `/api/app/opportunity-map?…&sources=sam,sbir` → `countsBySource.SBIR == 0`, no pin with
+   `src=='SBIR'`. The served map HTML contains no `"SBIR"` entry in the source-filter list.
+5. **Market-scan:** `/api/market-scan?naics=541512` → `sbir.retired == true`, `sbirOpportunities == []`.
+6. **Panel:** signed in as a test/staff account on `/briefings`: no "SBIR/STTR" sidebar item.
+7. **Unrelated tools still work:** e.g. `get_balance`, `search_grants`, `find_opportunities` on MCP;
+   the Grants panel "SBIR/STTR" chip still returns Grants.gov postings.
+8. **Tool Map artifact:** update the claude.ai artifact so no entry is named `search_sbir`. It is
+   deliberately not done before deploy.

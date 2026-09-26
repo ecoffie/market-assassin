@@ -810,7 +810,7 @@ function closeSheet(){openSheet=null;sheet.classList.remove('show');
 function renderSheet(k){
   let items,title;
   if(k==='src'){title='Where it came from';
-    items=["SAM","RECOMPETE","DLA","SBIR"].map(v=>({v,label:SRCLABEL[v],col:v==='SAM'?'--sam':v==='DLA'?'--dlac':v==='SBIR'?'--sbir':'--recomp',n:cnt('src',v)}));}
+    items=["SAM","RECOMPETE","DLA"].map(v=>({v,label:SRCLABEL[v],col:v==='SAM'?'--sam':v==='DLA'?'--dlac':v==='SBIR'?'--sbir':'--recomp',n:cnt('src',v)}));}
   else if(k==='cat'){title='Service line';
     items=CATS.map(v=>({v,label:v,col:CATCOL[v],n:cnt('cat',v)}));}
   else{title='Set-aside eligibility';
