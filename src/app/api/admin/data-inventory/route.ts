@@ -29,7 +29,8 @@ import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { FORECAST_SOURCE_AGENCY_CODES } from '@/lib/forecasts/agency-identity';
 import { CONTACT_KIND_GOVERNMENT, CONTACT_KIND_VENDOR } from '@/lib/gov-contacts/contact-kind';
 import { readAllPages } from '@/lib/paged-read';
-import { classifyFreshness, resolveAwardsIngestClocks } from '@/lib/awards-ingest/clocks';
+import { CHANGE_FIELD_LABEL, classifyLeaderboardMovement, type RankRow } from '@/lib/data-core/observation';
+import { AWARDS_INGEST_STALE_DAYS, classifyFreshness, resolveAwardsIngestClocks } from '@/lib/awards-ingest/clocks';
 import {
   computeTotals,
   countUpstreamPublishers,
@@ -428,6 +429,12 @@ export async function GET(request: NextRequest) {
         state: awardState,
         asOf: awardClocks?.sourceActionMax ?? null,
         basis: 'ingest clocks in data_sources.bq_awards (source MAX(action_date) + run times; classifyFreshness)',
+        ingest: {
+          status: awardFreshness.status,
+          sourceAgeDays: awardFreshness.sourceAgeDays,
+          runAgeDays: awardFreshness.runAgeDays,
+          staleAfterDays: AWARDS_INGEST_STALE_DAYS,
+        },
         detail: [
           `ingest: ${awardFreshness.status}`
             + (awardFreshness.sourceAgeDays != null ? ` · source ${awardFreshness.sourceAgeDays}d behind` : '')
@@ -616,6 +623,7 @@ export async function GET(request: NextRequest) {
     // ─── DERIVED / CURATED INTELLIGENCE ─────────────────────────────────────────
     {
       key: 'contacts', label: 'Contacts (government buyers + vendor POCs)', kind: 'derived_intelligence',
+      derivedFrom: ['sam_opps', 'sam_entities'],
       stored: c.contactsTotal, unit: 'contact rows',
       served: { count: c.contactsGov, label: 'government buying-office contacts (contact_kind = government_buyer)', excluded: [
         { label: 'vendor entity POCs (contact_kind = vendor_entity_poc) — contractor-side, not decision makers', count: c.contactsVendor },
@@ -628,6 +636,7 @@ export async function GET(request: NextRequest) {
     },
     {
       key: 'contractors', label: 'Contractor companies', kind: 'derived_intelligence',
+      derivedFrom: ['bq_awards'],
       stored: contractorCompanies, unit: 'companies',
       breakdown: [{ label: 'registered UEIs behind those companies (recipients)', count: contractorUeis, note: 'one company can hold several UEIs — not additive' }],
       headlineContribution: 0,
@@ -638,6 +647,7 @@ export async function GET(request: NextRequest) {
     },
     {
       key: 'events', label: 'Event Radar', kind: 'derived_intelligence',
+      derivedFrom: ['sam_opps'],
       stored: c.events, unit: 'events',
       headlineContribution: 0,
       freshness: fresh({ asOf: e.events, cadenceHours: 24, basis: 'MAX(sam_events.extracted_at)', jobs: CRON_JOBS.events }),
@@ -646,6 +656,7 @@ export async function GET(request: NextRequest) {
     },
     {
       key: 'dodaac_dir', label: 'Buying-office directory', kind: 'derived_intelligence',
+      derivedFrom: ['bq_awards'],
       stored: c.dodaac, unit: 'offices',
       headlineContribution: 0,
       freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — no registered producer cadence' },
@@ -654,6 +665,7 @@ export async function GET(request: NextRequest) {
     },
     {
       key: 'sourced_pain_points', label: 'Source-backed pain points', kind: 'derived_intelligence',
+      derivedFrom: ['gao_living'],
       stored: c.sourcedClaims, unit: 'claims',
       breakdown: [
         { label: 'tied to a held Institute source document', count: c.sourcedClaimsBacked },
@@ -666,6 +678,7 @@ export async function GET(request: NextRequest) {
     },
     {
       key: 'contract_patterns', label: 'Agency contract patterns', kind: 'derived_intelligence',
+      derivedFrom: [],
       stored: c.contractPatterns, unit: 'patterns',
       headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: null, basis: 'agency_intelligence (contract_pattern) — one-off build, no scheduled producer' },
@@ -719,6 +732,7 @@ export async function GET(request: NextRequest) {
     // ─── DERIVED INDEX / REPRESENTATION ─────────────────────────────────────────
     {
       key: 'semantic_index', label: 'Semantic index over SAM notices', kind: 'derived_index',
+      derivedFrom: ['sam_opps'],
       stored: embIndexed, unit: 'SAM notices with a vector',
       breakdown: [
         { label: 'SOW / PWS text indexed', count: c.embSow },
@@ -728,12 +742,17 @@ export async function GET(request: NextRequest) {
       ],
       headlineContribution: 0,
       headlineNote: 'these are SAM notices already counted above — a representation, not more records',
-      freshness: fresh({ asOf: null, cadenceHours: null, basis: 'embed-sow-corpus schedule (no per-row clock read here)', jobs: CRON_JOBS.embed }),
+      // The index has no per-row clock; its clock is the embedder's last SUCCESSFUL scheduled run.
+      freshness: fresh({
+        asOf: (() => { const r = latestRun('embed-sow-corpus'); return r && r.status === 'success' && (r.httpStatus == null || r.httpStatus < 300) ? r.at : null; })(),
+        cadenceHours: 1, basis: 'last successful embed-sow-corpus run (the index has no per-row clock)', jobs: CRON_JOBS.embed,
+      }),
       surface: { state: 'internal_only', tools: [], note: 'internal enrichment: powers hidden-match alerts and match_recompete_sow ranking; vectors are never returned' },
       upstreams: ['sam_gov'], provenance: 'OpenAI text-embedding-3-small over SAM SOW text (preferred) or description. OpenAI is a processing step, not a source.',
     },
     {
       key: 'knowledge_chunks', label: 'Knowledge-base passages (RAG chunks)', kind: 'derived_index',
+      derivedFrom: ['knowledge_base'],
       stored: c.ragChunks, unit: 'passages',
       headlineContribution: 0,
       headlineNote: 'searchable slices of the knowledge-base documents above',
@@ -772,6 +791,9 @@ export async function GET(request: NextRequest) {
       upstreams: ['federal_register'], provenance: 'Live Federal Register API. No NAICS tagging.',
     },
   ];
+
+  // ── Observation moat — reported SEPARATELY; never enters any source total ─────
+  const observation = await measureObservation(sb);
 
   const totals = computeTotals(datasets);
   const upstreams = countUpstreamPublishers(datasets, forecastIssuers);
@@ -813,6 +835,7 @@ export async function GET(request: NextRequest) {
       },
       registryDebt: debt,
       violations,
+      observation,
       provenanceLimits: {
         igSourceDocuments: c.igDocs,
         crsSourceDocuments: c.crsDocs,
@@ -822,4 +845,140 @@ export async function GET(request: NextRequest) {
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
+}
+
+/**
+ * What Mindy remembers about how the market changed. Every figure is read from an
+ * append-only / point-in-time store (see src/lib/data-core/observation.ts for what is
+ * deliberately excluded and why). Failures are reported as null, never as 0.
+ */
+async function measureObservation(sb: Sb) {
+  const hc = (t: string, f?: (q: Sb) => Sb) => headCount(sb, t, f);
+  const TRACKED = Object.keys(CHANGE_FIELD_LABEL);
+
+  const [rcTotal, rcByField, rcFirst, rcLast, rcLatest, series, lbTotal, icRows] = await Promise.all([
+    hc('recompete_changes'),
+    Promise.all(TRACKED.map(async (f) => ({ field: f, label: CHANGE_FIELD_LABEL[f], count: await hc('recompete_changes', (q) => q.eq('field', f)) }))),
+    edgeValue(sb, 'recompete_changes', 'observed_at', { asc: true }),
+    edgeValue(sb, 'recompete_changes', 'observed_at'),
+    (async () => {
+      try {
+        const { data, error } = await sb.from('recompete_changes')
+          .select('id, contract_id, piid, naics_code, field, old_value, new_value, observed_at')
+          .order('observed_at', { ascending: false }).order('id', { ascending: false }).limit(12);
+        return error ? null : (data as Array<{ id: number; contract_id: string; piid: string | null; naics_code: string | null; field: string; old_value: string | null; new_value: string | null; observed_at: string }>);
+      } catch { return null; }
+    })(),
+    // The stored daily cumulative series — exactly the rows snapshot-metrics wrote, no gap-filling.
+    (async () => {
+      try {
+        const res = await readAllPages<{ snapshot_date: string; value: number }>(
+          // truncation-ok: read through readAllPages (.range pages until a short page proves exhaustion; unexhausted → null)
+          () => sb.from('daily_metric_snapshots').select('snapshot_date, value')
+            .eq('metric_key', 'recompete_changes_total').order('snapshot_date', { ascending: true }),
+          { maxRows: 20_000 },
+        );
+        return res.error || !res.exhausted ? null : res.rows.map((r) => ({ date: r.snapshot_date, total: Number(r.value) }));
+      } catch { return null; }
+    })(),
+    hc('leaderboard_snapshots'),
+    (async () => {
+      try {
+        const res = await readAllPages<{ domain: string; change_type: string; canonical_agency: string; new_value: string | null; changed_at: string }>(
+          () => sb.from('intelligence_changes').select('domain, change_type, canonical_agency, new_value, changed_at')
+            .order('changed_at', { ascending: false }),
+          { maxRows: 20_000 },
+        );
+        return res.error || !res.exhausted ? null : res.rows;
+      } catch { return null; }
+    })(),
+  ]);
+
+  // Leaderboard snapshot dates — walked newest→oldest one distinct date at a time (weekly,
+  // so a handful of queries), instead of paging tens of thousands of rows to find them.
+  const lbDates: string[] = [];
+  try {
+    let before: string | null = null;
+    for (let i = 0; i < 260; i++) {
+      let q = sb.from('leaderboard_snapshots').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(1);
+      if (before) q = q.lt('snapshot_date', before);
+      const { data, error } = await q;
+      if (error || !data?.length) break;
+      before = String(data[0].snapshot_date);
+      lbDates.push(before);
+    }
+  } catch { /* dates stay partial → reported below */ }
+
+  const readSnapshot = async (date: string): Promise<RankRow[] | null> => {
+    try {
+      const res = await readAllPages<RankRow>(
+        // truncation-ok: read through readAllPages (.range pages until a short page proves exhaustion; unexhausted → null)
+        () => sb.from('leaderboard_snapshots').select('slug, recipient_uei, recipient_name, rank')
+          .eq('snapshot_date', date).order('slug', { ascending: true }).order('recipient_uei', { ascending: true }),
+        { maxRows: 50_000 },
+      );
+      return res.error || !res.exhausted ? null : res.rows;
+    } catch { return null; }
+  };
+  // Every stored snapshot is read (tens of thousands of rows, paged with proven
+  // exhaustion). Movement is only ever computed between two STORED snapshots.
+  const ascDates = lbDates.slice().reverse();
+  const snaps = await Promise.all(ascDates.map((d) => readSnapshot(d)));
+  const allRead = snaps.every((x) => x != null);
+  const latestSnap = snaps.length ? snaps[snaps.length - 1] : null;
+  const prevSnap = snaps.length >= 2 ? snaps[snaps.length - 2] : null;
+  const movement = latestSnap && prevSnap ? classifyLeaderboardMovement(prevSnap, latestSnap) : null;
+  const weekly = allRead && snaps.length >= 2
+    ? ascDates.slice(1).map((to, i) => ({ from: ascDates[i], to, counts: classifyLeaderboardMovement(snaps[i]!, snaps[i + 1]!, 0).counts }))
+    : null;
+  const span = allRead && snaps.length >= 2
+    ? { from: ascDates[0], to: ascDates[ascDates.length - 1], ...classifyLeaderboardMovement(snaps[0]!, snaps[snaps.length - 1]!) }
+    : null;
+
+  const knownFieldSum = rcByField.every((f) => f.count != null) ? rcByField.reduce((s, f) => s + (f.count ?? 0), 0) : null;
+  const tally = (rows: Array<Record<string, unknown>>, k: string) => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(String(r[k]), (m.get(String(r[k])) ?? 0) + 1);
+    return [...m.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  };
+
+  return {
+    recompeteChanges: {
+      total: rcTotal,
+      byField: [
+        ...rcByField,
+        ...(rcTotal != null && knownFieldSum != null && rcTotal - knownFieldSum > 0
+          ? [{ field: 'other', label: 'Other tracked field', count: rcTotal - knownFieldSum }] : []),
+      ],
+      firstObserved: rcFirst,
+      lastObserved: rcLast,
+      latest: rcLatest,
+      /** Stored daily cumulative totals (daily_metric_snapshots.recompete_changes_total). */
+      series,
+      basis: 'recompete_changes is append-only: each row is a tracked contract field observed to move, recorded before the hourly upsert overwrote it.',
+    },
+    leaderboards: {
+      rows: lbTotal,
+      snapshotDates: lbDates.length ? lbDates.slice().reverse() : null,
+      latestDate: lbDates[0] ?? null,
+      previousDate: lbDates[1] ?? null,
+      listsInLatest: latestSnap ? new Set(latestSnap.map((r) => r.slug)).size : null,
+      entriesInLatest: latestSnap ? latestSnap.length : null,
+      movement,
+      /** Consecutive stored snapshots compared pairwise — movement per snapshot interval. */
+      weekly,
+      /** First stored snapshot vs latest, within lists present in both. */
+      span,
+      basis: 'Point-in-time snapshots of the public /top/[slug] contractor rankings (weekly). Movement is computed only between two stored snapshots, within lists present in both.',
+    },
+    intelligenceChanges: icRows ? {
+      total: icRows.length,
+      byType: tally(icRows, 'change_type'),
+      byDomain: tally(icRows, 'domain'),
+      firstChanged: icRows.length ? icRows[icRows.length - 1].changed_at : null,
+      lastChanged: icRows[0]?.changed_at ?? null,
+      latest: icRows.slice(0, 3).map((r) => ({ agency: r.canonical_agency, changeType: r.change_type, value: r.new_value, at: r.changed_at })),
+      basis: 'Changes to GAO-backed strategic intelligence (agency_pain_points_db). A different kind of change from procurement movement — never added to it.',
+    } : null,
+  };
 }

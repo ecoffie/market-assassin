@@ -99,6 +99,11 @@ export interface InstanceFreshness {
 
 export interface Freshness {
   state: FreshnessState;
+  /**
+   * Structured ingest health where a producer publishes its own clocks (today: the award
+   * warehouse). Kept separate from `detail` so a visual can plot lag without parsing prose.
+   */
+  ingest?: { status: string; sourceAgeDays: number | null; runAgeDays: number | null; staleAfterDays: number };
   /** The data's own clock (last advance / last sync / file date). null = unknown. */
   asOf: string | null;
   /** Which clock `asOf` and `state` were read from — never implied. */
@@ -156,6 +161,12 @@ export interface InventoryDataset {
   /** Upstream publisher ids (keys of UPSTREAM_PUBLISHERS). Empty for internal corpora. */
   upstreams: string[];
   provenance: string;
+  /**
+   * Keys of the datasets this one is BUILT FROM (derived intelligence and indexes only).
+   * Drives the transformation view; a test asserts every key exists. Not a claim that
+   * every parent record flows into the child.
+   */
+  derivedFrom?: string[];
   proseAttributions?: ProseAttribution[];
   note?: string;
 }
@@ -303,8 +314,17 @@ export function inventoryViolations(datasets: InventoryDataset[]): string[] {
     if (d.grain === 'transaction' && d.kind !== 'source_corpus') {
       v.push(`${d.key}: transaction grain is only meaningful on a source corpus`);
     }
+    if ((d.kind === 'derived_intelligence' || d.kind === 'derived_index') && d.derivedFrom === undefined) {
+      v.push(`${d.key}: a ${d.kind} dataset must declare derivedFrom (use [] when built from a live API)`);
+    }
     if (d.surface.state === 'withheld' && d.surface.tools.length > 0) {
       v.push(`${d.key}: a withheld dataset cannot list customer tools`);
+    }
+  }
+  const known = new Set(datasets.map((d) => d.key));
+  for (const d of datasets) {
+    for (const parent of d.derivedFrom ?? []) {
+      if (!known.has(parent)) v.push(`${d.key}: derivedFrom references unknown dataset ${parent}`);
     }
   }
   return v;

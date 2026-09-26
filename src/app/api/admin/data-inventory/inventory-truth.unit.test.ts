@@ -304,6 +304,32 @@ describe('Data Core inventory truth', () => {
     expect(named.filter((t: string) => !live.has(t))).toEqual([]);
   });
 
+  it('OBSERVATION: reported separately, never added to any source total, never read from excluded stores', () => {
+    expect(body.observation).toBeDefined();
+    for (const k of ['recompeteChanges', 'leaderboards', 'intelligenceChanges']) expect(body.observation, k).toHaveProperty(k);
+    // the source totals are exactly the source datasets — observation adds nothing
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const src = body.datasets.filter((d: any) => d.kind === 'source_corpus').reduce((s: number, d: any) => s + (d.headlineContribution ?? 0), 0);
+    expect(body.totals.persistedSourceRows).toBe(src);
+    // customer watchlist history and the 24h overwrite cache are NOT observation history
+    const code = readFileSync(join(__dirname, 'route.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toContain("'daily_saved_search_snapshots'");
+    expect(code).not.toContain("'mcp_external_cache'");
+  });
+
+  it('COMPETITION HEALTH: labelled on-demand with no retained history, and claims no trend or movement', () => {
+    const charts = readFileSync(join(process.cwd(), 'src/app/admin/data-inventory/charts.tsx'), 'utf8');
+    // From the capabilities constant through the end of the card component — a claim in either counts.
+    const start = charts.indexOf('const CH_CAPABILITIES');
+    expect(start).toBeGreaterThan(-1);
+    const card = charts.slice(start, charts.indexOf('\n}\n', charts.indexOf('export function CompetitionHealthCard')));
+    expect(card).toMatch(/On-demand scorecard/);
+    expect(card).toMatch(/Historical health snapshots not yet retained/);
+    expect(card).toContain('/admin/competition-health');
+    expect(card).not.toMatch(/improving|weakening|trend|markets monitored|accumulated/i);
+  });
+
   it('COLLECTORS: every data-collector cron in the repo is represented by a dataset', () => {
     // Derived from the filesystem, not a list typed here: a new institute-* / sync-*
     // collector fails this until the inventory represents it (or it is declared not-a-corpus).

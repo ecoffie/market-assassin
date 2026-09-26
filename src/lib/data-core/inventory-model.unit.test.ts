@@ -25,8 +25,8 @@ function ds(p: Partial<InventoryDataset> & Pick<InventoryDataset, 'key' | 'kind'
 
 describe('computeTotals — owned records vs transaction rows vs everything else', () => {
   const sam = ds({ key: 'sam', kind: 'source_corpus', stored: 224_158, headlineContribution: 224_158 });
-  const index = ds({ key: 'idx', kind: 'derived_index', stored: 148_433, headlineContribution: 0 });
-  const contacts = ds({ key: 'contacts', kind: 'derived_intelligence', stored: 302_151, headlineContribution: 0 });
+  const index = ds({ key: 'idx', kind: 'derived_index', stored: 148_433, headlineContribution: 0, derivedFrom: ['sam'] });
+  const contacts = ds({ key: 'contacts', kind: 'derived_intelligence', stored: 302_151, headlineContribution: 0, derivedFrom: ['sam'] });
   const pain = ds({ key: 'pain', kind: 'static_manual', stored: 3_036, headlineContribution: 0 });
   const calc = ds({ key: 'calc', kind: 'passthrough', stored: null, headlineContribution: null,
     freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'x' }, surface: { state: 'passthrough', tools: [] } });
@@ -74,6 +74,17 @@ describe('computeTotals — owned records vs transaction rows vs everything else
     const hist = ds({ key: 'hist', kind: 'source_corpus', stored: 445, headlineContribution: 445,
       surface: { state: 'withheld', tools: ['get_agency_intel'] } });
     expect(inventoryViolations([hist])).toContain('hist: a withheld dataset cannot list customer tools');
+  });
+});
+
+describe('lineage — derived rows name what they are built from', () => {
+  it('a derived dataset without derivedFrom, or pointing at an unknown key, is a violation', () => {
+    const sam = ds({ key: 'sam', kind: 'source_corpus', stored: 1, headlineContribution: 1 });
+    expect(inventoryViolations([sam, ds({ key: 'ev', kind: 'derived_intelligence' })]))
+      .toContain('ev: a derived_intelligence dataset must declare derivedFrom (use [] when built from a live API)');
+    expect(inventoryViolations([sam, ds({ key: 'ev', kind: 'derived_intelligence', derivedFrom: ['nope'] })]))
+      .toContain('ev: derivedFrom references unknown dataset nope');
+    expect(inventoryViolations([sam, ds({ key: 'ev', kind: 'derived_intelligence', derivedFrom: ['sam'] })])).toEqual([]);
   });
 });
 
