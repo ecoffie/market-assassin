@@ -39,6 +39,7 @@ export interface BodyRelevanceCase {
     | 'product_attribute'
     | 'buyer_letterhead'
     | 'proximity_not_phrase'
+    | 'product_not_service'
     | 'genuine_rescue';
   input: string;
   term: string;
@@ -161,6 +162,25 @@ export const BODY_RELEVANCE_CASES: BodyRelevanceCase[] = [
     title: 'USCG ANT SAGINAW RIVER',
     naics: '336611',
     passage: 'low pressure fresh water wash down (maximum 5,000 psi)',
+    admit: false,
+  },
+
+  // ── CONFIRMED IN PRODUCTION 2026-09-22 — awarded results, not body text ─
+  // Observed on getmindy.ai after #1610 merged. The AWARDED fallback applies
+  // the same activity gate, so an exact word match on a PRODUCT is admitted
+  // for a SERVICE business. Labelling it "Already awarded" explains its
+  // TIMING; it says nothing about its RELEVANCE, and the label must not be
+  // mistaken for a disclosure of that. Not from sam_opportunities at all —
+  // verified 0 rows for both the title and the reference number — it comes
+  // from the BigQuery `usaspending.awards` task-order path.
+  {
+    klass: 'product_not_service',
+    input: 'we do detailing',
+    term: 'detailing',
+    title: 'DETAILING BOTTLE 12 OZ CLEAR PLASTIC',
+    naics: null,
+    passage:
+      '(no body text — matched on the TITLE, via the awarded/task-order fallback. $136, General Services Administration, awarded Jun 22, ref 47QSWA26F1E4Z.)',
     admit: false,
   },
 
