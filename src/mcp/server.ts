@@ -28,6 +28,7 @@ import { findPredecessor } from './tools/predecessor-award';
 import { lookupSamEntity } from './tools/sam-entity';
 import { searchContractors } from './tools/search-contractors';
 import { getAgencyIntel } from './tools/agency-intel';
+import { getLegislationStatus } from './tools/legislation-status';
 import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
@@ -204,6 +205,34 @@ server.registerTool(
 );
 
 server.registerTool(
+  'get_legislation_status',
+  {
+    title: 'Legislation Status (NDAA · Bills · Public Law)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      "Status of federal LEGISLATION from Mindy's stored Congress record. Use for NDAA / National Defense " +
+      'Authorization Act, Congress bill status, House bills (H.R.), Senate bills (S.), committee reports and ' +
+      'public law (PL) questions. Returns each bill with its versions, stage, law status, dates, the latest STORED ' +
+      'action and congress.gov links; House and Senate bills are never merged; only a public-law record is law. ' +
+      'Holds status, NOT bill text. Not for agency priorities (get_agency_intel), Federal Register regulations ' +
+      '(get_regulatory_demand) or finding work (find_opportunities).',
+    inputSchema: {
+      query: z
+        .string()
+        .min(1)
+        .describe('The user\'s words or an identifier: "FY2027 NDAA", "H.R. 8800", "S 4784", "PL 119-60", "S. Rept. 119-127".'),
+    },
+  },
+  async ({ query }) => {
+    const result = await getLegislationStatus({ query });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
   'get_regulatory_demand',
   {
     title: 'Get Regulatory Demand (Federal Register)',
@@ -214,7 +243,8 @@ server.registerTool(
       'by 6-18 months as the agency staffs up to implement it — a signal SAM/USASpending cannot ' +
       'provide. Pass at least one of query/agency. Returns grounded=false when no items match — ' +
       'suggest a broader term or longer window; do NOT invent demand. Federal Register does NOT ' +
-      'tag items to NAICS; any NAICS mapping is inference, not data — do not claim one.',
+      'tag items to NAICS; any NAICS mapping is inference, not data — do not claim one. Federal Register ' +
+      'regulation only — NOT congressional bills, NDAA status or public-law status (use get_legislation_status).',
     inputSchema: {
       query: z
         .string()
@@ -431,7 +461,8 @@ server.registerTool(
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
       'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
       'holds for the department — each bill and version with its stage and law status and a congress.gov link. ' +
-      'Bill text is not held. grounded=false when no agency matches — do not guess.',
+      'Bill text is not held. For bill or NDAA status not tied to an agency, use get_legislation_status. ' +
+      'grounded=false when no agency matches — do not guess.',
     inputSchema: {
       agency: z
         .string()
@@ -613,7 +644,8 @@ server.registerTool(
     description:
       'CURRENT INTELLIGENCE journey slot — what changed about how this buyer buys for a capability, and what to ' +
       'do differently (cited live deltas only). Composes recompete_changes, recompete_opportunities, sam_opportunities, ' +
-      'agency_forecasts, sam_events. Exposes pathway gaps honestly; never set-aside-first.',
+      'agency_forecasts, sam_events. Exposes pathway gaps honestly; never set-aside-first. Procurement-behavior ' +
+      'changes only — not congressional bill or NDAA status (use get_legislation_status).',
     inputSchema: {
       agency: z.string().optional().describe('Buying organization.'),
       office: z.string().optional(),

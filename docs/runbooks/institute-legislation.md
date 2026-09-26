@@ -12,9 +12,13 @@
 `upstream_quiet` — the TRUE data state (newest dated NDAA text 2026-07-30, beyond the 45-day
 recess threshold), not a fault. Runs on `GOVINFO_API_KEY` (api.data.gov, accepted by
 api.congress.gov) by decision; a separately named `CONGRESS_API_KEY` is not required.
-⚠️ **Operationally live ≠ customer product.** The Institute legislative corpus is NOT yet wired to
-a customer surface. The corrected FY2026 NDAA pain points (PL 119-60 cited) are customer-facing
-independently of this collector.
+**Customer surfaces (read-only, through `readLegislativeCorpus()` in
+`src/lib/strategic-intel/legislative-evidence.ts`):** `get_agency_intel` → `legislation` section
+(agency-scoped, #1699) and `get_legislation_status` (bill / NDAA / public-law status, 2026-09-26).
+Both carry "bill text not held" and "latest stored action" — the collector stores one latest action
+per bill and no action history or votes. The corrected FY2026 NDAA pain points (PL 119-60 cited)
+remain a separate, static surface.
+*(This line said "NOT yet wired to a customer surface" until 2026-09-26.)*
 *(Previously `PARKED / BLOCKED_CONTROLLED`, #1596, 2026-09-21 → 2026-09-23.)*
 *(This line said "NOT YET ENABLED (Gate 5)" until 2026-09-22, two days after the row was enabled.)*
 

@@ -46,6 +46,8 @@ export interface LegislativeVersion {
   document_number: string;
   source_type: string;
   evidence_class: LegislativeEvidenceClass;
+  /** Congress's version code (IH, RS, EH, ENR, PUBLIC-LAW …) — the stage evidence. Null for reports. */
+  version_code: string | null;
   version: string | null;
   stage: LegislativeStage | 'committee_report';
   law_status: LawStatusAtIngestion | 'not_applicable';
@@ -115,7 +117,7 @@ export interface LegislativeEvidence {
 }
 
 // ── pure helpers ──────────────────────────────────────────────────────────────
-interface HeldRow {
+export interface HeldRow {
   source_type: string;
   document_number: string;
   title: string;
@@ -163,6 +165,7 @@ function toVersion(row: HeldRow, link: LegislativeVersion['agency_link']): Legis
     document_number: row.document_number,
     source_type: row.source_type,
     evidence_class: evidenceClassOf(row),
+    version_code: isReport ? null : str(r.versionCode),
     version: isReport ? null : str(r.legislativeVersion),
     stage: isReport ? 'committee_report' : ((str(r.legislativeStage) as LegislativeStage) ?? 'other'),
     law_status: isReport ? 'not_applicable' : ((str(r.lawStatusAtIngestion) as LawStatusAtIngestion) ?? 'not_enacted'),
@@ -177,18 +180,25 @@ const byDateAsc = (a: LegislativeVersion, b: LegislativeVersion) =>
   (a.source_date ?? '9999').localeCompare(b.source_date ?? '9999') || a.document_number.localeCompare(b.document_number);
 
 /**
- * Group held rows into measures for ONE department. Pure: no I/O.
- * A measure is included when any of its own rows resolves to the department;
+ * Group held rows into measures. Pure: no I/O.
+ * With a department, a measure is included when any of its own rows resolves to it;
  * its committee reports (incl. unresolved errata) come with it, marked inherited.
+ * With `department = null` the WHOLE held corpus is grouped (the status tool's view):
+ * nothing is filtered, and agency_link reports each row's own resolution.
  */
-export function groupLegislativeEvidence(rows: HeldRow[], department: string): {
+export function groupLegislativeEvidence(rows: HeldRow[], department: string | null): {
   vehicles: LegislativeVehicle[];
   other_measures: LegislativeMeasure[];
 } {
   const bills = rows.filter((r) => r.source_type !== 'committee_report');
   const linkedKeys = new Set(
-    bills.filter((r) => r.canonical_agency === department).map(measureKeyOf).filter((k): k is string => !!k),
+    bills.filter((r) => department === null || r.canonical_agency === department)
+      .map(measureKeyOf).filter((k): k is string => !!k),
   );
+  const linkOf = (row: HeldRow): LegislativeVersion['agency_link'] =>
+    (department === null ? !!row.canonical_agency : row.canonical_agency === department)
+      ? 'own_resolution'
+      : 'inherited_from_associated_bill';
 
   const measures = new Map<string, LegislativeMeasure>();
   for (const row of bills) {
@@ -215,7 +225,7 @@ export function groupLegislativeEvidence(rows: HeldRow[], department: string): {
       };
       measures.set(key, m);
     }
-    m.versions.push(toVersion(row, row.canonical_agency === department ? 'own_resolution' : 'inherited_from_associated_bill'));
+    m.versions.push(toVersion(row, linkOf(row)));
     if (r.becameLaw === true) m.became_law = true;
     m.law_number = m.law_number ?? str(r.lawNumber);
     const actionDate = str(r.latestActionDate);
@@ -233,7 +243,7 @@ export function groupLegislativeEvidence(rows: HeldRow[], department: string): {
     const key = measureKeyOf(row);
     const m = key ? measures.get(key) : undefined;
     if (!m) continue;
-    m.committee_reports.push(toVersion(row, row.canonical_agency === department ? 'own_resolution' : 'inherited_from_associated_bill'));
+    m.committee_reports.push(toVersion(row, linkOf(row)));
   }
 
   const all = [...measures.values()];
@@ -350,6 +360,44 @@ export function legislativeAgencyGrain(query: string, parentAgency: string | nul
   return { department: null, grain: null };
 }
 
+/**
+ * The ONE read of the held legislative corpus: every legislative row + coverage from the
+ * control plane and discovery cursor. Shared by the agency reader and get_legislation_status.
+ * A rows-read failure THROWS (callers report unavailable, never "no legislation"); a clock-read
+ * failure only makes coverage UNKNOWN.
+ */
+export async function readLegislativeCorpus(
+  opts: { client?: SupabaseClient; now?: string } = {},
+): Promise<{ rows: HeldRow[]; coverage: LegislativeCoverage }> {
+  const client = opts.client ?? sb();
+  const [rowsRes, instRes, notesRes] = await Promise.all([
+    client
+      .from('institute_sources')
+      .select('source_type,document_number,title,source_url,publication_date,canonical_agency,raw')
+      .in('source_type', [...LEGISLATIVE_SOURCE_TYPES])
+      .order('document_number', { ascending: true })
+      .limit(HELD_ROW_CEILING),
+    client
+      .from('data_source_instances')
+      .select('last_poll,last_verified_ingest,last_source_advance')
+      .eq('source_key', SOURCE_KEY)
+      .maybeSingle(),
+    client.from('data_sources').select('notes').eq('key', SOURCE_KEY).maybeSingle(),
+  ]);
+  if (rowsRes.error) throw new Error(`readLegislativeCorpus: ${rowsRes.error.message}`);
+  const rows = (rowsRes.data ?? []) as HeldRow[];
+  const truncated = rows.length >= HELD_ROW_CEILING;
+  const coverage = instRes.error || notesRes.error
+    ? { ...legislativeCoverage({ instance: null, notes: null, heldRowsTruncated: truncated, now: opts.now }), status: 'unknown' as const }
+    : legislativeCoverage({
+        instance: instRes.data as never,
+        notes: (notesRes.data as { notes?: string | null } | null)?.notes ?? null,
+        heldRowsTruncated: truncated,
+        now: opts.now,
+      });
+  return { rows, coverage };
+}
+
 export async function getLegislativeEvidenceForAgency(
   input: { query: string; parentAgency?: string | null },
   opts: { client?: SupabaseClient; now?: string } = {},
@@ -371,33 +419,7 @@ export async function getLegislativeEvidenceForAgency(
     };
   }
 
-  const client = opts.client ?? sb();
-  const [rowsRes, instRes, notesRes] = await Promise.all([
-    client
-      .from('institute_sources')
-      .select('source_type,document_number,title,source_url,publication_date,canonical_agency,raw')
-      .in('source_type', [...LEGISLATIVE_SOURCE_TYPES])
-      .order('document_number', { ascending: true })
-      .limit(HELD_ROW_CEILING),
-    client
-      .from('data_source_instances')
-      .select('last_poll,last_verified_ingest,last_source_advance')
-      .eq('source_key', SOURCE_KEY)
-      .maybeSingle(),
-    client.from('data_sources').select('notes').eq('key', SOURCE_KEY).maybeSingle(),
-  ]);
-  // The corpus read decides the answer; a failure is UNAVAILABLE, never "no legislation".
-  if (rowsRes.error) throw new Error(`getLegislativeEvidenceForAgency: ${rowsRes.error.message}`);
-  const rows = (rowsRes.data ?? []) as HeldRow[];
-  // Clock reads only shape coverage; a failure there makes coverage UNKNOWN, not complete.
-  const coverage = instRes.error || notesRes.error
-    ? { ...legislativeCoverage({ instance: null, notes: null, heldRowsTruncated: rows.length >= HELD_ROW_CEILING, now: opts.now }), status: 'unknown' as const }
-    : legislativeCoverage({
-        instance: instRes.data as never,
-        notes: (notesRes.data as { notes?: string | null } | null)?.notes ?? null,
-        heldRowsTruncated: rows.length >= HELD_ROW_CEILING,
-        now: opts.now,
-      });
+  const { rows, coverage } = await readLegislativeCorpus(opts);
 
   const grouped = groupLegislativeEvidence(rows, department);
   const count = grouped.vehicles.length + grouped.other_measures.length;

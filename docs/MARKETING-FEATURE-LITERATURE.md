@@ -7355,3 +7355,30 @@ Scope: active orders (period of performance not ended), not the full history. A 
 - **Refused, with a plain reason:** filters the order data can't support, such as PSC codes or action dates.
 
 A bare contract number that appears under two agencies now asks which one you mean. Orders with no recorded parent contract are counted separately, never dropped. Live: OASIS+ management consulting in DC with a minimum order value of $1M returned 6 orders, and the Map showed the same 6.
+
+---
+
+## Ask Mindy where a bill stands in Congress (2026-09-26)
+
+**What.** Any AI agent connected to Mindy can now ask "What is the status of the FY2027 NDAA?",
+"Has it become law?", "Show me H.R. 8800" or "PL 119-60" and get the answer from Mindy's own stored
+Congress record — each House and Senate bill kept separate, every version with its stage and law
+status, the latest stored action, the committee reports, and a congress.gov link for each document.
+
+**Why it matters.** Before this, an agent asked about the NDAA went to the open web even with Mindy
+connected. Now the answer comes from a record that can prove its own coverage, and it says exactly
+what it can't establish.
+
+**Honest scope.** Status and documents, not text: Mindy does not hold bill text, so it will not say
+what a bill requires — it says so instead of guessing. It tracks NDAA bills in the current Congress
+(not appropriations or other bills), and it stores the latest action on each bill, not the full
+voting history. "Reported by committee" is never shown as "passed", and "passed the House" is never
+shown as law.
+
+**SEO.** FY2027 NDAA status / has the NDAA passed / NDAA House vs Senate bill / defense authorization
+bill tracker for contractors.
+
+**Proof.** Production data 2026-09-26: FY2027 → not enacted; H.R. 8800 passed the House (engrossed
+2026-07-22), S. 4784 reported in the Senate with S. Rept. 119-127. FY2026 → enacted as S. 1071,
+Public Law 119-60.
+

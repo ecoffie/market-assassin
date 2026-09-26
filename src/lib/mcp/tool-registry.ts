@@ -29,6 +29,7 @@ import { getSolicitationIncumbent } from '@/mcp/tools/solicitation-incumbent';
 import { lookupSamEntity } from '@/mcp/tools/sam-entity';
 import { searchContractors } from '@/mcp/tools/search-contractors';
 import { getAgencyIntel } from '@/mcp/tools/agency-intel';
+import { getLegislationStatus } from '@/mcp/tools/legislation-status';
 import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
@@ -121,6 +122,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_keyword_coverage: 5,
   get_market_vocabulary: 5,
   get_regulatory_demand: 5,
+  // 5 — owned-corpus legislation status read (3 PostgREST reads, ~0.3 s, no external call).
+  get_legislation_status: 5,
   get_agency_budget_trends: 5,
   get_federal_event_series: 5,
   search_federal_events: 5,
@@ -293,6 +296,36 @@ const INCUMBENT_FINANCIALS_TOOL_DEF = {
   },
 };
 
+/** OpenAI-style def for the legislation status tool (stored NDAA corpus, status + metadata only). */
+export const LEGISLATION_STATUS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_legislation_status',
+    description:
+      'Status of federal LEGISLATION from Mindy\'s stored Congress record. Use for NDAA / National Defense ' +
+      'Authorization Act, Congress bill status, House bills (H.R.), Senate bills (S.), committee reports and ' +
+      'public law (PL) questions — e.g. "What is the status of the FY2027 NDAA?", "Has it become law?", ' +
+      '"Show me H.R. 8800", "PL 119-60". Returns each bill with its versions, stage (introduced / reported / ' +
+      'passed House / passed Senate / enrolled / public law), law status, dates, the latest STORED action and ' +
+      'congress.gov links; House and Senate bills are never merged. Only a public-law record is law. Covers ' +
+      'NDAA-titled bills in the current Congress; other bills and appropriations are not tracked. Holds status, ' +
+      'NOT bill text — it cannot say what a bill contains, requires or directs. Not for agency priorities (use ' +
+      'get_agency_intel), Federal Register regulations (use get_regulatory_demand) or selling/finding work (use ' +
+      'find_opportunities). Credits: 5.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            'The user\'s words or an identifier: "FY2027 NDAA", "H.R. 8800", "S 4784", "PL 119-60", "S. Rept. 119-127".',
+        },
+      },
+      required: ['query'],
+    },
+  },
+};
+
 /** OpenAI-style def for the Federal Register regulatory-demand tool. */
 const REGULATORY_DEMAND_TOOL_DEF = {
   type: 'function' as const,
@@ -302,7 +335,8 @@ const REGULATORY_DEMAND_TOOL_DEF = {
       'Leading "demand before SAM" indicator: recent Federal Register rules/notices for a topic or ' +
       'agency. A proposed/final rule often precedes agency solicitations by 6-18 months. Federal ' +
       'Register does NOT tag items to NAICS — any NAICS mapping is inference, not data. Pass at least ' +
-      'one of query/agency.',
+      'one of query/agency. Federal Register regulation only (rules, proposed rules, notices) — NOT ' +
+      'congressional bills, NDAA status or public-law status: use get_legislation_status for those.',
     parameters: {
       type: 'object',
       properties: {
@@ -448,7 +482,8 @@ const AGENCY_INTEL_TOOL_DEF = {
       'holds for the department — each bill and version with its stage and law status (enacted law vs House/' +
       'Senate activity vs committee report) and a congress.gov link. Bill text is not held, so it cannot say ' +
       'what a version requires. Returns grounded=false when no agency matches — try the full name or a CGAC ' +
-      'code; do not guess an agency.',
+      'code; do not guess an agency. The legislation section is agency-scoped context — for bill or NDAA ' +
+      'status not tied to an agency, use get_legislation_status.',
     parameters: {
       type: 'object',
       properties: {
@@ -669,7 +704,8 @@ const CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF = {
       'Never invents CSO/OT/consortium/rapid/PAE pathways without observed evidence; exposes gaps in ' +
       'not_yet_measurable. Empty what_changed is honest. Observed pathways are record evidence only — not ' +
       'future-acquisition certainty; never treat an unavailable horizon as zero. Journey: FIND → CURRENT ' +
-      'INTELLIGENCE → PATHWAY. Credits: 8.',
+      'INTELLIGENCE → PATHWAY. Procurement-behavior changes only — not congressional bill or NDAA status ' +
+      '(use get_legislation_status). Credits: 8.',
     parameters: {
       type: 'object',
       properties: {
@@ -1885,6 +1921,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PRICING_INTEL_TOOL_DEF,
     INCUMBENT_FINANCIALS_TOOL_DEF,
     REGULATORY_DEMAND_TOOL_DEF,
+    LEGISLATION_STATUS_TOOL_DEF,
     AWARD_DETAIL_TOOL_DEF,
     PREDECESSOR_AWARD_TOOL_DEF,
     SOLICITATION_INCUMBENT_TOOL_DEF,
@@ -1953,6 +1990,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_pricing_intel' ||
     name === 'get_incumbent_financials' ||
     name === 'get_regulatory_demand' ||
+    name === 'get_legislation_status' ||
     name === 'get_award_detail' ||
     name === 'find_predecessor_award' ||
     name === 'get_solicitation_incumbent' ||
@@ -2082,6 +2120,13 @@ export async function runMcpTool(
       document_type: (args.document_type as 'RULE' | 'PROPOSED_RULE' | 'NOTICE' | undefined) ?? undefined,
       days_back: typeof args.days_back === 'number' ? args.days_back : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_legislation_status') {
+    const result = (await getLegislationStatus({
+      query: typeof args.query === 'string' ? args.query : '',
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

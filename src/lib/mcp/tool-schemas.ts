@@ -150,6 +150,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   get_keyword_coverage: { title: 'Get Keyword Coverage' },
   get_market_vocabulary: { title: 'Get Market Vocabulary' },
   get_pricing_intel: { title: 'Get Pricing Intel (GSA CALC)' },
+  get_legislation_status: { title: 'Legislation Status (NDAA · Bills · Public Law)' },
   get_regulatory_demand: { title: 'Get Regulatory Demand' },
   get_sba_goaling_share: { title: 'Get SBA Goaling Share' },
   get_sblo_contact: { title: 'Get SBLO Contact' },

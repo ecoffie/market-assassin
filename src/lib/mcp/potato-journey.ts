@@ -2,11 +2,16 @@
  * Potato journey orchestration.
  * P2 changes first-turn sequencing (value before qualification).
  * v1 evidence invariants stay locked — no new intelligence products, datasets, or MCP tools.
+ * The LEGISLATION line is routing only (approved 2026-09-26, get_legislation_status v1): a
+ * fresh claude.ai host sent an NDAA status question to web search because nothing in the
+ * VISIBLE top of these instructions named a Mindy tool for Congress. It must stay inside the
+ * first ~1,500 chars (legislation-routing.unit.test.ts).
  */
 
 /** First-turn contract — must lead initialize instructions. */
 export const P2_FIRST_TURN_INSTRUCTIONS = [
   'Solicitation intent (BEFORE Potato P2 FIND-first). Classify, then call ONE tool. Do not call FIND first and then lookup.',
+  'LEGISLATION (check FIRST, before the solicitation classes) — NDAA / National Defense Authorization Act / Congress bill status / an H.R. or S. bill number / public law (PL) / "has it become law" / committee report: call get_legislation_status ONCE. Not get_regulatory_demand (Federal Register is regulation, not Congress). Not find_opportunities or lookup_solicitation. Mindy holds bill status, not bill text — never state provisions from memory.',
   'KNOWN_ID — a notice UUID or solicitation identifier (isSolicitationIdentifier): call lookup_solicitation with that token. Do NOT call find_opportunities.',
   'HISTORICAL — submitted / bid / proposal / worked on / what happened / previous / old / recently / last month / "the solicitation we" / "the bid we" / a named program in a retrospective context: call lookup_solicitation ONCE with the user\'s words. Closed ≠ gone. Do NOT call find_opportunities first.',
   'CURRENT_FIND — sell / opportunities / available / where\'s the money / want to work with, without retrospective/past-work intent: Potato P2 below.',

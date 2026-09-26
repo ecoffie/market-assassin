@@ -19,6 +19,7 @@ describe('mcp tool-registry — catalog + pricing', () => {
   it('credit prices match the value-based ladder (locked 2026-07-20)', () => {
     expect(creditsFor('search_sam_opportunities')).toBe(5); // scan floor
     expect(creditsFor('lookup_solicitation')).toBe(5);
+    expect(creditsFor('get_legislation_status')).toBe(5);
     expect(creditsFor('get_contractor_profile')).toBe(10); // profile
     expect(creditsFor('find_capable_contractors')).toBe(20); // edge
     expect(creditsFor('draft_proposal')).toBe(40); // multi-agent

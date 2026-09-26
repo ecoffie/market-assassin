@@ -71,7 +71,7 @@ try {
   console.error(`✓ tools/list → [${names.join(', ')}]`);
   if (!names.includes('get_winning_playbook')) fail('get_winning_playbook not registered');
   for (const t of [
-    'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand',
+    'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand', 'get_legislation_status',
     'get_keyword_coverage', 'search_idv_contracts', 'search_past_contracts', 'get_contractor_award_history', 'assess_market_depth',
     'get_solicitation_documents', 'search_federal_events',
     'scan_proposal_compliance', 'evaluate_bid_decision',
@@ -191,6 +191,24 @@ try {
     const mentioned = firstAgencies.some((a) => frS._ai_hint?.summary?.includes(String(a)));
     if (!mentioned) fail(`regulatory-demand: _ai_hint agency not traceable to rules[0].agencies (${firstAgencies.join(', ')})`);
   }
+
+  // ── get_legislation_status (stored NDAA corpus) ────────────────────────────
+  // Status + metadata only. The invariant the smoke guards: a House-passed or
+  // Senate-reported bill is never reported as law, and bill text is never claimed.
+  console.error('\n→ calling get_legislation_status({ query: "What is the status of the FY2027 NDAA?" })');
+  const ls = await client.callTool({ name: 'get_legislation_status', arguments: { query: 'What is the status of the FY2027 NDAA?' } });
+  const lsS = ls.structuredContent;
+  if (!lsS) fail('legislation-status: no structuredContent');
+  console.error(`✓ outcome=${lsS.resolution?.outcome} · enacted=${lsS.overall_status?.enacted} · docs=${lsS.documents?.map((d) => `${d.bill}:${d.current_stage}`).join(', ')} · coverage=${lsS.coverage?.status}`);
+  if (lsS._meta?.degraded) fail('legislation-status: degraded=true (corpus unreadable)');
+  if (!lsS.limitations?.includes('bill_text_not_held')) fail('legislation-status: bill_text_not_held limitation missing');
+  for (const d of lsS.documents ?? []) {
+    if (d.progress?.enacted && !d.versions?.some((x) => x.evidence_class === 'ENACTED_LAW')) {
+      fail(`legislation-status: ${d.bill} marked enacted without an ENACTED_LAW record`);
+    }
+  }
+  const lsC = await client.callTool({ name: 'get_legislation_status', arguments: { query: 'What does H.R. 8800 say about cybersecurity?' } });
+  if (lsC.structuredContent?.content_status !== 'NOT_HELD') fail('legislation-status: content question did not return content_status=NOT_HELD');
 
   // ── get_award_detail (USASpending) ─────────────────────────────────────────
   // Stable historical DoD award (~$979M ceiling). USASpending retains historical
