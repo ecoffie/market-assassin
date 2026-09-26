@@ -338,7 +338,7 @@ function Row({ d, names }: { d: Dataset; names: Record<string, string> }) {
                     <div key={s.job} className="mb-1.5">
                       <span className="font-mono text-ink-soft">{s.job}</span> <span className="text-faint">{s.cron ?? 'no cron row'}{s.enabled === false ? ' · DISABLED' : ''}</span>
                       <div className="text-[11px] text-faint">
-                        last scheduled run: {s.lastScheduledRun ? `${when(s.lastScheduledRun.at)} (${s.lastScheduledRun.status ?? '?'}${s.lastScheduledRun.httpStatus != null ? `, HTTP ${s.lastScheduledRun.httpStatus}` : ', HTTP status unrecorded'})` : 'none in the last 21 days'}
+                        last scheduled run: {s.lastScheduledRun ? `${when(s.lastScheduledRun.at)} (${s.lastScheduledRun.status ?? '?'}${s.lastScheduledRun.httpStatus != null ? `, HTTP ${s.lastScheduledRun.httpStatus}` : ', HTTP status unrecorded'})` : 'none recorded'}
                         {s.lastManualRefresh && <> · last manual refresh: {when(s.lastManualRefresh)}</>}
                         {s.nextScheduled && <> · next scheduled: {when(s.nextScheduled)}</>}
                         {' · recurrence: '}<b className={s.recurrence === 'proven' ? 'text-emerald-300' : 'text-amber-300'}>{s.recurrence.replace(/_/g, ' ')}</b>

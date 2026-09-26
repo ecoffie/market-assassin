@@ -28,6 +28,7 @@ import { getCountClient } from '@/lib/supabase/server-clients';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { FORECAST_SOURCE_AGENCY_CODES } from '@/lib/forecasts/agency-identity';
 import { CONTACT_KIND_GOVERNMENT, CONTACT_KIND_VENDOR } from '@/lib/gov-contacts/contact-kind';
+import { readAllPages } from '@/lib/paged-read';
 import {
   computeTotals,
   countUpstreamPublishers,
@@ -248,14 +249,19 @@ export async function GET(request: NextRequest) {
       const vals = await Promise.all(e.map(([, p]) => p));
       return Object.fromEntries(e.map(([k], i) => [k, vals[i]])) as Record<string, string | null>;
     })(),
-    // the whole legislative corpus is small (tens of rows) — read it to derive FY coverage
+    // The legislative corpus is small (tens of rows) but is read with PROVEN exhaustion —
+    // a `.limit(n)` above 1,000 silently returns 1,000 rows (PostgREST cap). An unproven
+    // read is treated as unmeasured, never as a partial answer.
     (async () => {
       try {
-        const { data, error } = await sb.from('institute_sources')
-          .select('source_type, document_number, publication_date, raw')
-          .in('source_type', LEGISLATIVE_TYPES as unknown as string[])
-          .limit(2000);
-        return error ? null : (data as Array<{ source_type: string; document_number: string; publication_date: string | null; raw: Record<string, unknown> | null }>);
+        const res = await readAllPages<{ source_type: string; document_number: string; publication_date: string | null; raw: Record<string, unknown> | null }>(
+          () => sb.from('institute_sources')
+            .select('source_type, document_number, publication_date, raw')
+            .in('source_type', LEGISLATIVE_TYPES as unknown as string[])
+            .order('document_number', { ascending: true }),
+          { maxRows: 20_000 },
+        );
+        return res.error || !res.exhausted ? null : res.rows;
       } catch { return null; }
     })(),
     // control plane
@@ -277,17 +283,20 @@ export async function GET(request: NextRequest) {
         return error ? null : (data as Array<{ job_name: string; cron_expr: string | null; enabled: boolean | string | null }>);
       } catch { return null; }
     })(),
-    (async () => {
+    // Latest run PER JOB. A single "last 21 days, newest first" read hits the 1,000-row
+    // cap within ~7 days (embed-sow-corpus alone logs ~96 runs/day) and would silently
+    // drop a weekly job's run — exactly the legislation run this page must show.
+    Promise.all(allCronJobs.map(async (job) => {
       try {
         const { data, error } = await sb.from('cron_job_runs')
           .select('job_name, started_at, status, http_status')
-          .in('job_name', allCronJobs)
-          .gte('started_at', new Date(now.getTime() - 21 * 86_400_000).toISOString())
+          .eq('job_name', job)
           .order('started_at', { ascending: false })
-          .limit(1000);
-        return error ? null : (data as Array<{ job_name: string; started_at: string; status: string | null; http_status: number | null }>);
+          .limit(1);
+        if (error) return null;
+        return ((data ?? []) as Array<{ job_name: string; started_at: string; status: string | null; http_status: number | null }>)[0] ?? null;
       } catch { return null; }
-    })(),
+    })).then((rows) => rows.filter((r): r is NonNullable<typeof r> => r != null)),
     Promise.all([bqCount(BQ_TABLES.recipientsRollup), bqCount(BQ_TABLES.recipients), bqCount(BQ_TABLES.awards)]),
   ]);
   const c = counts;

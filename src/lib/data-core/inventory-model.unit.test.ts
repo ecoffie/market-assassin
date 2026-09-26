@@ -157,9 +157,20 @@ describe('scheduleTruth — a manual refresh does not prove the schedule', () =>
     expect(s.recurrence).toBe('failed');
   });
 
-  it('a disabled job has no next scheduled run', () => {
-    const s = scheduleTruth({ ...base, enabled: false, lastScheduledRun: null, lastPoll: null });
+  it('a disabled job has no next scheduled run and is labelled disabled, not proven', () => {
+    const s = scheduleTruth({ ...base, enabled: false, lastScheduledRun: { at: '2026-09-20T05:00:00Z', status: 'success', httpStatus: 200 }, lastPoll: null });
     expect(s.nextScheduled).toBeNull();
+    expect(s.recurrence).toBe('disabled');
+  });
+
+  it('a dispatched run with no outcome is not a failure — and not a success', () => {
+    const s = scheduleTruth({ ...base, lastScheduledRun: { at: '2026-09-26T01:00:00Z', status: 'dispatched', httpStatus: null }, lastPoll: null });
+    expect(s.recurrence).toBe('no_terminal_status');
+  });
+
+  it('a job with no cron row is unscheduled', () => {
+    const s = scheduleTruth({ ...base, cron: null, enabled: null, lastScheduledRun: null, lastPoll: null });
+    expect(s.recurrence).toBe('unscheduled');
   });
 });
 

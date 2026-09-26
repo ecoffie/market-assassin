@@ -67,9 +67,15 @@ export interface ScheduledRun {
 export type RecurrenceState =
   | 'proven'                 // a scheduled run after the last manual refresh returned 2xx
   | 'ran_status_unrecorded'  // a scheduled run after it reported success but no HTTP status (#1593)
+  | 'no_terminal_status'     // the latest run was dispatched and never recorded an outcome
   | 'not_yet_reproven'       // no scheduled run since the last manual refresh
   | 'failed'                 // the latest scheduled run failed
+  | 'disabled'               // the cron row exists but is disabled
+  | 'unscheduled'            // no cron_jobs row at all
   | 'unknown';
+
+/** cron_job_runs statuses that mean "sent, outcome never written" — not a failure. */
+const NON_TERMINAL = new Set(['dispatched', 'running', 'started', 'pending']);
 
 export interface ScheduleTruth {
   job: string;
@@ -375,10 +381,16 @@ export function scheduleTruth(input: {
     pollMs != null && (runMs == null || pollMs - runMs > MANUAL_GAP_MS) ? lastPoll : null;
 
   let recurrence: RecurrenceState = 'unknown';
-  if (!run) {
+  if (cron == null && enabled == null) {
+    recurrence = 'unscheduled';
+  } else if (enabled === false) {
+    recurrence = 'disabled';
+  } else if (!run) {
     recurrence = 'not_yet_reproven';
   } else if (lastManualRefresh) {
     recurrence = 'not_yet_reproven';
+  } else if (run.status && NON_TERMINAL.has(run.status)) {
+    recurrence = 'no_terminal_status';
   } else if (run.status && run.status !== 'success') {
     recurrence = 'failed';
   } else if (run.httpStatus != null && run.httpStatus >= 200 && run.httpStatus < 300) {

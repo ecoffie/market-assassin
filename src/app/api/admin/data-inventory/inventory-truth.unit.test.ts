@@ -88,7 +88,7 @@ function fakeQuery(table: string) {
       table === 'institute_sources' ? LEGISLATION_ROWS
         : table === 'data_source_instances' ? INSTANCES
           : table === 'cron_jobs' ? CRON_ROWS
-            : table === 'cron_job_runs' ? RUN_ROWS
+            : table === 'cron_job_runs' ? RUN_ROWS.filter((r) => filters.includes(`eq:job_name=${r.job_name}`))
               : table === 'data_sources' ? DATA_SOURCES
                 : [];
     resolve({ data, error: null });
