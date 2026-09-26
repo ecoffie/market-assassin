@@ -295,25 +295,44 @@ function restorerSrc() {
   return cook(MAP.slice(start, end));
 }
 
-function runRestore(search: string, stored: unknown) {
+function runRestore(search: string, stored: unknown, opts: { sig?: () => string | null } = {}) {
   const applied: unknown[] = [];
   const tracked: { action: string; props: Record<string, unknown> }[] = [];
-  const el = () => ({
-    style: { cssText: '' }, setAttribute() {}, appendChild() {}, remove() {},
-    textContent: '', onclick: null as unknown,
-  });
+  const mounted: Record<string, unknown>[] = [];
+  const el = () => {
+    const node: Record<string, unknown> = {
+      id: '', style: { cssText: '' }, setAttribute() {}, children: [] as Record<string, unknown>[],
+      appendChild(c: Record<string, unknown>) { (node.children as Record<string, unknown>[]).push(c); },
+      remove() { const i = mounted.indexOf(node); if (i >= 0) mounted.splice(i, 1); },
+      textContent: '', onclick: null as unknown,
+    };
+    return node;
+  };
   const win: Record<string, unknown> = {
     __applySavedSearch: (ss: unknown) => applied.push(ss),
     __mapStateMeaningful: meaningful(),
     __track: (_k: string, action: string, props: Record<string, unknown>) => tracked.push({ action, props }),
     __STATE_NAMES: { VA: 'Virginia' },
   };
-  const doc = { querySelector: () => ({ appendChild() {} }), createElement: () => el(), body: { appendChild() {} } };
+  if (opts.sig) win.__mapIntentSig = opts.sig;
+  const host = { appendChild: (n: Record<string, unknown>) => mounted.push(n) };
+  const doc = {
+    querySelector: () => host, createElement: () => el(), body: host,
+    getElementById: (id: string) => mounted.find((n) => n.id === id) || null,
+  };
   const ls = { getItem: (k: string) => (k === 'mi_map_last_search' && stored != null ? JSON.stringify(stored) : null) };
   new Function('location', 'localStorage', 'window', 'document', 'setTimeout', restorerSrc())(
     { search }, ls, win, doc, (f: () => void) => f(),
   );
-  return { applied, tracked };
+  const pill = () => mounted.find((n) => n.id === 'resumePill') || null;
+  const pillText = () => ((pill()?.children as Record<string, unknown>[]) || []).map((c) => c.textContent).join(' ');
+  const startFresh = () => {
+    const b = ((pill()?.children as Record<string, unknown>[]) || []).find((c) => c.textContent === 'Start fresh');
+    (b!.onclick as () => void)();
+  };
+  /** One fetchView round, exactly as _fetchViewNow runs the hook. */
+  const round = () => { const c = win.__checkResumeProvenance as (() => void) | null | undefined; if (c) c(); };
+  return { applied, tracked, pill, pillText, startFresh, round, win };
 }
 
 const YESTERDAY = () => ({
@@ -393,5 +412,103 @@ describe('unknown is not a memory', () => {
     const co = { mode: 'companies', filters: { agency: 'NAVY' }, t: Date.now() };
     const ss = runRestore('', co).applied[0] as { mode: string };
     expect(ss.mode).toBe('open');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1697 — THE PILL IS A CLAIM ABOUT THE CURRENT MARKET, NOT A SOUVENIR
+// "Picked up where you left off · 'software license'" stayed on screen after the
+// user searched "cybersecurity". Explicit current intent beats remembered intent:
+// the pill lives exactly as long as the map still shows the restored market.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('#1697 resume pill follows state provenance, not time', () => {
+  const SW = () => ({ mode: 'open', filters: { q: 'software license', horizons: { open: true, recompete: false, forecast: false } }, t: Date.now() - 3600e3 });
+  function session() {
+    let current = 'restored';
+    const r = runRestore('', SW(), { sig: () => current });
+    return { ...r, set: (s: string | null) => { current = s as string; } };
+  }
+
+  it('a restored market shows the pill naming what was restored', () => {
+    const s = session();
+    expect(s.pill()).toBeTruthy();
+    expect(s.pillText()).toContain('software license');
+  });
+  it('a round on the SAME market (pan, repaint, re-fetch) keeps it', () => {
+    const s = session(); s.round(); s.round();
+    expect(s.pill()).toBeTruthy();
+  });
+  it.each(['new keyword search', 'agency change', 'filter change', 'horizon change', 'Clear all'])(
+    '%s → the pill is gone on the next round', () => {
+      const s = session(); s.set('something the user asked for'); s.round();
+      expect(s.pill()).toBeNull();
+    });
+  it('once gone it never comes back, even if the user wanders back to the same market', () => {
+    const s = session(); s.set('new'); s.round(); s.set('restored'); s.round();
+    expect(s.pill()).toBeNull();
+    expect(s.win.__checkResumeProvenance).toBeNull();
+  });
+  it('an unreadable signature is UNKNOWN, not a change — the pill stays', () => {
+    const s = session(); s.set(null); s.round();
+    expect(s.pill()).toBeTruthy();
+  });
+  it('Start fresh removes the pill, clears the market, and retires the check', () => {
+    const s = session();
+    const cleared: unknown[] = [];
+    s.win.__applySavedSearch = (ss: unknown) => cleared.push(ss);
+    s.startFresh();
+    expect(s.pill()).toBeNull();
+    expect(s.win.__checkResumeProvenance).toBeNull();
+    expect(cleared).toHaveLength(1);
+  });
+  it('a ?q= deep link never restores, so no pill can claim it', () => {
+    const r = runRestore('?q=cybersecurity', SW(), { sig: () => 'x' });
+    expect(r.pill()).toBeNull();
+    expect(r.win.__checkResumeProvenance).toBeUndefined();
+  });
+  it('the fingerprint is taken from LIVE state after the apply — never from the stored object', () => {
+    const src = restorerSrc();
+    const apply = src.indexOf('window.__applySavedSearch({mode:mode,filters:f});');
+    const sig = src.indexOf('restoredSig=window.__mapIntentSig()');
+    expect(apply).toBeGreaterThan(0);
+    expect(sig).toBeGreaterThan(apply);
+  });
+});
+
+describe('#1697 the provenance check runs where intent changes funnel', () => {
+  it('_fetchViewNow runs the check on the same seam as the memory writer', () => {
+    const at = MAP.indexOf('function _fetchViewNow(t0){');
+    const body = MAP.slice(at, at + 1400);
+    const rem = body.indexOf('window.__rememberMapState()');
+    const chk = body.indexOf('window.__checkResumeProvenance()');
+    expect(rem).toBeGreaterThan(0);
+    expect(chk).toBeGreaterThan(rem);
+  });
+
+  /** Execute the real __mapIntentSig against a stubbed _mapState. */
+  function sigFn(state: { filters?: Record<string, unknown>; bbox?: unknown }, mode = 'open') {
+    const start = MAP.indexOf('  window.__mapIntentSig=function(){');
+    const end = MAP.indexOf('\n  };', start) + 5;
+    const win: Record<string, unknown> = { __mapMode: mode };
+    new Function('window', '_mapState', cook(MAP.slice(start, end)))(win, () => state);
+    return win.__mapIntentSig as () => string | null;
+  }
+  it('a pan does not change the signature (bbox/zoom are not intent)', () => {
+    const f = { q: 'software license', horizons: { open: true } };
+    expect(sigFn({ filters: f, bbox: { w: 1 } })()).toBe(sigFn({ filters: f, bbox: { w: 9 } })());
+  });
+  it('key order does not change the signature', () => {
+    expect(sigFn({ filters: { q: 'a', agency: 'NAVY' } })()).toBe(sigFn({ filters: { agency: 'NAVY', q: 'a' } })());
+  });
+  it.each([
+    ['query', { q: 'cybersecurity' }],
+    ['agency', { q: 'software license', agency: 'NAVY' }],
+    ['horizon', { q: 'software license', horizons: { open: true, recompete: true } }],
+  ])('a %s change changes the signature', (_n, next) => {
+    const base = sigFn({ filters: { q: 'software license' } })();
+    expect(sigFn({ filters: next as Record<string, unknown> })()).not.toBe(base);
+  });
+  it('a dataset switch changes the signature', () => {
+    expect(sigFn({ filters: {} }, 'open')()).not.toBe(sigFn({ filters: {} }, 'recompete')());
   });
 });
