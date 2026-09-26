@@ -143,6 +143,13 @@ export function effectiveGrantStatus(row: { status?: unknown; absent_since?: unk
 
 /** Grants.gov opportunity id from a cached detail URL (…/search-results-detail/<id>). The STABLE identity:
  *  the funding-opportunity number changes when a forecast is posted or a notice is reissued. */
+/** The SAME predicate as GRANTS_VISIBLE_OR / applyGrantsVisibility, in JS (for reconcile's own checks). */
+export function isGrantRowVisible(r: { absent_since?: string | null; source_status?: string | null; superseded_by?: string | null }): boolean {
+  if (r.superseded_by) return false;
+  if (!r.absent_since || !r.source_status) return true;
+  return r.source_status === 'posted' || r.source_status === 'forecast' || r.source_status === 'not_found';
+}
+
 export function grantsGovIdFromUrl(url: unknown): string | null {
   const m = String(url ?? '').match(/search-results-detail\/(\d+)\s*$/);
   return m ? m[1] : null;
@@ -157,6 +164,9 @@ export interface ReconcileResult {
   actionableMarkedAbsent: number;
   /** Of markedAbsent: the same Grants.gov id is listed today under a new number (duplicate, hidden). */
   superseded: number;
+  /** Same Grants.gov id listed under a new number, but the replacement row was NOT proven present and
+   *  visible — so the old row stays VISIBLE as absent/unverified instead of being hidden. By reason. */
+  supersedeDeclined?: Record<string, number>;
   restored: number;
 }
 
@@ -168,14 +178,17 @@ export interface ReconcileOptions {
   todayIso?: string;
 }
 
-type CacheRow = { opp_number: string; status: string | null; close_date: string | null; absent_since: string | null; url?: string | null };
+type CacheRow = {
+  opp_number: string; status: string | null; close_date: string | null; absent_since: string | null; url?: string | null;
+  map_lat?: number | null; superseded_by?: string | null; source_status?: string | null;
+};
 
 async function readAllCacheRows(db: SupabaseClient): Promise<CacheRow[]> {
   const out: CacheRow[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db
       .from('grants_cache')
-      .select('opp_number, status, close_date, absent_since, url')
+      .select('opp_number, status, close_date, absent_since, url, map_lat, superseded_by, source_status')
       .order('opp_number', { ascending: true })
       .range(from, from + 999);
     if (error) throw new Error(`grants_cache read failed: ${error.message}`);
@@ -223,14 +236,26 @@ export async function reconcileAbsentGrants(
     };
   }
 
-  // Identity first: a candidate whose Grants.gov id IS listed in this snapshot under another number is the
-  // same grant, renumbered (forecast → posting, reissue). Mark it superseded (duplicate); everything else is
-  // absent/unverified — visible until the official lookup confirms closed/archived.
+  // Identity first. A candidate is a duplicate ONLY on authoritative identity: its stored Grants.gov
+  // opportunity id (the `id` Grants.gov's own search API returned when we cached it) is listed in THIS
+  // snapshot under another number. Titles, number shapes and successor announcements are never used.
+  // Then the replacement must be PROVEN present and visible before the old row is hidden — otherwise
+  // hiding would delete the grant from view. Anything that fails a check stays absent/unverified (VISIBLE).
+  const byNumber = new Map(rows.map((r) => [r.opp_number, r] as const));
   const supersededBy = new Map<string, string>();
+  const declined: Record<string, number> = {};
+  const decline = (why: string) => { declined[why] = (declined[why] || 0) + 1; };
   for (const r of candidates) {
     const gid = grantsGovIdFromUrl(r.url);
     const current = gid ? run.seenIds?.get(gid) : undefined;
-    if (current && current !== r.opp_number) supersededBy.set(r.opp_number, current);
+    if (!current || current === r.opp_number) continue;
+    const rep = byNumber.get(current);
+    if (!rep) { decline('replacement_not_in_cache'); continue; }
+    if (grantsGovIdFromUrl(rep.url) !== gid) { decline('replacement_id_mismatch'); continue; }
+    if (!isGrantRowVisible(rep)) { decline('replacement_not_visible'); continue; }
+    if (!isActionable(rep, todayIso)) { decline('replacement_not_actionable'); continue; }
+    if (r.map_lat != null && rep.map_lat == null) { decline('replacement_not_on_map'); continue; }
+    supersededBy.set(r.opp_number, current);
   }
   let marked = 0;
   const plain = candidates.map((r) => r.opp_number).filter((id) => !supersededBy.has(id));
@@ -254,7 +279,7 @@ export async function reconcileAbsentGrants(
     if (error) throw new Error(`grants_cache mark-superseded failed: ${error.message}`);
     marked += 1;
   }
-  return { ran: true, reason: null, markedAbsent: marked, actionableMarkedAbsent: actionableCandidates, superseded: supersededBy.size, restored };
+  return { ran: true, reason: null, markedAbsent: marked, actionableMarkedAbsent: actionableCandidates, superseded: supersededBy.size, supersedeDeclined: declined, restored };
 }
 
 /* ── confirmation against the official source ──────────────────────────────────────────── */

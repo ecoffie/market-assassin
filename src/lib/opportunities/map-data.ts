@@ -204,6 +204,10 @@ export type MapOpp = {
   // latest snapshot, or absent from it and unverified / confirmed live / ambiguous not-found. Never 'closed':
   // source-confirmed closed/archived rows are not returned as pins at all.
   verification?: GrantVerification;
+  /** Grants only: earlier Grants.gov numbers of THIS grant (rows superseded by it). The old records are
+   *  kept in grants_cache with superseded_by → this number, so a search or saved pursuit under the old
+   *  number can be resolved to the current listing. */
+  formerly?: string[];
 };
 
 /**
@@ -723,8 +727,24 @@ export async function getGrantsViewportPins(
   }
   if (error) throw new Error(`getGrantsViewportPins: ${error.message}`);
 
+  // Preserve references: for each visible grant, the older numbers that were superseded by it.
+  const formerly = new Map<string, string[]>();
+  const rowsRead = (data || []) as unknown as Array<Record<string, unknown>>;
+  if (rowsRead.length && 'superseded_by' in rowsRead[0]) {
+    const sols = rowsRead.map((r) => String(r.opp_number ?? '').trim()).filter(Boolean);
+    for (let i = 0; i < sols.length; i += 200) {
+      const { data: prev, error: prevErr } = await sb.from('grants_cache')
+        .select('opp_number, superseded_by').in('superseded_by', sols.slice(i, i + 200));
+      // Degrade to no back-references (never an error on the map); the old rows are still kept.
+      if (prevErr) { console.error('[grants-map] formerly lookup failed:', prevErr.message); break; }
+      for (const p of (prev || []) as Array<{ opp_number: string; superseded_by: string }>) {
+        formerly.set(p.superseded_by, [...(formerly.get(p.superseded_by) || []), p.opp_number]);
+      }
+    }
+  }
+
   const out: MapOpp[] = [];
-  for (const r of (data || []) as unknown as Array<Record<string, unknown>>) {
+  for (const r of rowsRead) {
     const oppNumber = String(r.opp_number ?? '').trim();
     if (!oppNumber) continue;
     const forecasted = effectiveGrantStatus(r) === 'forecasted';
@@ -747,6 +767,7 @@ export async function getGrantsViewportPins(
       locSrc: 'office',                // always agency-HQ approximate (never a real PoP)
       est: Number(r.award_ceiling) || 0,
       ...(withReconcileRows ? { verification: grantVerification(r) } : {}),
+      ...(formerly.has(oppNumber) ? { formerly: formerly.get(oppNumber)!.sort() } : {}),
     });
   }
   return out;

@@ -85,9 +85,24 @@ first run would proceed.
 | superseded (renumbered duplicate) | `superseded_by` = the number the SAME Grants.gov id is listed under in the complete run | **hidden** (record kept); the grant is shown via its current row | `hidden.supersededDuplicates` |
 | expired posted (close date past) | unchanged | hidden by the existing read-time filter | — |
 
-- **Identity** is the Grants.gov opportunity id taken from the cached detail URL. The
+- **Identity** is the Grants.gov opportunity id taken from the cached detail URL. That URL is built
+  from the `id` that Grants.gov's own search API returned. The
   funding-opportunity number (`opp_number`, the cache key) changes when a forecast is posted or a
-  notice is reissued.
+  notice is reissued. **Titles, number shapes and successor announcements are never used**: two
+  distinct grants with near-identical titles and adjacent numbers are never merged (negative test).
+- **A duplicate is hidden only if the replacement is proven present and visible.** The replacement
+  row must meet all of these conditions:
+  - it is in the cache;
+  - it carries the same Grants.gov id;
+  - it is visible (same predicate as the read filter);
+  - it is actionable;
+  - it is on the map whenever the old row was.
+  If any check fails, the old row is **not** hidden. It stays visible as absent/unverified, and the
+  failure is counted in `reconcile.supersedeDeclined` by reason.
+- **References are preserved.** The old row is kept, with `superseded_by` pointing forward. The
+  replacement's map pin carries `formerly: [old numbers]`, so the old number can be resolved to
+  the current listing. Saved grant pursuits key on the number and fetch documents directly from
+  Grants.gov, not from this cache, so hiding a cache row cannot break them.
 - Superseded rows are not looked up; their current row is listed.
 - A row seen again clears `absent_since` and `superseded_by`.
 - The client does not yet *render* the `verification` label. The pin data carries it, and a UI
@@ -171,10 +186,21 @@ the real `classifySourceRecord`. `…/dry-run-new-rule-2026-09-26.json` is the n
   archived, but that is a different, non-random sample: only 1 of them overlaps my 12, and the
   alphabetical order clustered archived rows. "All 20 archived" did not generalize: the full 103
   include 17 live and 6 uncertain.
-- **The full 103** is the population. The dry run under the new rule: complete listing (925/925,
-  611/611); 17 superseded hidden right after one run; 86 visible as absent/unverified; after
-  looking up all 86, **80 would be hidden** (confirmed closed/archived), 3 stay visible as
-  ambiguous, 3 stay visible as unverified, and **0** confirmed-live grants would be hidden.
+- **The full 103** is the population. The dry run under the new rule
+  (`tasks/evidence/grants-cache-reconcile/dry-run-identity-proof-2026-09-26.json`) found a complete
+  listing (925/925 posted, 611/611 forecasted). The accounting:
+
+  | Outcome | Rows | State |
+  |---|---|---|
+  | Duplicate copies hidden | **17** | Each live replacement is visible |
+  | Confirmed closed/archived, hidden | **80** | 73 archived + 7 closed; records kept |
+  | Unresolved, retained | **6** | 3 ambiguous `not_found` + 3 unrecognized lookup responses; visibly marked unverified |
+  | **Total** | **97 hidden, 6 retained** | of 103 |
+
+  **Identity proof for the 17.** Each old row's Grants.gov id is listed under the new number in the
+  complete run. **Independently, Grants.gov's own `fetchOpportunity` for that id returns the new
+  number (17/17 agree).** Every replacement is in the cache, actionable and on the map, so 0 were
+  declined.
 
 ## Verify after an authorized release (the migration is NOT approved; clipboard ≠ approval)
 

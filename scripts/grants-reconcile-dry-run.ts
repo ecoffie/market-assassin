@@ -52,8 +52,30 @@ dotenv.config({ path: '.env.local', quiet: true });
   // New rule (2026-09-26): absence never hides. A would-be-absent row whose Grants.gov id is listed under a
   // NEW number is a SUPERSEDED duplicate (hidden; the grant stays visible once via its current row). Every
   // other would-be-absent row stays VISIBLE as absent/unverified until an official lookup says closed/archived.
+  // Same bar as reconcileAbsentGrants: same Grants.gov id AND the replacement row present in the cache with the
+  // same id, actionable, and on the map (prod has no reconcile columns yet, so every present row is visible).
+  const byNum = new Map(rows.map((r) => [r.opp_number, r] as const));
   const supersededBy = new Map<string, string>();
-  for (const r of wouldAbsentActionable) { const gid = grantsGovIdFromUrl(r.url); const cur = gid ? seenIds.get(gid) : undefined; if (cur && cur !== r.opp_number) supersededBy.set(r.opp_number, cur); }
+  const declined: Record<string, number> = {};
+  const identityProof: Array<Record<string, unknown>> = [];
+  for (const r of wouldAbsentActionable) {
+    const gid = grantsGovIdFromUrl(r.url); const cur = gid ? seenIds.get(gid) : undefined;
+    if (!cur || cur === r.opp_number) continue;
+    const repl = byNum.get(cur);
+    const why = !repl ? 'replacement_not_in_cache' : grantsGovIdFromUrl(repl.url) !== gid ? 'replacement_id_mismatch'
+      : !actionable(repl) ? 'replacement_not_actionable' : (r.map_lat != null && repl.map_lat == null) ? 'replacement_not_on_map' : null;
+    // Independent authoritative check: Grants.gov's own record for this id names the replacement number.
+    let officialNumber: string | null = null; let officialErr: string | null = null;
+    try {
+      const res = await fetch('https://api.grants.gov/v1/api/fetchOpportunity', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ opportunityId: Number(gid) }), signal: AbortSignal.timeout(10_000) });
+      const j = await res.json().catch(() => null) as { data?: { opportunityNumber?: string } } | null;
+      officialNumber = j?.data?.opportunityNumber ?? null;
+    } catch (e) { officialErr = (e as Error).message; }
+    identityProof.push({ old: r.opp_number, grantsGovId: gid, listedAs: cur, officialNumber, officialAgrees: officialNumber === cur, officialErr,
+      replacementInCache: !!repl, replacementOnMap: repl ? repl.map_lat != null : false, declined: why });
+    if (why) { declined[why] = (declined[why] || 0) + 1; continue; }
+    supersededBy.set(r.opp_number, cur);
+  }
   const absentUnverified = wouldAbsentActionable.filter((r) => !supersededBy.has(r.opp_number));
   const actionableBefore = tracked.filter(actionable).length;
   const breakerTrips = wouldAbsentActionable.length > 0.2 * actionableBefore;
@@ -77,7 +99,7 @@ dotenv.config({ path: '.env.local', quiet: true });
     breaker: { fraction: 0.2, trips: breakerTrips },
     reconcileWouldRun: complete && !breakerTrips,
     // New rule: what the MAP would do right after one run, and after the lookups (--confirm N) resolve.
-    identity: { supersededDuplicatesHidden: supersededBy.size, examples: [...supersededBy].slice(0, 5).map(([a, b]) => `${a}→${b}`) },
+    identity: { supersededDuplicatesHidden: supersededBy.size, declined, officialAgrees: identityProof.filter((x) => x.officialAgrees).length, proof: identityProof },
     afterRun: { hidden: supersededBy.size, hiddenReason: 'superseded duplicates only', visibleAbsentUnverified: absentUnverified.length },
     confirmationSample: sample,
     afterLookupsOfSample: sample.length ? {

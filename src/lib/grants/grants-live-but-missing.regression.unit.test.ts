@@ -36,6 +36,7 @@ vi.mock('@/lib/supabase/server-clients', () => ({ getReadClient: () => DB }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => DB }));
 
 import { ingestGrants } from './ingest';
+import { reconcileAbsentGrants } from './reconcile';
 import { getGrantsViewportPins } from '@/lib/opportunities/map-data';
 
 const NOW = '2026-09-26T09:00:00.000Z';
@@ -81,6 +82,68 @@ describe('PAR-26-120 — the measured case: same grant re-listed under a new num
     expect(v.filter((p) => p.sol === 'PAR-28-056')).toEqual([{ sol: 'PAR-28-056', verification: 'listed' }]);
     expect(v.some((p) => p.sol === 'PAR-26-120')).toBe(false); // not a second copy of the same grant
     expect(DB.tables.grants_cache.some((r) => r.opp_number === 'PAR-26-120')).toBe(true); // preserved
+  });
+
+  it('keeps a reference to the old record: the replacement pin lists PAR-26-120 as `formerly`', async () => {
+    world({ relistedAs: 'PAR-28-056' });
+    await ingest();
+    const pin = (await getGrantsViewportPins(US)).find((p) => p.sol === 'PAR-28-056')!;
+    expect(pin.formerly).toEqual(['PAR-26-120']);
+  });
+});
+
+describe('NEGATIVE — two DISTINCT grants with similar titles and numbers are never merged', () => {
+  it('PAR-26-120 (id 361275) missing, PAR-26-121 (id 361999, same title) listed → no duplicate; both visible', async () => {
+    const others = Array.from({ length: 12 }, (_, i) => ({ oppNumber: `PAR-27-${String(i + 1).padStart(3, '0')}`, id: String(400001 + i) }));
+    LISTING.posted = [...others, { oppNumber: 'PAR-26-121', id: '361999' }];
+    LISTING.forecasted = [{ oppNumber: 'FOR-X-1', id: '400999', closeDate: null }];
+    DB = makeFakeDb([
+      { ...cached('PAR-26-120', '361275', 'forecasted'), title: 'Cancer Moonshot Research Projects (R01 Clinical Trial Optional)' },
+      { ...cached('PAR-26-121', '361999', 'posted'), title: 'Cancer Moonshot Research Projects (R01 Clinical Trial Required)' },
+      ...others.map((g) => cached(g.oppNumber, g.id, 'posted')), cached('FOR-X-1', '400999', 'forecasted'),
+    ]);
+    const res = await ingest();
+    expect(res.reconcile?.ran).toBe(true);
+    expect(res.reconcile?.superseded).toBe(0);
+    expect(rowOf('PAR-26-120')).toMatchObject({ superseded_by: null, source_status: null });
+    const v = await visible();
+    expect(v).toContainEqual({ sol: 'PAR-26-120', verification: 'absent_unverified' });
+    expect(v).toContainEqual({ sol: 'PAR-26-121', verification: 'listed' });
+  });
+});
+
+describe('a same-id duplicate is hidden ONLY when the replacement is proven present and visible', () => {
+  const NOW_ISO = '2026-09-26T09:00:00.000Z';
+  const others = Array.from({ length: 12 }, (_, i) => cached(`PAR-27-${String(i + 1).padStart(3, '0')}`, String(400001 + i), 'posted'));
+  const run = (db: FakeDb) => reconcileAbsentGrants(db as never, {
+    complete: true, nowIso: NOW_ISO, previouslyAbsent: new Set(),
+    seen: new Set(['PAR-28-056', ...others.map((o) => o.opp_number)]),
+    seenIds: new Map([['361275', 'PAR-28-056'], ...others.map((o) => [String(o.url).split('/').pop()!, o.opp_number] as [string, string])]),
+  });
+  const old = () => cached('PAR-26-120', '361275', 'forecasted');
+  const cases: Array<[string, Record<string, unknown> | null]> = [
+    ['replacement_not_in_cache', null],
+    ['replacement_id_mismatch', cached('PAR-28-056', '999999', 'posted')],
+    ['replacement_not_visible', cached('PAR-28-056', '361275', 'posted', { absent_since: NOW_ISO, source_status: 'archived' })],
+    ['replacement_not_actionable', cached('PAR-28-056', '361275', 'posted', { close_date: '2026-01-01' })],
+    ['replacement_not_on_map', cached('PAR-28-056', '361275', 'posted', { map_lat: null, map_lng: null })],
+  ];
+  for (const [why, rep] of cases) {
+    it(`${why} → old row NOT hidden; stays visible as absent/unverified`, async () => {
+      const db = makeFakeDb([old(), ...others, ...(rep ? [rep] : [])]);
+      const res = await run(db);
+      expect(res.superseded).toBe(0);
+      expect(res.supersedeDeclined).toEqual({ [why]: 1 });
+      const row = db.tables.grants_cache.find((r) => r.opp_number === 'PAR-26-120')!;
+      expect(row).toMatchObject({ superseded_by: null, source_status: null });
+      expect(row.absent_since).toBeTruthy();
+    });
+  }
+  it('control: replacement present, same id, visible, actionable, on the map → superseded', async () => {
+    const db = makeFakeDb([old(), ...others, cached('PAR-28-056', '361275', 'posted')]);
+    const res = await run(db);
+    expect(res.superseded).toBe(1);
+    expect(res.supersedeDeclined).toEqual({});
   });
 });
 
