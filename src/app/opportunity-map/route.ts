@@ -2565,6 +2565,9 @@ const VIEWPORT_JS = `<script>
     // mode change already funnels through fetchView: one hook instead of twenty that
     // can drift apart.
     try{ if(window.__rememberMapState)window.__rememberMapState(); }catch(e){}
+    // RESUME PROVENANCE (#1697) — same seam, same reason: the "Picked up where you left off" pill
+    // leaves on the first round whose market is no longer the restored one.
+    try{ if(window.__checkResumeProvenance)window.__checkResumeProvenance(); }catch(e){}
     // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
     // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
     if(typeof _clearFetchError==='function')_clearFetchError();
@@ -3640,6 +3643,17 @@ const VIEWPORT_JS = `<script>
   // The user asked for a clean slate -> forget the market too, or Clear-all would
   // quietly undo itself on the next visit.
   window.__forgetMapState=function(){ try{ localStorage.removeItem(LAST_SEARCH_KEY); }catch(e){} };
+  // INTENT SIGNATURE (#1697) — the market the map is showing RIGHT NOW, as one comparable string:
+  // dataset + every _mapState filter (FILT, q, horizons, strategy). Deliberately NOT bbox/zoom: a pan
+  // is looking around the same market, not asking for a new one. Keys are sorted so two equal states
+  // always produce the same string. null = could not read the state (unknown, never "changed").
+  window.__mapIntentSig=function(){
+    try{
+      var f=(_mapState()||{}).filters||{}; var ks=Object.keys(f).sort();
+      var o={mode:(window.__mapMode||'open')}; for(var i=0;i<ks.length;i++)o[ks[i]]=f[ks[i]];
+      return JSON.stringify(o);
+    }catch(e){ return null; }
+  };
   // Captured ONCE at boot: the params that brought the user here, collapsed to a source label.
   try{
     var _qs=location.search||'';
@@ -9437,6 +9451,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // NO bbox: mi_map_last_view already restored the viewport synchronously in the
       // map constructor and is fresher (moveend, not filter-change).
       window.__applySavedSearch({mode:mode,filters:f});
+      // PROVENANCE (#1697): fingerprint the market AS RESTORED — read back from live state right
+      // after the synchronous apply, not from the stored object, so restorer normalization can never
+      // make the pill vanish on its own. The pill is true only while the map still shows exactly this.
+      var restoredSig=null; try{ if(window.__mapIntentSig)restoredSig=window.__mapIntentSig(); }catch(e){}
       // ── SAY SO ────────────────────────────────────────────────────────────
       // A map that silently opens filtered is a map whose numbers the user cannot
       // account for. __applySavedSearch syncs the visible controls, but nothing
@@ -9473,8 +9491,24 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           // …and the URL: a query typed since the restore would otherwise come back on reload.
           try{ if(window.__syncQueryUrl)window.__syncQueryUrl(true); }catch(e){}
           try{ pill.remove(); }catch(e){}
+          window.__checkResumeProvenance=null;
         };
         pill.appendChild(x); host.appendChild(pill);
+        // The pill means "this CURRENT market came from memory" — not "you once had a session".
+        // Explicit current intent beats remembered intent: the first round whose market differs
+        // from the restored one (new search, agency, filter, horizon, dataset, Clear all) removes it
+        // for good. Tied to state provenance, never to elapsed time. A pan keeps it (bbox is not
+        // part of the signature). An unreadable signature is unknown, not a change.
+        if(restoredSig){
+          window.__checkResumeProvenance=function(){
+            try{
+              if(!document.getElementById('resumePill')){ window.__checkResumeProvenance=null; return; }
+              var now=window.__mapIntentSig?window.__mapIntentSig():null;
+              if(now==null||now===restoredSig)return;
+              pill.remove(); window.__checkResumeProvenance=null;
+            }catch(e){}
+          };
+        }
       }catch(e){}
       // THE metric for this workstream: a returning visitor who did not have to
       // rebuild their market. age_hours + returning make "restored" readable
