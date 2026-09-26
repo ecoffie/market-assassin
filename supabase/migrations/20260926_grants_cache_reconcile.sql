@@ -9,8 +9,16 @@
 --                      unique fetch == its upstream hitCount, no degraded page, no error). Cleared the
 --                      moment a later run sees the row again. Absence alone never means "closed".
 --   * source_status  — THE SOURCE's statement, from the official fetchOpportunity API:
---                      posted | forecast (still live) · closed | archived | not_found (confirmed gone).
---                      Only written from a well-formed API answer; an API error leaves it NULL.
+--                      posted | forecast (live) · closed | archived (gone) · not_found (AMBIGUOUS).
+--                      Only written from a well-formed API answer; an API error/timeout leaves it NULL.
+--   * superseded_by  — identity: the SAME Grants.gov opportunity id is listed in the complete snapshot under
+--                      a NEW funding-opportunity number (forecast → posting, reissue). Holds that number.
+--
+-- Visibility (Eric, 2026-09-26): absence alone NEVER hides a grant. Hidden from actionable results only:
+--   source_status IN (closed, archived)  — confirmed gone (record kept), and
+--   superseded_by IS NOT NULL            — a duplicate; the grant stays visible once via its current row.
+-- Absent + unverified, lookup failed/timed out, or not_found → still VISIBLE, labelled.
+-- Measured 2026-09-26: 17 of 103 absent rows were live, every one re-listed under a new number.
 --   * last_seen_at   — the last ingest snapshot that listed the row.
 -- No row is ever deleted.
 --
@@ -28,6 +36,7 @@ ALTER TABLE public.grants_cache ADD COLUMN IF NOT EXISTS last_seen_at      times
 ALTER TABLE public.grants_cache ADD COLUMN IF NOT EXISTS absent_since      timestamptz;
 ALTER TABLE public.grants_cache ADD COLUMN IF NOT EXISTS source_status     text;
 ALTER TABLE public.grants_cache ADD COLUMN IF NOT EXISTS source_checked_at timestamptz;
+ALTER TABLE public.grants_cache ADD COLUMN IF NOT EXISTS superseded_by     text;
 
 DO $$
 BEGIN
@@ -50,7 +59,7 @@ CREATE TABLE IF NOT EXISTS public.grants_ingest_runs (
   complete     boolean NOT NULL,          -- every status proven complete this run
   degraded     boolean NOT NULL,
   per_status   jsonb NOT NULL,            -- { posted: {expected, fetchedUnique, pages, degraded, error, complete, reason}, ... }
-  reconcile    jsonb,                     -- { ran, reason, markedAbsent, actionableMarkedAbsent, restored }
+  reconcile    jsonb,                     -- { ran, reason, markedAbsent, actionableMarkedAbsent, superseded, restored }
   confirm      jsonb,                     -- { attempted, confirmed: {status: n}, unconfirmed }
   error        text
 );

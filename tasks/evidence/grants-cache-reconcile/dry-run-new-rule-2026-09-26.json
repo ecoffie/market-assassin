@@ -1,0 +1,405 @@
+{
+  "measuredAt": "2026-09-26T23:00:07.398Z",
+  "complete": true,
+  "completeness": {
+    "posted": {
+      "expected": 925,
+      "fetchedUnique": 925,
+      "pages": 10,
+      "degraded": false,
+      "error": null,
+      "complete": true,
+      "reason": null
+    },
+    "forecasted": {
+      "expected": 611,
+      "fetchedUnique": 611,
+      "pages": 7,
+      "degraded": false,
+      "error": null,
+      "complete": true,
+      "reason": null
+    }
+  },
+  "cache": {
+    "rows": 2227,
+    "tracked": 2227,
+    "actionableBefore": 1639
+  },
+  "wouldMarkAbsent": 691,
+  "wouldMarkAbsentActionable": 103,
+  "wouldMarkAbsentOnMap": 103,
+  "breaker": {
+    "fraction": 0.2,
+    "trips": false
+  },
+  "reconcileWouldRun": true,
+  "identity": {
+    "supersededDuplicatesHidden": 17,
+    "examples": [
+      "FOR-RFA-AG-26-012→RFA-AG-27-010",
+      "FOR-RFA-AG-26-024→PAR-27-096",
+      "PAR-25-454→PAR-28-062",
+      "PAR-26-027→PAR-27-054",
+      "PAR-26-030→PAR-27-056"
+    ]
+  },
+  "afterRun": {
+    "hidden": 17,
+    "hiddenReason": "superseded duplicates only",
+    "visibleAbsentUnverified": 86
+  },
+  "confirmationSample": [
+    {
+      "opp": "22-537",
+      "source": "archived"
+    },
+    {
+      "opp": "22-570",
+      "source": "archived"
+    },
+    {
+      "opp": "22-605",
+      "source": "archived"
+    },
+    {
+      "opp": "22-606",
+      "source": "archived"
+    },
+    {
+      "opp": "22-622",
+      "source": "archived"
+    },
+    {
+      "opp": "22-627",
+      "source": "archived"
+    },
+    {
+      "opp": "23-519",
+      "source": "archived"
+    },
+    {
+      "opp": "23-611",
+      "source": "archived"
+    },
+    {
+      "opp": "23-612",
+      "source": "archived"
+    },
+    {
+      "opp": "23-621",
+      "source": "archived"
+    },
+    {
+      "opp": "24-539",
+      "source": "archived"
+    },
+    {
+      "opp": "24-543",
+      "source": "archived"
+    },
+    {
+      "opp": "24-551",
+      "source": "archived"
+    },
+    {
+      "opp": "24-560",
+      "source": "archived"
+    },
+    {
+      "opp": "24-562",
+      "source": "archived"
+    },
+    {
+      "opp": "24-563",
+      "source": "archived"
+    },
+    {
+      "opp": "24-602",
+      "source": "archived"
+    },
+    {
+      "opp": "25-509",
+      "source": "archived"
+    },
+    {
+      "opp": "25-538",
+      "source": "archived"
+    },
+    {
+      "opp": "CDC-RFA-CK-26-0197",
+      "source": "archived"
+    },
+    {
+      "opp": "FOR-AI-27-017",
+      "source": "archived"
+    },
+    {
+      "opp": "FR-CRS-23-005",
+      "source": "closed"
+    },
+    {
+      "opp": "HHS-2025-IHS-ALZ-0001",
+      "source": "archived"
+    },
+    {
+      "opp": "HHS-2026-ACL-AOD-TBSG-0019",
+      "source": "not_found"
+    },
+    {
+      "opp": "HHS-2026-IHS-ETHIC-0001",
+      "source": "archived"
+    },
+    {
+      "opp": "HRSA-27-029",
+      "source": "not_found"
+    },
+    {
+      "opp": "IVV-FT-OPP-07282026150823",
+      "source": null
+    },
+    {
+      "opp": "IVV-FT-OPP-07282026160054",
+      "source": null
+    },
+    {
+      "opp": "NM-PMO1726",
+      "source": null
+    },
+    {
+      "opp": "NOAA-NESDISPO-STAR-2024-27967",
+      "source": "not_found"
+    },
+    {
+      "opp": "OFOP0003762",
+      "source": "closed"
+    },
+    {
+      "opp": "P11AT80708",
+      "source": "archived"
+    },
+    {
+      "opp": "P11AT80752",
+      "source": "archived"
+    },
+    {
+      "opp": "P12AC10113",
+      "source": "archived"
+    },
+    {
+      "opp": "P16AS00322",
+      "source": "archived"
+    },
+    {
+      "opp": "P16AS00333",
+      "source": "archived"
+    },
+    {
+      "opp": "P16AS00337",
+      "source": "archived"
+    },
+    {
+      "opp": "P17AS00001",
+      "source": "archived"
+    },
+    {
+      "opp": "PAR-25-228",
+      "source": "closed"
+    },
+    {
+      "opp": "PAR-25-229",
+      "source": "closed"
+    },
+    {
+      "opp": "PAR-26-128",
+      "source": "archived"
+    },
+    {
+      "opp": "PAR-27-066",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-07-5376",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-18-1517",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-18-7564",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-18-7607",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-19-006Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-19-072Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-19-073Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-19-088Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-19-1630",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-19-7479",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-20-1440",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-20-7909",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-22-1529",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-22-7569",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1179",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1401",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1403",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1406",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1407",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1415",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1417",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1443",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1491",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-1650",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-229Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-5115",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-5342",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-5345",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-7236",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-7643",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-23-7644",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-24-110Z",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-24-7791",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-25-058Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-25-342Y",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-98-1610",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-98-1670",
+      "source": "archived"
+    },
+    {
+      "opp": "PD-98-1680",
+      "source": "archived"
+    },
+    {
+      "opp": "R25AS00280",
+      "source": "closed"
+    },
+    {
+      "opp": "R26AS00016",
+      "source": "closed"
+    },
+    {
+      "opp": "RFA-DK-27-102",
+      "source": "archived"
+    },
+    {
+      "opp": "RFA-NS-26-009",
+      "source": "archived"
+    },
+    {
+      "opp": "VPL-01-23",
+      "source": "closed"
+    },
+    {
+      "opp": "W911NF26RA009",
+      "source": "archived"
+    }
+  ],
+  "afterLookupsOfSample": {
+    "checked": 86,
+    "wouldHide_confirmedClosedOrArchived": 80,
+    "staysVisible_confirmedLive": 0,
+    "staysVisible_notFoundAmbiguous": 3,
+    "staysVisible_lookupFailed": 3
+  }
+}

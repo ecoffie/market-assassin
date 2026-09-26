@@ -12,13 +12,14 @@ dotenv.config({ path: '.env.local', quiet: true });
 (async () => {
   const { searchGrants } = await import('../src/lib/grants/search');
   const { GRANT_INGEST_STATUSES } = await import('../src/lib/grants/ingest');
-  const { statusCompleteness, runIsComplete, classifySourceRecord } = await import('../src/lib/grants/reconcile');
+  const { statusCompleteness, runIsComplete, classifySourceRecord, grantsGovIdFromUrl } = await import('../src/lib/grants/reconcile');
   const { createClient } = await import('@supabase/supabase-js');
   const args = process.argv.slice(2);
   const confirmN = Number(args[args.indexOf('--confirm') + 1]) || 0;
   const today = new Date().toISOString().slice(0, 10);
 
   const seen = new Set<string>();
+  const seenIds = new Map<string, string>(); // Grants.gov opportunity id → number listed this run
   const completeness: Record<string, ReturnType<typeof statusCompleteness>> = {};
   for (const status of GRANT_INGEST_STATUSES) {
     const hitCounts: number[] = []; const unique = new Set<string>();
@@ -28,7 +29,7 @@ dotenv.config({ path: '.env.local', quiet: true });
       try { res = await searchGrants({ status, limit: 100, offset }); } catch (e) { error = (e as Error).message; break; }
       if (res.degraded) { degraded = true; break; }
       pages++; hitCounts.push(res.total);
-      for (const g of res.grants) if (g.oppNumber) { unique.add(g.oppNumber); seen.add(g.oppNumber); }
+      for (const g of res.grants) if (g.oppNumber) { unique.add(g.oppNumber); seen.add(g.oppNumber); const gid = grantsGovIdFromUrl(g.url); if (gid) seenIds.set(gid, g.oppNumber); }
       if (res.grants.length < 100) { exhausted = true; break; }
     }
     completeness[status] = statusCompleteness({ status, hitCounts, pages, fetchedUnique: unique.size, degraded, error, capped: !exhausted && !degraded && !error });
@@ -48,11 +49,18 @@ dotenv.config({ path: '.env.local', quiet: true });
   const wouldAbsent = tracked.filter((r) => !seen.has(r.opp_number));
   const wouldAbsentActionable = wouldAbsent.filter(actionable);
   const wouldAbsentOnMap = wouldAbsentActionable.filter((r) => r.map_lat != null);
+  // New rule (2026-09-26): absence never hides. A would-be-absent row whose Grants.gov id is listed under a
+  // NEW number is a SUPERSEDED duplicate (hidden; the grant stays visible once via its current row). Every
+  // other would-be-absent row stays VISIBLE as absent/unverified until an official lookup says closed/archived.
+  const supersededBy = new Map<string, string>();
+  for (const r of wouldAbsentActionable) { const gid = grantsGovIdFromUrl(r.url); const cur = gid ? seenIds.get(gid) : undefined; if (cur && cur !== r.opp_number) supersededBy.set(r.opp_number, cur); }
+  const absentUnverified = wouldAbsentActionable.filter((r) => !supersededBy.has(r.opp_number));
   const actionableBefore = tracked.filter(actionable).length;
   const breakerTrips = wouldAbsentActionable.length > 0.2 * actionableBefore;
 
   const sample: Array<{ opp: string; source: string | null }> = [];
-  for (const r of wouldAbsentActionable.slice(0, confirmN)) {
+  // Official lookups only for the absent/unverified rows (a superseded duplicate needs none).
+  for (const r of absentUnverified.slice(0, confirmN)) {
     const id = Number(String(r.url || '').match(/(\d+)\s*$/)?.[1]);
     let source: string | null = null;
     try {
@@ -68,7 +76,17 @@ dotenv.config({ path: '.env.local', quiet: true });
     wouldMarkAbsent: wouldAbsent.length, wouldMarkAbsentActionable: wouldAbsentActionable.length, wouldMarkAbsentOnMap: wouldAbsentOnMap.length,
     breaker: { fraction: 0.2, trips: breakerTrips },
     reconcileWouldRun: complete && !breakerTrips,
+    // New rule: what the MAP would do right after one run, and after the lookups (--confirm N) resolve.
+    identity: { supersededDuplicatesHidden: supersededBy.size, examples: [...supersededBy].slice(0, 5).map(([a, b]) => `${a}→${b}`) },
+    afterRun: { hidden: supersededBy.size, hiddenReason: 'superseded duplicates only', visibleAbsentUnverified: absentUnverified.length },
     confirmationSample: sample,
+    afterLookupsOfSample: sample.length ? {
+      checked: sample.length,
+      wouldHide_confirmedClosedOrArchived: sample.filter((x) => x.source === 'closed' || x.source === 'archived').length,
+      staysVisible_confirmedLive: sample.filter((x) => x.source === 'posted' || x.source === 'forecast').length,
+      staysVisible_notFoundAmbiguous: sample.filter((x) => x.source === 'not_found').length,
+      staysVisible_lookupFailed: sample.filter((x) => x.source == null).length,
+    } : null,
   };
   console.log(args.includes('--json') ? JSON.stringify(out, null, 2) : JSON.stringify(out));
 })();

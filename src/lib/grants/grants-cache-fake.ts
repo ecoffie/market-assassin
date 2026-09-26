@@ -5,7 +5,7 @@
  * table → the same error codes PostgREST returns), so the migration-missing path is tested for real.
  */
 type Row = Record<string, unknown>;
-const RECONCILE_COLS = ['last_seen_at', 'absent_since', 'source_status', 'source_checked_at'];
+const RECONCILE_COLS = ['last_seen_at', 'absent_since', 'source_status', 'source_checked_at', 'superseded_by'];
 
 export interface FakeDb {
   tables: { grants_cache: Row[]; grants_ingest_runs: Row[] };

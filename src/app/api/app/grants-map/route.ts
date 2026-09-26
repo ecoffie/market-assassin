@@ -11,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getGrantsViewportPins } from '@/lib/opportunities/map-data';
-import { GRANTS_VISIBLE_OR, isMissingSchemaError } from '@/lib/grants/reconcile';
+import { applyGrantsVisibility, isMissingSchemaError } from '@/lib/grants/reconcile';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const countVisible = (withReconcile: boolean) => {
       let q = sb().from('grants_cache').select('opp_number', { count: 'exact', head: true })
         .not('map_lat', 'is', null).or(OPEN_OR);
-      if (withReconcile) q = q.or(GRANTS_VISIBLE_OR);
+      if (withReconcile) q = applyGrantsVisibility(q);
       return q;
     };
     let reconcileApplied = true;
@@ -59,21 +59,24 @@ export async function GET(request: NextRequest) {
       totalForFilters = count;
     }
 
-    // Transparency: what the absence filter is holding back (null = unknown, never a fabricated 0).
-    let hidden: { notInLatestSnapshotUnconfirmed: number | null; confirmedGone: number | null } | null = null;
+    // Transparency (null = unknown, never a fabricated 0). HIDDEN = source-confirmed closed/archived +
+    // renumbered duplicates. VISIBLE-BUT-UNCERTAIN = absent from the latest complete snapshot and not (yet)
+    // confirmed gone — including failed lookups and ambiguous not_found. These are shown, labelled.
+    let hidden: { confirmedClosedOrArchived: number | null; supersededDuplicates: number | null } | null = null;
+    let visibleUncertain: { absentUnverified: number | null; absentNotFoundAmbiguous: number | null } | null = null;
     if (reconcileApplied) {
-      const [pending, gone] = await Promise.all([
-        sb().from('grants_cache').select('opp_number', { count: 'exact', head: true })
-          .not('map_lat', 'is', null).or(OPEN_OR).not('absent_since', 'is', null).is('source_status', null),
-        sb().from('grants_cache').select('opp_number', { count: 'exact', head: true })
-          .not('map_lat', 'is', null).or(OPEN_OR).not('absent_since', 'is', null).in('source_status', ['closed', 'archived', 'not_found']),
+      const base = () => sb().from('grants_cache').select('opp_number', { count: 'exact', head: true }).not('map_lat', 'is', null).or(OPEN_OR);
+      const [gone, dup, unverified, notFound] = await Promise.all([
+        base().is('superseded_by', null).not('absent_since', 'is', null).in('source_status', ['closed', 'archived']),
+        base().not('superseded_by', 'is', null),
+        base().is('superseded_by', null).not('absent_since', 'is', null).is('source_status', null),
+        base().is('superseded_by', null).not('absent_since', 'is', null).in('source_status', ['not_found']),
       ]);
-      if (pending.error) console.error('[grants-map] hidden-pending count failed:', pending.error.message);
-      if (gone.error) console.error('[grants-map] hidden-gone count failed:', gone.error.message);
-      hidden = {
-        notInLatestSnapshotUnconfirmed: pending.error ? null : pending.count,
-        confirmedGone: gone.error ? null : gone.count,
-      };
+      for (const [n, r] of [['gone', gone], ['dup', dup], ['unverified', unverified], ['notFound', notFound]] as const) {
+        if (r.error) console.error(`[grants-map] ${n} count failed:`, r.error.message);
+      }
+      hidden = { confirmedClosedOrArchived: gone.error ? null : gone.count, supersededDuplicates: dup.error ? null : dup.count };
+      visibleUncertain = { absentUnverified: unverified.error ? null : unverified.count, absentNotFoundAmbiguous: notFound.error ? null : notFound.count };
     }
 
     return NextResponse.json({
@@ -82,10 +85,10 @@ export async function GET(request: NextRequest) {
       totalForFilters,
       totalInView: pins.length,
       capped: pins.length >= MAX_PINS,
-      // Grants hidden because the latest COMPLETE Grants.gov snapshot no longer lists them (pending
-      // source confirmation) or the source confirmed them closed/archived/not found. null = the
-      // reconcile migration is not applied (no filter active).
+      // hidden = confirmed closed/archived + renumbered duplicates; visibleUncertain = shown, labelled.
+      // Both null = the reconcile migration is not applied (no filter active).
       hidden,
+      visibleUncertain,
       pins,
     });
   } catch (e) {

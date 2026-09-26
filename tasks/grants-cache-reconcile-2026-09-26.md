@@ -4,6 +4,22 @@ Follows the read-only report **#1711** (`tasks/grants-gov-path-health-2026-09-26
 **Stop before merge / deploy / migration.** The migration file is included and **not applied**.
 No production write, no feed or cron change, no credits.
 
+> **REVISED 2026-09-26 (review blocker).** The first version HID a row when a complete listing omitted
+> it. A complete listing proves the listing was fully retrieved, not that it contains every live grant,
+> and a known-live grant (PAR-26-120) would have been hidden. **Absence now never hides a grant:**
+> - absent → marked **absent/unverified**, still visible and labelled;
+> - an official lookup of **closed** or **archived** → removed from actionable results, record kept;
+> - an official lookup of **live** → visible;
+> - a failed, timed-out or **not_found** lookup → visible, uncertainty kept.
+>
+> Measuring all 103 then found the real mechanism behind "live but missing". All **17** such rows are
+> the **same Grants.gov opportunity re-listed under a new funding-opportunity number**. Examples:
+> PAR-26-120 → PAR-28-056, FOR-RFA-AG-26-024 → PAR-27-096.
+>
+> So a separate identity state, **superseded**, hides only the stale duplicate row; the grant stays
+> visible exactly once. The sections below are updated. The old hide-on-absence rule is mutation-tested
+> as a failure (7 tests red).
+
 ## The defect (measured, not assumed)
 
 `sync-grants` only upserts, so a grant Grants.gov stops listing stays in `grants_cache` looking
@@ -57,24 +73,26 @@ actionable rows present before, reconcile is refused and needs a supervised run
 (`allowLargeReconcile`, never set by the cron). Today's backlog is 103 / 1,639 = **6.3%**, so the
 first run would proceed.
 
-## States and read-path treatment (map pins + `grants-map` counts)
+## States and read-path treatment (map pins + `grants-map` counts) — REVISED
 
-| State | Condition | Map / headline count |
-|---|---|---|
-| present | `absent_since IS NULL` | shown (existing close-date rule still applies) |
-| absent_from_snapshot, unconfirmed | `absent_since` set, `source_status` NULL | **hidden**, counted in `hidden.notInLatestSnapshotUnconfirmed` |
-| confirmed live (`posted`/`forecast`) | absent but the source says live | **shown**, labelled by the confirmed status |
-| confirmed_closed / confirmed_archived / not_found | absent and the source says gone | **hidden**, counted in `hidden.confirmedGone` |
-| expired posted (close date past) | unchanged | hidden by the existing read-time filter (no marking, no delete) |
+| State | Condition | Map pin | `grants-map` counts |
+|---|---|---|---|
+| listed | `absent_since IS NULL` | shown, `verification: 'listed'` | headline |
+| absent / unverified | absent, `source_status` NULL (not looked up, **or lookup failed / timed out**) | **shown**, `'absent_unverified'` | headline + `visibleUncertain.absentUnverified` |
+| absent / confirmed live | absent, source `posted` / `forecast` | **shown**, `'absent_confirmed_live'`, labelled by confirmed status | headline |
+| absent / not_found (ambiguous) | absent, source `not_found` | **shown**, `'absent_not_found_ambiguous'` — never "closed" | headline + `visibleUncertain.absentNotFoundAmbiguous` |
+| absent / confirmed closed or archived | absent, source `closed` / `archived` | **hidden** (record kept) | `hidden.confirmedClosedOrArchived` |
+| superseded (renumbered duplicate) | `superseded_by` = the number the SAME Grants.gov id is listed under in the complete run | **hidden** (record kept); the grant is shown via its current row | `hidden.supersededDuplicates` |
+| expired posted (close date past) | unchanged | hidden by the existing read-time filter | — |
 
-**Why absent-and-unconfirmed is hidden rather than labelled:** the absence is proven by a complete
-snapshot, so presenting the row as actionable would repeat the defect. Hiding is reversible, and
-the row comes back if:
-- a later run sees it; or
-- the source confirms it live (PAR-26-120 is exactly that case).
-
-It is never shown as "closed". The `grants-map` response carries `hidden` counts so the headline
-doesn't silently shrink. `hidden: null` means the migration isn't applied and no filter is active.
+- **Identity** is the Grants.gov opportunity id taken from the cached detail URL. The
+  funding-opportunity number (`opp_number`, the cache key) changes when a forecast is posted or a
+  notice is reissued.
+- Superseded rows are not looked up; their current row is listed.
+- A row seen again clears `absent_since` and `superseded_by`.
+- The client does not yet *render* the `verification` label. The pin data carries it, and a UI
+  change is a separate step. Until then an absent/unverified grant looks like any other visible
+  grant, which is the safe direction.
 
 ## Safe without the migration
 
@@ -125,29 +143,67 @@ exist), verify it through PostgREST, then deploy. Either order is safe.
 - M4 outage classified as not_found → 3 red;
 - M5 schema guard on the upsert payload removed → 1 red.
 
-## Verify after an authorized release
+## Evidence — the 103 stale rows, all classified (read-only, 2026-09-26)
 
-1. `npm run db:check -- grants_cache absent_since` and `npm run db:check -- grants_ingest_runs`.
-2. **Before the first run:** `npx tsx scripts/grants-reconcile-dry-run.ts --confirm 20 --json`
-   (read-only). Expect `complete: true`, `wouldMarkAbsentActionable` ≈ the measured 103, and the
-   breaker not tripping.
+`tasks/evidence/grants-cache-reconcile/classify-all-103-2026-09-26.json` ran every stale row through
+the real `classifySourceRecord`. `…/dry-run-new-rule-2026-09-26.json` is the new-rule dry run.
+
+| Result | Rows | New-rule outcome |
+|---|---|---|
+| live, re-listed under a new number (16 posted + 1 forecast) | 17 | superseded → stale row hidden; grant visible once via its current row |
+| archived | 73 | visible as absent/unverified until looked up → then hidden |
+| closed | 7 | same → then hidden |
+| not_found | 3 | visible, labelled ambiguous |
+| lookup returned HTTP 200 but an unrecognised shape (`NM-PMO1726`, `IVV-FT-OPP-…` ×2) | 3 | visible, unverified |
+
+**How the three samples reconcile:**
+
+- **My original 12** (chosen by `synced_at`), re-run through the real classifier: 8 archived, 3 live,
+  1 not_found. The 8 archived are 5 synopses plus 3 archived forecasts (RFA-DK-27-102,
+  HHS-2025-IHS-ALZ-0001, RFA-NS-26-009). The 3 live are PAR-26-120, FOR-RFA-AG-26-024 and PAR-25-454,
+  all renumbered. The 1 not_found is NOAA-…-27967.
+  - My earlier report ("8 archived synopses, 3 dropped forecasts, 1 missing") had the right total and
+    the wrong members. My ad-hoc probe printed any archive date as "archived", including future
+    ones, so it counted 3 live synopses as archived; and it read `synopsis.archiveDate` only, so it
+    reported 3 archived forecasts as merely dropped. The fork's correction on RFA-DK-27-102 was
+    right.
+- **The fork's 20** were the first 20 **by `opp_number`** (the dry-run script's order). All 20 are
+  archived, but that is a different, non-random sample: only 1 of them overlaps my 12, and the
+  alphabetical order clustered archived rows. "All 20 archived" did not generalize: the full 103
+  include 17 live and 6 uncertain.
+- **The full 103** is the population. The dry run under the new rule: complete listing (925/925,
+  611/611); 17 superseded hidden right after one run; 86 visible as absent/unverified; after
+  looking up all 86, **80 would be hidden** (confirmed closed/archived), 3 stay visible as
+  ambiguous, 3 stay visible as unverified, and **0** confirmed-live grants would be hidden.
+
+## Verify after an authorized release (the migration is NOT approved; clipboard ≠ approval)
+
+1. Only after explicit sign-off:
+   `npm run migrate -- --only 20260926_grants_cache_reconcile.sql`. Never a bare `--go`, because
+   other migrations are pending. Then `npm run db:check -- grants_cache superseded_by` and
+   `npm run db:check -- grants_ingest_runs`.
+2. **Before the first run:**
+   `npx tsx scripts/grants-reconcile-dry-run.ts --confirm 200 --json` (read-only). Expect
+   `complete: true`, `identity.supersededDuplicatesHidden` ≈ 17, `afterRun.hidden` equal to
+   superseded only, and `afterLookupsOfSample.staysVisible_confirmedLive` = 0.
 3. **After the first nightly run:**
-   - `grants_ingest_runs` newest row has `complete=true` and `reconcile.ran=true`, with
-     `actionableMarkedAbsent` ≈ the dry-run number;
-   - the `grants-map` response `hidden.notInLatestSnapshotUnconfirmed` ≈ that number, minus
-     confirmations;
-   - `totalForFilters` drops by the same amount.
-4. **Over the next runs,** confirmation moves rows from `notInLatestSnapshotUnconfirmed` to
-   `confirmedGone`, or back to visible if the source says they're live. The bound is 40 per run, so
-   the ~103 backlog clears in about 3 runs.
+   - `grants_ingest_runs` newest row has `complete=true`, `reconcile.ran=true` and
+     `reconcile.superseded` ≈ the dry run;
+   - `grants-map` `hidden.supersededDuplicates` ≈ 17;
+   - `hidden.confirmedClosedOrArchived` climbs only as lookups land (40 per run);
+   - `visibleUncertain.absentUnverified` falls correspondingly;
+   - **PAR-28-056 is visible, PAR-26-120 is not, and no grant appears twice.**
+4. **Regression pinned:**
+   `src/lib/grants/grants-live-but-missing.regression.unit.test.ts` (PAR-26-120 both ways).
 
 ## Unknown / open
 
-- **The ~83 unverified rows:** the confirmation step will classify them; nothing is asserted about
-  them before then.
-- **Why a live grant can be missing from a complete listing:** PAR-26-120 is live per
-  `fetchOpportunity`, yet it wasn't in today's posted or forecasted search. Until confirmed it would
-  be hidden. Confirmation restores it, but the listing gap itself is unexplained.
+- **The 3 unrecognised lookup shapes** (HTTP 200, the classifier returns null) stay unconfirmed and
+  visible. Worth a look before release, but not a blocker.
+- **Why a live grant can be missing from a complete listing: RESOLVED for all 17 measured cases.**
+  Each is the same Grants.gov id re-listed under a new funding-opportunity number (superseded). A
+  genuinely missing live grant, with no id match, would stay visible as absent/unverified. That path
+  is pinned by the regression test.
 - **hitCount availability:** the legacy search endpoint's `total` falls back to the page length if
   `hitCount` is absent. That's caught by the consistency rule for multi-page statuses, but a
   single-page status without `hitCount` would look complete. Both statuses are 7–10 pages today.

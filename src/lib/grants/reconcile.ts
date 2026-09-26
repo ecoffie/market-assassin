@@ -90,7 +90,7 @@ export function isMissingSchemaError(err: { code?: string; message?: string } | 
 }
 
 export async function probeReconcileSchema(db: SupabaseClient): Promise<ReconcileSchema> {
-  const cols = await db.from('grants_cache').select('opp_number, last_seen_at, absent_since, source_status, source_checked_at').limit(1);
+  const cols = await db.from('grants_cache').select('opp_number, last_seen_at, absent_since, source_status, source_checked_at, superseded_by').limit(1);
   const runs = await db.from('grants_ingest_runs').select('id').limit(1);
   const columns = !cols.error;
   const runsTable = !runs.error;
@@ -102,18 +102,50 @@ export async function probeReconcileSchema(db: SupabaseClient): Promise<Reconcil
 /* ── read-path visibility ──────────────────────────────────────────────────────────────── */
 
 /**
- * PostgREST `.or()` a row must satisfy to be shown as actionable (combined, AND-ed, with the existing
- * close-date filter): never absent, OR absent but the source has since confirmed it is still live.
- * Hidden: absent-and-unconfirmed (not in the latest complete snapshot; pending source check) and
- * absent-and-confirmed-gone (closed / archived / not_found). Hidden rows are PRESERVED, not deleted.
+ * VISIBILITY RULE (Eric, 2026-09-26 — replaces "hide on absence"). A complete listing proves the
+ * listing was fully RETRIEVED, not that it contains every live grant (measured: 17 of 103 "absent"
+ * rows were live, each re-listed under a NEW funding-opportunity number). So:
+ *
+ *   listed in the latest snapshot                        → visible
+ *   absent, not yet looked up                            → VISIBLE, labelled absent/unverified
+ *   absent, official lookup says posted / forecast       → visible (confirmed live)
+ *   absent, lookup failed / timed out (source_status NULL)→ VISIBLE, uncertainty retained
+ *   absent, lookup says not_found (ambiguous)            → VISIBLE, labelled ambiguous — never "closed"
+ *   absent, lookup says closed / archived                → HIDDEN from actionable results (record kept)
+ *   superseded_by set — the SAME Grants.gov opportunity  → HIDDEN as a duplicate: the grant stays
+ *     id is listed in the complete run under a new number   visible exactly once via its current row
+ *
+ * Hidden rows are PRESERVED, never deleted.
  */
-export const GRANTS_VISIBLE_OR = 'absent_since.is.null,source_status.in.(posted,forecast)';
+export const GRANTS_HIDDEN_SOURCE_STATES: readonly SourceStatus[] = ['closed', 'archived'];
+export const GRANTS_VISIBLE_OR = 'absent_since.is.null,source_status.is.null,source_status.in.(posted,forecast,not_found)';
+
+/** Apply the visibility rule to a grants_cache query (AND-ed with the caller's own filters). */
+export function applyGrantsVisibility<Q extends { is(c: string, v: null): Q; or(e: string): Q }>(q: Q): Q {
+  return q.is('superseded_by', null).or(GRANTS_VISIBLE_OR);
+}
+
+export type GrantVerification = 'listed' | 'absent_unverified' | 'absent_confirmed_live' | 'absent_not_found_ambiguous';
+/** What a visible row can honestly say about itself. */
+export function grantVerification(row: { absent_since?: unknown; source_status?: unknown }): GrantVerification {
+  if (!row.absent_since) return 'listed';
+  if (row.source_status === 'posted' || row.source_status === 'forecast') return 'absent_confirmed_live';
+  if (row.source_status === 'not_found') return 'absent_not_found_ambiguous';
+  return 'absent_unverified';
+}
 
 /** The cached status to present for a visible row: a source confirmation beats the stale cached status. */
 export function effectiveGrantStatus(row: { status?: unknown; absent_since?: unknown; source_status?: unknown }): string {
   if (row.absent_since && row.source_status === 'forecast') return 'forecasted';
   if (row.absent_since && row.source_status === 'posted') return 'posted';
   return String(row.status || '');
+}
+
+/** Grants.gov opportunity id from a cached detail URL (…/search-results-detail/<id>). The STABLE identity:
+ *  the funding-opportunity number changes when a forecast is posted or a notice is reissued. */
+export function grantsGovIdFromUrl(url: unknown): string | null {
+  const m = String(url ?? '').match(/search-results-detail\/(\d+)\s*$/);
+  return m ? m[1] : null;
 }
 
 /* ── reconcile (mark absent) ───────────────────────────────────────────────────────────── */
@@ -123,6 +155,8 @@ export interface ReconcileResult {
   reason: string | null;
   markedAbsent: number;
   actionableMarkedAbsent: number;
+  /** Of markedAbsent: the same Grants.gov id is listed today under a new number (duplicate, hidden). */
+  superseded: number;
   restored: number;
 }
 
@@ -134,14 +168,14 @@ export interface ReconcileOptions {
   todayIso?: string;
 }
 
-type CacheRow = { opp_number: string; status: string | null; close_date: string | null; absent_since: string | null };
+type CacheRow = { opp_number: string; status: string | null; close_date: string | null; absent_since: string | null; url?: string | null };
 
 async function readAllCacheRows(db: SupabaseClient): Promise<CacheRow[]> {
   const out: CacheRow[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db
       .from('grants_cache')
-      .select('opp_number, status, close_date, absent_since')
+      .select('opp_number, status, close_date, absent_since, url')
       .order('opp_number', { ascending: true })
       .range(from, from + 999);
     if (error) throw new Error(`grants_cache read failed: ${error.message}`);
@@ -161,10 +195,14 @@ const isActionable = (r: CacheRow, todayIso: string) =>
  */
 export async function reconcileAbsentGrants(
   db: SupabaseClient,
-  run: { complete: boolean; seen: Set<string>; previouslyAbsent: Set<string>; nowIso: string },
+  run: {
+    complete: boolean; seen: Set<string>; previouslyAbsent: Set<string>; nowIso: string;
+    /** Grants.gov opportunity id → the opp_number it is listed under in THIS snapshot. */
+    seenIds?: Map<string, string>;
+  },
   opts: ReconcileOptions = {},
 ): Promise<ReconcileResult> {
-  const none = (reason: string): ReconcileResult => ({ ran: false, reason, markedAbsent: 0, actionableMarkedAbsent: 0, restored: 0 });
+  const none = (reason: string): ReconcileResult => ({ ran: false, reason, markedAbsent: 0, actionableMarkedAbsent: 0, superseded: 0, restored: 0 });
   if (!run.complete) return none('run not proven complete — nothing marked absent');
   if (run.seen.size === 0) return none('empty snapshot — nothing marked absent');
 
@@ -181,24 +219,42 @@ export async function reconcileAbsentGrants(
     return {
       ran: false,
       reason: `breaker: ${actionableCandidates} actionable rows would be marked absent (> ${Math.round(fraction * 100)}% of ${actionableBefore}) — refused; needs a supervised run`,
-      markedAbsent: 0, actionableMarkedAbsent: 0, restored,
+      markedAbsent: 0, actionableMarkedAbsent: 0, superseded: 0, restored,
     };
   }
 
+  // Identity first: a candidate whose Grants.gov id IS listed in this snapshot under another number is the
+  // same grant, renumbered (forecast → posting, reissue). Mark it superseded (duplicate); everything else is
+  // absent/unverified — visible until the official lookup confirms closed/archived.
+  const supersededBy = new Map<string, string>();
+  for (const r of candidates) {
+    const gid = grantsGovIdFromUrl(r.url);
+    const current = gid ? run.seenIds?.get(gid) : undefined;
+    if (current && current !== r.opp_number) supersededBy.set(r.opp_number, current);
+  }
   let marked = 0;
-  const ids = candidates.map((r) => r.opp_number);
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i + 200);
+  const plain = candidates.map((r) => r.opp_number).filter((id) => !supersededBy.has(id));
+  for (let i = 0; i < plain.length; i += 200) {
+    const chunk = plain.slice(i, i + 200);
     const { error } = await db
       .from('grants_cache')
       // A fresh absence invalidates any earlier source confirmation — it must be re-confirmed.
-      .update({ absent_since: run.nowIso, source_status: null, source_checked_at: null })
+      .update({ absent_since: run.nowIso, source_status: null, source_checked_at: null, superseded_by: null })
       .in('opp_number', chunk)
       .is('absent_since', null);
     if (error) throw new Error(`grants_cache mark-absent failed: ${error.message}`);
     marked += chunk.length;
   }
-  return { ran: true, reason: null, markedAbsent: marked, actionableMarkedAbsent: actionableCandidates, restored };
+  for (const [stale, current] of supersededBy) {
+    const { error } = await db
+      .from('grants_cache')
+      .update({ absent_since: run.nowIso, source_status: null, source_checked_at: null, superseded_by: current })
+      .in('opp_number', [stale])
+      .is('absent_since', null);
+    if (error) throw new Error(`grants_cache mark-superseded failed: ${error.message}`);
+    marked += 1;
+  }
+  return { ran: true, reason: null, markedAbsent: marked, actionableMarkedAbsent: actionableCandidates, superseded: supersededBy.size, restored };
 }
 
 /* ── confirmation against the official source ──────────────────────────────────────────── */
@@ -259,6 +315,7 @@ export async function confirmAbsentGrants(
     .from('grants_cache')
     .select('opp_number, url')
     .not('absent_since', 'is', null)
+    .is('superseded_by', null) // a renumbered duplicate needs no lookup — its current row is listed
     .is('source_checked_at', null)
     .order('absent_since', { ascending: true })
     .limit(limit);

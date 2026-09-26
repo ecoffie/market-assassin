@@ -4,7 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
-import { GRANTS_VISIBLE_OR, effectiveGrantStatus, isMissingSchemaError } from '@/lib/grants/reconcile';
+import { applyGrantsVisibility, effectiveGrantStatus, grantVerification, isMissingSchemaError, type GrantVerification } from '@/lib/grants/reconcile';
 import { naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from './map-filters';
 import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
@@ -200,6 +200,10 @@ export type MapOpp = {
   // shows it WITHOUT the ≈ glyph, unlike an open opp's modeled M-Estimate. '' when the agency
   // published no value (2.4%) → the card shows an honest "Estimate pending", never a fabricated one.
   estRange?: string;
+  // Grants only (src/lib/grants/reconcile.ts): what this pin can honestly say about itself — 'listed' in the
+  // latest snapshot, or absent from it and unverified / confirmed live / ambiguous not-found. Never 'closed':
+  // source-confirmed closed/archived rows are not returned as pins at all.
+  verification?: GrantVerification;
 };
 
 /**
@@ -695,16 +699,16 @@ export async function getGrantsViewportPins(
   const query = (withReconcile: boolean) => {
     let q = sb
       .from('grants_cache')
-      .select(withReconcile ? `${BASE_COLS}, absent_since, source_status` : BASE_COLS)
+      .select(withReconcile ? `${BASE_COLS}, absent_since, source_status, superseded_by` : BASE_COLS)
       .not('map_lat', 'is', null)
       .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
       .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
       // Actionable only: a future/rolling deadline (posted still open) OR a forecasted grant (not yet
       // open → no close_date). Expired POSTED grants (past close_date) are dropped as noise.
       .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`);
-    // Reconcile (src/lib/grants/reconcile.ts): hide rows absent from the latest PROVEN-COMPLETE snapshot
-    // unless the source has since confirmed them live. Hidden rows are preserved, never deleted.
-    if (withReconcile) q = q.or(GRANTS_VISIBLE_OR);
+    // Reconcile (src/lib/grants/reconcile.ts): hide ONLY source-confirmed closed/archived rows and renumbered
+    // duplicates. Absent-but-unverified / lookup-failed / ambiguous not_found rows stay visible (labelled).
+    if (withReconcile) q = applyGrantsVisibility(q);
     // Order by posted/open date DESC (newest first) — NOT close_date. Forecasted grants have no
     // close_date, so a close_date sort dumped ALL 502 of them past the 1,000-pin cap → they never
     // rendered on a wide viewport. posted_date is populated for both statuses, so newest-first keeps
@@ -724,6 +728,7 @@ export async function getGrantsViewportPins(
     const oppNumber = String(r.opp_number ?? '').trim();
     if (!oppNumber) continue;
     const forecasted = effectiveGrantStatus(r) === 'forecasted';
+    const withReconcileRows = 'absent_since' in r;
     out.push({
       id: 'gr-' + oppNumber,
       title: String(r.title || 'Federal grant'),
@@ -741,6 +746,7 @@ export async function getGrantsViewportPins(
       src: 'GRANTS',
       locSrc: 'office',                // always agency-HQ approximate (never a real PoP)
       est: Number(r.award_ceiling) || 0,
+      ...(withReconcileRows ? { verification: grantVerification(r) } : {}),
     });
   }
   return out;

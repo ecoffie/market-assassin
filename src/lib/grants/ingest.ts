@@ -17,7 +17,7 @@ import { searchGrants } from './search';
 import { grantsHqFor } from './grants-hq';
 import { geocodeCity } from '@/lib/geo/city-geocode';
 import {
-  statusCompleteness, runIsComplete, probeReconcileSchema, reconcileAbsentGrants, confirmAbsentGrants,
+  statusCompleteness, runIsComplete, probeReconcileSchema, reconcileAbsentGrants, confirmAbsentGrants, grantsGovIdFromUrl,
   type StatusCompleteness, type ReconcileResult, type ConfirmResult, type ReconcileOptions,
 } from './reconcile';
 
@@ -162,7 +162,7 @@ export async function ingestGrants(
   for (const r of rows) byId.set(r.opp_number as string, r);
   const deduped = [...byId.values()].map((r) =>
     // Seen in this snapshot → last_seen_at now, and any earlier absence is cleared (restored).
-    schema.columns ? { ...r, last_seen_at: nowIso, absent_since: null } : r,
+    schema.columns ? { ...r, last_seen_at: nowIso, absent_since: null, superseded_by: null } : r,
   );
 
   let upserted = 0;
@@ -179,10 +179,13 @@ export async function ingestGrants(
 
   let reconcile: ReconcileResult;
   if (!schema.columns) {
-    reconcile = { ran: false, reason: 'reconcile migration not applied (grants_cache columns missing) — upsert-only', markedAbsent: 0, actionableMarkedAbsent: 0, restored: 0 };
+    reconcile = { ran: false, reason: 'reconcile migration not applied (grants_cache columns missing) — upsert-only', markedAbsent: 0, actionableMarkedAbsent: 0, superseded: 0, restored: 0 };
   } else {
-    reconcile = await reconcileAbsentGrants(db, { complete, seen: new Set(byId.keys()), previouslyAbsent, nowIso }, opts.reconcile)
-      .catch((e) => ({ ran: false, reason: `reconcile error: ${(e as Error).message}`, markedAbsent: 0, actionableMarkedAbsent: 0, restored: 0 }));
+    // Stable identity: Grants.gov opportunity id → the number it is listed under in THIS snapshot.
+    const seenIds = new Map<string, string>();
+    for (const r of byId.values()) { const gid = grantsGovIdFromUrl(r.url); if (gid) seenIds.set(gid, r.opp_number as string); }
+    reconcile = await reconcileAbsentGrants(db, { complete, seen: new Set(byId.keys()), previouslyAbsent, nowIso, seenIds }, opts.reconcile)
+      .catch((e) => ({ ran: false, reason: `reconcile error: ${(e as Error).message}`, markedAbsent: 0, actionableMarkedAbsent: 0, superseded: 0, restored: 0 }));
     if (!complete && reconcile.reason?.startsWith('run not proven complete')) {
       const why = Object.entries(completeness).filter(([, c]) => !c.complete).map(([st, c]) => `${st}: ${c.reason}`);
       if (upsertFailed) why.push('upsert: a chunk failed');
