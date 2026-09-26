@@ -20,7 +20,7 @@
  * THE CONTRACT. Every dataset declares ONE kind, and the kind decides what it may do:
  *
  *   source_corpus        — records we hold that came from an upstream. The ONLY kind
- *                          that enters the unique-underlying-record headline.
+ *                          that enters the source-record totals.
  *   derived_intelligence — records we built from other records (contacts extracted
  *                          from notices, claims derived from GAO reports, decoded
  *                          offices). Real, but not additional underlying records.
@@ -135,16 +135,22 @@ export interface InventoryDataset {
   kind: DatasetKind;
   /** Rows physically held. null = unmeasured (never a guessed 0). Passthrough is always null. */
   stored: number | null;
+  /**
+   * What ONE row is. 'transaction' (e.g. the USASpending award warehouse, one row per
+   * award modification) is not semantically comparable to a notice, a forecast or a
+   * report, so it is totalled SEPARATELY from owned source records. Default 'record'.
+   */
+  grain?: 'record' | 'transaction';
   unit: string;
   /** Rows a customer surface can actually read, when that differs from `stored`. */
   served?: { count: number | null; label: string; excluded: CountPart[] };
   breakdown?: CountPart[];
   /**
-   * What this dataset adds to the unique-underlying-record headline. Only a
+   * What this dataset adds to the persisted-source totals. Only a
    * source_corpus may be non-zero (enforced by computeTotals). null = unmeasured.
    */
-  uniqueContribution: number | null;
-  uniqueNote?: string;
+  headlineContribution: number | null;
+  headlineNote?: string;
   freshness: Freshness;
   surface: CustomerSurface;
   /** Upstream publisher ids (keys of UPSTREAM_PUBLISHERS). Empty for internal corpora. */
@@ -232,11 +238,18 @@ export function countUpstreamPublishers(
 // ── Totals ─────────────────────────────────────────────────────────────────────
 
 export interface InventoryTotals {
-  /** Σ source_corpus uniqueContribution. The headline. */
-  uniqueSourceRecords: number;
-  /** Source corpora whose contribution could not be measured — the headline is a floor. */
+  /**
+   * PRIMARY: Σ record-grain source_corpus contributions. Per-dataset counts — datasets are
+   * NOT deduplicated against each other, so this is a sum, never a "unique" claim.
+   */
+  ownedSourceRecords: number;
+  /** SECONDARY: Σ transaction-grain source_corpus contributions (the award warehouse). */
+  transactionRows: number;
+  /** TOTAL: ownedSourceRecords + transactionRows — persisted source ROWS of mixed grain. */
+  persistedSourceRows: number;
+  /** Source corpora whose contribution could not be measured — the totals are a floor. */
   unmeasuredSources: string[];
-  /** Σ derived_intelligence stored — built FROM the sources; not additional underlying records. */
+  /** Σ derived_intelligence stored — built FROM the sources; never in the source totals. */
   derivedRecords: number;
   /** Σ static_manual stored. */
   staticRecords: number;
@@ -247,16 +260,20 @@ export interface InventoryTotals {
 }
 
 export function computeTotals(datasets: InventoryDataset[]): InventoryTotals {
-  const sum = (kind: DatasetKind, pick: (d: InventoryDataset) => number | null) =>
-    datasets.filter((d) => d.kind === kind).reduce((s, d) => s + (pick(d) ?? 0), 0);
+  const sum = (pred: (d: InventoryDataset) => boolean, pick: (d: InventoryDataset) => number | null) =>
+    datasets.filter(pred).reduce((s, d) => s + (pick(d) ?? 0), 0);
+  const isSource = (d: InventoryDataset) => d.kind === 'source_corpus';
+  const isTxn = (d: InventoryDataset) => d.grain === 'transaction';
+  const ownedSourceRecords = sum((d) => isSource(d) && !isTxn(d), (d) => d.headlineContribution);
+  const transactionRows = sum((d) => isSource(d) && isTxn(d), (d) => d.headlineContribution);
   return {
-    uniqueSourceRecords: sum('source_corpus', (d) => d.uniqueContribution),
-    unmeasuredSources: datasets
-      .filter((d) => d.kind === 'source_corpus' && d.uniqueContribution == null)
-      .map((d) => d.key),
-    derivedRecords: sum('derived_intelligence', (d) => d.stored),
-    staticRecords: sum('static_manual', (d) => d.stored),
-    indexedRepresentations: sum('derived_index', (d) => d.stored),
+    ownedSourceRecords,
+    transactionRows,
+    persistedSourceRows: ownedSourceRecords + transactionRows,
+    unmeasuredSources: datasets.filter((d) => isSource(d) && d.headlineContribution == null).map((d) => d.key),
+    derivedRecords: sum((d) => d.kind === 'derived_intelligence', (d) => d.stored),
+    staticRecords: sum((d) => d.kind === 'static_manual', (d) => d.stored),
+    indexedRepresentations: sum((d) => d.kind === 'derived_index', (d) => d.stored),
     passthroughCapabilities: datasets.filter((d) => d.kind === 'passthrough').length,
   };
 }
@@ -271,17 +288,20 @@ export function inventoryViolations(datasets: InventoryDataset[]): string[] {
   for (const d of datasets) {
     if (keys.has(d.key)) v.push(`${d.key}: duplicate key`);
     keys.add(d.key);
-    if (d.kind !== 'source_corpus' && d.uniqueContribution) {
-      v.push(`${d.key}: ${d.kind} may not contribute to the unique-record headline`);
+    if (d.kind !== 'source_corpus' && d.headlineContribution) {
+      v.push(`${d.key}: ${d.kind} may not contribute to the source-record totals`);
     }
     if (d.kind === 'passthrough') {
       if (d.stored !== null) v.push(`${d.key}: passthrough must not report a stored count`);
       if (d.freshness.state !== 'PASSTHROUGH') v.push(`${d.key}: passthrough freshness must be PASSTHROUGH`);
       if (d.surface.state !== 'passthrough') v.push(`${d.key}: passthrough surface must be passthrough`);
     }
-    if (d.kind === 'source_corpus' && d.uniqueContribution != null && d.stored != null
-        && d.uniqueContribution > d.stored) {
-      v.push(`${d.key}: unique contribution exceeds stored rows`);
+    if (d.kind === 'source_corpus' && d.headlineContribution != null && d.stored != null
+        && d.headlineContribution > d.stored) {
+      v.push(`${d.key}: headline contribution exceeds stored rows`);
+    }
+    if (d.grain === 'transaction' && d.kind !== 'source_corpus') {
+      v.push(`${d.key}: transaction grain is only meaningful on a source corpus`);
     }
     if (d.surface.state === 'withheld' && d.surface.tools.length > 0) {
       v.push(`${d.key}: a withheld dataset cannot list customer tools`);

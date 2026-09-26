@@ -65,7 +65,7 @@ const RUN_ROWS = [{ job_name: 'institute-legislation-sync', started_at: '2026-09
 const DATA_SOURCES = [
   { key: 'sam_opportunities', record_count: 123_255, last_built: null },
   { key: 'gsa_calc_pricing', record_count: 240_000, last_built: null },
-  { key: 'bq_awards', record_count: null, last_built: '2026-09-20T00:00:00Z' },
+  { key: 'bq_awards', record_count: null, last_built: '2026-09-20T00:00:00Z', notes: '[awards-ingest-clocks:v1]\n{"sourceActionMax":"2026-09-18","acquiredAt":"2026-09-21T10:00:00.000Z","mergedAt":"2026-09-21T10:30:00.000Z","recipientsRebuiltAt":"2026-09-21T11:00:00.000Z"}\n[/awards-ingest-clocks]' },
 ];
 
 function fakeQuery(table: string) {
@@ -183,21 +183,56 @@ describe('Data Core inventory truth', () => {
     expect(body.provenanceLimits.crsSourceDocuments).toBe(0);
   });
 
-  it('HEADLINE: the semantic index and passthrough never enter the unique-record total', () => {
+  it('HEADLINE: owned records exclude the transaction-grain warehouse; index, static, derived and passthrough excluded', () => {
     const idx = row('semantic_index');
     expect(idx.kind).toBe('derived_index');
-    expect(idx.uniqueContribution).toBe(0);
+    expect(idx.headlineContribution).toBe(0);
     // indexed = SOW + description only; empty-array "none" sentinels are not vectors
     expect(idx.stored).toBe(30_541 + 117_892);
-    const sources = body.datasets.filter((d: { kind: string }) => d.kind === 'source_corpus');
-    const expected = sources.reduce((s: number, d: { uniqueContribution: number | null }) => s + (d.uniqueContribution ?? 0), 0);
-    expect(body.totals.uniqueSourceRecords).toBe(expected);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sources = body.datasets.filter((d: any) => d.kind === 'source_corpus');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sum = (arr: any[]) => arr.reduce((s: number, d: any) => s + (d.headlineContribution ?? 0), 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recordGrain = sources.filter((d: any) => d.grain !== 'transaction');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const txnGrain = sources.filter((d: any) => d.grain === 'transaction');
+    expect(txnGrain.map((d: { key: string }) => d.key)).toEqual(['bq_awards']);
+    expect(body.totals.ownedSourceRecords).toBe(sum(recordGrain));
+    expect(body.totals.ownedSourceRecords).not.toBeGreaterThanOrEqual(63_000_000); // the warehouse is NOT in it
+    expect(body.totals.transactionRows).toBe(63_000_000);
+    expect(body.totals.persistedSourceRows).toBe(body.totals.ownedSourceRecords + body.totals.transactionRows);
+    // derived, static, index and passthrough stay out of every source total
+    for (const kind of ['derived_intelligence', 'static_manual', 'derived_index', 'passthrough']) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const d of body.datasets.filter((x: any) => x.kind === kind)) expect(d.headlineContribution ?? 0, d.key).toBe(0);
+    }
+    expect(body.totals.derivedRecords).toBeGreaterThan(0);
+    expect(body.totals.staticRecords).toBeGreaterThan(0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const d of body.datasets.filter((x: any) => x.kind === 'passthrough')) {
       expect(d.stored, d.key).toBeNull();
       expect(d.surface.state, d.key).toBe('passthrough');
     }
     for (const k of ['pricing_intel', 'incumbent_financials', 'regulatory_demand']) expect(row(k)?.kind, k).toBe('passthrough');
+  });
+
+  it('AWARD WAREHOUSE: transaction grain, a data date from the ingest clocks, and a completeness caveat', () => {
+    const w = row('bq_awards');
+    expect(w.grain).toBe('transaction');
+    expect(w.unit).toMatch(/transaction grain/);
+    expect(w.freshness.asOf).toBe('2026-09-18'); // source MAX(action_date), not the build date
+    expect(w.freshness.detail).toMatch(/RECENCY ONLY — not completeness/);
+    expect(w.provenance).toMatch(/not a count of distinct awards/);
+  });
+
+  it('NO "UNIQUE": nothing the API or page shows claims cross-dataset uniqueness', () => {
+    // The API payload is what the page renders, so scan every string in it.
+    expect(JSON.stringify(body)).not.toMatch(/unique/i);
+    // And the page's own rendered text (comments stripped — they may explain the rule).
+    const page = readFileSync(join(process.cwd(), 'src/app/admin/data-inventory/page.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(page).not.toMatch(/unique/i);
   });
 
   it('SAM: stored total and active/open are different numbers, and only active is called open', () => {
@@ -212,7 +247,7 @@ describe('Data Core inventory truth', () => {
     const rc = row('recompetes');
     expect(rc.stored).toBe(181_773);
     expect(rc.served.count).toBe(143_709);
-    expect(rc.uniqueContribution).toBe(181_773 - 9_297);
+    expect(rc.headlineContribution).toBe(181_773 - 9_297);
     const ex = rc.served.excluded.reduce((s: number, e: { count: number }) => s + e.count, 0);
     expect(rc.served.count + ex).toBe(rc.stored);
   });

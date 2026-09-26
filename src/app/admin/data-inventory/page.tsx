@@ -7,8 +7,10 @@
  * corpus · derived intelligence · static/manual · derived index · live passthrough),
  * with stored-vs-served counts, freshness and customer surface on every row.
  *
- * The headline is the UNIQUE UNDERLYING SOURCE RECORD total. Derived records, index
- * representations and passthrough capabilities are shown beside it, never added to it.
+ * Headline hierarchy, by GRAIN: owned source records (primary) · + award transactions
+ * (secondary, a different grain) · = persisted source rows. Nothing is called "unique":
+ * datasets are summed per store, not deduplicated against each other. Derived records,
+ * index representations, static files and passthrough are shown beside it, never added.
  * (The previous "moat, quantified" pies summed all of them — including SAM rows twice.)
  */
 
@@ -29,10 +31,10 @@ interface InstanceFreshness {
   heldPopulation: number | null; lastDataAdvance: string | null;
 }
 interface Dataset {
-  key: string; label: string; kind: Kind; stored: number | null; unit: string;
+  key: string; label: string; kind: Kind; stored: number | null; unit: string; grain?: 'record' | 'transaction';
   served?: { count: number | null; label: string; excluded: CountPart[] };
   breakdown?: CountPart[];
-  uniqueContribution: number | null; uniqueNote?: string;
+  headlineContribution: number | null; headlineNote?: string;
   freshness: { state: FreshnessState; asOf: string | null; basis: string; detail?: string; schedules?: ScheduleTruth[]; instances?: InstanceFreshness[] };
   surface: { state: SurfaceState; tools: string[]; app?: string[]; note?: string };
   upstreams: string[]; provenance: string;
@@ -43,7 +45,8 @@ interface InventoryData {
   generatedAt: string;
   datasets: Dataset[];
   totals: {
-    uniqueSourceRecords: number; unmeasuredSources: string[]; derivedRecords: number;
+    ownedSourceRecords: number; transactionRows: number; persistedSourceRows: number;
+    unmeasuredSources: string[]; derivedRecords: number;
     staticRecords: number; indexedRepresentations: number; passthroughCapabilities: number;
   };
   upstreams: {
@@ -56,7 +59,7 @@ interface InventoryData {
 }
 
 const SECTIONS: Array<{ kind: Kind; title: string; blurb: string }> = [
-  { kind: 'source_corpus', title: 'Owned source corpora', blurb: 'Records held from an upstream publisher. The only rows in the headline total.' },
+  { kind: 'source_corpus', title: 'Owned source corpora', blurb: 'Held from an upstream publisher. The only rows in the source totals — record-grain rows count as owned records, the award warehouse counts separately as transactions.' },
   { kind: 'derived_intelligence', title: 'Derived / curated intelligence', blurb: 'Built from the corpora above. Real records of a different type — not additional underlying records.' },
   { kind: 'static_manual', title: 'Static / manual data', blurb: 'Hand-authored or bundled files. No producer, no clock.' },
   { kind: 'derived_index', title: 'Derived index / representation', blurb: 'Representations of records already counted (vectors, chunks). Never a record count.' },
@@ -129,14 +132,8 @@ export default function DataInventoryPage() {
   if (!data) return <div className="min-h-screen bg-ground-deep p-6 text-muted">Loading…</div>;
   const t = data.totals;
   const u = data.upstreams;
-  // The award-transaction warehouse is a legitimate owned corpus but ~98% of the headline
-  // by count. Show the headline WITH its composition so neither number is read alone.
-  const warehouse = data.datasets.find((d) => d.key === 'bq_awards')?.uniqueContribution ?? null;
-  const headlineSub = t.unmeasuredSources.length
-    ? `floor — unmeasured: ${t.unmeasuredSources.join(', ')}`
-    : warehouse != null
-      ? `incl. ${fmt(warehouse)} award transactions · ${fmt(t.uniqueSourceRecords - warehouse)} in all other corpora`
-      : 'owned source corpora only';
+  const warehouse = data.datasets.find((d) => d.grain === 'transaction') ?? null;
+  const floorNote = t.unmeasuredSources.length ? ` · floor — unmeasured: ${t.unmeasuredSources.join(', ')}` : '';
 
   return (
     <div className="min-h-screen bg-ground-deep p-4 md:p-6 text-slate-200">
@@ -157,24 +154,42 @@ export default function DataInventoryPage() {
           </div>
         )}
 
-        {/* Headline */}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-2">
-          <Stat
-            label="Unique underlying source records"
-            value={fmt(t.uniqueSourceRecords)}
-            sub={headlineSub}
-            cls="text-white" big
-          />
-          <Stat label="Derived intelligence records" value={fmt(t.derivedRecords)} sub="built from the sources — not added" cls="text-amber-300" />
-          <Stat label="Static / manual records" value={fmt(t.staticRecords)} sub="hand-authored files — not added" cls="text-slate-300" />
-          <Stat label="Indexed representations" value={fmt(t.indexedRepresentations)} sub="vectors + chunks of counted records" cls="text-sky-300" />
-          <Stat label="Upstream publishers" value={String(u.total)} sub={`${u.persisted.length} feeds + ${u.forecastIssuers.length} forecast issuers`} cls="text-emerald-300" />
-          <Stat label="Live passthrough" value={String(t.passthroughCapabilities)} sub="capabilities · 0 persisted records" cls="text-violet-300" />
+        {/* Headline — by grain. Primary is owned RECORDS; the award warehouse is a different
+            grain (one row per award modification), so it is added visibly, never blended. */}
+        <div className="mt-4 rounded-xl border border-emerald-500/40 bg-ground p-4 mb-3">
+          <div className="grid gap-4 md:grid-cols-3 md:items-end">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-emerald-300">Owned source records</div>
+              <div className="text-3xl font-bold tabular-nums text-white">{fmt(t.ownedSourceRecords)}</div>
+              <div className="text-[11px] text-faint">record-grain source datasets, summed per dataset{floorNote}</div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-sky-300">+ Award transactions</div>
+              <div className="text-2xl font-bold tabular-nums text-sky-200">+ {fmt(t.transactionRows)}</div>
+              <div className="text-[11px] text-faint">
+                USASpending warehouse · transaction grain (each modification is a row)
+                {warehouse ? <> · data through {day(warehouse.freshness.asOf)} · {warehouse.freshness.state}</> : null}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-ink-soft">= Persisted source rows</div>
+              <div className="text-2xl font-bold tabular-nums text-ink-soft">{fmt(t.persistedSourceRows)}</div>
+              <div className="text-[11px] text-faint">mixed grain — records + transactions</div>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-faint">
+            Counts are per dataset and are <b>not deduplicated across datasets</b> — several share an upstream
+            (award transactions ↔ recompete contracts ↔ contractor companies ↔ SAM entities; Grants.gov in both grants and the research slice).
+            The award warehouse reports recency, not completeness (see its row).
+          </p>
         </div>
-        <p className="text-[11px] text-faint mb-6">
-          Unique within each corpus. Corpora are distinct stores and are not deduplicated against each other where they share an upstream
-          (e.g. recompete contracts vs. the contractor population&apos;s award history; Grants.gov in both grants and the research slice).
-        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+          <Stat label="Derived intelligence records" value={fmt(t.derivedRecords)} sub="built from the sources — not in source totals" cls="text-amber-300" />
+          <Stat label="Semantic / indexed representations" value={fmt(t.indexedRepresentations)} sub="vectors + chunks of records already counted" cls="text-sky-300" />
+          <Stat label="Static / manual records" value={fmt(t.staticRecords)} sub="hand-authored files — not in source totals" cls="text-slate-300" />
+          <Stat label="Live passthrough" value={String(t.passthroughCapabilities)} sub="capabilities · 0 persisted rows" cls="text-violet-300" />
+          <Stat label="Upstream publishers" value={String(u.total)} sub={`${u.persisted.length} feeds + ${u.forecastIssuers.length} forecast issuers`} cls="text-emerald-300" />
+        </div>
 
         {SECTIONS.map((s) => {
           const rows = data.datasets.filter((d) => d.kind === s.kind);
@@ -189,7 +204,7 @@ export default function DataInventoryPage() {
                     <tr>
                       <th className="text-left px-3 py-2 w-[34%]">Dataset</th>
                       <th className="text-right px-3 py-2">Stored</th>
-                      <th className="text-right px-3 py-2">{s.kind === 'source_corpus' ? 'Served · headline' : 'Served'}</th>
+                      <th className="text-right px-3 py-2">{s.kind === 'source_corpus' ? 'Served · counts toward' : 'Served'}</th>
                       <th className="text-left px-3 py-2">Freshness</th>
                       <th className="text-left px-3 py-2">Customer surface</th>
                     </tr>
@@ -291,11 +306,11 @@ function Row({ d, names }: { d: Dataset; names: Record<string, string> }) {
           ) : <span className="text-faint">—</span>}
           {d.kind === 'source_corpus' && (
             <div className="mt-1 text-[10px] font-sans text-emerald-400/80 whitespace-normal max-w-[180px] ml-auto">
-              headline +{fmt(d.uniqueContribution)}{d.uniqueNote ? ` — ${d.uniqueNote}` : ''}
+              {d.grain === 'transaction' ? 'award transactions' : 'owned records'} +{fmt(d.headlineContribution)}{d.headlineNote ? ` — ${d.headlineNote}` : ''}
             </div>
           )}
-          {d.kind !== 'source_corpus' && d.uniqueNote && (
-            <div className="mt-1 text-[10px] font-sans text-faint whitespace-normal max-w-[180px] ml-auto">{d.uniqueNote}</div>
+          {d.kind !== 'source_corpus' && d.headlineNote && (
+            <div className="mt-1 text-[10px] font-sans text-faint whitespace-normal max-w-[180px] ml-auto">{d.headlineNote}</div>
           )}
         </td>
         <td className="px-3 py-2">

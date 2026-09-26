@@ -13,7 +13,7 @@ const SCREENS = [
     desc: 'Every dataset Mindy holds, measured live — owned sources vs derived vs passthrough, with freshness and what customers can read.',
     // No hand-typed figure here: '~604,718 records · 13 datasets · 34 sources' went stale
     // and described a double-counted total. The page itself is the measurement.
-    stat: 'Live counts · unique records · upstream publishers · freshness',
+    stat: 'Owned source records · award transactions · publishers · freshness',
     line: 'Mindy arrives full — it already knows your market at login.',
   },
   {

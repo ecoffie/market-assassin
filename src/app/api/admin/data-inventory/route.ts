@@ -4,7 +4,7 @@
  * GET /api/admin/data-inventory?password=$ADMIN_PASSWORD
  *
  * This route MEASURES (live head-counts, control-plane rows, cron runs). What the
- * measurements mean — kinds, the unique-record headline, freshness states, upstream
+ * measurements mean — kinds, the source-record totals, freshness states, upstream
  * publisher counting — lives in the pure model `src/lib/data-core/inventory-model.ts`,
  * where it is unit-tested.
  *
@@ -29,6 +29,7 @@ import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { FORECAST_SOURCE_AGENCY_CODES } from '@/lib/forecasts/agency-identity';
 import { CONTACT_KIND_GOVERNMENT, CONTACT_KIND_VENDOR } from '@/lib/gov-contacts/contact-kind';
 import { readAllPages } from '@/lib/paged-read';
+import { classifyFreshness, resolveAwardsIngestClocks } from '@/lib/awards-ingest/clocks';
 import {
   computeTotals,
   countUpstreamPublishers,
@@ -42,6 +43,7 @@ import {
   timestampState,
   worstState,
   type Freshness,
+  type FreshnessState,
   type InstanceFreshness,
   type InventoryDataset,
   type ScheduleTruth,
@@ -268,11 +270,11 @@ export async function GET(request: NextRequest) {
     (async () => {
       try {
         const [ds, dsi] = await Promise.all([
-          sb.from('data_sources').select('key, record_count, last_built'),
+          sb.from('data_sources').select('key, record_count, last_built, notes'),
           sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_poll'),
         ]);
         return {
-          sources: ds.error ? null : (ds.data as Array<{ key: string; record_count: number | null; last_built: string | null }>),
+          sources: ds.error ? null : (ds.data as Array<{ key: string; record_count: number | null; last_built: string | null; notes: string | null }>),
           instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_poll: string | null }>),
         };
       } catch { return { sources: null, instances: null }; }
@@ -302,7 +304,16 @@ export async function GET(request: NextRequest) {
   const c = counts;
   const e = edges;
   const [contractorCompanies, contractorUeis, bqAwards] = bq;
-  const bqAwardsBuilt = controlPlane.sources?.find((s) => s.key === 'bq_awards')?.last_built ?? null;
+  const bqAwardsRow = controlPlane.sources?.find((s) => s.key === 'bq_awards') ?? null;
+  const bqAwardsBuilt = bqAwardsRow?.last_built ?? null;
+  // The ingest stamps its own clocks (source MAX(action_date) + run times) into the registry
+  // notes, so the warehouse's data date is read without scanning 65M BigQuery rows.
+  const awardClocks = resolveAwardsIngestClocks({ notes: bqAwardsRow?.notes, lastBuilt: bqAwardsBuilt });
+  const awardFreshness = classifyFreshness({ clocks: awardClocks, now: now.toISOString() });
+  const awardState: FreshnessState =
+    awardFreshness.status === 'healthy' ? 'CURRENT'
+      : awardFreshness.status === 'unmeasured' ? 'UNKNOWN'
+        : 'STALE'; // upstream_stale and ingest_broken both mean the data is behind
 
   // ── Control-plane helpers ─────────────────────────────────────────────────────
   const instances = controlPlane.instances ?? [];
@@ -403,28 +414,35 @@ export async function GET(request: NextRequest) {
       served: { count: c.samActive, label: 'active / currently open', excluded: [
         { label: 'archived / closed (kept as history — lookup, recompete + incumbent evidence)', count: c.samTotal == null || c.samActive == null ? null : c.samTotal - c.samActive },
       ] },
-      uniqueContribution: c.samTotal,
+      headlineContribution: c.samTotal,
       freshness: fresh({ instanceKey: 'sam_opportunities_sam_gov', asOf: e.sam, cadenceHours: 24, basis: 'MAX(sam_opportunities.created_at)', jobs: CRON_JOBS.sam }),
       surface: { state: 'customer_readable', tools: ['find_opportunities', 'search_sam_opportunities', 'lookup_solicitation'], app: ['Opportunity Map', 'Daily alerts'] },
       upstreams: ['sam_gov'], provenance: 'Mirror of the SAM.gov Opportunities API — active AND historical notices. Only the active slice is "open".',
     },
     {
       key: 'bq_awards', label: 'Federal award transactions (USASpending warehouse)', kind: 'source_corpus',
-      stored: bqAwards, unit: 'award transactions',
-      uniqueContribution: bqAwards,
-      freshness: fresh({
-        asOf: bqAwardsBuilt, cadenceHours: 24 * 7,
-        basis: 'data_sources.bq_awards.last_built (weekly ingest)',
-        // Not measured here: a per-agency/month cohort check needs a BigQuery scan.
-        detail: 'RECENCY ONLY — not completeness. Per-agency monthly cohort completeness is checked by `npm run verify:oracles -- --only freshness`, which can fail while this reads CURRENT.',
-      }),
+      grain: 'transaction',
+      stored: bqAwards, unit: 'award transactions (transaction grain)',
+      headlineContribution: bqAwards,
+      freshness: {
+        state: awardState,
+        asOf: awardClocks?.sourceActionMax ?? null,
+        basis: 'ingest clocks in data_sources.bq_awards (source MAX(action_date) + run times; classifyFreshness)',
+        detail: [
+          `ingest: ${awardFreshness.status}`
+            + (awardFreshness.sourceAgeDays != null ? ` · source ${awardFreshness.sourceAgeDays}d behind` : '')
+            + (awardFreshness.runAgeDays != null ? ` · last run ${awardFreshness.runAgeDays}d ago` : ''),
+          // Not measured here: per-agency/month cohort completeness needs a BigQuery scan.
+          'RECENCY ONLY — not completeness. Per-agency monthly cohort completeness is checked by `npm run verify:oracles -- --only freshness`, which can fail while this reads CURRENT.',
+        ].join(' · '),
+      },
       surface: { state: 'customer_readable', tools: ['get_contractor_award_history', 'find_capable_contractors'], app: ['/awards pages', 'Contractor pages'] },
       upstreams: ['usaspending'], provenance: 'USASpending contract award TRANSACTIONS in BigQuery — transaction grain (each modification is a row, keyed by txn_id), so this is not a count of distinct awards. Contractor companies and the buying-office directory are derived from it.',
     },
     {
       key: 'sam_entities', label: 'SAM entity registrations', kind: 'source_corpus',
       stored: c.samEntities, unit: 'entity records',
-      uniqueContribution: c.samEntities,
+      headlineContribution: c.samEntities,
       freshness: fresh({ asOf: e.samEntities, cadenceHours: null, basis: 'MAX(sam_entities.synced_at) — sync-gov-buyer-data has no registered schedule', jobs: CRON_JOBS.samEntities }),
       surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps' },
       upstreams: ['sam_gov'], provenance: 'SAM.gov entity export (UEI, CAGE, NAICS, certifications). Overlaps the award-derived contractor companies — different record type, not deduplicated.',
@@ -432,8 +450,8 @@ export async function GET(request: NextRequest) {
     {
       key: 'usaspending_awards_mirror', label: 'USASpending awards mirror (legacy, Supabase)', kind: 'source_corpus',
       stored: c.usaspendingAwards, unit: 'award rows',
-      uniqueContribution: 0,
-      uniqueNote: 'excluded from the headline — a small subset of the award warehouse above',
+      headlineContribution: 0,
+      headlineNote: 'excluded from the headline — a small subset of the award warehouse above',
       freshness: fresh({ asOf: e.usaspendingAwards, cadenceHours: 24 * 7, basis: 'MAX(usaspending_awards.synced_at)', jobs: CRON_JOBS.usaspendingAwards }),
       surface: { state: 'customer_readable', tools: ['get_contractor_award_history'], note: 'name-search sales-history path reads this mirror' },
       upstreams: ['usaspending'], provenance: 'Weekly USASpending API pull into Supabase. The same award population as the BigQuery warehouse.',
@@ -450,7 +468,7 @@ export async function GET(request: NextRequest) {
           return rest ? [{ label: 'outside the closed source_agency vocabulary', count: rest }] : [];
         })(),
       ],
-      uniqueContribution: c.forecasts,
+      headlineContribution: c.forecasts,
       freshness: {
         state: forecastInstances.length ? worstState(forecastInstances.map((i) => i.state)) : timestampState(e.forecasts, 24, now),
         asOf: e.forecasts,
@@ -474,8 +492,8 @@ export async function GET(request: NextRequest) {
         { label: 'implausible_value', count: c.rcImplausible },
         ...(rcOtherFlag ? [{ label: 'other quality flags', count: rcOtherFlag }] : []),
       ] },
-      uniqueContribution: rcUnderlying,
-      uniqueNote: 'stored minus grouped_synthetic rows, which are aggregates of other contracts rather than contracts',
+      headlineContribution: rcUnderlying,
+      headlineNote: 'stored minus grouped_synthetic rows, which are aggregates of other contracts rather than contracts',
       freshness: fresh({ asOf: e.recompetes, cadenceHours: 1, basis: 'MAX(recompete_opportunities.last_synced_at)', jobs: CRON_JOBS.recompetes }),
       surface: { state: 'customer_readable', tools: ['get_expiring_contracts', 'find_opportunities'], app: ['Recompetes panel', 'Briefings'] },
       upstreams: ['usaspending'], provenance: 'Per-contract rows from the USASpending Awards API. Only unflagged rows reach customers.',
@@ -484,7 +502,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'dibbs', label: 'DLA small-buy RFQs (DIBBS)', kind: 'source_corpus',
       stored: c.dibbs, unit: 'RFQs',
-      uniqueContribution: c.dibbs,
+      headlineContribution: c.dibbs,
       freshness: fresh({ instanceKey: 'dibbs_dla_flat_files', asOf: e.dibbs, cadenceHours: 24, basis: 'MAX(dibbs_rfqs.synced_at)', jobs: CRON_JOBS.dibbs,
         detail: 'Stored total, not currently-open: dibbs_rfqs.status is not populated, so an open/closed split cannot be measured.' }),
       surface: { state: 'customer_readable', tools: [], app: ['DIBBS panel', 'Opportunity Map', 'Opportunity detail'] },
@@ -494,7 +512,7 @@ export async function GET(request: NextRequest) {
       key: 'grants', label: 'Federal grants', kind: 'source_corpus',
       stored: c.grants, unit: 'grant opportunities',
       breakdown: [{ label: 'posted', count: c.grantsPosted }, { label: 'forecasted', count: c.grantsForecasted }],
-      uniqueContribution: c.grants,
+      headlineContribution: c.grants,
       freshness: fresh({ instanceKey: 'grants_gov_api', asOf: e.grants, cadenceHours: 24, basis: 'MAX(grants_cache.synced_at)', jobs: CRON_JOBS.grants }),
       surface: { state: 'customer_readable', tools: ['search_grants'], app: ['Opportunity Map grants layer'] },
       upstreams: ['grants_gov'], provenance: 'Grants.gov mirrored nightly into grants_cache.',
@@ -512,7 +530,7 @@ export async function GET(request: NextRequest) {
         { label: 'view: grant-type', count: c.resTypeGrant, note: 'subset, not additive' },
         { label: 'view: BAA', count: c.resTypeBaa, note: 'subset, not additive' },
       ],
-      uniqueContribution: c.research,
+      headlineContribution: c.research,
       freshness: {
         state: researchInstances.length ? worstState(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
         asOf: e.resNih,
@@ -527,7 +545,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'dod_sbir_topics', label: 'DoD SBIR/STTR topics', kind: 'source_corpus',
       stored: c.dodSbir, unit: 'topics',
-      uniqueContribution: c.dodSbir,
+      headlineContribution: c.dodSbir,
       freshness: {
         state: 'UNKNOWN',
         asOf: null,
@@ -550,7 +568,7 @@ export async function GET(request: NextRequest) {
         { label: 'appropriation records', count: legBy('appropriation') },
         { label: 'NDAA provision records', count: legBy('ndaa_provision') },
       ],
-      uniqueContribution: legislativeRows ? leg.length : null,
+      headlineContribution: legislativeRows ? leg.length : null,
       freshness: {
         state: legInst ? mapSourceState(legInst.source_state) : 'UNKNOWN',
         asOf: legInst?.last_data_advance ?? null,
@@ -569,7 +587,7 @@ export async function GET(request: NextRequest) {
       key: 'gao_living', label: 'GAO reports (living)', kind: 'source_corpus',
       stored: c.gaoLiving, unit: 'reports',
       breakdown: [{ label: 'with a source URL', count: c.gaoLivingWithUrl }],
-      uniqueContribution: c.gaoLiving,
+      headlineContribution: c.gaoLiving,
       freshness: fresh({ instanceKey: 'institute_gao', asOf: gaoInst?.last_data_advance ?? e.gaoDiscovered, cadenceHours: 24, basis: 'MAX(institute_sources.discovered_at) for gao_report', jobs: CRON_JOBS.gao,
         detail: e.gaoPubMin && e.gaoPubMax ? `publication range ${e.gaoPubMin} → ${e.gaoPubMax}` : undefined }),
       surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'reached as cited evidence behind sourced pain points' },
@@ -578,7 +596,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'gao_historical', label: 'GAO testimonies — historical (1993–2000)', kind: 'source_corpus',
       stored: c.histGao, unit: 'testimonies',
-      uniqueContribution: c.histGao,
+      headlineContribution: c.histGao,
       freshness: {
         state: 'STATIC', asOf: e.histGaoMax, basis: 'agency_intelligence.publication_date (government date)',
         detail: `frozen GovInfo collection, published ${e.histGaoMin ?? '?'} → ${e.histGaoMax ?? '?'}; fetcher quarantined. NOT current GAO intelligence.`,
@@ -589,7 +607,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'knowledge_base', label: 'Knowledge base (teaching + podcast + proposals)', kind: 'source_corpus',
       stored: c.ragDocs, unit: 'documents',
-      uniqueContribution: c.ragDocs,
+      headlineContribution: c.ragDocs,
       freshness: { state: 'MANUAL', asOf: e.ragIngested, basis: 'MAX(mindy_rag_documents.ingested_at) — ingested by script, no scheduled producer' },
       surface: { state: 'customer_readable', tools: ['get_winning_playbook', 'search_podcast_lessons'], app: ['Mindy Chat', 'Proposal Assist'] },
       upstreams: ['govcon_giants'], provenance: 'Internal GovCon Giants corpus (8 yrs teaching, podcast interviews, winning proposals). Ours — not an upstream publisher.',
@@ -603,7 +621,7 @@ export async function GET(request: NextRequest) {
         { label: 'vendor entity POCs (contact_kind = vendor_entity_poc) — contractor-side, not decision makers', count: c.contactsVendor },
         { label: 'unclassified (contact_kind IS NULL) — fail closed, never served as buyers', count: c.contactsUnclassified },
       ] },
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: fresh({ instanceKey: 'decision_makers_sam_contacts', asOf: e.contacts, cadenceHours: 2, basis: 'MAX(federal_contacts.updated_at)', jobs: CRON_JOBS.decisionMakers }),
       surface: { state: 'customer_readable', tools: ['search_federal_contacts'], app: ['Contacts map', 'Office rosters'], note: 'customer buyer queries require contact_kind = government_buyer' },
       upstreams: ['sam_gov'], provenance: 'Extracted from SAM notice POCs (government) and the SAM entity export (vendors). Rows, not people.',
@@ -612,8 +630,8 @@ export async function GET(request: NextRequest) {
       key: 'contractors', label: 'Contractor companies', kind: 'derived_intelligence',
       stored: contractorCompanies, unit: 'companies',
       breakdown: [{ label: 'registered UEIs behind those companies (recipients)', count: contractorUeis, note: 'one company can hold several UEIs — not additive' }],
-      uniqueContribution: 0,
-      uniqueNote: 'canonical contractor population (recipients_rollup_merged — contractor-corpus.ts P0 decision); rolled up from the award warehouse',
+      headlineContribution: 0,
+      headlineNote: 'canonical contractor population (recipients_rollup_merged — contractor-corpus.ts P0 decision); rolled up from the award warehouse',
       freshness: fresh({ asOf: bqAwardsBuilt, cadenceHours: 24 * 7, basis: 'follows the weekly award ingest (data_sources.bq_awards.last_built)' }),
       surface: { state: 'customer_readable', tools: ['search_contractors', 'find_capable_contractors', 'get_contractor_profile'], app: ['Contractor pages'] },
       upstreams: ['usaspending'], provenance: 'One row per company, rolled up from USASpending award recipients in BigQuery.',
@@ -621,7 +639,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'events', label: 'Event Radar', kind: 'derived_intelligence',
       stored: c.events, unit: 'events',
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: fresh({ asOf: e.events, cadenceHours: 24, basis: 'MAX(sam_events.extracted_at)', jobs: CRON_JOBS.events }),
       surface: { state: 'customer_readable', tools: ['search_federal_events', 'get_federal_event_series'] },
       upstreams: ['sam_gov'], provenance: 'Industry days / sources-sought extracted from SAM notices, DoDAAC-decoded to the buying office.',
@@ -629,7 +647,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'dodaac_dir', label: 'Buying-office directory', kind: 'derived_intelligence',
       stored: c.dodaac, unit: 'offices',
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — no registered producer cadence' },
       surface: { state: 'internal_only', tools: [], note: 'anchors office rosters, events and opportunity office names' },
       upstreams: ['usaspending'], provenance: 'Contracting offices decoded from award DoDAACs (USASpending/FPDS in BigQuery).',
@@ -641,7 +659,7 @@ export async function GET(request: NextRequest) {
         { label: 'tied to a held Institute source document', count: c.sourcedClaimsBacked },
         { label: 'change-log events (intelligence_changes)', count: c.intelChanges, note: 'history of these claims, not additional claims' },
       ],
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: { state: 'UNKNOWN', asOf: e.claimsEvidence, basis: 'MAX(agency_pain_points_db.last_evidence_at) — derived alongside the GAO collector; no independent clock' },
       surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'preferred over legacy claims; served with citations' },
       upstreams: ['gao'], provenance: 'Claims derived from the living GAO corpus, each citing its institute_sources document.',
@@ -649,7 +667,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'contract_patterns', label: 'Agency contract patterns', kind: 'derived_intelligence',
       stored: c.contractPatterns, unit: 'patterns',
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: null, basis: 'agency_intelligence (contract_pattern) — one-off build, no scheduled producer' },
       surface: { state: 'internal_only', tools: [], note: 'loaded by getUnifiedAgencyIntelligence; not rendered by a customer tool' },
       upstreams: ['usaspending'], provenance: 'USASpending spending-pattern summaries per agency.',
@@ -659,7 +677,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'pain_points', label: 'Agency pain points (curated, static)', kind: 'static_manual',
       stored: sc.painPoints, unit: 'claims',
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: painAsOf, basis: 'last change to src/data/agency-pain-points.json (git)' },
       surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'served as LEGACY (labelled) when no source-backed claim exists' },
       upstreams: [],
@@ -675,7 +693,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'priorities', label: 'Agency spending priorities (curated, static)', kind: 'static_manual',
       stored: sc.priorities, unit: 'claims',
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: painAsOf, basis: 'last change to src/data/agency-pain-points.json (git)' },
       surface: { state: 'customer_readable', tools: ['get_agency_intel'] },
       upstreams: [],
@@ -692,7 +710,7 @@ export async function GET(request: NextRequest) {
     {
       key: 'budget_authority', label: 'Budget authority (static file)', kind: 'static_manual',
       stored: budgetAgencies, unit: 'toptier agencies',
-      uniqueContribution: 0,
+      headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: budgetAsOf, basis: 'agency-budget-data.json lastUpdated', detail: `fiscal years ${budgetFys.join(', ') || '?'} — FY2025 enacted, FY2026 President's request` },
       surface: { state: 'customer_readable', tools: ['get_agency_budget_trends'] },
       upstreams: ['omb'], provenance: 'Built once from the OMB FY2026 discretionary request + agency CBJs. Not a living budget feed.',
@@ -708,8 +726,8 @@ export async function GET(request: NextRequest) {
         { label: 'skipped — under 80 chars of text (empty-array sentinel, NOT a vector)', count: c.embNone, note: 'not counted as indexed' },
         { label: 'not yet processed', count: c.embPending },
       ],
-      uniqueContribution: 0,
-      uniqueNote: 'these are SAM notices already counted above — a representation, not more records',
+      headlineContribution: 0,
+      headlineNote: 'these are SAM notices already counted above — a representation, not more records',
       freshness: fresh({ asOf: null, cadenceHours: null, basis: 'embed-sow-corpus schedule (no per-row clock read here)', jobs: CRON_JOBS.embed }),
       surface: { state: 'internal_only', tools: [], note: 'internal enrichment: powers hidden-match alerts and match_recompete_sow ranking; vectors are never returned' },
       upstreams: ['sam_gov'], provenance: 'OpenAI text-embedding-3-small over SAM SOW text (preferred) or description. OpenAI is a processing step, not a source.',
@@ -717,8 +735,8 @@ export async function GET(request: NextRequest) {
     {
       key: 'knowledge_chunks', label: 'Knowledge-base passages (RAG chunks)', kind: 'derived_index',
       stored: c.ragChunks, unit: 'passages',
-      uniqueContribution: 0,
-      uniqueNote: 'searchable slices of the knowledge-base documents above',
+      headlineContribution: 0,
+      headlineNote: 'searchable slices of the knowledge-base documents above',
       freshness: { state: 'MANUAL', asOf: e.ragIngested, basis: 'follows knowledge-base ingestion' },
       surface: { state: 'internal_only', tools: [], note: 'retrieval layer behind get_winning_playbook / Chat' },
       upstreams: ['govcon_giants'], provenance: 'Chunked + embedded knowledge-base documents.',
@@ -727,28 +745,28 @@ export async function GET(request: NextRequest) {
     // ─── LIVE PASSTHROUGH ───────────────────────────────────────────────────────
     {
       key: 'usaspending_live', label: 'USASpending API (live queries)', kind: 'passthrough', stored: null, unit: '—',
-      uniqueContribution: null,
+      headlineContribution: null,
       freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'fetched live per call (spending_by_award / spending_by_category)' },
       surface: { state: 'passthrough', tools: ['search_past_contracts', 'get_keyword_coverage', 'generate_market_report'] },
       upstreams: ['usaspending'], provenance: 'Live USASpending search API. Distinct from the persisted award warehouse above; keyword coverage is a derived MEASUREMENT computed per call, not a held dataset.',
     },
     {
       key: 'pricing_intel', label: 'GSA CALC+ labor rates', kind: 'passthrough', stored: null, unit: '—',
-      uniqueContribution: null,
+      headlineContribution: null,
       freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'fetched live per call; 12h response cache (mcp_external_cache)' },
       surface: { state: 'passthrough', tools: ['get_pricing_intel'] },
       upstreams: ['gsa_calc'], provenance: 'Live GSA CALC+ API. Nothing persisted beyond a short-TTL response cache; its population is GSA\'s, not ours.',
     },
     {
       key: 'incumbent_financials', label: 'SEC EDGAR financials', kind: 'passthrough', stored: null, unit: '—',
-      uniqueContribution: null,
+      headlineContribution: null,
       freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'fetched live per call; 6–24h response cache' },
       surface: { state: 'passthrough', tools: ['get_incumbent_financials'] },
       upstreams: ['sec_edgar'], provenance: 'Live SEC EDGAR companyfacts. Public filers only.',
     },
     {
       key: 'regulatory_demand', label: 'Federal Register documents', kind: 'passthrough', stored: null, unit: '—',
-      uniqueContribution: null,
+      headlineContribution: null,
       freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'fetched live per call; 1h response cache' },
       surface: { state: 'passthrough', tools: ['get_regulatory_demand'] },
       upstreams: ['federal_register'], provenance: 'Live Federal Register API. No NAICS tagging.',

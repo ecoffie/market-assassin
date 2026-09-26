@@ -16,42 +16,52 @@ import {
 
 function ds(p: Partial<InventoryDataset> & Pick<InventoryDataset, 'key' | 'kind'>): InventoryDataset {
   return {
-    label: p.key, stored: 0, unit: 'rows', uniqueContribution: 0, upstreams: [], provenance: '',
+    label: p.key, stored: 0, unit: 'rows', headlineContribution: 0, upstreams: [], provenance: '',
     freshness: { state: 'CURRENT', asOf: null, basis: 'test' },
     surface: { state: 'customer_readable', tools: [] },
     ...p,
   };
 }
 
-describe('computeTotals — the unique-underlying-record headline', () => {
-  const sam = ds({ key: 'sam', kind: 'source_corpus', stored: 224_158, uniqueContribution: 224_158 });
-  const index = ds({ key: 'idx', kind: 'derived_index', stored: 148_433, uniqueContribution: 0 });
-  const contacts = ds({ key: 'contacts', kind: 'derived_intelligence', stored: 302_151, uniqueContribution: 0 });
-  const pain = ds({ key: 'pain', kind: 'static_manual', stored: 3_036, uniqueContribution: 0 });
-  const calc = ds({ key: 'calc', kind: 'passthrough', stored: null, uniqueContribution: null,
+describe('computeTotals — owned records vs transaction rows vs everything else', () => {
+  const sam = ds({ key: 'sam', kind: 'source_corpus', stored: 224_158, headlineContribution: 224_158 });
+  const index = ds({ key: 'idx', kind: 'derived_index', stored: 148_433, headlineContribution: 0 });
+  const contacts = ds({ key: 'contacts', kind: 'derived_intelligence', stored: 302_151, headlineContribution: 0 });
+  const pain = ds({ key: 'pain', kind: 'static_manual', stored: 3_036, headlineContribution: 0 });
+  const calc = ds({ key: 'calc', kind: 'passthrough', stored: null, headlineContribution: null,
     freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'x' }, surface: { state: 'passthrough', tools: [] } });
 
   it('only source corpora enter the headline — the semantic index is never added again', () => {
     const t = computeTotals([sam, index, contacts, pain, calc]);
-    expect(t.uniqueSourceRecords).toBe(224_158);
+    expect(t.ownedSourceRecords).toBe(224_158);
+    expect(t.transactionRows).toBe(0);
+    expect(t.persistedSourceRows).toBe(224_158);
     expect(t.indexedRepresentations).toBe(148_433);
     expect(t.derivedRecords).toBe(302_151);
     expect(t.staticRecords).toBe(3_036);
     expect(t.passthroughCapabilities).toBe(1);
   });
 
+  it('transaction-grain rows are totalled separately from owned records, and both make the persisted total', () => {
+    const awards = ds({ key: 'awards', kind: 'source_corpus', grain: 'transaction', stored: 65_030_126, headlineContribution: 65_030_126 });
+    const t = computeTotals([sam, awards, index]);
+    expect(t.ownedSourceRecords).toBe(224_158);
+    expect(t.transactionRows).toBe(65_030_126);
+    expect(t.persistedSourceRows).toBe(224_158 + 65_030_126);
+  });
+
   it('a mis-declared index contribution still cannot enter the headline', () => {
-    const cheating = { ...index, uniqueContribution: 148_433 };
-    expect(computeTotals([sam, cheating]).uniqueSourceRecords).toBe(224_158);
+    const cheating = { ...index, headlineContribution: 148_433 };
+    expect(computeTotals([sam, cheating]).ownedSourceRecords).toBe(224_158);
     expect(inventoryViolations([sam, cheating])).toEqual([
-      'idx: derived_index may not contribute to the unique-record headline',
+      'idx: derived_index may not contribute to the source-record totals',
     ]);
   });
 
   it('an unmeasured source makes the headline a floor, and says which', () => {
-    const unknown = ds({ key: 'leg', kind: 'source_corpus', stored: null, uniqueContribution: null });
+    const unknown = ds({ key: 'leg', kind: 'source_corpus', stored: null, headlineContribution: null });
     const t = computeTotals([sam, unknown]);
-    expect(t.uniqueSourceRecords).toBe(224_158);
+    expect(t.ownedSourceRecords).toBe(224_158);
     expect(t.unmeasuredSources).toEqual(['leg']);
   });
 
@@ -61,7 +71,7 @@ describe('computeTotals — the unique-underlying-record headline', () => {
   });
 
   it('a withheld dataset cannot advertise customer tools', () => {
-    const hist = ds({ key: 'hist', kind: 'source_corpus', stored: 445, uniqueContribution: 445,
+    const hist = ds({ key: 'hist', kind: 'source_corpus', stored: 445, headlineContribution: 445,
       surface: { state: 'withheld', tools: ['get_agency_intel'] } });
     expect(inventoryViolations([hist])).toContain('hist: a withheld dataset cannot list customer tools');
   });
