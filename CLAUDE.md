@@ -584,6 +584,7 @@ demand is forming BEFORE the solicitation appears?*
 - **Research/Lab multi-source ⚠️ PARTIAL** — healthy NIH masks dormant sources: `darpa_baa` and the `grants_gov` slice are ~5 months dead and `nsf_sbir` has NEVER written a row, while both crons logged **75 successful runs of 86**. Needs **per-source** advancement monitoring (a dataset-level clock reports this corpus healthy).
 - ⛔ While parked: do NOT wire SBIR.gov, expand SBIR coverage, investigate DARPA, repair NSF, add DIBBS monitoring, change grant retention, dedupe grant populations, change sync schedules, or add specialty feeds.
 - Inventory truth is DONE and merged (#1457): DIBBS + "Research & Lab Funding Opportunities" are represented, grants is `curated` not passthrough, SBIR is a **non-counting subtype**. PR #1339 closed as superseded.
+- **`/admin/data-inventory` is an ADMIN TRUTH SURFACE (rewritten 2026-09-26, audit `tasks/data-inventory-audit-2026-09-26.md`).** Semantics live in `src/lib/data-core/inventory-model.ts`: every dataset has ONE `kind` (`source_corpus` · `derived_intelligence` · `derived_index` · `static_manual` · `passthrough`) and ONLY `source_corpus` enters the unique-record headline. Stored ≠ served (SAM active, recompete `quality_flag IS NULL`, contacts `contact_kind = government_buyer`). A "source" is an UPSTREAM PUBLISHER, never a label. Registry counts that disagree are shown as DEBT, never adopted. ⚠️ `embedding_source='none'` rows carry an EMPTY-ARRAY sentinel, not a vector — `sow_embedding IS NOT NULL` over-counts the index by ~55K. ⚠️ The BQ `awards` table is TRANSACTION grain (65M rows), not distinct awards. `inventory-truth.unit.test.ts` derives candidate collectors from `src/app/api/cron/` — a new `institute-*`/`sync-*` collector fails CI until it has a row.
 
 ### MCP Connectors Directory — SUBMITTED 2026-07-17
 Full record: **`tasks/mcp-directory-submission-readiness-2026-07-17.md`**. Don't re-investigate; read that file.
@@ -2804,8 +2805,10 @@ TTLs: EDGAR facts 24h / submissions 6h / tickers 24h; Federal Register 1h; CALC 
 **Adding a new tool:** pure fn in `src/mcp/tools/<name>.ts` + client in `src/lib/<source>/` → register in
 BOTH `src/lib/mcp/tool-registry.ts` (def + `listMcpTools`/`isMcpTool`/`runMcpTool` + `TOOL_CREDITS`) AND
 `src/mcp/server.ts` (zod inputSchema) → add a `callTool` block to `scripts/mcp-smoke.mjs` (assert grounded +
-traceability) → add a `data_sources` seed row + a `DatasetEntry` (provenance 'passthrough') in
-`src/app/api/admin/data-inventory/route.ts` + a row in `docs/DATA-SOURCES-REGISTRY.md`.
+traceability) → add a `data_sources` seed row + an inventory row in
+`src/app/api/admin/data-inventory/route.ts` (`kind: 'passthrough'`, `stored: null` for a live API;
+`source_corpus` only if it PERSISTS rows; list the tool in `surface.tools` — the inventory test checks it
+against `listMcpTools()`) + a row in `docs/DATA-SOURCES-REGISTRY.md`.
 
 ---
 

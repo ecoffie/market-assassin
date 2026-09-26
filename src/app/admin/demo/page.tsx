@@ -10,8 +10,10 @@ const SCREENS = [
     n: 1,
     href: '/admin/data-inventory',
     title: 'The Data Core — what Mindy knows',
-    desc: 'The moat, quantified. Live record counts across every dataset that powers Mindy.',
-    stat: '~604,718 records · 13 datasets · 34 sources',
+    desc: 'Every dataset Mindy holds, measured live — owned sources vs derived vs passthrough, with freshness and what customers can read.',
+    // No hand-typed figure here: '~604,718 records · 13 datasets · 34 sources' went stale
+    // and described a double-counted total. The page itself is the measurement.
+    stat: 'Live counts · unique records · upstream publishers · freshness',
     line: 'Mindy arrives full — it already knows your market at login.',
   },
   {
