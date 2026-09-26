@@ -67,7 +67,7 @@ describe('other customer-facing surfaces', () => {
   it('Mindy Chat no longer claims SBIR/STTR search and says where to go instead', () => {
     const chat = read('src/app/api/app/chat/route.ts');
     expect(chat).not.toMatch(/IDV\/GWAC vehicles, grants, SBIR\/STTR\./);
-    expect(chat).toMatch(/SBIR\/STTR open-topic search is NOT available in Mindy/);
+    expect(chat).toMatch(/Mindy's dedicated SBIR\/STTR open-topic search is NOT available/);
   });
   it('marketing copy no longer advertises SBIR search', () => {
     expect(code('src/app/market-intelligence/page.tsx')).not.toMatch(/Forecasts, SBIR, Grants/);

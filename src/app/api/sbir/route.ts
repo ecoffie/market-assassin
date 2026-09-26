@@ -1,5 +1,5 @@
 /**
- * /api/sbir — RETIRED 2026-09-26.
+ * /api/sbir — RETIRED 2026-09-26 (Mindy's dedicated SBIR/STTR search; Grants.gov search is separate and kept).
  *
  * This endpoint served the in-app SBIR/STTR panel from NIH RePORTER (funded awards) plus the
  * `aggregated_opportunities` sbir_sttr slice (42/42 NIH project pages) — award history presented as

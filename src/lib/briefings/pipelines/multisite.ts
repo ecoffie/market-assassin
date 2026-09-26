@@ -128,6 +128,10 @@ export async function fetchMultisiteOpportunities(
     query = query.in('opportunity_type', params.opportunityTypes);
   }
 
+  if (params.excludeOpportunityTypes && params.excludeOpportunityTypes.length > 0) {
+    query = query.not('opportunity_type', 'in', `(${params.excludeOpportunityTypes.join(',')})`);
+  }
+
   // Agency filters
   if (params.agencies && params.agencies.length > 0) {
     const agencyConditions = params.agencies

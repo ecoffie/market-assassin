@@ -1614,12 +1614,12 @@ function BriefingsDashboardContent() {
           </div>
         )}
 
-        {/* SBIR/STTR search — RETIRED 2026-09-26 (src/lib/sbir/retired.ts). No nav entry points remain;
+        {/* Mindy's dedicated SBIR/STTR search — RETIRED 2026-09-26 (src/lib/sbir/retired.ts). No nav entry points remain;
             this notice covers any residual path (an old tab mapping or a persisted panel). */}
         {activePanel === 'sbir' && (
           <div className="max-w-3xl mx-auto px-4 py-8">
             <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-6">
-              <h2 className="text-xl font-semibold text-white mb-2">SBIR/STTR search has been retired</h2>
+              <h2 className="text-xl font-semibold text-white mb-2">Mindy&apos;s dedicated SBIR/STTR search has been retired</h2>
               <p className="text-gray-300 text-sm mb-4">{sbirSearchRetiredMessage()}</p>
               <div className="flex flex-wrap gap-3">
                 {SBIR_SEARCH_RETIRED.links.map((l) => (

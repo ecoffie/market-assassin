@@ -293,6 +293,11 @@ export async function generateAIBriefing(
         const multisiteResult = await fetchMultisiteOpportunities({
           postedFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
           limit: 25,
+          // Mindy's dedicated SBIR/STTR search is RETIRED (src/lib/sbir/retired.ts): the sbir_sttr slice is
+          // NIH RePORTER award pages, not open topics, so it must never reach a briefing as an "R&D
+          // opportunity". This path is ACTIVE — precompute-briefings calls it nightly (measured 2026-09-26;
+          // only an unrelated LLM outage kept its output from being saved).
+          excludeOpportunityTypes: ['sbir_sttr'],
           // No NAICS filter - get all R&D opportunities
         });
 

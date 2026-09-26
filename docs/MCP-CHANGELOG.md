@@ -24,6 +24,8 @@ default-off `_ai_hint`. Investigation: `tasks/sbir-reed-investigation-2026-09-26
   (`isError:false`, "No credits were charged"), logged in `mcp_call_log` as status `retired` with
   0 credits; it never reaches `runMcpTool` or the debit. `src/lib/mcp/retired-tools.ts` is the list;
   a test fails if a retired name is ever registered again.
+- **Scope:** Mindy's *dedicated* SBIR/STTR search — not all SBIR discovery (Grants.gov SBIR/STTR
+  announcements stay searchable in the Grants panel).
 - **Retired with it (same PR):** the in-app SBIR panel + sidebar item, `/api/sbir` (now 410), the
   Opportunity Map SBIR source and `/api/market-scan`'s SBIR section — one shared notice
   (`src/lib/sbir/retired.ts`).

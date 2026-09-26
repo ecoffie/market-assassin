@@ -1,6 +1,6 @@
-# SBIR/STTR search retirement — final packet (2026-09-26)
+# Retirement of Mindy's DEDICATED SBIR/STTR search — final packet (2026-09-26)
 
-**Decision (Eric, 2026-09-26):** retire SBIR/STTR search on every customer-facing surface. Keep the
+**Decision (Eric, 2026-09-26):** retire **Mindy's dedicated SBIR/STTR search** on every surface that offered it. This is **not** a retirement of all SBIR-related discovery: Grants.gov funding announcements, including agency SBIR/STTR FOAs, stay searchable in the Grants panel, a separate and supported source. Keep the
 shared NIH/SBIR libraries and all stored data. PR **#1710**. **Stop before merge/deploy.** No
 credits and no customer messages: Louis's proposed 105-credit correction remains a separate,
 unauthorized item.
@@ -25,6 +25,7 @@ and Mindy's Grants panel for SBIR funding announcements posted on Grants.gov.
 | Opportunity Map SBIR source | client asked `sources=sam,sbir`; `countsBySource.SBIR = 0` (empty cache — latent); "SBIR/STTR" option in the "Where it came from" filter | server ignores `sources=…,sbir` (accepted, contributes nothing); client asks `sources=sam`; SBIR removed from the source filter (`template.html`, `template-html.ts` regenerated) |
 | `/api/market-scan` | `includeSbir` defaulted ON → multisite NIH rows returned as `sbirOpportunities` (no UI caller; directly callable) | never fetched; `sbirOpportunities: []` plus `sbir: { retired: true, … }`; "NIH RePORTER" dropped from `dataSources` |
 | Mindy Chat system prompt | claimed "…grants, SBIR/STTR" under OPPORTUNITIES; tools come from `listMcpTools()` | claim removed. A new line says SBIR/STTR open-topic search is not available, where to go instead, and never to present awards as open topics. `search_sbir` is already absent from its tool list |
+| AI briefing generator (multisite fetch) | **ACTIVE path.** `precompute-briefings` runs nightly (enabled; 200 on 09-24/25/26), finds 179 profiles and calls `generateAIBriefing`, whose multisite fetch runs **before** the LLM. No template has been saved since 2026-06-29 **only** because every LLM provider returns 404 model_not_found (`briefing_precompute_runs` 2026-09-26: 0 generated / 2 failed, while the cron reports `success`) | the fetch excludes `opportunity_type='sbir_sttr'` (`excludeOpportunityTypes`), so the retired slice cannot enter a briefing when the LLM path is repaired |
 | Marketing / upgrade copy | `/market-intelligence` "Forecasts, SBIR, Grants"; `/agencies` "…NIH RePORTER, SBIR/STTR…"; `/briefings` upsell "SBIR/STTR intel" | SBIR claims removed |
 
 ## Kept on purpose (and why)
@@ -37,12 +38,24 @@ and Mindy's Grants panel for SBIR funding announcements posted on Grants.gov.
 | `src/mcp/tools/sbir.ts` | unregistered; nothing imports it |
 | Informational mentions: NASA SBIR tip on `/agencies/[slug]`, the `budget-intel` keyword list, the `potato-journey` jargon list, `engagement.SBIR_SEARCH` / `surface-registry` ids | not search entry points. The analytics ids keep historical events readable |
 
-**Observed, not changed (no evidence of customer exposure):** the AI briefing generator's multisite
-fetch has no type filter, so the 42 active NIH `sbir_sttr` rows *could* enter its prompt as "R&D
-opportunities".
-- Scanned 230 stored templates (daily 06-08→06-29; weekly/pursuit to 09-28): **0** SBIR/NIH mentions.
-- Daily templates have not been generated since 2026-06-29.
-- Recommended follow-up, if briefings resume: exclude `opportunity_type='sbir_sttr'` there.
+**Briefing generator — why it was fixed, not deferred.** Saved templates showing zero SBIR/NIH
+mentions did **not** establish that the path was inactive, and it is not inactive:
+- it runs nightly and reaches the multisite fetch;
+- only an unrelated LLM outage stops its output being saved.
+
+So the retired `sbir_sttr` slice is now excluded at the fetch. Evidence:
+- **Read-only live run of the generator's exact fetch** (posted in the last 30 days, limit 25): before
+  and after the change, 25 rows, **0** `sbir_sttr`. Today's newest 25 are all `nih_reporter/grant`, so
+  current exposure is 0; the exclusion guards the day SBIR rows are among the newest.
+- `multisite-sbir-exclusion.unit.test.ts` (3): the filter is applied inside the query; other callers
+  are unchanged; the generator requests it. **Mutation:** removing it from the generator turns the
+  test red.
+
+**Flagged for decision (NOT changed — parked Research & Lab feed, not Mindy's dedicated SBIR search):**
+- the same run shows the generator feeds **NIH RePORTER `grant` rows** (funded projects) to the LLM
+  as "R&D opportunities" — the same award-shown-as-opportunity class;
+- the cron reports `success` while generation fails 100% — the *dead operation reported as success*
+  class.
 
 ## #1708 — closed unmerged
 
@@ -117,7 +130,8 @@ Verify **by name**, not by count. The catalog total can change for unrelated rea
 4. **Map:** `/api/app/opportunity-map?…&sources=sam,sbir` → `countsBySource.SBIR == 0`, no pin with
    `src=='SBIR'`. The served map HTML contains no `"SBIR"` entry in the source-filter list.
 5. **Market-scan:** `/api/market-scan?naics=541512` → `sbir.retired == true`, `sbirOpportunities == []`.
-6. **Panel:** signed in as a test/staff account on `/briefings`: no "SBIR/STTR" sidebar item.
+6. **Panel (signed-in navigation):** signed in as a test/staff account on `/briefings`, there is no "SBIR/STTR" sidebar item; the Grants panel's SBIR/STTR chip still returns Grants.gov postings.
+6b. **Briefings:** after release, the next `briefing_precompute_runs` row still shows the generator reaching its fetch. If the LLM path is repaired, a saved template contains no `reporter.nih.gov/project-details` link labelled as an SBIR opportunity.
 7. **Unrelated tools still work:** e.g. `get_balance`, `search_grants`, `find_opportunities` on MCP;
    the Grants panel "SBIR/STTR" chip still returns Grants.gov postings.
 8. **Tool Map artifact:** update the claude.ai artifact so no entry is named `search_sbir`. It is
