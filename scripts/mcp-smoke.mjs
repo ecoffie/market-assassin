@@ -316,15 +316,6 @@ try {
   if (fcS._meta?.degraded) fail('forecasts: degraded=true (Supabase agency_forecasts unreachable)');
   if (!fcS._meta?.grounded) fail('forecasts: grounded=false for NAICS 541 (7,700 forecasts exist; regression?)');
 
-  // ── search_sbir (NIH RePORTER) ─────────────────────────────────────────────
-  console.error('\n→ calling search_sbir({ keyword: "cancer", source: "nih", limit: 5 })');
-  const sb = await client.callTool({ name: 'search_sbir', arguments: { keyword: 'cancer', source: 'nih', limit: 5 } });
-  const sbS = sb.structuredContent;
-  if (!sbS) fail('sbir: no structuredContent');
-  console.error(`✓ grounded=${sbS._meta?.grounded} · degraded=${sbS._meta?.degraded} · count=${sbS._meta?.count}${sbS.opportunities?.[0] ? ` · top=${String(sbS.opportunities[0].title).slice(0,50)}` : ''}`);
-  if (sbS._meta?.degraded) console.error('⚠ sbir: degraded=true (NIH RePORTER unreachable) — NON-FATAL');
-  else if (!sbS._meta?.grounded) fail('sbir: grounded=false for "cancer" on NIH RePORTER (regression?)');
-
   // ── get_expiring_contracts (Supabase recompete_opportunities) ──────────────
   console.error('\n→ calling get_expiring_contracts({ naics: "541", months_window: 24, limit: 5 })');
   const ec = await client.callTool({ name: 'get_expiring_contracts', arguments: { naics: '541', months_window: 24, limit: 5 } });

@@ -54,6 +54,7 @@ export function statusStyle(status: string): { label: string; cls: string; dot: 
   switch (status) {
     case 'success': return { label: 'success', cls: 'text-slate-400', dot: 'bg-slate-500' };
     case 'uncharged': return { label: 'free (race)', cls: 'text-slate-400', dot: 'bg-slate-600' };
+    case 'retired': return { label: 'retired tool — not charged', cls: 'text-slate-400', dot: 'bg-slate-600' };
     case 'rejected_no_credits': return { label: 'no credits', cls: 'text-amber-300', dot: 'bg-amber-400' };
     case 'gated': return { label: 'Pro only', cls: 'text-amber-300', dot: 'bg-amber-400' };
     case 'failed': return { label: 'failed', cls: 'text-rose-300', dot: 'bg-rose-400' };

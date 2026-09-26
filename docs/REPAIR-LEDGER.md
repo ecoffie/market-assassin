@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — Mindy's DEDICATED SBIR/STTR search retired (MCP `search_sbir`, in-app panel, `/api/sbir`, map source, market-scan, briefing multisite fetch) — Grants.gov SBIR discovery kept
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | MCP catalog / billing | `search_sbir` withdrawn: removed from registry, `TOOL_CREDITS`, tool groups, stdio server, catalogs, smoke. Stale `tools/call` answered at the hosted edge (after auth, before the SDK) with `tool_retired` (`isError:false`, 0 credits), logged `retired`; `runMeteredTool` refuses retired names before pricing. Same PR retires the in-app SBIR panel + nav item, `/api/sbir` (410), the map SBIR source/filter and market-scan's SBIR section via ONE notice (`src/lib/sbir/retired.ts`); chat + marketing copy stop advertising it; the AI briefing generator's multisite fetch (an ACTIVE nightly path) excludes `sbir_sttr`. Libraries, stored data and parked feeds untouched. Record: tasks/sbir-reed-investigation-2026-09-26.md | `search_sbir: {` → `src/lib/mcp/retired-tools.ts` | sbir-search-retirement.unit (14: real /api/sbir 410 GET/POST + surface guards), retired-tools.unit (5), route.retired-tool.unit (5, real mcp-handler: absent from tools/list, stale call never dispatches, unrelated tool dispatches, unauth 401), metered.unit retired case; mutation: intercept removed → stale-call test red; name re-grouped → discovery test red | 🟡 PR |
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

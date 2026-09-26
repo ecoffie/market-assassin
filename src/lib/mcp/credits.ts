@@ -81,6 +81,7 @@ export type CallStatus =
   | 'rejected_invalid_input' // credit integrity: required input absent → tool never ran
   | 'uncharged'
   | 'gated'
+  | 'retired' // a stale call to a retired tool (retired-tools.ts) — never run, never charged
   // Extraction guard (Layers A+B). Enforced blocks:
   | 'requires_paid' // Layer A — free-only account hit a proprietary tool (blocked)
   | 'throttled' // Layer B — per-account rolling cap exceeded (blocked)

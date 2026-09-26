@@ -7,6 +7,7 @@
  * GET /api/market-scan?naics=541512&state=FL
  */
 
+import { SBIR_SEARCH_RETIRED, sbirSearchRetiredMessage } from '@/lib/sbir/retired';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   industryNames,
@@ -86,7 +87,9 @@ interface MarketScanResult {
   samOpportunities: Opportunity[];
   forecasts: Opportunity[];
   grants: Opportunity[];
+  /** Always [] — SBIR/STTR search retired 2026-09-26 (see `sbir`). */
   sbirOpportunities: Opportunity[];
+  sbir: { retired: true; code: string; retired_on: string; message: string };
   recompetes: Opportunity[];
 
   // All opportunities ranked
@@ -843,7 +846,9 @@ export async function GET(request: NextRequest) {
   const zipCode = searchParams.get('zipCode');
   const yearsParam = searchParams.get('years');
   const includeGrants = searchParams.get('includeGrants') !== 'false';
-  const includeSbir = searchParams.get('includeSbir') !== 'false';
+  // SBIR/STTR RETIRED 2026-09-26 (src/lib/sbir/retired.ts): `includeSbir` is still accepted but ignored —
+  // the multisite slice it read is NIH award history, not open topics. Never fetched, never ranked.
+  const includeSbir = false;
   const setAside = searchParams.get('setAside') || undefined;
 
   // Validate required params
@@ -972,7 +977,8 @@ export async function GET(request: NextRequest) {
     samOpportunities: samOpps.slice(0, 20),
     forecasts: forecasts.slice(0, 10),
     grants: grants.slice(0, 10),
-    sbirOpportunities: sbirOpps.slice(0, 10),
+    sbirOpportunities: sbirOpps.slice(0, 10), // always [] — retired
+    sbir: { retired: true, code: SBIR_SEARCH_RETIRED.code, retired_on: SBIR_SEARCH_RETIRED.retired_on, message: sbirSearchRetiredMessage() },
     recompetes: recompetes.slice(0, 10),
 
     rankedOpportunities,

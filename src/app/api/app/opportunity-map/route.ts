@@ -56,11 +56,11 @@ function wantSamSources(raw: string | null): boolean {
   if (!s || s === 'all') return true;
   return s.split(',').map((x) => x.trim()).includes('sam');
 }
-/** Include SBIR/STTR topics under Open Opps? Opt-in via ?sources=...,sbir (Eric 2026-07-28). Same
- *  opt-in shape as DIBBS so existing SAM-only callers are unchanged. */
-function wantSbirSources(raw: string | null): boolean {
-  const s = (raw || 'sam').toLowerCase();
-  return s.includes('sbir') || s === 'all';
+/** SBIR/STTR topics under Open Opps — RETIRED 2026-09-26 (src/lib/sbir/retired.ts). `?sources=...,sbir`
+ *  is still ACCEPTED (old clients / cached URLs keep working) but contributes nothing: the only source
+ *  was the DoD topic cache, which has never held a row, so no SBIR pin was ever real. SAM/DLA unaffected. */
+function wantSbirSources(_raw: string | null): boolean {
+  return false;
 }
 
 // Query MEANING (text, agency, query-named codes/set-asides/states, exclusions) comes from the

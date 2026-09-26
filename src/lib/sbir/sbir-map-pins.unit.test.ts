@@ -32,10 +32,11 @@ describe('SBIR pins are real, approximate, and fail-soft', () => {
   });
 });
 
-describe('SBIR is an opt-in source under Open Opps (like DIBBS)', () => {
-  it('wantSbirSources gates it on ?sources=...,sbir', () => {
+describe('SBIR source under Open Opps — RETIRED 2026-09-26 (src/lib/sbir/retired.ts)', () => {
+  it('?sources=...,sbir is still accepted but contributes nothing (the gate is permanently off)', () => {
     expect(routeSrc).toContain('function wantSbirSources');
-    expect(routeSrc).toContain("s.includes('sbir')");
+    expect(routeSrc).toMatch(/function wantSbirSources\(_raw: string \| null\): boolean \{\s*return false;/);
+    expect(routeSrc).not.toContain("s.includes('sbir')");
   });
   it('SBIR pins are merged + counted separately (never absorb the SAM headline)', () => {
     // Assert the INVARIANT (all three sources merged, SBIR counted on its own),

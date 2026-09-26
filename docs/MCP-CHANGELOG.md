@@ -5,9 +5,37 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 64** (never trust a grep — tools register
+Authoritative tool count: **`listMcpTools()` = 63** (never trust a grep — tools register
 via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 64.
+TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 63.
+
+---
+
+## September 2026 — `search_sbir` RETIRED (catalog 64 → 63)
+
+**Retired:** `search_sbir` (was 5 credits). It could not return OPEN SBIR/STTR topics: its only
+open-topic source (the DoD cache `dod_sbir_topics`) has never received a row, its "multisite" source
+selected a nonexistent column and errored on every call since #158, and its default returned funded
+NIH projects in a field named `opportunities` — the "these are awards" caveat lived only in the
+default-off `_ai_hint`. Investigation: `tasks/sbir-reed-investigation-2026-09-26.md` (PR #1708).
+
+- **Absent from discovery:** registry, `TOOL_CREDITS`, tool groups, stdio server, catalogs, smoke.
+- **Stale clients:** a `tools/call` for `search_sbir` returns a clear `tool_retired` result
+  (`isError:false`, "No credits were charged"), logged in `mcp_call_log` as status `retired` with
+  0 credits; it never reaches `runMcpTool` or the debit. `src/lib/mcp/retired-tools.ts` is the list;
+  a test fails if a retired name is ever registered again.
+- **Scope:** Mindy's *dedicated* SBIR/STTR search — not all SBIR discovery. The notice points users
+  directly to SBIR.gov, DoD DSIP and Grants.gov; it does not recommend Mindy's Grants panel for SBIR
+  coverage (its live health is under separate investigation).
+- **Retired with it (same PR):** the in-app SBIR panel + sidebar item, `/api/sbir` (now 410), the
+  Opportunity Map SBIR source and `/api/market-scan`'s SBIR section — one shared notice
+  (`src/lib/sbir/retired.ts`).
+- **Kept (not deleted):** `src/lib/sbir/*` (NIH RePORTER + DoD normalization), all stored data
+  (`aggregated_opportunities`, `dod_sbir_topics`), the unregistered `src/mcp/tools/sbir.ts` wrapper, and
+  the parked specialty feeds (untouched). The Grants panel (incl. its SBIR chip) is a separate
+  Grants.gov path, left in place and out of scope.
+- **To restore an open-topic tool:** a separate product decision + a working open-topic source — see
+  the investigation record §7. Remove the name from `RETIRED_TOOLS` in the same change.
 
 ---
 
