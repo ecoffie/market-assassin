@@ -50,6 +50,19 @@ describe('runMeteredTool', () => {
     expect(registry.runMcpTool).not.toHaveBeenCalled();
   });
 
+  it('answers a RETIRED tool without running, pricing or charging it, and logs it as retired', async () => {
+    m(registry.creditsFor).mockReturnValue(5);
+    m(credits.getBalance).mockResolvedValue(100);
+    const r = await runMeteredTool('search_sbir', { keyword: 'zero trust' }, ctx);
+    expect(r).toMatchObject({ ok: false, creditsCharged: 0 });
+    expect(r.ok === false && r.error.code).toBe('tool_retired');
+    expect(r.ok === false && r.error.message).toMatch(/No credits were charged/);
+    expect(registry.runMcpTool).not.toHaveBeenCalled();
+    expect(credits.getBalance).not.toHaveBeenCalled();
+    expect(credits.debitCredits).not.toHaveBeenCalled();
+    expect(credits.logCall).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'search_sbir', status: 'retired', creditsCharged: 0 }));
+  });
+
   it('rejects insufficient balance BEFORE running the tool (top-up message)', async () => {
     m(registry.creditsFor).mockReturnValue(5);
     m(credits.getBalance).mockResolvedValue(2);

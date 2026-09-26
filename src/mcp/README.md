@@ -53,7 +53,7 @@ Prices are in credits (debited **on success only**; repeat/cached reads are free
 connect grants **100 free credits**. Live catalog + prices: `GET /api/mcp/catalog`.
 
 **Public data & search** — `search_sam_opportunities` · `get_market_vocabulary` ·
-`get_keyword_coverage` · `search_grants` · `get_agency_forecasts` · `search_sbir` ·
+`get_keyword_coverage` · `search_grants` · `get_agency_forecasts` ·
 `get_expiring_contracts` · `search_idv_contracts` · `get_solicitation_documents` ·
 `search_federal_events`
 

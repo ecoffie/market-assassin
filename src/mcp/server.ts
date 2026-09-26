@@ -31,7 +31,6 @@ import { getAgencyIntel } from './tools/agency-intel';
 import { getLegislationStatus } from './tools/legislation-status';
 import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
-import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { findOpportunitiesTool } from './tools/find-opportunities';
 import { lookupSolicitationTool } from './tools/lookup-solicitation';
@@ -528,29 +527,6 @@ server.registerTool(
   },
   async ({ naics, agency, state, set_aside, fiscal_year, keyword, limit }) => {
     const result = await agencyForecasts({ naics, agency, state, set_aside, fiscal_year, keyword, limit });
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
-  },
-);
-
-server.registerTool(
-  'search_sbir',
-  {
-    title: 'Search SBIR/STTR',
-    annotations: { readOnlyHint: true, openWorldHint: true },
-    description:
-      'SBIR/STTR small-business R&D from NIH RePORTER (awarded projects — who won what) + a multisite aggregate ' +
-      'of open notices. source="nih" = awarded NIH projects; source="multisite"/"all" = open notices. Filter by ' +
-      'keyword / agency / phase. grounded=false when nothing matches — try source="all".',
-    inputSchema: {
-      keyword: z.string().optional().describe('Search term, e.g. "machine learning".'),
-      agency: z.string().optional().describe('NIH institute (NCI, NIAID) or broad agency (NSF, DOD).'),
-      phase: z.enum(['1', '2', 'all']).optional().describe('SBIR/STTR phase (default all).'),
-      source: z.enum(['nih', 'dod', 'multisite', 'all']).optional().describe('Data source: nih=awarded NIH projects; dod=open DoD SBIR/STTR topics; multisite=open notices; all.'),
-      limit: z.number().int().min(1).max(50).optional().describe('Max results (default 25).'),
-    },
-  },
-  async ({ keyword, agency, phase, source, limit }) => {
-    const result = await sbirSearch({ keyword, agency, phase, source, limit });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
@@ -1677,7 +1653,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + office-early-signal + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling + draft-proposal + draft-proposal-section + export-proposal registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + office-early-signal + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling + draft-proposal + draft-proposal-section + export-proposal registered',
   );
 }
 

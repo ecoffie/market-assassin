@@ -14,6 +14,7 @@ import { resolvePayer, debitResolvedPayer, isChargeable, getPoolBalance, type Pa
 import { recordSearchAxes } from '@/lib/search-history';
 import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
+import { isRetiredTool, retiredToolMessage } from './retired-tools';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
 import { classifyBillingOutcome, isBillable, preflightPaidInput } from './credit-integrity';
@@ -48,6 +49,13 @@ export async function runMeteredTool(
   args: Record<string, unknown>,
   ctx: MeteredContext,
 ): Promise<MeteredOutcome> {
+  // A RETIRED tool is answered before anything else — never run, never priced, never debited.
+  // Logged ('retired', 0 credits) so stale clients are visible. Covers every entry point that
+  // dispatches through here; the hosted transport answers first (see retired-tools.ts).
+  if (isRetiredTool(name)) {
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'retired', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+    return { ok: false, error: { code: 'tool_retired', message: retiredToolMessage(name) }, creditsCharged: 0 };
+  }
   if (!isMcpTool(name)) {
     return { ok: false, error: { code: 'unknown_tool', message: `Unknown tool: ${name}` }, creditsCharged: 0 };
   }

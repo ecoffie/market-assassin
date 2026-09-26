@@ -191,6 +191,8 @@ export interface MultisiteSearchParams {
   // Filter by source
   sources?: SourceId[];
   excludeSources?: SourceId[];
+  /** Opportunity types to leave out (e.g. 'sbir_sttr' — retired SBIR/STTR search, src/lib/sbir/retired.ts). */
+  excludeOpportunityTypes?: string[];
 
   // Classification filters
   naicsCodes?: string[];

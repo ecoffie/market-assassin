@@ -35,14 +35,23 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ results: [], data: [], opportunities: [] }), { status: 200 })));
 });
 
-describe('/api/market-scan — funded NIH projects never appear as SBIR opportunities', () => {
-  it('returns the NSF solicitation and not the funded NIH project', async () => {
+describe('/api/market-scan — funded NIH projects never appear as SBIR opportunities (with #1710 retirement)', () => {
+  // Stacked on #1710: Mindy's dedicated SBIR/STTR search is RETIRED, so market-scan's SBIR section is
+  // never fetched. The combined contract: the retirement notice survives, the SBIR list is empty even
+  // when a caller asks for it, and a funded NIH project appears NOWHERE in the response.
+  it.each([
+    ['default', 'http://localhost/api/market-scan?naics=541512&includeGrants=false'],
+    ['caller asks includeSbir=true', 'http://localhost/api/market-scan?naics=541512&includeGrants=false&includeSbir=true'],
+  ])('%s → retirement notice present, SBIR list empty, no funded NIH project anywhere', async (_label, url) => {
     const { GET } = await import('./route');
-    const res = await GET(new NextRequest('http://localhost/api/market-scan?naics=541512&includeGrants=false'));
+    const res = await GET(new NextRequest(url));
     const body = await res.json();
-    const titles = (body.sbirOpportunities ?? []).map((o: { title: string }) => o.title);
-    expect(titles).toContain('OPEN-NSF SBIR Phase I Solicitation');
-    expect(titles.join(' ')).not.toContain('FUNDED-NIH');
-    expect(JSON.stringify(body.rankedOpportunities ?? [])).not.toContain('FUNDED-NIH');
+    expect(body.sbir).toMatchObject({ retired: true, code: 'sbir_search_retired', retired_on: '2026-09-26' });
+    expect(body.sbir.message).toMatch(/retired on 2026-09-26/);
+    expect(body.sbirOpportunities).toEqual([]);
+    const whole = JSON.stringify(body);
+    expect(whole).not.toContain('FUNDED-NIH');
+    expect(whole).not.toMatch(/reporter\.nih\.gov\/project-details/);
+    expect(body.dataSources ?? []).not.toContain('NIH RePORTER');
   });
 });
