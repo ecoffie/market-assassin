@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { AWARD_HISTORY_SOURCES, recordKindFor, type RecordKind } from '@/lib/research/award-history';
 import type {
   SourceId,
   MultisiteSearchParams,
@@ -32,9 +33,14 @@ export interface MultisiteOpportunity {
   pscCode?: string;
   setAside?: SetAsideType;
   opportunityType: OpportunityType;
+  /** award_history = an already-FUNDED project (e.g. NIH RePORTER) — never an open opportunity. */
+  recordKind: RecordKind;
 
   postedDate?: string;
+  /** A proposal deadline. Never set on award_history rows — see projectEndDate. */
   closeDate?: string;
+  /** award_history only: the funded project's end date (NOT a deadline). */
+  projectEndDate?: string;
 
   estimatedValue?: number;
 
@@ -105,6 +111,14 @@ export async function fetchMultisiteOpportunities(
   // Source filters
   if (params.sources && params.sources.length > 0) {
     query = query.in('source', params.sources);
+  }
+
+  // Award history (funded NIH RePORTER projects) is NOT an opportunity feed. Excluded by default,
+  // inside the query (never after a limit), so every opportunity consumer is protected. A caller that
+  // explicitly asks for an award-history source still gets it — labeled recordKind='award_history'.
+  const askedForAwardHistory = (params.sources ?? []).some((s) => AWARD_HISTORY_SOURCES.includes(s));
+  if (!askedForAwardHistory) {
+    query = query.not('source', 'in', `(${AWARD_HISTORY_SOURCES.join(',')})`);
   }
 
   if (params.excludeSources && params.excludeSources.length > 0) {
@@ -188,7 +202,9 @@ export async function fetchMultisiteOpportunities(
   }
 
   // Transform to MultisiteOpportunity format
-  const opportunities: MultisiteOpportunity[] = (data || []).map(row => ({
+  const opportunities: MultisiteOpportunity[] = (data || []).map(row => {
+    const recordKind = recordKindFor(row);
+    return {
     id: row.id,
     source: row.source as SourceId,
     externalId: row.external_id,
@@ -203,9 +219,12 @@ export async function fetchMultisiteOpportunities(
     pscCode: row.psc_code,
     setAside: row.set_aside as SetAsideType,
     opportunityType: row.opportunity_type as OpportunityType,
+    recordKind,
 
     postedDate: row.posted_date,
-    closeDate: row.close_date,
+    // A funded project's close_date is its END, not a deadline — never expose it as closeDate.
+    closeDate: recordKind === 'award_history' ? undefined : row.close_date,
+    projectEndDate: recordKind === 'award_history' ? row.close_date : undefined,
 
     estimatedValue: row.estimated_value,
 
@@ -221,7 +240,8 @@ export async function fetchMultisiteOpportunities(
 
     status: row.status,
     scrapedAt: row.scraped_at
-  }));
+    };
+  });
 
   return {
     opportunities,
