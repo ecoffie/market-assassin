@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { naicsSourceForUserWrite } from '@/lib/profile/naics-provenance';
+import { KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
 import { createClient } from '@supabase/supabase-js';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -333,13 +334,27 @@ export async function POST(request: NextRequest) {
       // Normalize on write (was storing the raw client array): trim, drop empties,
       // drop bare NAICS numbers (the #239 pollution class — a code typed into the
       // keyword box), and CASE-INSENSITIVE dedupe. This is the path that had let
-      // mixed-case duplicates ("ERP","ERP"...) accumulate across re-saves. Cap 40.
+      // mixed-case duplicates ("ERP","ERP"...) accumulate across re-saves.
+      //
+      // Over the limit is REJECTED with nothing written. This used to be a
+      // silent .slice(0, 40): a 53-keyword save returned success and kept the
+      // first 40 (2026-09-24). Returning here, before any upsert, leaves the
+      // previously saved settings untouched.
       const seen = new Set<string>();
-      record.keywords = (Array.isArray(keywords) ? keywords : [])
+      const cleaned = (Array.isArray(keywords) ? keywords : [])
         .map((k: unknown) => String(k).trim())
         .filter((k: string) => k.length > 0 && !/^\d{2,6}$/.test(k))
-        .filter((k: string) => { const lc = k.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; })
-        .slice(0, 40);
+        .filter((k: string) => { const lc = k.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; });
+      if (cleaned.length > KEYWORD_MAX_COUNT) {
+        return NextResponse.json({
+          success: false,
+          error: keywordLimitError(cleaned.length),
+          code: 'keyword_limit',
+          submitted: cleaned.length,
+          max: KEYWORD_MAX_COUNT,
+        }, { status: 400 });
+      }
+      record.keywords = cleaned;
     }
 
     // NAICS or keywords changed → the capability vector (hidden-match base-wide

@@ -19,7 +19,11 @@ export const OPEN_MARKET_NO_KEYWORDS_COPY =
 
 export const OPEN_NOW_HEADING = 'Open Now';
 export const OPEN_NOW_EXPLAIN =
-  'Work you can pursue now — currently open solicitations matching your market.';
+  'Open notices in your market. Each one shows its stage — only items marked Bid take a proposal.';
+
+/** Fallback-path copy (no "new" claim). Stage-honest: not every open notice is a solicitation. */
+export const OPEN_STILL_OPEN_EXPLAIN =
+  'These notices are still open in your market. Each one shows its stage — only items marked Bid take a proposal.';
 
 export type OpenKeywordOutcome =
   | 'distinctive_hits'
@@ -77,6 +81,65 @@ export function scoreContractDKeywords(text: string, keywords: string[]): number
     score += isDistinctiveKeyword(k, keywords) ? 25 : 2;
   }
   return score;
+}
+
+/**
+ * WHERE each saved keyword was found on a notice. Title evidence and body evidence
+ * are kept apart because they are not the same claim: a title names the work being
+ * bought; a description mentions everything from the SOW to the FAR boilerplate.
+ */
+export interface KeywordEvidence {
+  /** Distinctive keywords found in the TITLE. */
+  title: string[];
+  /** Distinctive keywords found only in the DESCRIPTION. */
+  body: string[];
+  /** Generic single words (not distinctive) found anywhere — rank-only. */
+  weak: string[];
+}
+
+/**
+ * Evidence weights. Why capped: scoreContractDKeywords gave +25 per hit with no
+ * ceiling, so a 40-keyword profile stacked description mentions ("compliance",
+ * "program management" in a boilerplate list) past a notice whose TITLE named the
+ * work, and the 0–100 clamp then tied them all at 100 (6 of 7 on a real customer's
+ * Sep 24 2026 alert). Here one title hit (30) outweighs the most a description can
+ * ever add (3 × 6 = 18), and no count of keywords can push body mentions further.
+ */
+export const KEYWORD_EVIDENCE_WEIGHTS = {
+  titleEach: 30,
+  titleMax: 2,
+  bodyEach: 6,
+  bodyMax: 3,
+  weakEach: 2,
+  weakMax: 3,
+} as const;
+
+export function keywordEvidence(
+  title: string | null | undefined,
+  body: string | null | undefined,
+  keywords: string[],
+): KeywordEvidence {
+  const t = String(title || '');
+  const b = String(body || '');
+  const distinctive = distinctiveKeywords(keywords);
+  const distinctiveSet = new Set(distinctive.map((k) => k.toLowerCase()));
+  const inTitle = distinctive.filter((k) => keywordOccursInText(t, k));
+  const inBody = distinctive.filter((k) => !inTitle.includes(k) && keywordOccursInText(b, k));
+  const weak = sanitizeKeywords(keywords)
+    .filter((k) => !distinctiveSet.has(k.toLowerCase()))
+    .filter((k) => keywordOccursInText(`${t} ${b}`, k));
+  return { title: inTitle, body: inBody, weak };
+}
+
+export function scoreKeywordEvidence(e: KeywordEvidence): number {
+  const w = KEYWORD_EVIDENCE_WEIGHTS;
+  return Math.min(e.title.length, w.titleMax) * w.titleEach
+    + Math.min(e.body.length, w.bodyMax) * w.bodyEach
+    + Math.min(e.weak.length, w.weakMax) * w.weakEach;
+}
+
+export function hasKeywordSupport(e: KeywordEvidence): boolean {
+  return e.title.length + e.body.length > 0;
 }
 
 /**

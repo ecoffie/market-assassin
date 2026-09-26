@@ -5,7 +5,8 @@ import {
   fetchSamOpportunities,
   fetchSamOpportunitiesFromCache,
   fetchSamOpportunityNoticeSummaryFromCache,
-  scoreOpportunity,
+  scoreOpportunityDetailed,
+  type OpportunityMatchEvidence,
   SAMOpportunity,
   SAMNoticeSummary,
 } from '@/lib/briefings/pipelines/sam-gov';
@@ -32,6 +33,7 @@ import { isMailboxSuppressed } from '@/lib/email/suppression';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
 import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { renderMatchReason, renderStageLabel, OPEN_STILL_OPEN_EXPLAIN } from '@/lib/alerts/match-evidence-copy';
 import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
   COMING_BACK_PANEL_PATH,
@@ -244,6 +246,9 @@ function isDeliveryTimeForTimezone(timezone: string | undefined): boolean {
   // Allow delivery if local time is between 5 AM and 8 AM
   return localHour >= 5 && localHour <= 8;
 }
+
+/** A ranked alert row: display score, unclamped rank, and the evidence behind both. */
+type RankedOpp = SAMOpportunity & { score: number; rank?: number; evidence?: OpportunityMatchEvidence };
 
 /**
  * Save failed email for retry
@@ -873,18 +878,22 @@ async function runDailyAlertJob(options?: {
         // Tiebreaker: actionable RUNWAY (higher = more days to respond) so a
         // strong-fit opp with real runway leads the email, not a 1-day scramble.
         // The email's own urgency badge still flags the tight ones lower down.
-        let scoredOpps = opportunities.map(opp => ({
-          ...opp,
-          score: scoreOpportunity(opp, {
-            naics_codes: userNaics, // Original codes, not expanded
-            agencies: user.agencies || [],
-            keywords: userKeywords,
-            business_description: user.business_description || null,
-            business_type: user.business_type || null,
-            setAsides: user.set_aside_preferences || undefined,
-          }),
-        })).sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
+        // Sort on the UNCLAMPED rank: the 0–100 display score tied 6 of 7 notices
+        // at 100 on a real alert, leaving the order to the deadline. Evidence rides
+        // along so the email shows why each notice is here instead of recomputing it.
+        const scoreProfile = {
+          naics_codes: userNaics, // Original codes, not expanded
+          agencies: user.agencies || [],
+          keywords: userKeywords,
+          business_description: user.business_description || null,
+          business_type: user.business_type || null,
+          setAsides: user.set_aside_preferences || undefined,
+        };
+        let scoredOpps: RankedOpp[] = opportunities.map(opp => {
+          const d = scoreOpportunityDetailed(opp, scoreProfile);
+          return { ...opp, score: d.score, rank: d.rank, evidence: d.evidence };
+        }).sort((a, b) => {
+          if (b.rank !== a.rank) return b.rank - a.rank;
           return runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
         });
 
@@ -942,21 +951,14 @@ async function runDailyAlertJob(options?: {
         // product rather than an exact-match-only trigger.
         let usedRepeatFallback = false;
         if (scoredOpps.length === 0 && allActiveOpportunities.length > 0) {
-          const resurfacedOpps = allActiveOpportunities
-            .map(opp => ({
-              ...opp,
-              score: scoreOpportunity(opp, {
-                naics_codes: userNaics,
-                agencies: user.agencies || [],
-                keywords: userKeywords,
-                business_description: user.business_description || null,
-                business_type: user.business_type || null,
-                setAsides: user.set_aside_preferences || undefined,
-              }),
-            }))
+          const resurfacedOpps: RankedOpp[] = allActiveOpportunities
+            .map(opp => {
+              const d = scoreOpportunityDetailed(opp, scoreProfile);
+              return { ...opp, score: d.score, rank: d.rank, evidence: d.evidence };
+            })
             .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
             .sort((a, b) => {
-              if (b.score !== a.score) return b.score - a.score;
+              if (b.rank !== a.rank) return b.rank - a.rank;
               // Real runway first (pursuable over tight), soonest-deadline only
               // as the final tiebreaker within the same runway tier.
               const rank = runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
@@ -1128,6 +1130,12 @@ async function runDailyAlertJob(options?: {
                 naics: o.naicsCode,
                 deadline: o.responseDeadline,
                 score: o.score,
+                rank: o.rank,
+                basis: o.evidence?.basis,
+                keywordsInTitle: o.evidence?.keywords.title,
+                keywordsInDescription: o.evidence?.keywords.body,
+                agencyMatch: o.evidence?.agencies,
+                stage: o.evidence?.stage.respondability,
                 repeatFallback: usedRepeatFallback || undefined,
               })),
               // 💡 Hidden matches appended with a flag so the Source Feed can badge them.
@@ -1555,7 +1563,7 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
 // Send daily alert email - alert product format (distinct from Market Intelligence briefings)
 async function sendDailyAlertEmail(
   email: string,
-  opportunities: (SAMOpportunity & { score: number })[],
+  opportunities: RankedOpp[],
   user: AlertUser,
   grants: (GrantOpportunity & { score: number })[] = [],
   allActiveOpportunities: SAMOpportunity[] = [],
@@ -1715,18 +1723,11 @@ function mindyDayBannerHtml(): string {
     return ''; // a banner must never break the alert it rides on
   }
 }
-  const profileNaics: string[] = Array.isArray(user.naics_codes) ? user.naics_codes : [];
-  const matchReason = (opp: SAMOpportunity & { score: number }): string => {
-    const bits: string[] = [];
-    const code = opp.naicsCode || '';
-    if (code && profileNaics.includes(code)) bits.push(`NAICS ${code}`);
-    else if (code && profileNaics.some((n) => code.startsWith(n) || n.startsWith(code))) bits.push(`NAICS ${code} (related)`);
-    if (opp.setAside && user.business_type && opp.setAside.toLowerCase().includes(String(user.business_type).toLowerCase().slice(0, 4))) {
-      bits.push(`${opp.setAside} eligible`);
-    } else if (opp.setAside) bits.push(opp.setAside);
-    return bits.slice(0, 2).join(' · ');
-  };
-
+  // "Why this is here" comes from the evidence computed at ranking time
+  // (lib/alerts/match-evidence-copy). It used to print NAICS + the raw set-aside
+  // code only — "Matched on NAICS 611430 · NONE" — hiding the keyword that
+  // actually admitted the notice and printing SAM's no-set-aside literal as a reason.
+  const matchReason = (opp: RankedOpp): string => renderMatchReason(opp);
   const opportunitiesHtml = shownOpps.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
     // Urgency is EDITORIAL, not alarmist: a small rust-red word, no fire emoji, no pink
@@ -1734,7 +1735,10 @@ function mindyDayBannerHtml(): string {
     const urgent = daysUntil <= 7;
     const dayLabel = daysUntil <= 0 ? 'DUE TODAY' : `${daysUntil} DAY${daysUntil === 1 ? '' : 'S'} LEFT`;
     const reason = matchReason(opp);
-    const meta = [opp.noticeType || 'Solicitation', opp.setAside, opp.naicsCode ? `NAICS ${opp.naicsCode}` : '']
+    // Stage first: a Special Notice ("ceiling increase") or Presolicitation has
+    // nothing to submit and must not read as a bid. 'NONE' is not a set-aside.
+    const realSetAside = opp.setAside && !/^none$/i.test(opp.setAside) ? opp.setAside : '';
+    const meta = [renderStageLabel(opp), realSetAside, opp.naicsCode ? `NAICS ${opp.naicsCode}` : '']
       .filter(Boolean).join(' &middot; ');
     return `
       <tr>
@@ -1754,7 +1758,7 @@ function mindyDayBannerHtml(): string {
           </p>
           <p style="color:#64748b;font-size:12px;line-height:1.5;margin:6px 0 0 0;">${meta}</p>
           <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:3px 0 0 0;">
-            Posted ${formatDate(opp.postedDate)} &middot; Due ${formatDate(opp.responseDeadline)}${reason ? ` &middot; Matched on ${reason}` : ''}
+            Posted ${formatDate(opp.postedDate)} &middot; Due ${formatDate(opp.responseDeadline)}${reason ? ` &middot; ${reason}` : ''}
           </p>
           <p style="margin:11px 0 0 0;">
             <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">View opportunity &rarr;</a>
@@ -1899,7 +1903,7 @@ function mindyDayBannerHtml(): string {
   <!-- ── OPEN NOW: respondable SAM. Never mixed with Coming Back recompetes. ── -->
   <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
-  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${isUsingFallback ? 'These solicitations are still open in your market.' : OPEN_NOW_EXPLAIN}</p>
+  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${isUsingFallback ? OPEN_STILL_OPEN_EXPLAIN : OPEN_NOW_EXPLAIN}</p>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
     ${opportunitiesHtml}
   </table>

@@ -21,6 +21,7 @@
  * 60 seconds — no setup."
  */
 
+import { KEYWORD_MAX_COUNT } from '@/lib/keywords/sanitize';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -590,7 +591,16 @@ export async function POST(request: NextRequest) {
       const existing = Array.isArray(cur?.keywords)
         ? cur!.keywords.map((k: unknown) => String(k).toLowerCase().trim()).filter(Boolean)
         : [];
-      const merged = Array.from(new Set([...existing, ...derived])).slice(0, 40);
+      // Auto-derived terms fill only the ROOM left under the shared limit. The old
+      // `.slice(0, 40)` on the merged array could never drop a user keyword only
+      // because existing came first — but it silently capped at a different number
+      // than the Settings save. Existing keywords are never trimmed here.
+      const room = Math.max(0, KEYWORD_MAX_COUNT - existing.length);
+      const fresh = derived.filter((d) => !existing.includes(d));
+      if (fresh.length > room) {
+        errors.push(`keywords (non-fatal): ${fresh.length - room} derived keyword(s) not added — profile is at the ${KEYWORD_MAX_COUNT}-keyword limit`);
+      }
+      const merged = [...existing, ...fresh.slice(0, room)];
       if (merged.length > existing.length) {
         await supabase
           .from('user_notification_settings')

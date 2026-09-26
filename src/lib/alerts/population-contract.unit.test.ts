@@ -100,7 +100,7 @@ describe('the shipped surfaces satisfy the contract', () => {
     const SRC = read('src/app/api/cron/daily-alerts/route.ts');
     expect(SRC).toMatch(/subject: isUsingFallback/);
     expect(SRC).toMatch(/OPEN_NOW_HEADING/);
-    expect(SRC).toMatch(/These solicitations are still open in your market/);
+    expect(SRC).toMatch(/OPEN_STILL_OPEN_EXPLAIN/);
     expect(SRC).not.toMatch(/isUsingFallback \? 'Still open in your market' : 'New today'/);
   });
 
