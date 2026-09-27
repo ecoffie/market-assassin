@@ -32,6 +32,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-09-26 | Map / opportunity detail / recompete / forecast / DNA set-aside labels | **A NULL set-aside rendered "Open", "Open / unrestricted", "Open (unrestricted)" or a "Full & Open" DNA chip on every Map surface** (17,808 active SAM notices NULL vs 3,847 explicit "No Set aside used"; 101,694/143,532 recompetes NULL). Recompete vocabulary ("SB-Total", "8(a)", "SDVOSB" — 18k+ rows) fell through `setGroupKey` to NONE and was labelled "Open / unrestricted". New `mapSetAside()` returns the filter bucket + a POSITIVE `open` flag (explicit statement only); pins carry `setOpen`, every renderer reads Open only from it, the genome emits the full_open strand only with it. Filters unchanged (a filter may treat NULL as Full & Open). Persisted DNA: approved SURGICAL reconciliation via scripts/reconcile-full-open-dna.ts (only the full_open strand and key change; kept only on affirmative evidence; snapshot, guarded write, re-read reconcile). Dry run 2026-09-27: 5,499 candidates, of which 4,542 not stated + 3 explicit set-aside to remove and 954 affirmative kept; run after #1727 is production-live. | `export function mapSetAside(` → `src/lib/opportunities/map-data.ts` | `set-aside-truth.unit.test.ts` 39/41 red on origin/main → 41/41 green; 213 neighbouring files green | 🟡 PR open |
 
+## 2026-09-26 — P1-B /today estimate provenance
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | /today featured cards + footer | The footer said "Every number on this page is a live query … nothing is estimated" directly under M-Estimate "Est." ranges, and a card whose estimate had no basis rendered a bare dollar figure with no estimate marker. The basis line now always renders (missing basis → "Est. — Mindy estimate (basis not available)"); the footer says counts are queries refreshed every few hours and "Est." values are M-Estimates, not a government figure. Methodology unchanged. | `Est. — Mindy estimate (basis not available)` → `src/app/today/route.ts` | `estimate-provenance.unit.test.ts` 4/4 red on origin/main → 4/4 green | 🟡 PR open |
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
