@@ -127,3 +127,13 @@ against the fix, they pass. `verify:engagement` is **RED on production today** (
 ## Historical gap — telemetry INCOMPLETE, not zero engagement
 
 **2026-08-21 (#1232) → 2026-09-27T00:42:12Z:** signed-in `/app` panel events, `/app` exit panel-time, `/briefings`, and signed-in map-card events were **not recorded**. The zeros in that window are missing data, not absent usage. Nothing was backfilled or synthesized. Any Learn baseline starts after T0.
+
+## T0 ruling (Eric, 2026-09-27)
+
+| period | meaning |
+|---|---|
+| 2026-08-21 → **2026-09-27T00:42:12Z** | telemetry **incomplete**: the zeros are not engagement |
+| **T0 = 2026-09-27T00:42:12Z** onward | repaired telemetry period (the production deployment timestamp of #1719) |
+| customer validation timestamp | the first real signed-in customer event observed through the repaired path. Recorded separately; it **does not move T0** |
+
+Controlled production acceptance proves the transport is correct. The customer-only `verify:engagement` proves ordinary usage. Learn may not treat post-T0 engagement **rates** as a behavioral baseline until customer validation has happened and there is enough normal traffic to make the measurement meaningful. If the monitoring window ends with no customer traffic, the verdict is **NO TRAFFIC / INCONCLUSIVE**, not FAIL. No artificial customer activity is generated.
