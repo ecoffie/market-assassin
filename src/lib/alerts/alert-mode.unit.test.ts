@@ -163,6 +163,8 @@ describe('matcher has no customer-specific branches', () => {
       'open-contract-d.ts',
       '../market/keyword-sanitize.ts',
       '../briefings/pipelines/sam-gov.ts',
+      'agency-match.ts',
+      'match-evidence-copy.ts',
     ];
     for (const file of files) {
       const src = readFileSync(join(__dirname, file), 'utf8')
