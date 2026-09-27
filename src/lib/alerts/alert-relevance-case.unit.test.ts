@@ -30,7 +30,7 @@ describe('frozen case (2026-09-24 alert) — ranking follows evidence', () => {
     expect(pos(list, 'VA Enterprise Artificial Intelligence')).toBeLessThan(pos(list, 'Surface Transportation Systems Engineering'));
   });
 
-  it('a ceiling-increase Special Notice (nothing to submit) ranks below every biddable/respondable row', () => {
+  it('IN THIS CASE the ceiling-increase Special Notice ranks below every biddable/respondable row (a demotion, not a general guarantee)', () => {
     const list = ranked();
     const mtccs = pos(list, 'MTCCS II Ceiling Increase');
     const actionable = list.filter((x) => x.evidence.stage.respondability !== 'none').map((x) => pos(list, x.o.title));
@@ -148,5 +148,41 @@ describe('daily-alerts admission uses only the user\'s own keywords', () => {
     // "reentry" admitted Residential Reentry Services for a medical-linen firm.
     expect(src).not.toMatch(/getVocabularyForCodes/);
     expect(src).toMatch(/const matchKeywords = userKeywords;/);
+  });
+});
+
+describe('what the ranking does NOT guarantee — the claims are boosts/demotions, not strict tiers', () => {
+  const base = { ...byTitle('FedRAMP Webex'), description: '', setAside: null, setAsideDescription: null, noticeType: 'Solicitation' } as SAMOpportunity;
+  const PROFILE = { ...CASE_PROFILE, keywords: ['records management', 'workflow automation'] };
+
+  it('title evidence beats description evidence in KEYWORD points only; other bonuses can reverse the final order', () => {
+    // Description-only hit, but exact NAICS + a target agency + due this week.
+    const bodyOnly = { ...base, noticeId: 'b', title: 'Enterprise support services', description: 'includes workflow automation',
+      naicsCode: '541511', department: 'VETERANS AFFAIRS, DEPARTMENT OF', subTier: 'VETERANS AFFAIRS, DEPARTMENT OF',
+      responseDeadline: new Date(Date.parse(CASE_SENT_AT) + 3 * 864e5).toISOString() } as SAMOpportunity;
+    // Title hit, but only a related NAICS, no target agency, deadline months out.
+    const titleHit = { ...base, noticeId: 't', title: 'Records Management Support', naicsCode: '5415',
+      department: 'FEDERAL DEPOSIT INSURANCE CORPORATION', subTier: 'FEDERAL DEPOSIT INSURANCE CORPORATION',
+      responseDeadline: new Date(Date.parse(CASE_SENT_AT) + 90 * 864e5).toISOString() } as SAMOpportunity;
+    const b = scoreOpportunityDetailed(bodyOnly, PROFILE);
+    const t = scoreOpportunityDetailed(titleHit, PROFILE);
+    expect(scoreKeywordEvidence(t.evidence.keywords)).toBeGreaterThan(scoreKeywordEvidence(b.evidence.keywords));
+    expect(b.rank).toBeGreaterThan(t.rank);
+  });
+
+  it('the stage penalty is exactly a 40-point demotion — a strong heads-up notice can still outrank a weak biddable one', () => {
+    const asBid = scoreOpportunityDetailed({ ...base, noticeType: 'Solicitation' } as SAMOpportunity, PROFILE);
+    const asHeadsUp = scoreOpportunityDetailed({ ...base, noticeType: 'Special Notice' } as SAMOpportunity, PROFILE);
+    expect(asBid.rank - asHeadsUp.rank).toBe(40);
+
+    const strongHeadsUp = { ...base, noticeId: 's', noticeType: 'Presolicitation', title: 'Records Management and Workflow Automation',
+      naicsCode: '541511', department: 'VETERANS AFFAIRS, DEPARTMENT OF', subTier: 'VETERANS AFFAIRS, DEPARTMENT OF' } as SAMOpportunity;
+    const weakBid = { ...base, noticeId: 'w', noticeType: 'Solicitation', title: 'Webex licenses', naicsCode: '5415',
+      department: 'FEDERAL DEPOSIT INSURANCE CORPORATION', subTier: 'FEDERAL DEPOSIT INSURANCE CORPORATION' } as SAMOpportunity;
+    const sh = scoreOpportunityDetailed(strongHeadsUp, PROFILE);
+    expect(sh.evidence.stage.respondability).toBe('none');
+    expect(sh.rank).toBeGreaterThan(scoreOpportunityDetailed(weakBid, PROFILE).rank);
+    // What protects the reader is the label, not the position.
+    expect(renderStageLabel({ ...strongHeadsUp, evidence: sh.evidence })).toMatch(/^Heads-up only, nothing to submit/);
   });
 });

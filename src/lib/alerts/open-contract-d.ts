@@ -102,8 +102,14 @@ export interface KeywordEvidence {
  * ceiling, so a 40-keyword profile stacked description mentions ("compliance",
  * "program management" in a boilerplate list) past a notice whose TITLE named the
  * work, and the 0–100 clamp then tied them all at 100 (6 of 7 on a real customer's
- * Sep 24 2026 alert). Here one title hit (30) outweighs the most a description can
- * ever add (3 × 6 = 18), and no count of keywords can push body mentions further.
+ * Sep 24 2026 alert). Within KEYWORD points, one title hit (30) outweighs the most a
+ * description can ever add (3 × 6 = 18), and no count of keywords can push body
+ * mentions further.
+ *
+ * ⚠️ That is a guarantee about keyword points ONLY. The final rank also adds NAICS,
+ * agency, deadline and set-aside points, which can and do reverse it: a description-only
+ * notice in the user's exact NAICS at a target agency can outrank a title hit elsewhere.
+ * Title evidence is a strong BOOST, not a strict tier (pinned in alert-relevance-case).
  */
 export const KEYWORD_EVIDENCE_WEIGHTS = {
   titleEach: 30,
@@ -198,7 +204,38 @@ export function applyOpenAlertMode<T>(
   return { ...preferred, omitOpen: false };
 }
 
-export function openMarketNote(outcome: OpenKeywordOutcome): string | null {
+/**
+ * How much of the NAICS/PSC market the keyword check actually examined. The fetcher
+ * scans the whole market up to MAX_PREFER_SCAN_ROWS; past that bound, matches are
+ * NOT checked. "No keyword hits" over a truncated scan is not a finding that none
+ * exist, so the note must say coverage was incomplete instead.
+ */
+export interface KeywordScanCoverage {
+  scanTruncated?: boolean;
+  marketRowsScanned?: number;
+}
+
+export function keywordScanIncompleteCopy(outcome: OpenKeywordOutcome, scanned: number | undefined): string | null {
+  const examined = typeof scanned === 'number' && scanned > 0
+    ? `Your market is larger than Mindy checked today: it looked at the first ${scanned.toLocaleString('en-US')} open notices (soonest deadlines first)`
+    : 'Your market is larger than Mindy checked today: it looked at only part of it (soonest deadlines first)';
+  if (outcome === 'open_market_no_keyword_hits') {
+    return `${examined} and found no keyword match among them. Matches may exist further out — this is not a finding that none exist. Showing open opportunities in your NAICS/PSC codes.`;
+  }
+  if (outcome === 'focused_omit_open') {
+    return `${examined} and found no keyword match among them, so Focused mode shows no open notices today. Matches may exist further out — this is not a finding that none exist.`;
+  }
+  if (outcome === 'distinctive_hits') {
+    return `${examined}. Keyword matches below come from those notices only; later matches were not checked today.`;
+  }
+  return null;
+}
+
+export function openMarketNote(outcome: OpenKeywordOutcome, coverage?: KeywordScanCoverage): string | null {
+  if (coverage?.scanTruncated) {
+    const incomplete = keywordScanIncompleteCopy(outcome, coverage.marketRowsScanned);
+    if (incomplete) return incomplete;
+  }
   if (outcome === 'open_market_no_keyword_hits') return OPEN_MARKET_NO_KEYWORD_HITS_COPY;
   if (outcome === 'no_keywords_configured') return OPEN_MARKET_NO_KEYWORDS_COPY;
   return null;

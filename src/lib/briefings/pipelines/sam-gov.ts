@@ -633,9 +633,13 @@ export interface OpportunityMatchEvidence {
 }
 
 /**
- * Stage penalty on the RANK only (not the displayed score). A Special Notice
- * ("MTCCS II Ceiling Increase"), Presolicitation or Award has nothing to submit,
- * so it must never outrank work the user can bid or respond to.
+ * Stage DEMOTION on the RANK only (not the displayed score). A Special Notice
+ * ("MTCCS II Ceiling Increase"), Presolicitation or Award has nothing to submit, so
+ * it loses 40 rank points.
+ *
+ * ⚠️ A demotion, not a strict tier: a strongly matched heads-up notice can still
+ * outrank a weakly matched biddable one. What prevents it reading as biddable is the
+ * stage label in the email, not its position (pinned in alert-relevance-case).
  */
 const NOT_RESPONDABLE_RANK_PENALTY = 40;
 
