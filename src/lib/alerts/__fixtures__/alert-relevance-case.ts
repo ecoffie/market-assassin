@@ -6,7 +6,7 @@
  * each saved-keyword hit (±70 chars), joined with " … " — enough to reproduce the
  * matcher's evidence without committing full notice bodies.
  *
- * What went wrong on the live email (investigation: tasks/jonathan-santana-alert-relevance-2026-09-26.md):
+ * What went wrong on the live email (investigation: tasks/daily-alert-relevance-2026-09-26.md):
  *   - 6 of 7 notices scored a clamped 100, so order fell to the deadline.
  *   - "NIST" gave FDA and the Federal Highway Administration +30 (admi-NIST-ration).
  *   - "VA" never matched Veterans Affairs.

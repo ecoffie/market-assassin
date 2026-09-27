@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-26 — Daily-alert relevance: evidence ranking, filter before limit
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-26 | Daily alerts / keyword writers | A customer's 2026-09-24 alert: 6 of 7 notices tied at a clamped 100; "NIST" gave FDA and FHWA +30 (admi-NIST-ration); a Special Notice ceiling increase listed as open work; 13 of his 53 keywords silently dropped on save. **Fix:** keyword profiles scan the whole NAICS/PSC market before the row limit (was first 200 by deadline: 17 vs 27 matches on his own keywords); title vs description evidence with capped weights and an unclamped rank; nothing-to-submit notices rank below actionable work; anchored agency identity (`agency-match.ts`); the email shows the keyword + field and the stage, never `NONE`; one shared `KEYWORD_MAX_COUNT` (60) with over-limit saves rejected (was 40/30/40/30 silent slices); mined vocabulary terms no longer admit rows. Record: tasks/daily-alert-relevance-2026-09-26.md | `export function matchProfileAgencies(` → `src/lib/alerts/agency-match.ts` · `export const MAX_PREFER_SCAN_ROWS` → `src/lib/briefings/pipelines/sam-gov.ts` · `export function keywordLimitError(` → `src/lib/keywords/sanitize.ts` | 4 new test files (frozen real-data case + 2 unrelated profiles, agency identity, filter-before-limit, keyword limit); old behaviour re-injected → red, reverted → green; full suite green; read-only replay of 5 real profiles vs main | 🟡 PR — not merged, not deployed |
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
