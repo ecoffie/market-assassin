@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { ensureFreeSettingsRow } from '@/lib/onboarding/ensure-free-settings-row';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -29,19 +30,27 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Deactivate alerts for this user (unified table)
-    const { error } = await getSupabase()
+    // Deactivate alerts for this user (unified table). Counted: a bare update that matched 0 rows
+    // used to render "Unsubscribed" for an address we hold no settings for (P0-H). This GET is
+    // unauthenticated (CAN-SPAM one-click), so it must NOT create a row for an arbitrary address —
+    // it reports the truth instead. Every alert sender mails only addresses that HAVE a row.
+    const { count, error } = await getSupabase()
       .from('user_notification_settings')
       .update({
         alerts_enabled: false,
         alert_frequency: 'paused',
         updated_at: new Date().toISOString(),
-      })
-      .eq('user_email', email.toLowerCase());
+      }, { count: 'exact' })
+      .eq('user_email', email.toLowerCase().trim());
 
-    if (error) {
-      console.error('[Unsubscribe] Error:', error);
+    if (error || count == null) {
+      console.error('[Unsubscribe] Error:', error?.message ?? 'update count unknown');
       return new NextResponse(await getUnsubscribePage('error', 'Failed to unsubscribe'), {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+    if (count === 0) {
+      return new NextResponse(await getUnsubscribePage('none', email), {
         headers: { 'Content-Type': 'text/html' },
       });
     }
@@ -85,16 +94,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { error } = await getSupabase()
+    // Authenticated: a signed-in user who unsubscribes before any settings row exists gets a
+    // PAUSED row, so a row created later (setup, profile) can never start their alerts.
+    const ensured = await ensureFreeSettingsRow(getSupabase(), auth.email!, { paused: true });
+    if (ensured.outcome === 'failed') {
+      console.error('[Unsubscribe] could not establish settings row:', ensured.error);
+      return NextResponse.json({ success: false, error: 'Failed to unsubscribe' }, { status: 500 });
+    }
+
+    const { count, error } = await getSupabase()
       .from('user_notification_settings')
       .update({
         alerts_enabled: false,
         alert_frequency: 'paused',
         updated_at: new Date().toISOString(),
-      })
-      .eq('user_email', auth.email!);
+      }, { count: 'exact' })
+      .eq('user_email', auth.email!.toLowerCase().trim());
 
-    if (error) {
+    if (error || !count) {
       console.error('[Unsubscribe] Error:', error);
       return NextResponse.json(
         { success: false, error: 'Failed to unsubscribe' },
@@ -116,9 +133,17 @@ export async function POST(request: NextRequest) {
 }
 
 // Generate HTML page for unsubscribe confirmation
-async function getUnsubscribePage(status: 'success' | 'error', message: string): Promise<string> {
+// Every interpolated value is escaped: `message` carries the raw ?email= query value, which used to
+// be reflected into this page unescaped (SEC-5).
+function escapeHtml(v: string): string {
+  return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+}
+
+async function getUnsubscribePage(status: 'success' | 'error' | 'none', rawMessage: string): Promise<string> {
   const isSuccess = status === 'success';
-  const resubscribeUrl = isSuccess ? await createSecureAccessUrl(message, 'preferences') : '/alerts/preferences';
+  const isNone = status === 'none';
+  const message = escapeHtml(rawMessage);
+  const resubscribeUrl = escapeHtml(isSuccess ? await createSecureAccessUrl(rawMessage, 'preferences') : '/alerts/preferences');
 
   return `
 <!DOCTYPE html>
@@ -126,7 +151,7 @@ async function getUnsubscribePage(status: 'success' | 'error', message: string):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${isSuccess ? 'Unsubscribed' : 'Error'} - GovCon Giants</title>
+  <title>${isSuccess ? 'Unsubscribed' : isNone ? 'No alerts' : 'Error'} - GovCon Giants</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -151,7 +176,7 @@ async function getUnsubscribePage(status: 'success' | 'error', message: string):
       margin-bottom: 16px;
     }
     h1 {
-      color: ${isSuccess ? '#166534' : '#dc2626'};
+      color: ${isSuccess || isNone ? '#166534' : '#dc2626'};
       font-size: 24px;
       margin: 0 0 16px 0;
     }
@@ -192,9 +217,12 @@ async function getUnsubscribePage(status: 'success' | 'error', message: string):
 </head>
 <body>
   <div class="card">
-    <div class="icon">${isSuccess ? '✅' : '❌'}</div>
-    <h1>${isSuccess ? 'Unsubscribed' : 'Error'}</h1>
-    ${isSuccess ? `
+    <div class="icon">${isSuccess || isNone ? '✅' : '❌'}</div>
+    <h1>${isSuccess ? 'Unsubscribed' : isNone ? 'No alerts for this address' : 'Error'}</h1>
+    ${isNone ? `
+      <p>Mindy has no alert settings for this address, so it is not being sent opportunity alerts. Nothing was changed.</p>
+      <p class="email">${message}</p>
+    ` : isSuccess ? `
       <p>You've been unsubscribed from daily opportunity alerts.</p>
       <p class="email">${message}</p>
       <p style="margin-top: 24px; font-size: 14px;">

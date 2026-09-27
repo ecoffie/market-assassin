@@ -62,20 +62,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has alert settings (they should be backfilled)
-    const { data: userSettings, error: userSettingsErr } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, briefings_enabled')
-      .eq('user_email', email.toLowerCase())
-      .maybeSingle(); // may not exist yet — returns null instead of PGRST116
-    if (userSettingsErr) console.error('[opportunities/save] settings query error:', userSettingsErr.message);
-
-    if (!userSettings) {
-      return NextResponse.json(
-        { error: 'User not found. Please set up your alert preferences first.' },
-        { status: 404 }
-      );
-    }
+    // P0-H (2026-09-27): no settings-row gate. This route used to 404 "User not found" when the
+    // caller had no user_notification_settings row, although nothing below reads that row — so
+    // every company/buyer/recompete Save and popup heart failed for the 24.1% of users without
+    // one. A save needs a verified identity (above), not an alerts row.
 
     // If no opportunityData provided, we'd need to fetch from SAM.gov
     // For now, require it to be passed (comes from the email link)
