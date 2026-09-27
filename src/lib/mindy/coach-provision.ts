@@ -83,7 +83,68 @@ export interface SeedResult {
   keywords: string[];
   states: string[];
   setAsides: string[];
+  /** Target-list rows actually persisted (= targets.inserted). */
   agencies: number;
+  targets: CoachTargetSeedOutcome;
+}
+
+export interface CoachTargetSeedOutcome {
+  /** Rows sent to user_target_list (only buyers that carried a real office). */
+  attempted: number;
+  /** Rows the insert confirmed. */
+  inserted: number;
+  /** Buyers dropped because nothing in hand names an office (never invented). */
+  skippedNoOffice: number;
+  /** The insert error, surfaced — never swallowed. null when none. */
+  error: string | null;
+}
+
+/** A measured-market buyer. `office` is present only when the source names one. */
+export interface SeedBuyer {
+  name: string;
+  amount: number;
+  office?: string | null;
+}
+
+/**
+ * Pure: turn measured-market buyers into user_target_list rows.
+ *
+ * `office_name` is NOT NULL and is the table's dedupe key (UNIQUE user_email,
+ * office_name). The text-seed buyer list comes from USASpending `awarding_agency`,
+ * which is a DEPARTMENT — it never names an office. Relabelling the department as
+ * its own office would be a fabricated claim, so a buyer without a real office is
+ * skipped and counted, not written.
+ *
+ * `set_aside_spending` is deliberately NOT set: `amount` is total contract
+ * obligations for the NAICS set, not set-aside spend.
+ */
+export function planCoachTargetRows(
+  buyers: SeedBuyer[],
+  workspaceId: string,
+  clientEmail: string,
+  sourceNaics: string[],
+): { rows: Record<string, unknown>[]; skippedNoOffice: number } {
+  const rows: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  let skippedNoOffice = 0;
+  for (const b of buyers) {
+    const agency = (b.name || '').trim();
+    const office = (b.office || '').trim();
+    if (!agency || !office || office.toLowerCase() === agency.toLowerCase()) { skippedNoOffice++; continue; }
+    const key = office.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      workspace_id: workspaceId,
+      user_email: clientEmail,
+      agency_name: agency,
+      office_name: office,
+      status: 'targeting',
+      added_from: 'capability_text_seed',
+      source_naics: sourceNaics.join(',') || null,
+    });
+  }
+  return { rows, skippedNoOffice };
 }
 
 /**
@@ -127,23 +188,26 @@ export async function seedClientProfile(
   }, { onConflict: 'user_email' });
 
   // Pre-load top buyers of the MEASURED market (coverage candidates) into Target List.
-  // source_naics cites measured candidates, not company identity.
-  let agenciesSeeded = 0;
+  // source_naics cites measured candidates, not company identity. Only buyers that
+  // carry a real office are written (see planCoachTargetRows); the insert error is
+  // surfaced on the result + logged, never swallowed.
+  const targets: CoachTargetSeedOutcome = { attempted: 0, inserted: 0, skippedNoOffice: 0, error: null };
   if (p?.agencies?.length) {
-    const targets = p.agencies.slice(0, 6).map((a) => ({
-      workspace_id: workspaceId,
-      user_email: clientEmail,
-      agency_name: a.name,
-      set_aside_spending: a.amount,
-      status: 'targeting',
-      added_from: 'capability_text_seed',
-      source_naics: coverageCandidates.join(','),
-    }));
-    const { error } = await supabase.from('user_target_list').insert(targets);
-    if (!error) agenciesSeeded = targets.length;
+    const plan = planCoachTargetRows(p.agencies.slice(0, 6) as SeedBuyer[], workspaceId, clientEmail, coverageCandidates);
+    targets.skippedNoOffice = plan.skippedNoOffice;
+    targets.attempted = plan.rows.length;
+    if (plan.rows.length) {
+      const { error } = await supabase.from('user_target_list').insert(plan.rows);
+      if (error) {
+        targets.error = error.message || String(error);
+        console.error(`[coach-provision] target-list seed insert failed for "${businessName}":`, targets.error);
+      } else {
+        targets.inserted = plan.rows.length;
+      }
+    }
   }
 
-  return { naics, psc, keywords, states, setAsides, agencies: agenciesSeeded };
+  return { naics, psc, keywords, states, setAsides, agencies: targets.inserted, targets };
 }
 
 /**
