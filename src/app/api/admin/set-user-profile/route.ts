@@ -1,4 +1,4 @@
-import { KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
+import { validateKeywordSave } from '@/lib/keywords/sanitize';
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveLegalNamePatch } from '@/lib/vault/legal-name';
 import { createClient } from '@supabase/supabase-js';
@@ -60,11 +60,12 @@ export async function POST(request: NextRequest) {
     update.naics_codes = persist.codes;
   }
   if (Array.isArray(body.keywords)) {
-    const kws = Array.from(new Set(body.keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean)));
-    if (kws.length > KEYWORD_MAX_COUNT) {
-      return NextResponse.json({ success: false, error: keywordLimitError(kws.length) }, { status: 400 });
+    // The shared normalizer — same rules as every user-facing writer.
+    const checked = validateKeywordSave(body.keywords);
+    if (!checked.ok) {
+      return NextResponse.json({ success: false, error: checked.error, code: checked.code }, { status: 400 });
     }
-    update.keywords = kws;
+    update.keywords = checked.keywords;
   }
   // PSC only written when a psc_codes column exists — guarded so a missing column
   // doesn't fail the whole write. Try it; on column error, retry without it.

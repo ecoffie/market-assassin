@@ -254,7 +254,7 @@ type RankedOpp = SAMOpportunity & { score: number; rank?: number; evidence?: Opp
  */
 async function saveFailedAlert(
   email: string,
-  opportunities: (SAMOpportunity & { score: number })[],
+  opportunities: RankedOpp[],
   error: string
 ) {
   await upsertAlertLog(getSupabase(), {
@@ -262,12 +262,18 @@ async function saveFailedAlert(
     alert_date: new Date().toISOString().split('T')[0],
     alert_type: 'daily',
     opportunities_count: opportunities.length,
+    // The retry re-sends from THIS payload (there is no description to recompute
+    // from), so it must carry the match evidence and stage the email renders.
     opportunities_data: opportunities.slice(0, 20).map(o => ({
       noticeId: o.noticeId,
       title: o.title,
       agency: o.department,
       naics: o.naicsCode,
       deadline: o.responseDeadline,
+      postedDate: o.postedDate,
+      noticeType: o.noticeType,
+      setAside: o.setAside,
+      evidence: o.evidence,
     })),
     delivery_status: 'failed',
     error_message: error,
@@ -330,8 +336,16 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
       sendDailyAlertEmail(
         alert.user_email,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Map the stored payload back onto the fields the email reads. It used to spread
+        // the stored keys as-is, so department / NAICS / due date came through as
+        // `agency` / `naics` / `deadline` and rendered blank. `evidence` (stored since
+        // 2026-09-26) gives the retry the same reason line and stage label; rows failed
+        // before that have none and render no reason line rather than an invented one.
         (alert.opportunities_data || []).map((o: any) => ({
           ...o,
+          department: o.department ?? o.agency,
+          naicsCode: o.naicsCode ?? o.naics,
+          responseDeadline: o.responseDeadline ?? o.deadline,
           score: 50, // Default score for retry
           uiLink: `https://sam.gov/opp/${o.noticeId}/view`,
         })),
@@ -742,6 +756,10 @@ async function runDailyAlertJob(options?: {
             states: userStates,
             limit: 200, // Get more from cache, filter locally
             savedNaics: userNaics,
+            // Keyword profiles: return every preferred row. Newness, dedupe and RANKING
+            // below run on all of them; the final cut happens after ranking, not by
+            // deadline inside the fetch (a strong title match at row 201+ was dropped).
+            keepAllPreferred: true,
           });
           if (cacheResult.queryStatus === 'error') {
             // UNKNOWN, not zero. Do not rank, do not fall back to "all active", do not
@@ -1514,10 +1532,22 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
   };
 
   const cached = await fetchSamOpportunitiesFromCache({ limit: 10 });
-  const opportunities = (cached.opportunities || []).slice(0, 3).map((opp, i) => ({
-    ...opp,
-    score: 72 - i * 8,
-  }));
+  // Score with the SAME function the live path uses, so the fixture shows the real
+  // "why this is here" line and stage label. Hard-coded scores with no evidence
+  // rendered cards with no reason line and no stage prefix, so a regression in that
+  // copy would pass fixture QA unseen.
+  const fixtureProfile = {
+    naics_codes: fixtureUser.naics_codes || [],
+    agencies: fixtureUser.agencies || [],
+    keywords: fixtureUser.keywords || [],
+    business_description: fixtureUser.business_description || null,
+    business_type: fixtureUser.business_type || null,
+    setAsides: fixtureUser.set_aside_preferences || undefined,
+  };
+  const opportunities: RankedOpp[] = (cached.opportunities || []).slice(0, 3).map((opp) => {
+    const d = scoreOpportunityDetailed(opp, fixtureProfile);
+    return { ...opp, score: d.score, rank: d.rank, evidence: d.evidence };
+  });
 
   if (opportunities.length === 0) {
     return NextResponse.json(

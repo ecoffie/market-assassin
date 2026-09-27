@@ -1,68 +1,66 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { sanitizeKeywords, KEYWORD_MAX_COUNT, keywordLimitError } from './sanitize';
+import {
+  KEYWORD_MAX_COUNT,
+  keywordAddLimitError,
+  keywordLimitError,
+  normalizeKeywordInput,
+  validateKeywordSave,
+} from './sanitize';
 
 /**
- * NEVER SILENTLY DISCARD KEYWORDS. A customer saved 53 keywords (2026-09-24); the
- * Settings save kept the first 40 with a success response. Every writer now either
- * stores the full list or rejects the save with nothing written.
+ * The shared keyword normalizer — the rules every user-input writer applies. Behaviour on the
+ * real save handlers (writes, rejections, prior settings preserved, identical results across
+ * Settings / onboarding / add-keywords) is proven in keyword-save-handlers.unit.test.ts.
  */
 
-// The real list that was truncated, in the order it was submitted.
-const SUBMITTED_53 = 'artificial intelligence, AI governance, AI risk management, responsible AI, generative AI, intelligent automation, workflow automation, process automation, digital transformation, application modernization, software development, systems integration, data analytics, data management, decision support, operational intelligence, business intelligence, information management, case management, knowledge management, records management, evidence management, program management, project management, acquisition support, acquisition modernization, procurement modernization, contract management, compliance, auditability, traceability, provenance, human oversight, human-in-the-loop, cybersecurity, cloud modernization, FedRAMP, FISMA, data governance, privacy, Section 508, workforce development, AI literacy, digital literacy, instructional design, public health, health data, reporting application, regulated data, source selection, acquisition lifecycle, contract administration, market research'
-  .split(',').map((s) => s.trim());
+// The real list that was truncated (2026-09-24), in the order it was submitted.
+const SUBMITTED_53 = 'artificial intelligence, AI governance, AI risk management, responsible AI, generative AI, intelligent automation, workflow automation, process automation, digital transformation, application modernization, software development, systems integration, data analytics, data management, decision support, operational intelligence, business intelligence, information management, case management, knowledge management, records management, evidence management, program management, project management, acquisition support, acquisition modernization, procurement modernization, contract management, compliance, auditability, traceability, provenance, human oversight, human-in-the-loop, cybersecurity, cloud modernization, FedRAMP, FISMA, data governance, privacy, Section 508, workforce development, AI literacy, digital literacy, instructional design, public health, health data, reporting application, regulated data, source selection, acquisition lifecycle, contract administration, market research';
 
-describe('shared keyword limit', () => {
-  it('the submitted 53-keyword list fits the shared limit', () => {
-    expect(SUBMITTED_53).toHaveLength(53);
-    expect(KEYWORD_MAX_COUNT).toBeGreaterThanOrEqual(SUBMITTED_53.length);
-    const r = sanitizeKeywords(SUBMITTED_53);
-    expect(r.keywords).toHaveLength(53);
-    expect(r.overLimit).toEqual([]);
+describe('normalizeKeywordInput', () => {
+  it('splits a pasted list on real separators and keeps the first spelling', () => {
+    const r = normalizeKeywordInput(['Cyber Security, cloud; FedRAMP\nFISMA | fedramp', 'Cloud']);
+    expect(r.keywords).toEqual(['Cyber Security', 'cloud', 'FedRAMP', 'FISMA']);
+    expect(r.unusable).toEqual([]);
   });
 
-  it('reports what is over the limit instead of dropping it silently', () => {
-    const many = Array.from({ length: KEYWORD_MAX_COUNT + 3 }, (_, i) => `term ${i}`);
-    const r = sanitizeKeywords(many);
-    expect(r.keywords).toHaveLength(KEYWORD_MAX_COUNT);
-    expect(r.overLimit).toEqual(['term 60', 'term 61', 'term 62']);
+  it('never splits on spaces — a multi-word keyword is one keyword', () => {
+    expect(normalizeKeywordInput(['base operations support']).keywords).toEqual(['base operations support']);
   });
 
-  it('the rejection message says nothing was saved and how many to remove', () => {
-    expect(keywordLimitError(63)).toBe(`You entered 63 keywords; the limit is ${KEYWORD_MAX_COUNT}. Nothing was saved — remove 3 and save again.`);
+  it('reports — never drops — a bare NAICS code and an unsplittable blob', () => {
+    const blob = 'a '.repeat(40).trim();
+    const r = normalizeKeywordInput(['541511', blob, 'cybersecurity']);
+    expect(r.keywords).toEqual(['cybersecurity']);
+    expect(r.unusable.map((u) => u.reason)).toEqual(['naics_code', 'too_long']);
+  });
+
+  it('the submitted 53-keyword list survives intact', () => {
+    expect(normalizeKeywordInput([SUBMITTED_53]).keywords).toHaveLength(53);
   });
 });
 
-describe('every keyword writer rejects over-limit saves instead of truncating', () => {
-  const read = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8');
-
-  it('no writer keeps a silent numeric keyword cap', () => {
-    for (const rel of [
-      'src/app/api/alerts/preferences/route.ts',
-      'src/app/api/app/profile/route.ts',
-      'src/app/api/app/keywords/add/route.ts',
-      'src/app/api/admin/set-user-profile/route.ts',
-      'src/app/api/app/vault/prefill/route.ts',
-    ]) {
-      const src = read(rel);
-      // Comments may QUOTE the old bug; log lines may truncate a string for display.
-      const code = src
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .split('\n')
-        .map((l) => l.replace(/\/\/.*$/, ''))
-        .filter((l) => !/console\.(log|warn|error)/.test(l))
-        .join('\n');
-      expect(code, rel).not.toMatch(/keywords?\b[^;\n]*\.slice\(0,\s*\d+\)/i);
-      expect(src, rel).toMatch(/KEYWORD_MAX_COUNT/);
-    }
+describe('validateKeywordSave', () => {
+  it(`accepts exactly ${KEYWORD_MAX_COUNT}; rejects ${KEYWORD_MAX_COUNT + 1} with the count`, () => {
+    const at = Array.from({ length: KEYWORD_MAX_COUNT }, (_, i) => `term ${i}`);
+    expect(validateKeywordSave(at)).toEqual({ ok: true, keywords: at });
+    const over = validateKeywordSave([...at, 'one more']);
+    expect(over).toMatchObject({ ok: false, code: 'keyword_limit', submitted: KEYWORD_MAX_COUNT + 1 });
   });
 
-  it('preferences returns 400 before any write when over the limit', () => {
-    const src = read('src/app/api/alerts/preferences/route.ts');
-    const reject = src.indexOf("code: 'keyword_limit'");
-    const firstWrite = Math.min(...['.update(record)', '.insert(record)'].map((w) => src.indexOf(w)).filter((i) => i > 0));
-    expect(reject).toBeGreaterThan(0);
-    expect(reject).toBeLessThan(firstWrite);
+  it('rejects unusable entries before counting', () => {
+    expect(validateKeywordSave(['541511'])).toMatchObject({ ok: false, code: 'keyword_unusable' });
+  });
+});
+
+describe('limit messages', () => {
+  it('a replacing save says how many to remove', () => {
+    expect(keywordLimitError(63)).toBe(`You entered 63 keywords; the limit is ${KEYWORD_MAX_COUNT}. Nothing was saved — remove 3 and save again.`);
+  });
+
+  it('an ADDITIVE save describes what the user did — not "you entered 61"', () => {
+    const full = keywordAddLimitError(KEYWORD_MAX_COUNT, 1);
+    expect(full).toBe(`You have ${KEYWORD_MAX_COUNT} saved keywords; adding 1 would make ${KEYWORD_MAX_COUNT + 1}, over the limit of ${KEYWORD_MAX_COUNT}. Nothing was saved. Remove a saved keyword in Settings first.`);
+    expect(full).not.toMatch(/You entered/);
+    expect(keywordAddLimitError(58, 5)).toMatch(/Only 2 more fit/);
   });
 });

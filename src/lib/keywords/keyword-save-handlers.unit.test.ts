@@ -11,54 +11,12 @@ import { KEYWORD_MAX_COUNT, mergeDerivedKeywords } from './sanitize';
  * Auth / workspace resolution are mocked to "this user, own workspace" — they are not under test.
  */
 
-type Row = Record<string, unknown>;
-type Write = { table: string; op: 'insert' | 'update' | 'upsert' | 'delete'; payload: unknown };
+import { STORE, WRITES } from './__fixtures__/recording-supabase';
 
-const STORE: Record<string, Row[]> = {};
-const WRITES: Write[] = [];
-
-function fakeClient() {
-  return {
-    from(table: string) {
-      const filters: Array<[string, unknown]> = [];
-      let pendingWrite: Write | null = null;
-      const rows = () => (STORE[table] || []).filter((r) => filters.every(([k, v]) => r[k] === v));
-      const result = () => {
-        if (pendingWrite) {
-          WRITES.push(pendingWrite);
-          const w = pendingWrite as Write;
-          const payload = (Array.isArray(w.payload) ? w.payload : [w.payload]) as Row[];
-          if (w.op === 'update') for (const r of rows()) Object.assign(r, payload[0]);
-          if (w.op === 'insert' || w.op === 'upsert') {
-            STORE[table] = STORE[table] || [];
-            for (const p of payload) {
-              const hit = STORE[table].find((r) => r.user_email === p.user_email);
-              if (hit && w.op === 'upsert') Object.assign(hit, p); else STORE[table].push({ ...p });
-            }
-          }
-          return { data: payload, error: null, count: payload.length };
-        }
-        const r = rows();
-        return { data: r, error: null, count: r.length };
-      };
-      const b: Record<string, unknown> = {};
-      const self = () => b;
-      for (const m of ['select', 'order', 'limit', 'range', 'in', 'neq', 'gte', 'lte', 'or', 'ilike', 'like', 'is', 'not', 'contains']) b[m] = self;
-      b.eq = (k: string, v: unknown) => { filters.push([k, v]); return b; };
-      for (const op of ['insert', 'update', 'upsert', 'delete'] as const) {
-        b[op] = (payload?: unknown) => { pendingWrite = { table, op, payload }; return b; };
-      }
-      b.maybeSingle = async () => { const r = result(); return { data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data, error: null }; };
-      b.single = b.maybeSingle;
-      b.then = (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) => Promise.resolve(result()).then(res, rej);
-      return b;
-    },
-    rpc: async () => ({ data: null, error: null }),
-    auth: { admin: { getUserById: async () => ({ data: null, error: null }) } },
-  };
-}
-
-vi.mock('@supabase/supabase-js', () => ({ createClient: () => fakeClient() }));
+vi.mock('@supabase/supabase-js', async () => {
+  const { fakeClient: make } = await import('./__fixtures__/recording-supabase');
+  return { createClient: () => make() };
+});
 vi.mock('@/lib/api-auth', () => ({
   verifyUserOwnsEmail: async (_req: unknown, email: string) => ({ authenticated: true, email }),
   verifyUserSession: async () => ({ authenticated: true }),
@@ -127,7 +85,7 @@ describe('POST /api/app/profile (onboarding save)', () => {
     it(`${n} keywords save intact`, async () => {
       const res = await post(kws(n));
       expect(res.status).toBe(200);
-      expect(stored()).toEqual(kws(n)); // already lowercase: sanitize lowercases, nothing else changes
+      expect(stored()).toEqual(kws(n));
     });
   }
 
@@ -156,6 +114,10 @@ describe('POST /api/app/keywords/add (additive merge)', () => {
     seed(kws(KEYWORD_MAX_COUNT - 2));
     const res = await post(['new term alpha', 'new term beta', 'new term gamma']);
     expect(res.status).toBe(400);
+    const body = await res.json();
+    // Describes what the user did (had 58, adding 3), not "you entered 61".
+    expect(body.error).toMatch(/You have 58 saved keywords; adding 3 would make 61/);
+    expect(body.error).not.toMatch(/You entered/);
     expect(WRITES).toEqual([]);
     expect(stored()).toEqual(kws(KEYWORD_MAX_COUNT - 2));
   });
@@ -202,5 +164,65 @@ describe('vault prefill — the documented EXCEPTION (derived, not user input)',
     const r = mergeDerivedKeywords(existing, ['derived a']);
     expect(r.merged).toEqual(existing);
     expect(r.skipped).toEqual(['derived a']);
+  });
+});
+
+describe('ONE input behaves the same on every surface (shared normalization)', () => {
+  // A realistic paste: comma, semicolon and newline separated, mixed case, one repeat.
+  const PASTE = ['Cyber Security, cloud migration; FedRAMP\nFISMA, fedramp'];
+  const EXPECTED = ['Cyber Security', 'cloud migration', 'FedRAMP', 'FISMA'];
+
+  it('Settings, onboarding and add-keywords store the identical list', async () => {
+    const results: Record<string, unknown> = {};
+
+    seed([]);
+    const settings = await (await import('@/app/api/alerts/preferences/route')).POST(
+      req('http://x/api/alerts/preferences', { email: EMAIL, keywords: PASTE }));
+    expect(settings.status).toBe(200);
+    results.settings = [...stored()];
+
+    seed([]);
+    const onboarding = await (await import('@/app/api/app/profile/route')).POST(
+      req('http://x/api/app/profile', { email: EMAIL, keywords: PASTE }));
+    expect(onboarding.status).toBe(200);
+    results.onboarding = [...stored()];
+
+    seed([]);
+    const add = await (await import('@/app/api/app/keywords/add/route')).POST(
+      req('http://x/api/app/keywords/add', { email: EMAIL, keywords: PASTE }));
+    expect(add.status).toBe(200);
+    results.add = [...stored()];
+
+    expect(results).toEqual({ settings: EXPECTED, onboarding: EXPECTED, add: EXPECTED });
+  });
+
+  it('an unusable entry is rejected identically on every surface, with nothing written', async () => {
+    const BAD = ['cybersecurity, 541511'];
+    for (const [name, mod, url] of [
+      ['settings', '@/app/api/alerts/preferences/route', 'http://x/api/alerts/preferences'],
+      ['onboarding', '@/app/api/app/profile/route', 'http://x/api/app/profile'],
+      ['add', '@/app/api/app/keywords/add/route', 'http://x/api/app/keywords/add'],
+    ] as const) {
+      seed();
+      const res = await (await import(mod)).POST(req(url, { email: EMAIL, keywords: BAD }));
+      expect(res.status, name).toBe(400);
+      expect((await res.json()).code, name).toBe('keyword_unusable');
+      expect(WRITES, name).toEqual([]);
+      expect(stored(), name).toEqual(PRIOR);
+    }
+  });
+
+  it('the same over-limit paste is rejected on every surface (a comma blob is not "one keyword")', async () => {
+    const blob = [Array.from({ length: KEYWORD_MAX_COUNT + 1 }, (_, i) => `term ${i}`).join(', ')];
+    for (const [name, mod, url] of [
+      ['settings', '@/app/api/alerts/preferences/route', 'http://x/api/alerts/preferences'],
+      ['onboarding', '@/app/api/app/profile/route', 'http://x/api/app/profile'],
+    ] as const) {
+      seed();
+      const res = await (await import(mod)).POST(req(url, { email: EMAIL, keywords: blob }));
+      expect(res.status, name).toBe(400);
+      expect((await res.json()).code, name).toBe('keyword_limit');
+      expect(WRITES, name).toEqual([]);
+    }
   });
 });

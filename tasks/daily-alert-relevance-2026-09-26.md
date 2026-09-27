@@ -58,6 +58,57 @@ The limit of 60 is a proposal, validated by the save-path tests above, not by on
 
 **Rarity weighting was NOT shipped.** It remains an experiment: rare words are not necessarily relevant.
 
+## Final-review corrections (round 3, 2026-09-26)
+
+Final code review of the pair (#1717 @ `9278985c` + #1718 @ `3b9e7cf7`) found verified
+defects. Each fix below has a mutation check: the old behaviour turns its test red.
+
+| # | Defect | Fix |
+|---|---|---|
+| 1 | UI claimed rejected keyword saves succeeded. The coverage banner set "✓ Added" and Market Research auto-capture was fire-and-forget. | Both read the response. The banner shows the server's error and keeps the button; the capture shows a "was not saved" toast. **Verified through the actual UI** (see below). |
+| 2 | Filter-before-limit was partial: the preferred set was still cut to 200 **by deadline** inside the fetch, before newness, dedupe and ranking. | `keepAllPreferred`: daily-alerts receives every preferred row (≤ 4,000) and makes the final cut after eligibility and ranking. Tested at fetch level with 260 matches, where the only title match is 250th by deadline. The #1718 cron test covers the sent email. |
+| 3 | Exactly 4,000 rows was reported as truncated. | After a full final page, probe one row past the bound. A failed probe is disclosed as possible truncation, never as complete. Tests: exactly 4,000 → complete; 4,001 → truncated. |
+| 4 | The admin fixture send and the retry path rendered no reason line or stage. | The fixture scores with `scoreOpportunityDetailed`. Failed sends now store `evidence`, and the retry maps stored fields back onto the ones the email reads (department / NAICS / due date were blank before). Rows that failed before this change carry no evidence and render no reason line. |
+| 5 | "In your NAICS market" was printed for PSC-only profiles. | The label names the admitting market: NAICS match → "NAICS market", otherwise "PSC market". |
+| 6 | Adding one keyword at the limit said "You entered 61 … remove 1". | `keywordAddLimitError`: "You have 60 saved keywords; adding 1 would make 61…". |
+| 8 | Paged reads over a live table can repeat or skip rows. | notice_id de-duplication removes **repeats only**. ⚠️ A row that moves backward across a page boundary before its page is read is **not recoverable**. A pinning test proves that limitation is real, so no one reads de-dup as a consistency guarantee. |
+| 10 | The limit was counted differently per surface: Settings didn't split a comma paste; onboarding and add-keywords lowercased. | One normalizer, `validateKeywordSave` / `normalizeKeywordInput`, for Settings, onboarding, add-keywords and admin: <br>• split real separators; <br>• case-insensitive de-dup keeping the first spelling; <br>• an unusable entry (over-long blob, bare NAICS code) rejects the save with nothing written. <br>The same paste stores the identical list on all three user surfaces (tested on the real handlers). The prefill no longer re-cases saved keywords. |
+
+**UI verification.** Three surfaces, all using the real components rendered in jsdom, with real
+buttons clicked and only `fetch` intercepted. These are component renders, not a real browser.
+- **Settings.** The real panel's save request goes into the **real** preferences handler over a write-recording fake.
+  - 61 keywords → "Codes/keywords did NOT save: You entered 61 keywords… remove 1", zero writes, prior keywords kept.
+  - 53 keywords → saved intact, with "Settings saved" shown.
+- **Market Research build.** Its capture request goes into the **real** add-keywords handler.
+  - At the limit → 400, zero writes, "“drone repair” was not saved to your keywords. You have 60 saved keywords…".
+  - With room → saved, no warning.
+- **Coverage banner "+ Add all".**
+  - 400 → the server message shows and "✓ Added" never does.
+  - A network failure → "Not saved".
+  - 200 → "✓ Added".
+
+**Large-market cost (measured on prod data, read-only, median of 3).** The heap figure is the delta per call.
+
+| Profile | Rows scanned | Old | New | Heap |
+|---|---|---|---|---|
+| Emergency management | 449 | 441 ms | 663 ms | +5.3 MB |
+| Fire alarm / security | 841 | 355–422 ms | 590–779 ms | +6.8 MB |
+| Reported customer | 893 | 450 ms | 567 ms | +10.8 MB |
+| Largest (80 NAICS, construction) | 4,000 (truncated) | 511 ms | **3,674 ms** | +22.5 MB |
+
+- Process RSS: 163–189 MB.
+- Of 286 daily keyword profiles, 5 have raw NAICS markets over 4,000. Raw counts overstate the real scan: one profile's raw count of about 2,000 scanned 841 after the set-aside and deadline filters.
+- **Worst case +3.2 s per large profile.** Parallel page reads, or moving the keyword filter into SQL, is the obvious follow-up if batch timings approach the 300 s cap. Not done here.
+
+**#9 check — callers that still sort by the capped score** (weekly-alerts, send-notifications,
+diff-engine, trigger-alerts). Replay of that ordering on 5 profiles:
+- **Top-10 overlap** old vs new: 5–10 of 10.
+- **Emergency-management profile:** ties at 100 went from 10 to 4 and title-match rows from 1 to 3 (better); heads-up notices went from 3 to 5 (**worse**).
+- **Reported customer:** heads-up 1 → 2 and no-keyword rows 7 → 8 (**slightly worse**).
+- **Largest profile:** heads-up 2 → 0.
+
+The mixed result comes from those callers not using the new unclamped rank, which carries the heads-up demotion. **Not neutral for those jobs.** Tracked with #9.
+
 ## Replay — main vs this branch (live data, read-only, 2026-09-26)
 
 Five real daily-alert profiles in unrelated sectors. Columns count the top 10 rows.
@@ -117,6 +168,8 @@ Five real daily-alert profiles in unrelated sectors. Columns count the top 10 ro
 - PSC codes are still silently capped at 30 in the `preferences` and `profile` routes.
 - Several briefing paths truncate keywords for their own queries (10 or 20). That is outside daily alerts.
 - Keyword-only profiles (no NAICS/PSC) still query with the first 15 distinctive keywords.
+- #9: weekly-alerts / send-notifications / diff-engine / trigger-alerts still sort by the clamped score (replay above: mixed, not neutral).
+- Scan cost on the largest markets (+3.2 s at 4,000 rows) — parallel reads or SQL keyword filtering.
 - Same-title duplicate notices are not collapsed (PTAG ×2, Berlin Roof ×3, Hydrologic ×4).
 - Whether `VOCAB_ALERT_EXPANSION` earns a rank-only role.
 - Rarity weighting as a measured experiment.
