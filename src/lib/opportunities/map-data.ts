@@ -14,6 +14,7 @@ import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 // chain (ZIP → OCONUS → office fallback) that the simpler shared `geocodeCity()` doesn't need.
 import { CITY_COORDS } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { classifySetAside, type SetAsideKind } from '@/lib/beginner/labels';
 import zipCoordsRaw from '@/data/us-zip-coords.json';
 import worldCityRaw from '@/data/world-city-coords.json';
 import countryCentroidRaw from '@/data/country-centroids.json';
@@ -158,6 +159,41 @@ export function setGroupKey(code: string | null | undefined): string {
   const c = (code || '').toUpperCase().trim();
   return CODE_TO_GROUP.get(c) ?? 'NONE';
 }
+
+const KIND_TO_GROUP: Partial<Record<SetAsideKind, string>> = {
+  sb: 'SB', '8a': '8A', sdvosb: 'SDVOSB', vosb: 'SDVOSB', wosb: 'WOSB', edwosb: 'WOSB', hubzone: 'HZ',
+};
+
+/**
+ * A map pin's set-aside: the FILTER bucket (`key`) and whether the source EXPLICITLY said there is
+ * no set-aside (`open`).
+ *
+ * ⚠️ Absent ≠ unrestricted. `key: 'NONE'` is the Unrestricted/Full-&-Open FILTER bucket, and a
+ * filter may keep NULL there. A LABEL may not: only `open === true` may be rendered as
+ * "Open / unrestricted"; a NONE pin with `open` false reads "Not stated". `open` is a positive
+ * assertion, so a payload that lacks it (stale cache, DLA, grants) degrades to "Not stated" —
+ * never to the stronger claim. (Repair board P1-A; measured 2026-09-26: 17,808 active SAM notices
+ * carry NULL set-aside vs 3,847 an explicit "No Set aside used"; recompetes 101,694 NULL.)
+ *
+ * Accepts a SAM code ("SBA", "NONE") OR descriptive text ("SB-Total", "Full & Open",
+ * "Small Business Set Aside - Total"). Exact SAM codes resolve through SET_GROUPS first; anything
+ * else goes through the canonical `classifySetAside`, so a recompete "SB-Total" is a Small Business
+ * pin — it used to fall through setGroupKey to NONE and render as "Open / unrestricted".
+ * An unrecognized non-empty value is a restriction we can't name → OTHER, never NONE.
+ */
+export function mapSetAside(raw: string | null | undefined): { key: string; open: boolean } {
+  const t = (raw || '').trim();
+  if (!t) return { key: 'NONE', open: false };
+  // "TBD" / "To be determined" (agency forecasts) is a placeholder, not a decision — for the map it
+  // is the same as saying nothing. (classifySetAside keeps it 'unknown' for the eligibility copy.)
+  if (/^(tbd|to be determined)$/i.test(t)) return { key: 'NONE', open: false };
+  const byCode = CODE_TO_GROUP.get(t.toUpperCase());
+  if (byCode && byCode !== 'NONE') return { key: byCode, open: false };
+  const kind = classifySetAside(t);
+  if (kind === 'open') return { key: 'NONE', open: true };
+  if (kind === 'not_stated') return { key: 'NONE', open: false };
+  return { key: KIND_TO_GROUP[kind] ?? 'OTHER', open: false };
+}
 export const SET_COLOR: Record<string, string> = Object.fromEntries(SET_GROUPS.map((g) => [g.key, g.color]));
 export const SET_LABEL: Record<string, string> = Object.fromEntries(SET_GROUPS.map((g) => [g.key, g.label]));
 
@@ -182,7 +218,7 @@ export function naicsCategory(naics: string | null | undefined): string {
 export type MapSrc = 'SAM' | 'DLA' | 'FORECAST' | 'GRANTS';
 
 export type MapOpp = {
-  id: string; title: string; agency: string; set: string; setLabel: string;
+  id: string; title: string; agency: string; set: string; setLabel: string; setOpen?: boolean;
   naics: string; cat: string; loc: string; close: string | null; sol: string;
   uiLink: string | null; lat: number; lng: number; src: MapSrc; locSrc: LocSource;
   // SOW card facts (Tier 1) — present only once the row has been precomputed AND has
@@ -300,8 +336,14 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
       id: String(r.notice_id ?? ''),
       title: String(r.title ?? 'Untitled opportunity'),
       agency: String(r.department ?? ''),
-      set: setGroupKey(r.set_aside_code as string),
-      setLabel: (r.set_aside_description as string) || SET_LABEL[setGroupKey(r.set_aside_code as string)],
+      ...(() => {
+        const sa = mapSetAside((r.set_aside_code as string) || (r.set_aside_description as string));
+        return {
+          set: sa.key,
+          ...(sa.open ? { setOpen: true } : {}),
+          setLabel: (r.set_aside_description as string) || (sa.key === 'NONE' && !sa.open ? 'Not stated' : SET_LABEL[sa.key]),
+        };
+      })(),
       naics: String(r.naics_code ?? ''),
       cat: naicsCategory(r.naics_code as string),
       loc: city ? `${city}, ${state}` : state,
@@ -367,9 +409,10 @@ export async function getDibbsMapPins(limit = 400): Promise<MapOpp[]> {
       title: desc ? (fsc ? `${fsc}-- ${desc}` : desc) : `RFQ ${sol}`,
       agency: office.office, // real DLA center name (dodaac_directory + USASpending agree)
       // DIBBS carries no set-aside field — 'NONE' is the honest value, not an assumption
-      // that these are unrestricted-by-policy. The UI shows it under "Unrestricted".
-      set: 'NONE',
-      setLabel: SET_LABEL.NONE,
+      // that these are unrestricted-by-policy. It sits in the Unrestricted FILTER bucket, but with
+      // no setOpen its LABEL reads "Not stated".
+      set: 'NONE', // no set-aside field in this source → NOT STATED (no setOpen), never "Unrestricted"
+      setLabel: 'Not stated',
       naics: '', // DIBBS is FSC/NSN-coded, not NAICS — leave empty rather than cross-walk a guess
       cat: 'DLA Supply/Parts', // the category the map template already colors (--dla)
       loc: `${office.city}, ${office.state}`,
@@ -449,8 +492,8 @@ export async function getDibbsViewportPins(
       id: sol,
       title: desc ? (fsc ? `${fsc}-- ${desc}` : desc) : `RFQ ${sol}`,
       agency: String(r.map_office ?? 'DLA'),
-      set: 'NONE',
-      setLabel: SET_LABEL.NONE,
+      set: 'NONE', // no set-aside field in this source → NOT STATED (no setOpen), never "Unrestricted"
+      setLabel: 'Not stated',
       naics: '',
       cat: 'DLA Supply/Parts',
       loc: String(r.map_loc ?? ''),
@@ -584,8 +627,13 @@ export async function getForecastViewportPins(
       id: 'fc-' + id,
       title: String(r.title || 'Forecast opportunity'),
       agency,
-      set: (r.set_aside_type ? String(r.set_aside_type) : 'NONE'),
-      setLabel: (r.set_aside_type ? String(r.set_aside_type) : SET_LABEL.NONE),
+      // Forecast set_aside_type is free text ("Small Business", "Full and Open", "TBD", …). It used
+      // to be passed through raw, so the client's SETMAP missed every value and rendered them all
+      // as None/"To be determined" — including 6,804 "Small Business" forecasts. Canonical now.
+      ...(() => {
+        const sa = mapSetAside(r.set_aside_type ? String(r.set_aside_type) : null);
+        return { set: sa.key, ...(sa.open ? { setOpen: true } : {}), setLabel: r.set_aside_type ? String(r.set_aside_type) : 'Not stated' };
+      })(),
       naics: String(r.naics_code || ''),
       cat: 'Forecast · ' + timing,
       loc: city ? `${city}, ${st}` : (st || ''),
@@ -619,7 +667,7 @@ export async function getForecastViewportPins(
  * + a `noLoc` reason so the card can honestly say "no location yet" rather than an empty place.
  */
 export type UnplacedForecastRow = {
-  id: string; title: string; agency: string; set: string; setLabel: string;
+  id: string; title: string; agency: string; set: string; setLabel: string; setOpen?: boolean;
   naics: string; cat: string; noLoc: string; close: string | null; est: number; estRange: string;
 };
 
@@ -659,8 +707,13 @@ export async function getUnplacedForecastRows(
       id: 'fc-' + id,
       title: String(r.title || 'Forecast opportunity'),
       agency,
-      set: (r.set_aside_type ? String(r.set_aside_type) : 'NONE'),
-      setLabel: (r.set_aside_type ? String(r.set_aside_type) : SET_LABEL.NONE),
+      // Forecast set_aside_type is free text ("Small Business", "Full and Open", "TBD", …). It used
+      // to be passed through raw, so the client's SETMAP missed every value and rendered them all
+      // as None/"To be determined" — including 6,804 "Small Business" forecasts. Canonical now.
+      ...(() => {
+        const sa = mapSetAside(r.set_aside_type ? String(r.set_aside_type) : null);
+        return { set: sa.key, ...(sa.open ? { setOpen: true } : {}), setLabel: r.set_aside_type ? String(r.set_aside_type) : 'Not stated' };
+      })(),
       naics: String(r.naics_code || ''),
       cat: 'Forecast · ' + timing,
       noLoc,
@@ -716,8 +769,8 @@ export async function getGrantsViewportPins(
       id: 'gr-' + oppNumber,
       title: String(r.title || 'Federal grant'),
       agency: String(r.agency || 'Federal agency'),
-      set: 'NONE',
-      setLabel: SET_LABEL.NONE,
+      set: 'NONE', // no set-aside field in this source → NOT STATED (no setOpen), never "Unrestricted"
+      setLabel: 'Not stated',
       naics: '',
       cat: forecasted ? 'Grant · Upcoming' : 'Grant · ' + String(r.agency_code || 'federal'),
       loc: '',                         // grants have no place of performance

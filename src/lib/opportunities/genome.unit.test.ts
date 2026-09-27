@@ -49,9 +49,12 @@ describe('computeGenome — grounded strands only', () => {
   it('set-aside vs full & open are mutually exclusive and grounded in the real set key', () => {
     expect(keys({ src: 'SAM', set: 'SDVOSB' })).toContain('set_aside');
     expect(keys({ src: 'SAM', set: '8A' })).toContain('set_aside');
-    expect(keys({ src: 'SAM', set: 'NONE' })).toContain('full_open');
+    // Full & Open only when the record EXPLICITLY says so — a NONE bucket alone is "not stated"
+    // (repair board P1-A: absent ≠ unrestricted).
+    expect(keys({ src: 'SAM', set: 'NONE', setOpen: true })).toContain('full_open');
+    expect(keys({ src: 'SAM', set: 'NONE' })).not.toContain('full_open');
     // NONE never also emits set_aside
-    expect(keys({ src: 'SAM', set: 'NONE' })).not.toContain('set_aside');
+    expect(keys({ src: 'SAM', set: 'NONE', setOpen: true })).not.toContain('set_aside');
     // a missing set emits neither
     expect(keys({ src: 'SAM', set: null })).toEqual([]);
   });

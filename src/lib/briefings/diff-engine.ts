@@ -107,7 +107,8 @@ export function processOpportunityDiffs(
       category: 'new_opportunity',
 
       title: opp.title,
-      subtitle: `${opp.department} • ${opp.setAside || 'Open'}`,
+      // No set-aside on the record is NOT STATED, never "Open" (repair board P1-A).
+      subtitle: `${opp.department} • ${opp.setAside || 'Set-aside not stated'}`,
       description: truncate(opp.description, 200),
 
       relevanceScore: score,

@@ -587,7 +587,8 @@ function MarketIntelDashboard() {
       opp.department,
       opp.naics_code || '',
       NOTICE_TYPE_LABELS[opp.notice_type || ''] || opp.notice_type || '',
-      SET_ASIDE_LABELS[opp.set_aside_code || ''] || opp.set_aside_code || 'Full & Open',
+      // A NULL set_aside_code is NOT STATED — absent ≠ unrestricted (repair board P1-A).
+      SET_ASIDE_LABELS[opp.set_aside_code || ''] || opp.set_aside_code || 'Not stated',
       opp.response_deadline ? new Date(opp.response_deadline).toLocaleDateString() : '',
       opp.days_until_deadline ?? '',
       opp.ui_link || '',

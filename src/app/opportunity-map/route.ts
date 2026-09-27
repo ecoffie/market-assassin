@@ -1742,7 +1742,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,totalObligated:p.totalObligated||0,awardCount:p.awardCount||0,distinctAgencyCount:p.distinctAgencyCount||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(_m==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),subAgency:clean(p.subAgency||''),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
+    if(_m==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),subAgency:clean(p.subAgency||''),naics:p.naics,set:SETMAP[p.set]||'None',setOpen:p.setOpen===true,value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     // src comes from the SERVER (SAM | DLA) — the Open dataset now mixes both, and the UI keys
     // the source chip/color/filter off it (SRCLABEL, .chip.DLA). Defaulting to 'SAM' would
@@ -1775,7 +1775,7 @@ const VIEWPORT_JS = `<script>
     // (genome.ts) and shipped on the open (SAM) pin. Threaded onto the row so the drawer renders it
     // (pursueSignals) with zero client compute. Absent on RECOMPETE/FORECAST pins built elsewhere →
     // [] here, and pursueSignals falls back to its own signal logic for those (no regression).
-    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estN:p.estN||0,estLow:p.estLow||0,estHigh:p.estHigh||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits,dna:(Array.isArray(p.dna)?p.dna:[])};
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',setOpen:p.setOpen===true,loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estN:p.estN||0,estLow:p.estLow||0,estHigh:p.estHigh||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits,dna:(Array.isArray(p.dna)?p.dna:[])};
   }
   // DRAWER_JS is a SEPARATE script IIFE and cannot see toRow. Share/deep-link fetch injects a
   // pin through this bridge so the Awarded drawer is identical to a pin click (COMPOUND).
@@ -1785,7 +1785,7 @@ const VIEWPORT_JS = `<script>
   // (o.noLoc) and noPin=true flags it so the card renders a muted "\\ud83d\\udccd no location yet"
   // instead of a place, and clicking it never tries to fly the map to a coordinate.
   function unplacedToRow(u){
-    return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0,estRange:u.estRange||''};
+    return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',setOpen:u.setOpen===true,loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0,estRange:u.estRange||''};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -6184,7 +6184,9 @@ const DRAWER_JS = `<script>
   // "What's special" — grey chips of the opportunity's key traits (all real fields).
   function tagsSec(o,extra){
     var tags=[];
-    if(o.setAsideLabel&&o.setAsideLabel!=='Open')tags.push(o.setAsideLabel); else tags.push('Open / unrestricted');
+    // An empty setAsideLabel means the record states NO set-aside at all (an explicit "no set-aside"
+    // arrives as its description) — absent is not unrestricted (repair board P1-A).
+    tags.push(o.setAsideLabel||'Set-aside not stated');
     if(o.category)tags.push(o.category);
     if(o.noticeType)tags.push(o.noticeType);
     var bf=(extra&&extra.bidFacts)||[];
@@ -6229,7 +6231,7 @@ const DRAWER_JS = `<script>
     var loc=o.location?((o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'')):'';
     return '<div class="snapgrid">'
       + '<div><div class="k">Response due</div><div class="'+dueCls+'">'+longDate(o.deadline)+'</div></div>'
-      + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
+      + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Not stated')+'</div></div>'
       + '<div><div class="k">Agency</div><div class="v">'+esc(agency)+'</div></div>'
       + '<div><div class="k">Location</div><div class="v">'+esc(loc||'Not specified')+'</div></div>'
       + '</div>';
@@ -6888,7 +6890,7 @@ const DRAWER_JS = `<script>
     if(!sims||!sims.length)return sec('Related opportunities',empty('No related open opportunities found right now.'),'similar');
     var cards=sims.slice(0,6).map(function(s){
       return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(s.id)+'\\')">'
-        + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'<span class="sim-sa open">Open</span>')
+        + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'<span class="sim-sa">Not stated</span>')
         + '<div class="sim-t">'+esc(s.title)+'</div>'
         + '<div class="sim-ag">'+esc(s.agency||'')+'</div>'
         + '<div class="sim-m">'+esc([s.location,(s.deadline?'due '+s.deadline:'')].filter(Boolean).join(' \\u00b7 '))+'</div>'
@@ -6964,7 +6966,7 @@ const DRAWER_JS = `<script>
     var cards=targets.slice(0,6).map(function(t){
       var meta=[(t.agency||''),(t.deadline?'due '+longDate(t.deadline):'')].filter(Boolean).join(' \\u00b7 ');
       return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(t.id)+'\\',true)">'
-        + (t.setAside?'<span class="sim-sa">'+esc(t.setAside)+'</span>':'<span class="sim-sa open">Open</span>')
+        + (t.setAside?'<span class="sim-sa">'+esc(t.setAside)+'</span>':(t.setAsideOpen?'<span class="sim-sa open">Open</span>':'<span class="sim-sa">Not stated</span>'))
         + '<div class="sim-t">'+esc(t.title||'Opportunity')+'</div>'
         + '<div class="sim-ag">'+esc(t.agency||'')+'</div>'
         + '<div class="sim-m">'+esc(meta)+'</div>'
@@ -7534,7 +7536,7 @@ const DRAWER_JS = `<script>
     if(!sims.length)return sec('Similar recompetes',empty('No similar recompetes in view \\u2014 pan the map or widen the dataset to find peers.'),'similar');
     var cards=sims.map(function(s){
       var key=String(s.nid||s.sol||'');
-      var setLabel=(!s.set||s.set==='None')?'Open':s.set;
+      var setLabel=(!s.set||s.set==='None')?(s.setOpen?'Open':'Not stated'):s.set;
       return '<button class="sim-card" onclick="openRecompeteDrawer(\\''+esc(key)+'\\')">'
         + '<span class="sim-sa'+(setLabel==='Open'?' open':'')+'">'+esc(setLabel)+'</span>'
         + '<div class="sim-t">'+esc(s.title||'Awarded contract')+'</div>'
@@ -7642,7 +7644,7 @@ const DRAWER_JS = `<script>
     CUR={ kind:'recompete', id:o.nid||o.sol, title:rcTitle, department:o.agency||'',
       solicitation:o.sol||'', naics:o.naics||'', deadline:o.exp||'', sol:o.sol||o.nid, uiLink:usaspendingUrlForRecompete(o) };
     var rcType=contractTypeLabel(o.contractType); // real award type: IDIQ vehicle / task order / …
-    var setLabel=(!o.set||o.set==='None')?'Open / unrestricted':o.set;
+    var setLabel=(!o.set||o.set==='None')?(o.setOpen?'Open / unrestricted':'Not stated'):o.set;
     // EXACT contract value everywhere in this drawer (Eric 2026-08-05: "can we not round up the
     // numbers"): fmtM(valueNum) = the full USASpending ceiling ($575,284), NOT the rounded o.value
     // string ($575K). Fall back to the pre-formatted string only when the raw number is missing.
@@ -7734,7 +7736,7 @@ const DRAWER_JS = `<script>
   function recompeteTraitChips(o){
     var tags=[];
     if(o.cat)tags.push(o.cat);
-    tags.push((!o.set||o.set==='None')?'Open / unrestricted':o.set);
+    tags.push((!o.set||o.set==='None')?(o.setOpen?'Open / unrestricted':'Set-aside not stated'):o.set);
     var win=recompeteExpiryWindow(o.exp); if(win)tags.push(win);
     if(!tags.length)return '';
     return tags.slice(0,6).map(function(t){return '<span class="ws-tag">'+esc(t)+'</span>';}).join('');
@@ -7974,7 +7976,7 @@ const DRAWER_JS = `<script>
       if(!_row){
         _row={src:'RECOMPETE',title:d.pin.title,cat:d.pin.cat,contractType:d.pin.contractType||'',
           agency:d.pin.agency||'',subAgency:d.pin.subAgency||'',naics:d.pin.naics||'',
-          set:d.pin.set||'None',value:d.pin.value,valueNum:d.pin.valueNum||0,
+          set:(d.pin.set&&d.pin.set!=='NONE')?d.pin.set:'None',setOpen:d.pin.setOpen===true,value:d.pin.value,valueNum:d.pin.valueNum||0,
           exp:String(d.pin.exp||'').slice(0,10),loc:d.pin.loc||'',state:d.pin.state||'',
           sol:d.pin.sol||'',nid:d.pin.id,lat:d.pin.lat,lng:d.pin.lng,
           locSrc:d.pin.locPrecision==='city'?'pop':'office',uei:d.pin.uei||null,synced:d.pin.synced||null};
@@ -8141,7 +8143,7 @@ const DRAWER_JS = `<script>
       return fmtM(Number(o.est)||0);
     }
     var fTitle=o.title||'Planned procurement';
-    var setLabel=(!o.set||o.set==='None')?'To be determined':o.set;
+    var setLabel=(!o.set||o.set==='None')?(o.setOpen?'Full & open':'To be determined'):o.set;
     // CUR mirrors the other drawers so the action bar (Save/Share/More) works. kind='forecast'
     // routes Share → ?forecast=, and there is no live solicitation URL yet (uiLink stays empty).
     CUR={ kind:'forecast', id:o.nid||o.sol, title:fTitle, department:o.agency||'',

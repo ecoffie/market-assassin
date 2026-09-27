@@ -23,6 +23,7 @@
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { expandStateToBorders } from '@/lib/utils/state-expansion';
+import { classifySetAside } from '@/lib/beginner/labels';
 
 export const CROSS_SELL_LIMIT = 6;
 
@@ -57,6 +58,9 @@ export type OpenBidTarget = {
   title: string;
   agency: string;
   setAside: string | null;
+  /** TRUE only when the notice EXPLICITLY states no set-aside. `setAside: null` alone is
+   *  ambiguous (explicit none OR not stated) — the renderer must never read null as "Open". */
+  setAsideOpen: boolean;
   deadline: string | null; // ISO datetime
   naics: string;
   state: string;
@@ -266,8 +270,10 @@ export async function findOpenBidTargets(
       id: String(r.notice_id || ''),
       title: (r.title || '').trim() || 'Untitled opportunity',
       agency: (r.department || '').trim(),
-      // Prefer the human label, fall back to the code; null when genuinely unrestricted/unknown.
+      // Prefer the human label, fall back to the code; null when unrestricted OR not stated —
+      // setAsideOpen says which (absent ≠ unrestricted, repair board P1-A).
       setAside: setAsideLabel(r.set_aside_description, r.set_aside_code),
+      setAsideOpen: classifySetAside(r.set_aside_code || r.set_aside_description) === 'open',
       deadline: r.response_deadline || null,
       naics: String(r.naics_code || key.naics),
       state: key.state,
@@ -277,7 +283,8 @@ export async function findOpenBidTargets(
   return out;
 }
 
-/** Human set-aside label from the SAM description/code; null → "Open / unrestricted" at render. */
+/** Human set-aside label from the SAM description/code; null → the renderer reads setAsideOpen
+ *  ("Open" only when explicit, otherwise "Not stated"). */
 function setAsideLabel(desc: string | null | undefined, code: string | null | undefined): string | null {
   const d = (desc || '').trim();
   if (d && !/^no set aside/i.test(d)) return d;

@@ -66,10 +66,15 @@ describe('recompeteTraitChips — trait chip row (gap 5)', () => {
     expect(html).toContain('SDVOSB');
     expect(html).toContain('Expires');
   });
-  it('shows "Open / unrestricted" when there is no set-aside', () => {
+  it('an ABSENT set-aside reads "Set-aside not stated" — absent ≠ unrestricted (P1-A)', () => {
     const html = recompeteTraitChips({ cat: 'Roofing', set: 'None', exp: '' });
-    expect(html).toContain('Open / unrestricted');
+    expect(html).toContain('Set-aside not stated');
+    expect(html).not.toContain('Open / unrestricted');
     expect(html).not.toContain('Expires'); // no exp → no expiry chip
+  });
+  it('shows "Open / unrestricted" only when the record EXPLICITLY says so (setOpen)', () => {
+    const html = recompeteTraitChips({ cat: 'Roofing', set: 'None', setOpen: true, exp: '' });
+    expect(html).toContain('Open / unrestricted');
   });
   it('caps at 6 chips and escapes content', () => {
     const html = recompeteTraitChips({ cat: '<script>', set: 'None', exp: daysFromNow(90) });

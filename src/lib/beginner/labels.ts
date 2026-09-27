@@ -146,7 +146,12 @@ export function classifySetAside(raw: string | null | undefined): SetAsideKind {
     n.startsWith('nosetaside') ||
     n.includes('unrestricted') ||
     n.includes('fullandopen') ||
-    n.includes('opencompetition')
+    // "Full & Open" — the recompete vocabulary; the '&' normalizes away.
+    n.includes('fullopen') ||
+    n.includes('opencompetition') ||
+    // "Other Than Small Business" (agency forecasts) says the buy is NOT reserved for small
+    // business. It CONTAINS "small business", so without this it read as a small-business set-aside.
+    n.includes('otherthansmall')
   ) {
     return 'open';
   }
@@ -170,8 +175,13 @@ export function classifySetAside(raw: string | null | undefined): SetAsideKind {
   // Same trap as above: "Veteran-Owned Small Business Set-Aside" CONTAINS "small business". It
   // used to be checked AFTER the catch-all and read as open-to-every-small-business — which the
   // company-anchored FIND eligibility screen would have turned into ELIGIBLE for any small firm.
-  if (n === 'vsa' || n === 'vss' || n.includes('veteran')) return 'vosb';
-  if (n === 'sba' || n === 'sbp' || n === 'sb' || n.includes('smallbusiness') || n.includes('totalsmall')) {
+  if (n === 'vsa' || n === 'vss' || n === 'vosb' || n.includes('veteran')) return 'vosb';
+  if (
+    n === 'sba' || n === 'sbp' || n === 'sb' ||
+    // Recompete vocabulary: "SB-Total" / "SB-Partial".
+    n === 'sbtotal' || n === 'sbpartial' ||
+    n.includes('smallbusiness') || n.includes('totalsmall')
+  ) {
     return 'sb';
   }
   if (n === 'isbee' || n === 'iee' || n === 'biciv' || n === 'las') return 'other';

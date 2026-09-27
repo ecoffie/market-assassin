@@ -578,7 +578,7 @@ const AGENCY={VA:"Veterans Affairs",DoD:"Dept of Defense",GSA:"General Services 
 const SETFULL={SDVOSB:"Service-Disabled Veteran-Owned",SB:"Small Business",
  "8(a)":"8(a) Competed",EDWOSB:"Economically Disadv. WOSB",WOSB:"Women-Owned Small Business",
  "Veteran SA":"Veteran-Owned",ISBEE:"Indian Small Business",
- "Buy Indian":"Buy Indian Set-Aside",None:"Open / unrestricted","":"—"};
+ "Buy Indian":"Buy Indian Set-Aside",None:"Not stated","":"—"};
 const SETGROUPS=[
  {key:"SDVOSB",label:"SDVOSB",col:"--grnd",match:s=>s==="SDVOSB"||s==="Veteran SA"},
  {key:"SB",label:"Small Business",col:"--jan",match:s=>s==="SB"},
@@ -1374,7 +1374,7 @@ function cardHTML(o){
    ?`<div class="st"><div class="k">Contract value</div><div class="v money">${(Number(o.valueNum)>0?estMoneyExact(o.valueNum):(o.value||'—'))}</div></div>
      <div class="st"><div class="k">Win odds</div><div class="v ${o.prob==='high'?'hi':'med'}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
      <div class="st"><div class="k">Expires</div><div class="v">${shortDate(o.exp)}</div></div>`
-   :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?'Open':o.set}</div></div>
+   :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?(o.setOpen?'Open':'Not stated'):o.set}</div></div>
      <div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>
      <div class="st"><div class="k">Due</div><div class="v">${shortDate(o.close)}</div></div>`;
   // The status pill only earns its place when the TIMING is genuinely actionable — otherwise it
