@@ -104,3 +104,36 @@ against the fix, they pass. `verify:engagement` is **RED on production today** (
    browser session showing a `pipeline` / `panel_time` (flush_reason `hidden`) row.
 4. The prompt's section F (privacy / event contract) arrived truncated; nothing in the event
    payload shape was changed.
+
+## Production acceptance (2026-09-27)
+
+- **Merge:** #1719 → `539f6f5b` at 00:38:46Z. Deployed by the normal git path, with no manual deploy. Production served it from **00:42:12Z**, confirmed by the served `maps-account-build:539f6f5b…` stamp and the new `if(!_anonC){` branch in the `/opportunity-map` HTML.
+- **Controlled signed-in session:** isolated Puppeteer profile with a server-signed MI token for the staff test account `eric@govcongiants.com`. It never touched a real browser profile. Every request carried `x-mi-auth-token` as a keepalive `fetch`, and every row below persisted as the token's identity:
+
+| producer | stored row (UTC) |
+|---|---|
+| `/app` page_view panel=pipeline | 00:43:57 |
+| `pipeline` page_view (`useAppTracker`) | 00:43:58 |
+| panel_time `flush_reason=hidden` (real tab switch, 12,480 ms) | 00:44:10 |
+| panel_time `flush_reason=pagehide` (real navigation, 5,567 ms) | 00:44:20 |
+| signed-in map card `impression` ×2 (`source_feed`) | 00:44:31 |
+| `/briefings` page_view + exit panel_time | 00:46:48 / 00:46:59 |
+| `market_intel_dashboard` page_view | 00:48:0x |
+
+- **Anonymous regression:** a fresh profile with no token. The map's `_track` (`map_view`, `cards_shown`) and the card impression sent through the existing **beacon** all persisted under `anon:<uuid>`.
+- **Auth negatives on production** (each tagged with a unique probe marker): no token → 401; tampered signature → 401; A's token claiming B's email → 401 on both `/api/mindy/engagement` and `/api/app/engagement`. **Rows written with the marker: 0.**
+- **Oracle:** tightened to exclude staff and test accounts, because a verification session must never be what turns it green. With `--include-staff` it is PASS 4/4 guarded (from the controlled session). The **customer-only** verdict is the acceptance gate and is pending real traffic.
+
+## Historical gap — telemetry INCOMPLETE, not zero engagement
+
+**2026-08-21 (#1232) → 2026-09-27T00:42:12Z:** signed-in `/app` panel events, `/app` exit panel-time, `/briefings`, and signed-in map-card events were **not recorded**. The zeros in that window are missing data, not absent usage. Nothing was backfilled or synthesized. Any Learn baseline starts after T0.
+
+## T0 ruling (Eric, 2026-09-27)
+
+| period | meaning |
+|---|---|
+| 2026-08-21 → **2026-09-27T00:42:12Z** | telemetry **incomplete**: the zeros are not engagement |
+| **T0 = 2026-09-27T00:42:12Z** onward | repaired telemetry period (the production deployment timestamp of #1719) |
+| customer validation timestamp | the first real signed-in customer event observed through the repaired path. Recorded separately; it **does not move T0** |
+
+Controlled production acceptance proves the transport is correct. The customer-only `verify:engagement` proves ordinary usage. Learn may not treat post-T0 engagement **rates** as a behavioral baseline until customer validation has happened and there is enough normal traffic to make the measurement meaningful. If the monitoring window ends with no customer traffic, the verdict is **NO TRAFFIC / INCONCLUSIVE**, not FAIL. No artificial customer activity is generated.
