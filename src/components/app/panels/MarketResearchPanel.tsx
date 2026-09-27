@@ -17,6 +17,7 @@ import ContractorLink from '../contractors/ContractorLink';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackingModal';
 import { EntryAccessibilityCard } from './EntryAccessibilityCard';
+import { buildSaveResearchProfilePayload } from './market-research-profile-payload';
 import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { getProductVendorHint } from '@/lib/lookup-intent';
@@ -629,6 +630,8 @@ function rollupChartBuyers(rows: AgencyTableRow[]): BuyerLike[] {
 }
 
 export default function MarketResearchPanel({ email, tier, onNavigate }: MarketResearchPanelProps) {
+  // Set only by the business-type <select> onChange — see buildSaveResearchProfilePayload.
+  const businessTypeChosenByUserRef = useRef(false);
   const [formData, setFormData] = useState<FormData>({
     businessType: '',
     naicsCode: '',
@@ -1128,19 +1131,19 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     if (!email) { showToast({ message: 'Sign in to save to your profile.', variant: 'error' }); return; }
     setSavingProfile(true);
     try {
-      const naicsCodes = naics.map((n) => n.code);
-      const pscCodes = psc.map((p) => p.code);
-      const keywords = keyword.trim() ? [keyword.trim()] : [];
+      // businessType is sent ONLY if the user picked it in this form — never the
+      // 'Small Business' default, which overwrote stored 8(a)/SDVOSB/WOSB types.
       const res = await authedFetch('/api/app/profile', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildSaveResearchProfilePayload({
           email,
-          naicsCodes,        // REPLACES the profile's NAICS (the route sets, not appends)
-          pscCodes,          // PSC = what was bought (most precise signal); OR'd into alert matching
-          keywords,
-          businessType: formData.businessType || 'Small Business',
-        }),
+          naicsCodes: naics.map((n) => n.code),
+          pscCodes: psc.map((p) => p.code),
+          keyword,
+          businessType: formData.businessType,
+          businessTypeChosenByUser: businessTypeChosenByUserRef.current,
+        })),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data && !data.error) {
@@ -2143,7 +2146,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               Set-aside / business type
               <select
                 value={formData.businessType}
-                onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
+                onChange={(e) => { businessTypeChosenByUserRef.current = true; setFormData({ ...formData, businessType: e.target.value as BusinessType }); }}
                 className="mt-1 w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               >
                 <option value="Small Business">Small Business (default)</option>
@@ -2256,7 +2259,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               <span className="text-sm text-muted">Business type</span>
               <select
                 value={formData.businessType}
-                onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
+                onChange={(e) => { businessTypeChosenByUserRef.current = true; setFormData({ ...formData, businessType: e.target.value as BusinessType }); }}
                 className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-white outline-none focus:border-emerald-500"
               >
                 <option value="">Use saved/default</option>
