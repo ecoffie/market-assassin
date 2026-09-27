@@ -232,8 +232,11 @@ in `saveCurrentOpp`, restricted to a SAM drawer with a canonical 32-hex `notice_
 (`!CUR.kind && !CUR.isDla && /^[a-f0-9]{32}$/`), and callers passing a `done` callback
 (`openProposalWorkspace`, `startCapture`) are excluded so their signed-in destinations still work.
 **A save is still not a pursuit** — the label says "Saved", never "Tracked"/"In pursuits".
-⚠️ `window.__claimAnonWatches` (W1/#1600) still calls a bare `_uemail()` from SAVE_JS and therefore
-throws — **separate, unfixed, out of scope here.**
+`window.__claimAnonWatches` (W1/#1600) called a bare `_uemail()` (and `_anonId`/`_track`/`_ss*`)
+from SAVE_JS and threw — **fixed 2026-09-26 (P0-F)**; it now uses SAVE_JS's own `tok()/email()/_anonKey()`
+and `window.__track/__ssMsg/__ssReset`. Guarded by `anon-watch-claim.unit.test.ts` (executes the claim in
+SAVE_JS scope). The 37 pre-fix `anon:` watches are NOT reassigned — only the browser holding that anon id
+can claim them.
 
 ---
 

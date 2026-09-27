@@ -66,7 +66,7 @@ describe('it never implies alerts it will not send', () => {
 
   it('only a successful claim reports alerts on', () => {
     const h = SRC.slice(SRC.indexOf('_ss.onclick=function()'));
-    expect(h).toMatch(/c\.claimed>0.*_ssMsg\('\\u2713 Alerts on'\)/s);
+    expect(h).toMatch(/c\.claimed>0.*ui\('__ssMsg','\\u2713 Alerts on'\)/s);
   });
 });
 
