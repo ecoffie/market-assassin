@@ -21,6 +21,7 @@
  * 60 seconds — no setup."
  */
 
+import { KEYWORD_MAX_COUNT, mergeDerivedKeywords } from '@/lib/keywords/sanitize';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -565,9 +566,16 @@ export async function POST(request: NextRequest) {
         .eq('user_email', userEmail)
         .maybeSingle();
       const existing = Array.isArray(cur?.keywords)
-        ? cur!.keywords.map((k: unknown) => String(k).toLowerCase().trim()).filter(Boolean)
+        ? cur!.keywords.map((k: unknown) => String(k).trim()).filter(Boolean) // kept as saved — never re-cased
         : [];
-      const merged = Array.from(new Set([...existing, ...derived])).slice(0, 40);
+      // The documented exception to "reject, never truncate": derived terms are not
+      // user input, so they fill only the room left under the shared limit
+      // (mergeDerivedKeywords). Existing keywords are never trimmed; what did not
+      // fit is reported in `errors`, not dropped silently.
+      const { merged, skipped } = mergeDerivedKeywords(existing, derived);
+      if (skipped.length > 0) {
+        errors.push(`keywords (non-fatal): ${skipped.length} derived keyword(s) not added — profile is at the ${KEYWORD_MAX_COUNT}-keyword limit`);
+      }
       if (merged.length > existing.length) {
         await supabase
           .from('user_notification_settings')

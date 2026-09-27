@@ -19,7 +19,11 @@ export const OPEN_MARKET_NO_KEYWORDS_COPY =
 
 export const OPEN_NOW_HEADING = 'Open Now';
 export const OPEN_NOW_EXPLAIN =
-  'Work you can pursue now — currently open solicitations matching your market.';
+  'Open notices in your market. Each one shows its stage — only items marked Bid take a proposal.';
+
+/** Fallback-path copy (no "new" claim). Stage-honest: not every open notice is a solicitation. */
+export const OPEN_STILL_OPEN_EXPLAIN =
+  'These notices are still open in your market. Each one shows its stage — only items marked Bid take a proposal.';
 
 export type OpenKeywordOutcome =
   | 'distinctive_hits'
@@ -80,6 +84,71 @@ export function scoreContractDKeywords(text: string, keywords: string[]): number
 }
 
 /**
+ * WHERE each saved keyword was found on a notice. Title evidence and body evidence
+ * are kept apart because they are not the same claim: a title names the work being
+ * bought; a description mentions everything from the SOW to the FAR boilerplate.
+ */
+export interface KeywordEvidence {
+  /** Distinctive keywords found in the TITLE. */
+  title: string[];
+  /** Distinctive keywords found only in the DESCRIPTION. */
+  body: string[];
+  /** Generic single words (not distinctive) found anywhere — rank-only. */
+  weak: string[];
+}
+
+/**
+ * Evidence weights. Why capped: scoreContractDKeywords gave +25 per hit with no
+ * ceiling, so a 40-keyword profile stacked description mentions ("compliance",
+ * "program management" in a boilerplate list) past a notice whose TITLE named the
+ * work, and the 0–100 clamp then tied them all at 100 (6 of 7 on a real customer's
+ * Sep 24 2026 alert). Within KEYWORD points, one title hit (30) outweighs the most a
+ * description can ever add (3 × 6 = 18), and no count of keywords can push body
+ * mentions further.
+ *
+ * ⚠️ That is a guarantee about keyword points ONLY. The final rank also adds NAICS,
+ * agency, deadline and set-aside points, which can and do reverse it: a description-only
+ * notice in the user's exact NAICS at a target agency can outrank a title hit elsewhere.
+ * Title evidence is a strong BOOST, not a strict tier (pinned in alert-relevance-case).
+ */
+export const KEYWORD_EVIDENCE_WEIGHTS = {
+  titleEach: 30,
+  titleMax: 2,
+  bodyEach: 6,
+  bodyMax: 3,
+  weakEach: 2,
+  weakMax: 3,
+} as const;
+
+export function keywordEvidence(
+  title: string | null | undefined,
+  body: string | null | undefined,
+  keywords: string[],
+): KeywordEvidence {
+  const t = String(title || '');
+  const b = String(body || '');
+  const distinctive = distinctiveKeywords(keywords);
+  const distinctiveSet = new Set(distinctive.map((k) => k.toLowerCase()));
+  const inTitle = distinctive.filter((k) => keywordOccursInText(t, k));
+  const inBody = distinctive.filter((k) => !inTitle.includes(k) && keywordOccursInText(b, k));
+  const weak = sanitizeKeywords(keywords)
+    .filter((k) => !distinctiveSet.has(k.toLowerCase()))
+    .filter((k) => keywordOccursInText(`${t} ${b}`, k));
+  return { title: inTitle, body: inBody, weak };
+}
+
+export function scoreKeywordEvidence(e: KeywordEvidence): number {
+  const w = KEYWORD_EVIDENCE_WEIGHTS;
+  return Math.min(e.title.length, w.titleMax) * w.titleEach
+    + Math.min(e.body.length, w.bodyMax) * w.bodyEach
+    + Math.min(e.weak.length, w.weakMax) * w.weakEach;
+}
+
+export function hasKeywordSupport(e: KeywordEvidence): boolean {
+  return e.title.length + e.body.length > 0;
+}
+
+/**
  * Is this opportunity inside the user's SAVED industry, using the same
  * exact-vs-4-digit rule the SAM cache query uses (CURATED_EXACT_CODES stay
  * exact; other codes widen to their 4-digit industry group)?
@@ -135,7 +204,38 @@ export function applyOpenAlertMode<T>(
   return { ...preferred, omitOpen: false };
 }
 
-export function openMarketNote(outcome: OpenKeywordOutcome): string | null {
+/**
+ * How much of the NAICS/PSC market the keyword check actually examined. The fetcher
+ * scans the whole market up to MAX_PREFER_SCAN_ROWS; past that bound, matches are
+ * NOT checked. "No keyword hits" over a truncated scan is not a finding that none
+ * exist, so the note must say coverage was incomplete instead.
+ */
+export interface KeywordScanCoverage {
+  scanTruncated?: boolean;
+  marketRowsScanned?: number;
+}
+
+export function keywordScanIncompleteCopy(outcome: OpenKeywordOutcome, scanned: number | undefined): string | null {
+  const examined = typeof scanned === 'number' && scanned > 0
+    ? `Your market is larger than Mindy checked today: it looked at the first ${scanned.toLocaleString('en-US')} open notices (soonest deadlines first)`
+    : 'Your market is larger than Mindy checked today: it looked at only part of it (soonest deadlines first)';
+  if (outcome === 'open_market_no_keyword_hits') {
+    return `${examined} and found no keyword match among them. Matches may exist further out — this is not a finding that none exist. Showing open opportunities in your NAICS/PSC codes.`;
+  }
+  if (outcome === 'focused_omit_open') {
+    return `${examined} and found no keyword match among them, so Focused mode shows no open notices today. Matches may exist further out — this is not a finding that none exist.`;
+  }
+  if (outcome === 'distinctive_hits') {
+    return `${examined}. Keyword matches below come from those notices only; later matches were not checked today.`;
+  }
+  return null;
+}
+
+export function openMarketNote(outcome: OpenKeywordOutcome, coverage?: KeywordScanCoverage): string | null {
+  if (coverage?.scanTruncated) {
+    const incomplete = keywordScanIncompleteCopy(outcome, coverage.marketRowsScanned);
+    if (incomplete) return incomplete;
+  }
   if (outcome === 'open_market_no_keyword_hits') return OPEN_MARKET_NO_KEYWORD_HITS_COPY;
   if (outcome === 'no_keywords_configured') return OPEN_MARKET_NO_KEYWORDS_COPY;
   return null;

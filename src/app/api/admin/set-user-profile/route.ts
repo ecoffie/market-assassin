@@ -1,3 +1,4 @@
+import { validateKeywordSave } from '@/lib/keywords/sanitize';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isKnownNaicsCode, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
@@ -58,7 +59,12 @@ export async function POST(request: NextRequest) {
     update.naics_codes = persist.codes;
   }
   if (Array.isArray(body.keywords)) {
-    update.keywords = Array.from(new Set(body.keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean))).slice(0, 30);
+    // The shared normalizer — same rules as every user-facing writer.
+    const checked = validateKeywordSave(body.keywords);
+    if (!checked.ok) {
+      return NextResponse.json({ success: false, error: checked.error, code: checked.code }, { status: 400 });
+    }
+    update.keywords = checked.keywords;
   }
   // PSC only written when a psc_codes column exists — guarded so a missing column
   // doesn't fail the whole write. Try it; on column error, retry without it.

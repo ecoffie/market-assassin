@@ -33,6 +33,7 @@ const fmt$ = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? 
 export default function MarketCoverageBanner({ coverage, email }: { coverage: MarketCoverage | null; email?: string | null }) {
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   if (!coverage || !coverage.total_market) return null;
   const hiddenPct = 100 - coverage.top_code_pct;
   const keywords = coverage.keywords || [];
@@ -49,15 +50,24 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
   async function addKeywords() {
     if (!email || keywords.length === 0) return;
     setAdding(true);
+    setAddError(null);
     try {
-      await authedFetch('/api/app/keywords/add', email, {
+      const res = await authedFetch('/api/app/keywords/add', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, keywords }),
       });
-      setAdded(true);
-    } catch { /* non-fatal */ }
-    finally { setAdding(false); }
+      // "✓ Added" only when the server actually saved them. A 400 (keyword limit,
+      // unusable entry) used to show "Added" while nothing was written.
+      if (res.ok) {
+        setAdded(true);
+      } else {
+        const body = await res.json().catch(() => null);
+        setAddError(body?.error || 'Not saved — please try again.');
+      }
+    } catch {
+      setAddError('Not saved — check your connection and try again.');
+    } finally { setAdding(false); }
   }
   return (
     <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-blue-900/15 to-purple-600/10 p-4 mb-4">
@@ -143,6 +153,9 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
                 )
               )}
             </div>
+            {addError && (
+              <div role="alert" className="text-[11px] text-red-300 mb-1.5">{addError}</div>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {keywords.map((kw) => (
                 <span key={kw} className="rounded-full border border-hairline bg-ground px-2 py-0.5 text-[11px] text-ink-soft">{kw}</span>

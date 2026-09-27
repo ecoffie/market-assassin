@@ -1105,11 +1105,19 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       // clobbers). Their language is the strongest search signal — used to be
       // discarded after a single Sport report, leaving keyword-empty profiles.
       if (email) {
+        // A rejected add (keyword limit / unusable entry) must be VISIBLE — it used to be
+        // fire-and-forget, so a keyword the server refused looked saved.
         authedFetch('/api/app/keywords/add', email, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, keywords: [sportKeyword.trim()] }),
-        }).catch(() => { /* non-fatal */ });
+        })
+          .then(async (res) => {
+            if (res.ok) return;
+            const body = await res.json().catch(() => null);
+            showToast({ message: `“${sportKeyword.trim()}” was not saved to your keywords. ${body?.error || ''}`.trim(), variant: 'error' });
+          })
+          .catch(() => { /* network failure: the report still runs; nothing claims it was saved */ });
       }
     } catch {
       showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
