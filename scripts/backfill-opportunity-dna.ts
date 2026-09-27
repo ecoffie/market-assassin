@@ -18,10 +18,8 @@
  *   npx tsx scripts/backfill-opportunity-dna.ts --go --limit 5000
  *   npx tsx scripts/backfill-opportunity-dna.ts --go --all # loop until the corpus is drained
  *
- *   --recompute-full-open  re-drain rows whose PERSISTED DNA carries the "Full & Open" strand but
- *                          whose set_aside_code is NULL (repair board P1-A: absent ≠ unrestricted —
- *                          17,808 active rows on 2026-09-26). Recomputing drops the strand, so the
- *                          selection shrinks to zero and the loop terminates. DRY unless --go.
+ * ⚠️ Do NOT use this to repair the stale "Full & Open" strand (repair board P1-A): a recompute also
+ *    moves time/data-derived strands. Use scripts/reconcile-full-open-dna.ts (surgical, snapshotted).
  */
 import 'dotenv/config';
 import { config } from 'dotenv';
@@ -38,7 +36,6 @@ const GO = process.argv.includes('--go');
 const ALL = process.argv.includes('--all');
 const arg = (f: string, d: number) => { const i = process.argv.indexOf(f); return i >= 0 ? parseInt(process.argv[i + 1], 10) || d : d; };
 const LIMIT = arg('--limit', 2000);
-const RECOMPUTE_FULL_OPEN = process.argv.includes('--recompute-full-open');
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
@@ -57,14 +54,9 @@ async function runBatch(early: Map<string, { band: string; pct: number }>): Prom
   const cols = 'notice_id, naics_code, department, title, set_aside_code, set_aside_description, notice_type, response_deadline, solicitation_number';
   const nowIso = new Date().toISOString();
   const batchSize = Math.min(LIMIT, 1000);
-  const { data: rows, error } = RECOMPUTE_FULL_OPEN
-    ? await db.from('sam_opportunities').select(cols)
-      .eq('active', true).gt('response_deadline', nowIso)
-      .contains('opportunity_dna_keys', ['full_open']).is('set_aside_code', null)
-      .order('posted_date', { ascending: false }).limit(batchSize)
-    : await db.from('sam_opportunities').select(cols)
-      .eq('active', true).gt('response_deadline', nowIso).is('dna_computed_at', null)
-      .order('posted_date', { ascending: false }).limit(batchSize);
+  const { data: rows, error } = await db.from('sam_opportunities').select(cols)
+    .eq('active', true).gt('response_deadline', nowIso).is('dna_computed_at', null)
+    .order('posted_date', { ascending: false }).limit(batchSize);
   if (error) throw error;
   const batch = (rows || []) as Row[];
   if (!batch.length) return 0;
@@ -103,17 +95,11 @@ async function runBatch(early: Map<string, { band: string; pct: number }>): Prom
 
 async function main() {
   const nowIso = new Date().toISOString();
-  let cq = db.from('sam_opportunities')
+  const { count: remaining, error: cErr } = await db.from('sam_opportunities')
     .select('notice_id', { count: 'exact', head: true })
-    .eq('active', true).gt('response_deadline', nowIso);
-  cq = RECOMPUTE_FULL_OPEN
-    ? cq.contains('opportunity_dna_keys', ['full_open']).is('set_aside_code', null)
-    : cq.is('dna_computed_at', null);
-  const { count: remaining, error: cErr } = await cq;
+    .eq('active', true).gt('response_deadline', nowIso).is('dna_computed_at', null);
   if (cErr) throw cErr;
-  console.log(RECOMPUTE_FULL_OPEN
-    ? `Active open opps with a "Full & Open" strand but NO set-aside on record: ${remaining ?? 'unknown'}`
-    : `Active open opps not yet DNA-computed: ${remaining ?? 'unknown'}`);
+  console.log(`Active open opps not yet DNA-computed: ${remaining ?? 'unknown'}`);
   if (!GO) { console.log(`DRY RUN. Re-run with --go (limit ${LIMIT}${ALL ? ', looping until drained' : ''}) to compute.`); return; }
 
   const early = await loadDodaacEarlySignal().catch(() => new Map<string, { band: string; pct: number }>());
