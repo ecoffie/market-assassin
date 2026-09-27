@@ -65,6 +65,14 @@ export interface BuyerDetail {
   oppCount: number;
   roster: BuyerRosterContact[];
   agencyIntel: { priorities: string[]; painPoints: string[] } | null;
+  /** The solicitation of the federal_contacts ROW this drawer was opened from (id = one person on
+   *  one notice). It is the office context the user actually opened — a person named on notices
+   *  from several offices must not be credited to whichever of them sorts first. */
+  anchorSolicitation: string | null;
+  /** Distinct DoDAAC prefixes across every notice this person is named on (0 when none are
+   *  DoDAAC-shaped). > 1 means the person spans offices; consumers must not treat the person as
+   *  one office. */
+  officeCount: number;
 }
 
 function sb(): SupabaseClient {
@@ -250,5 +258,11 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
     oppCount: opportunities.length,
     roster,
     agencyIntel,
+    anchorSolicitation: me.solicitation_number || null,
+    officeCount: new Set(
+      solNums
+        .map((n) => n.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))
+        .filter((d) => /^[A-Z][A-Z0-9]{5}$/.test(d)),
+    ).size,
   };
 }

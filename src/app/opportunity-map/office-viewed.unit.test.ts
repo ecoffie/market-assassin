@@ -66,13 +66,24 @@ function drawerHarness(resp: { status: number; body: unknown } | 'network') {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('Players buyer drawer', () => {
-  it('fires office_viewed once the buyer RENDERS, keyed to its office', async () => {
+  it('fires office_viewed once the buyer RENDERS, keyed to the ANCHOR row the user opened', async () => {
+    // The person is named on notices from two offices; the most recent (sorted first) is W91QVN,
+    // but the drawer was opened from their W51LL5 row. Credit W51LL5 — never the first-sorted one.
     const h = drawerHarness({ status: 200, body: { success: true, buyer: {
       id: 'c1', name: 'Pat Buyer', agency: 'Department of the Army', office: '',
-      opportunities: [{ solicitationNumber: 'W912PL24R0001' }] } } });
+      anchorSolicitation: 'W51LL526RA017', officeCount: 2,
+      opportunities: [{ solicitationNumber: 'W91QVN26RA078' }, { solicitationNumber: 'W51LL526RA017' }] } } });
     h.open('c1'); await flush(); await flush();
     expect(h.events).toEqual([['tool_use', 'office_viewed',
-      { office_key: 'dodaac:W912PL', office_key_source: 'dodaac', agency: 'Department of the Army', entry: 'buyer_drawer', record_kind: 'buyer' }]]);
+      { office_key: 'dodaac:W51LL5', office_key_source: 'dodaac', agency: 'Department of the Army', entry: 'buyer_drawer', record_kind: 'buyer', contact_office_count: 2 }]]);
+  });
+
+  it('with no anchor DoDAAC it falls back to the office name, never to another notice', async () => {
+    const h = drawerHarness({ status: 200, body: { success: true, buyer: {
+      id: 'c2', name: 'Lee', agency: 'Department of State', office: 'AQM Momentum', anchorSolicitation: '19AQMM26R0001x',
+      officeCount: 0, opportunities: [{ solicitationNumber: 'W91QVN26RA078' }] } } });
+    h.open('c2'); await flush(); await flush();
+    expect(h.events[0][2]).toMatchObject({ office_key: 'office:aqm momentum', office_key_source: 'office_name' });
   });
 
   it('a failed load (401 / 404 / network) is not a view', async () => {
