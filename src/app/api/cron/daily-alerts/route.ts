@@ -718,10 +718,10 @@ async function runDailyAlertJob(options?: {
             states: userStates,
             limit: 200, // Get more from cache, filter locally
             savedNaics: userNaics,
-            // Keyword profiles: return every preferred row. Newness, dedupe and RANKING
-            // below run on all of them; the final cut happens after ranking, not by
-            // deadline inside the fetch (a strong title match at row 201+ was dropped).
-            keepAllPreferred: true,
+            // Opt-in (daily alerts only): scan the whole market for keyword matches and
+            // return every preferred row. Newness, dedupe and RANKING below run on all of
+            // them; the final cut happens after ranking, not by deadline inside the fetch.
+            fullMarketKeywordScan: true,
           });
 
           const appliedOpen = applyOpenAlertMode(
