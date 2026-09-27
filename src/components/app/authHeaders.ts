@@ -22,6 +22,14 @@ function tokenEmail(token: string | null): string | null {
   }
 }
 
+/** The email of the MI session stored in this browser, or null when signed out.
+ *  Decoded WITHOUT verifying — it only tells a page which account to NAME in a request;
+ *  the server still verifies the token (x-mi-auth-token) against that email. */
+export function storedMIEmail(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return tokenEmail(window.localStorage.getItem('mi_beta_auth_token')); } catch { return null; }
+}
+
 export function getMIApiHeaders(email?: string | null, init?: HeadersInit) {
   const headers = new Headers(init);
   const wantEmail = email ? email.toLowerCase().trim() : '';
