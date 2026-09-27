@@ -17,13 +17,18 @@
  *   npx tsx scripts/backfill-opportunity-dna.ts --go       # write, default 2000
  *   npx tsx scripts/backfill-opportunity-dna.ts --go --limit 5000
  *   npx tsx scripts/backfill-opportunity-dna.ts --go --all # loop until the corpus is drained
+ *
+ *   --recompute-full-open  re-drain rows whose PERSISTED DNA carries the "Full & Open" strand but
+ *                          whose set_aside_code is NULL (repair board P1-A: absent ≠ unrestricted —
+ *                          17,808 active rows on 2026-09-26). Recomputing drops the strand, so the
+ *                          selection shrinks to zero and the loop terminates. DRY unless --go.
  */
 import 'dotenv/config';
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
 import { computeGenome, genomeKeys } from '../src/lib/opportunities/genome';
-import { setGroupKey } from '../src/lib/opportunities/map-data';
+import { mapSetAside } from '../src/lib/opportunities/map-data';
 import { sapBuyerTier } from '../src/lib/opportunities/sap-friendly-agencies';
 import { isRepeatBuyer } from '../src/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '../src/lib/opportunities/early-signal-pins';
@@ -33,12 +38,13 @@ const GO = process.argv.includes('--go');
 const ALL = process.argv.includes('--all');
 const arg = (f: string, d: number) => { const i = process.argv.indexOf(f); return i >= 0 ? parseInt(process.argv[i + 1], 10) || d : d; };
 const LIMIT = arg('--limit', 2000);
+const RECOMPUTE_FULL_OPEN = process.argv.includes('--recompute-full-open');
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 interface Row {
   notice_id: string; naics_code: string | null; department: string | null; title: string | null;
-  set_aside_code: string | null; notice_type: string | null; response_deadline: string | null;
+  set_aside_code: string | null; set_aside_description: string | null; notice_type: string | null; response_deadline: string | null;
   solicitation_number: string | null;
 }
 
@@ -46,11 +52,19 @@ async function runBatch(early: Map<string, { band: string; pct: number }>): Prom
   const nowMs = Date.now();
   // Drain never-computed rows first (dna_computed_at NULL). Active + still-open only — the strategy
   // filter runs on the live corpus, and a closed opp's genome is stale/irrelevant.
-  const { data: rows, error } = await db.from('sam_opportunities')
-    .select('notice_id, naics_code, department, title, set_aside_code, notice_type, response_deadline, solicitation_number')
-    .eq('active', true).gt('response_deadline', new Date().toISOString()).is('dna_computed_at', null)
-    .order('posted_date', { ascending: false })
-    .limit(LIMIT);
+  // Deliberately bounded read: PostgREST caps a response at 1,000 rows, so a LIMIT above that would
+  // silently return 1,000 — cap it explicitly. The loop (--all) drains the rest batch by batch.
+  const cols = 'notice_id, naics_code, department, title, set_aside_code, set_aside_description, notice_type, response_deadline, solicitation_number';
+  const nowIso = new Date().toISOString();
+  const batchSize = Math.min(LIMIT, 1000);
+  const { data: rows, error } = RECOMPUTE_FULL_OPEN
+    ? await db.from('sam_opportunities').select(cols)
+      .eq('active', true).gt('response_deadline', nowIso)
+      .contains('opportunity_dna_keys', ['full_open']).is('set_aside_code', null)
+      .order('posted_date', { ascending: false }).limit(batchSize)
+    : await db.from('sam_opportunities').select(cols)
+      .eq('active', true).gt('response_deadline', nowIso).is('dna_computed_at', null)
+      .order('posted_date', { ascending: false }).limit(batchSize);
   if (error) throw error;
   const batch = (rows || []) as Row[];
   if (!batch.length) return 0;
@@ -65,7 +79,8 @@ async function runBatch(early: Map<string, { band: string; pct: number }>): Prom
       const genome = computeGenome({
         src: 'SAM',
         noticeType: r.notice_type, title: r.title,
-        set: setGroupKey(r.set_aside_code), close: r.response_deadline,
+        ...(() => { const sa = mapSetAside(r.set_aside_code || r.set_aside_description); return { set: sa.key, setOpen: sa.open }; })(),
+        close: r.response_deadline,
         sbf, repeatBuyer, postsEarly,
       }, nowMs);
       const keys = genomeKeys(genome);
@@ -88,10 +103,17 @@ async function runBatch(early: Map<string, { band: string; pct: number }>): Prom
 
 async function main() {
   const nowIso = new Date().toISOString();
-  const { count: remaining } = await db.from('sam_opportunities')
+  let cq = db.from('sam_opportunities')
     .select('notice_id', { count: 'exact', head: true })
-    .eq('active', true).gt('response_deadline', nowIso).is('dna_computed_at', null);
-  console.log(`Active open opps not yet DNA-computed: ${remaining ?? '?'}`);
+    .eq('active', true).gt('response_deadline', nowIso);
+  cq = RECOMPUTE_FULL_OPEN
+    ? cq.contains('opportunity_dna_keys', ['full_open']).is('set_aside_code', null)
+    : cq.is('dna_computed_at', null);
+  const { count: remaining, error: cErr } = await cq;
+  if (cErr) throw cErr;
+  console.log(RECOMPUTE_FULL_OPEN
+    ? `Active open opps with a "Full & Open" strand but NO set-aside on record: ${remaining ?? 'unknown'}`
+    : `Active open opps not yet DNA-computed: ${remaining ?? 'unknown'}`);
   if (!GO) { console.log(`DRY RUN. Re-run with --go (limit ${LIMIT}${ALL ? ', looping until drained' : ''}) to compute.`); return; }
 
   const early = await loadDodaacEarlySignal().catch(() => new Map<string, { band: string; pct: number }>());

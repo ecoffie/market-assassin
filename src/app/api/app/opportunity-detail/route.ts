@@ -309,7 +309,9 @@ export async function GET(request: NextRequest) {
 
   // Bid Facts — the "Facts & features" grid. All real columns.
   const bidFacts = [
-    { k: 'Set-aside', v: opp.setAsideLabel || 'Open (unrestricted)' },
+    // setAsideLabel is '' only when the record carries no set-aside at all (an explicit "no
+    // set-aside" arrives as its description). Absent ≠ unrestricted — repair board P1-A.
+    { k: 'Set-aside', v: opp.setAsideLabel || 'Not stated' },
     { k: 'NAICS', v: opp.naics || '—' },
     { k: 'PSC', v: opp.psc || '—' },
     { k: 'Notice type', v: opp.noticeType || '—' },

@@ -51,6 +51,9 @@ export interface GenomeInput {
   noticeType?: string | null;   // SAM free-text notice_type
   title?: string | null;
   set?: string | null;          // set-group key: SDVOSB | SB | 8A | WOSB | HZ | OTHER | NONE
+  /** TRUE only when the SOURCE explicitly says there is no set-aside (mapSetAside().open). A NONE
+   *  set without it is NOT STATED — absent ≠ unrestricted — and earns no Full & Open strand. */
+  setOpen?: boolean | null;
   close?: string | null;        // response deadline (ISO date) or null
   sbf?: number | boolean | null; // SB-friendly buyer flag (sapBuyerTier 'most') — computed upstream
   // Phase 1.5 grounded strands — both computed UPSTREAM (server-side) and passed in, keeping this fn
@@ -161,14 +164,16 @@ export function computeGenome(row: GenomeInput, now: number): OppGenome {
 
   // ── Tier 1 · Approach — how should I go in? (engine: Strategy DNA) ─────────────────────────
   // Set-aside = an eligibility edge (the objective fact "this is set aside"; whether it's an advantage
-  // FOR YOU is the Recommendation layer, kept out of the genome). NONE = full & open.
+  // FOR YOU is the Recommendation layer, kept out of the genome). NONE + setOpen = full & open;
+  // NONE WITHOUT setOpen = the record states nothing, so NO approach strand (repair board P1-A: a
+  // missing set-aside used to render the "Full & Open" chip on 17,808 active notices).
   const set = (row.set || '').toUpperCase();
   if (set && set !== 'NONE') {
     // NAME the actual set-aside — never a bare "Small Business" / "Set-Aside" (Eric 2026-08-04:
     // "instead of 'Small Business' I'd rather see '✓ Small Business Set-Aside'"). The label reuses the
     // row's real set-aside value (SDVOSB, WOSB, 8(a), SB, …) so it's grounded, never fabricated.
     out.push({ category: 'approach', key: 'set_aside', label: setAsideLabel(row.set), tone: 'good', tier: 1 });
-  } else if (set === 'NONE') {
+  } else if (set === 'NONE' && row.setOpen === true) {
     out.push({ category: 'approach', key: 'full_open', label: 'Full & Open', tone: 'neutral', tier: 1 });
   }
 

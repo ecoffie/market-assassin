@@ -27,7 +27,7 @@ import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
 // the SAME computeGenome() + genomeKeys() as the map decorate + backfill — one source of truth, no
 // lib-duplicate drift. The three derived flags are computed exactly as the map decorate does.
 import { computeGenome, genomeKeys } from '@/lib/opportunities/genome';
-import { setGroupKey } from '@/lib/opportunities/map-data';
+import { mapSetAside } from '@/lib/opportunities/map-data';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
@@ -355,7 +355,10 @@ function mapToDbRecord(opp: SamOpportunity) {
     src: 'SAM',
     noticeType: record.notice_type as string | null,
     title: record.title as string | null,
-    set: setGroupKey(record.set_aside_code as string | null),
+    ...(() => {
+      const sa = mapSetAside((record.set_aside_code as string | null) || (record.set_aside_description as string | null));
+      return { set: sa.key, setOpen: sa.open };
+    })(),
     close: record.response_deadline as string | null,
     sbf, repeatBuyer, postsEarly,
   }, Date.now());

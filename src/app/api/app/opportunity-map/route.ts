@@ -16,7 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
+import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, mapSetAside, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
@@ -85,8 +85,16 @@ function toPin(r: Record<string, any>) {
     id: String(r.notice_id ?? ''),
     title: String(r.title ?? 'Untitled opportunity'),
     agency: String(r.department ?? ''),
-    set: setGroupKey(r.set_aside_code as string),
-    setLabel: (r.set_aside_description as string) || SET_LABEL[setGroupKey(r.set_aside_code as string)],
+    // mapSetAside: filter bucket + an explicit-open flag. Only setOpen may render "Open /
+    // unrestricted"; a NULL set-aside is "Not stated" (repair board P1-A).
+    ...(() => {
+      const sa = mapSetAside((r.set_aside_code as string) || (r.set_aside_description as string));
+      return {
+        set: sa.key,
+        ...(sa.open ? { setOpen: true } : {}),
+        setLabel: (r.set_aside_description as string) || (sa.key === 'NONE' && !sa.open ? 'Not stated' : SET_LABEL[sa.key]),
+      };
+    })(),
     naics: String(r.naics_code ?? ''),
     cat: naicsCategory(r.naics_code as string),
     loc: locLabel,
@@ -357,7 +365,7 @@ export async function GET(request: NextRequest) {
       // Opportunity DNA (genome) — grounded strands computed from the pin's own real fields. ONE
       // shared lib (genome.ts) so the client renders, never computes, and the Phase-2 backfill
       // writes the same strands. src stays 'SAM' here (RECOMPETE/FORECAST pins are built elsewhere).
-      const dna = computeGenome({ src: pin.src, noticeType: pin.noticeType, title: pin.title, set: pin.set, close: pin.close, sbf, repeatBuyer, postsEarly }, nowMs);
+      const dna = computeGenome({ src: pin.src, noticeType: pin.noticeType, title: pin.title, set: pin.set, setOpen: (pin as { setOpen?: boolean }).setOpen === true, close: pin.close, sbf, repeatBuyer, postsEarly }, nowMs);
       return { ...pin, fits: fitsPin(pin.naics), sbf, dna };
     });
 

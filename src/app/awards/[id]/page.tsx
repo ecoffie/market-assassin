@@ -92,6 +92,9 @@ export default async function AwardDetailPage({ params }: PageProps) {
   const amount = Number(award.obligation_amount);
   const firmHref = `/contractors/${recipientSlug(award.recipient_name)}`;
   const setAside = award.set_aside && !/no set aside/i.test(award.set_aside) ? award.set_aside : null;
+  // FPDS reports "NO SET ASIDE USED." explicitly; a NULL set_aside is NOT REPORTED — absent ≠
+  // unrestricted (repair board P1-A), so only the explicit value may read "Full & Open".
+  const setAsideNone = !!award.set_aside && /no set aside/i.test(award.set_aside);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -147,7 +150,7 @@ export default async function AwardDetailPage({ params }: PageProps) {
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {award.piid && <Pill mono>{award.piid}</Pill>}
-              <Pill accent="open">{setAside || 'Full & Open'}</Pill>
+              <Pill accent="open">{setAside || (setAsideNone ? 'Full & Open' : 'Set-aside not reported')}</Pill>
               {award.naics_code && <Pill>NAICS {award.naics_code}</Pill>}
             </div>
           </div>
@@ -171,7 +174,7 @@ export default async function AwardDetailPage({ params }: PageProps) {
             <Row label="PIID" value={award.piid || '—'} mono />
             <Row label="Period of performance" value={`${fmtDate(award.pop_start_date)} → ${fmtDate(award.pop_end_date)}`} />
             <Row label="Place of performance" value={[award.pop_city, award.pop_state, award.pop_country].filter(Boolean).join(', ') || '—'} />
-            <Row label="Set-aside" value={setAside || 'None (Full & Open)'} />
+            <Row label="Set-aside" value={setAside || (setAsideNone ? 'None (Full & Open)' : 'Not reported')} />
             {award.contract_pricing_type && <Row label="Pricing type" value={award.contract_pricing_type} />}
             {award.psc_code && <Row label="PSC" value={`${award.psc_code}${award.psc_description ? ` — ${award.psc_description}` : ''}`} />}
             {award.naics_code && <Row label="NAICS" value={`${award.naics_code}${award.naics_description ? ` — ${award.naics_description}` : ''}`} />}

@@ -4,7 +4,7 @@
  * COMPOUND: one toPin() so /api/app/recompete-map and /api/app/recompete-row cannot drift.
  * id = contract_id, sol = piid. The map client’s toRow(recompete) reads this exact pin.
  */
-import { setGroupKey, naicsCategory } from '@/lib/opportunities/map-data';
+import { mapSetAside, naicsCategory } from '@/lib/opportunities/map-data';
 import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
@@ -31,6 +31,8 @@ export type RecompetePin = {
   cat: string;
   naics: string;
   set: string;
+  /** Only when the source EXPLICITLY says Full & Open — see mapSetAside. */
+  setOpen?: boolean;
   value: string;
   valueNum: number | null;
   exp: string | null;
@@ -84,7 +86,14 @@ export function toPin(r: Record<string, any>): RecompetePin {
     subAgency: r.awarding_sub_agency || null,
     cat: naicsCategory(r.naics_code) || (r.naics_description || 'Recompete'),
     naics: String(r.naics_code ?? ''),
-    set: setGroupKey(r.set_aside_type),
+    // Recompete set_aside_type is USASpending vocabulary ("SB-Total", "8(a)", "Full & Open") or
+    // NULL (101,694 of 143,532 rows, 2026-09-26). setGroupKey only knows SAM codes, so EVERY value
+    // — "SB-Total" included — fell to NONE and rendered "Open / unrestricted". mapSetAside reads
+    // both vocabularies; only an explicit "Full & Open" sets setOpen (repair board P1-A).
+    ...(() => {
+      const sa = mapSetAside(r.set_aside_type);
+      return { set: sa.key, ...(sa.open ? { setOpen: true } : {}) };
+    })(),
     value: money(val),
     // Raw numeric ceiling (potential_total_value, 100% populated — measured 2026-07-26) — the
     // formatted `value` above ("$837.8M") can't be bucketed into a histogram or compared with
