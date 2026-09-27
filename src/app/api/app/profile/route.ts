@@ -7,6 +7,7 @@ import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { sanitizeKeywords } from '@/lib/keywords/sanitize';
+import { resolveAlertsEnabledWrite } from '@/lib/alerts/alerts-enabled-write';
 import {
   mergePrioritiesIntoAggregated,
   prioritiesFromAggregated,
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       locationStates,
       locationZip,
       alertFrequency,
+      alertsEnabled,
       onboardingComplete,
       referralCode,
       // precise=true → save the codes EXACTLY as given, no prefix expansion at all.
@@ -124,8 +126,12 @@ export async function POST(request: NextRequest) {
       : [];
 
     // Update user_notification_settings with profile data
+    // alerts_enabled is NOT written here: a partial update changes only explicitly
+    // submitted fields. It used to be hardcoded to true, so every unrelated save
+    // (Market Research "save to profile", the Map settings drawer) turned a user's
+    // alerts back ON after they had turned them off. See resolveAlertsEnabledWrite
+    // below; a brand-new row still gets the default from freeNotificationSettingsInsert.
     const updateData: Record<string, unknown> = {
-      alerts_enabled: true,
       updated_at: new Date().toISOString(),
     };
 
@@ -207,11 +213,6 @@ export async function POST(request: NextRequest) {
       alertFrequency === 'paused'
     ) {
       updateData.alert_frequency = alertFrequency;
-      // Keep alerts_enabled in sync with paused so the daily-alerts cron
-      // doesn't keep emailing users who chose Paused at onboarding.
-      if (alertFrequency === 'paused') {
-        updateData.alerts_enabled = false;
-      }
     }
 
     // Coach Mode: a "save to profile" from Market Research while operating AS a
@@ -222,10 +223,22 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings, error: existingSettingsErr } = await supabase
       .from('user_notification_settings')
-      .select('user_email, invitation_source, trial_source, agencies, keywords, aggregated_profile, naics_codes')
+      .select('user_email, invitation_source, trial_source, agencies, keywords, aggregated_profile, naics_codes, alert_frequency')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingSettingsErr) console.error('[profile] existing settings query error:', existingSettingsErr.message);
+
+    // Only an explicit instruction changes alerts_enabled: a submitted boolean,
+    // choosing Paused (keeps the daily-alerts cron from emailing a user who paused),
+    // or moving OFF paused to an active frequency.
+    const alertsEnabledWrite = resolveAlertsEnabledWrite({
+      alertsEnabled,
+      alertFrequency,
+      storedFrequency: existingSettings?.alert_frequency ?? null,
+    });
+    if (alertsEnabledWrite !== undefined) {
+      updateData.alerts_enabled = alertsEnabledWrite;
+    }
 
     if (referralCode && !existingSettings?.invitation_source?.startsWith('partner_')) {
       try {
