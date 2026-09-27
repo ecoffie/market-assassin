@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { observeFederalContactsUsage } from '@/lib/auth-observability';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
@@ -222,6 +223,8 @@ export async function GET(request: NextRequest) {
 
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
+  // R0/E6 observability (behaviour-neutral): per-user usage class (listing vs roster/bulk).
+  observeFederalContactsUsage(request, auth.session.email);
 
   const sb = getSupabase();
 

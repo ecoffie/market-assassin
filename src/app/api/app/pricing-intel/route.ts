@@ -12,10 +12,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchPricingIntel, fetchPricingIntelByKeywords } from '@/lib/utils/calc-rates';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const email = url.searchParams.get('email');
+  // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+  observeProGateIdentity(request, email);
   const naics = url.searchParams.get('naics');
   // Native CALC search: query labor categories directly by role keyword(s).
   const keyword = url.searchParams.get('keyword');

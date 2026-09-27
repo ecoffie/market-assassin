@@ -17,6 +17,7 @@ import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-go
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,8 @@ function realSetAside(s: unknown): string | null {
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
+  // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+  observeProGateIdentity(request, email);
   if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
   if (!supabaseUrl || !supabaseKey) return NextResponse.json({ success: false, error: 'not configured' }, { status: 500 });
 

@@ -25,6 +25,7 @@ import {
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
 } from '@/lib/bigquery/recipients';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,8 @@ export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
   const email = (request.nextUrl.searchParams.get('email') || '').trim();
+  // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+  observeProGateIdentity(request, email);
   const name = (request.nextUrl.searchParams.get('name') || '').trim();
   if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
