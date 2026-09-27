@@ -56,6 +56,26 @@ by hand.
 
 ---
 
+## ⛔ Never pop an unidentified shared stash
+
+**The stash stack is shared by the main checkout and every worktree, and by every concurrent
+session.** `git stash pop` / `git stash apply` with no argument takes `stash@{0}` — whoever pushed
+it. On 2026-09-26 an agent in a linked worktree ran a bare `git stash` on an already-clean tree
+(which stashed nothing), then `git stash pop` applied another session's
+`auto: cursor sessionEnd 2026-09-20T15:24` entry from `main` into its tree. `package-lock.json`
+conflicted; the tree was restored from HEAD and the foreign entry survived only because a
+conflicted pop does not drop it.
+
+- **Before any `pop`/`apply`/`drop`, identify the entry:** `git stash list --format='%H %gd %gs'`
+  and `git stash show -p <sha>`. It is yours only if you pushed it this session under a tag you chose.
+- **Never `pop`.** If you must stash: `git stash push -u -m "<unique-tag>"`, capture its SHA
+  immediately, restore with `git stash apply <sha>`, then drop it by re-finding the tag.
+- **Prefer no stash at all.** To test old code, use a WIP commit, or `git show origin/main:<file>`
+  into place and `git checkout HEAD -- <file>` back.
+- An entry you did not create is someone else's work. Leave it; report it.
+
+---
+
 ## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first
 
 `vercel --prod` uploads the directory that owns the nearest `.vercel/project.json`,
