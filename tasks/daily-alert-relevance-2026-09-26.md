@@ -1,4 +1,4 @@
-# Daily-alert relevance — investigation + fix batch (2026-09-26)
+# Daily-alert relevance — investigation + PARTIAL Open-alert repair (2026-09-26)
 
 Customer case: an SDVOSB AI / acquisition-support firm ("Customer A"). He reported the
 2026-09-24 alert and his keyword list, and believed "the algorithm just needs a few more
@@ -6,6 +6,11 @@ days to refine". Identity is kept out of the repo on purpose; the named investig
 outside version control.
 
 **His account was not changed and nothing was sent to him.** All production access was read-only.
+
+⚠️ **This is a PARTIAL repair of the Open section only.** Railway grants, expired deadlines,
+recompetes, duplicate notices and misleading counts are still unresolved (see "Explicitly OPEN").
+Do **not** tell the customer his daily email is fixed. Do **not** restore his keyword list
+before release verification.
 
 ## What the investigation found (before this PR)
 
@@ -22,12 +27,17 @@ outside version control.
 ## What this PR changes
 
 1. **Filter before limit.** For keyword profiles, the fetcher scans the whole NAICS/PSC
-   market (bounded at 4,000 rows) before applying the limit. Hitting the bound is reported
-   as `scanTruncated`, never silent.
-2. **Evidence ranking.** Keyword hits are split into title and description.
-   - One title hit (30) outweighs the most descriptions can add (3 × 6).
+   market (bounded at 4,000 rows) before applying the limit.
+   - If the market is bigger than the bound, the fetch reports `scanTruncated`.
+   - daily-alerts carries that into the email. A truncated check is disclosed as incomplete
+     coverage ("…looked at the first 4,000 open notices… not a finding that none exist").
+   - It is never reported as "No keyword hits".
+2. **Evidence ranking — boosts and demotions, not strict tiers.**
+   - Keyword hits are split into title and description. Within **keyword points**, one title hit (30) outweighs the most descriptions can add (3 × 6).
+   - The final rank also adds NAICS, agency, deadline and set-aside points, which **can reverse that order**. A test pins a description-only notice outranking a title hit.
    - Ordering uses an unclamped `rank`; the display score stays 0–100.
-   - Notices with nothing to submit (Special Notice, Presolicitation, Award, Justification) rank below actionable work.
+   - Notices with nothing to submit (Special Notice, Presolicitation, Award, Justification) are **demoted by 40 rank points**. That is not a guarantee they rank below all actionable work, and a test pins a strong heads-up notice outranking a weak biddable one.
+   - What prevents a heads-up notice reading as biddable is its stage label.
 3. **Anchored agency identity** (`src/lib/alerts/agency-match.ts`):
    - toptier via the canonical resolver;
    - sub-agencies via curated alias full names;
@@ -36,16 +46,15 @@ outside version control.
    - "Keyword “x” in title / in description", or "No keyword match — in your NAICS market".
    - "Bid" / "Respond, not priced" / "Heads-up only, nothing to submit".
    - SAM's `NONE` set-aside is no longer printed as a reason, and no longer earns +5.
-5. **Never silently discard keywords.** One shared `KEYWORD_MAX_COUNT` (60) across all five
-   writers (was 40/30/40/30, each a silent slice).
-   - Over-limit saves return 400 and write nothing.
-   - The Settings panel already surfaces a failed save.
-   - The vault prefill never trims existing keywords.
+5. **Never silently discard user-entered keywords.** One shared `KEYWORD_MAX_COUNT` (60)
+   across the four user-input writers (Settings, onboarding profile, keywords/add, admin).
+   - Before, these carried 40/30/40/30 silent slices.
+   - Proven on the **real handlers** against a write-recording Supabase fake: 53 and 60 save intact; 61 returns 400 with **zero writes** and the prior list preserved.
+   - **Documented exception — the vault prefill.** Its keywords are auto-DERIVED, not user input, so `mergeDerivedKeywords` adds them only into the remaining room. Existing keywords are never trimmed, and the derived terms that did not fit are reported in the response's `errors`.
 6. **Vocabulary terms no longer admit rows** (separate commit, easy to drop). The
    `VOCAB_ALERT_EXPANSION` flag is inert until someone decides whether vocab earns a rank-only role.
 
-⚠️ **Decision needed:** 60 is my choice. It admits the largest real list on record (53) with
-headroom. Daily alerts match keywords in memory, so the count does not grow the SQL query.
+The limit of 60 is a proposal, validated by the save-path tests above, not by one customer's list.
 
 **Rarity weighting was NOT shipped.** It remains an experiment: rare words are not necessarily relevant.
 
@@ -114,9 +123,10 @@ Five real daily-alert profiles in unrelated sectors. Columns count the top 10 ro
 
 ## Tests
 
-- `src/lib/alerts/alert-relevance-case.unit.test.ts` — frozen real-data case plus two unrelated profiles, the stage label, and "no vocab admission".
+- `src/lib/keywords/keyword-save-handlers.unit.test.ts` — the real save handlers against a write-recording fake: 53/60 intact; 61 → 400, zero writes, prior list preserved; keywords/add at and over the limit; an existing over-limit row is never trimmed; the prefill exception.
+- `src/lib/alerts/alert-relevance-case.unit.test.ts` — frozen real-data case plus two unrelated profiles, the stage label, "no vocab admission", and the ranking NON-guarantees (bonuses can reverse title > description; heads-up is a 40-point demotion only).
 - `src/lib/alerts/agency-match.unit.test.ts` — NIST vs Administration, VA vs Veterans Affairs / Naval, State vs "United States", parent vs component.
-- `src/lib/briefings/pipelines/sam-cache-filter-before-limit.unit.test.ts` — a match at row 420 of 450 is found; truncation is reported.
+- `src/lib/briefings/pipelines/sam-cache-filter-before-limit.unit.test.ts` — a match at row 420 of 450 is found. With the only match beyond row 4,000: the fetch misses it, reports `scanTruncated`, and the note daily-alerts prints discloses incomplete coverage instead of "no keyword match". Also checks that the route wires the fetch's coverage into that note.
 - `src/lib/keywords/keyword-limit.unit.test.ts` — the 53-keyword list fits; over-limit is reported; the preferences route rejects before any write; no writer keeps a silent keyword cap.
 
 Each new guard was proven by injecting the old behaviour (red) and reverting (green).

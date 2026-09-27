@@ -31,7 +31,7 @@ import { openSearchFailureReason, retryOpenSearchToday, isOpenSearchFailure, ope
 import { isMailboxSuppressed } from '@/lib/email/suppression';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
-import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome, type KeywordScanCoverage } from '@/lib/alerts/open-contract-d';
 import { renderMatchReason, renderStageLabel, OPEN_STILL_OPEN_EXPLAIN } from '@/lib/alerts/match-evidence-copy';
 import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
@@ -710,6 +710,9 @@ async function runDailyAlertJob(options?: {
         let allActiveOpportunities: SAMOpportunity[] = [];
         let noticeSummary: SAMNoticeSummary | undefined;
         let openKeywordOutcome: OpenKeywordOutcome | undefined;
+        // Carried to the email: a keyword check over a TRUNCATED market scan must say
+        // coverage was incomplete, never "no keyword match" (openMarketNote).
+        let keywordScan: KeywordScanCoverage = {};
         let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
         let openSearchError: OpenSearchError | undefined;
         try {
@@ -759,6 +762,10 @@ async function runDailyAlertJob(options?: {
           );
           allActiveOpportunities = appliedOpen.rows;
           openKeywordOutcome = appliedOpen.outcome;
+          keywordScan = { scanTruncated: cacheResult.scanTruncated, marketRowsScanned: cacheResult.marketRowsScanned };
+          if (keywordScan.scanTruncated) {
+            console.warn(`[Daily Alerts] ${user.user_email}: keyword scan truncated at ${keywordScan.marketRowsScanned} market rows — email will disclose incomplete coverage`);
+          }
 
           const industry = filterMarketToSavedIndustry(
             allActiveOpportunities,
@@ -1073,7 +1080,7 @@ async function runDailyAlertJob(options?: {
             noticeSummary,
             hiddenMatches,
             {
-              openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined),
+              openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured', keywordScan) ?? undefined),
               comingBack,
               openUnavailable: !!openUnavailable,
             },

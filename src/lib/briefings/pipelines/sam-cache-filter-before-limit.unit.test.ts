@@ -94,3 +94,51 @@ describe('fetchSamOpportunitiesFromCache — keyword preference sees the whole m
     expect(r.marketRowsScanned).toBeUndefined();
   });
 });
+
+describe('truncated scan → the alert DISCLOSES incomplete coverage (fetch → outcome → email note)', () => {
+  it('the only keyword match lies beyond the scan bound: the note says coverage was incomplete, never "no keyword match"', async () => {
+    const { openMarketNote, OPEN_MARKET_NO_KEYWORD_HITS_COPY } = await import('@/lib/alerts/open-contract-d');
+    MARKET = market(MAX_PREFER_SCAN_ROWS + 500, [MAX_PREFER_SCAN_ROWS + 10]);
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+    });
+    // The fetch really did miss it — that is the premise.
+    expect(r.opportunities.some((o) => o.noticeId === `n${String(MAX_PREFER_SCAN_ROWS + 10).padStart(5, '0')}`)).toBe(false);
+    expect(r.openKeywordOutcome).toBe('open_market_no_keyword_hits');
+    expect(r.scanTruncated).toBe(true);
+
+    // Exactly what daily-alerts passes to the email (route: openMarketNote(outcome, keywordScan)).
+    const note = openMarketNote(r.openKeywordOutcome!, { scanTruncated: r.scanTruncated, marketRowsScanned: r.marketRowsScanned });
+    expect(note).not.toBe(OPEN_MARKET_NO_KEYWORD_HITS_COPY);
+    expect(note).toMatch(/looked at the first 4,000 open notices/);
+    expect(note).toMatch(/not a finding that none exist/);
+  });
+
+  it('matches found inside the bound still say later notices were not checked', async () => {
+    const { openMarketNote } = await import('@/lib/alerts/open-contract-d');
+    MARKET = market(MAX_PREFER_SCAN_ROWS + 500, [10, MAX_PREFER_SCAN_ROWS + 10]);
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+    });
+    expect(r.openKeywordOutcome).toBe('distinctive_hits');
+    const note = openMarketNote(r.openKeywordOutcome!, { scanTruncated: r.scanTruncated, marketRowsScanned: r.marketRowsScanned });
+    expect(note).toMatch(/later matches were not checked today/);
+  });
+
+  it('a complete scan keeps the ordinary copy', async () => {
+    const { openMarketNote, OPEN_MARKET_NO_KEYWORD_HITS_COPY } = await import('@/lib/alerts/open-contract-d');
+    MARKET = market(450, []);
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+    });
+    expect(openMarketNote(r.openKeywordOutcome!, { scanTruncated: r.scanTruncated, marketRowsScanned: r.marketRowsScanned }))
+      .toBe(OPEN_MARKET_NO_KEYWORD_HITS_COPY);
+  });
+
+  it('daily-alerts carries the scan coverage from the fetch into the email note', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/app/api/cron/daily-alerts/route.ts', 'utf8');
+    expect(src).toMatch(/keywordScan = \{ scanTruncated: cacheResult\.scanTruncated, marketRowsScanned: cacheResult\.marketRowsScanned \}/);
+    expect(src).toMatch(/openMarketNote\(openKeywordOutcome \?\? 'no_keywords_configured', keywordScan\)/);
+  });
+});

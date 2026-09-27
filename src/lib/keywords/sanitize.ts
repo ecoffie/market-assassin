@@ -98,3 +98,21 @@ export function sanitizeKeywords(
   // non-empty is discarding the user's input and must reject instead.
   return { keywords: unique.slice(0, max), dropped, overLimit: unique.slice(max) };
 }
+
+/**
+ * The ONE exception to "reject, never truncate": auto-DERIVED keywords (vault prefill)
+ * are not user input, so they fill only the room left under the limit instead of
+ * failing the prefill. Existing keywords are never trimmed or reordered, and the
+ * derived terms that did not fit are returned so the caller can report them.
+ */
+export function mergeDerivedKeywords(
+  existing: string[],
+  derived: string[],
+  max: number = KEYWORD_MAX_COUNT,
+): { merged: string[]; added: string[]; skipped: string[] } {
+  const have = new Set(existing);
+  const fresh = Array.from(new Set(derived)).filter((d) => !have.has(d));
+  const room = Math.max(0, max - existing.length);
+  const added = fresh.slice(0, room);
+  return { merged: [...existing, ...added], added, skipped: fresh.slice(room) };
+}
