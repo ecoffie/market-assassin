@@ -5492,9 +5492,11 @@ const SAVE_JS = `<script>
     btn.textContent='Saving\\u2026'; btn.disabled=true;
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
-    .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
-      var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
+    // Verdict by HTTP status (409 = already tracked), never by body shape: a non-JSON 5xx
+    // parses to {} and must not read as a save. (Same rule as DRAWER_JS postSave.)
+    .then(function(r){return r.json().catch(function(){return {};}).then(function(d){ return {r:r,d:d||{}}; });}).then(function(x){
+      var dup=x.r.status===409;
+      if(x.r.ok||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
         // FUNNEL: pursuit_started — a real save to My Pursuits (the fifth funnel step). Only on a
         // genuine save (dup counts too — the intent happened). notice_id in metadata for join-back.
         try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(o.sol),agency:String(o.agency||'')}); }catch(e){} }
@@ -5989,43 +5991,56 @@ const DRAWER_JS = `<script>
   // Action bar: Back (close) · Save (→pursuits) · Share (copy link) · Hide (dismiss + hide card) · More.
   var _back=document.getElementById('oppBack'); if(_back)_back.onclick=close;
   function _auth(){ var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){} try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){} return {t:t,em:em}; }
+  // ── SAVE TRUTH (P0-C, 2026-09-26) ─────────────────────────────────────────
+  // Invariant: a persistence failure can never appear as persistence success.
+  // The action bar used to write "Saved" BEFORE any request and swallow every
+  // failure; its open/forecast/DLA branch also posted {email,noticeId} to
+  // /api/pipeline, which requires user_email + title, so every one of those
+  // saves 400'd while the button said "Saved". Now there is ONE body builder
+  // (saveReq) shared by the action bar and every in-body save, and ONE verdict
+  // (saveOutcome) decided by HTTP STATUS — never by whether a parsed body
+  // happens to lack an error field (a non-JSON 500/502 parses to {} and used
+  // to read as success).
+  function saveReq(a){
+    var k=CUR&&CUR.kind;
+    if(k==='company')return {url:'/api/opportunities/save',body:{email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'company_map',
+      opportunityData:{noticeId:CUR.id,entityType:'company',uei:CUR.id,title:CUR.title,department:CUR.department,agency:CUR.department}}};
+    if(k==='buyer')return {url:'/api/opportunities/save',body:{email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'buyer_map',
+      opportunityData:{noticeId:CUR.id,entityType:'buyer',title:CUR.title,department:CUR.department,agency:CUR.department}}};
+    // A recompete has NO sam_opportunities row, so it saves a snapshot (source=recompete_map,
+    // PIID as noticeId) — the same Favorites row the popup heart + in-body Track write.
+    if(k==='recompete')return {url:'/api/opportunities/save',body:{email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'recompete_map',
+      opportunityData:{noticeId:CUR.id,entityType:'recompete',solicitationNumber:CUR.solicitation,title:CUR.title,department:CUR.department,agency:CUR.department,naicsCode:CUR.naics}}};
+    // Open / forecast / DLA → a pursuit. /api/pipeline requires user_email + title.
+    return {url:'/api/pipeline',body:{user_email:a.em,title:CUR.title,notice_id:CUR.id,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'}};
+  }
+  function saveOutcome(r){ if(r&&r.ok)return 'saved'; if(r&&r.status===409)return 'dup'; return 'fail'; }
+  // Resolves {state:'saved'|'dup'|'fail', d:<parsed body or {}>, pipeline:boolean}. Never rejects.
+  function postSave(a){
+    var q=saveReq(a);
+    return fetch(q.url,{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(q.body)})
+      .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline'}; }); },
+            function(){ return {state:'fail',d:{},pipeline:q.url==='/api/pipeline'}; });
+  }
+  window.__mapPostSave=postSave;
   var _save=document.getElementById('oppSave');
-  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
-    _save.classList.add('done'); _save.querySelector('span').textContent='Saved';
-    // Company drawer save (COMPOUND parity): a hearted company saves via the SAME
-    // /api/opportunities/save endpoint the map hearts use — the UEI stands in for
-    // noticeId, source='company_map', with a snapshot so the Favorites page can
-    // render it without a sam_opportunities hydration hit. Opps/recompetes keep the
-    // pursuits save (a company isn't a pursuit).
-    if(CUR.kind==='company'){
-      fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
-        body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'company_map',
-          opportunityData:{noticeId:CUR.id,entityType:'company',uei:CUR.id,title:CUR.title,department:CUR.department,agency:CUR.department}})}).catch(function(){});
-      return;
-    }
-    // Gov Buyer drawer save (COMPOUND parity): the federal_contacts id stands in for noticeId,
-    // source='buyer_map' — same endpoint the buyer popup heart uses. A buyer isn't a pursuit.
-    if(CUR.kind==='buyer'){
-      fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
-        body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'buyer_map',
-          opportunityData:{noticeId:CUR.id,entityType:'buyer',title:CUR.title,department:CUR.department,agency:CUR.department}})}).catch(function(){});
-      return;
-    }
-    // Recompete drawer action-bar Save (COMPOUND parity, gap 3): a recompete has NO
-    // sam_opportunities row, so it saves via /api/opportunities/save with a snapshot
-    // (source=recompete_map, PIID as noticeId) — same path the in-body "Track this recompete"
-    // + the popup heart use, so all three land the same Favorites row. A recompete isn't a pursuit.
-    if(CUR.kind==='recompete'){
-      fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
-        body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'recompete_map',
-          opportunityData:{noticeId:CUR.id,entityType:'recompete',solicitationNumber:CUR.solicitation,title:CUR.title,department:CUR.department,agency:CUR.department,naicsCode:CUR.naics}})}).catch(function(){});
-      return;
-    }
-    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify({noticeId:CUR.id,email:a.em,title:CUR.title,agency:CUR.department})}).catch(function(){}); };
+  if(_save)_save.onclick=function(){ if(!CUR)return; if(_save.dataset.busy==='1'||_save.classList.contains('done'))return;
+    var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+    var sp=_save.querySelector('span'), rec=CUR;
+    _save.dataset.busy='1'; if(sp)sp.textContent='Saving\\u2026';
+    postSave(a).then(function(res){
+      // The drawer moved on while this was in flight: __resetOppSave already reset the
+      // button for the new record, and this verdict belongs to the old one.
+      if(CUR!==rec)return;
+      _save.dataset.busy='';
+      if(res.state==='saved'||res.state==='dup'){ _save.classList.add('done'); if(sp)sp.textContent=(res.state==='dup')?'Already saved':'Saved'; }
+      else { _save.classList.remove('done'); if(sp)sp.textContent='Couldn\\'t save'; }
+    });
+  };
   // The Save button is PERSISTENT action-bar DOM (built once, reused for every opp the drawer opens).
   // So its "Saved"/done state carries over to the NEXT opp unless we reset it on open — the "I clicked
   // once but they all look saved" bug. Every drawer open MUST call this first.
-  window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
+  window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); b.dataset.busy=''; var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
   if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':(CUR.kind==='forecast')?'forecast':'opp'; 
     // share_id identifies THIS share event (not the opportunity): a fresh UUID per click, carried
@@ -6465,11 +6480,10 @@ const DRAWER_JS = `<script>
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     var t=a.t, em=a.em;
     setBtnLabel(btn,'Saving\\u2026');
-    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
-    .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
-      var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-      if((d&&!d.error)||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
+    // Same body builder + status verdict as the action bar (postSave): a non-2xx is never a save.
+    postSave({t:t,em:em}).then(function(res){
+      var d=res.d, dup=res.state==='dup';
+      if(res.state==='saved'||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
         // The pursuit ROW id — returned on a fresh save AND (since 2026-08-13) alongside the 409 for
         // one already tracked. Cached on the button so a second click doesn't re-POST just to learn
         // an id it already had. This is what /opportunity-map/proposal?pursuit=<id> needs.
@@ -6479,7 +6493,7 @@ const DRAWER_JS = `<script>
         try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){}
         if(typeof done==='function')done(true,_pid); }
       else { setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); }
-    }).catch(function(){ setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); });
+    });
   };
   // "Start capture" used to be a LINK to /app?panel=proposals&notice=<id>. /app reads only
   // reset/setup/signup/panel/email — it has never read "notice" — so the id was silently dropped
@@ -7709,14 +7723,12 @@ const DRAWER_JS = `<script>
     if(!CUR||CUR.kind!=='recompete'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     btn.textContent='Saving\\u2026';
-    fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
-      body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'recompete_map',
-        opportunityData:{noticeId:CUR.id,entityType:'recompete',solicitationNumber:CUR.solicitation,title:CUR.title,department:CUR.department,agency:CUR.department,naicsCode:CUR.naics}})})
-      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
-        var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-        if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 Tracked':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1'; }
-        else btn.textContent='Try again';
-      }).catch(function(){ btn.textContent='Try again'; });
+    // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
+    postSave(a).then(function(res){
+      var dup=res.state==='dup';
+      if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 Tracked':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      else btn.textContent='Try again';
+    });
   };
   // Agency intel + pricing for the Awarded drawer — mirrors the open-opp drawer's renderIntel(),
   // but ONLY the two sections a recompete row doesn't already carry (agency priorities/pain points
@@ -8649,14 +8661,12 @@ const DRAWER_JS = `<script>
     if(!CUR||CUR.kind!=='company'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('add this company to your targets'); if(!a)return;
     btn.textContent='Saving\\u2026';
-    fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
-      body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'company_map',
-        opportunityData:{noticeId:CUR.id,entityType:'company',uei:CUR.id,title:CUR.title,department:CUR.department,agency:CUR.department}})})
-      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
-        var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-        if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In targets':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
-        else btn.textContent='Try again';
-      }).catch(function(){ btn.textContent='Try again'; });
+    // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
+    postSave(a).then(function(res){
+      var dup=res.state==='dup';
+      if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 In targets':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      else btn.textContent='Try again';
+    });
   };
   function companyRender(c){
     // CUR mirrors the opp drawer's CUR so the shared action bar (Save/Share/Hide/More) works.
@@ -8908,14 +8918,12 @@ const DRAWER_JS = `<script>
     if(!CUR||CUR.kind!=='buyer'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('add this buyer to your CRM'); if(!a)return;
     btn.textContent='Saving\\u2026';
-    fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
-      body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'buyer_map',
-        opportunityData:{noticeId:CUR.id,entityType:'buyer',title:CUR.title,department:CUR.department,agency:CUR.department}})})
-      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
-        var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-        if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In CRM':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
-        else btn.textContent='Try again';
-      }).catch(function(){ btn.textContent='Try again'; });
+    // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
+    postSave(a).then(function(res){
+      var dup=res.state==='dup';
+      if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 In CRM':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      else btn.textContent='Try again';
+    });
   };
   // ── Buyer DNA from PAST events (Network / Players surface) ──────────────────────────────────
   // Fills #buyerEventDna with named BEHAVIOR signals ("Runs Industry Days — 7 in the past year"),
