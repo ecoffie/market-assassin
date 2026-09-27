@@ -21,6 +21,7 @@ import {
 } from '@/lib/alerts/alert-mode';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 import { freeNotificationSettingsInsert } from '@/lib/onboarding/free-notification-defaults';
+import { buildBusinessProfileInsert, buildBusinessProfileUpdate } from '@/lib/profile/business-profile-patch';
 
 /**
  * MI Beta Profile API
@@ -363,33 +364,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Also update user_business_profiles if it exists
-    const { data: existingProfile } = await supabase
+    // Also update user_business_profiles if it exists. PARTIAL update: a field
+    // this caller omitted is left untouched (see business-profile-patch.ts —
+    // a codes-only save used to wipe the stored business description).
+    const bpInput = {
+      businessDescription,
+      expandedNaicsCodes,
+      setAsides,
+      safeSetAsides,
+      nowIso: new Date().toISOString(),
+    };
+    const { data: existingProfile, error: existingProfileErr } = await supabase
       .from('user_business_profiles')
       .select('user_email')
       .eq('user_email', rowEmail)
       .maybeSingle();
-
-    if (existingProfile) {
-      await supabase
-        .from('user_business_profiles')
-        .update({
-          business_description: businessDescription || null,
-          extracted_naics_codes: expandedNaicsCodes,
-          extracted_set_asides: safeSetAsides,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_email', rowEmail);
+    if (existingProfileErr) {
+      console.error('[profile] business profile lookup error:', existingProfileErr.message);
+    } else if (existingProfile) {
+      const bpPatch = buildBusinessProfileUpdate(bpInput);
+      if (bpPatch) {
+        const { error: bpErr } = await supabase
+          .from('user_business_profiles')
+          .update(bpPatch)
+          .eq('user_email', rowEmail);
+        if (bpErr) console.error('[profile] business profile update error:', bpErr.message);
+      }
     } else {
       // Create new business profile
-      await supabase.from('user_business_profiles').insert({
+      const { error: bpErr } = await supabase.from('user_business_profiles').insert({
         user_email: rowEmail,
-        business_description: businessDescription || null,
-        extracted_naics_codes: expandedNaicsCodes,
-        extracted_set_asides: safeSetAsides,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        ...buildBusinessProfileInsert(bpInput),
       });
+      if (bpErr) console.error('[profile] business profile insert error:', bpErr.message);
     }
 
     // Auto-seed My Target List from the user's CHOSEN target agencies (add-only,
