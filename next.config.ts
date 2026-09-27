@@ -434,6 +434,11 @@ const nextConfig: NextConfig = {
         '/content-generator-product',   // the SALES page; /content-generator is the tool
         '/expiring-contracts',
         '/market-assassin',             // the SALES page; /federal-market-assassin is the tool
+        // Added 2026-09-27: their payment links (Ultimate Giant Bundle $1,497, Federal
+        // Contractor Database $497) were deactivated in Stripe the same day. The DB TOOL
+        // (/contractor-database) and its gate (/database-locked) stay live for buyers.
+        '/bundles/ultimate',
+        '/contractor-database-product', // the SALES page; /contractor-database is the tool
         // NOT '/market-assassin-locked' — it looks like a sales page but is the ACCESS GATE.
         // Verified 2026-07-28: proxy.ts redirects unentitled users there, the tool itself
         // router.replace()s there in 3 places, and /api/ma-access/[token] sends both its

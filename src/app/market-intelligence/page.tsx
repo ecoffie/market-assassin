@@ -412,20 +412,6 @@ function MarketIntelligenceContent() {
           </p>
         </div>
 
-        {/* Ultimate Bundle callout — keeps the existing copy
-            but moves it under the new pricing card. */}
-        <div className="mt-6 bg-(--mp-wash) border border-(--mp-line) rounded-lg p-4 text-center">
-          <p className="text-(--mp-muted) text-xs mb-1">Planning to go all-in?</p>
-          <p className="text-(--mp-ink) text-sm mb-2">
-            The <span className="text-(--mp-navy) font-medium">Ultimate Bundle ($1,497)</span> includes lifetime Mindy AI access.
-          </p>
-          <Link
-            href="/bundles/ultimate"
-            className="text-(--mp-navy) hover:text-(--mp-navy-hover) text-xs font-medium"
-          >
-            Compare with Ultimate →
-          </Link>
-        </div>
       </div>
 
       {/* Pro vs. Team vs. Enterprise tier-card section removed

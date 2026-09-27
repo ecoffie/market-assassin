@@ -298,15 +298,6 @@ export default function StartPage() {
                 <p className="text-slate-400 text-sm mb-3">
                   We&apos;ll send you a weekly digest with the best 5 opportunities matching your profile.
                 </p>
-                <Link
-                  href="https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y"
-                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
-                >
-                  Upgrade to Daily Alerts - $19/mo
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </Link>
               </div>
             </div>
           </div>

@@ -11,7 +11,7 @@ export default function UltimateBundlePage() {
       gradientTo="#ea580c"
       price={1497}
       originalPrice={3285}
-      checkoutUrl="https://buy.stripe.com/6oU3cwff897ceND84UfnO0t"
+      checkoutUrl="/pricing"
       badge="BEST VALUE - EVERYTHING INCLUDED"
       accessSummary="One-time payment. Lifetime access to every included tool, including Market Intelligence."
       accessBadgeLabel="Lifetime MI Included"
