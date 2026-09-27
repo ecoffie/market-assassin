@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac } from 'crypto';
+import { observeVerifyResult } from '@/lib/auth-observability';
 import {
   getMarketAssassinAccessResilient,
   hasBriefingsAccessResilient,
@@ -431,7 +432,25 @@ export interface VerifyOptions {
   requireStrongAuth?: boolean;
 }
 
+/**
+ * R0 observability wrapper (tasks/mindy-entitlement-audit-2026-09-26.md §14).
+ *
+ * Returns EXACTLY what verifyUserOwnsEmailCore returns — the same object, not a
+ * copy. It only records which method authenticated (fire-and-forget, after the
+ * response; see src/lib/auth-observability.ts). The core body below is pinned
+ * byte-for-byte to its pre-R0 text by auth-observability.unit.test.ts.
+ */
 export async function verifyUserOwnsEmail(
+  request: NextRequest,
+  claimedEmail: string,
+  options: VerifyOptions = {}
+): Promise<AuthResult> {
+  const result = await verifyUserOwnsEmailCore(request, claimedEmail, options);
+  observeVerifyResult(request, claimedEmail, result as AuthResult & Record<string, unknown>);
+  return result;
+}
+
+async function verifyUserOwnsEmailCore(
   request: NextRequest,
   claimedEmail: string,
   options: VerifyOptions = {}

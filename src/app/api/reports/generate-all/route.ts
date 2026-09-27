@@ -17,6 +17,7 @@ import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
 import { getMarketAssassinTier } from '@/lib/access-codes';
 import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 // Free reports available to all users (4 reports)
 const FREE_REPORT_KEYS = ['simplifiedAcquisition', 'budgetCheckup', 'governmentBuyers'];
@@ -126,6 +127,8 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting: email-based if available, stricter IP-based for unauthenticated
     const email = getEmailFromRequest(request, body);
+    // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+    observeProGateIdentity(request, email);
     if (email) {
       const rl = await checkReportRateLimit(email);
       if (!rl.allowed) return rateLimitResponse(rl);

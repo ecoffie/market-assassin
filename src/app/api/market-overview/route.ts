@@ -26,6 +26,7 @@ import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import primeDb from '@/data/prime-contractors-database.json';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 /** Distinct federal agencies BUYING this market (USASpending). Scopes on PSC ("what was bought")
  *  when a specific/dominant PSC is in hand — else the NAICS set. Best-effort — an external hiccup
@@ -350,6 +351,8 @@ export async function GET(request: NextRequest) {
   // coverageCandidates as if they were passed here — callers must not launder.
   const corroboratedCodes = parseCodes(sp.get('naics'));
   const email = (sp.get('email') || '').toLowerCase().trim();
+  // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+  observeProGateIdentity(request, email);
 
   if (!keyword && corroboratedCodes.length === 0) {
     return NextResponse.json(

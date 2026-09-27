@@ -24,6 +24,7 @@ import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { smallBizSharePct } from './share';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -229,6 +230,8 @@ export async function POST(request: NextRequest) {
   }
 
   const email = body.email || '';
+  // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+  observeProGateIdentity(request, email);
   const naics = body.naics || body.naicsCode || '';
   const businessType = body.businessType || '';
 

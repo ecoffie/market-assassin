@@ -64,6 +64,7 @@ import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 export const maxDuration = 120;
 import { dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -327,6 +328,8 @@ export async function POST(request: NextRequest) {
       refresh?: boolean;       // staff-only: bypass the 24h cache to force a fresh compute (verification)
     };
 
+    // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+    observeProGateIdentity(request, email);
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }

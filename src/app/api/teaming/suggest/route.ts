@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import contractorData from '@/data/contractors.json';
+import { observeProGateIdentity } from '@/lib/auth-observability';
 
 // Actual structure from contractors.json
 interface ContractorRaw {
@@ -30,6 +31,8 @@ interface ContractorRaw {
 }
 
 export async function GET(request: NextRequest) {
+  // R0 observability (behaviour-neutral): this route is unauthenticated today; record who calls it.
+  observeProGateIdentity(request, request.nextUrl.searchParams.get('email') || request.headers.get('x-user-email'));
   const naics = request.nextUrl.searchParams.get('naics');
   const setAside = request.nextUrl.searchParams.get('setAside');
   const agency = request.nextUrl.searchParams.get('agency');
