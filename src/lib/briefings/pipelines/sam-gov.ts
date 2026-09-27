@@ -94,6 +94,12 @@ interface SAMSearchParams {
   states?: string[]; // Multiple state codes for expanded search
   /** Saved NAICS market. PSC recall cannot escape this set. */
   savedNaics?: string[];
+  /**
+   * Keyword-scan path only: return EVERY preferred row (bounded by MAX_PREFER_SCAN_ROWS)
+   * instead of the first `limit` by deadline, so the caller can apply eligibility and
+   * ranking before its own final cut. Ignored on the no-keyword path.
+   */
+  keepAllPreferred?: boolean;
 }
 
 const DESCRIPTION_STOP_WORDS = new Set([
@@ -1006,6 +1012,14 @@ export async function fetchSamOpportunitiesFromCache(
     const rows: SAMCacheOpportunityRow[] = [];
     let scanTruncated = false;
     if (scanWholeMarket) {
+      // Pages are concatenated with notice_id DE-DUPLICATION. ⚠️ Limitation, stated
+      // precisely: the table is synced continuously, so a row whose deadline changes
+      // between two page reads can land in both pages (removed here) OR in neither
+      // (NOT recoverable here — a row that slid across a page boundary before its page
+      // was read is simply not seen this run). De-duplication fixes repeats only; a
+      // consistent snapshot would need a single read or a server-side cursor.
+      const seenIds = new Set<string>();
+      let lastPageFull = false;
       for (let from = 0; from < MAX_PREFER_SCAN_ROWS; from += PREFER_SCAN_PAGE) {
         const { data, error } = await applySamCacheFilters(
           supabase
@@ -1013,7 +1027,7 @@ export async function fetchSamOpportunitiesFromCache(
             .select(COLUMNS)
             .order('response_deadline', { ascending: true })
             .order('notice_id', { ascending: true }) // stable paging across equal deadlines
-            .range(from, from + PREFER_SCAN_PAGE - 1),
+            .range(from, Math.min(from + PREFER_SCAN_PAGE, MAX_PREFER_SCAN_ROWS) - 1),
           params
         );
         if (error) {
@@ -1021,9 +1035,29 @@ export async function fetchSamOpportunitiesFromCache(
           return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
         }
         const page = (data || []) as SAMCacheOpportunityRow[];
-        rows.push(...page);
-        if (page.length < PREFER_SCAN_PAGE) break;
-        if (from + PREFER_SCAN_PAGE >= MAX_PREFER_SCAN_ROWS) scanTruncated = true;
+        for (const r of page) {
+          if (seenIds.has(r.notice_id)) continue;
+          seenIds.add(r.notice_id);
+          rows.push(r);
+        }
+        lastPageFull = page.length === Math.min(PREFER_SCAN_PAGE, MAX_PREFER_SCAN_ROWS - from);
+        if (!lastPageFull) break;
+      }
+      // A full final page only means the market is AT LEAST the bound. Probe one row
+      // past it: exactly MAX_PREFER_SCAN_ROWS rows is a complete scan, not a truncated one
+      // (reporting it as truncated would tell the user "your market is larger" — false).
+      if (lastPageFull) {
+        const { data: beyond, error: beyondErr } = await applySamCacheFilters(
+          supabase
+            .from('sam_opportunities')
+            .select('notice_id')
+            .order('response_deadline', { ascending: true })
+            .order('notice_id', { ascending: true })
+            .range(MAX_PREFER_SCAN_ROWS, MAX_PREFER_SCAN_ROWS),
+          params
+        );
+        // Unknown is not "complete": if the probe fails, disclose possible truncation.
+        scanTruncated = beyondErr ? true : ((beyond || []) as unknown[]).length > 0;
       }
       if (scanTruncated) {
         console.warn(`[SAM Cache] market exceeds ${MAX_PREFER_SCAN_ROWS} rows — keyword preference examined the first ${rows.length} by deadline`);
@@ -1108,8 +1142,12 @@ export async function fetchSamOpportunitiesFromCache(
       console.log(`[SAM Cache] Contract D no distinctive hits in Open market — keeping ${industry.rows.length} NAICS/PSC rows`);
     }
 
+    // `keepAllPreferred`: the caller applies its own eligibility (newness, dedupe) and
+    // RANKING and makes the final cut itself. Slicing here by DEADLINE would drop a
+    // strong title match at row 201+ of the preferred set before it is ever ranked.
+    const keepAll = scanWholeMarket && params.keepAllPreferred === true;
     return {
-      opportunities: preferred.rows.slice(0, limit),
+      opportunities: keepAll ? preferred.rows : preferred.rows.slice(0, limit),
       totalRecords: preferred.rows.length,
       keywordMatchCount: preferred.distinctiveMatchCount,
       distinctiveMatchCount: preferred.distinctiveMatchCount,

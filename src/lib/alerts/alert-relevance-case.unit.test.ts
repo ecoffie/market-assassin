@@ -186,3 +186,22 @@ describe('what the ranking does NOT guarantee — the claims are boosts/demotion
     expect(renderStageLabel({ ...strongHeadsUp, evidence: sh.evidence })).toMatch(/^Heads-up only, nothing to submit/);
   });
 });
+
+describe('market-only label names the market that actually admitted the row', () => {
+  const row = { ...byTitle('FedRAMP Webex'), title: 'Webex licenses', description: '' } as SAMOpportunity;
+
+  it('a NAICS profile: "in your NAICS market"', () => {
+    const d = scoreOpportunityDetailed(row, CASE_PROFILE);
+    expect(d.evidence.naics).toBe('exact');
+    expect(renderMatchReason({ ...row, evidence: d.evidence })).toMatch(/No keyword match &mdash; in your NAICS market/);
+  });
+
+  it('a PSC-only profile (no NAICS): "in your PSC market" — never a NAICS claim', () => {
+    const PSC_ONLY = { ...CASE_PROFILE, naics_codes: [] as string[] };
+    const d = scoreOpportunityDetailed(row, PSC_ONLY);
+    expect(d.evidence.naics).toBeNull();
+    const reason = renderMatchReason({ ...row, evidence: d.evidence });
+    expect(reason).toMatch(/No keyword match &mdash; in your PSC market/);
+    expect(reason).not.toMatch(/NAICS/);
+  });
+});

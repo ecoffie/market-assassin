@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 type Row = Record<string, unknown>;
 let MARKET: Row[] = [];
 const calls = { range: 0, limit: 0 };
+/** Optional hook: runs before each range read (used to simulate a sync moving rows between pages). */
+let onRange: ((from: number) => void) | null = null;
 
 function fakeQuery() {
   let from = 0;
@@ -21,7 +23,7 @@ function fakeQuery() {
   const chain = () => q;
   for (const m of ['select', 'eq', 'or', 'gte', 'lte', 'order', 'in', 'like', 'ilike', 'is']) q[m] = chain;
   q.limit = (n: number) => { calls.limit++; to = n - 1; return q; };
-  q.range = (a: number, b: number) => { calls.range++; from = a; to = b; return q; };
+  q.range = (a: number, b: number) => { calls.range++; onRange?.(a); from = a; to = b; return q; };
   q.then = (resolve: (v: unknown) => void) => resolve({ data: MARKET.slice(from, to + 1), error: null });
   return q;
 }
@@ -140,5 +142,86 @@ describe('truncated scan → the alert DISCLOSES incomplete coverage (fetch → 
     const src = readFileSync('src/app/api/cron/daily-alerts/route.ts', 'utf8');
     expect(src).toMatch(/keywordScan = \{ scanTruncated: cacheResult\.scanTruncated, marketRowsScanned: cacheResult\.marketRowsScanned \}/);
     expect(src).toMatch(/openMarketNote\(openKeywordOutcome \?\? 'no_keywords_configured', keywordScan\)/);
+  });
+});
+
+describe('scan-bound edges (exactly vs more than MAX_PREFER_SCAN_ROWS)', () => {
+  it('exactly 4,000 rows is a COMPLETE scan — not reported as truncated', async () => {
+    MARKET = market(MAX_PREFER_SCAN_ROWS, [3990]);
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+    });
+    expect(r.marketRowsScanned).toBe(MAX_PREFER_SCAN_ROWS);
+    expect(r.scanTruncated).toBe(false);
+    expect(r.opportunities.map((o) => o.noticeId)).toEqual(['n03990']);
+  });
+
+  it('4,001 rows IS truncated (one row past the bound exists)', async () => {
+    MARKET = market(MAX_PREFER_SCAN_ROWS + 1, []);
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+    });
+    expect(r.marketRowsScanned).toBe(MAX_PREFER_SCAN_ROWS);
+    expect(r.scanTruncated).toBe(true);
+  });
+});
+
+describe('keepAllPreferred — the final cut happens after the caller ranks, not by deadline here', () => {
+  // 260 keyword matches; the ONLY title match is the 250th by deadline (past the old 200 cut).
+  function bigHitMarket(): Row[] {
+    return Array.from({ length: 600 }, (_, i) => ({
+      notice_id: `m${String(i).padStart(5, '0')}`,
+      title: i === 499 ? 'Artificial Intelligence Governance Support' : `IT support ${i}`,
+      description: i < 520 && i % 2 === 1 ? 'tasks include artificial intelligence pilots' : '',
+      naics_code: '541511', notice_type: 'Solicitation',
+      response_deadline: future(1 + i / 10), posted_date: future(-5), active: true,
+    }));
+  }
+
+  it('without it, the preferred set is cut to `limit` by deadline — the title match is lost', async () => {
+    MARKET = bigHitMarket();
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+    });
+    expect(r.distinctiveMatchCount).toBe(260);
+    expect(r.opportunities).toHaveLength(200);
+    expect(r.opportunities.some((o) => o.noticeId === 'm00499')).toBe(false);
+  });
+
+  it('with it, every preferred row is returned so ranking can find the title match', async () => {
+    MARKET = bigHitMarket();
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, keepAllPreferred: true,
+    });
+    expect(r.opportunities).toHaveLength(260);
+    expect(r.opportunities.some((o) => o.noticeId === 'm00499')).toBe(true);
+  });
+});
+
+describe('paging over a live table: de-duplication fixes REPEATS only', () => {
+  it('a row that moves into the next page between reads is returned once, not twice', async () => {
+    MARKET = market(1500, [1200]);
+    const moved = { ...MARKET[999] };
+    onRange = (from) => { if (from === 1000) MARKET.splice(1000, 0, moved); }; // sync re-sorts it into page 2
+    try {
+      const r = await fetchSamOpportunitiesFromCache({
+        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, keepAllPreferred: true,
+      });
+      expect(r.marketRowsScanned).toBe(1500); // 1,501 rows read, the repeat removed
+    } finally { onRange = null; }
+  });
+
+  it('LIMITATION (documented, not solved): a row that moves backward across a page boundary is skipped', async () => {
+    MARKET = market(1500, [1000]);
+    // Before page 2 is read, the AI row (index 1000) moves to index 10 — into page 1, already read.
+    onRange = (from) => { if (from === 1000) { const [row] = MARKET.splice(1000, 1); MARKET.splice(10, 0, row); } };
+    try {
+      const r = await fetchSamOpportunitiesFromCache({
+        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, keepAllPreferred: true,
+      });
+      // Not seen in either read. De-duplication cannot recover it; this test pins that the
+      // limitation is REAL so no one reads the de-dup as a consistency guarantee.
+      expect(r.opportunities.some((o) => o.noticeId === 'n01000')).toBe(false);
+    } finally { onRange = null; }
   });
 });

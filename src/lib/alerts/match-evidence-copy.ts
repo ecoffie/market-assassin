@@ -31,7 +31,12 @@ export function renderMatchReason(opp: WithEvidence): string {
   } else if (e.keywords.body.length > 0) {
     bits.push(`Keyword ${e.keywords.body.slice(0, 2).map(quote).join(', ')} in description`);
   } else {
-    bits.push('No keyword match &mdash; in your NAICS market');
+    // Say which saved market admitted the row. A row with no NAICS match was admitted
+    // by a saved PSC code (the saved-industry filter drops off-NAICS rows whenever the
+    // profile HAS NAICS), so "in your NAICS market" would be false for a PSC-only profile.
+    bits.push(e.naics
+      ? 'No keyword match &mdash; in your NAICS market'
+      : 'No keyword match &mdash; in your PSC market');
   }
   if (naicsBit) bits.push(naicsBit);
   return bits.join(' &middot; ');

@@ -566,7 +566,7 @@ export async function POST(request: NextRequest) {
         .eq('user_email', userEmail)
         .maybeSingle();
       const existing = Array.isArray(cur?.keywords)
-        ? cur!.keywords.map((k: unknown) => String(k).toLowerCase().trim()).filter(Boolean)
+        ? cur!.keywords.map((k: unknown) => String(k).trim()).filter(Boolean) // kept as saved — never re-cased
         : [];
       // The documented exception to "reject, never truncate": derived terms are not
       // user input, so they fill only the room left under the shared limit

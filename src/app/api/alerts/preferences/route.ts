@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
+import { KEYWORD_MAX_COUNT, validateKeywordSave } from '@/lib/keywords/sanitize';
 import { createClient } from '@supabase/supabase-js';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -321,30 +321,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (keywords !== undefined) {
-      // Normalize on write (was storing the raw client array): trim, drop empties,
-      // drop bare NAICS numbers (the #239 pollution class — a code typed into the
-      // keyword box), and CASE-INSENSITIVE dedupe. This is the path that had let
-      // mixed-case duplicates ("ERP","ERP"...) accumulate across re-saves.
-      //
-      // Over the limit is REJECTED with nothing written. This used to be a
-      // silent .slice(0, 40): a 53-keyword save returned success and kept the
-      // first 40 (2026-09-24). Returning here, before any upsert, leaves the
-      // previously saved settings untouched.
-      const seen = new Set<string>();
-      const cleaned = (Array.isArray(keywords) ? keywords : [])
-        .map((k: unknown) => String(k).trim())
-        .filter((k: string) => k.length > 0 && !/^\d{2,6}$/.test(k))
-        .filter((k: string) => { const lc = k.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; });
-      if (cleaned.length > KEYWORD_MAX_COUNT) {
+      // ONE normalizer for every keyword writer (validateKeywordSave): split real
+      // separators, trim, case-insensitive dedupe keeping the first spelling. An
+      // unusable entry (over-long blob, bare NAICS code) or more than
+      // KEYWORD_MAX_COUNT keywords REJECTS the save before any write, so the
+      // previously saved settings stay untouched. This used to be a silent
+      // .slice(0, 40) (2026-09-24: 53 saved as 40) and did not split pastes, so a
+      // comma blob counted as ONE keyword here and many on the onboarding path.
+      const checked = validateKeywordSave(keywords);
+      if (!checked.ok) {
         return NextResponse.json({
           success: false,
-          error: keywordLimitError(cleaned.length),
-          code: 'keyword_limit',
-          submitted: cleaned.length,
+          error: checked.error,
+          code: checked.code,
+          submitted: checked.submitted,
           max: KEYWORD_MAX_COUNT,
         }, { status: 400 });
       }
-      record.keywords = cleaned;
+      record.keywords = checked.keywords;
     }
 
     // NAICS or keywords changed → the capability vector (hidden-match base-wide

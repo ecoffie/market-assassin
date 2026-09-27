@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
-import { sanitizeKeywords, KEYWORD_MAX_COUNT, keywordLimitError } from '@/lib/keywords/sanitize';
+import { normalizeKeywordInput, KEYWORD_MAX_COUNT, keywordAddLimitError, keywordUnusableError } from '@/lib/keywords/sanitize';
 
 /**
  * POST /api/app/keywords/add  { email, keywords: string[] }
@@ -31,16 +31,15 @@ export async function POST(request: NextRequest) {
     const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
     const rowEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
-    // Split paste-blobs and drop over-long entries BEFORE they reach the DB.
-    // This route previously validated only the array (dedupe + cap 40) and
-    // never an individual string, so a 1,604-char paste stored as one keyword
-    // and silently degraded that user's matching. See lib/keywords/sanitize.
-    const { keywords: clean, dropped } = sanitizeKeywords(incoming, { max: Number.POSITIVE_INFINITY });
-    if (dropped.length) {
-      console.warn(`[keywords/add] dropped ${dropped.length} unsplittable blob(s) for ${email}: ${dropped.map((d) => `${d.slice(0, 40)}…`).join(' | ')}`);
+    // The shared normalizer — the SAME rules as Settings and onboarding. An unusable
+    // entry (over-long blob, bare NAICS code) rejects the add with nothing written;
+    // it used to be dropped with only a server log.
+    const { keywords: clean, unusable } = normalizeKeywordInput(incoming);
+    if (unusable.length > 0) {
+      return NextResponse.json({ error: keywordUnusableError(unusable), code: 'keyword_unusable' }, { status: 400 });
     }
     if (clean.length === 0) {
-      return NextResponse.json({ success: true, added: 0, dropped: dropped.length, note: 'no usable keywords' });
+      return NextResponse.json({ success: true, added: 0, note: 'no keywords supplied' });
     }
 
     const supabase = createClient(
@@ -49,21 +48,33 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const { data: cur } = await supabase
+    const { data: cur, error: curErr } = await supabase
       .from('user_notification_settings')
       .select('keywords')
       .eq('user_email', rowEmail)
       .maybeSingle();
+    if (curErr) {
+      return NextResponse.json({ error: curErr.message }, { status: 500 });
+    }
 
-    // Sanitize the EXISTING array too: a row written before this guard can
-    // already hold a blob, and a plain merge would carry it forward forever.
-    // `max: Infinity` here: an existing row is never trimmed on read — trimming it
-    // would silently delete keywords the user already saved.
-    const { keywords: existing } = sanitizeKeywords(cur?.keywords, { max: Number.POSITIVE_INFINITY });
-    const merged = Array.from(new Set([...existing, ...clean]));
-    if (merged.length > KEYWORD_MAX_COUNT && merged.length > existing.length) {
+    // The saved list is kept EXACTLY as stored — never re-normalized, trimmed or
+    // re-cased on read (that would silently change or delete keywords the user already
+    // saved). New keywords are de-duplicated against it case-insensitively.
+    const existing: string[] = Array.isArray(cur?.keywords)
+      ? (cur!.keywords as unknown[]).map((k) => String(k)).filter((k) => k.trim().length > 0)
+      : [];
+    const have = new Set(existing.map((k) => k.trim().toLowerCase()));
+    const fresh = clean.filter((k) => !have.has(k.toLowerCase()));
+    const merged = [...existing, ...fresh];
+    if (fresh.length > 0 && merged.length > KEYWORD_MAX_COUNT) {
       return NextResponse.json(
-        { error: keywordLimitError(merged.length), code: 'keyword_limit', submitted: merged.length, max: KEYWORD_MAX_COUNT },
+        {
+          error: keywordAddLimitError(existing.length, fresh.length),
+          code: 'keyword_limit',
+          saved: existing.length,
+          adding: fresh.length,
+          max: KEYWORD_MAX_COUNT,
+        },
         { status: 400 },
       );
     }
