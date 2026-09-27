@@ -730,6 +730,9 @@ export default function OnboardingPage() {
           targetAgencies: (autoProfile.agencies || []).map((a: { name: string }) => a.name),
           locationStates: autoProfile.states || [],
           alertFrequency: 'weekdays',
+          // Onboarding completion is the one save that INTENDS to turn alerts on —
+          // say so explicitly; the profile route no longer enables them implicitly.
+          alertsEnabled: true,
           onboardingComplete: true,
         }),
       });
@@ -1026,6 +1029,8 @@ export default function OnboardingPage() {
           targetAgencies: allAgencies,
           locationStates: selectedStates,
           alertFrequency: frequency,
+          // Explicit: onboarding completion enables alerts unless the user chose Paused.
+          alertsEnabled: frequency !== 'paused',
           onboardingComplete: true,
         }),
       });
