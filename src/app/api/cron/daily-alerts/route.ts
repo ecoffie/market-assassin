@@ -899,8 +899,12 @@ async function runDailyAlertJob(options?: {
         // Sort on the UNCLAMPED rank: the 0–100 display score tied 6 of 7 notices
         // at 100 on a real alert, leaving the order to the deadline. Evidence rides
         // along so the email shows why each notice is here instead of recomputing it.
+        const userPscForLabel = (user.psc_codes || []).filter(Boolean);
         const scoreProfile = {
           naics_codes: userNaics, // Original codes, not expanded
+          // The PSCs the market query used (user's own, else derived) — only to label
+          // which market admitted a row.
+          psc_codes: userPscForLabel.length > 0 ? userPscForLabel : uniquePSCs,
           agencies: user.agencies || [],
           keywords: userKeywords,
           business_description: user.business_description || null,

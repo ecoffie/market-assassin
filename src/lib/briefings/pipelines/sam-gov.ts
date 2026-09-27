@@ -16,6 +16,7 @@ import {
   keywordIncludeTerms,
   preferDistinctiveInOpenMarket,
   keywordEvidence,
+  naicsInSavedMarket,
   scoreKeywordEvidence,
   hasKeywordSupport,
   type KeywordEvidence,
@@ -633,6 +634,8 @@ function isVAOpportunity(opportunity: SAMOpportunity): boolean {
 
 export interface OpportunityScoreProfile {
   naics_codes: string[];
+  /** The PSC codes the market query OR'd in (user's own, else derived). Used only to say which market admitted a row. */
+  psc_codes?: string[];
   agencies: string[];
   keywords: string[];
   business_description?: string | null;
@@ -648,6 +651,14 @@ export interface OpportunityMatchEvidence {
   agencies: string[];
   /** 'keyword' = at least one distinctive keyword found; 'market_only' = NAICS/PSC market with no keyword support. */
   basis: 'keyword' | 'market_only';
+  /**
+   * Which saved market admits this row, by the SAME rule the market filter uses
+   * (naicsInSavedMarket: curated codes exact, others their 4-digit group; PSC by prefix).
+   * null = neither — e.g. a fixture row — so no market may be claimed for it.
+   * (`naics` above is a SCORING signal — exact/prefix only — and must not be used for this:
+   * a 541519 row admitted through a saved 541511's 5415 group has naics === null.)
+   */
+  market: 'naics' | 'psc' | null;
   stage: { label: string | null; respondability: Respondability };
 }
 
@@ -751,6 +762,11 @@ export function scoreOpportunityDetailed(
       keywords: kw,
       agencies,
       basis: hasKeywordSupport(kw) ? 'keyword' : 'market_only',
+      market: naicsInSavedMarket(opportunity.naicsCode, userProfile.naics_codes)
+        ? 'naics'
+        : (userProfile.psc_codes || []).some((p) => p && (opportunity.classificationCode || '').toUpperCase().startsWith(p.toUpperCase()))
+          ? 'psc'
+          : null,
       stage: { label: stage.label, respondability: stage.respondability },
     },
   };
