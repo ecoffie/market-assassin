@@ -16,6 +16,7 @@ import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInpu
 import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
 import { suggestedCodesToReview } from '@/lib/alerts/coming-back-to-market';
 import type { NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
+import { explicitBusinessTypeField } from '@/lib/alerts/save-profile-patch';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -725,7 +726,9 @@ export default function OnboardingPage() {
           // keywords the Vault prefill derived from the company's identity (the
           // describe-business path already carries them on autoProfile.keywords).
           keywords: (ueiKeywords.length ? ueiKeywords : autoProfile.keywords) || [],
-          businessType: autoProfile.setAsides?.[0] || 'Small Business',
+          // Only a set-aside shown on the confirm screen — never a 'Small Business'
+          // default, which overwrote a stored certification on re-onboarding.
+          ...explicitBusinessTypeField(autoProfile.setAsides?.[0]),
           setAsides: autoProfile.setAsides || [],
           targetAgencies: (autoProfile.agencies || []).map((a: { name: string }) => a.name),
           locationStates: autoProfile.states || [],
@@ -1024,7 +1027,8 @@ export default function OnboardingPage() {
           businessDescription: businessDescription.trim() || null,
           naicsCodes: allNaicsCodes,
           naicsPriorities,
-          businessType: selectedSetAsides[0] || null,
+          // No selection = leave stored business_type alone (null would CLEAR it).
+          ...explicitBusinessTypeField(selectedSetAsides[0]),
           setAsides: selectedSetAsides,
           targetAgencies: allAgencies,
           locationStates: selectedStates,

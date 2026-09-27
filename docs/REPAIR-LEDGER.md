@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-27 — save-profile: only an explicitly selected business type overwrites
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-27 | save-profile alert targeting (business_type, agencies, locations, NAICS) | **Three callers sent a defaulted Small Business into POST /api/alerts/save-profile, which upserted the whole targeting row** (business_type, agencies, location fields, NAICS). Opportunity Hunter sent businessFormation or Small Business on the email gate and every later search (unauthenticated free source; 74 of 80 OH emails already had a row; 58 of 80 now have empty agencies). generate-all forwarded the report default business type, the report agency scope and zip (latent: 366 attempts, 0 completed, server-to-server call carries no auth). Onboarding sent the first set-aside or Small Business (auto) and first set-aside or null, a clear (manual). /briefings and /market-intelligence sent an empty NAICS list, wiping stored NAICS. Invariant: a partial update changes only explicitly submitted fields. **Fix:** buildSaveProfileTargetingPatch writes a field on an existing row only for a non-blank string or non-empty array, and existing rows are UPDATEd not upserted; new rows keep defaults. Clients spread explicitBusinessTypeField (never a default); generate-all forwards only NAICS and PSC via buildReportAlertProfileBody. Set-aside eligibility unchanged. | `export function buildSaveProfileTargetingPatch(` → `src/lib/alerts/save-profile-patch.ts` | `business-type-explicit-only.unit.test.ts` on the real POST handler + in-memory table: 8/14 red on origin/main call sites, 14/14 green; tsc clean; 26 related files / 260 tests green | 🟡 PR open |
+
 ## 2026-09-26 — P1-A set-aside truth: absent ≠ unrestricted
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
