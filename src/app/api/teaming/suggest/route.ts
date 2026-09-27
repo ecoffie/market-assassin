@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import contractorData from '@/data/contractors.json';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 
 // Actual structure from contractors.json
 interface ContractorRaw {
@@ -37,7 +38,14 @@ export async function GET(request: NextRequest) {
   const setAside = request.nextUrl.searchParams.get('setAside');
   const agency = request.nextUrl.searchParams.get('agency');
   const state = request.nextUrl.searchParams.get('state');
-  const limit = parseInt(request.nextUrl.searchParams.get('limit') || '10');
+  // R1: this returns Contractor-DB SBLO names, emails and phones, so it requires a
+  // verified identity (it was unauthenticated) and the page size is capped (it was not).
+  const identity = await verifyClaimedIdentity(
+    request,
+    request.nextUrl.searchParams.get('email') || request.headers.get('x-user-email'),
+  );
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
+  const limit = Math.min(Math.max(parseInt(request.nextUrl.searchParams.get('limit') || '10') || 10, 1), 50);
 
   if (!naics) {
     return NextResponse.json(

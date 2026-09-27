@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac } from 'crypto';
 import { observeVerifyResult } from '@/lib/auth-observability';
@@ -504,9 +504,14 @@ async function verifyUserOwnsEmailCore(
     }
   }
 
-  // Methods 3 & 4 below are WEAK (a spoofable plaintext cookie; a token-less
-  // staff-email claim). Strong-auth callers (the vault) stop here — for the
-  // most sensitive PII, only a real session/token/2FA is acceptable.
+  // R1 (tasks/mindy-entitlement-audit-2026-09-26.md §12 E1, locked ruling):
+  // the two former WEAK methods are REMOVED from authorization —
+  //   Method 3: a plaintext `ma_access_email` cookie equal to the claimed email
+  //             (user-settable: anyone can set a cookie to anyone's address), and
+  //   Method 4: any claimed staff-domain email, with no proof at all.
+  // Only a Supabase session, a signed email-action link or the Mindy MI session
+  // identify a user. `requireStrongAuth` is therefore the default for every caller;
+  // the option is kept so existing call sites compile unchanged.
   if (options.requireStrongAuth) {
     return {
       authenticated: false,
@@ -515,20 +520,85 @@ async function verifyUserOwnsEmailCore(
     };
   }
 
-  // Method 3: Check cookie (legacy, weak auth)
-  const cookieEmail = request.cookies.get('ma_access_email')?.value?.toLowerCase();
-  if (cookieEmail && cookieEmail === normalized) {
-    return { authenticated: true, email: normalized, method: 'cookie' };
-  }
-
-  // Method 4: Trust internal staff members (no cookie required)
-  // Staff members are trusted if the claimed email matches a known staff email
-  const staffRole = getStaffRole(normalized);
-  if (staffRole !== 'none') {
-    return { authenticated: true, email: normalized, method: 'cookie' };
-  }
-
   return { authenticated: false, email: null, error: 'Unauthorized - please sign in' };
+}
+
+/**
+ * R1 — the identity a request can PROVE, independent of any email it claims.
+ *
+ * Accepts only the strong methods (tasks/mindy-entitlement-audit-2026-09-26.md §13):
+ *   - the Mindy MI session token (x-mi-auth-token / x-mi-2fa-token / MI Bearer)
+ *   - a Supabase session (Authorization: Bearer <jwt>)
+ *   - a signed email-action link (?token=&ts=) — only for the claimed email it signs
+ * Never a cookie, never a claimed staff address, never a body/query email on its own.
+ */
+export interface VerifiedIdentity {
+  email: string;
+  method: 'session' | 'token';
+}
+
+export async function getVerifiedIdentity(
+  request: NextRequest,
+  claimedEmail?: string | null
+): Promise<VerifiedIdentity | null> {
+  try {
+    const { getTwoFactorTokenFromRequest, verifyTwoFactorSessionToken } = await import('@/lib/two-factor-session');
+    const miToken = getTwoFactorTokenFromRequest(request);
+    if (miToken) {
+      const r = verifyTwoFactorSessionToken(miToken);
+      if (r.valid && r.email) return { email: r.email.toLowerCase(), method: 'session' };
+    }
+  } catch {
+    // fall through
+  }
+
+  const auth = request.headers.get('authorization');
+  if (auth?.startsWith('Bearer ')) {
+    const session = await verifyUserSession(request);
+    if (session.authenticated && session.email) return { email: session.email, method: 'session' };
+  }
+
+  const claimed = claimedEmail?.toLowerCase().trim();
+  const token = request.nextUrl.searchParams.get('token');
+  const ts = request.nextUrl.searchParams.get('ts');
+  if (claimed && token && ts) {
+    const link = verifyEmailToken(claimed, token, ts);
+    if (link.authenticated && link.email) return { email: link.email, method: 'token' };
+  }
+  return null;
+}
+
+/**
+ * R1 — reconcile a claimed email with the proven identity.
+ *   verified   : the request proved an identity and the claim (if any) matches it.
+ *                Use `email` — the VERIFIED address — for every downstream read/write.
+ *   anonymous  : no proven identity. Callers answer 401, or serve the Free result.
+ *   mismatch   : proven identity for a DIFFERENT address than claimed. Always 401.
+ */
+export type ClaimedIdentity =
+  | { status: 'verified'; email: string; method: VerifiedIdentity['method'] }
+  | { status: 'anonymous' }
+  | { status: 'mismatch'; verifiedEmail: string };
+
+export async function verifyClaimedIdentity(
+  request: NextRequest,
+  claimedEmail?: string | null
+): Promise<ClaimedIdentity> {
+  const claimed = claimedEmail?.toLowerCase().trim() || null;
+  const identity = await getVerifiedIdentity(request, claimed);
+  if (!identity) return { status: 'anonymous' };
+  if (claimed && claimed !== identity.email) return { status: 'mismatch', verifiedEmail: identity.email };
+  return { status: 'verified', email: identity.email, method: identity.method };
+}
+
+/** R1: the standard 401 for an anonymous or mismatched identity on a gated route. */
+export function identityFailureResponse(identity: Exclude<ClaimedIdentity, { status: 'verified' }>) {
+  return NextResponse.json(
+    identity.status === 'mismatch'
+      ? { error: 'Email mismatch with session', auth_required: true }
+      : { error: 'Sign in required', auth_required: true },
+    { status: 401 }
+  );
 }
 
 /**

@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface Tile {
   key: string;
@@ -67,7 +68,7 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
     if (naics) qs.set('naics', naics);
     if (state) qs.set('state', state);
     if (email) qs.set('email', email);
-    fetch(`/api/market-overview?${qs.toString()}`)
+    fetch(`/api/market-overview?${qs.toString()}`, { headers: getMIApiHeaders(email) })
       .then((r) => r.json())
       .then((d) => { if (!cancelled) { if (d?.success) setData(d); else setError(true); setLoading(false); } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });

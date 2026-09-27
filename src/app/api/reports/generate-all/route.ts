@@ -12,10 +12,9 @@ import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget
 import { MICRO_PURCHASE_THRESHOLD, SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 import { fetchPricingIntel } from '@/lib/utils/calc-rates';
 import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
-import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
+import { getEmailFromRequest, verifyMIAccess, verifyClaimedIdentity, identityFailureResponse, type MIAccessTier } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
-import { getMarketAssassinTier } from '@/lib/access-codes';
 import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 
@@ -126,9 +125,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting: email-based if available, stricter IP-based for unauthenticated
-    const email = getEmailFromRequest(request, body);
-    // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
-    observeProGateIdentity(request, email);
+    const claimedEmail = getEmailFromRequest(request, body);
+    // R0 observability: records whether this claimed email carried a verified identity.
+    observeProGateIdentity(request, claimedEmail);
+
+    // R1: the identity is the VERIFIED session, never the ma_access_email cookie or the
+    // body's userEmail on their own. A claim that contradicts the session is refused; an
+    // anonymous caller gets the Free report set (and the anonymous rate limit).
+    const identity = await verifyClaimedIdentity(request, (body?.userEmail as string | undefined) || null);
+    if (identity.status === 'mismatch') return identityFailureResponse(identity);
+    const email = identity.status === 'verified' ? identity.email : null;
+
     if (email) {
       const rl = await checkReportRateLimit(email);
       if (!rl.allowed) return rateLimitResponse(rl);
@@ -139,17 +146,18 @@ export async function POST(request: NextRequest) {
       if (!rl.allowed) return rateLimitResponse(rl);
     }
 
-    // Server-side access verification - MI tiers (free/pro/none)
-    const auth = await verifyMIAccess(email);
+    // Server-side access verification - MI tiers (free/pro/none).
+    // Anonymous (no verified identity) = the Free set; it never reads a paid entitlement.
+    const auth = identity.status === 'verified'
+      ? await verifyMIAccess(identity.email)
+      : { tier: 'free' as MIAccessTier, email: null, error: undefined };
     if (auth.tier === 'none') {
       console.log('[generate-all] Access denied:', { email, authError: auth.error });
       return NextResponse.json(
         {
           success: false,
           error: auth.error || 'Email required for access',
-          hint: !email
-            ? 'Please sign in to generate reports'
-            : 'Your session may have expired. Please sign in again.',
+          hint: 'Your session may have expired. Please sign in again.',
         },
         { status: 403 }
       );
@@ -980,16 +988,10 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Save alert profile for ALL MA users (non-blocking)
-    // This updates their alert preferences with the NAICS/PSC codes they actually use
-    if (email) {
-      const userTier = await getMarketAssassinTier(email);
-      if (userTier) {
-        saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
-          console.error('[Alerts] Failed to save profile:', err);
-        });
-      }
-    }
+    // R1: the post-report call to /api/alerts/save-profile was REMOVED. It was a
+    // server-to-server fetch carrying only an email, so it authenticated solely through
+    // the removed staff-claim method (every customer call 401'd silently), and it would
+    // REPLACE the user's alert NAICS. Re-adding it needs a signed call and a product ruling.
 
     // Filter reports based on access tier
     // Free tier only gets: governmentBuyers, budgetCheckup, simplifiedAcquisition
@@ -1055,53 +1057,5 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  }
-}
-
-/**
- * Save alert profile for MA Premium users
- * Called after report generation to enable weekly alerts
- *
- * Supports:
- * - NAICS code input (single or comma-separated prefixes like "236, 238")
- * - PSC code input (will be expanded to related NAICS codes)
- */
-async function saveAlertProfile(
-  email: string,
-  inputs: CoreInputs,
-  selectedAgencies: string[]
-): Promise<void> {
-  try {
-    // Build NAICS codes array - handle comma-separated input
-    const naicsCodes: string[] = [];
-    if (inputs.naicsCode) {
-      // Support comma-separated NAICS codes/prefixes (e.g., "236, 238320, 541")
-      const codes = inputs.naicsCode.split(/[,;\s]+/).map(c => c.trim()).filter(c => c);
-      naicsCodes.push(...codes);
-    }
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai'}/api/alerts/save-profile`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          naicsCodes,
-          pscCode: inputs.pscCode || null, // PSC code will be expanded to related NAICS
-          businessType: inputs.businessType || null,
-          targetAgencies: selectedAgencies.slice(0, 10), // Top 10 agencies
-          locationZip: inputs.zipCode || null,
-        }),
-      }
-    );
-
-    if (response.ok) {
-      const result = await response.json();
-      console.log(`[Alerts] Saved alert profile for ${email}: ${result.data?.naicsCount || 0} NAICS codes`);
-    }
-  } catch (error) {
-    // Non-blocking, just log
-    console.error('[Alerts] Error saving profile:', error);
   }
 }

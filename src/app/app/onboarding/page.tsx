@@ -554,7 +554,7 @@ export default function OnboardingPage() {
       const companyNaics = (profile?.naics || []).filter((c: string) => /^\d{2,6}$/.test(c));
       if (companyNaics.length) qs.set('naics', companyNaics.join(','));
       if (email) qs.set('email', email);
-      const r = await fetch(`/api/market-overview?${qs.toString()}`);
+      const r = await fetch(`/api/market-overview?${qs.toString()}`, { headers: getMIApiHeaders(email) });
       const j = await r.json();
       if (j?.success) setOverview(j);
     } catch { /* reveal degrades gracefully */ }
