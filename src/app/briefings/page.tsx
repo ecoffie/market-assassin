@@ -15,6 +15,7 @@ import ShareButton from '@/components/briefings/ShareButton';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import GettingStartedPanel from '@/components/app/panels/GettingStartedPanel';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { sendAppEngagement } from '@/components/app/track';
 import PipelineBoard from '@/components/bd-assist/PipelineBoard';
 import ContactsPanel from '@/components/bd-assist/ContactsPanel';
 import { persistAccessEmail, reconcileAccessEmail, clearAccessEmail } from '@/lib/access-cookie';
@@ -666,29 +667,13 @@ function BriefingsDashboardContent() {
     metadata: Record<string, unknown> = {},
     eventSource = 'market_intelligence'
   ) => {
-    const trackedEmail = email || inputEmail;
-    if (!trackedEmail || !trackedEmail.includes('@')) return;
-
-    const payload = JSON.stringify({
-      email: trackedEmail.toLowerCase().trim(),
-      eventType,
-      eventSource,
-      metadata,
-    });
-
-    if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
-      const blob = new Blob([payload], { type: 'application/json' });
-      navigator.sendBeacon('/api/app/engagement', blob);
-      return;
-    }
-
-    fetch('/api/app/engagement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: true,
-    }).catch(() => {});
-  }, [email, inputEmail]);
+    // Only the SIGNED-IN email — never the unverified inputEmail box. The server derives
+    // identity from the MI token and 401s a claim the token does not cover; and passing a
+    // different email to getMIApiHeaders would purge the real token as "stale".
+    // Authenticated keepalive fetch, never sendBeacon (no auth header) — see track.ts.
+    if (!email || !email.includes('@')) return;
+    sendAppEngagement(email.toLowerCase().trim(), { eventType, eventSource, metadata }, '/api/app/engagement');
+  }, [email]);
 
   const flushPanelTime = useCallback((reason: string, panelOverride?: MIPanel) => {
     const panel = panelOverride || lastTrackedPanelRef.current;

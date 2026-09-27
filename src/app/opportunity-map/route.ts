@@ -10224,15 +10224,20 @@ const ASK_MINDY_JS = `<script>(function(){
 // per opp per page) + card CLICK through the EXISTING engagement pipe (/api/app/engagement →
 // user_engagement). This is the prerequisite for the future A/B of hero treatments + "which opps
 // get clicked" ranking — nothing about the card renders differently; it just measures.
-//   • SIGNED-IN ONLY: /api/app/engagement verifies the email (verifyUserOwnsEmail), so a logged-out
-//     browser would 400. Their behavior isn't attributable anyway — we skip cleanly (no email → no
-//     beacon). Uses the same mi_beta_auth_token identity every other authed map fetch uses.
-//   • FIRE-AND-FORGET: sendBeacon (survives the navigation the click triggers), never throws, never
-//     blocks the drawer open. A tracking failure must never touch the user's flow.
+//   • IDENTITY: signed-in = a live mi_beta_auth_token (sent as x-mi-auth-token; the endpoint
+//     requires it since #1232); otherwise the anonymous anon:<uuid> id.
+//   • FIRE-AND-FORGET: keepalive fetch when signed in (survives navigation AND carries the auth
+//     header); sendBeacon only for anonymous events. Never throws, never blocks the drawer open.
 //   • eventType is a VALID catalog type (link_click / tool_use); metadata carries {kind, opp, variant,
 //     est, src} so the analysis can split click vs impression + the hero variant (estimate_only for v1).
 const CARD_TRACK_JS = `<script>(function(){
-  function em(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){} return ''; }
+  // SIGNED-IN identity = a LIVE MI token and the email it carries — nothing else. The
+  // endpoint 401s a real email without the token (#1232), so the old briefings_access_email
+  // fallback and an EXPIRED token could only ever produce a rejected request. Both now fall
+  // through to the anonymous id instead (mirrors _track).
+  function tok(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; if(!t) return '';
+    if(typeof window.__tokenExpired==='function'&&window.__tokenExpired(t)) return ''; return t; }catch(e){ return ''; } }
+  function em(t){ try{ if(!t) return ''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} return ''; }
   var seen={}; // opp id -> 1, so an impression fires at most ONCE per opp per page load
   window.__trackCard=function(kind,sol,o){
     try{
@@ -10241,7 +10246,7 @@ const CARD_TRACK_JS = `<script>(function(){
       // arriving on Demo Day, almost none of whom are signed in on first touch. Falls back to the
       // SAME anon id the main tracker uses (via the window bridge — this is a separate <script>
       // IIFE and cannot see that closure).
-      var e=em(); var _anonC=false;
+      var tk=tok(); var e=em(tk); var _anonC=false; if(!e) tk='';
       if(!e){ try{ e=(typeof window.__anonId==='function')?window.__anonId():''; }catch(_x){ e=''; } _anonC=!!e; }
       if(!e||!sol) return;                              // still no id → skip
       if(kind==='impression'){ if(seen[sol]) return; seen[sol]=1; }
@@ -10284,8 +10289,16 @@ const CARD_TRACK_JS = `<script>(function(){
       var payload=JSON.stringify({ email:e,
         eventType:(kind==='cta_click'||kind==='click'?'link_click':'tool_use'),
         eventSource:'source_feed', metadata:meta });
+      // TRANSPORT. Signed-in: keepalive fetch WITH the token — a beacon cannot carry a header,
+      // so every signed-in card event was 401'd from 2026-08-21 (source_feed signed-in
+      // impressions/popups: 14,397 in the month before → 0 after). Anonymous: the beacon still
+      // works (the anon: id needs no header) and is left exactly as it was.
+      if(!_anonC){
+        fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':tk},body:payload,keepalive:true}).catch(function(){});
+        return;
+      }
       if(navigator.sendBeacon){ var bl=new Blob([payload],{type:'application/json'}); if(navigator.sendBeacon('/api/app/engagement',bl)) return; }
-      fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-user-email':e},body:payload,keepalive:true}).catch(function(){});
+      fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json'},body:payload,keepalive:true}).catch(function(){});
     }catch(e){}
   };
   // One shared observer; each card is observed as it's appended (see the card-append seam). Fires an
