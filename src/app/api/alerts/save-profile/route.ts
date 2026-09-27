@@ -323,16 +323,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Alerts] Saved alert profile for ${email}: ${expandedNaics.length} NAICS codes, ${targetAgencies?.length || 0} agencies`);
 
-    if (businessDescription !== undefined) {
+    // PARTIAL update: only a non-blank description is written. The signup form's
+    // box is never pre-filled from the stored value and sends `trim() || null`
+    // when left empty — that is an untouched box, NOT a clear, so it must not
+    // wipe a description a returning user already wrote.
+    if (cleanBusinessDescription) {
       try {
-        await getSupabase()
+        const nowIso = new Date().toISOString();
+        const { error: mirrorErr } = await getSupabase()
           .from('user_business_profiles')
           .upsert({
             user_email: verifiedEmail,
-            business_description: cleanBusinessDescription || null,
-            business_description_updated_at: cleanBusinessDescription ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
+            business_description: cleanBusinessDescription,
+            business_description_updated_at: nowIso,
+            updated_at: nowIso,
           }, { onConflict: 'user_email' });
+        if (mirrorErr) throw mirrorErr;
       } catch (businessProfileError) {
         console.warn('[Alerts] Could not mirror business description:', businessProfileError);
       }
