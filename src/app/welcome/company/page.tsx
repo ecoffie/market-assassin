@@ -23,6 +23,7 @@ import { useSearchParams } from 'next/navigation';
 import { DECLARABLE_CERTIFICATIONS, type CertificationAnswer } from '@/lib/profile/company-setup-input';
 import { rankSuggestions, groundingLabel } from '@/lib/profile/suggestion-ranking';
 import type { SetupAction } from '@/lib/profile/company-setup-outcome';
+import { authedFetch, storedMIEmail } from '@/components/app/authHeaders';
 
 type Suggestion = { code: string; name: string; reason?: string };
 
@@ -30,6 +31,8 @@ function CompanySetupInner() {
   const params = useSearchParams();
   const [step, setStep] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
+  // A failed SAVE is shown, never turned into a redirect that looks like success.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [companyName, setCompanyName] = useState('');
   const [description, setDescription] = useState('');
@@ -68,10 +71,17 @@ function CompanySetupInner() {
   /** Every outcome goes through the same endpoint; only the ACTION differs. */
   const finish = async (action: SetupAction) => {
     setBusy(true);
+    setSaveError(null);
     try {
-      const r = await fetch('/api/company-setup', {
+      // The route only writes the caller's OWN profile and takes strong auth, so the request
+      // must NAME the account and carry its session token. It used to send neither: every
+      // call got 401 "Email required" and the page redirected anyway, so no confirmed setup
+      // was ever saved from here (Learn repair board P0-E, 2026-09-26).
+      const email = storedMIEmail();
+      const r = await authedFetch('/api/company-setup', email, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          email,
           action,
           companyName, description,
           certifications: certs,
@@ -79,8 +89,17 @@ function CompanySetupInner() {
           selection: { naicsCodes: rankedNaics.map((s) => s.code), keywords },
           next: params.get('next'), intent: params.get('intent'),
         }),
-      });
-      const j = await r.json().catch(() => null);
+      }).catch(() => null);
+      const j = await r?.json().catch(() => null);
+      const saved = !!(r && r.ok && j?.success);
+      // Skip saves nothing the user asked to keep, so it always moves on. A SAVE that did not
+      // land stays on this screen and says so — moving on would read as success.
+      if (!saved && action !== 'skip') {
+        setSaveError(!email || r?.status === 401
+          ? 'Sign in to save your selections — nothing was saved.'
+          : 'We couldn\u2019t save your selections — nothing was saved. Please try again.');
+        return;
+      }
       window.location.href = j?.path || '/opportunity-map';
     } finally { setBusy(false); }
   };
@@ -224,6 +243,13 @@ function CompanySetupInner() {
                 Use Mindy&apos;s suggestions
               </button>
             </div>
+
+            {saveError && (
+              <p role="alert" className="mt-4 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {saveError}{' '}
+                <button onClick={leave} className="underline underline-offset-4">Continue without saving</button>
+              </p>
+            )}
 
             <button onClick={() => finish('skip')} disabled={busy}
               className="mt-4 text-sm text-slate-400 underline underline-offset-4 hover:text-slate-200">

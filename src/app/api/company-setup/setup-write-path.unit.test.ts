@@ -111,3 +111,28 @@ describe('the screens carry no legacy destinations', () => {
     expect(uiCode).toContain('Show me my market');
   });
 });
+
+describe('the screen sends an identity and never hides a failed save (P0-E)', () => {
+  const ui = readFileSync('src/app/welcome/company/page.tsx', 'utf8');
+  const uiCode = ui.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+                   .replace(/^([^\n]*?)\/\/.*$/gm, '$1');
+  const finish = uiCode.slice(uiCode.indexOf('const finish = async'), uiCode.indexOf('const toggleCert'));
+
+  it('names the account and carries the session token (it used to send neither → 401 every time)', () => {
+    expect(finish).toContain("authedFetch('/api/company-setup', email");
+    expect(finish).toMatch(/body: JSON\.stringify\(\{\s*email,/);
+  });
+
+  it('decides "saved" from the response, not from having sent a request', () => {
+    expect(finish).toMatch(/r\.ok && j\?\.success/);
+  });
+
+  it('a failed SAVE stays on the screen; only skip moves on regardless', () => {
+    const guard = finish.indexOf("if (!saved && action !== 'skip')");
+    const redirect = finish.indexOf('window.location.href');
+    expect(guard).toBeGreaterThan(-1);
+    expect(redirect).toBeGreaterThan(guard);
+    expect(finish.slice(guard, redirect)).toMatch(/return;/);
+  });
+});
+

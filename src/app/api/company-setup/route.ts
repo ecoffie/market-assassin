@@ -17,6 +17,7 @@ import { resolveSetupInput, type CertificationAnswer } from '@/lib/profile/compa
 import { resolvePostSignupDestination } from '@/lib/mindy/post-signup-destination';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
+import { freeNotificationSettingsInsert } from '@/lib/onboarding/free-notification-defaults';
 
 const ACTIONS: SetupAction[] = ['confirm', 'accept_all', 'skip'];
 
@@ -76,14 +77,42 @@ export async function POST(request: NextRequest) {
     // ── Screen 2 patch. For skip this is `{}` and adds nothing.
     Object.assign(notif, outcome.profile);
 
+    let createdRow = false;
     if (Object.keys(notif).length) {
-      const { error } = await sb.from('user_notification_settings')
-        .update({ ...notif, updated_at: new Date().toISOString() })
+      // ── A MISSING ROW IS NOT A WRITE (P0-E). `.update()` against a user with no settings
+      // row matches zero rows and returns no error, so it used to answer success while the
+      // confirmed codes went nowhere. Ask for the touched rows and CREATE the row (same free
+      // defaults /api/app/profile creates) when there is none. An existing row is only ever
+      // patched with the keys above — nothing else on it changes. The row count comes from
+      // { count: 'exact' } (never a RETURNING payload), and a NULL count is UNKNOWN — a failure,
+      // not "no row" (INT-005 / Bug Prevention Rule #11).
+      const nowIso = new Date().toISOString();
+      const patch = { ...notif, updated_at: nowIso };
+      const updateRow = () => sb.from('user_notification_settings')
+        .update(patch, { count: 'exact' })
         .eq('user_email', email);
-      if (error) {
+      const fail = (message: string) => {
         // Surface the write failure — a silent one would look identical to a skip.
-        console.error('[company-setup] profile update failed:', error.message);
-        return NextResponse.json({ success: false, error: error.message, path: destination.path }, { status: 500 });
+        console.error('[company-setup] profile update failed:', message);
+        return NextResponse.json({ success: false, error: message, path: destination.path }, { status: 500 });
+      };
+
+      const { count: updated, error } = await updateRow();
+      if (error) return fail(error.message);
+      if (updated == null) return fail('settings update count unknown');
+      if (updated === 0) {
+        const { error: insErr } = await sb.from('user_notification_settings')
+          .insert({ ...freeNotificationSettingsInsert(email, nowIso), ...patch });
+        if (insErr) {
+          // 23505: a concurrent request created the row between our update and insert.
+          // Patch that row rather than reporting a false failure.
+          if (insErr.code !== '23505') return fail(insErr.message);
+          const { count: retried, error: retryErr } = await updateRow();
+          if (retryErr) return fail(retryErr.message);
+          if (!retried) return fail('settings row could not be written');
+        } else {
+          createdRow = true;
+        }
       }
     }
 
@@ -101,6 +130,7 @@ export async function POST(request: NextRequest) {
       success: true,
       path: destination.path,
       wrote: Object.keys(notif),
+      created_settings_row: createdRow,
       provenance: outcome.profile.naics_source ?? null,
       reason: outcome.reason,
     });

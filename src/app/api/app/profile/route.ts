@@ -20,6 +20,7 @@ import {
   parseAlertMode,
 } from '@/lib/alerts/alert-mode';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
+import { freeNotificationSettingsInsert } from '@/lib/onboarding/free-notification-defaults';
 
 /**
  * MI Beta Profile API
@@ -314,15 +315,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const baseInsert = {
-      user_email: rowEmail,
-      treatment_type: 'free',
-      alerts_enabled: true,
-      briefings_enabled: false,
-      alert_frequency: 'daily',
-      timezone: 'America/New_York',
-      created_at: new Date().toISOString(),
-    };
+    const baseInsert = freeNotificationSettingsInsert(rowEmail);
     const runWrite = (payload: Record<string, unknown>) => existingSettings
       ? supabase.from('user_notification_settings').update(payload).eq('user_email', rowEmail)
       : supabase.from('user_notification_settings').insert({ ...baseInsert, ...payload });
