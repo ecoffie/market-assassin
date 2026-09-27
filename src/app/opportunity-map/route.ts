@@ -7360,6 +7360,33 @@ const DRAWER_JS = `<script>
         box.insertAdjacentHTML('beforeend',html); buildTabs();
       }).catch(function(){ rosterPlaceholder(box,'Couldn\\u2019t load other contacts right now.'); });
   }
+  // ── office_viewed (Learn M3·discover, repair board P0-G, 2026-09-26) ─────────────────────────
+  // "Did this user actually inspect a buying office?" Fired when a buyer drawer RENDERS (never on a
+  // load failure) and when the listing drawer's Buyer tab is opened. It rides window.__track — the
+  // Map's authenticated transport (keepalive fetch + x-mi-auth-token; anon:<uuid> when signed out),
+  // which #1719 kept as the correct producer — so no second sender exists.
+  //   · office_key is an OFFICE, never an agency: DoDAAC (the repo's isValidDodaac shape, same key
+  //     the target list uses) from the solicitation prefix, else the normalized office name, else
+  //     null. Falling back to the agency would let five agencies read as "five buying offices".
+  //   · Every open is recorded (repeats are measurable); completion counts DISTINCT non-null keys
+  //     server-side, so a repeat can never advance a mission.
+  //   · One fire-and-forget POST. No discovery request, no map resize, no repaint.
+  function officeKeyOf(sol, office){
+    var d=String(sol||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+    if(/^[A-Z][A-Z0-9]{5}$/.test(d))return {key:'dodaac:'+d, src:'dodaac'};
+    var o=String(office||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    if(o)return {key:'office:'+o, src:'office_name'};
+    return {key:null, src:null};
+  }
+  function trackOfficeViewed(entry, sol, office, agency, recordKind){
+    try{
+      if(!window.__track)return;
+      var k=officeKeyOf(sol, office);
+      window.__track('tool_use','office_viewed',{office_key:k.key, office_key_source:k.src,
+        agency:String(agency||''), entry:entry, record_kind:recordKind||''});
+    }catch(e){}
+  }
+  window.__officeKeyOf=officeKeyOf;
   // Build the sticky tab bar from the sections that are actually present (id → label).
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
@@ -7388,10 +7415,14 @@ const DRAWER_JS = `<script>
       // Gov Buyer drawer
       [['buyeropps'],'Opportunities'],[['buyeragency'],'Agency'],[['buyercontact'],'Contact'],[['buyersimilar'],'Similar buyers'],[['buyerroster'],'Players']];
     // Resolve each group to the first anchor that's actually in the DOM → one tab, or skip the group.
+    var BUYER_TAB_ANCHORS={agencyintel:1,contacts:1,roster:1,fcpoc:1};
     var want=[]; groups.forEach(function(g){ var ids=g[0]; for(var i=0;i<ids.length;i++){ if(document.getElementById('osec-'+ids[i])){ want.push([ids[i],g[1]]); return; } } });
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
-    Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
+    Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); }
+      // The listing's "Buyer" tab (anchors agencyintel/contacts/roster/fcpoc) = the user opened the buyer.
+      if(BUYER_TAB_ANCHORS[b.getAttribute('data-t')]&&CUR&&CUR.kind!=='buyer'&&CUR.kind!=='company'){
+        trackOfficeViewed('buyer_tab', CUR.solicitation||CUR.sol, CUR.office, CUR.department, CUR.kind||'open'); } }; });
     // Scroll-spy: highlight the tab of the section currently in view.
     function spy(){ var ids=Array.prototype.map.call(tabs.querySelectorAll('.opptab'),function(b){return b.getAttribute('data-t');});
       var cur=ids[0]; for(var i=0;i<ids.length;i++){ var el=document.getElementById('osec-'+ids[i]); if(el&&el.offsetTop-140<=dr.scrollTop)cur=ids[i]; }
@@ -8995,6 +9026,9 @@ const DRAWER_JS = `<script>
       body.innerHTML=buyerRender(d.buyer);
       buildTabs();
       loadBuyerEventDna(d.buyer);   // past-event behavior signals (async, self-hiding)
+      // Only a RENDERED buyer counts as viewed — a failed load above returned before this line.
+      var _bs=''; try{ var _ops=d.buyer.opportunities||[]; for(var _i=0;_i<_ops.length;_i++){ if(officeKeyOf(_ops[_i].solicitationNumber,'').src==='dodaac'){ _bs=_ops[_i].solicitationNumber; break; } } }catch(e){}
+      trackOfficeViewed('buyer_drawer', _bs, d.buyer.office, d.buyer.agency, 'buyer');
     }).catch(function(){ body.innerHTML=drawerLoadError(0,'buyer'); });
   };
 })();
