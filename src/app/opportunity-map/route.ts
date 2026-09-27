@@ -4995,6 +4995,8 @@ const VIEWPORT_JS = `<script>
   var _ss=document.getElementById('saveSearchBtn');
   function _ssReset(){ if(_ss)_ss.innerHTML='<svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>Save search'; }
   function _ssMsg(t){ if(_ss)_ss.textContent=t; setTimeout(_ssReset,1900); }
+  // Exported for SAVE_JS's __claimAnonWatches, which runs in a different IIFE.
+  window.__ssMsg=_ssMsg; window.__ssReset=_ssReset;
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
     // What this search WATCHES, for the default name — "Open", "Forecasts", or
@@ -5305,20 +5307,26 @@ const SAVE_JS = `<script>
     window.open(url,'_blank','noopener');
   };
   // Claim this browser's anonymous watches onto the signed-in account. The
-  // account email is NEVER sent — the server reads it from the verified session.
+  // account email is NEVER sent as an identity claim — the server derives it
+  // from the verified MI session (x-mi-auth-token) and ignores the body.
+  // ⚠️ SCOPE (P0-F, 2026-09-26): this is SAVE_JS. It used to call _uemail(),
+  // _anonId(), _track() and _ss/_ssMsg/_ssReset — all private to the VIEWPORT_JS
+  // IIFE — so it threw a ReferenceError on its first statement and no anonymous
+  // watch was ever claimed (prod: 37 unclaimed, 0 watch_claimed events). Every
+  // identifier below is either this block's own or read off window.
   window.__claimAnonWatches=function(){
-    var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
-    var em=_uemail(); if(!t||!em)return;
-    var aid=_anonId(); if(!aid)return;
+    var t=tok(); var em=t?email(t):''; if(!t||!em)return;
+    var aid=_anonKey(); if(!aid)return;
+    var ui=function(name,arg){ try{ if(typeof window[name]==='function')window[name](arg); }catch(e){} };
     fetch('/api/app/map-watch',{method:'POST',
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({action:'claim',anonId:aid})})
       .then(function(r){return r.json();}).then(function(c){
         // Only a VERIFIED claim counts.
-        if(c&&c.success&&c.claimed>0){ try{ _track('tool_use','watch_claimed',{watches:c.claimed}); }catch(e){}
-          if(_ss)_ssMsg('\u2713 Alerts on'); }
-        else if(_ss)_ssReset();
-      }).catch(function(){ if(_ss)_ssReset(); });
+        if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed}); }catch(e){}
+          ui('__ssMsg','\u2713 Alerts on'); }
+        else ui('__ssReset');
+      }).catch(function(){ ui('__ssReset'); });
   };
 
   // ── RESTORE ──────────────────────────────────────────────────────────────
