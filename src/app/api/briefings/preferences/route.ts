@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { parseBriefingPreferenceUpdate } from '@/lib/briefings/preference-update';
 
 interface BriefingPreferences {
   timezone: string;
@@ -83,11 +84,25 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/briefings/preferences
- * Body: { email, timezone?, email_frequency?, preferred_delivery_hour?, sms_enabled?, phone_number? }
+ * Body: { email, timezone?, email_frequency?, preferred_delivery_hour? }
+ *
+ * SEC-3 (2026-09-27): explicit allowlist (see lib/briefings/preference-update.ts). This used to
+ * upsert `{ briefings_enabled: true, ...requestBody }`, letting any authenticated caller write any
+ * column on their own settings row (tier, paid/subscription state, identity, toggles) and
+ * force-enabling briefings on every call. Now:
+ *  - only the allowlisted fields are written, any other key is rejected by name;
+ *  - SMS is not settable here (consent lives in sms/verify/* and sms/disable);
+ *  - nothing is forced, and a missing row is NOT created with DB defaults (those turn briefings
+ *    on) — it is reported, never a silent success.
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { email, ...updates } = body;
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
+  }
+  const { email, ...updates } = body as { email?: string } & Record<string, unknown>;
 
   if (!email) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
@@ -99,55 +114,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
+  const parsed = parseBriefingPreferenceUpdate(updates);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error, rejected: parsed.rejected ?? [] }, { status: 400 });
+  }
+
   // Coach Mode: save the ACTIVE CLIENT's delivery preferences, not the coach's.
   const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
   const prefsEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
 
-  // Validate phone number if provided and SMS is being enabled
-  if (updates.sms_enabled && updates.phone_number) {
-    const normalizedPhone = normalizePhoneNumber(updates.phone_number);
-    if (!normalizedPhone) {
-      return NextResponse.json(
-        { error: 'Invalid phone number format. Please use a valid US phone number.' },
-        { status: 400 }
-      );
-    }
-    updates.phone_number = normalizedPhone;
-  }
-
-  // If disabling SMS, clear phone number
-  if (updates.sms_enabled === false) {
-    updates.phone_number = null;
-  }
-
-  // Map email_frequency to briefing_frequency for unified table
-  const mappedUpdates = { ...updates };
-  if ('email_frequency' in mappedUpdates) {
-    mappedUpdates.briefing_frequency = mappedUpdates.email_frequency;
-    delete mappedUpdates.email_frequency;
-  }
-
-  // Upsert user notification settings (unified table)
-  const { data, error } = await getSupabase()
+  const { count, error } = await getSupabase()
     .from('user_notification_settings')
-    .upsert(
-      {
-        user_email: prefsEmail,
-        briefings_enabled: true,
-        ...mappedUpdates,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_email' }
-    )
-    .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
-    .single();
+    .update({ ...parsed.patch, updated_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('user_email', prefsEmail);
 
   if (error) {
-    console.error('[BriefingPrefs] Error updating preferences:', error);
+    console.error('[BriefingPrefs] Error updating preferences:', error.message);
     return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 });
   }
+  if (count == null) {
+    // Unknown is not success (Bug Prevention Rule #11).
+    return NextResponse.json({ error: 'Update could not be confirmed' }, { status: 500 });
+  }
+  if (count === 0) {
+    return NextResponse.json({ error: 'settings_not_initialized' }, { status: 409 });
+  }
 
-  console.log(`[BriefingPrefs] Updated preferences for ${auth.email}:`, updates);
+  const { data, error: readErr } = await getSupabase()
+    .from('user_notification_settings')
+    .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
+    .eq('user_email', prefsEmail)
+    .single();
+  if (readErr || !data) {
+    return NextResponse.json({ error: 'Failed to read preferences' }, { status: 500 });
+  }
 
   return NextResponse.json({
     success: true,
@@ -159,34 +159,4 @@ export async function POST(request: NextRequest) {
       phone_number: data.phone_number,
     },
   });
-}
-
-/**
- * Normalize phone number to E.164 format
- */
-function normalizePhoneNumber(phone: string): string | null {
-  // Remove all non-digit characters except leading +
-  const cleaned = phone.replace(/[^\d+]/g, '');
-
-  // Already in E.164 format
-  if (cleaned.startsWith('+1') && cleaned.length === 12) {
-    return cleaned;
-  }
-
-  // Has + but not +1 (international)
-  if (cleaned.startsWith('+')) {
-    return cleaned.length >= 10 ? cleaned : null;
-  }
-
-  // US number without country code
-  if (cleaned.length === 10) {
-    return `+1${cleaned}`;
-  }
-
-  // US number with leading 1
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    return `+${cleaned}`;
-  }
-
-  return null;
 }
