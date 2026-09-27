@@ -44,6 +44,7 @@ import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-
 import { computeNextAction } from '@/lib/pipeline/next-action';
 import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
 import { familyAttachmentForNotice } from '@/lib/sam/solicitation-family';
+import { normalizePursuitDates } from '@/lib/pipeline/pursuit-dates';
 
 /** A verified caller writing into a resolved workspace. Never built from a body. */
 export interface PursuitWriteContext {
@@ -122,7 +123,13 @@ export interface FailedPursuit {
   kind: 'error';
   error: { message: string; details: string | null; hint: string | null; code: string | null };
 }
-export type CreatePursuitResult = CreatedPursuit | DuplicatePursuit | FailedPursuit;
+/** A date field the caller sent is not a date (#1705). Nothing was written. */
+export interface InvalidPursuit {
+  kind: 'invalid';
+  field: string;
+  error: string;
+}
+export type CreatePursuitResult = CreatedPursuit | DuplicatePursuit | FailedPursuit | InvalidPursuit;
 
 const isUuid = (v?: string | null) => !!v && /^[a-f0-9]{32}$/i.test(v.trim());
 
@@ -140,6 +147,13 @@ export async function createCanonicalPursuit(
   // Work on a copy: the unknown-column retry below deletes keys, and a caller's
   // object should not be mutated out from under it.
   const body: Record<string, unknown> = { ...draft };
+
+  // #1705: '' for an unknown deadline must become NULL (a TIMESTAMPTZ rejects
+  // '' with 22007 → the save 500'd). A non-empty value that is not a date is
+  // refused, never coerced. Runs BEFORE the SAM deadline backfill so a blank
+  // deadline still gets the SAM date when one exists.
+  const dates = normalizePursuitDates(body);
+  if (!dates.ok) return { kind: 'invalid', field: dates.field, error: dates.error };
 
   body.user_email = userEmail;
   body.stage = body.stage || 'tracking';
