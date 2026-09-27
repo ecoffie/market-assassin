@@ -20,6 +20,10 @@
  *   - WATCHED producers are real but low-volume (≈1/day or less); 0 is reported, never failed.
  *
  * Anonymous ids (anon:<uuid>) are excluded everywhere — the question is signed-in identity.
+ * Staff (@govcongiants.com) and the controlled acceptance/reviewer accounts are excluded too:
+ * a verification session must never be what turns this green. It proves the transport, not
+ * that CUSTOMERS' events flow — the #1719 acceptance session wrote exactly the rows this
+ * oracle counts. Pass --include-staff only to inspect a controlled test.
  */
 import pg from 'pg';
 import { createRequire } from 'node:module';
@@ -33,6 +37,10 @@ const args = process.argv.slice(2);
 const days = Number(args[args.indexOf('--days') + 1]) > 0 && args.includes('--days')
   ? Number(args[args.indexOf('--days') + 1]) : 7;
 const asJson = args.includes('--json');
+const includeStaff = args.includes('--include-staff');
+const STAFF_SQL = includeStaff ? '' : `
+      AND user_email NOT LIKE '%@govcongiants.com'
+      AND user_email NOT IN ('demo@getmindy.ai')`;
 
 // Each producer is a named predicate over user_engagement. Baselines are signed-in events
 // in the 30 days BEFORE the 2026-08-21 break (measured 2026-09-26).
@@ -69,7 +77,7 @@ const { rows } = await client.query(
           max(created_at) AS newest
      FROM user_engagement
     WHERE created_at >= now() - ($1 || ' days')::interval
-      AND user_email NOT LIKE 'anon:%'`,
+      AND user_email NOT LIKE 'anon:%'${STAFF_SQL}`,
   [String(days)],
 );
 await client.end();
@@ -91,7 +99,7 @@ const overall = !controlsBusy ? 'UNKNOWN' : failed.length ? 'FAIL' : 'PASS';
 if (asJson) {
   console.log(JSON.stringify({ window_days: days, overall, newest_signed_in_event: row.newest, results }, null, 2));
 } else {
-  console.log(`Signed-in engagement producers — last ${days} day(s)  (newest signed-in event: ${row.newest?.toISOString?.() ?? row.newest})`);
+  console.log(`Signed-in engagement producers — last ${days} day(s)${includeStaff ? ' — INCLUDING staff/test accounts' : ', customers only'}  (newest signed-in event: ${row.newest?.toISOString?.() ?? row.newest})`);
   for (const r of results) {
     const base = r.baseline30d ? `  (pre-break 30d: ${r.baseline30d})` : '';
     console.log(`  ${r.verdict.padEnd(32)} ${r.role.padEnd(8)} ${r.key.padEnd(24)} ${String(r.count).padStart(6)}${base}`);
