@@ -59,7 +59,7 @@ describe('fetchSamOpportunitiesFromCache — keyword preference sees the whole m
   it('finds a keyword match beyond the old 200-row cutoff', async () => {
     MARKET = market(450, [420]);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.openKeywordOutcome).toBe('distinctive_hits');
     expect(r.opportunities.map((o) => o.noticeId)).toEqual(['n00420']);
@@ -70,17 +70,17 @@ describe('fetchSamOpportunitiesFromCache — keyword preference sees the whole m
   it('with no match anywhere, returns the market and says there were no keyword hits', async () => {
     MARKET = market(450, []);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.openKeywordOutcome).toBe('open_market_no_keyword_hits');
     expect(r.distinctiveMatchCount).toBe(0);
-    expect(r.opportunities).toHaveLength(200);
+    expect(r.opportunities).toHaveLength(450); // opt-in: the whole market; daily-alerts ranks, then cuts
   });
 
   it('reports — does not hide — a market larger than the scan bound', async () => {
     MARKET = market(MAX_PREFER_SCAN_ROWS + 500, [MAX_PREFER_SCAN_ROWS + 10]);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.scanTruncated).toBe(true);
     expect(r.marketRowsScanned).toBe(MAX_PREFER_SCAN_ROWS);
@@ -102,7 +102,7 @@ describe('truncated scan → the alert DISCLOSES incomplete coverage (fetch → 
     const { openMarketNote, OPEN_MARKET_NO_KEYWORD_HITS_COPY } = await import('@/lib/alerts/open-contract-d');
     MARKET = market(MAX_PREFER_SCAN_ROWS + 500, [MAX_PREFER_SCAN_ROWS + 10]);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     // The fetch really did miss it — that is the premise.
     expect(r.opportunities.some((o) => o.noticeId === `n${String(MAX_PREFER_SCAN_ROWS + 10).padStart(5, '0')}`)).toBe(false);
@@ -120,7 +120,7 @@ describe('truncated scan → the alert DISCLOSES incomplete coverage (fetch → 
     const { openMarketNote } = await import('@/lib/alerts/open-contract-d');
     MARKET = market(MAX_PREFER_SCAN_ROWS + 500, [10, MAX_PREFER_SCAN_ROWS + 10]);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.openKeywordOutcome).toBe('distinctive_hits');
     const note = openMarketNote(r.openKeywordOutcome!, { scanTruncated: r.scanTruncated, marketRowsScanned: r.marketRowsScanned });
@@ -131,7 +131,7 @@ describe('truncated scan → the alert DISCLOSES incomplete coverage (fetch → 
     const { openMarketNote, OPEN_MARKET_NO_KEYWORD_HITS_COPY } = await import('@/lib/alerts/open-contract-d');
     MARKET = market(450, []);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(openMarketNote(r.openKeywordOutcome!, { scanTruncated: r.scanTruncated, marketRowsScanned: r.marketRowsScanned }))
       .toBe(OPEN_MARKET_NO_KEYWORD_HITS_COPY);
@@ -149,7 +149,7 @@ describe('scan-bound edges (exactly vs more than MAX_PREFER_SCAN_ROWS)', () => {
   it('exactly 4,000 rows is a COMPLETE scan — not reported as truncated', async () => {
     MARKET = market(MAX_PREFER_SCAN_ROWS, [3990]);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.marketRowsScanned).toBe(MAX_PREFER_SCAN_ROWS);
     expect(r.scanTruncated).toBe(false);
@@ -159,14 +159,14 @@ describe('scan-bound edges (exactly vs more than MAX_PREFER_SCAN_ROWS)', () => {
   it('4,001 rows IS truncated (one row past the bound exists)', async () => {
     MARKET = market(MAX_PREFER_SCAN_ROWS + 1, []);
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.marketRowsScanned).toBe(MAX_PREFER_SCAN_ROWS);
     expect(r.scanTruncated).toBe(true);
   });
 });
 
-describe('keepAllPreferred — the final cut happens after the caller ranks, not by deadline here', () => {
+describe('fullMarketKeywordScan — opt-in; the final cut happens after the caller ranks', () => {
   // 260 keyword matches; the ONLY title match is the 250th by deadline (past the old 200 cut).
   function bigHitMarket(): Row[] {
     return Array.from({ length: 600 }, (_, i) => ({
@@ -178,20 +178,23 @@ describe('keepAllPreferred — the final cut happens after the caller ranks, not
     }));
   }
 
-  it('without it, the preferred set is cut to `limit` by deadline — the title match is lost', async () => {
+  it('WITHOUT the opt-in (every non-daily caller): main\'s behaviour — one capped query, the title match is never seen', async () => {
     MARKET = bigHitMarket();
+    calls.range = 0; calls.limit = 0;
     const r = await fetchSamOpportunitiesFromCache({
       naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200,
     });
-    expect(r.distinctiveMatchCount).toBe(260);
-    expect(r.opportunities).toHaveLength(200);
+    expect(calls).toEqual({ range: 0, limit: 1 });       // single capped read, exactly as on main
+    expect(r.marketRowsScanned).toBeUndefined();
+    expect(r.scanTruncated).toBeUndefined();
+    expect(r.distinctiveMatchCount).toBe(100);           // only the hits inside the first 200 rows
     expect(r.opportunities.some((o) => o.noticeId === 'm00499')).toBe(false);
   });
 
-  it('with it, every preferred row is returned so ranking can find the title match', async () => {
+  it('WITH the opt-in (daily alerts): every preferred row is returned so ranking can find the title match', async () => {
     MARKET = bigHitMarket();
     const r = await fetchSamOpportunitiesFromCache({
-      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, keepAllPreferred: true,
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
     });
     expect(r.opportunities).toHaveLength(260);
     expect(r.opportunities.some((o) => o.noticeId === 'm00499')).toBe(true);
@@ -205,7 +208,7 @@ describe('paging over a live table: de-duplication fixes REPEATS only', () => {
     onRange = (from) => { if (from === 1000) MARKET.splice(1000, 0, moved); }; // sync re-sorts it into page 2
     try {
       const r = await fetchSamOpportunitiesFromCache({
-        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, keepAllPreferred: true,
+        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
       });
       expect(r.marketRowsScanned).toBe(1500); // 1,501 rows read, the repeat removed
     } finally { onRange = null; }
@@ -217,7 +220,7 @@ describe('paging over a live table: de-duplication fixes REPEATS only', () => {
     onRange = (from) => { if (from === 1000) { const [row] = MARKET.splice(1000, 1); MARKET.splice(10, 0, row); } };
     try {
       const r = await fetchSamOpportunitiesFromCache({
-        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, keepAllPreferred: true,
+        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
       });
       // Not seen in either read. De-duplication cannot recover it; this test pins that the
       // limitation is REAL so no one reads the de-dup as a consistency guarantee.

@@ -17,6 +17,7 @@ import {
   preferDistinctiveInOpenMarket,
   keywordEvidence,
   naicsInSavedMarket,
+  scoreContractDKeywords,
   scoreKeywordEvidence,
   hasKeywordSupport,
   type KeywordEvidence,
@@ -96,11 +97,12 @@ interface SAMSearchParams {
   /** Saved NAICS market. PSC recall cannot escape this set. */
   savedNaics?: string[];
   /**
-   * Keyword-scan path only: return EVERY preferred row (bounded by MAX_PREFER_SCAN_ROWS)
-   * instead of the first `limit` by deadline, so the caller can apply eligibility and
-   * ranking before its own final cut. Ignored on the no-keyword path.
+   * OPT-IN (daily alerts): scan the whole NAICS/PSC market (bounded by MAX_PREFER_SCAN_ROWS)
+   * for keyword matches, and return EVERY preferred row instead of the first `limit` by
+   * deadline, so the caller applies eligibility and ranking before its own final cut.
+   * Without it the fetch behaves exactly as on main. Ignored when there are no keywords.
    */
-  keepAllPreferred?: boolean;
+  fullMarketKeywordScan?: boolean;
 }
 
 const DESCRIPTION_STOP_WORDS = new Set([
@@ -773,23 +775,98 @@ export function scoreOpportunityDetailed(
 }
 
 /**
- * Score an opportunity for relevance to user's profile (0–100, for display).
+ * LEGACY scorer — preserved BYTE-FOR-BYTE from main for weekly-alerts, send-notifications,
+ * diff-engine and trigger-alerts. Do not "fix" it here.
+ *
+ * Daily alerts use scoreOpportunityDetailed (evidence ranking, anchored agencies, stage
+ * demotion, unclamped rank). Routing the other callers through the new scorer changed their
+ * ordering (replayed 2026-09-26: top-10 overlap 5–10/10, heads-up notices up for 2 of 5
+ * profiles), so they keep this function until a separate PR migrates them deliberately.
+ * Equality with main is pinned by legacy-scorer.unit.test.ts.
  *
  * Set-aside and agency ranking follow the rules in
- * docs/TODO-mindy-app-completion.md §5 ("Profile And Ranking Quality"):
- * - Boost Total Small Business / SB-friendly matches for users with any cert
- * - Penalize special set-asides (SDVOSB/VOSB/8a/WOSB/EDWOSB/HUBZone/Tribal)
- *   when the user doesn't hold that certification
- * - Downrank VA opportunities for non-veteran profiles (Sources Sought/RFI/
- *   Special Notice exempt — they stay visible as research signals)
- *
- * Sort by scoreOpportunityDetailed().rank, not this: the clamp makes ties.
+ * docs/TODO-mindy-app-completion.md §5 ("Profile And Ranking Quality").
  */
 export function scoreOpportunity(
   opportunity: SAMOpportunity,
-  userProfile: OpportunityScoreProfile,
+  userProfile: {
+    naics_codes: string[];
+    agencies: string[];
+    keywords: string[];
+    business_description?: string | null;
+    setAsides?: string[];
+    business_type?: string | null;
+  }
 ): number {
-  return scoreOpportunityDetailed(opportunity, userProfile).score;
+  let score = 0;
+
+  // NAICS match (highest weight)
+  if (userProfile.naics_codes.includes(opportunity.naicsCode)) {
+    score += 40;
+  } else if (userProfile.naics_codes.some(n =>
+    opportunity.naicsCode.startsWith(n) || n.startsWith(opportunity.naicsCode)
+  )) {
+    score += 20; // Partial NAICS match
+  }
+
+  // Agency match
+  const oppAgency = `${opportunity.department} ${opportunity.subTier}`.toLowerCase();
+  if (userProfile.agencies.some(a => oppAgency.includes(a.toLowerCase()))) {
+    score += 30;
+  }
+
+  const oppText = `${opportunity.title} ${opportunity.description}`;
+  score += scoreContractDKeywords(oppText, userProfile.keywords);
+
+  // Business description semantic-lite ranking.
+  // Structured filters still decide inclusion; this only nudges ordering.
+  const descriptionTerms = extractDescriptionTerms(userProfile.business_description);
+  if (descriptionTerms.length > 0) {
+    const descriptionMatches = descriptionTerms.filter(term => oppText.toLowerCase().includes(term)).length;
+    score += Math.min(descriptionMatches * 3, 15);
+  }
+
+  // Deadline urgency (closer = higher score)
+  if (opportunity.responseDeadline) {
+    const daysUntilDue = getDaysUntil(opportunity.responseDeadline);
+    if (daysUntilDue <= 7) {
+      score += 15; // Due this week
+    } else if (daysUntilDue <= 14) {
+      score += 10; // Due in two weeks
+    } else if (daysUntilDue <= 30) {
+      score += 5; // Due this month
+    }
+  }
+
+  // Set-aside scoring — replaces the old flat +10 "any set-aside" bonus.
+  const userCerts = getUserCertifications(userProfile);
+  const requiredCerts = getOpportunityRequiredCerts(opportunity);
+  const research = isResearchNotice(opportunity.noticeType);
+
+  if (requiredCerts.length === 0) {
+    // No specific cert required — small Total Small Business / SBA / SBP bonus
+    if (isTotalSmallBusiness(opportunity) && userCerts.size > 0) {
+      score += 15;
+    } else if (opportunity.setAside) {
+      // Generic set-aside (e.g. Full and Open with preference) — small nudge
+      score += 5;
+    }
+  } else {
+    const userHasMatchingCert = requiredCerts.some(c => userCerts.has(c));
+    if (userHasMatchingCert) {
+      score += 20; // Direct cert match — strong boost
+    } else if (!research) {
+      score -= 25; // Cert required, user doesn't have it — strong penalty
+    }
+    // Research notices with mismatched set-asides: no change (stay visible)
+  }
+
+  // VA downrank for non-veteran profiles (research notices exempt).
+  if (isVAOpportunity(opportunity) && !isVeteranProfile(userCerts) && !research) {
+    score -= 15;
+  }
+
+  return Math.max(0, Math.min(score, 100)); // Clamp to [0, 100]
 }
 
 // Helper functions
@@ -1045,12 +1122,15 @@ export async function fetchSamOpportunitiesFromCache(
       'set_aside_code, set_aside_description, notice_type, active, ' +
       'pop_city, pop_state, pop_zip, pop_country, ui_link, last_modified';
 
-    // FILTER BEFORE LIMIT. When keywords will be preferred inside a NAICS/PSC
-    // market, read the whole (bounded) market first; the `limit` is applied
-    // AFTER preference below. Without keywords, the old single capped query is
-    // unchanged — there is nothing to prefer, so the first `limit` rows are the answer.
+    // FILTER BEFORE LIMIT — OPT-IN (`fullMarketKeywordScan`, daily alerts only). Read the
+    // whole (bounded) NAICS/PSC market, prefer keyword matches across all of it, and
+    // return every preferred row so the caller ranks before its own final cut.
+    // Every other caller (weekly-alerts, send-briefings-fast, market-dossier, save-profile,
+    // admin tools) keeps main's behaviour exactly: one capped query, preference on those
+    // rows. Changing them is a separate, deliberate migration.
     const scanWholeMarket =
-      distinctiveKeywords(keywords).length > 0 && keywordIncludeTerms(keywords, naicsCodes, pscCodes).length === 0
+      params.fullMarketKeywordScan === true
+      && distinctiveKeywords(keywords).length > 0 && keywordIncludeTerms(keywords, naicsCodes, pscCodes).length === 0
       && (naicsCodes.length > 0 || pscCodes.length > 0);
 
     const rows: SAMCacheOpportunityRow[] = [];
@@ -1188,10 +1268,10 @@ export async function fetchSamOpportunitiesFromCache(
       console.log(`[SAM Cache] Contract D no distinctive hits in Open market — keeping ${industry.rows.length} NAICS/PSC rows`);
     }
 
-    // `keepAllPreferred`: the caller applies its own eligibility (newness, dedupe) and
+    // On the opt-in path the caller applies its own eligibility (newness, dedupe) and
     // RANKING and makes the final cut itself. Slicing here by DEADLINE would drop a
     // strong title match at row 201+ of the preferred set before it is ever ranked.
-    const keepAll = scanWholeMarket && params.keepAllPreferred === true;
+    const keepAll = scanWholeMarket;
     return {
       opportunities: keepAll ? preferred.rows : preferred.rows.slice(0, limit),
       totalRecords: preferred.rows.length,
