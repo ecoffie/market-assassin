@@ -16,6 +16,7 @@ import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace, clien
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 import { indexFamiliesByNoticeId, type FamilyNoticeRow } from '@/lib/sam/solicitation-family';
 import { createCanonicalPursuit, type PursuitDraft } from '@/lib/pipeline/create-pursuit';
+import { normalizePursuitDates } from '@/lib/pipeline/pursuit-dates';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -317,6 +318,14 @@ export async function POST(request: NextRequest) {
       { clientNoticeType },
     );
 
+    if (result.kind === 'invalid') {
+      // #1705: a date field that is not a date is the CALLER's error — 400
+      // naming the field, never a Postgres 500 and never a fabricated date.
+      return NextResponse.json(
+        { error: result.error, field: result.field },
+        { status: 400 }
+      );
+    }
     if (result.kind === 'duplicate') {
       return NextResponse.json(
         { error: 'Opportunity already in pipeline', opportunity: result.existing },
@@ -377,6 +386,17 @@ export async function PATCH(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
+
+    // #1705: same date contract as POST — '' → NULL, a non-date → 400. An
+    // absent key stays absent so an edit that doesn't mention a date keeps it.
+    const dates = normalizePursuitDates(updates);
+    if (!dates.ok) {
+      return NextResponse.json(
+        { error: dates.error, field: dates.field },
+        { status: 400 }
+      );
+    }
+
     const { workspaceId } = await resolveActiveWorkspace(user_email, request);
     updates.updated_by = user_email.toLowerCase();
     updates.workspace_id = updates.workspace_id || workspaceId;

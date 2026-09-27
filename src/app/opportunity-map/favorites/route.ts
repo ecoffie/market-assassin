@@ -612,7 +612,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       agency: r.agency||'',
       naics_code: o.naics||'',
       set_aside: o.set||'',
-      response_deadline: r.response_deadline||'',
+      response_deadline: r.response_deadline||null,  // unknown = null, never '' (#1705: '' 500s the TIMESTAMPTZ insert)
       value_estimate: val,
       notice_type: r.notice_type||'',
       source: 'saved_inbox'
