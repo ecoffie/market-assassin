@@ -28,8 +28,10 @@
  *   4. TODAY'S MARKET  — the numbers last, borderless: "now the numbers make sense."
  * Spacing groups 1+2 as ONE chapter; a full rule + real air separates the rest.
  *
- * Every figure is a live query (src/lib/today/intel.ts, KV-cached, refreshed by the 3-hourly
- * precompute cron). A null count is DROPPED, never rendered as 0.
+ * Every COUNT is a query (src/lib/today/intel.ts, KV-cached, refreshed by the 3-hourly
+ * precompute cron). A null count is DROPPED, never rendered as 0. The card DOLLAR values are
+ * M-Estimates (intel_value_range: prior contract ±15% or comparable-award percentiles) — Mindy's
+ * estimate, never a government value — and every one is labelled "Est." (P1-B).
  */
 import { NextResponse } from 'next/server';
 import { MAPS_HOME_URL, MAPS_HOME_PATH, MAPS_HOME_IS_APEX } from '@/lib/mindy/maps-home';
@@ -55,11 +57,12 @@ function esc(v: unknown): string {
 function card(o: FeaturedOpp): string {
   // The basis line has two shapes ("based on…" vs "309 comparable…"), so the prefix is
   // shape-aware — otherwise it reads "Est. from based on the prior contract".
-  // estBasis is nullable: when we have no provenance for the estimate we render NO basis line
-  // rather than a bare "Est. from" with nothing after it.
+  // estBasis is nullable. The value above it is an M-Estimate either way, so a missing basis
+  // still gets an estimate label — never a bare dollar figure that reads as a known/government
+  // value (repair board P1-B). What is unknown is the BASIS, and the line says exactly that.
   const basis = o.estBasis
     ? (/^(based|from|per|using)\b/i.test(o.estBasis) ? `Est. ${o.estBasis}` : `Est. from ${o.estBasis}`)
-    : '';
+    : 'Est. — Mindy estimate (basis not available)';
   // ⚠️ THESE ARE DOLLARS. They shipped as bare integers — the hero of every featured card read
   // "195479" and "8041670" instead of "$195K" and "$8M" (Eric screenshot 2026-08-15). The type
   // is `number` and the render was `esc(o.estMedian)`, so nothing was WRONG enough to fail a
@@ -78,7 +81,7 @@ function card(o: FeaturedOpp): string {
     .map((d) => `<span class="tc-dna ${esc(d.tone || 'neutral')}">${esc(d.label)}</span>`).join('');
   return `<a class="tcard" href="${esc(o.href)}">
     <div class="tc-val">${esc(estMoneyServer(o.estMedian))}${range}</div>
-    ${basis ? `<div class="tc-basis">${esc(basis)}</div>` : ''}
+    <div class="tc-basis">${esc(basis)}</div>
     <div class="tc-agency">${esc(o.agency)}</div>
     <div class="tc-title">${esc(o.title)}</div>
     <div class="tc-meta">${urgency}${place}</div>
@@ -565,7 +568,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   </section>` : ''}
 
   <div class="tfoot">
-    Every number on this page is a live query against SAM.gov, USASpending and agency forecast data — nothing is estimated.
+    Counts on this page are queried from SAM.gov, USASpending and agency forecast data and refreshed every few hours. Dollar values marked “Est.” are M-Estimates — Mindy’s own estimate from the prior contract or comparable past contracts, not a government figure. Open any card to see how it’s calculated.
     ${intel.degraded ? '<span class="warn">Some sections are unavailable right now and have been omitted rather than shown as zero.</span>' : ''}
   </div>
 
