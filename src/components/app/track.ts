@@ -15,6 +15,9 @@
  *   track('page_view', 'source_feed', { panel: 'alerts' });
  *   track('tool_use', 'market_research', { action: 'lens_click', lens: 'map' });
  *
+ * Transport: sendAppEngagement() — authenticated keepalive fetch, NEVER
+ * sendBeacon (a beacon cannot carry the auth header; see below).
+ *
  * Fire-and-forget: never awaits, never throws. Tracking failures
  * must not break the user's flow.
  *
@@ -140,6 +143,65 @@ function readAttribution(): Attribution {
   return out;
 }
 
+/**
+ * THE authenticated transport for signed-in engagement events. Every signed-in
+ * producer on the /app surface must go through this — never `navigator.sendBeacon`.
+ *
+ * Why (measured 2026-09-26): since #1232 (2026-08-21) /api/app/engagement requires
+ * STRONG auth for a real email — the MI session token in `x-mi-auth-token`. A beacon
+ * cannot carry a header, and the token lives in localStorage (not a cookie), so every
+ * signed-in beacon 401'd. `sendBeacon` returns `true` the moment the request is QUEUED,
+ * so the fetch fallback never ran and nothing ever saw the 401. pipeline 157→0,
+ * market_intel_dashboard 773→0, forecasts/settings/market_research/onboarding → 0 for
+ * five weeks while the Map (fetch + token) kept recording.
+ *
+ * `fetch(..., { keepalive: true })` is the replacement: it survives pagehide / tab close
+ * like a beacon does AND carries the auth header. Identity is established server-side
+ * from the token; the body email is only the CLAIM the token must match.
+ *
+ * No token → the event is NOT sent. It would 401 anyway, and inventing identity (a
+ * weaker auth path, trusting the body email) is worse than a missing event.
+ * Fire-and-forget: never throws, never awaited by callers.
+ */
+export function sendAppEngagement(
+  email: string | null | undefined,
+  event: { eventType: string; eventSource: string; metadata?: Record<string, unknown> },
+  url: string = '/api/mindy/engagement',
+): void {
+  if (!email || typeof window === 'undefined') return;
+  try {
+    const headers = getMIApiHeaders(email, { 'Content-Type': 'application/json' });
+    if (!headers.has('x-mi-auth-token') && !headers.has('x-mi-2fa-token')) {
+      telemetryDevWarn(`dropped ${event.eventSource}/${event.eventType}: no MI session token`);
+      return;
+    }
+    const body = JSON.stringify({
+      email,
+      eventType: event.eventType,
+      eventSource: event.eventSource,
+      metadata: event.metadata || {},
+    });
+    void fetch(url, { method: 'POST', headers, body, keepalive: true })
+      .then((res) => {
+        if (!res.ok) telemetryDevWarn(`${event.eventSource}/${event.eventType} rejected: HTTP ${res.status}`);
+      })
+      .catch(() => {
+        // Swallow — tracking errors must not surface to the user. (An unload can
+        // cancel the promise; keepalive still delivers the request.)
+      });
+  } catch {
+    // Belt-and-suspenders: tracking must never break the user's flow.
+  }
+}
+
+/** Loud in development, silent in production — a rejected telemetry request is a
+ *  defect, and this one hid for five weeks precisely because nothing said so. */
+function telemetryDevWarn(msg: string): void {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`[engagement telemetry] ${msg}`);
+  }
+}
+
 export function useAppTracker(email: string | null | undefined) {
   return useCallback(
     (eventType: AppEventType, eventSource: AppEventSource, metadata?: Record<string, unknown>) => {
@@ -154,32 +216,7 @@ export function useAppTracker(email: string | null | undefined) {
         ...attribution,
         ...(metadata || {}),
       };
-      const payload = JSON.stringify({
-        email,
-        eventType,
-        eventSource,
-        metadata: merged,
-      });
-      try {
-        // Beacon preferred — survives navigation / panel-close. Falls
-        // back to fetch if Beacon isn't available (older browsers,
-        // SSR). Both fire-and-forget.
-        if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-          const blob = new Blob([payload], { type: 'application/json' });
-          const sent = navigator.sendBeacon('/api/mindy/engagement', blob);
-          if (sent) return;
-        }
-        void fetch('/api/mindy/engagement', {
-          method: 'POST',
-          headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
-          body: payload,
-          keepalive: true,
-        }).catch(() => {
-          // Swallow — tracking errors must not surface to the user.
-        });
-      } catch {
-        // Belt-and-suspenders. If Beacon throws (rare) we don't care.
-      }
+      sendAppEngagement(email, { eventType, eventSource, metadata: merged });
     },
     [email],
   );

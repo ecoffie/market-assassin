@@ -62,6 +62,18 @@ export async function POST(request: NextRequest) {
       // which is validated by shape above and can never name a real account.
       const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
       if (!auth.authenticated) {
+        // Rejections only (never successes), so this is quiet in a healthy system. It exists
+        // because this exact 401 dropped every signed-in /app beacon for five weeks
+        // (2026-08-21 → 09-26) with nothing anywhere saying so. `had_token=false` means the
+        // PRODUCER forgot the header (a transport bug); `true` means an expired/mismatched
+        // session. Source + reason only — no email in the log line.
+        console.warn('[app/engagement] rejected unauthenticated event', {
+          event_source: eventSource,
+          event_type: eventType,
+          had_token: !!(request.headers.get('x-mi-auth-token') || request.headers.get('x-mi-2fa-token')
+            || request.headers.get('authorization')),
+          reason: auth.error || 'unauthorized',
+        });
         return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
       }
       resolvedEmail = auth.email!;

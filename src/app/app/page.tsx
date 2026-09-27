@@ -16,6 +16,7 @@ import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
 import { getSupabase } from '@/lib/supabase/client';
 import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
+import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 
@@ -205,15 +206,17 @@ function AppDashboard() {
     return headers;
   }, []);
 
+  // Every event goes through the shared AUTHENTICATED transport (keepalive fetch +
+  // x-mi-auth-token). This used to sendBeacon the unload flush, which cannot carry the
+  // header /api/app/engagement has required since #1232 — so every tab-hide/close
+  // panel_time was silently 401'd from 2026-08-21. See sendAppEngagement in track.ts.
   const trackEngagement = useCallback((
     eventType: 'page_view' | 'tool_use' | 'login' | 'profile_update' | 'onboarding_step',
     metadata: Record<string, unknown>,
-    options: { keepalive?: boolean; beacon?: boolean } = {}
   ) => {
     if (!email || typeof window === 'undefined') return;
 
-    const payload = JSON.stringify({
-      email,
+    sendAppEngagement(email, {
       eventType,
       eventSource: 'market_intelligence',
       metadata: {
@@ -222,21 +225,9 @@ function AppDashboard() {
         path: window.location.pathname,
       },
     });
-
-    if (options.beacon && navigator.sendBeacon) {
-      navigator.sendBeacon('/api/mindy/engagement', new Blob([payload], { type: 'application/json' }));
-      return;
-    }
-
-    fetch('/api/mindy/engagement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: options.keepalive,
-    }).catch(() => {});
   }, [email]);
 
-  const flushPanelTime = useCallback((panel: AppPanel, options: { keepalive?: boolean; beacon?: boolean } = {}) => {
+  const flushPanelTime = useCallback((panel: AppPanel, reason: string) => {
     const now = Date.now();
     const durationMs = Math.max(now - panelStartedAtRef.current, 0);
     panelStartedAtRef.current = now;
@@ -247,7 +238,8 @@ function AppDashboard() {
       action: 'panel_time',
       panel,
       duration_ms: durationMs,
-    }, options);
+      flush_reason: reason,
+    });
   }, [trackEngagement]);
 
   const loadUserProfile = useCallback(async (userEmail: string) => {
@@ -568,21 +560,27 @@ function AppDashboard() {
     panelStartedAtRef.current = Date.now();
     trackEngagement('page_view', { panel: activePanel, tier });
 
+    // Page exit: `visibilitychange→hidden` is the last event mobile browsers reliably
+    // deliver, and `pagehide` covers desktop close/navigate (and, unlike beforeunload,
+    // does not disable the back/forward cache). The flush resets the clock, so when both
+    // fire the second is under 3s and dropped — no double counting. A keepalive fetch
+    // CAN still be lost on a hard kill; a slightly short duration is the accepted cost of
+    // never sending an unauthenticated event.
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        flushPanelTime(activePanelRef.current, { beacon: true });
+        flushPanelTime(activePanelRef.current, 'hidden');
       } else {
         panelStartedAtRef.current = Date.now();
       }
     };
-    const handleBeforeUnload = () => flushPanelTime(activePanelRef.current, { beacon: true });
+    const handlePageHide = () => flushPanelTime(activePanelRef.current, 'pagehide');
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      flushPanelTime(activePanelRef.current, { keepalive: true });
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      flushPanelTime(activePanelRef.current, 'unmount');
+      window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [email, activePanel, tier, trackEngagement, flushPanelTime]);
@@ -640,7 +638,7 @@ function AppDashboard() {
 
   const handlePanelChange = useCallback((nextPanel: AppPanel, context?: Record<string, unknown>) => {
     if (nextPanel === activePanelRef.current && !context) return;
-    flushPanelTime(activePanelRef.current, { keepalive: true });
+    flushPanelTime(activePanelRef.current, 'panel_change');
     activePanelRef.current = nextPanel;
     panelStartedAtRef.current = Date.now();
     setActivePanel(nextPanel);
