@@ -188,20 +188,36 @@ describe('what the ranking does NOT guarantee — the claims are boosts/demotion
 });
 
 describe('market-only label names the market that actually admitted the row', () => {
-  const row = { ...byTitle('FedRAMP Webex'), title: 'Webex licenses', description: '' } as SAMOpportunity;
+  const row = { ...byTitle('FedRAMP Webex'), title: 'Webex licenses', description: '', naicsCode: '541519', classificationCode: 'DA01' } as SAMOpportunity;
+  const label = (profile: Parameters<typeof scoreOpportunityDetailed>[1], r: SAMOpportunity = row) => {
+    const d = scoreOpportunityDetailed(r, profile);
+    return { market: d.evidence.market, text: renderMatchReason({ ...r, evidence: d.evidence }) };
+  };
 
-  it('a NAICS profile: "in your NAICS market"', () => {
-    const d = scoreOpportunityDetailed(row, CASE_PROFILE);
-    expect(d.evidence.naics).toBe('exact');
-    expect(renderMatchReason({ ...row, evidence: d.evidence })).toMatch(/No keyword match &mdash; in your NAICS market/);
+  it('exact NAICS: "in your NAICS market"', () => {
+    expect(label(CASE_PROFILE)).toMatchObject({ market: 'naics', text: expect.stringMatching(/No keyword match &mdash; in your NAICS market/) });
   });
 
-  it('a PSC-only profile (no NAICS): "in your PSC market" — never a NAICS claim', () => {
-    const PSC_ONLY = { ...CASE_PROFILE, naics_codes: [] as string[] };
-    const d = scoreOpportunityDetailed(row, PSC_ONLY);
-    expect(d.evidence.naics).toBeNull();
-    const reason = renderMatchReason({ ...row, evidence: d.evidence });
-    expect(reason).toMatch(/No keyword match &mdash; in your PSC market/);
-    expect(reason).not.toMatch(/NAICS/);
+  it('admitted through the 4-digit NAICS group (saved 541620, row 541690): still NAICS — never PSC', () => {
+    // 541620 is not a curated-exact code, so the market filter admits its whole 5416 group.
+    const grouped = { ...row, naicsCode: '541690' } as SAMOpportunity;
+    const profile = { ...CASE_PROFILE, naics_codes: ['541620'], psc_codes: ['DA01'] };
+    expect(scoreOpportunityDetailed(grouped, profile).evidence.naics).toBeNull(); // the SCORING signal is blind to the group
+    const r = label(profile, grouped);
+    expect(r.market).toBe('naics');                                              // the ADMISSION rule is not
+    expect(r.text).toMatch(/in your NAICS market/);
+  });
+
+  it('a PSC-only profile: "in your PSC market" — never a NAICS claim', () => {
+    const r = label({ ...CASE_PROFILE, naics_codes: [], psc_codes: ['DA01'] });
+    expect(r.market).toBe('psc');
+    expect(r.text).toMatch(/No keyword match &mdash; in your PSC market/);
+    expect(r.text).not.toMatch(/NAICS/);
+  });
+
+  it('a row NEITHER market admits (e.g. a fixture row): no market is claimed', () => {
+    const r = label({ ...CASE_PROFILE, naics_codes: ['236220'], psc_codes: ['Z1AA'] });
+    expect(r.market).toBeNull();
+    expect(r.text).toBe('No keyword match');
   });
 });

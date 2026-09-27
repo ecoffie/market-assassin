@@ -31,12 +31,14 @@ export function renderMatchReason(opp: WithEvidence): string {
   } else if (e.keywords.body.length > 0) {
     bits.push(`Keyword ${e.keywords.body.slice(0, 2).map(quote).join(', ')} in description`);
   } else {
-    // Say which saved market admitted the row. A row with no NAICS match was admitted
-    // by a saved PSC code (the saved-industry filter drops off-NAICS rows whenever the
-    // profile HAS NAICS), so "in your NAICS market" would be false for a PSC-only profile.
-    bits.push(e.naics
+    // Name ONLY the market that actually admitted the row (evidence.market, computed with
+    // the admission rule). A PSC-admitted row must not say NAICS; a row neither market
+    // admits (e.g. a fixture row) claims no market at all.
+    bits.push(e.market === 'naics'
       ? 'No keyword match &mdash; in your NAICS market'
-      : 'No keyword match &mdash; in your PSC market');
+      : e.market === 'psc'
+        ? 'No keyword match &mdash; in your PSC market'
+        : 'No keyword match');
   }
   if (naicsBit) bits.push(naicsBit);
   return bits.join(' &middot; ');
