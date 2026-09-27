@@ -38,6 +38,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-09-26 | /today featured cards + footer | The footer said "Every number on this page is a live query … nothing is estimated" directly under M-Estimate "Est." ranges, and a card whose estimate had no basis rendered a bare dollar figure with no estimate marker. The basis line now always renders (missing basis → "Est. — Mindy estimate (basis not available)"); the footer says counts are queries refreshed every few hours and "Est." values are M-Estimates, not a government figure. Methodology unchanged. | `Est. — Mindy estimate (basis not available)` → `src/app/today/route.ts` | `estimate-provenance.unit.test.ts` 4/4 red on origin/main → 4/4 green | 🟡 PR open |
 
+## 2026-09-27 — Alert settings: business description is a partial update
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-27 | `/api/alerts/preferences` + `/api/alerts/save-profile` → `user_business_profiles.business_description` | **A keywords-only save overwrote the user's own business description.** The mirror block ran whenever `keywords` was present and wrote `"Federal contractor: …"` (derived from keywords) — or NULL on `keywords: []` — so the Settings panel main save, TargetingCard, the Map settings drawer and the "delete my profile" reset (whose copy clears only codes/keywords/agencies) all rewrote it. save-profile nulled it whenever the never-prefilled signup box was empty. Prod (read-only): 176 of 564 non-null descriptions (31%) are derived-shaped. **Fix:** `resolveBusinessDescriptionWrite` — omitted/blank is untouched; a derived description only fills an empty one or refreshes one that equals the derivation of the previous keywords; a failed stored-read skips the write. save-profile writes only a non-blank description. | `export function resolveBusinessDescriptionWrite(` → `src/lib/alerts/business-description-patch.ts` | Route test on real POST handler + in-memory Supabase: 4/8 RED on origin/main routes, 8/8 GREEN after; helper 10/10; tsc clean; related 17 files / 184 tests | 🟡 PR open |
+
 ## 2026-09-26 — #1696 Part 2: one discovery round per Maps load
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

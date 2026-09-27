@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setup';
+import {
+  cleanBusinessDescription,
+  mayDeriveBusinessDescription,
+  resolveBusinessDescriptionWrite,
+} from '@/lib/alerts/business-description-patch';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import {
   mergePrioritiesIntoAggregated,
@@ -506,23 +510,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (businessDescription !== undefined || keywords !== undefined) {
-      let cleanDescription = typeof businessDescription === 'string'
-        ? businessDescription.trim()
-        : '';
-      if (!cleanDescription && Array.isArray(keywords) && keywords.length > 0) {
-        cleanDescription = deriveBusinessDescriptionFromKeywords(keywords) || '';
-      }
-
+    // Mirror the business description to user_business_profiles — PARTIAL update:
+    // an omitted/blank description is untouched, and a keywords-derived one only
+    // ever fills an empty (or previously auto-derived) description. It used to run
+    // on every keywords save, overwriting the user's own text with
+    // "Federal contractor: …" — or NULL on `keywords: []` (the profile reset).
+    // Rules: src/lib/alerts/business-description-patch.ts.
+    const userWroteDescription = cleanBusinessDescription(businessDescription) !== null;
+    if (userWroteDescription || mayDeriveBusinessDescription({ businessDescription, keywords: record.keywords })) {
       try {
-        await getSupabase()
-          .from('user_business_profiles')
-          .upsert({
-            user_email: rowEmail,
-            business_description: cleanDescription || null,
-            business_description_updated_at: cleanDescription ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_email' });
+        let storedDescription: string | null = null;
+        if (!userWroteDescription) {
+          // Only a derived fill needs the stored value. A failed read is UNKNOWN,
+          // not empty — skip the write rather than risk overwriting user text.
+          const { data: storedProfile, error: storedErr } = await getSupabase()
+            .from('user_business_profiles')
+            .select('business_description')
+            .eq('user_email', rowEmail)
+            .maybeSingle();
+          if (storedErr) throw storedErr;
+          storedDescription = storedProfile?.business_description ?? null;
+        }
+        const nextDescription = resolveBusinessDescriptionWrite({
+          businessDescription,
+          keywords: record.keywords,
+          storedDescription,
+          previousKeywords: existing?.keywords,
+        });
+        if (nextDescription) {
+          const nowIso = new Date().toISOString();
+          const { error: mirrorErr } = await getSupabase()
+            .from('user_business_profiles')
+            .upsert({
+              user_email: rowEmail,
+              business_description: nextDescription,
+              business_description_updated_at: nowIso,
+              updated_at: nowIso,
+            }, { onConflict: 'user_email' });
+          if (mirrorErr) throw mirrorErr;
+        }
       } catch (businessProfileError) {
         console.warn('[Notification Preferences] Could not mirror business description:', businessProfileError);
       }
