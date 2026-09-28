@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { fileURLToPath } from 'node:url';
+import { availableParallelism } from 'node:os';
 
 // Phase 2 unit tests — pure logic in src/lib (+ a few src/components utils).
 // Fast, browser-less, no DB/network. E2E (Playwright) was intentionally dropped;
@@ -20,15 +21,16 @@ export default defineConfig({
     globals: true,
     // The unit suite can never reach BigQuery (bq CLI or REST), unconditionally. Live BigQuery
     // integration tests are *.bq-integration.test.ts, run only by vitest.bq-integration.config.ts.
-    setupFiles: ['./src/test/no-live-bigquery.setup.ts'],
+    setupFiles: [
+      './src/test/no-live-bigquery.setup.ts',
+      // Any non-loopback network connection in a unit test fails immediately.
+      './tests/setup/no-network.ts',
+    ],
     // Only pick up *.unit.test.ts(x). This deliberately avoids the existing
     // tests/*.test.ts protocol files (keyword-geo-filter.test.ts, office-name-
     // parity.test.mts) that were written for other runners.
     include: [
       'src/**/*.unit.test.{ts,tsx}',
-      'src/lib/sam/lookup-solicitation.live.test.ts',
-      // Opt-in (CREDIT_INTEGRITY_LIVE=1): writes to ONE synthetic account's ledger.
-      'src/lib/mcp/credit-integrity.live.test.ts',
       'src/lib/agent-tasks/**/*.e2e.test.ts',
       'src/lib/agent-tasks/**/*.concurrent.test.ts',
       'src/lib/agent-tasks/**/*.race.test.ts',
@@ -36,9 +38,24 @@ export default defineConfig({
       'tests/unit/**/*.test.{ts,tsx}',
       // Decision-chain: behavioural tests that CALL tools and assert returned values.
       // Distinct from *.unit.test.ts, which assert on source text and cannot detect a wrong answer.
-      'src/mcp/decision-chain/**/*.{seam,live}.test.{ts,tsx}',
+      'src/mcp/decision-chain/**/*.seam.test.{ts,tsx}',
     ],
-    exclude: ['node_modules', '.next', 'tests/fixtures', 'scripts', '**/*.bq-integration.test.ts'],
+    // *.live.test.* files reach real services and run under vitest.live.config.ts
+    // (`npm run test:live`), never in the deterministic unit run that gates a push.
+    exclude: ['node_modules', '.next', 'tests/fixtures', 'scripts', '**/*.bq-integration.test.ts', '**/*.live.test.{ts,tsx}'],
+    // ── Worker ceiling (deterministic, not left to whoever runs the suite) ──────────────
+    // Measured 2026-09-28 on a 16-core machine running several agents at once, full suite,
+    // real tests, nothing skipped:
+    //   15 workers (default) → 3/3 runs failed with `Timeout calling "onTaskUpdate"` (all tests passed)
+    //   12 workers           → 3/3 failed the same way
+    //    8 workers           → 3/3 clean (one at load avg 85), ~86s
+    //    6 / 4 workers       → 5/5 clean, 110s / 160s
+    // The ROOT cause (CLI e2e suites blocking the worker with spawnSync) is fixed separately;
+    // this ceiling bounds CPU oversubscription so one machine's other work cannot starve the
+    // run. Half the cores, capped at 8 and floored at 2, is the fastest measured clean point.
+    pool: 'forks',
+    maxWorkers: Math.max(2, Math.min(8, Math.floor(availableParallelism() / 2))),
+    minWorkers: 1,
     // Keep runs snappy and deterministic for the pre-commit / CI path.
     //
     // ⏱ 10s → 45s (2026-09-21). This is ONE global clock shared by two very different kinds of

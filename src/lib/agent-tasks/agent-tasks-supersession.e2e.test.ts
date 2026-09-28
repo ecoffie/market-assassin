@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { spawnTsxSync } from './test-cli-spawn';
+import { spawnTsx } from './test-cli-spawn';
 import { sanitizedGitEnv } from './git-evidence';
 import type { AgentTaskRegistry, TaskRecord } from './types';
 
@@ -80,8 +80,8 @@ function seed(tasks: TaskRecord[], revision = 10) {
   writeFileSync(reg, JSON.stringify(r, null, 2));
 }
 
-function run(args: string[]) {
-  return spawnTsxSync(SCRIPT, [...args, '--registry', reg], {
+async function run(args: string[]) {
+  return spawnTsx(SCRIPT, [...args, '--registry', reg], {
     cwd: ROOT,
     env: process.env,
     encoding: 'utf8',
@@ -106,19 +106,19 @@ const OK_ARGS = [
   '--confirm',
 ];
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'pstack-supersede-e2e-'));
   reg = join(dir, 'registry.json');
 });
 
-afterEach(() => {
+afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
 describe('CLI supersede lifecycle', () => {
-  it('closes the source and creates a successor anchored on REAL origin/main', () => {
+  it('closes the source and creates a successor anchored on REAL origin/main', async () => {
     seed([task()]);
-    const r = run(OK_ARGS);
+    const r = await run(OK_ARGS);
     expect(r.status, r.stderr).toBe(0);
 
     const out = JSON.parse(r.stdout);
@@ -134,10 +134,10 @@ describe('CLI supersede lifecycle', () => {
     expect(out.successor.baseSha).not.toBe(OLD_BASE);
   });
 
-  it('the superseded source disappears from `list --ready` and the successor appears', () => {
+  it('the superseded source disappears from `list --ready` and the successor appears', async () => {
     seed([task()]);
-    expect(run(OK_ARGS).status).toBe(0);
-    const listed = run(['list', '--ready']);
+    expect((await run(OK_ARGS)).status).toBe(0);
+    const listed = await run(['list', '--ready']);
     expect(listed.status).toBe(0);
     // Assert on the QUEUED IDS, not raw text: the successor legitimately REFERENCES the
     // source via supersedesTaskId, so a substring check would always find it.
@@ -146,40 +146,40 @@ describe('CLI supersede lifecycle', () => {
     expect(ids).not.toContain('TASK-E2E-SRC-001');
   });
 
-  it('rejects a non-administrator at the CLI boundary', () => {
+  it('rejects a non-administrator at the CLI boundary', async () => {
     seed([task()]);
-    const r = run(OK_ARGS.map((a) => (a === 'administrator' ? 'builder' : a)));
+    const r = await run(OK_ARGS.map((a) => (a === 'administrator' ? 'builder' : a)));
     expect(r.status).not.toBe(0);
     expect(`${r.stderr}${r.stdout}`).toContain('administrator');
     expect(JSON.parse(readFileSync(reg, 'utf8')).tasks['TASK-E2E-SRC-002']).toBeUndefined();
   });
 
-  it('rejects a missing --confirm at the CLI boundary', () => {
+  it('rejects a missing --confirm at the CLI boundary', async () => {
     seed([task()]);
-    const r = run(OK_ARGS.filter((a) => a !== '--confirm'));
+    const r = await run(OK_ARGS.filter((a) => a !== '--confirm'));
     expect(r.status).not.toBe(0);
     expect(JSON.parse(readFileSync(reg, 'utf8')).tasks['TASK-E2E-SRC-002']).toBeUndefined();
   });
 
-  it('rejects missing required arguments with the usage line', () => {
+  it('rejects missing required arguments with the usage line', async () => {
     seed([task()]);
-    const r = run(['supersede', 'TASK-E2E-SRC-001', '--actor', 'eric', '--role', 'administrator']);
+    const r = await run(['supersede', 'TASK-E2E-SRC-001', '--actor', 'eric', '--role', 'administrator']);
     expect(r.status).not.toBe(0);
     expect(`${r.stderr}${r.stdout}`).toContain('usage: supersede');
   });
 
-  it('offers no --current-main override — the base cannot be fabricated from the CLI', () => {
+  it('offers no --current-main override — the base cannot be fabricated from the CLI', async () => {
     seed([task()]);
-    const r = run([...OK_ARGS, '--current-main', '0000000000000000000000000000000000000000']);
+    const r = await run([...OK_ARGS, '--current-main', '0000000000000000000000000000000000000000']);
     expect(r.status).toBe(0);
     // The bogus flag is ignored; the real main still wins.
     expect(JSON.parse(r.stdout).successor.baseSha).toBe(realMainSha());
   });
 
-  it('leaves the registry untouched when the successor id already exists', () => {
+  it('leaves the registry untouched when the successor id already exists', async () => {
     seed([task(), task({ id: 'TASK-E2E-SRC-002', branch: 'other', worktree: 'other-wt' })]);
     const before = readFileSync(reg, 'utf8');
-    const r = run(OK_ARGS);
+    const r = await run(OK_ARGS);
     expect(r.status).not.toBe(0);
     expect(readFileSync(reg, 'utf8')).toBe(before);
   });

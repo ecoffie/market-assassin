@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { spawnTsxSync } from './test-cli-spawn';
+import { spawnTsx } from './test-cli-spawn';
 import { sanitizedGitEnv } from './git-evidence';
 import { resolveSharedRepoRoot, resolveTaskWorktreePath } from './task-worktree';
 import type { AgentTaskRegistry, TaskCheckpoint, TaskRecord } from './types';
@@ -48,8 +48,8 @@ function git(args: string[], cwd: string): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', env: sanitizedGitEnv() }).trim();
 }
 
-function run(args: string[], cwd: string) {
-  return spawnTsxSync(SCRIPT_SRC, [...args, '--registry', regPath], {
+async function run(args: string[], cwd: string) {
+  return spawnTsx(SCRIPT_SRC, [...args, '--registry', regPath], {
     cwd,
     env: { ...sanitizedGitEnv(), AGENT_TASK_REGISTRY_PATH: regPath },
     encoding: 'utf8',
@@ -170,7 +170,7 @@ const ATTEST = [
   '--confirm',
 ];
 
-beforeAll(() => {
+beforeAll(async () => {
   // Space in the directory name is deliberate — mirrors "Market Assasin".
   root = mkdtempSync(join(tmpdir(), 'pstack attest e2e-'));
   mainWt = join(root, 'main');
@@ -205,13 +205,13 @@ beforeAll(() => {
   regPath = join(regDir, 'registry.json');
 });
 
-afterAll(() => {
+afterAll(async () => {
   rmSync(root, { recursive: true, force: true });
   rmSync(join(regPath, '..'), { recursive: true, force: true });
 });
 
 describe('C — one canonical worktree path from EVERY invocation location', () => {
-  it('resolves the SAME absolute candidate path from main, the task worktree, and another linked worktree', () => {
+  it('resolves the SAME absolute candidate path from main, the task worktree, and another linked worktree', async () => {
     const fromMain = resolveTaskWorktreePath({ worktreeRel: WT_REL, cwd: mainWt });
     const fromTask = resolveTaskWorktreePath({ worktreeRel: WT_REL, cwd: taskWt });
     const fromOther = resolveTaskWorktreePath({ worktreeRel: WT_REL, cwd: otherWt });
@@ -225,7 +225,7 @@ describe('C — one canonical worktree path from EVERY invocation location', () 
     expect(git(['rev-parse', 'HEAD'], fromMain.value.absPath).toLowerCase()).toBe(CANDIDATE);
   });
 
-  it('THE OLD BUG: join(cwd, task.worktree) from a linked worktree nests into a nonexistent path', () => {
+  it('THE OLD BUG: join(cwd, task.worktree) from a linked worktree nests into a nonexistent path', async () => {
     const buggy = join(taskWt, WT_REL);
     expect(buggy).not.toBe(resolveTaskWorktreePath({ worktreeRel: WT_REL, cwd: taskWt }).ok
       ? (resolveTaskWorktreePath({ worktreeRel: WT_REL, cwd: taskWt }) as { value: { absPath: string } }).value.absPath
@@ -234,7 +234,7 @@ describe('C — one canonical worktree path from EVERY invocation location', () 
     expect(() => git(['rev-parse', 'HEAD'], buggy)).toThrow();
   });
 
-  it('the shared root is identical from every worktree', () => {
+  it('the shared root is identical from every worktree', async () => {
     const a = resolveSharedRepoRoot(mainWt);
     const b = resolveSharedRepoRoot(taskWt);
     const c = resolveSharedRepoRoot(otherWt);
@@ -244,7 +244,7 @@ describe('C — one canonical worktree path from EVERY invocation location', () 
     expect(c.value).toBe(a.value);
   });
 
-  it('rejects path traversal outside the shared repository', () => {
+  it('rejects path traversal outside the shared repository', async () => {
     const r = resolveTaskWorktreePath({ worktreeRel: '../../../etc', cwd: mainWt });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -252,7 +252,7 @@ describe('C — one canonical worktree path from EVERY invocation location', () 
     expect(r.message).toMatch(/outside the shared repository/);
   });
 
-  it('handles spaces in the repository path (execFile argv, never a shell string)', () => {
+  it('handles spaces in the repository path (execFile argv, never a shell string)', async () => {
     expect(root).toContain(' ');
     const r = resolveTaskWorktreePath({ worktreeRel: WT_REL, cwd: taskWt });
     expect(r.ok).toBe(true);
@@ -263,7 +263,7 @@ describe('C — one canonical worktree path from EVERY invocation location', () 
 });
 
 describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
-  it('1. a NEW checkpoint without structured evidence FAILS at submission', () => {
+  it('1. a NEW checkpoint without structured evidence FAILS at submission', async () => {
     // Same task, but parked in verification with a live verifier lease, so a fresh
     // `verified` submission is the operation under test.
     const t = task({
@@ -290,7 +290,7 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
         at: new Date().toISOString(),
       }),
     );
-    const r = run(['checkpoint', TASK_ID, '--owner', 'attest-verifier', '--file', cpFile], taskWt);
+    const r = await run(['checkpoint', TASK_ID, '--owner', 'attest-verifier', '--file', cpFile], taskWt);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/verification_incomplete/);
     expect(r.stderr).toMatch(/prose|candidateHeadSha/i);
@@ -298,12 +298,12 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     expect(readFileSync(regPath, 'utf8')).toBe(before);
   });
 
-  it('2. administrator attestation SUCCEEDS once, and 3. checkpoints stay byte-identical', () => {
+  it('2. administrator attestation SUCCEEDS once, and 3. checkpoints stay byte-identical', async () => {
     seed();
     const before = read();
     const cpBefore = JSON.stringify(before.tasks[TASK_ID].checkpoints);
 
-    const r = run(ATTEST, taskWt);
+    const r = await run(ATTEST, taskWt);
     expect(r.status, r.stderr).toBe(0);
 
     const after = read();
@@ -336,25 +336,25 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     expect(t.auditLog[0].metadata.candidateHeadSha).toBe(CANDIDATE);
   });
 
-  it('8. a REPEATED attestation fails', () => {
+  it('8. a REPEATED attestation fails', async () => {
     seed();
-    expect(run(ATTEST, taskWt).status).toBe(0);
+    expect((await run(ATTEST, taskWt)).status).toBe(0);
     const afterFirst = readFileSync(regPath, 'utf8');
 
-    const second = run(ATTEST, taskWt);
+    const second = await run(ATTEST, taskWt);
     expect(second.status).not.toBe(0);
     expect(second.stderr).toMatch(/attestation_conflict/);
     expect(readFileSync(regPath, 'utf8')).toBe(afterFirst);
   });
 
-  it('4+6. integration-handoff succeeds FROM THE TASK WORKTREE using the attestation', () => {
+  it('4+6. integration-handoff succeeds FROM THE TASK WORKTREE using the attestation', async () => {
     seed();
-    expect(run(ATTEST, taskWt).status).toBe(0);
+    expect((await run(ATTEST, taskWt)).status).toBe(0);
     expect(
-      run(['claim', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'], taskWt).status,
+      (await run(['claim', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'], taskWt)).status,
     ).toBe(0);
 
-    const h = run(
+    const h = await run(
       ['integration-handoff', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'],
       taskWt,
     );
@@ -366,19 +366,19 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     expect(out.worktreeArtifact.clean).toBe(true);
   });
 
-  it('5+6. approve succeeds FROM A DIFFERENT LINKED WORKTREE and resolves the SAME candidate', () => {
+  it('5+6. approve succeeds FROM A DIFFERENT LINKED WORKTREE and resolves the SAME candidate', async () => {
     seed();
-    expect(run(ATTEST, taskWt).status).toBe(0);
-    expect(run(['claim', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'], taskWt).status).toBe(0);
+    expect((await run(ATTEST, taskWt)).status).toBe(0);
+    expect((await run(['claim', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'], taskWt)).status).toBe(0);
 
     // Handoff from the task worktree...
-    const h = run(['integration-handoff', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'], taskWt);
+    const h = await run(['integration-handoff', TASK_ID, '--owner', 'attest-integrator', '--role', 'integrator'], taskWt);
     expect(h.status, h.stderr).toBe(0);
     const handoffHead = JSON.parse(h.stdout).candidateHeadSha;
 
     // ...approve from an UNRELATED linked worktree. Under the old cwd-joined resolution
     // this produced a nested nonexistent path and could not resolve the artifact at all.
-    const a = run(
+    const a = await run(
       ['approve', TASK_ID, '--actor', 'eric-orchestrator', '--role', 'administrator', '--evidence', 'phase-3a4-e2e'],
       otherWt,
     );
@@ -389,7 +389,7 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     expect(handoffHead).toBe(CANDIDATE);
   });
 
-  it('7. there is NO --no-git path and NO SHA override on attestation', () => {
+  it('7. there is NO --no-git path and NO SHA override on attestation', async () => {
     seed();
     for (const extra of [
       ['--no-git'],
@@ -397,19 +397,19 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
       ['--candidate-tree', CANDIDATE_TREE],
     ]) {
       const before = readFileSync(regPath, 'utf8');
-      const r = run([...ATTEST, ...extra], taskWt);
+      const r = await run([...ATTEST, ...extra], taskWt);
       expect(r.status, `expected rejection for ${extra[0]}`).not.toBe(0);
       expect(r.stderr).toMatch(/no --no-git and no candidate SHA overrides/);
       expect(readFileSync(regPath, 'utf8')).toBe(before);
     }
   });
 
-  it('9a. a DIRTY worktree fails attestation', () => {
+  it('9a. a DIRTY worktree fails attestation', async () => {
     seed();
     const dirty = join(taskWt, 'docs/engineering/scratch.md');
     writeFileSync(dirty, 'uncommitted\n');
     try {
-      const r = run(ATTEST, taskWt);
+      const r = await run(ATTEST, taskWt);
       expect(r.status).not.toBe(0);
       expect(r.stderr).toMatch(/not clean/);
       expect(read().tasks[TASK_ID].candidateEvidenceAttestation ?? null).toBeNull();
@@ -418,7 +418,7 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     }
   });
 
-  it('9b. a DIVERGENT candidate (commandResults head != live HEAD) fails', () => {
+  it('9b. a DIVERGENT candidate (commandResults head != live HEAD) fails', async () => {
     // Checkpoints claim a head the worktree does not have.
     const bogus = 'a'.repeat(40);
     const cps = legacyCheckpoints().map((c) => ({
@@ -430,13 +430,13 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     }));
     seed(task({ checkpoints: cps as TaskCheckpoint[] }));
 
-    const r = run(ATTEST, taskWt);
+    const r = await run(ATTEST, taskWt);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/candidate_integrity|!== command consensus/);
     expect(read().tasks[TASK_ID].candidateEvidenceAttestation ?? null).toBeNull();
   });
 
-  it('9c. NON-UNANIMOUS commandResults fail (no consensus to derive from)', () => {
+  it('9c. NON-UNANIMOUS commandResults fail (no consensus to derive from)', async () => {
     const cps = legacyCheckpoints();
     cps[1] = {
       ...cps[1],
@@ -446,12 +446,12 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
       },
     };
     seed(task({ checkpoints: cps }));
-    const r = run(ATTEST, taskWt);
+    const r = await run(ATTEST, taskWt);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/disagree on candidate head/);
   });
 
-  it('9d. a STALE base (main moved on) fails attestation', () => {
+  it('9d. a STALE base (main moved on) fails attestation', async () => {
     // Advance origin/main past the task base.
     writeFileSync(join(mainWt, 'docs/engineering/newer.md'), 'newer\n');
     git(['add', '.'], mainWt);
@@ -460,7 +460,7 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     git(['update-ref', 'refs/remotes/origin/main', newMain], mainWt);
     try {
       seed();
-      const r = run(ATTEST, taskWt);
+      const r = await run(ATTEST, taskWt);
       expect(r.status).not.toBe(0);
       expect(r.stderr).toMatch(/stale_main/);
       expect(read().tasks[TASK_ID].candidateEvidenceAttestation ?? null).toBeNull();
@@ -470,15 +470,15 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     }
   });
 
-  it('9e. SELF-VERIFIED chains cannot be laundered through attestation', () => {
+  it('9e. SELF-VERIFIED chains cannot be laundered through attestation', async () => {
     const cps = legacyCheckpoints().map((c) => ({ ...c, actor: 'same-agent' }));
     seed(task({ checkpoints: cps }));
-    const r = run(ATTEST, taskWt);
+    const r = await run(ATTEST, taskWt);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/self_verification_forbidden/);
   });
 
-  it('9f. an ACTIVE LEASE blocks attestation, and a non-integration state does too', () => {
+  it('9f. an ACTIVE LEASE blocks attestation, and a non-integration state does too', async () => {
     seed(
       task({
         lease: {
@@ -490,38 +490,38 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
         },
       }),
     );
-    expect(run(ATTEST, taskWt).stderr).toMatch(/lease_conflict/);
+    expect((await run(ATTEST, taskWt)).stderr).toMatch(/lease_conflict/);
 
     seed(task({ state: 'verification', lease: null, assignedRole: 'verifier' }));
-    expect(run(ATTEST, taskWt).stderr).toMatch(/invalid_transition/);
+    expect((await run(ATTEST, taskWt)).stderr).toMatch(/invalid_transition/);
   });
 
-  it('9g. structured evidence already present => nothing to attest', () => {
+  it('9g. structured evidence already present => nothing to attest', async () => {
     const cps = legacyCheckpoints().map((c) => ({
       ...c,
       evidence: { ...c.evidence, candidateHeadSha: CANDIDATE, candidateTreeSha: CANDIDATE_TREE },
     }));
     seed(task({ checkpoints: cps }));
-    const r = run(ATTEST, taskWt);
+    const r = await run(ATTEST, taskWt);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/attestation_conflict|nothing to attest/);
   });
 
-  it('9h. administrator role, --confirm and a non-empty --reason are all REQUIRED', () => {
+  it('9h. administrator role, --confirm and a non-empty --reason are all REQUIRED', async () => {
     seed();
     const base = ['attest-candidate-evidence', TASK_ID, '--actor', 'eric-orchestrator'];
     // no --role administrator
-    expect(run([...base, '--reason', 'x'.repeat(20), '--confirm'], taskWt).status).not.toBe(0);
+    expect((await run([...base, '--reason', 'x'.repeat(20), '--confirm'], taskWt)).status).not.toBe(0);
     // no --confirm
     expect(
-      run([...base, '--role', 'administrator', '--reason', 'x'.repeat(20)], taskWt).stderr,
+      (await run([...base, '--role', 'administrator', '--reason', 'x'.repeat(20)], taskWt)).stderr,
     ).toMatch(/--confirm/);
     // no --reason
-    expect(run([...base, '--role', 'administrator', '--confirm'], taskWt).status).not.toBe(0);
+    expect((await run([...base, '--role', 'administrator', '--confirm'], taskWt)).status).not.toBe(0);
     expect(read().tasks[TASK_ID].candidateEvidenceAttestation ?? null).toBeNull();
   });
 
-  it('10. registry writes stay ATOMIC — a failed attestation leaves no tmp debris', () => {
+  it('10. registry writes stay ATOMIC — a failed attestation leaves no tmp debris', async () => {
     seed();
     const before = readFileSync(regPath, 'utf8');
     // Force a failure late in the flow (divergent head) and confirm no partial write.
@@ -531,13 +531,13 @@ describe('PHASE 3A.4 — full attestation lifecycle against real Git', () => {
     }));
     seed(task({ checkpoints: cps as TaskCheckpoint[] }));
     const seeded = readFileSync(regPath, 'utf8');
-    const r = run(ATTEST, taskWt);
+    const r = await run(ATTEST, taskWt);
     expect(r.status).not.toBe(0);
     expect(readFileSync(regPath, 'utf8')).toBe(seeded);
 
     // And a SUCCESSFUL write leaves exactly one registry file, no .tmp siblings.
     seed();
-    expect(run(ATTEST, taskWt).status).toBe(0);
+    expect((await run(ATTEST, taskWt)).status).toBe(0);
     const dirEntries = execFileSync('ls', [join(regPath, '..')], { encoding: 'utf8' });
     expect(dirEntries).toContain('registry.json');
     expect(dirEntries).not.toMatch(/\.tmp\./);

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, readFileSync, mkdtempSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 /**
  * THE DETECTOR MUST BE ABLE TO FAIL.
@@ -21,21 +22,36 @@ import { join } from 'node:path';
  * than reading the script's source.
  */
 const ROOT = process.cwd();
-const PROBE = join(ROOT, 'src/lib/__selftest_probe__');
+const AUDIT = join(ROOT, 'scripts/audit-supabase-errors.mjs');
+const BASELINE = join(ROOT, 'tests/fixtures/supabase-errors-baseline.json');
 
+/**
+ * Run the real audit against fixtures in a PRIVATE temp tree laid out like the repo
+ * (src/lib/__selftest_probe__/…), never in the checkout itself.
+ *
+ * This used to write the probe into the real src/lib. Under a parallel run, any test
+ * that walks src/ (forecasts/writer, verified-sender) could list the probe and then
+ * hit ENOENT when it vanished — a nondeterministic red on a green branch (measured
+ * 2026-09-28). The audit resolves SCAN_ROOTS and its baseline relative to cwd, so a
+ * temp cwd with the same layout exercises exactly the same code.
+ */
 function runAuditOn(files: Record<string, string>): string {
-  mkdirSync(PROBE, { recursive: true });
-  for (const [name, body] of Object.entries(files)) writeFileSync(join(PROBE, name), body);
+  const tmp = mkdtempSync(join(tmpdir(), 'audit-supabase-selftest-'));
+  const probe = join(tmp, 'src/lib/__selftest_probe__');
+  mkdirSync(probe, { recursive: true });
+  mkdirSync(join(tmp, 'tests/fixtures'), { recursive: true });
+  copyFileSync(BASELINE, join(tmp, 'tests/fixtures/supabase-errors-baseline.json'));
+  for (const [name, body] of Object.entries(files)) writeFileSync(join(probe, name), body);
   try {
     // Exits non-zero when it finds something new, so capture either way.
-    return execFileSync('node', ['scripts/audit-supabase-errors.mjs'], {
-      cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    return execFileSync('node', [AUDIT], {
+      cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (e) {
     const err = e as { stdout?: string; stderr?: string };
     return (err.stdout || '') + (err.stderr || '');
   } finally {
-    rmSync(PROBE, { recursive: true, force: true });
+    rmSync(tmp, { recursive: true, force: true });
   }
 }
 

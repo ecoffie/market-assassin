@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { spawnTsxSync } from './test-cli-spawn';
+import { spawnTsx } from './test-cli-spawn';
 
 /**
  * PHASE 3A.5 — END-TO-END, through the REAL CLI, against a LIVE-SHAPED fixture.
@@ -30,20 +30,20 @@ const SUC = 'TASK-PSTACK-PILOT-002';
 let dir: string;
 let reg: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'pstack-repair-e2e-'));
   reg = join(dir, 'registry.json');
   writeFileSync(reg, readFileSync(FIXTURE, 'utf8'), 'utf8');
 });
-afterEach(() => {
+afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
 const sha = (p: string) => createHash('sha256').update(readFileSync(p)).digest('hex');
 const load = () => JSON.parse(readFileSync(reg, 'utf8'));
 
-function run(args: string[]) {
-  return spawnTsxSync(SCRIPT, [...args, '--registry', reg], {
+async function run(args: string[]) {
+  return spawnTsx(SCRIPT, [...args, '--registry', reg], {
     cwd: ROOT,
     env: process.env,
     encoding: 'utf8',
@@ -63,7 +63,7 @@ const REPAIR = [
 ];
 
 describe('3A.5 — live-shaped repair through the real CLI', () => {
-  it('the fixture starts in the exact broken live shape', () => {
+  it('the fixture starts in the exact broken live shape', async () => {
     const r = load();
     expect(r.version).toBe(1);
     expect(r.revision).toBe(18);
@@ -76,8 +76,8 @@ describe('3A.5 — live-shaped repair through the real CLI', () => {
     expect(r.tasks['TASK-PSTACK-PILOT-003']).toBeUndefined();
   });
 
-  it('repairs both fields, advances the revision once, and migrates v1 -> v2', () => {
-    const res = run(REPAIR);
+  it('repairs both fields, advances the revision once, and migrates v1 -> v2', async () => {
+    const res = await run(REPAIR);
     expect(res.status).toBe(0);
 
     const after = load();
@@ -92,9 +92,9 @@ describe('3A.5 — live-shaped repair through the real CLI', () => {
     expect(after.provenance.worktreePath.startsWith('/')).toBe(true);
   });
 
-  it('preserves states, bases, branches, worktrees and checkpoints byte-for-byte', () => {
+  it('preserves states, bases, branches, worktrees and checkpoints byte-for-byte', async () => {
     const before = load();
-    run(REPAIR);
+    await run(REPAIR);
     const after = load();
 
     for (const id of [SRC, SUC]) {
@@ -126,18 +126,18 @@ describe('3A.5 — live-shaped repair through the real CLI', () => {
     }
   });
 
-  it('a REPEAT repair is refused as already_repaired and changes NOTHING', () => {
-    expect(run(REPAIR).status).toBe(0);
+  it('a REPEAT repair is refused as already_repaired and changes NOTHING', async () => {
+    expect((await run(REPAIR)).status).toBe(0);
     const afterFirst = sha(reg);
 
-    const second = run(REPAIR);
+    const second = await run(REPAIR);
     expect(second.status).not.toBe(0);
     expect(`${second.stderr}`).toContain('already_repaired');
     expect(sha(reg)).toBe(afterFirst);
     expect(load().revision).toBe(19);
   });
 
-  it('REJECTS any arbitrary field / value / successor override', () => {
+  it('REJECTS any arbitrary field / value / successor override', async () => {
     for (const banned of [
       ['--field', 'supersededByTaskId'],
       ['--value', SUC],
@@ -146,14 +146,14 @@ describe('3A.5 — live-shaped repair through the real CLI', () => {
       ['--set', 'x'],
     ]) {
       const before = sha(reg);
-      const res = run([...REPAIR, ...banned]);
+      const res = await run([...REPAIR, ...banned]);
       expect(res.status).not.toBe(0);
       expect(`${res.stderr}`).toContain('unauthorized_actor');
       expect(sha(reg)).toBe(before);
     }
   });
 
-  it('REQUIRES administrator role, --confirm and a non-empty --reason', () => {
+  it('REQUIRES administrator role, --confirm and a non-empty --reason', async () => {
     const cases: string[][] = [
       ['repair-supersession-link', SRC, '--actor', 'a', '--role', 'builder', '--reason', 'r', '--confirm'],
       ['repair-supersession-link', SRC, '--actor', 'a', '--role', 'administrator', '--reason', 'r'],
@@ -161,29 +161,29 @@ describe('3A.5 — live-shaped repair through the real CLI', () => {
     ];
     for (const args of cases) {
       const before = sha(reg);
-      const res = run(args);
+      const res = await run(args);
       expect(res.status).not.toBe(0);
       expect(sha(reg)).toBe(before);
     }
   });
 
-  it('an ORDINARY mutation on the version-1 fixture is refused with registry_upgrade_required', () => {
+  it('an ORDINARY mutation on the version-1 fixture is refused with registry_upgrade_required', async () => {
     const before = sha(reg);
-    const res = run(['release', SUC, '--owner', 'pstack-pilot-integrator-v2', '--role', 'integrator']);
+    const res = await run(['release', SUC, '--owner', 'pstack-pilot-integrator-v2', '--role', 'integrator']);
     expect(res.status).not.toBe(0);
     expect(`${res.stderr}`).toContain('registry_upgrade_required');
     expect(sha(reg)).toBe(before);
     expect(load().version).toBe(1);
   });
 
-  it('post-repair, the registry passes `doctor` and the chain is traversable', () => {
-    run(REPAIR);
+  it('post-repair, the registry passes `doctor` and the chain is traversable', async () => {
+    await run(REPAIR);
     const after = load();
     expect(after.tasks[SRC].supersededByTaskId).toBe(SUC);
     expect(after.tasks[SUC].supersedesTaskId).toBe(SRC);
     // A readable registry is itself the invariant proof: assertRegistryInvariants
     // rejects an asymmetric or dangling link on every read.
-    const list = run(['list']);
+    const list = await run(['list']);
     expect(list.status).toBe(0);
   });
 });
@@ -200,10 +200,10 @@ describe('3A.5 B — historical parsers reject version 2 WITHOUT rewriting it', 
 
   let workDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     workDir = mkdtempSync(join(tmpdir(), 'pstack-histparse-'));
   });
-  afterEach(() => {
+  afterEach(async () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
@@ -254,7 +254,7 @@ console.log(JSON.stringify({
 }));
 `;
 
-  it.each(GENERATIONS)('generation %s rejects a version-2 registry and writes nothing', (genSha) => {
+  it.each(GENERATIONS)('generation %s rejects a version-2 registry and writes nothing', async (genSha) => {
     const genDir = materialize(genSha);
     if (!genDir) return; // history not available in this checkout
 
@@ -285,7 +285,7 @@ console.log(JSON.stringify({
 
     const probePath = join(workDir, `probe-${genSha}.mts`);
     writeFileSync(probePath, PROBE, 'utf8');
-    const res = spawnTsxSync(probePath, [genDir, target], {
+    const res = await spawnTsx(probePath, [genDir, target], {
       cwd: ROOT,
       env: process.env,
       encoding: 'utf8',
@@ -303,7 +303,7 @@ console.log(JSON.stringify({
     expect(out.stillVersion2).toBe(true);
   });
 
-  it('CONTROL: the same historical writer DOES mutate a version-1 registry', () => {
+  it('CONTROL: the same historical writer DOES mutate a version-1 registry', async () => {
     // Without this control, every assertion above could pass because the harness is
     // broken rather than because the version boundary works.
     const genDir = materialize('dd90ea7c');
@@ -321,7 +321,7 @@ console.log(JSON.stringify({
     );
     const probePath = join(workDir, 'probe-control.mts');
     writeFileSync(probePath, PROBE, 'utf8');
-    const res = spawnTsxSync(probePath, [genDir, target], {
+    const res = await spawnTsx(probePath, [genDir, target], {
       cwd: ROOT,
       env: process.env,
       encoding: 'utf8',
