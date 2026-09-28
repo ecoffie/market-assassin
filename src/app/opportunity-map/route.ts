@@ -2946,6 +2946,10 @@ const VIEWPORT_JS = `<script>
     var onCount=['open','recompete','forecast'].filter(function(m){return window.__horizons[m]!==false;}).length;
     if(on && onCount<=1)return; // keep at least one horizon visible
     window.__horizons[h]=!on;
+    // horizon_toggled (Learn PR 2b): a USER toggle only. System callers — __isolateHorizon (typed
+    // deep links) and the saved-search restorer — set window.__hzSystem, and URL restores set
+    // __urlRestoring, so a restore never reads as the user exploring a horizon.
+    if(!window.__hzSystem&&!window.__urlRestoring){ try{ _track('tool_use','horizon_toggled',{horizon:h, on:!on}); }catch(e){} }
     // (The old Source-filter reconciliation here is gone — DLA is its own map mode now, not an Open
     // source, so toggling a horizon no longer has to clear a source pill.)
     // Sync BOTH surfaces that show this horizon's on/off state — the full chips in the Filters panel
@@ -2962,11 +2966,14 @@ const VIEWPORT_JS = `<script>
   // alone leaves Open+Forecast on and the rail at ~128k mixed results.
   window.__isolateHorizon=function(want){
     if(!want||!window.__horizons||!(want in window.__horizons))return;
-    ['open','recompete','forecast'].forEach(function(h){
-      var on=(window.__horizons[h]!==false);
-      if(h===want&&!on)window.toggleHorizon(h);
-      if(h!==want&&on)window.toggleHorizon(h);
-    });
+    window.__hzSystem=true;
+    try{
+      ['open','recompete','forecast'].forEach(function(h){
+        var on=(window.__horizons[h]!==false);
+        if(h===want&&!on)window.toggleHorizon(h);
+        if(h!==want&&on)window.toggleHorizon(h);
+      });
+    }finally{ window.__hzSystem=false; }
   };
   // Typed-address boot: the param names the corpus. Write __horizons BEFORE finishBoot's
   // first fetchView so ?recompete= does not request /opportunity-map + /forecast-map and
@@ -5181,11 +5188,14 @@ const VIEWPORT_JS = `<script>
     // window.__horizons directly: it owns the chip sync for BOTH surfaces (.hzc + .hznrow) and the
     // "never turn the last one off" guard, so the UI cannot end up disagreeing with the fetch.
     if(f.horizons&&typeof f.horizons==='object'){
-      ['open','recompete','forecast'].forEach(function(h){
-        var want=(f.horizons[h]!==false);
-        var have=(window.__horizons&&window.__horizons[h]!==false);
-        if(want!==have&&typeof window.toggleHorizon==='function')window.toggleHorizon(h);
-      });
+      window.__hzSystem=true;   // a restore is not the user toggling (horizon_toggled)
+      try{
+        ['open','recompete','forecast'].forEach(function(h){
+          var want=(f.horizons[h]!==false);
+          var have=(window.__horizons&&window.__horizons[h]!==false);
+          if(want!==have&&typeof window.toggleHorizon==='function')window.toggleHorizon(h);
+        });
+      }finally{ window.__hzSystem=false; }
     }
     // Restore the saved viewport (bbox) so results frame where the search was made.
     var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
@@ -5993,7 +6003,19 @@ const DRAWER_JS = `<script>
       m.addTo(l);
     });
   }
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); }
+  // window.__drawerKind (Learn PR 2b / Get Help): which record the drawer is showing —
+  // 'open' | 'dla' | 'recompete' | 'forecast' | 'company' | 'buyer', or null when closed.
+  // Read-only for other modules; set by each drawer opener below.
+  window.__drawerKind=null;
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; }
+  // listing_open for drawers that can be reached WITHOUT openOppDrawer (typed ?recompete= /
+  // ?forecast= deep links, similar-listing cards). openOppDrawer already emits it before routing
+  // to these drawers and leaves a one-shot marker, so the same open is never counted twice.
+  function listingOpenOnce(key, horizon){
+    var k=String(key||''); var already=(window.__listingOpenFired===k); window.__listingOpenFired=null;
+    if(already||!k)return;
+    try{ if(window.__track) window.__track('tool_use','listing_open',{notice_id:k, horizon:horizon}); }catch(e){}
+  }
   if(bd)bd.onclick=close;
   document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
   // Action bar: Back (close) · Save (→pursuits) · Share (copy link) · Hide (dismiss + hide card) · More.
@@ -7380,12 +7402,15 @@ const DRAWER_JS = `<script>
     if(o)return {key:'office:'+o, src:'office_name'};
     return {key:null, src:null};
   }
-  function trackOfficeViewed(entry, sol, office, agency, recordKind){
+  function trackOfficeViewed(entry, sol, office, agency, recordKind, contactOfficeCount){
     try{
       if(!window.__track)return;
       var k=officeKeyOf(sol, office);
-      window.__track('tool_use','office_viewed',{office_key:k.key, office_key_source:k.src,
-        agency:String(agency||''), entry:entry, record_kind:recordKind||''});
+      var m={office_key:k.key, office_key_source:k.src, agency:String(agency||''), entry:entry, record_kind:recordKind||''};
+      // A buyer named on notices from several offices is AMBIGUOUS as "one office": record how many
+      // so completion logic can decide, instead of this event guessing.
+      if(typeof contactOfficeCount==='number') m.contact_office_count=contactOfficeCount;
+      window.__track('tool_use','office_viewed',m);
     }catch(e){}
   }
   window.__officeKeyOf=officeKeyOf;
@@ -7987,6 +8012,8 @@ const DRAWER_JS = `<script>
     }).catch(function(){ _rcFetchKey=''; });
   }
   window.openRecompeteDrawer=function(key){
+    listingOpenOnce(key,'recompete');
+    window.__drawerKind='recompete';
     var o=findRecompeteRow(key);
     if(o){ paintRecompeteDrawer(o); return true; }
     fetchRecompeteRow(key);
@@ -7997,7 +8024,9 @@ const DRAWER_JS = `<script>
   // recompete drawer — never a fetch. Honest about its nature: no deadline, no attachments, an
   // ESTIMATE not a solicitation. (Eric 2026-08-03 — "the forecast listings are missing information".)
   window.openForecastDrawer=function(key){
-    var o=findRecompeteRow(key); if(!o){ return; }   // findRecompeteRow scans rows/OPPS by nid/sol — any src
+    var o=findRecompeteRow(key); if(!o){ window.__listingOpenFired=null; return; }   // findRecompeteRow scans rows/OPPS by nid/sol — any src
+    listingOpenOnce(key,'forecast');
+    window.__drawerKind='forecast';
     if(window.__resetOppSave)window.__resetOppSave();
     dr.classList.remove('buyer-accent');
     clearTaskOrderPins();
@@ -8323,7 +8352,15 @@ const DRAWER_JS = `<script>
     if(!nid)return;
     // WHICH LISTINGS GET OPENED — the number the listing redesign has to be judged against.
     // Fired before the route decision below so it counts the intent, not just the successes.
-    try{ if(window.__track) window.__track('tool_use','listing_open',{notice_id:String(nid)}); }catch(e){}
+    // Horizon (Learn PR 2b) comes from the SAME value the routing below uses — the clicked pin's
+    // src — so the event can never disagree with the drawer that opens. No pin in hand (a typed
+    // ?opp= deep link, or a buyer-drawer opp link): a 32-hex id is a SAM notice → 'open'.
+    var _lpin=null; try{ var _la=(window.OPPS||OPPS||[]); for(var _li=0;_li<_la.length;_li++){ var _lo=_la[_li]; if(_lo&&(String(_lo.nid)===String(nid)||String(_lo.sol)===String(nid))){ _lpin=_lo; break; } } }catch(e){}
+    var _HZ={SAM:'open',RECOMPETE:'recompete',FORECAST:'forecast',DLA:'dla',GRANTS:'grants',SBIR:'sbir'};
+    var _hz=_lpin?(_HZ[_lpin.src]||'unknown')
+      :(!force&&window.__mapMode==='recompete')?'recompete'
+      :(/^[a-f0-9]{32}$/i.test(String(nid))?'open':'unknown');
+    try{ if(window.__track) window.__track('tool_use','listing_open',{notice_id:String(nid), horizon:_hz}); }catch(e){}
     // Route by the CLICKED PIN's source, NOT the global mode. The Opportunities map MERGES horizons
     // (SAM open + recompete + forecast), so window.__mapMode is always 'open' even for a recompete/
     // forecast pin — keying the drawer route off the mode meant recompete/forecast cards fetched
@@ -8340,12 +8377,14 @@ const DRAWER_JS = `<script>
     if(!force){
       var _src=_pin?_pin.src:null;
       // RECOMPETE pins build their detail from the row in hand (no SAM opp-intel fetch).
-      if(_src==='RECOMPETE' || (!_pin && window.__mapMode==='recompete')){ window.openRecompeteDrawer(nid); return; }
+      // One-shot marker: the recompete/forecast drawers also emit listing_open when opened directly
+      // (deep links, similar cards); this tells them the open above was already counted.
+      if(_src==='RECOMPETE' || (!_pin && window.__mapMode==='recompete')){ window.__listingOpenFired=String(nid); window.openRecompeteDrawer(nid); return; }
       // FORECAST pins have NO opportunity-detail endpoint (fc- ids aren't sam_opportunities notice_ids)
       // and NO uiLink to open externally — the old window.open(uiLink) fell through to the fetch and
       // 404'd ("Couldn't load this opportunity"). Render the in-app forecast drawer from the row in
       // hand instead (planned-work detail, no fetch). (Eric 2026-08-03.)
-      if(_src==='FORECAST' && _pin){ window.openForecastDrawer(nid); return; }
+      if(_src==='FORECAST' && _pin){ window.__listingOpenFired=String(nid); window.openForecastDrawer(nid); return; }
       // GRANTS still open their external source record (grants carry a real apply URL).
       if(_src==='GRANTS' && _pin){ var _u=_pin.uiLink||_pin.url; if(_u){ try{ window.open(_u,'_blank','noopener'); }catch(e){} return; } }
     }
@@ -8360,6 +8399,7 @@ const DRAWER_JS = `<script>
     // reads metadata->>notice_id back. Guarded by nid (line 5497) so a null never logs. Not a
     // re-render path — openOppDrawer is the open entry point; the intel re-fetch below never re-enters it.
     try{ if(window.__track) window.__track('page_view','listing_view',{notice_id:String(nid)}); }catch(e){}
+    window.__drawerKind='open';
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
     dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins();
@@ -8382,7 +8422,7 @@ const DRAWER_JS = `<script>
       // DLA drawer is a flat layout (no tabbed #osec sections), so DON'T call buildTabs() — it
       // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
-      if(d.opp.isDla){ try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
+      if(d.opp.isDla){ window.__drawerKind='dla'; try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount,savedCount:d.savedCount,viewCount:d.viewCount});
       // "Should I pursue this?" fills from the M-Win fetch below (fillPursue) — until then it is loading, locally.
       var _pb=document.getElementById('pursueBox'); if(_pb)_pb.innerHTML='<div aria-busy="true"><div class="osk" style="width:88%"></div><div class="osk" style="width:64%"></div></div>';
@@ -8762,6 +8802,7 @@ const DRAWER_JS = `<script>
     // equality check here made every card of the OTHER type a DEAD CLICK. Allow either contact mode.
     if(window.__mapMode&&window.__mapMode!=='companies'&&window.__mapMode!=='buyers')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
+    window.__drawerKind='company';
     dr.classList.remove('buyer-accent'); // company → blue accent (buyers are red)
     clearTaskOrderPins();
     // Pass the pin's geocoded city/state through (fallback location when the BQ profile row is
@@ -9015,6 +9056,7 @@ const DRAWER_JS = `<script>
     // so requiring 'buyers' here made every Gov-Buyer pin/card a dead click on the live map.
     if(window.__mapMode&&window.__mapMode!=='buyers'&&window.__mapMode!=='companies')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
+    window.__drawerKind='buyer';
     clearTaskOrderPins();
     var em=''; try{ var t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
@@ -9029,8 +9071,10 @@ const DRAWER_JS = `<script>
       buildTabs();
       loadBuyerEventDna(d.buyer);   // past-event behavior signals (async, self-hiding)
       // Only a RENDERED buyer counts as viewed — a failed load above returned before this line.
-      var _bs=''; try{ var _ops=d.buyer.opportunities||[]; for(var _i=0;_i<_ops.length;_i++){ if(officeKeyOf(_ops[_i].solicitationNumber,'').src==='dodaac'){ _bs=_ops[_i].solicitationNumber; break; } } }catch(e){}
-      trackOfficeViewed('buyer_drawer', _bs, d.buyer.office, d.buyer.agency, 'buyer');
+      // Keyed from the ANCHOR row (the person-on-notice the user opened), never from whichever of
+      // the person's notices sorts first: 20.9% of DoDAAC-bearing buyers span more than one office
+      // (measured 2026-09-27), and the first-sorted notice credited the wrong one.
+      trackOfficeViewed('buyer_drawer', d.buyer.anchorSolicitation||'', d.buyer.office, d.buyer.agency, 'buyer', d.buyer.officeCount);
     }).catch(function(){ body.innerHTML=drawerLoadError(0,'buyer'); });
   };
 })();

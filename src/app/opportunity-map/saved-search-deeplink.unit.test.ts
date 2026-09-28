@@ -87,7 +87,7 @@ describe('a saved search restores its horizons', () => {
   it('goes through toggleHorizon so the chips cannot disagree with the fetch', () => {
     // toggleHorizon owns the .hzc + .hznrow sync AND the "never turn the last one off" guard.
     expect(restorer).not.toContain('window.__horizons[h]=');
-    const toggle = map.slice(map.indexOf('window.toggleHorizon=function'), map.indexOf('window.toggleHorizon=function') + 1200);
+    const toggle = map.slice(map.indexOf('window.toggleHorizon=function'), map.indexOf('window.toggleHorizon=function') + 2000); // widened: horizon_toggled (Learn PR 2b) sits above the chip sync
     expect(toggle).toContain(".hzc[data-hz=\"'+h+'\"], .hznrow[data-hz=\"'+h+'\"]");
     expect(toggle).toContain('if(on && onCount<=1)return;');
   });
