@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // Lazy-loaded Supabase client to avoid build-time errors
 let _supabase: SupabaseClient | null = null;
@@ -81,6 +82,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SEC-4: only a VERIFIED identity may write its own history and alert targeting.
+    // The body email is a claim, never identity; it must match what the request proves
+    // (Mindy session token or Supabase session). The plaintext ma_access_email cookie and a
+    // bare staff-address claim are refused (requireStrongAuth), as is ?email=.
+    const auth = await verifyUserOwnsEmail(request, body.user_email, { requireStrongAuth: true });
+    if (!auth.authenticated || !auth.email) {
+      return NextResponse.json({ success: false, error: 'Sign in required', auth_required: true }, { status: 401 });
+    }
+    const verifiedEmail = auth.email.toLowerCase().trim();
+
     // Validate tool
     if (!VALID_TOOLS.includes(body.tool)) {
       return NextResponse.json(
@@ -113,7 +124,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase
       .from('user_search_history')
       .insert({
-        user_email: body.user_email.toLowerCase().trim(),
+        user_email: verifiedEmail,
         tool: body.tool,
         search_type: body.search_type || 'keyword', // Default to keyword if not specified
         search_value: normalizedValue,
@@ -138,7 +149,7 @@ export async function POST(request: NextRequest) {
     let profileUpdated = false;
     let profileReason: string | null = null;
     try {
-      const email = body.user_email.toLowerCase().trim();
+      const email = verifiedEmail;
       const searchType = body.search_type || 'keyword';
 
       // Map search type to profile column. Columns must exist on
@@ -215,7 +226,7 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/search-capture?email=user@example.com
  *
- * Returns search history for a user (for debugging/admin).
+ * Returns the VERIFIED caller's own search history (401 for anyone else).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -229,6 +240,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // SEC-4: history + the settings row are readable only by the verified owner.
+    const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
+    if (!auth.authenticated || !auth.email) {
+      return NextResponse.json({ error: 'Sign in required', auth_required: true }, { status: 401 });
+    }
+
     const supabase = getSupabase();
     if (!supabase) {
       return NextResponse.json(
@@ -240,7 +257,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('user_search_history')
       .select('*')
-      .eq('user_email', email.toLowerCase().trim())
+      .eq('user_email', auth.email)
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -256,7 +273,7 @@ export async function GET(request: NextRequest) {
     const { data: profile } = await supabase
       .from('user_notification_settings')
       .select('*')
-      .eq('user_email', email.toLowerCase().trim())
+      .eq('user_email', auth.email)
       .maybeSingle();
 
     return NextResponse.json({

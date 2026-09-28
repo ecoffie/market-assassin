@@ -74321,9 +74321,12 @@ function captureDbSearch(searchValue) {
     else if (val.includes('@')) searchType = 'keyword'; // email search
     else searchType = 'company';
 
+    // SEC-4: the route only accepts a verified Mindy session; without one it refuses (401).
+    const headers = { 'Content-Type': 'application/json' };
+    try { const tok = localStorage.getItem('mi_beta_auth_token'); if (tok) headers['x-mi-auth-token'] = tok; } catch { /* ignore */ }
     fetch('/api/search-capture', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
             user_email: email,
             tool: 'contractor_db',
