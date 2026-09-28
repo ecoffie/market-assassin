@@ -74,6 +74,9 @@ function MarketIntelligenceContent() {
               alertsEnabled: true,
               briefingsEnabled: true,
               source: 'paid_existing',
+              // The server re-verifies this invitation (bound to this email) before any
+              // activation — the client-side check above is not proof to the server.
+              inviteToken,
               stripeCustomerId: data.customerId || undefined,
               isActive: true,
             }),

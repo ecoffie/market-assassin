@@ -89,7 +89,9 @@ async function post(body: Row) {
   const req = new NextRequest('http://localhost/api/alerts/save-profile', {
     method: 'POST',
     body: JSON.stringify({ email: EMAIL, ...body }),
-    headers: { 'content-type': 'application/json' },
+    // A verified owner (the auth mock accepts it). Since the save-profile security fix, an
+    // ANONYMOUS request may only create a new row — these cases update an existing one.
+    headers: { 'content-type': 'application/json', 'x-mi-auth-token': 'verified-owner' },
   });
   const res = await POST(req);
   expect(res.status).toBe(200);
@@ -118,7 +120,8 @@ describe('POST /api/alerts/save-profile — omitted fields are untouched on an e
   });
 
   it('naicsCodes: [] (briefings / market-intelligence signup) does not wipe stored NAICS', async () => {
-    await post({ naicsCodes: [], source: 'paid_existing' });
+    // (was source 'paid_existing', which now requires a bound invitation; /briefings sends free_signup)
+    await post({ naicsCodes: [], source: 'free_signup' });
     expect(db.settings?.naics_codes).toEqual(['238220', '541330']);
   });
 

@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-28 — P0 security: save-profile requires a verified identity
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-28 | Security / POST+GET /api/alerts/save-profile | The four free sources skipped auth, so an anonymous POST could overwrite ANY existing user's saved targeting, and source paid_existing granted the KV briefings Pro gate to any email. Now only a verified identity (the strong path: Supabase session, signed email token or signed Mindy session; never the body/query email, the plaintext cookie or a claimed staff address) may mutate a user's state. An anonymous caller may only CREATE a row for an email with no saved state (pure insert; an existing row gets 401 sign_in_required). paid_existing always needs a database-backed, unused, unexpired invitation bound to the email, claimed atomically (single-use: a replay or concurrent second request gets 401); the Stripe customer comes from the invitation, and the KV Pro grant runs only after the profile write lands (a failed write releases the claim). An anonymous signup never applies a partner-referral Pro trial. GET is strong-auth only. | `export async function resolveSaveProfileIdentity(` → `src/lib/alerts/save-profile-identity.ts` | verified-identity.unit.test.ts 30/30 green (19/24 red on the pre-fix route; replay/race/grant-after-write/referral 5/6 red on the first cut); C-4 suite green as a verified owner | 🟡 PR open |
+
 ## 2026-09-27 — save-profile: only an explicitly selected business type overwrites
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

@@ -7,6 +7,7 @@ import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveSaveProfileIdentity, SIGN_IN_REQUIRED, type InvitationRow } from '@/lib/alerts/save-profile-identity';
 import {
   logSignupEvent,
   logSignupCompleted,
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       source,
       referralCode,
       inviteToken,
-      stripeCustomerId,
+      // stripeCustomerId from the body is deliberately NOT read — the invitation row supplies it.
       businessDescription,
     } = body;
 
@@ -100,21 +101,40 @@ export async function POST(request: NextRequest) {
     // free_signup / free-signup = MI Free signup from /alerts/signup
     const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup' || source === 'free_signup' || source === 'paid_existing';
 
-    // SECURITY: For free signups, we allow creating a profile without prior auth
-    // (user is signing up for the first time). For updates from existing users, verify ownership.
-    let verifiedEmail = email.toLowerCase().trim();
-    if (!isFreeSource) {
-      const auth = await verifyUserOwnsEmail(request, email);
-      if (!auth.authenticated) {
-        // Log auth failure event
-        logSignupFailed(source || 'unknown', new Error(auth.error || 'Unauthorized'), email).catch(() => {});
-        return NextResponse.json(
-          { success: false, error: auth.error || 'Unauthorized' },
-          { status: 401 }
-        );
-      }
-      verifiedEmail = auth.email!;
+    // SECURITY (P0, 2026-09-28): only a VERIFIED identity may mutate a user's saved state —
+    // never the body email, a query email, the plaintext cookie or a claimed staff address.
+    // See src/lib/alerts/save-profile-identity.ts. An anonymous caller may only CREATE a row
+    // for an email with no saved state (enforced below: existing row → 401, pure INSERT).
+    const identity = await resolveSaveProfileIdentity(request, email, {
+      source,
+      inviteToken,
+      lookupInvitation: async (token) => {
+        const { data, error } = await getSupabase()
+          .from('invitation_tokens')
+          .select('email, used_at, expires_at')
+          .eq('token', token)
+          .maybeSingle();
+        return { row: data as InvitationRow | null, error: error ? error.message : null };
+      },
+    });
+    if (identity.kind === 'rejected') {
+      logSignupFailed(source || 'unknown', new Error(identity.code), email).catch(() => {});
+      return NextResponse.json(
+        { success: false, error: identity.error, code: identity.code },
+        { status: identity.status }
+      );
     }
+    // The Pro alert profile (a non-free source) needs a verified identity — it used to accept
+    // the weak cookie / staff claim.
+    if (!isFreeSource && identity.kind !== 'verified') {
+      logSignupFailed(source || 'unknown', new Error('sign_in_required'), email).catch(() => {});
+      return NextResponse.json(
+        { success: false, error: 'Please sign in to save alerts.', code: 'sign_in_required' },
+        { status: 401 }
+      );
+    }
+    const verifiedEmail = identity.email;
+    const anonymous = identity.kind === 'anonymous';
 
     // Collect all NAICS codes from various inputs
     const allNaicsCodes: string[] = [];
@@ -203,6 +223,14 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+    // An anonymous caller never touches an EXISTING user's state (that was the overwrite hole).
+    if (anonymous && existingSave) {
+      logSignupFailed(source || 'unknown', new Error(SIGN_IN_REQUIRED.code), email).catch(() => {});
+      return NextResponse.json(
+        { success: false, error: SIGN_IN_REQUIRED.error, code: SIGN_IN_REQUIRED.code },
+        { status: 401 }
+      );
+    }
     const delivery = saveProfileAlertDeliveryPatch(existingSave, alertFrequency);
 
     // Build upsert payload
@@ -235,7 +263,13 @@ export async function POST(request: NextRequest) {
 
     // Partner referral (e.g. NCMBC) — 30-day Pro trial, tagged cohort
     let partnerReferralApplied = false;
-    if (referralCode) {
+    // A partner referral grants a 30-day Pro trial, so it requires a VERIFIED identity — an
+    // anonymous signup cannot grant Pro (P0 2026-09-28). A verified sign-up still gets it via
+    // /api/auth/mi-signup or /api/app/profile.
+    if (referralCode && anonymous) {
+      console.log(`[Alerts] Partner referral not applied to an anonymous signup (sign-in required): ${verifiedEmail}`);
+    }
+    if (referralCode && !anonymous) {
       try {
         const partnerResult = await applyPartnerReferralIfEligible(
           getSupabase(),
@@ -265,29 +299,42 @@ export async function POST(request: NextRequest) {
 
     // paid_existing = subscriber activated via magic link invitation
     // They get FULL Daily Briefings access ($49/mo value), not just Daily Alerts
+    // paid_existing: the invitation is SINGLE-USE. Claim it atomically (used_at IS NULL and
+    // unexpired → exactly one row) BEFORE anything is granted, so a replay or a concurrent
+    // second request finds it used and gets 401. The Stripe customer comes from the
+    // invitation, never the request body. The KV Pro grant runs only after the profile write
+    // succeeds; a failed write releases the claim.
+    let claimedInviteToken: string | null = null;
     if (source === 'paid_existing') {
+      const nowIso = new Date().toISOString();
+      // Exact count, never a RETURNING payload (INT-005): a NULL count is unknown, not success.
+      const { count: claimedCount, error: claimErr } = await getSupabase()
+        .from('invitation_tokens')
+        .update({ used_at: nowIso }, { count: 'exact' })
+        .eq('token', String(inviteToken))
+        .is('used_at', null)
+        .gt('expires_at', nowIso);
+      if (claimErr || claimedCount !== 1) {
+        if (claimErr) console.error('[Alerts] invitation claim failed:', claimErr.message);
+        logSignupFailed(source, new Error('invite_already_used'), email).catch(() => {});
+        return NextResponse.json(
+          { success: false, error: 'This activation link has already been used or has expired.', code: 'invite_required' },
+          { status: 401 }
+        );
+      }
+      claimedInviteToken = String(inviteToken);
       // Enable Daily Briefings (includes Daily Market Intel + Weekly Deep Dive + Pursuit Brief)
       upsertPayload.briefings_enabled = true;
-
-      // Track invitation cohort for 90-day analysis
-      if (inviteToken) {
-        upsertPayload.invitation_sent_at = new Date().toISOString();
-        upsertPayload.invitation_source = 'invitation_campaign';
-      }
-      if (stripeCustomerId) {
-        upsertPayload.stripe_customer_id = stripeCustomerId;
-      }
-
-      // Grant KV access for briefings (gates actual tool access)
-      try {
-        await grantBriefingsAccess(verifiedEmail);
-        console.log(`[Alerts] Granted briefings access to paid subscriber: ${verifiedEmail}`);
-      } catch (kvError) {
-        console.warn(`[Alerts] KV error granting briefings to ${email}:`, kvError);
-        // Continue anyway - database flag will work as fallback
-      }
-
-      console.log(`[Alerts] Paid subscriber activated: ${email} (Stripe: ${stripeCustomerId || 'unknown'}) - Daily Briefings enabled`);
+      upsertPayload.invitation_sent_at = nowIso;
+      upsertPayload.invitation_source = 'invitation_campaign';
+      const { data: inviteRow, error: inviteReadErr } = await getSupabase()
+        .from('invitation_tokens')
+        .select('stripe_customer_id')
+        .eq('token', claimedInviteToken)
+        .maybeSingle();
+      if (inviteReadErr) console.error('[Alerts] invitation customer read failed:', inviteReadErr.message);
+      const inviteCustomer = (inviteRow as { stripe_customer_id?: string | null } | null)?.stripe_customer_id;
+      if (inviteCustomer) upsertPayload.stripe_customer_id = inviteCustomer;
     }
 
     if (!existingSave) {
@@ -307,14 +354,39 @@ export async function POST(request: NextRequest) {
           .eq('user_email', verifiedEmail)
           .select()
           .single()
-      : await getSupabase()
-          .from('user_notification_settings')
-          // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
-          .upsert(upsertPayload, {
-            onConflict: 'user_email',
-          })
-          .select()
-          .single();
+      : anonymous
+        // Anonymous → pure INSERT: if a row appeared since the read (a race), the unique
+        // user_email constraint refuses it instead of overwriting someone's state.
+        ? await getSupabase()
+            .from('user_notification_settings')
+            .insert(upsertPayload)
+            .select()
+            .single()
+        : await getSupabase()
+            .from('user_notification_settings')
+            // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
+            .upsert(upsertPayload, {
+              onConflict: 'user_email',
+            })
+            .select()
+            .single();
+
+    if (error && anonymous && (error as { code?: string }).code === '23505') {
+      logSignupFailed(source || 'unknown', new Error(SIGN_IN_REQUIRED.code), email).catch(() => {});
+      return NextResponse.json(
+        { success: false, error: SIGN_IN_REQUIRED.error, code: SIGN_IN_REQUIRED.code },
+        { status: 401 }
+      );
+    }
+
+    if (error && claimedInviteToken) {
+      // The profile did not save — give the invitation back so the subscriber can retry.
+      const { error: releaseErr } = await getSupabase()
+        .from('invitation_tokens')
+        .update({ used_at: null })
+        .eq('token', claimedInviteToken);
+      if (releaseErr) console.error('[Alerts] invitation release failed:', releaseErr.message);
+    }
 
     if (error) {
       console.error('[Alerts] Error saving profile:', error);
@@ -325,6 +397,16 @@ export async function POST(request: NextRequest) {
         { success: false, error: errorMessage },
         { status: 500 }
       );
+    }
+
+    if (claimedInviteToken) {
+      // Grant KV access for briefings (gates actual tool access) — only after the write landed.
+      try {
+        await grantBriefingsAccess(verifiedEmail);
+        console.log(`[Alerts] Paid subscriber activated via invitation: ${verifiedEmail} - Daily Briefings enabled`);
+      } catch (kvError) {
+        console.warn(`[Alerts] KV error granting briefings to ${verifiedEmail}:`, kvError);
+      }
     }
 
     // Log successful signup completion
@@ -350,7 +432,9 @@ export async function POST(request: NextRequest) {
             business_description: cleanBusinessDescription,
             business_description_updated_at: nowIso,
             updated_at: nowIso,
-          }, { onConflict: 'user_email' });
+            // Anonymous (new-signup) writes are insert-if-absent: never overwrite a business
+            // profile that already exists for this email.
+          }, { onConflict: 'user_email', ignoreDuplicates: anonymous });
         if (mirrorErr) throw mirrorErr;
       } catch (businessProfileError) {
         console.warn('[Alerts] Could not mirror business description:', businessProfileError);
@@ -566,7 +650,9 @@ export async function GET(request: NextRequest) {
     }
 
     // SECURITY: Verify user owns this email
-    const auth = await verifyUserOwnsEmail(request, email);
+    // Strong identity only (P0 2026-09-28): the plaintext cookie / claimed staff address used to
+    // read any user's saved targeting here.
+    const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
     if (!auth.authenticated) {
       return NextResponse.json(
         { success: false, error: auth.error || 'Unauthorized' },
