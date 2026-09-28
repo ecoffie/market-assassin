@@ -241,7 +241,7 @@ async function applyProfileFlags(
 
   // No row yet. Only worth creating one if we're granting (any CAPABILITY flag
   // true). Check booleans specifically: `updates` now also carries string columns
-  // (tier, access_source), and every non-empty string is truthy — so a plain
+  // (access_source), and every non-empty string is truthy — so a plain
   // `.some(Boolean)` would treat a REVOKE as a grant and insert a row for it.
   if (Object.values(updates).some((v) => v === true)) {
     // user_profiles.user_id is NOT NULL (FK to auth.users). A user who hasn't
@@ -355,14 +355,19 @@ export async function applyMemberGrant(opts: {
       ? (granting ? { access_team: true, access_briefings: true } : { access_team: false })
       : { access_briefings: granting };
 
-  // Descriptive columns, written alongside the gate flags. These do NOT control
-  // access (the KV key + the capability booleans do) — but leaving them stale is
-  // why an audit on 2026-08-16 found 46 users holding access while still reading
-  // `tier: 'free'`, which makes every admin listing and revenue report wrong.
-  // Only stamped on GRANT: a revoke shouldn't claim the Command Center as the
-  // source of an access the user no longer has.
+  // Descriptive provenance, written alongside the gate flags. Only stamped on
+  // GRANT: a revoke shouldn't claim the Command Center as the source of an access
+  // the user no longer has.
+  //
+  // ⚠️ NEVER write `user_profiles.tier` here. That column is the legacy Content
+  // Reaper tier — CHECK (tier IN ('free','content-engine','full-fix')). Stamping
+  // 'pro'/'team' into it (added 2026-08-16) made Postgres reject the WHOLE
+  // update, so from then on every Command Center grant silently failed to write
+  // the capability flags. Pro survived via the KV key; Team has no KV gate, so
+  // every Team grant reported "GRANTED" while access_team stayed false (measured
+  // 2026-09-28 on a paying $499/mo Team subscriber). Plan tier is derived from
+  // the booleans (deriveTier) — it is not a stored column.
   if (granting) {
-    updates.tier = opts.tier === 'team' ? 'team' : 'pro';
     updates.access_source = 'command-center';
   }
 
@@ -402,6 +407,36 @@ export async function applyMemberGrant(opts: {
       success: false, email, tier: opts.tier, action: opts.action, status,
       welcomeEmailSent: false, message: `Failed to grant access: ${kvError}`, error: kvError,
     };
+  }
+
+  // 2.5) Team has NO KV gate: access_team on the profile row IS the entitlement
+  // (verifyMIAccess reads it). So a Team grant that didn't land on the profile is
+  // a failed grant — report it, never "GRANTED". Read back instead of trusting
+  // the write's return value (the 2026-08-16 regression returned success here).
+  if (opts.tier === 'team' && granting) {
+    const after = await getMemberStatus(email);
+    if (!after.accessTeam) {
+      const reason = flagError
+        ? `profile write failed: ${flagError}`
+        : softSkip
+          ? 'user has not signed up yet — Team is stored on the profile row, which is created at signup'
+          : 'access_team did not read back true';
+      await recordGrant({
+        targetEmail: email,
+        actorEmail: normalize(opts.actorEmail),
+        action: opts.action,
+        tier: opts.tier,
+        sentWelcome: false,
+        grantSource: opts.grantSource ?? null,
+        note: `[NOT APPLIED: ${reason}]${opts.note ? ` ${opts.note}` : ''}`,
+      });
+      return {
+        success: false, email, tier: opts.tier, action: opts.action, status: after,
+        welcomeEmailSent: false,
+        message: `Team access NOT granted to ${email}: ${reason}. (Pro-level KV access was granted.)`,
+        error: reason,
+      };
+    }
   }
 
   // 3) Team grant also provisions the shared workspace + seats.
