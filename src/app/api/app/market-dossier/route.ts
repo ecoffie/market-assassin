@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 
@@ -68,6 +68,10 @@ export async function GET(request: NextRequest) {
   observeProGateIdentity(request, email);
   if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
   if (!supabaseUrl || !supabaseKey) return NextResponse.json({ success: false, error: 'not configured' }, { status: 500 });
+  // R1: identity comes from the verified session, never from the claimed email alone —
+  // the dossier reads the user's private profile, so an anonymous caller gets nothing.
+  const identity = await verifyClaimedIdentity(request, email);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -188,7 +192,7 @@ export async function GET(request: NextRequest) {
   //    each, with the remainder locked behind a Pro upgrade. Counts stay FULL so
   //    the UI can say "5 of 23" and the locked CTA shows the real prize. Pro/Team/
   //    Enterprise get the whole dossier.
-  const access = await verifyMIAccess(email).catch(() => null);
+  const access = await verifyMIAccess(identity.email).catch(() => null);
   const tier = access?.tier || 'free';
   const isPaid = tier === 'pro' || tier === 'team' || tier === 'enterprise';
 

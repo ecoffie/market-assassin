@@ -45,7 +45,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assertRankingComplete } from '@/lib/integrity/postconditions';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import {
   getPainPointsForAgency,
@@ -417,8 +417,12 @@ export async function POST(request: NextRequest) {
     const marketFilter = buildMarketFilter({ coverage, pscCode: psc, keyword: keywordForCoverage });
 
     // Tier check. Free users still see data, just fewer rows.
-    const access = await verifyMIAccess(email);
-    const isFree = access.tier === 'free' && !access.isStaff;
+    // R1: the tier comes from the VERIFIED identity. An anonymous caller gets the Free
+    // result (the same rows a Free account sees); a claim that contradicts the session is refused.
+    const identity = await verifyClaimedIdentity(request, email);
+    if (identity.status === 'mismatch') return identityFailureResponse(identity);
+    const access = identity.status === 'verified' ? await verifyMIAccess(identity.email) : null;
+    const isFree = !access || (access.tier === 'free' && !access.isStaff);
 
     // Normalize the states filter so it participates in the cache key (different
     // state selections = different markets = different cache rows). No states column
@@ -522,7 +526,7 @@ export async function POST(request: NextRequest) {
     // Staff can force a fresh compute (bypass the 24h cache) with { refresh: true }
     // — needed to verify a fix without waiting out the TTL. Non-staff can't, so a
     // user can't hammer the expensive USASpending fan-out on demand.
-    const skipCache = wantRefresh && access.isStaff;
+    const skipCache = wantRefresh && !!access?.isStaff;
     try {
       const { data: cacheRow } = skipCache ? { data: null } : await supabase
         .from('agency_target_data_cache')
