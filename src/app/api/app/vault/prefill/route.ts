@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
+import { resolveLegalNamePatch, normalizeLegalName, type LegalNameWriter } from '@/lib/vault/legal-name';
 import { resolveUei, ueiMessage } from '@/lib/sam/resolve-uei';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
@@ -408,6 +409,28 @@ export async function POST(request: NextRequest) {
     ];
     for (const k of WRITABLE_IDENTITY) {
       if (k in identity) cleanIdentity[k] = identity[k];
+    }
+    // P0-I: the posted legal_name is CLIENT-SUPPLIED (the confirm form was only pre-filled
+    // from SAM, and the user may have edited it). It is stamped `sam` only when it equals
+    // SAM's legalBusinessName for this UEI (cache-first — the GET just fetched it). Differs →
+    // the user changed it (user_entered). Lookup failed / no entity → provenance UNKNOWN,
+    // never assumed to be SAM.
+    if ('legal_name' in cleanIdentity) {
+      const requested = cleanIdentity.legal_name;
+      delete cleanIdentity.legal_name;
+      let writer: LegalNameWriter = 'unverified';
+      try {
+        const entity = await getEntityByUEI(uei);
+        if (entity?.legalBusinessName) {
+          writer = normalizeLegalName(entity.legalBusinessName).toLowerCase() === normalizeLegalName(requested).toLowerCase()
+            ? 'sam' : 'vault_edit';
+        }
+      } catch (e) {
+        console.error('[vault/prefill] SAM entity check failed; legal name provenance stays unknown:', e);
+      }
+      const ln = await resolveLegalNamePatch(supabase, userEmail, requested, writer);
+      if ('error' in ln) errors.push(`identity legal_name: ${ln.error}`);
+      else Object.assign(cleanIdentity, ln.patch);
     }
     const { error: idErr } = await supabase
       .from('user_identity_profile')

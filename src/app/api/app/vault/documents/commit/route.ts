@@ -24,6 +24,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resolveLegalNamePatch } from '@/lib/vault/legal-name';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
@@ -118,6 +119,15 @@ export async function POST(request: NextRequest) {
 
   // 1) Identity + Overview → one upsert (preserves untouched columns).
   const identityPatch = normalizeIdentity(selections.overview, selections.identity, sourceText);
+  if ('legal_name' in identityPatch) {
+    // P0-I: an imported name the owner confirmed is user_entered; it never overwrites an
+    // admin-set name. Resolved through the one provenance decision.
+    const requested = identityPatch.legal_name;
+    delete identityPatch.legal_name;
+    const ln = await resolveLegalNamePatch(sb, userEmail, requested, 'vault_edit');
+    if ('error' in ln) skipped.push({ section: 'identity', item: 'legal name', reason: ln.error });
+    else Object.assign(identityPatch, ln.patch);
+  }
   if (Object.keys(identityPatch).length > 0) {
     const row = { ...identityPatch, user_email: userEmail, updated_at: new Date().toISOString(), capability_embedded_at: null };
     const { error } = await sb.from('user_identity_profile').upsert(row, { onConflict: 'user_email' });

@@ -14,18 +14,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 type Row = Record<string, unknown>;
-const db: { rows: Row[]; bizRows: Row[]; failInsert?: { code: string; message: string }; hideFromFirstUpdate?: boolean; nullCount?: boolean } = { rows: [], bizRows: [] };
+const db: { rows: Row[]; bizRows: Row[]; idRows: Row[]; failInsert?: { code: string; message: string }; hideFromFirstUpdate?: boolean; nullCount?: boolean } = { rows: [], bizRows: [], idRows: [] };
 
 function table(name: string) {
-  const rows = name === 'user_notification_settings' ? db.rows : db.bizRows;
-  let op: 'update' | 'insert' | 'upsert' | 'count' | null = null;
+  const rows = name === 'user_notification_settings' ? db.rows : name === 'user_identity_profile' ? db.idRows : db.bizRows;
+  const isSettings = name === 'user_notification_settings';
+  let op: 'update' | 'insert' | 'upsert' | 'count' | 'select' | null = null;
   let payload: Row = {};
   let opts: { ignoreDuplicates?: boolean; count?: string; head?: boolean } = {};
-  let eq: [string, unknown] | null = null;
+  const filters: Array<(r: Row) => boolean> = [];
+  const match = (r: Row) => filters.every((f) => f(r));
   const exec = () => {
     if (op === 'upsert') {
       // Mirrors PostgREST: ignoreDuplicates = INSERT … ON CONFLICT DO NOTHING (count = rows inserted).
-      if (db.failInsert) return { data: null, count: null, error: db.failInsert };
+      if (db.failInsert && isSettings) return { data: null, count: null, error: db.failInsert };
       const i = rows.findIndex((r) => r.user_email === payload.user_email);
       if (i >= 0) {
         if (opts.ignoreDuplicates) return { data: null, count: 0, error: null };
@@ -34,19 +36,20 @@ function table(name: string) {
       rows.push({ ...payload });
       return { data: null, count: 1, error: null };
     }
-    if (op === 'count') {
-      return { data: null, count: rows.filter((r) => eq && r[eq[0]] === eq[1]).length, error: null };
-    }
-    const hit = rows.filter((r) => eq && r[eq[0]] === eq[1]);
+    if (op === 'count') return { data: null, count: rows.filter(match).length, error: null };
+    if (op === 'select') return { data: rows.find(match) ?? null, error: null };
+    const hit = rows.filter(match);
     hit.forEach((r) => Object.assign(r, payload));
-    return { data: null, count: db.nullCount ? null : hit.length, error: null };
+    return { data: null, count: db.nullCount && isSettings ? null : hit.length, error: null };
   };
   const q: Record<string, unknown> = {
     update(p: Row) { op = 'update'; payload = p; return q; },
     insert(p: Row) { op = 'insert'; payload = p; return q; },
     upsert(p: Row, o: typeof opts = {}) { op = 'upsert'; payload = p; opts = o; return q; },
-    eq(c: string, v: unknown) { eq = [c, v]; return q; },
-    select(_c?: string, o: typeof opts = {}) { if (o.head) op = 'count'; return q; },
+    eq(c: string, v: unknown) { filters.push((r) => r[c] === v); return q; },
+    is(c: string, v: unknown) { filters.push((r) => (r[c] ?? null) === v); return q; },
+    select(_c?: string, o: typeof opts = {}) { if (o.head) op = 'count'; else if (!op) op = 'select'; return q; },
+    maybeSingle() { return Promise.resolve(exec()); },
     then(res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) { return Promise.resolve(exec()).then(res, rej); },
   };
   return q;
@@ -71,7 +74,7 @@ const confirmBody = {
 const call = (body: unknown) =>
   POST(new NextRequest('https://getmindy.ai/api/company-setup', { method: 'POST', body: JSON.stringify(body) }));
 
-beforeEach(() => { db.rows = []; db.bizRows = []; db.failInsert = undefined; db.hideFromFirstUpdate = false; db.nullCount = false; });
+beforeEach(() => { db.rows = []; db.bizRows = []; db.idRows = []; db.failInsert = undefined; db.hideFromFirstUpdate = false; db.nullCount = false; });
 
 describe('user WITHOUT a settings row', () => {
   it('confirm creates the row carrying the confirmed codes and user_confirmed provenance', async () => {
@@ -84,8 +87,10 @@ describe('user WITHOUT a settings row', () => {
       user_email: 'new@example.com',
       naics_codes: ['238990'],
       naics_source: 'user_confirmed',
-      company_name: 'Acme Fences',
     });
+    // P0-I: company identity is NOT a notification setting — it lands in the Vault as user_entered.
+    expect(db.rows[0]).not.toHaveProperty('company_name');
+    expect(db.idRows).toEqual([expect.objectContaining({ user_email: 'new@example.com', legal_name: 'Acme Fences', legal_name_source: 'user_entered' })]);
   });
 
   it('the created row gets the same free defaults /api/app/profile creates', async () => {
@@ -143,5 +148,34 @@ describe('skip still writes nothing into the active profile', () => {
   it('skip never claims user_confirmed', async () => {
     await call({ ...confirmBody, action: 'skip' });
     for (const r of db.rows) expect(r.naics_source).toBeUndefined();
+  });
+});
+
+describe('P0-I — company name is Vault identity, never a notification setting', () => {
+  it('a SAM-grounded Vault name is not overwritten by the onboarding name; setup still succeeds and reports it kept', async () => {
+    db.idRows.push({ user_email: 'new@example.com', legal_name: 'ACME FENCES LLC', legal_name_source: 'sam' });
+    const res = await call(confirmBody);
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.company_name).toEqual({ outcome: 'kept', reason: 'protected_sam' });
+    expect(db.idRows[0]).toMatchObject({ legal_name: 'ACME FENCES LLC', legal_name_source: 'sam' });
+    expect(db.rows[0]).toMatchObject({ naics_source: 'user_confirmed' }); // M1 codes still land
+  });
+  it('an earlier user_entered name is updated', async () => {
+    db.idRows.push({ user_email: 'new@example.com', legal_name: 'Acme', legal_name_source: 'user_entered' });
+    const j = await (await call(confirmBody)).json();
+    expect(j.company_name).toMatchObject({ outcome: 'written' });
+    expect(db.idRows[0]).toMatchObject({ legal_name: 'Acme Fences', legal_name_source: 'user_entered' });
+  });
+  it('a name typed and then skipped is still saved as the user’s own statement — without creating a settings row', async () => {
+    const res = await call({ email: 'new@example.com', action: 'skip', companyName: 'Acme Fences' });
+    expect(res.status).toBe(200);
+    expect(db.idRows).toEqual([expect.objectContaining({ legal_name: 'Acme Fences', legal_name_source: 'user_entered' })]);
+    expect(db.rows).toHaveLength(0);
+  });
+  it('no notification-settings write ever carries company_name', async () => {
+    db.rows.push({ user_email: 'new@example.com' });
+    await call(confirmBody);
+    expect(db.rows.every((r) => !('company_name' in r))).toBe(true);
   });
 });

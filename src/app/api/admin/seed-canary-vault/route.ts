@@ -33,7 +33,7 @@ function buildIdentity(email: string) {
   return {
     user_email: email,
     uei: 'CANARYGCG234',                      // test UEI (no O/I/0/1) — clearly synthetic
-    legal_name: 'GOVCON GIANTS — CANARY (Construction / Infrastructure)',
+    legal_name: 'GOVCON GIANTS — CANARY (Construction / Infrastructure)', legal_name_source: 'admin', // P0-I: admin-seeded
     dba: 'GovCon Giants',
     primary_naics: ['236220', '237310', '541330', '237990', '236210'],
     certifications: ['Small Business'],

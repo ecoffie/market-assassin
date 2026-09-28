@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
+import { resolveLegalNamePatch } from '@/lib/vault/legal-name';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,15 @@ export async function PUT(request: NextRequest) {
     row.primary_naics = row.primary_naics.filter(
       (c: unknown) => typeof c === 'string' && isKnownNaicsCode(c),
     );
+  }
+  // P0-I: legal_name goes through the one provenance decision (owner edit → user_entered;
+  // an admin-set name is kept; re-saving the same value never downgrades a SAM name).
+  if ('legal_name' in row) {
+    const requested = row.legal_name;
+    delete row.legal_name;
+    const ln = await resolveLegalNamePatch(getSupabase(), writeEmail, requested, 'vault_edit');
+    if ('error' in ln) return NextResponse.json({ success: false, error: ln.error }, { status: 500 });
+    Object.assign(row, ln.patch);
   }
   // Invalidate the cached capability vector — the meaning text may have changed;
   // the embed-user-capabilities cron will re-embed. (No-op if the column is absent.)

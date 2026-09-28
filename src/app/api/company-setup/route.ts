@@ -18,6 +18,7 @@ import { resolvePostSignupDestination } from '@/lib/mindy/post-signup-destinatio
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 import { ensureFreeSettingsRow } from '@/lib/onboarding/ensure-free-settings-row';
+import { applyLegalName } from '@/lib/vault/legal-name';
 
 const ACTIONS: SetupAction[] = ['confirm', 'accept_all', 'skip'];
 
@@ -70,7 +71,10 @@ export async function POST(request: NextRequest) {
     // not the same as discarding what the user typed about themselves: a name and a
     // description are their own statements, not Mindy's inference.
     const notif: Record<string, unknown> = {};
-    if (screen1.company_name) notif.company_name = screen1.company_name;
+    // Company name is IDENTITY, not a notification setting (P0-I, option B): it goes to the
+    // Vault (user_identity_profile.legal_name) as user_entered, never onto
+    // user_notification_settings (that column never existed; writing it 500'd every setup
+    // with a name). A SAM-grounded, admin-set or unknown-provenance name is never overwritten.
     if (screen1.set_aside_preferences) notif.set_aside_preferences = screen1.set_aside_preferences;
     if (screen1.location_states) notif.location_states = screen1.location_states;
 
@@ -102,6 +106,16 @@ export async function POST(request: NextRequest) {
       if (updated === 0) return fail('settings row could not be written');
     }
 
+    let companyName: { outcome: string; reason?: string } | null = null;
+    if (screen1.company_name) {
+      const r = await applyLegalName(sb, email, screen1.company_name, 'onboarding');
+      if (r.outcome === 'failed') {
+        console.error('[company-setup] company name write failed:', r.error);
+        return NextResponse.json({ success: false, error: 'Could not save company name', path: destination.path }, { status: 500 });
+      }
+      companyName = { outcome: r.outcome, reason: r.reason };
+    }
+
     if (screen1.business_description) {
       const { error } = await sb.from('user_business_profiles')
         .upsert({
@@ -117,6 +131,9 @@ export async function POST(request: NextRequest) {
       path: destination.path,
       wrote: Object.keys(notif),
       created_settings_row: createdRow,
+      // 'written' (user_entered) or 'kept' with the reason (protected_sam / protected_admin /
+      // protected_unknown / unchanged) — a kept name is reported, never claimed as saved.
+      company_name: companyName,
       provenance: outcome.profile.naics_source ?? null,
       reason: outcome.reason,
     });

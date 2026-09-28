@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveLegalNamePatch } from '@/lib/vault/legal-name';
 import { createClient } from '@supabase/supabase-js';
 import { isKnownNaicsCode, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
@@ -89,6 +90,12 @@ export async function POST(request: NextRequest) {
         .filter((c) => isKnownNaicsCode(c));
     }
     if (Array.isArray(v.certifications)) vaultRow.certifications = (v.certifications as unknown[]).map(String);
+    if ('legal_name' in vaultRow) {
+      // P0-I: an admin write keeps explicit admin provenance.
+      const ln = await resolveLegalNamePatch(supabase, email, vaultRow.legal_name, 'admin');
+      delete vaultRow.legal_name;
+      if (!('error' in ln)) Object.assign(vaultRow, ln.patch);
+    }
     await supabase.from('user_identity_profile').upsert(vaultRow, { onConflict: 'user_email' });
   }
 
