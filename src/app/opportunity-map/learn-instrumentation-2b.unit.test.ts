@@ -137,3 +137,32 @@ describe('a share link never carries learn= (or anything else from the current U
 });
 
 void flush;
+
+describe('typed ?recompete= retry loop counts one open, not one per retry (prod 2026-09-28: 4-15)', () => {
+  function run(paintOnTry: number) {
+    const events: Ev[] = [];
+    const timers: Array<() => void> = [];
+    const win: Record<string, unknown> = { __track: (k: string, a: string, m: Record<string, unknown>) => events.push([k, a, m]), __mapMode: 'open', OPPS: [] };
+    let calls = 0;
+    const el = () => ({ innerHTML: '', classList: { add() {}, remove() {} }, scrollTop: 0 });
+    const drawer =
+      slice("  window.__drawerKind=null;\n  function close(){", "  // Action bar:") +
+      slice('  window.openRecompeteDrawer=function(key){', '\n  };') + '\n  };\n';
+    new Function('document', 'window', 'OPPS', 'dr', 'bd', 'body', 'clearTaskOrderPins', 'findRecompeteRow', 'paintRecompeteDrawer', 'fetchRecompeteRow', drawer)(
+      { addEventListener() {} }, win, [], el(), el(), el(), () => {},
+      (k: string) => (++calls >= paintOnTry ? { nid: k } : null),
+      (o: { nid: string }) => { win.__recompeteOpenedId = o.nid; }, () => {});
+    const loop = slice('  (function(){ try{ var m=(location.search||\'\').match(/[?&]recompete=([^&]+)/);', '  // Deep-link: /opportunity-map?strategy=');
+    new Function('window', 'location', 'setTimeout', loop)(win, { search: '?recompete=CONT_AWD_X' }, (f: () => void) => timers.push(f));
+    while (timers.length) timers.shift()!();
+    return { events, calls };
+  }
+  it('row found on the 5th try → 5 drawer calls, ONE listing_open', () => {
+    const r = run(5);
+    expect(r.calls).toBe(5);
+    expect(r.events.filter((e) => e[1] === 'listing_open')).toEqual([['tool_use', 'listing_open', { notice_id: 'CONT_AWD_X', horizon: 'recompete' }]]);
+  });
+  it('row in memory immediately → one call, one listing_open', () => {
+    expect(run(1).events.filter((e) => e[1] === 'listing_open')).toHaveLength(1);
+  });
+});

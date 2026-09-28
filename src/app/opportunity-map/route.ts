@@ -9285,10 +9285,16 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // path; fetchView still merges window.__horizons.
   // Success = window.__recompeteOpenedId === rid (valid data for THAT id), not drawer .show
   // (an error drawer from a competing handler would already have .show).
+  // ONE open = ONE listing_open. This loop RE-INVOKES openRecompeteDrawer every 150ms until the row
+  // paints (measured on prod 2026-09-28: 4-15 calls per typed link), and openRecompeteDrawer emits
+  // listing_open itself. After the first call, pre-set the one-shot marker so a retry of the SAME
+  // open is not counted again.
   (function(){ try{ var m=(location.search||'').match(/[?&]recompete=([^&]+)/); if(!m)return; var rid=decodeURIComponent(m[1]);
-    var tries=0; (function go(){
+    var tries=0, counted=false; (function go(){
       if(window.openRecompeteDrawer){
         if(typeof window.__isolateHorizon==='function')window.__isolateHorizon('recompete');
+        if(counted)window.__listingOpenFired=rid;
+        counted=true;
         window.openRecompeteDrawer(rid);
         if(window.__recompeteOpenedId===rid)return;
         if(tries++<40)setTimeout(go,150);
