@@ -358,9 +358,6 @@ function MarketIntelligenceContent() {
               <span className="text-(--mp-ok)">✓</span> Weekly deep dives
             </li>
             <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
-              <span className="text-(--mp-ok)">✓</span> Pursuit briefs
-            </li>
-            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
               <span className="text-(--mp-ok)">✓</span> {/* tier-display-ok: pricing plan selector */ tier === 'team' ? 'Shared pipeline + CRM' : 'Saved target list + outreach log'}
             </li>
             <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
@@ -575,7 +572,7 @@ function MarketIntelligenceContent() {
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div>
               <p className="text-(--mp-navy) font-semibold mb-1">Mindy Pro: $149/mo</p>
-              <p className="text-(--mp-muted)">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring. Includes FHC training access.</p>
+              <p className="text-(--mp-muted)">AI-powered briefings, personalized by your NAICS + geography. Daily and weekly briefs with win probability scoring. Includes FHC training access.</p>
             </div>
             <div>
               <p className="text-(--mp-muted) font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>

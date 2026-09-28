@@ -90,7 +90,6 @@ const featureMatrix: Array<{
     rows: [
       { feature: `${forecastsLabel} agency forecasts`, free: 'Browse', pro: 'Full access', teams: 'Full access' },
       { feature: 'Weekly market deep dives', free: false, pro: true, teams: true },
-      { feature: 'Pursuit briefs (deep research)', free: false, pro: true, teams: true },
     ],
   },
   {
@@ -349,7 +348,6 @@ export default function PricingPage() {
                   'Competitor & incumbent tracking',
                   'Recompete alerts 12 months out',
                   'Weekly market deep dives',
-                  'Pursuit briefs on demand',
                   'Priority email support (24hr)',
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-(--mp-ink) text-sm">

@@ -1,5 +1,9 @@
 'use client';
 
+// Path kept for already-sent email save links (save-redirect lands here).
+// Pursuit Briefs were retired by product decision 2026-09-28 — this page only
+// confirms the save; it must not promise a brief.
+
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -18,45 +22,12 @@ function RequestedContent() {
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          Pursuit Brief Requested!
+          Opportunity Saved
         </h1>
 
         <p className="text-gray-600 mb-6">
-          We're generating your personalized Pursuit Brief for <strong className="text-purple-700">{decodeURIComponent(title)}</strong>.
+          <strong className="text-purple-700">{decodeURIComponent(title)}</strong> was saved to your watchlist{email ? <> for <span className="font-mono text-purple-600">{email}</span></> : null}.
         </p>
-
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-          <p className="text-purple-800 text-sm">
-            <strong>Check your inbox!</strong><br />
-            Your brief will be sent to <span className="font-mono text-purple-600">{email}</span> within the next 5-10 minutes.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">Your Pursuit Brief includes:</h3>
-          <ul className="text-left text-sm text-gray-600 space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <span>Win probability score with explanation</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <span>Key evaluation criteria breakdown</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <span>Competitive positioning analysis</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <span>Teaming recommendations</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <span>Go/No-Go decision framework</span>
-            </li>
-          </ul>
-        </div>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <a

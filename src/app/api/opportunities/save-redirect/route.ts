@@ -5,8 +5,11 @@
  * Since email links must be GET requests, this endpoint:
  * 1. Receives opportunity data via query params
  * 2. Saves the opportunity to user's watchlist
- * 3. Triggers Pursuit Brief generation
- * 4. Redirects to a confirmation page
+ * 3. Redirects to a confirmation page
+ *
+ * Pursuit Briefs were retired by product decision (2026-09-28): saving no longer
+ * requests or emails a brief. The /pursuit-brief/* paths are kept only because
+ * already-sent email links land there.
  *
  * Query params:
  * - email: user email
@@ -73,7 +76,7 @@ export async function GET(request: NextRequest) {
     // opportunities/save). A verified identity is what a save needs.
 
     // Save the opportunity (upsert to handle duplicates)
-    const { data: savedOpp, error: saveError } = await supabase
+    const { error: saveError } = await supabase
       .from('user_saved_opportunities')
       .upsert({
         user_email: auth.email!,
@@ -87,7 +90,7 @@ export async function GET(request: NextRequest) {
         response_deadline: oppData.responseDeadline as string || oppData.response_deadline as string || null,
         posted_date: oppData.postedDate as string || oppData.posted_date as string || null,
         source: 'daily_alert',
-        pursuit_brief_requested: true,
+        pursuit_brief_requested: false,
         status: 'watching',
       }, {
         onConflict: 'user_email,notice_id',
@@ -101,20 +104,6 @@ export async function GET(request: NextRequest) {
         `${baseUrl}/pursuit-brief/error?reason=save_failed`
       );
     }
-
-    // Trigger Pursuit Brief generation (fire and forget)
-    fetch(`${baseUrl}/api/opportunities/pursuit-brief`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: auth.email!,
-        savedOpportunityId: savedOpp?.id,
-        noticeId,
-        opportunityData: oppData,
-      }),
-    }).catch(err => {
-      console.error('[Save Redirect] Failed to trigger pursuit brief:', err);
-    });
 
     // Redirect to success page
     const title = encodeURIComponent((oppData.title as string || 'the opportunity').slice(0, 50));

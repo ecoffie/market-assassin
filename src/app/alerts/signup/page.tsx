@@ -411,15 +411,6 @@ function AlertSignupContent() {
                     <p className="text-slate-500">Market analysis, teaming opportunities, and recompete intelligence</p>
                   </div>
                 </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <div>
-                    <strong className="text-white">Pursuit Briefs</strong>
-                    <p className="text-slate-500">Your top 3 opportunity targets with specific pursuit guidance</p>
-                  </div>
-                </li>
               </ul>
               <Link
                 href="/briefings"
@@ -1058,9 +1049,6 @@ function AlertSignupContent() {
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-purple-400">✓</span> Weekly Deep Dive — strategic analysis and teaming
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-purple-400">✓</span> Pursuit Briefs — capture guidance for targets
                     </li>
                   </ul>
                 </div>

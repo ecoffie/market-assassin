@@ -1205,8 +1205,8 @@ export default function OpportunityHunterPage() {
                       </div>
                     </div>
                     <p className="text-(--mp-navy) text-sm mt-3 leading-relaxed">
-                      Turn these {results.agencies.length} agencies into a daily action plan. Get ranked opportunities,
-                      weekly deep dives on market movement, and pursuit briefs with capture guidance — all personalized to your NAICS codes.
+                      Turn these {results.agencies.length} agencies into a daily action plan. Get ranked opportunities
+                      and weekly deep dives on market movement — all personalized to your NAICS codes.
                     </p>
                   </div>
                   <div className="flex flex-col items-center md:items-end gap-2">

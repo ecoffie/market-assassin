@@ -20,7 +20,7 @@ export default function UltimateBundlePage() {
       includedProducts={[
         {
           name: 'Market Intelligence - Lifetime Access',
-          description: 'Lifetime access to the unified Market Intelligence platform: daily bid targets, weekly market deep dives, pursuit intelligence, pipeline tracking, teaming CRM, and secure team-ready workspace features.',
+          description: 'Lifetime access to the unified Market Intelligence platform: daily bid targets, weekly market deep dives, pipeline tracking, teaming CRM, and secure team-ready workspace features.',
           price: 1497,
           icon: '🚀',
           link: '/market-intelligence',

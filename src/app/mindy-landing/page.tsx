@@ -573,10 +573,6 @@ export default function MindyLandingPage() {
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Weekly deep dives</span>
                 </li>
-                <li className="flex items-start gap-2 text-ink-soft text-sm">
-                  <span className="text-emerald-400 mt-0.5">✓</span>
-                  <span>Pursuit briefs</span>
-                </li>
               </ul>
 
               <Link
