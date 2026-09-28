@@ -32,6 +32,7 @@
 
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { explicitBusinessTypeField } from '@/lib/alerts/save-profile-patch';
 // UnifiedSidebar removed - Opportunity Hunter is a standalone free product, not part of MI platform
 
 const OPPORTUNITY_HUNTER_PRO_PRODUCT_ID = 'opportunity-hunter-pro';
@@ -277,7 +278,8 @@ export default function OpportunityHunterPage() {
         body: JSON.stringify({
           email: email,
           naicsCodes: results?.searchCriteria.naicsCode ? [results.searchCriteria.naicsCode] : [],
-          businessType: results?.searchCriteria.businessFormation || 'Small Business',
+          // Only a type the user picked in the form — never a default (it overwrote stored certs).
+          ...explicitBusinessTypeField(results?.searchCriteria.businessFormation),
           source: 'opportunity-hunter-free',
         }),
       }).catch(() => {}); // Silently ignore errors
@@ -513,7 +515,7 @@ export default function OpportunityHunterPage() {
                 body: JSON.stringify({
                   email: email,
                   naicsCodes: [result.searchCriteria.naicsCode],
-                  businessType: result.searchCriteria.businessFormation || 'Small Business',
+                  ...explicitBusinessTypeField(result.searchCriteria.businessFormation),
                   source: 'opportunity-hunter-free',
                 }),
               }).catch(() => {}); // Silent - don't interrupt user experience

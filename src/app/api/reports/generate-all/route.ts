@@ -16,6 +16,7 @@ import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/ap
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
 import { getMarketAssassinTier } from '@/lib/access-codes';
+import { buildReportAlertProfileBody } from '@/lib/alerts/report-alert-profile-body';
 import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 
@@ -985,7 +986,7 @@ export async function POST(request: NextRequest) {
     if (email) {
       const userTier = await getMarketAssassinTier(email);
       if (userTier) {
-        saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
+        saveAlertProfile(email, inputs).catch(err => {
           console.error('[Alerts] Failed to save profile:', err);
         });
       }
@@ -1069,30 +1070,14 @@ export async function POST(request: NextRequest) {
 async function saveAlertProfile(
   email: string,
   inputs: CoreInputs,
-  selectedAgencies: string[]
 ): Promise<void> {
   try {
-    // Build NAICS codes array - handle comma-separated input
-    const naicsCodes: string[] = [];
-    if (inputs.naicsCode) {
-      // Support comma-separated NAICS codes/prefixes (e.g., "236, 238320, 541")
-      const codes = inputs.naicsCode.split(/[,;\s]+/).map(c => c.trim()).filter(c => c);
-      naicsCodes.push(...codes);
-    }
-
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai'}/api/alerts/save-profile`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          naicsCodes,
-          pscCode: inputs.pscCode || null, // PSC code will be expanded to related NAICS
-          businessType: inputs.businessType || null,
-          targetAgencies: selectedAgencies.slice(0, 10), // Top 10 agencies
-          locationZip: inputs.zipCode || null,
-        }),
+        body: JSON.stringify(buildReportAlertProfileBody(email, inputs)),
       }
     );
 

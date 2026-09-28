@@ -20,6 +20,7 @@ import { applyPartnerReferralIfEligible, partnerReferralSourceLabel } from '@/li
 import { defaultAlertModeForNewUser, mergeAlertModeIntoAggregated } from '@/lib/alerts/alert-mode';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 import { saveProfileAlertDeliveryPatch } from '@/lib/alerts/paused-delivery';
+import { buildSaveProfileTargetingPatch } from '@/lib/alerts/save-profile-patch';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -34,7 +35,7 @@ interface AlertProfileRequest {
   naicsCodes: string[];       // Can be full codes or prefixes (e.g., ["541511", "236"])
   naicsInput?: string;        // Alternative: comma-separated string (e.g., "541511, 236, 238320")
   pscCode?: string;           // If provided, will expand to related NAICS codes
-  businessType: string;
+  businessType?: string | null; // omitted/blank = leave stored business_type untouched
   targetAgencies?: string[];
   locationState?: string;
   locationStates?: string[];
@@ -205,21 +206,24 @@ export async function POST(request: NextRequest) {
     const delivery = saveProfileAlertDeliveryPatch(existingSave, alertFrequency);
 
     // Build upsert payload
+    // PARTIAL update for an existing row: only fields the request actually carries
+    // are written — an omitted/blank/defaulted business type, agency list, location
+    // or empty NAICS list leaves the stored value untouched. New rows keep defaults.
     const upsertPayload: Record<string, unknown> = {
       user_email: verifiedEmail,
-      naics_codes: expandedNaics.length > 0 ? expandedNaics : [],
-      business_type: businessType || null,
-      agencies: targetAgencies || [],
-      location_state: locationState || null,
-      location_states: Array.isArray(locationStates) ? locationStates : [],
-      location_zip: locationZip || null,
+      ...buildSaveProfileTargetingPatch({
+        rowExists: !!existingSave,
+        expandedNaics,
+        businessType,
+        targetAgencies,
+        locationState,
+        locationStates,
+        locationZip,
+      }),
       is_active: true,
       alerts_enabled: delivery.alerts_enabled,
       alert_frequency: delivery.alert_frequency,
       updated_at: new Date().toISOString(),
-      // NAICS/keywords changed → capability vector is stale; null the stamp so the
-      // embed-user-capabilities cron re-embeds (hidden-match base-wide fallback).
-      capability_embedded_at: null,
     };
 
     const cleanBusinessDescription = typeof businessDescription === 'string'
@@ -293,15 +297,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert notification settings (unified table)
-    const { data, error } = await getSupabase()
-      .from('user_notification_settings')
-      // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
-      .upsert(upsertPayload, {
-        onConflict: 'user_email',
-      })
-      .select()
-      .single();
+    // Existing row → UPDATE only the submitted columns (an upsert's insert tuple
+    // would need every NOT NULL column). New row → upsert with defaults.
+    const { data, error } = existingSave
+      ? await getSupabase()
+          .from('user_notification_settings')
+          // truncation-ok: eq on the unique user_email — this update cannot return 1,000 rows
+          .update(upsertPayload)
+          .eq('user_email', verifiedEmail)
+          .select()
+          .single()
+      : await getSupabase()
+          .from('user_notification_settings')
+          // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
+          .upsert(upsertPayload, {
+            onConflict: 'user_email',
+          })
+          .select()
+          .single();
 
     if (error) {
       console.error('[Alerts] Error saving profile:', error);

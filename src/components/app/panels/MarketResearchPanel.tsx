@@ -944,6 +944,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           inputs: {
             naicsCode: activeFormData.naicsCode,
             pscCode: activeFormData.pscCode,
+            // REPORT parameter only (set-aside math). generate-all no longer forwards it to
+            // the alert profile — see buildReportAlertProfileBody — so this default is never stored.
             businessType: activeFormData.businessType || 'Small Business',
             veteranStatus: activeFormData.veteranStatus,
             zipCode: activeFormData.zipCode,
