@@ -17,13 +17,16 @@
  *   - a later grounded SAM identity                    → may supersede user_entered
  *   - admin writes                                     → keep explicit admin provenance
  *   - lookup failure / absence                         → unknown (NULL), never "sam"
+ *   - unknown                                          → onboarding does not overwrite
+ *   - admin                                            → SAM / onboarding do not overwrite
+ *   - sam                                              → onboarding AND the user's own
+ *                                                        Vault/display edits do not overwrite
  *
- * Also decided here (not spelled out in the ruling, chosen conservatively):
- *   - onboarding never overwrites a non-empty name of UNKNOWN provenance — it may be SAM's;
- *   - SAM never overwrites an admin-set name;
- *   - an explicit Vault identity edit by the owner (vault_edit) may replace any non-admin
- *     name and is stamped user_entered — it is the owner's own statement;
- *   - an identical value never downgrades provenance (re-saving a SAM name stays sam).
+ * SAM-verified legal identity stays grounded legal identity (Eric, 2026-09-28 rule change).
+ * If Mindy needs a user-preferred company name / DBA, model it SEPARATELY — never by
+ * overwriting a SAM legal_name. An identical value never downgrades provenance.
+ * An owner's explicit Vault edit may still replace user_entered or unknown (their own
+ * statement about a name nobody verified); it is stamped user_entered.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -89,6 +92,7 @@ export function decideLegalNameWrite(
       return { action: 'write', legal_name: name, legal_name_source: 'sam', reason: 'sam_supersedes' };
     case 'vault_edit':
       if (curSource === 'admin') return { action: 'keep', reason: 'protected_admin' };
+      if (curSource === 'sam') return { action: 'keep', reason: 'protected_sam' };
       return { action: 'write', legal_name: name, legal_name_source: 'user_entered', reason: 'owner_edit' };
     case 'onboarding':
     case 'unverified':

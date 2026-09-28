@@ -49,8 +49,12 @@ describe('never infer, never downgrade', () => {
   it('SAM confirming an identical user_entered value upgrades it to sam', () => {
     expect(decideLegalNameWrite(cur('ACME LLC', 'user_entered'), 'ACME LLC', 'sam')).toMatchObject({ action: 'write', legal_name_source: 'sam' });
   });
-  it("the owner's explicit Vault edit replaces a non-admin name as user_entered", () => {
-    expect(decideLegalNameWrite(cur('ACME LLC', 'sam'), 'Acme Holdings', 'vault_edit')).toMatchObject({ action: 'write', legal_name_source: 'user_entered' });
+  it("a SAM legal name is not overwritten by the user's own Vault / display edit (rule change 2026-09-28)", () => {
+    expect(decideLegalNameWrite(cur('ACME LLC', 'sam'), 'Acme Holdings', 'vault_edit')).toEqual({ action: 'keep', reason: 'protected_sam' });
+  });
+  it("the owner's explicit Vault edit replaces user_entered and unknown names as user_entered", () => {
+    expect(decideLegalNameWrite(cur('Acme', 'user_entered'), 'Acme Holdings', 'vault_edit')).toMatchObject({ action: 'write', legal_name_source: 'user_entered' });
+    expect(decideLegalNameWrite(cur('Acme', null), 'Acme Holdings', 'vault_edit')).toMatchObject({ action: 'write', legal_name_source: 'user_entered' });
   });
   it('an empty submission never clears a stored name', () => {
     expect(decideLegalNameWrite(cur('ACME', 'sam'), '   ', 'vault_edit')).toEqual({ action: 'keep', reason: 'empty_input' });

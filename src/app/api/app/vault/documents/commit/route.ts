@@ -126,7 +126,12 @@ export async function POST(request: NextRequest) {
     delete identityPatch.legal_name;
     const ln = await resolveLegalNamePatch(sb, userEmail, requested, 'vault_edit');
     if ('error' in ln) skipped.push({ section: 'identity', item: 'legal name', reason: ln.error });
-    else Object.assign(identityPatch, ln.patch);
+    else {
+      Object.assign(identityPatch, ln.patch);
+      if (ln.decision.action === 'keep' && ln.decision.reason !== 'unchanged' && ln.decision.reason !== 'empty_input') {
+        skipped.push({ section: 'identity', item: 'legal name', reason: `kept existing (${ln.decision.reason})` });
+      }
+    }
   }
   if (Object.keys(identityPatch).length > 0) {
     const row = { ...identityPatch, user_email: userEmail, updated_at: new Date().toISOString(), capability_embedded_at: null };
