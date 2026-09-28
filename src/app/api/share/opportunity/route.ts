@@ -78,13 +78,16 @@ export async function POST(request: NextRequest) {
     // Get user's company name from profile if not provided
     let sharerCompany = companyName;
     if (!sharerCompany) {
-      const { data: profile } = await supabase
-        .from('user_notification_settings')
-        .select('company_name')
-        .ilike('user_email', email)
+      // P0-I: company identity lives in the Vault (user_identity_profile.legal_name).
+      // user_notification_settings.company_name never existed, so this always came back null.
+      const { data: profile, error: profileErr } = await supabase
+        .from('user_identity_profile')
+        .select('legal_name')
+        .eq('user_email', String(email).toLowerCase().trim())
         .maybeSingle();
+      if (profileErr) console.error('[share/opportunity] identity read failed:', profileErr.message);
 
-      sharerCompany = profile?.company_name || null;
+      sharerCompany = profile?.legal_name || null;
     }
 
     // Create the share record
