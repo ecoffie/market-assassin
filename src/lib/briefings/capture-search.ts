@@ -66,9 +66,17 @@ export async function captureSearch(params: CaptureSearchParams): Promise<void> 
 
   try {
     // Fire and forget — don't await in the UI
+    // SEC-4: the route writes only for a verified session, so send the Mindy session
+    // token when the browser holds one. Without it the capture is refused (401) — a
+    // search from a signed-out browser is not attributable to anyone.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      const tok = typeof window !== 'undefined' ? window.localStorage.getItem('mi_beta_auth_token') : null;
+      if (tok) headers['x-mi-auth-token'] = tok;
+    } catch { /* storage unavailable */ }
     fetch('/api/search-capture', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         user_email: params.userEmail,
         tool: params.tool,
