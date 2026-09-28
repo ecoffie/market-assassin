@@ -69,19 +69,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Check if user exists in notification settings
-    const { data: userSettings, error: userSettingsErr } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, briefings_enabled')
-      .eq('user_email', auth.email!)
-      .maybeSingle();
-    if (userSettingsErr) console.error('[save-redirect] settings query error:', userSettingsErr.message);
-
-    if (!userSettings) {
-      return NextResponse.redirect(
-        `${baseUrl}/pursuit-brief/error?reason=user_not_found&email=${encodeURIComponent(email)}`
-      );
-    }
+    // P0-H: no settings-row gate — the row was only checked for existence, never read (see
+    // opportunities/save). A verified identity is what a save needs.
 
     // Save the opportunity (upsert to handle duplicates)
     const { data: savedOpp, error: saveError } = await supabase

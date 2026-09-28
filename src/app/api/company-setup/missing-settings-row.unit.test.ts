@@ -18,22 +18,25 @@ const db: { rows: Row[]; bizRows: Row[]; failInsert?: { code: string; message: s
 
 function table(name: string) {
   const rows = name === 'user_notification_settings' ? db.rows : db.bizRows;
-  let op: 'update' | 'insert' | 'upsert' | null = null;
+  let op: 'update' | 'insert' | 'upsert' | 'count' | null = null;
   let payload: Row = {};
+  let opts: { ignoreDuplicates?: boolean; count?: string; head?: boolean } = {};
   let eq: [string, unknown] | null = null;
   const exec = () => {
-    if (op === 'insert') {
-      if (db.failInsert) return { data: null, error: db.failInsert };
-      if (rows.some((r) => r.user_email === payload.user_email)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
-      rows.push({ ...payload });
-      return { data: [{ ...payload }], error: null };
-    }
     if (op === 'upsert') {
+      // Mirrors PostgREST: ignoreDuplicates = INSERT … ON CONFLICT DO NOTHING (count = rows inserted).
+      if (db.failInsert) return { data: null, count: null, error: db.failInsert };
       const i = rows.findIndex((r) => r.user_email === payload.user_email);
-      if (i >= 0) rows[i] = { ...rows[i], ...payload }; else rows.push({ ...payload });
-      return { data: null, error: null };
+      if (i >= 0) {
+        if (opts.ignoreDuplicates) return { data: null, count: 0, error: null };
+        rows[i] = { ...rows[i], ...payload }; return { data: null, count: 1, error: null };
+      }
+      rows.push({ ...payload });
+      return { data: null, count: 1, error: null };
     }
-    if (db.hideFromFirstUpdate) { db.hideFromFirstUpdate = false; return { data: null, count: 0, error: null }; }
+    if (op === 'count') {
+      return { data: null, count: rows.filter((r) => eq && r[eq[0]] === eq[1]).length, error: null };
+    }
     const hit = rows.filter((r) => eq && r[eq[0]] === eq[1]);
     hit.forEach((r) => Object.assign(r, payload));
     return { data: null, count: db.nullCount ? null : hit.length, error: null };
@@ -41,9 +44,9 @@ function table(name: string) {
   const q: Record<string, unknown> = {
     update(p: Row) { op = 'update'; payload = p; return q; },
     insert(p: Row) { op = 'insert'; payload = p; return q; },
-    upsert(p: Row) { op = 'upsert'; payload = p; return q; },
+    upsert(p: Row, o: typeof opts = {}) { op = 'upsert'; payload = p; opts = o; return q; },
     eq(c: string, v: unknown) { eq = [c, v]; return q; },
-    select() { return q; },
+    select(_c?: string, o: typeof opts = {}) { if (o.head) op = 'count'; return q; },
     then(res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) { return Promise.resolve(exec()).then(res, rej); },
   };
   return q;
@@ -98,69 +101,26 @@ describe('user WITHOUT a settings row', () => {
     expect(j.success).toBe(false);
   });
 
-  it('a concurrent create (23505) falls back to updating the row that now exists', async () => {
-    // Another request created the row between our update (saw 0 rows) and our insert.
-    db.rows.push({ user_email: 'new@example.com', alerts_enabled: false });
-    db.hideFromFirstUpdate = true;
+  it('a row created concurrently by another request is patched, never duplicated or overwritten', async () => {
+    // The other request won the insert; ours hits ON CONFLICT DO NOTHING, then patches that row.
+    db.rows.push({ user_email: 'new@example.com', alerts_enabled: false, treatment_type: 'free' });
     const res = await call(confirmBody);
     const j = await res.json();
     expect(j.success).toBe(true);
     expect(db.rows).toHaveLength(1);
     expect(db.rows[0].naics_source).toBe('user_confirmed');
     expect(db.rows[0].alerts_enabled).toBe(false); // the racing row's own settings are kept
-  });
-});
-
-describe('user WITHOUT a settings row', () => {
-  it('confirm creates the row carrying the confirmed codes and user_confirmed provenance', async () => {
-    const res = await call(confirmBody);
-    const j = await res.json();
-    expect(res.status).toBe(200);
-    expect(j.success).toBe(true);
-    expect(db.rows).toHaveLength(1);
-    expect(db.rows[0]).toMatchObject({
-      user_email: 'new@example.com',
-      naics_codes: ['238990'],
-      naics_source: 'user_confirmed',
-      company_name: 'Acme Fences',
-    });
-  });
-
-  it('the created row gets the same free defaults /api/app/profile creates', async () => {
-    await call(confirmBody);
-    expect(db.rows[0]).toMatchObject({ treatment_type: 'free', alerts_enabled: true, briefings_enabled: false, alert_frequency: 'daily' });
-  });
-
-  it('a failed create is an error, never success', async () => {
-    db.failInsert = { code: '42501', message: 'permission denied' };
-    const res = await call(confirmBody);
-    const j = await res.json();
-    expect(res.status).toBe(500);
-    expect(j.success).toBe(false);
-  });
-
-  it('a concurrent create (23505) falls back to updating the row that now exists', async () => {
-    // Another request created the row between our update (0 rows) and our insert.
-    db.rows.push({ user_email: 'someone-else@example.com' });
-    const realInsert = db.failInsert;
-    expect(realInsert).toBeUndefined();
-    db.failInsert = { code: '23505', message: 'duplicate key value violates unique constraint' };
-    // Simulate the racing writer landing just before our retry.
-    const res = await (async () => { const p = call(confirmBody); db.rows.push({ user_email: 'new@example.com', alerts_enabled: false }); return p; })();
-    const j = await res.json();
-    expect(j.success).toBe(true);
-    const mine = db.rows.find((r) => r.user_email === 'new@example.com')!;
-    expect(mine.naics_source).toBe('user_confirmed');
-    expect(mine.alerts_enabled).toBe(false); // the racing row's own settings are kept
+    expect(j.created_settings_row).toBe(false);
   });
 });
 
 describe('an unknown update count is a failure, never "no row"', () => {
-  it('count NULL → 500, and no row is created', async () => {
+  it('count NULL on the patch → 500, never success', async () => {
     db.nullCount = true;
     const res = await call(confirmBody);
+    const j = await res.json();
     expect(res.status).toBe(500);
-    expect(db.rows).toHaveLength(0);
+    expect(j.success).toBe(false);
   });
 });
 

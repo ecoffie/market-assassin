@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
-  const { error } = await getSupabase()
+  // Counted (P0-H): with no settings row this used to return success having changed nothing.
+  // SMS can only ever have been enabled on an existing row (sms/verify/check), so a missing row
+  // means SMS is already off — say so explicitly rather than implying a change was made.
+  const { count, error } = await getSupabase()
     .from('user_notification_settings')
     .update({
       sms_enabled: false,
@@ -36,12 +39,15 @@ export async function POST(request: NextRequest) {
       sms_verify_code: null,
       sms_verify_expires_at: null,
       updated_at: new Date().toISOString(),
-    })
+    }, { count: 'exact' })
     .eq('user_email', email);
 
-  if (error) {
-    console.error('[sms/disable] error', error.message);
+  if (error || count == null) {
+    console.error('[sms/disable] error', error?.message ?? 'update count unknown');
     return NextResponse.json({ success: false, error: 'Could not update.' }, { status: 500 });
   }
-  return NextResponse.json({ success: true });
+  if (count === 0) {
+    return NextResponse.json({ success: true, changed: false, sms_enabled: false, reason: 'no_settings_row' });
+  }
+  return NextResponse.json({ success: true, changed: true, sms_enabled: false });
 }

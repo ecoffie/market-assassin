@@ -131,7 +131,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Real-time profile update: if this user has a briefing profile,
-    // immediately add the new search value to it (don't wait for nightly cron)
+    // immediately add the new search value to it (don't wait for nightly cron).
+    // P0-H: the outcome is REPORTED (profile_updated + reason) — with no settings row this used to
+    // return "Search captured" having silently skipped the profile. No row is created here: a
+    // Free-default row turns alerts ON, and a search is not consent to alert email.
+    let profileUpdated = false;
+    let profileReason: string | null = null;
     try {
       const email = body.user_email.toLowerCase().trim();
       const searchType = body.search_type || 'keyword';
@@ -157,12 +162,14 @@ export async function POST(request: NextRequest) {
           .select(`${column}, aggregated_profile`)
           .eq('user_email', email)
           .maybeSingle();
-        if (captureReadErr) console.error('[search-capture] profile read error:', captureReadErr.message);
+        if (captureReadErr) { console.error('[search-capture] profile read error:', captureReadErr.message); profileReason = 'profile_read_failed'; }
+        else if (!profile) profileReason = 'no_settings_row';
 
         if (profile) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const profileData = profile as any;
           const currentValues: string[] = Array.isArray(profileData[column]) ? profileData[column] : [];
+          if (currentValues.includes(normalizedValue)) profileReason = 'already_present';
           if (!currentValues.includes(normalizedValue)) {
             const updatedValues = [...currentValues, normalizedValue];
             // Also update aggregated_profile JSONB to stay in sync
@@ -175,18 +182,24 @@ export async function POST(request: NextRequest) {
               .from('user_notification_settings')
               .update({ [column]: updatedValues, aggregated_profile: updatedJsonb, updated_at: new Date().toISOString() })
               .eq('user_email', email);
-            if (captureUpdateErr) console.error('[search-capture] profile update error:', captureUpdateErr.message);
+            if (captureUpdateErr) { console.error('[search-capture] profile update error:', captureUpdateErr.message); profileReason = 'profile_update_failed'; }
+            else profileUpdated = true;
           }
         }
+      } else {
+        profileReason = 'search_type_not_profiled';
       }
     } catch (profileErr) {
       // Non-fatal — nightly cron will catch up
       console.error('Profile update error (non-fatal):', profileErr);
+      profileReason = 'profile_update_failed';
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Search captured'
+      message: 'Search captured',
+      profile_updated: profileUpdated,
+      ...(profileReason ? { profile_reason: profileReason } : {}),
     });
 
   } catch (error) {
