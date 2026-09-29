@@ -19,7 +19,7 @@
  *      replenishment cannot grant it a second time.
  *
  * Unrelated personal credits (signup, referral, admin, comp) and purchased credits stay
- * personal. Every step is written to mcp_pool_grants.details as the audit record.
+ * personal. Every step is written to mcp_pool_credit_grants.details as the audit record.
  *
  * Refuses (skips, reported) any subscriber whose Team credits can't be told apart from a
  * Pro allowance — e.g. they also hold an active Pro subscription — rather than guess.
@@ -152,7 +152,7 @@ async function main() {
       if (org && teamGrantedThisMonth > 0) {
         const claimKey = `${poolReplenishKey(org.orgId, month)}:c${org.monthlyCredits}`;
         const { error } = await db
-          .from('mcp_pool_grants')
+          .from('mcp_pool_credit_grants')
           .upsert(
             {
               idempotency_key: claimKey, pool_id: org.poolId,

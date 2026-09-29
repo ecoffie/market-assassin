@@ -35,6 +35,13 @@ beforeAll(async () => {
   ]) {
     await db.exec(mig(f));
   }
+  // Production residue: the retired 20260909_mcp_grant_pool.sql left an EMPTY
+  // mcp_pool_grants(grant_key, pool_id, amount, granted_at) table behind (its file was
+  // deleted, so a fresh chain never recreates it). The first prod apply collided with it
+  // (`column "created_at" does not exist`). Recreate it here so this suite runs against
+  // the schema production actually has.
+  await db.exec(`CREATE TABLE mcp_pool_grants (grant_key TEXT PRIMARY KEY, pool_id UUID NOT NULL,
+    amount INTEGER NOT NULL, granted_at TIMESTAMPTZ NOT NULL DEFAULT now());`);
   await db.exec(MIGRATION);
   await db.exec(MIGRATION); // idempotent re-apply
 
@@ -150,7 +157,7 @@ describe('mcp_transfer_personal_to_pool', () => {
     expect(bal).toEqual({ balance: 1500, purchased_balance: 500 });
     expect(await poolBalance()).toBe(before);
     // The failed call's claim row was rolled back with it, so the key is reusable.
-    expect(await one(`SELECT 1 FROM mcp_pool_grants WHERE idempotency_key = 'mig:too-much'`)).toBeUndefined();
+    expect(await one(`SELECT 1 FROM mcp_pool_credit_grants WHERE idempotency_key = 'mig:too-much'`)).toBeUndefined();
   });
 
   it('moves allowance only, keeps purchased credits, writes both ledger sides', async () => {
@@ -166,7 +173,7 @@ describe('mcp_transfer_personal_to_pool', () => {
     expect(out!.delta).toBe(-800);
     expect(inn).toEqual({ delta: 800, user_email: `pool:${poolId}` });
     const audit = await one<{ credits: number; source_email: string; details: { test: boolean } }>(
-      `SELECT credits, source_email, details FROM mcp_pool_grants WHERE idempotency_key = 'mig:owner'`,
+      `SELECT credits, source_email, details FROM mcp_pool_credit_grants WHERE idempotency_key = 'mig:owner'`,
     );
     expect(audit).toEqual({ credits: 800, source_email: user, details: { test: true } });
   });
