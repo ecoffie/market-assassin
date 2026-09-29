@@ -104,3 +104,23 @@ export async function gscQuery<T = unknown>(body: Record<string, unknown>): Prom
   }
   return (await res.json()) as T;
 }
+
+/**
+ * URL Inspection (read-only): Google's index status for one URL of the property.
+ * Quota: 2,000/day and 600/minute per property. Returns the raw HTTP status on
+ * failure so callers can tell transient (429/5xx) from permanent (other 4xx) errors.
+ */
+export async function gscInspectUrl(
+  inspectionUrl: string
+): Promise<{ ok: true; result: Record<string, unknown> } | { ok: false; status: number; error: string }> {
+  const token = await getToken();
+  const siteUrl = await resolveSiteUrl();
+  const res = await fetch('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inspectionUrl, siteUrl }),
+  });
+  if (!res.ok) return { ok: false, status: res.status, error: (await res.text()).slice(0, 300) };
+  const data = (await res.json()) as { inspectionResult?: { indexStatusResult?: Record<string, unknown> } };
+  return { ok: true, result: data.inspectionResult?.indexStatusResult ?? {} };
+}
