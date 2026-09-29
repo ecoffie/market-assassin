@@ -13,6 +13,7 @@
  * front so we don't repeat the same query for every page view.
  */
 import { BigQuery, type BigQueryOptions } from '@google-cloud/bigquery';
+import { assertLiveBigQueryAllowed } from './guard';
 
 const PROJECT_ID = 'market-assasin';
 const DATASET = 'usaspending';
@@ -116,7 +117,13 @@ export function getServiceAccountEmail(): string {
 }
 
 function getClient(): BigQuery {
+  // Fail closed before credentials are read: no live BigQuery during `next build`, or in the
+  // unit suite without RUN_LIVE_BQ_TESTS=1 (see ./guard.ts). Checked on every call, not just
+  // the first, so a client created earlier in the process cannot be reused during a build.
+  assertLiveBigQueryAllowed('bigquery client');
   if (_client) return _client;
+  // CI's zero-BigQuery build gate fails if this line ever appears in a build log.
+  console.log('[bq-client] created');
 
   const saJson = process.env.GCP_SA_JSON;
   if (saJson) {

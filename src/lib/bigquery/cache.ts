@@ -20,6 +20,7 @@
  */
 import { kv } from '@vercel/kv';
 import { bqQuery, type BqQueryParams } from './client';
+import { isLiveBigQueryBlocked } from './guard';
 
 // Bump this string whenever the source data is refreshed (QUARTERLY
 // ingest, schema change, derived-table rebuild). All cached keys
@@ -272,6 +273,18 @@ export async function queryCached<T = Record<string, unknown>>(
   try {
     rows = await bqQuery<T>(opts);
   } catch (err) {
+    // The execution guard (./guard.ts) refused live BigQuery: `next build`, or the unit suite
+    // without RUN_LIVE_BQ_TESTS. Same contract as a cache-only cold miss: serve stale if KV has
+    // it, else mark UNAVAILABLE (callers noindex) and return []. Never cached, never logged as a
+    // BigQuery failure (the guard already logs one line per operation).
+    if (isLiveBigQueryBlocked(err)) {
+      try {
+        const stale = await kv.get<T[]>(key);
+        if (stale !== null && stale !== undefined) return stale;
+      } catch { /* KV unavailable — fall through */ }
+      markUnavailable(key, 'live-bq-blocked');
+      return [];
+    }
     // BQ can fail hard — most importantly "Custom quota exceeded"
     // (daily QueryUsagePerDay cap), which previously 500'd every
     // contractor page once the quota was hit. Degrade gracefully:

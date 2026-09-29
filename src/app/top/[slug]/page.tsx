@@ -46,12 +46,15 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 // WEEK. The snapshot-leaderboards cron also revalidatePath()s these on-demand after each
 // weekly snapshot, so this is just the self-heal backstop. Reads are cheap (rollup, warm).
 export const revalidate = 86400;
-export const dynamicParams = false;
+// Rendered on first request, then cached by ISR, NOT prerendered at build. Prerendering ran
+// each listicle's data query during `next build`; with builds now cache-only
+// (src/lib/bigquery/guard.ts) a cold KV key would bake "0 Contractors Ranked · $0" into the
+// build output as an indexable page. Runtime renders keep the cold-scan fallback. Unknown
+// slugs still 404 via getListicleBySlug() -> notFound() below.
+export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  // All listicles are well-defined upfront. Return them so each gets
-  // a stable URL — but don't run BQ at build (ISR fills it on first hit).
-  return LISTICLES.map((l) => ({ slug: l.slug }));
+  return [];
 }
 
 interface PageProps {

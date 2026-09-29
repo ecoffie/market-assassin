@@ -18,6 +18,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // Unit tests can never reach BigQuery (bq CLI or REST). See the file for the opt-in.
+    setupFiles: ['./src/test/no-live-bigquery.setup.ts'],
     // Only pick up *.unit.test.ts(x). This deliberately avoids the existing
     // tests/*.test.ts protocol files (keyword-geo-filter.test.ts, office-name-
     // parity.test.mts) that were written for other runners.

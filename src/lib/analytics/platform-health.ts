@@ -27,6 +27,7 @@
  * (which would assert a problem we haven't actually observed in the data).
  */
 import { createClient } from '@supabase/supabase-js';
+import { liveBigQueryBlockReason } from '@/lib/bigquery/guard';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -198,7 +199,10 @@ export async function getPlatformHealth(): Promise<PlatformHealth> {
     const raw = process.env.GCP_SA_JSON || '';
     const decoded = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
     const creds = decoded ? JSON.parse(decoded) : null;
-    if (!creds) {
+    const guardReason = liveBigQueryBlockReason();
+    if (guardReason) {
+      unmeasured.push({ check: 'BigQuery awards freshness', blockedBy: guardReason });
+    } else if (!creds) {
       unmeasured.push({ check: 'BigQuery awards freshness', blockedBy: 'GCP_SA_JSON not configured in this environment' });
     } else {
       const bq = new BigQuery({ projectId: creds.project_id, credentials: creds });

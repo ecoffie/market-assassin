@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "MINDY_BUILD=1 next build",
     "start": "next start",
     "lint": "eslint",
     "build:whitepaper": "node scripts/build-whitepaper-docx.mjs",
