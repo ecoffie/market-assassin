@@ -12,17 +12,19 @@
  *      the build script). Builds are cache-only: a KV miss renders the page's empty/
  *      unavailable path, and ISR fills it at runtime. Background: on 2026-09-29 a local
  *      build with no KV ran 64 live queries from the /top/* prerenders.
- *   2. The unit suite is running (VITEST) and RUN_LIVE_BQ_TESTS !== '1'. Merely having
- *      Google credentials on the machine never enables live BigQuery. Background: a test
- *      that switched on whenever GOOGLE_APPLICATION_CREDENTIALS was set wrote two load
+ *   2. Vitest is running (any config). No variable re-enables app-code BigQuery under Vitest;
+ *      in particular having Google credentials, or RUN_LIVE_BQ_TESTS=1, does not. Background: a
+ *      test that switched on whenever GOOGLE_APPLICATION_CREDENTIALS was set wrote two load
  *      jobs into a production dataset.
  *   3. BQ_DISABLED === '1' (operator kill switch).
  *
  * Runtime request handling and operator scripts are unaffected.
  *
- * Integration tests that genuinely need BigQuery must opt in with RUN_LIVE_BQ_TESTS=1
- * AND name an approved disposable target (BQ_TEST_PROJECT + BQ_TEST_DATASET). Production
- * datasets are refused by name even if someone adds them to the approved list.
+ * Live BigQuery integration tests are *.bq-integration.test.ts files, excluded from the unit
+ * suite and run only by `npm run test:bq-integration` (its own Vitest process). That process
+ * needs RUN_LIVE_BQ_TESTS=1 AND an approved disposable target (BQ_TEST_PROJECT +
+ * BQ_TEST_DATASET), and even then only `bq` commands confined to that dataset are admitted
+ * (authorizeBqCommand). Production datasets are refused by name even if approved.
  */
 
 export class LiveBigQueryBlockedError extends Error {
@@ -40,9 +42,11 @@ export function liveBigQueryBlockReason(env: Env = process.env): string | null {
     return 'next build is cache-only; live BigQuery is never called during a build';
   }
   if (env.BQ_DISABLED === '1') return 'BQ_DISABLED=1';
-  if (env.VITEST && env.RUN_LIVE_BQ_TESTS !== '1') {
-    return 'unit tests never call BigQuery (integration tests need RUN_LIVE_BQ_TESTS=1 and an approved disposable dataset)';
-  }
+  // Under Vitest, app code NEVER reaches BigQuery, with no environment escape. RUN_LIVE_BQ_TESTS
+  // does not change this: the live integration test runs in its own Vitest process
+  // (vitest.bq-integration.config.ts) and uses the `bq` CLI through a narrow authorizer that only
+  // admits commands targeting the approved disposable dataset (src/test/bq-integration.setup.ts).
+  if (env.VITEST) return 'app code never calls BigQuery under Vitest (unit or integration process)';
   return null;
 }
 
@@ -120,4 +124,74 @@ export function uniqueTestTableName(prefix: string, now: Date = new Date(), rand
   const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
   const suffix = Math.floor(random() * 36 ** 6).toString(36).padStart(6, '0');
   return `${prefix.replace(/[^a-zA-Z0-9_]/g, '_')}_${stamp}_${suffix}`;
+}
+
+// ── Narrow `bq` CLI authorization (integration process only) ──────────────────
+
+export type BqAuthorization = { ok: true } | { ok: false; reason: string };
+
+const SAFE_IDENT = /^[A-Za-z0-9_]+$/;
+const FORBIDDEN_SQL = /\b(INSERT|UPDATE|DELETE|MERGE|CREATE|DROP|ALTER|TRUNCATE|GRANT|REVOKE|EXPORT|CALL|EXECUTE|DECLARE|SET|BEGIN|LOAD)\b/i;
+const FORBIDDEN_QUERY_FLAGS = /^--(destination_table|replace|append_table|use_legacy_sql(?!=false)|batch|dry_run=false)\b/;
+
+/** `dataset.table` or `project:dataset.table`, confined to the target. */
+function tableRefInTarget(ref: string, target: DisposableBqTarget): boolean {
+  const m = ref.match(/^(?:([A-Za-z0-9-]+):)?([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)$/);
+  if (!m) return false;
+  const [, project, dataset, table] = m;
+  return (project === undefined || project === target.project) && dataset === target.dataset && SAFE_IDENT.test(table);
+}
+
+/**
+ * Decide whether ONE `bq` CLI invocation may run in the integration process. It is admitted only
+ * when it is provably confined to the approved disposable dataset:
+ *   - `--project_id=<approved project>` exactly once, as the first argument
+ *   - subcommand is load | query | show | rm | version
+ *   - load/show/rm: exactly one table reference, inside the approved dataset
+ *     (rm requires -t; dataset removal flags -r/-d are refused)
+ *   - query: exactly one read-only SELECT with no statement separators or DML/DDL, every table
+ *     reference is backtick-quoted `project.dataset.table` inside the target, and no flag that
+ *     writes results (--destination_table, --replace, --append_table)
+ * Anything else, including any unrecognised shape, is refused.
+ */
+export function authorizeBqCommand(args: string[], target: DisposableBqTarget): BqAuthorization {
+  if (args.length === 1 && args[0] === 'version') return { ok: true };
+  if (args[0] !== `--project_id=${target.project}`) return { ok: false, reason: `first argument must be --project_id=${target.project}` };
+  if (args.slice(1).some((a) => /^--(project_id|dataset_id|location)=/.test(a))) return { ok: false, reason: 'project/dataset/location may be set only once' };
+  const [sub, ...rest] = args.slice(1);
+  const positional = rest.filter((a) => !a.startsWith('-'));
+  const flags = rest.filter((a) => a.startsWith('-'));
+
+  switch (sub) {
+    case 'load': {
+      if (positional.length !== 3) return { ok: false, reason: 'load needs exactly: <table> <source> <schema>' };
+      if (!tableRefInTarget(positional[0], target)) return { ok: false, reason: `load destination ${positional[0]} is outside ${target.project}:${target.dataset}` };
+      return { ok: true };
+    }
+    case 'show':
+    case 'rm': {
+      if (sub === 'rm' && (!flags.includes('-t') || flags.some((f) => f === '-r' || f === '-d'))) return { ok: false, reason: 'rm must be a single-table removal (-t), never -r/-d' };
+      if (positional.length !== 1 || !tableRefInTarget(positional[0], target)) return { ok: false, reason: `${sub} target must be one table in ${target.project}:${target.dataset}` };
+      return { ok: true };
+    }
+    case 'query': {
+      if (positional.length !== 1) return { ok: false, reason: 'query needs exactly one SQL argument' };
+      if (flags.some((f) => FORBIDDEN_QUERY_FLAGS.test(f))) return { ok: false, reason: 'query may not write results (destination/replace/append/legacy/batch)' };
+      const sql = positional[0].trim();
+      if (!/^SELECT\b/i.test(sql) || sql.includes(';') || FORBIDDEN_SQL.test(sql)) return { ok: false, reason: 'query must be a single read-only SELECT' };
+      const refs = [...sql.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+      if (!refs.length) return { ok: false, reason: 'query must reference its tables as `project.dataset.table`' };
+      for (const ref of refs) {
+        const parts = ref.split('.');
+        if (parts.length !== 3 || parts[0] !== target.project || parts[1] !== target.dataset || !SAFE_IDENT.test(parts[2])) {
+          return { ok: false, reason: `query references ${ref}, outside ${target.project}.${target.dataset}` };
+        }
+      }
+      // Any FROM/JOIN must be followed by a backtick-quoted reference (no unqualified tables).
+      if (/\b(FROM|JOIN)\s+(?!`)/i.test(sql)) return { ok: false, reason: 'every FROM/JOIN must name a backtick-quoted table' };
+      return { ok: true };
+    }
+    default:
+      return { ok: false, reason: `bq ${sub ?? '(none)'} is not an allowed integration-test command` };
+  }
 }

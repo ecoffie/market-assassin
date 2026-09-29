@@ -189,7 +189,12 @@ export async function getPlatformHealth(): Promise<PlatformHealth> {
   //   quota exhausted → UNKNOWN  ("we cannot verify"), never "stale"
   //   query succeeds  → healthy/degraded on the real age
   //   any other error → UNKNOWN with the real message
-  try {
+  // The live-BigQuery guard runs FIRST: before the SDK is loaded and before GCP_SA_JSON is read
+  // or decoded (guard.ts invariant: block before credentials are touched).
+  const guardReason = liveBigQueryBlockReason();
+  if (guardReason) {
+    unmeasured.push({ check: 'BigQuery awards freshness', blockedBy: guardReason });
+  } else try {
     const { BigQuery } = await import('@google-cloud/bigquery');
     // ⚠️ GCP_SA_JSON is stored BASE64-ENCODED in this project (measured: a raw JSON.parse threw
     // `Unexpected token 'e', "ewogICJ0eX"…` — that's `{"ty…` base64'd). Decode when it doesn't
@@ -199,10 +204,7 @@ export async function getPlatformHealth(): Promise<PlatformHealth> {
     const raw = process.env.GCP_SA_JSON || '';
     const decoded = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
     const creds = decoded ? JSON.parse(decoded) : null;
-    const guardReason = liveBigQueryBlockReason();
-    if (guardReason) {
-      unmeasured.push({ check: 'BigQuery awards freshness', blockedBy: guardReason });
-    } else if (!creds) {
+    if (!creds) {
       unmeasured.push({ check: 'BigQuery awards freshness', blockedBy: 'GCP_SA_JSON not configured in this environment' });
     } else {
       const bq = new BigQuery({ projectId: creds.project_id, credentials: creds });

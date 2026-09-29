@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
+  authorizeBqCommand,
   assertLiveBigQueryAllowed,
   isLiveBigQueryBlocked,
   liveBigQueryBlockReason,
@@ -14,10 +16,10 @@ describe('liveBigQueryBlockReason', () => {
     expect(liveBigQueryBlockReason({ MINDY_BUILD: '1' })).toMatch(/cache-only/);
   });
 
-  it('blocks the unit suite unless RUN_LIVE_BQ_TESTS=1, and credentials alone never enable it', () => {
-    expect(liveBigQueryBlockReason({ VITEST: 'true' })).toMatch(/unit tests/);
-    expect(liveBigQueryBlockReason({ VITEST: 'true', GOOGLE_APPLICATION_CREDENTIALS: '/k.json', GCP_SA_JSON: '{}' })).toMatch(/unit tests/);
-    expect(liveBigQueryBlockReason({ VITEST: 'true', RUN_LIVE_BQ_TESTS: '1' })).toBeNull();
+  it('blocks app code under Vitest unconditionally: not credentials, not RUN_LIVE_BQ_TESTS=1', () => {
+    expect(liveBigQueryBlockReason({ VITEST: 'true' })).toMatch(/never calls BigQuery under Vitest/);
+    expect(liveBigQueryBlockReason({ VITEST: 'true', GOOGLE_APPLICATION_CREDENTIALS: '/k.json', GCP_SA_JSON: '{}' })).toMatch(/under Vitest/);
+    expect(liveBigQueryBlockReason({ VITEST: 'true', RUN_LIVE_BQ_TESTS: '1', BQ_TEST_PROJECT: 'p', BQ_TEST_DATASET: 'ci_x' })).toMatch(/under Vitest/);
   });
 
   it('a build is blocked even if RUN_LIVE_BQ_TESTS is set', () => {
@@ -92,7 +94,69 @@ describe('uniqueTestTableName', () => {
   });
 });
 
+describe('authorizeBqCommand (integration process only)', () => {
+  const T = { project: 'market-assasin', dataset: 'ci_disposable' };
+  const P = `--project_id=${T.project}`;
+  const ok = (args: string[]) => authorizeBqCommand(args, T).ok;
+
+  it("admits exactly the integration test's commands", () => {
+    expect(ok([P, 'load', '--source_format=CSV', '--skip_leading_rows=1', '--allow_quoted_newlines', '--replace', 'ci_disposable.awards_it_1', '/tmp/a.csv', '/tmp/s.json'])).toBe(true);
+    expect(ok([P, 'query', '--nouse_legacy_sql', '--format=csv', 'SELECT COUNT(*) AS n FROM `market-assasin.ci_disposable.awards_it_1`'])).toBe(true);
+    expect(ok([P, 'rm', '-f', '-t', 'market-assasin:ci_disposable.awards_it_1'])).toBe(true);
+    expect(ok(['version'])).toBe(true);
+  });
+
+  it('refuses the 2026-09-29 incident commands against production', () => {
+    expect(ok([P, 'load', '--replace', 'usaspending.awards_ingest_staging_fixture_test', '/tmp/a.csv', '/tmp/s.json'])).toBe(false);
+    expect(ok([P, 'query', '--nouse_legacy_sql', 'SELECT COUNT(*) AS n FROM `market-assasin.usaspending.awards_ingest_staging_fixture_test`'])).toBe(false);
+  });
+
+  it('refuses anything that escapes the dataset or writes outside it', () => {
+    expect(ok(['--project_id=other', 'query', 'SELECT 1 FROM `other.ci_disposable.t`'])).toBe(false);
+    expect(ok([P, '--project_id=other', 'show', 'ci_disposable.t'])).toBe(false);
+    expect(ok([P, 'query', 'SELECT * FROM `market-assasin.ci_disposable.t` JOIN `market-assasin.usaspending.awards` USING (k)'])).toBe(false);
+    expect(ok([P, 'query', 'SELECT * FROM usaspending.awards'])).toBe(false); // unqualified
+    expect(ok([P, 'query', '--destination_table=usaspending.awards', 'SELECT 1 AS x FROM `market-assasin.ci_disposable.t`'])).toBe(false);
+    expect(ok([P, 'query', 'DELETE FROM `market-assasin.ci_disposable.t` WHERE true'])).toBe(false);
+    expect(ok([P, 'query', 'SELECT 1 FROM `market-assasin.ci_disposable.t`; DROP TABLE `market-assasin.usaspending.awards`'])).toBe(false);
+    expect(ok([P, 'rm', '-r', '-f', '-d', 'market-assasin:ci_disposable'])).toBe(false);
+    expect(ok([P, 'rm', '-f', 'market-assasin:ci_disposable.t'])).toBe(false); // -t required
+    expect(ok([P, 'cp', 'ci_disposable.t', 'usaspending.awards'])).toBe(false);
+    expect(ok([P, 'mk', '--dataset', 'market-assasin:ci_new'])).toBe(false);
+    expect(ok([P, 'load', 'market-assasin:usaspending.x', '/tmp/a.csv', '/tmp/s.json'])).toBe(false);
+  });
+});
+
+describe('platform-health reads no credentials before the guard', () => {
+  it('checks liveBigQueryBlockReason() before importing the SDK or reading GCP_SA_JSON', () => {
+    const src = readFileSync(new URL('../analytics/platform-health.ts', import.meta.url), 'utf8');
+    const guard = src.indexOf('liveBigQueryBlockReason()');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(src.indexOf("import('@google-cloud/bigquery')"));
+    expect(guard).toBeLessThan(src.indexOf('process.env.GCP_SA_JSON'));
+  });
+});
+
 describe('unit-suite tripwire (src/test/no-live-bigquery.setup.ts)', () => {
+  it('cannot be disabled by RUN_LIVE_BQ_TESTS=1 (the flag is not read by the unit setup at all)', async () => {
+    const setup = readFileSync(new URL('../../test/no-live-bigquery.setup.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//, '');
+    expect(setup).not.toMatch(/RUN_LIVE_BQ_TESTS/);
+    process.env.RUN_LIVE_BQ_TESTS = '1';
+    const cp = await import('node:child_process');
+    expect(() => cp.execFileSync('bq', ['version'])).toThrow(/Unit tests may not call BigQuery/);
+    delete process.env.RUN_LIVE_BQ_TESTS;
+  });
+
+  it('the unit config excludes integration files, and only the integration config includes them', async () => {
+    const unit = readFileSync(new URL('../../../vitest.config.ts', import.meta.url), 'utf8');
+    const integ = readFileSync(new URL('../../../vitest.bq-integration.config.ts', import.meta.url), 'utf8');
+    expect(unit).toMatch(/'\*\*\/\*\.bq-integration\.test\.ts'/);
+    expect(unit).toMatch(/no-live-bigquery\.setup\.ts/);
+    expect(integ).toMatch(/include: \['src\/\*\*\/\*\.bq-integration\.test\.ts'\]/);
+    expect(integ).toMatch(/bq-integration\.setup\.ts/);
+    expect(integ).not.toMatch(/no-live-bigquery|unit\.test/);
+  });
+
   it('blocks the bq CLI through every child_process entry point', async () => {
     const cp = await import('node:child_process');
     expect(() => cp.execFileSync('bq', ['version'])).toThrow(/Unit tests may not call BigQuery/);

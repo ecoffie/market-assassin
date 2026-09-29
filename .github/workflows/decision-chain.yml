@@ -33,7 +33,11 @@ jobs:
       - name: Decision-chain (seam)
         run: npm run test:chain
 
+      # Run WITH RUN_LIVE_BQ_TESTS=1 on purpose: the unit suite must stay sealed from BigQuery even
+      # when the integration opt-in is set (the guard and the tripwire ignore it; tests assert both).
       - name: Unit suite
+        env:
+          RUN_LIVE_BQ_TESTS: '1'
         run: npm run test:unit
 
       # BigQuery safety: an ordinary build must make zero live BigQuery calls. CI has no KV,
