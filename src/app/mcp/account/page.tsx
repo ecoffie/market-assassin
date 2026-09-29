@@ -20,12 +20,15 @@ import {
   UsageKpis, UsageOverTime, SpendByTool, ActivityLog,
   type UsageSummary, type McpCall,
 } from '../usage-charts';
+import { TeamSection } from './team-section';
+import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
 
-type Section = 'usage' | 'activity' | 'billing' | 'keys' | 'crm' | 'referrals' | 'settings';
+type Section = 'usage' | 'activity' | 'billing' | 'team' | 'keys' | 'crm' | 'referrals' | 'settings';
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'usage', label: 'Usage', icon: '◧' },
   { id: 'activity', label: 'Activity', icon: '≡' },
   { id: 'billing', label: 'Billing', icon: '◈' },
+  { id: 'team', label: 'Team', icon: '⚇' },
   { id: 'keys', label: 'API keys', icon: '⚿' },
   { id: 'crm', label: 'CRM', icon: '⇄' },
   { id: 'referrals', label: 'Refer & earn', icon: '◇' },
@@ -41,11 +44,12 @@ interface AutoRecharge {
 interface ApiKeyRow { id: string; key_prefix: string; label: string | null; created_at: string; last_used_at: string | null; revoked_at: string | null }
 interface BillingRow { id: string; date: string; label: string; credits: number; balanceAfter: number; free: boolean }
 
-// Refill packs — must match CREDIT_PACKAGES ids/credits in src/lib/mcp/packages.ts.
-// Single premium top-up SKU (GOS #015); legacy 'plus'/'scale' were retired.
-const REFILL_PACKS: { id: string; label: string }[] = [
-  { id: 'refill', label: '500 credits ($119)' },
-];
+// Refill packs, derived from CREDIT_PACKAGES so the label can never drift from what the
+// pack actually grants (it once read "500 credits" after the pack became 1,000).
+const REFILL_PACKS: { id: string; label: string }[] = CREDIT_PACKAGES.map((p) => ({
+  id: p.id,
+  label: `${p.credits.toLocaleString()} credits ($${p.usd})`,
+}));
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -291,7 +295,7 @@ export default function McpAccountPage() {
 
   // ---- Section bodies --------------------------------------------------------
   const sectionTitle: Record<Section, string> = {
-    usage: 'Usage', activity: 'Activity', billing: 'Billing', keys: 'API keys', crm: 'CRM connection', referrals: 'Refer & earn', settings: 'Settings',
+    usage: 'Usage', activity: 'Activity', billing: 'Billing', team: 'Team', keys: 'API keys', crm: 'CRM connection', referrals: 'Refer & earn', settings: 'Settings',
   };
 
   const usageBody = (
@@ -593,7 +597,7 @@ export default function McpAccountPage() {
   );
 
   const bodies: Record<Section, React.ReactNode> = {
-    usage: usageBody, activity: activityBody, billing: billingBody, keys: keysBody, crm: crmBody, referrals: referralsBody, settings: settingsBody,
+    usage: usageBody, activity: activityBody, billing: billingBody, team: <TeamSection email={email} />, keys: keysBody, crm: crmBody, referrals: referralsBody, settings: settingsBody,
   };
 
   return (

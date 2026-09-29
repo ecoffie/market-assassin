@@ -482,6 +482,31 @@ export async function POST(request: NextRequest) {
       } catch (provisionErr) {
         console.error('[stripe-webhook] team workspace provisioning failed (non-fatal):', provisionErr);
       }
+      // Pooled team credits (tasks/PRD-pooled-team-credits.md): the billing org, the
+      // buyer as team_owner, and the credit pool. Idempotent on the subscription id; the
+      // invoice.paid path provisions too, whichever event arrives first. Non-fatal: before
+      // the migration is applied the columns don't exist, and that is the legacy state.
+      const teamSubId = typeof session.subscription === 'string'
+        ? session.subscription
+        : session.subscription?.id ?? null;
+      if (teamSubId) {
+        try {
+          const { provisionPooledOrg, isPoolSchemaMissing } = await import('@/lib/mcp/team-pools');
+          try {
+            await provisionPooledOrg({
+              subscriptionId: teamSubId,
+              customerId: typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null,
+              ownerEmail: email,
+              name: session.customer_details?.name ? `${session.customer_details.name}'s team` : undefined,
+              planKey: 'team',
+            });
+          } catch (poolErr) {
+            if (!isPoolSchemaMissing(poolErr)) throw poolErr;
+          }
+        } catch (poolErr) {
+          console.error('[stripe-webhook] pooled team org provisioning failed (non-fatal):', poolErr);
+        }
+      }
     }
 
     // Get/create profile

@@ -19,6 +19,31 @@ tool, federal market research.*
 
 ---
 
+## Shared team credits for multi-seat subscriptions (Sep 2026) — (coming: built, not yet sold publicly)
+
+**What:** A company buys one subscription, names its users, and every member's Mindy usage
+draws from one shared, company-owned credit pool. The owner invites people by email (only
+the invited address can accept), sees each member's 30-day usage, and removes people in one
+click. The pool refills to its monthly allowance each month, including on annual plans, and
+never stacks or refills what was already spent. Any plan can be set up with more than one
+seat, not just Team.
+
+**Why:** Buyers asked for one invoice and one allowance for a BD team. Until now credits
+lived on one person's account, so a two-person company had no product to buy and a
+proposal could not truthfully say "shared across your team".
+
+**SEO / content hooks:** GovCon software for BD teams · shared AI credits for proposal
+teams · multi-user federal market intelligence · per-seat GovCon subscription.
+
+**Proof:** billing rules in `src/lib/mcp/payer.ts` and `src/lib/mcp/team-pools.ts`;
+database rules in `supabase/migrations/20260929_pooled_team_credits.sql`, proven by a
+PGlite test over the real migration chain. Measured need: 0 shared pools existed in
+production and the one Team subscription's allowance went only to its buyer
+(`mcp_credit_pool`, `mcp_credit_ledger`, 2026-09-29). **Do not market until the rollout
+in `tasks/PRD-pooled-team-credits.md` §11 is complete and seat pricing is approved.**
+
+---
+
 ## Owned evidence Phase 0–1 — market window honesty + CAI compose contract (Sep 2026)
 
 **What:** Market coverage totals are labeled as one-FY description-match

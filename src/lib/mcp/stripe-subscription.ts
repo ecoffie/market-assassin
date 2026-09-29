@@ -18,6 +18,7 @@
  */
 import type Stripe from 'stripe';
 import { subscriptionGrantForPriceId, subscriptionGrantForMeta, subscriptionPlan, type SubscriptionGrant } from './packages';
+import { findPooledOrgBySubscription, replenishPool, isPoolSchemaMissing, subscriptionIdFromInvoice } from './team-pools';
 import { applyCreditOnce } from './credits';
 import { sendCreditReceiptEmail } from './credit-emails';
 import { getStripe } from '@/lib/stripe';
@@ -96,6 +97,27 @@ export async function handleMcpSubscriptionInvoice(invoice: Stripe.Invoice): Pro
   if (!email) {
     console.error('[mcp:sub] no email on invoice', invoice.id);
     return { handled: true, plan: grant.planId, interval: grant.interval, error: 'no_email' };
+  }
+
+  // A subscription an admin configured as MULTI-SEAT funds its organization's POOL, and
+  // replenishes MONTHLY even when billed annually (Eric, 2026-09-29) — so it never also
+  // receives the personal (and, for annual, 12x up-front) grant below. The monthly cron
+  // tops the pool up in later months.
+  const subscriptionId = subscriptionIdFromInvoice(invoice);
+  if (subscriptionId) {
+    try {
+      const org = await findPooledOrgBySubscription(subscriptionId);
+      if (org) {
+        const r = await replenishPool(org);
+        console.log(`[mcp:sub] pool ${org.orgId} +${r.granted} (${grant.planId}/${grant.interval}, applied=${r.applied}) invoice ${invoice.id}`);
+        return { handled: true, applied: r.applied, credits: r.granted, email, plan: grant.planId, interval: grant.interval };
+      }
+    } catch (e) {
+      if (!isPoolSchemaMissing(e)) {
+        console.error('[mcp:sub] pool lookup failed, deferring to cron:', (e as Error).message);
+        return { handled: true, plan: grant.planId, interval: grant.interval, error: 'pool_grant_failed' };
+      }
+    }
   }
 
   // Ledger reason encodes the interval so monthly vs annual grants are distinguishable.

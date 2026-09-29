@@ -34,26 +34,10 @@ export interface CreditPackage {
  * metadata `type=mcp_credit_topup` + `package=refill`; the webhook grants credits
  * SERVER-SIDE from the package id (never a raw credits number).
  *
- * Locked model (2026-07-19): ONE premium "ran out mid-month" valve — 500 cr / $119
- * (~$0.238/cr, the priciest per-credit in the whole ladder ON PURPOSE, so it never
- * undercuts subscribing). Also the SKU auto-recharge draws from. Product/link/price
+ * Locked model (2026-07-19): ONE premium "ran out mid-month" valve at $119. It launched
+ * at 500 cr; since Phase 3 (2026-09-15) it grants 1,000 cr (~$0.119/cr). Also the SKU auto-recharge draws from. Product/link/price
  * created live 2026-07-19; the 4 legacy top-ups ($79/300, $149/700, $99/5,000, $49/2,000)
  * were ARCHIVED in Stripe the same pass (prices + payment links deactivated).
- */
-/**
- * ⚠️ PHASE 3 DECISION (Eric, 2026-09-15) — NOT YET IMPLEMENTED. Do not apply early.
- *
- * The $119 pack becomes **1,000 credits** (from 500), **non-expiring**, and **preserved
- * through renewal** — a balance must survive a subscription renewal rather than being
- * reset or replaced by the monthly allowance.
- *
- * Until that release the current 500-credit pack stays EXACTLY as is. Prices unchanged.
- *
- * Context that makes the current shape worth fixing, measured 2026-09-15 against live
- * Stripe: the paywall's PRIMARY offer to a blocked user is Entry at $99/mo — a RECURRING
- * subscription — while the "one-time" $119 pack is the only true one-off and costs MORE
- * for the same 500 credits. Phase 3 resolves that product structure; changing credit
- * quantities before then would make the comparison worse, not better.
  */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
   // PHASE 3 (Eric, 2026-09-15): $119 buys 1,000 credits. Price UNCHANGED; the pack
@@ -160,6 +144,31 @@ export const TEAM_MONTHLY_CREDITS = Math.max(
   0,
   Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '1000') || 0,
 );
+
+/**
+ * POOLED (multi-seat) plan configuration — tasks/PRD-pooled-team-credits.md.
+ *
+ * A credit pool is a capability of ANY subscription configured with more than one seat
+ * (Eric, 2026-09-29) — not of one price. These are the DEFAULTS a newly provisioned
+ * organization receives; the live values are stored on the organization
+ * (`seat_limit`, `pool_monthly_credits`) so a negotiated deal (e.g. a 2-seat Growth
+ * subscription) is configured per org via the admin provisioning endpoint.
+ *
+ * ⚠️ NOT TARGET PRICING. Team is seeded with today's economics (5 seats, the
+ * TEAM_MONTHLY_CREDITS allowance) only so existing behaviour is unchanged when a pool
+ * replaces the personal grant. Eric explicitly rejected 1,000 credits / 5 seats as the
+ * target; the seat-and-credit pricing proposal comes back to him before any public
+ * pricing change, and changing a number here is that change.
+ *
+ * A plan absent from this map is single-seat by default (no pool) until configured.
+ */
+export interface PooledPlanDefault {
+  seats: number;
+  monthlyCredits: number;
+}
+export const POOLED_PLAN_DEFAULTS: Readonly<Record<string, PooledPlanDefault>> = {
+  team: { seats: 5, monthlyCredits: TEAM_MONTHLY_CREDITS },
+};
 
 /**
  * Internal team (Eric, Branden, the dev team) monthly comp allowance — deliberately HIGH so

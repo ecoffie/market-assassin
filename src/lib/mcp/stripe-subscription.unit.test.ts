@@ -2,12 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./credits', () => ({ applyCreditOnce: vi.fn() }));
 vi.mock('./credit-emails', () => ({ sendCreditReceiptEmail: vi.fn() }));
+// Pooled team credits: keep the pure helpers real, stub the pool lookups/writes.
+vi.mock('./team-pools', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./team-pools')>()),
+  findPooledOrgBySubscription: vi.fn().mockResolvedValue(null),
+  replenishPool: vi.fn(),
+}));
 // Stub the Stripe client so the customer-email fallback is testable offline.
 const retrieve = vi.fn();
 vi.mock('@/lib/stripe', () => ({ getStripe: () => ({ customers: { retrieve } }) }));
 
 import { handleMcpSubscriptionInvoice } from './stripe-subscription';
 import * as credits from './credits';
+import * as pools from './team-pools';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const m = (fn: unknown) => fn as any;
 
@@ -84,5 +91,32 @@ describe('handleMcpSubscriptionInvoice', () => {
     const r = await handleMcpSubscriptionInvoice(invoice({ customer_email: null, customer: null }));
     expect(r).toMatchObject({ handled: true, plan: 'entry', error: 'no_email' });
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleMcpSubscriptionInvoice — pooled (multi-seat) subscriptions', () => {
+  const pooledOrg = { orgId: 'o1', name: 'Acme', poolId: 'p1', seatLimit: 2, monthlyCredits: 3500, planKey: 'growth', subscriptionId: 'sub_growth' };
+
+  it('funds the POOL monthly and never grants the buyer personally', async () => {
+    m(pools.findPooledOrgBySubscription).mockResolvedValueOnce(pooledOrg);
+    m(pools.replenishPool).mockResolvedValueOnce({ applied: true, granted: 3500, newBalance: 3500 });
+    const r = await handleMcpSubscriptionInvoice(invoice({ parent: { subscription_details: { subscription: 'sub_growth' } } }));
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 3500 });
+    expect(pools.replenishPool).toHaveBeenCalledWith(pooledOrg);
+    expect(credits.applyCreditOnce).not.toHaveBeenCalled();
+  });
+
+  it('a pool lookup failure grants NOTHING personally (the cron self-heals) — no double allowance', async () => {
+    m(pools.findPooledOrgBySubscription).mockRejectedValueOnce(new Error('connection reset'));
+    const r = await handleMcpSubscriptionInvoice(invoice({ parent: { subscription_details: { subscription: 'sub_growth' } } }));
+    expect(r).toMatchObject({ handled: true, error: 'pool_grant_failed' });
+    expect(credits.applyCreditOnce).not.toHaveBeenCalled();
+  });
+
+  it('before the migration is applied (legacy schema) the personal grant is unchanged', async () => {
+    m(pools.findPooledOrgBySubscription).mockRejectedValueOnce(new Error('column organizations.seat_limit does not exist'));
+    const r = await handleMcpSubscriptionInvoice(invoice({ parent: { subscription_details: { subscription: 'sub_growth' } } }));
+    expect(r).toMatchObject({ handled: true, applied: true, credits: ENTRY_CR });
+    expect(credits.applyCreditOnce).toHaveBeenCalledTimes(1);
   });
 });

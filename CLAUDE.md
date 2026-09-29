@@ -434,6 +434,13 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
+### Pooled team credits (PR 4B) — BUILT, awaiting approval (2026-09-29)
+Record: **`tasks/PRD-pooled-team-credits.md`** (§0 decisions, §10 build status, §11 rollout runbook). Read it; do not re-derive.
+- A pool belongs to an org linked to ANY subscription configured with `seat_limit > 1` (not a Team price). Billing membership = explicit `org_members` rows with `team_owner`/`team_member` ONLY — never coach roles, never email domain.
+- Funding = `mcp_replenish_pool` (top-up to the monthly allowance, (month, ceiling) claim; annual plans replenish monthly). Pool grants key `pool:<org_id>:<YYYY-MM>` — never the personal `pro:<email>:<month>` key.
+- ⛔ Migration `20260929_pooled_team_credits.sql` is NOT applied and the one Team subscriber is NOT migrated; each needs Eric's approval (runbook §11). Apply with `--only`, never bare `--go`.
+- ⛔ No public pricing/copy change and no `POOLED_PLAN_DEFAULTS` change until Eric approves the seat-and-credit proposal (private repo `ecoffie/govcon-proposals`, `mindy-pricing/`).
+
 ### Solicitation identity sequence — FROZEN 2026-09-20
 Sequence: **Solicitation truth ✓ → Family persistence ✓ (lazy only) → Historical discovery ✓ → targeted family backfill later → PAE later.**
 - **#1557 Solicitation Truth** — merged, production-proven.

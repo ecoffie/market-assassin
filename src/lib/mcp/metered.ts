@@ -158,6 +158,24 @@ export async function runMeteredTool(
     const balance = payer.kind === 'pool'
       ? await getPoolBalance(payer.poolId!)
       : await getBalance(ctx.userEmail);
+    if (balance < cost && payer.kind === 'pool') {
+      // A pooled member's calls bill the TEAM pool, and nothing ever falls back to their
+      // personal balance. So the personal paywall (buy credits for yourself) would sell
+      // them credits this call can never use. Point them at the pool's owner instead.
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      return {
+        ok: false,
+        error: {
+          code: 'team_pool_insufficient_credits',
+          message:
+            `Your team's shared credits${payer.orgName ? ` (${payer.orgName})` : ''} are too low for this request ` +
+            `(${cost} needed, ${balance} left). Your team owner can add credits, or the pool refills at the start ` +
+            'of next month. Nothing was charged.',
+        },
+        creditsCharged: 0,
+        balance,
+      };
+    }
     if (balance < cost) {
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
       // Save the request so it can be run verbatim after they upgrade, and so
@@ -246,7 +264,10 @@ export async function runMeteredTool(
   // been debited yet, so a non-billable outcome is simply never charged — no refund.
   if (!isBillable(classifyBillingOutcome(result))) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
-    return { ok: true, result, creditsCharged: 0, balance: await getBalance(ctx.userEmail), needsRecharge: false };
+    // Report the balance of the payer that WOULD have paid — a pooled member's personal
+    // balance is not the number that governs their calls.
+    const payerBalance = payer.kind === 'pool' ? await getPoolBalance(payer.poolId!) : await getBalance(ctx.userEmail);
+    return { ok: true, result, creditsCharged: 0, balance: payerBalance, needsRecharge: false };
   }
 
   // 3) Priced tool → debit the RESOLVED payer on success (atomic).
@@ -256,16 +277,19 @@ export async function runMeteredTool(
     { reason: 'tool_call', toolName: name, apiKeyId: ctx.apiKeyId },
     payer,
   );
+  // Auto-recharge is a PERSONAL card mandate. A low POOL must never trigger it: that
+  // would charge an individual's card for their employer's shared allowance.
+  const recharge = (bal: number) => debit.payer === 'personal' && bal < AUTORECHARGE_SIGNAL_FLOOR;
   if (debit.ok) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId });
-    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: debit.newBalance < AUTORECHARGE_SIGNAL_FLOOR };
+    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance) };
   }
 
   // Edge race: balance dropped below cost between pre-check and debit (concurrent
   // calls at a near-empty balance). The result is already produced — deliver it, but
   // charge 0 and mark it uncharged for reconciliation. Balance is never negative.
   await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
-  return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: debit.newBalance < AUTORECHARGE_SIGNAL_FLOOR };
+  return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance) };
 }
 
 /**

@@ -26,6 +26,16 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-09-29 — Pooled team credits (PR 4B): pools funded, payer generalised, three pooled-billing defects fixed
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-29 | MCP billing / pool funding | Pools can finally be funded: monthly top-up to the allowance, claimed per (month, ceiling), never stacked, never refilled by spending; annual pooled plans replenish monthly (tasks/PRD-pooled-team-credits.md) | `CREATE OR REPLACE FUNCTION mcp_replenish_pool(` → `supabase/migrations/20260929_pooled_team_credits.sql` | PGlite SQL test over the real migration chain (12 cases) | IN PR (not on main; migration NOT applied) |
+| 2026-09-29 | MCP billing / payer | Pool eligibility is any ACTIVE subscription whose org is configured with more than one seat (was: Team price only); only team_owner/team_member count (never coach roles); unknown subscription state charges nothing | `.in('role', [...TEAM_ROLES]);` → `src/lib/mcp/payer.ts` | payer unit test (12 cases) | IN PR (not on main) |
+| 2026-09-29 | MCP metering / empty pool | An empty TEAM pool showed the member the PERSONAL paywall and checkout, selling credits their pooled calls could never use; now a team-specific refusal with no checkout | `team_pool_insufficient_credits` → `src/lib/mcp/metered.ts` | metered unit test, pooled cases | IN PR (not on main) |
+| 2026-09-29 | MCP metering / auto-recharge | A low POOL would have fired the member's PERSONAL auto-recharge (charging an individual's card for the team allowance); now only personal debits signal it | `debit.payer === 'personal' && bal < AUTORECHARGE_SIGNAL_FLOOR` → `src/lib/mcp/metered.ts` | metered unit test; injected regression went red then green | IN PR (not on main) |
+| 2026-09-29 | MCP extraction guard | Pooled members read as free-tier (no paid grant on their personal ledger); membership in a funded pool now counts as paid standing | `return payer.kind === 'pool';` → `src/lib/mcp/extraction-guard.ts` | extraction-guard unit test + full suite green | IN PR (not on main) |
+
 ## 2026-09-28 — P0 security: save-profile requires a verified identity
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

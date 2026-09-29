@@ -31,6 +31,10 @@ import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } f
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import {
+  listPooledOrgsBySubscription, replenishPool, routeSubscriptionGrants, isPoolSchemaMissing,
+  type PooledOrg,
+} from '@/lib/mcp/team-pools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,37 +62,58 @@ type Target = { email: string; amount: number; group: Group; mode: 'add' | 'topu
 
 // A candidate before resolution — `mode` is assigned by consider() when it lands in the
 // final map, so sources that only ever 'add' (Stripe subs) need not spell it out.
-type Candidate = { email: string; amount: number; group: Group };
+type Candidate = { email: string; amount: number; group: Group; subscriptionId?: string };
 
 /** Enumerate ACTIVE Stripe subscriptions → paying Pro/Team subscribers. Surfaces (never swallows)
  *  a Stripe failure so a monthly run that couldn't read subs is flagged, not silently a no-op. */
-async function activeSubscribers(): Promise<{ subs: Candidate[]; error: string | null }> {
+async function activeSubscribers(): Promise<{ subs: Candidate[]; activeIds: Set<string>; error: string | null }> {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return { subs: [], error: 'STRIPE_SECRET_KEY missing' };
+  const activeIds = new Set<string>();
+  if (!key) return { subs: [], activeIds, error: 'STRIPE_SECRET_KEY missing' };
   const stripe = new Stripe(key);
   const subs: Candidate[] = [];
   try {
     for await (const s of stripe.subscriptions.list({ status: 'active', limit: 100, expand: ['data.customer'] })) {
+      // EVERY active subscription id is recorded: a pooled org can sit on ANY plan
+      // (Team, or a multi-seat MCP plan like Growth), not only the app tiers below.
+      activeIds.add(s.id);
       const amt = s.items.data[0]?.price?.unit_amount ?? 0;
       const cust = s.customer;
       const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
       if (!email) continue;
-      if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub' });
-      // ⚠️ This credits the SINGLE Stripe billing-contact email — NOT the team.
-      // `mcp_credit_balance` is keyed by user_email with no pool, so other seats
-      // receive nothing here and cannot draw on this balance. Real pooling needs an
-      // explicit organization model (design pending). Do not describe Team credits as
-      // "shared across seats" while this is the grant path.
-      else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub' });
+      if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub', subscriptionId: s.id });
+      // A Team subscription whose organization is provisioned for pooling replenishes
+      // its POOL instead (routeSubscriptionGrants below). Until it is provisioned, the
+      // allowance still lands on the billing contact's personal balance, as before.
+      else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub', subscriptionId: s.id });
     }
   } catch (e) {
-    return { subs, error: (e as Error).message || 'stripe subscription enumeration failed' };
+    return { subs, activeIds, error: (e as Error).message || 'stripe subscription enumeration failed' };
   }
-  return { subs, error: null };
+  return { subs, activeIds, error: null };
+}
+
+/**
+ * Pooled orgs keyed by subscription. Before the pooled-credits migration is applied the
+ * columns do not exist — that is the LEGACY state (no pools; every grant stays personal),
+ * reported as `poolMode: 'legacy'`, not an error. Any other failure is an error, and the
+ * caller then withholds Team personal grants this run rather than risk granting a pooled
+ * subscription twice (the daily self-heal retries).
+ */
+async function pooledOrgs(): Promise<{ bySub: Map<string, PooledOrg>; poolMode: 'active' | 'legacy'; poolError: string | null }> {
+  try {
+    return { bySub: await listPooledOrgsBySubscription(), poolMode: 'active', poolError: null };
+  } catch (e) {
+    if (isPoolSchemaMissing(e)) return { bySub: new Map(), poolMode: 'legacy', poolError: null };
+    return { bySub: new Map(), poolMode: 'active', poolError: (e as Error).message || 'pooled org lookup failed' };
+  }
 }
 
 /** Resolve final per-email targets (dedupe; keep the highest amount when an email matches twice). */
-async function buildTargets(): Promise<{ targets: Target[]; subError: string | null; sponsorError: string | null }> {
+async function buildTargets(): Promise<{
+  targets: Target[]; pools: PooledOrg[]; subError: string | null; sponsorError: string | null;
+  poolError: string | null; poolMode: 'active' | 'legacy';
+}> {
   const byEmail = new Map<string, Target>();
   // NO STACKING (policy, Eric 2026-09-15): one grant per account per month, the HIGHEST
   // applicable allowance across every source. This dedupe IS the rule — adding a source
@@ -101,13 +126,24 @@ async function buildTargets(): Promise<{ targets: Target[]; subError: string | n
   };
   for (const email of INTERNAL_TEAM) consider(email, INTERNAL_MONTHLY_CREDITS, 'internal');
   for (const email of ADVOCATES) consider(email, PRO_MONTHLY_CREDITS, 'advocate');
-  const { subs, error } = await activeSubscribers();
-  for (const s of subs) consider(s.email, s.amount, s.group);
+  const { subs, activeIds, error } = await activeSubscribers();
+  const { bySub, poolMode, poolError } = await pooledOrgs();
+  const routed = routeSubscriptionGrants(
+    subs.map((s) => ({ email: s.email, amount: s.amount, group: s.group, subscriptionId: s.subscriptionId ?? '' })),
+    bySub,
+    activeIds,
+  );
+  for (const s of routed.personal) {
+    // Pool lookup failed (not merely "not migrated yet"): withhold TEAM personal grants this
+    // run so a pooled subscription can never be granted twice. Pro grants are unaffected.
+    if (poolError && s.group === 'team-sub') continue;
+    consider(s.email, s.amount, s.group as Group);
+  }
   // Sponsored accounts. A smaller paid plan must not reduce a sponsored benefit, and the
   // sponsorship stands until its own expiry — both follow from taking the higher amount.
   const { entitlements, error: sponsorError } = await activeSponsorEntitlements();
   for (const ent of entitlements) consider(ent.userEmail, ent.monthlyAllowance, 'sponsored', 'topup');
-  return { targets: [...byEmail.values()], subError: error, sponsorError };
+  return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode };
 }
 
 export async function GET(request: NextRequest) {
@@ -125,12 +161,13 @@ export async function GET(request: NextRequest) {
   // granted). On any other day it is the DAILY SELF-HEAL pass: idempotent by the
   // same pro:<email>:<YYYY-MM> key, so it grants only whoever upstream missed.
   const isMonthStart = now.getUTCDate() === 1;
-  const { targets, subError, sponsorError } = await buildTargets();
+  const { targets, pools, subError, sponsorError, poolError, poolMode } = await buildTargets();
   const byGroup = targets.reduce<Record<string, number>>((a, t) => { a[t.group] = (a[t.group] || 0) + 1; return a; }, {});
 
   if (preview) {
     return NextResponse.json({
-      success: true, preview: true, month, audience: targets.length, byGroup, subError, sponsorError,
+      success: true, preview: true, month, audience: targets.length, byGroup, subError, sponsorError, poolError, poolMode,
+      pools: pools.map((p) => ({ orgId: p.orgId, name: p.name, seatLimit: p.seatLimit, monthlyCredits: p.monthlyCredits })),
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
       targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group, mode: t.mode })),
     });
@@ -168,6 +205,20 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ── Pool replenishment: one top-up per pooled org per month (idempotent per month +
+  // allowance; never stacked, never refilled by spending). Annual pooled plans land here
+  // every month too — they are replenished monthly, not granted 12x up front.
+  let poolsReplenished = 0, poolsAlreadyFull = 0, poolCreditsGranted = 0;
+  for (const org of pools) {
+    try {
+      const r = await replenishPool(org, month);
+      if (r.applied && r.granted > 0) { poolsReplenished++; poolCreditsGranted += r.granted; }
+      else poolsAlreadyFull++;
+    } catch (err) {
+      errors.push(`pool ${org.orgId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   // ── Awareness: a run that couldn't grant correctly must fail LOUD (record 'error' + alert),
   // not report success with 0 grants. The internal team is a static list, so the audience can
   // never legitimately be below it — a smaller audience means the sub enumeration broke.
@@ -178,11 +229,12 @@ export async function GET(request: NextRequest) {
   const tooSmall = targets.length < INTERNAL_TEAM.length;
   // A failed sponsor read is an anomaly for the same reason a failed Stripe read is: it
   // silently drops a whole audience from the grant while the run still reports success.
-  const anomaly = Boolean(subError) || Boolean(sponsorError) || errors.length > 0 || nothingHappened || tooSmall;
+  const anomaly = Boolean(subError) || Boolean(sponsorError) || Boolean(poolError) || errors.length > 0 || nothingHappened || tooSmall;
 
   const summary = {
     month, audience: targets.length, byGroup, granted, alreadyHad, subError, sponsorError,
     sponsoredSatisfied,
+    poolMode, poolError, pools: pools.length, poolsReplenished, poolsAlreadyFull, poolCreditsGranted,
     errors: errors.slice(0, 10),
     mode: isMonthStart ? 'monthly-grant' : 'daily-self-heal',
     healed: healed.slice(0, 20),
