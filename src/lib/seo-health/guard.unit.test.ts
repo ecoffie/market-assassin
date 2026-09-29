@@ -189,7 +189,7 @@ describe('seo-health at runtime', () => {
 });
 
 describe('seo-health routes: header-only auth', () => {
-  it('reject ?password=ADMIN_PASSWORD (secrets never travel in URLs), and a missing or wrong bearer', async () => {
+  it('reject ?password=ADMIN_PASSWORD, x-vercel-cron: 1 (caller-controlled), and a wrong bearer', async () => {
     process.env.ADMIN_PASSWORD = 'admin-pw';
     process.env.CRON_SECRET = 'cron-secret';
     const { NextRequest } = await import('next/server');
@@ -199,6 +199,8 @@ describe('seo-health routes: header-only auth', () => {
       expect({ path, status: byQuery.status }).toEqual({ path, status: 401 });
       const wrong = await GET(new NextRequest('https://getmindy.ai/api/cron/x', { headers: { authorization: 'Bearer admin-pw' } }));
       expect({ path, status: wrong.status }).toEqual({ path, status: 401 });
+      const spoofed = await GET(new NextRequest('https://getmindy.ai/api/cron/x', { headers: { 'x-vercel-cron': '1' } }));
+      expect({ path, status: spoofed.status }).toEqual({ path, status: 401 });
     }
     delete process.env.ADMIN_PASSWORD;
     delete process.env.CRON_SECRET;
@@ -215,7 +217,7 @@ function memoryStore() {
     insertChecks: async (_id: number, checks: Array<{ url: string }>) => new Set(checks.map((c) => c.url)),
     upsertStratumDaily: async () => {},
     crawlHistory: async () => [],
-    canaryHistory: async () => [],
+    previousCompletedCanaries: async () => null,
     previousRunSummary: async () => null,
     inspections: async () => [],
     latestRuns: async () => [],

@@ -275,7 +275,11 @@ export async function runSeoHealth(deps: RunDeps): Promise<RunResult> {
   try {
     const crawledUrls = [...crawlChecks, ...canaryChecks].map((c) => c.url);
     if (crawledUrls.length) escalations.push(...urlPersistent(await deps.store.crawlHistory(crawledUrls, iso(deps.now() - 365 * 86_400_000))));
-    escalations.push(...canaryDown(await deps.store.canaryHistory(2)));
+    if (canaryChecks.length) {
+      // This run's canaries (in memory; the run is not finalized yet) vs the preceding completed run.
+      const current = Object.fromEntries(canaryChecks.map((c) => [c.url, c.outcome]));
+      escalations.push(...canaryDown(current, await deps.store.previousCompletedCanaries(runId)));
+    }
     const prev = await deps.store.previousRunSummary(runId);
     const nowRates = (summary.crawl as { rates?: Partial<Record<Stratum, StratumRate>> } | undefined)?.rates;
     const prevRates = (prev?.crawl as { rates?: Partial<Record<Stratum, StratumRate>> } | undefined)?.rates ?? null;

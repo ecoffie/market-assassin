@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cronHeaderAuthorized } from './auth';
+import { cronBearerAuthorized } from './auth';
 import { fetchDatePageRowsPaged, type GscRow } from './observe';
 import { coverageDays, stratumOf } from './types';
 import { evaluateCompletion } from './watchdog';
@@ -60,18 +60,18 @@ describe('fetchDatePageRowsPaged', () => {
   });
 });
 
-describe('cronHeaderAuthorized (header only)', () => {
+describe('cronBearerAuthorized (Bearer CRON_SECRET only)', () => {
   const env = { CRON_SECRET: 's3cret' };
-  it('accepts the dispatcher bearer and Vercel cron header', () => {
-    expect(cronHeaderAuthorized(new Headers({ authorization: 'Bearer s3cret' }), env)).toBe(true);
-    expect(cronHeaderAuthorized(new Headers({ 'x-vercel-cron': '1' }), env)).toBe(true);
+  it('accepts only the exact dispatcher bearer', () => {
+    expect(cronBearerAuthorized(new Headers({ authorization: 'Bearer s3cret' }), env)).toBe(true);
   });
-  it('rejects a wrong bearer, a bare secret, no CRON_SECRET configured, and anything in the URL', () => {
-    expect(cronHeaderAuthorized(new Headers({ authorization: 'Bearer nope' }), env)).toBe(false);
-    expect(cronHeaderAuthorized(new Headers({ authorization: 's3cret' }), env)).toBe(false);
-    expect(cronHeaderAuthorized(new Headers({ authorization: 'Bearer ' }), {})).toBe(false);
-    // The function takes headers only: there is no way to pass a ?password= query.
-    expect(cronHeaderAuthorized.length).toBeLessThanOrEqual(2);
+  it('rejects x-vercel-cron (caller-controlled), wrong or bare secrets, and an unset CRON_SECRET', () => {
+    expect(cronBearerAuthorized(new Headers({ 'x-vercel-cron': '1' }), env)).toBe(false);
+    expect(cronBearerAuthorized(new Headers({ 'x-vercel-cron': '1', authorization: 'Bearer nope' }), env)).toBe(false);
+    expect(cronBearerAuthorized(new Headers({ authorization: 'Bearer nope' }), env)).toBe(false);
+    expect(cronBearerAuthorized(new Headers({ authorization: 's3cret' }), env)).toBe(false);
+    expect(cronBearerAuthorized(new Headers({ authorization: 'Bearer ' }), {})).toBe(false);
+    expect(cronBearerAuthorized(new Headers({ authorization: 'Bearer undefined' }), {})).toBe(false);
   });
 });
 

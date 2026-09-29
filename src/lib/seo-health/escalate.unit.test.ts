@@ -46,13 +46,25 @@ describe('urlPersistent', () => {
   });
 });
 
-describe('canaryDown', () => {
-  it('needs two consecutive failing runs', () => {
-    expect(canaryDown([{ '/': 'http_5xx' }])).toEqual([]);
-    expect(canaryDown([{ '/': 'http_5xx' }, { '/': 'ok' }])).toEqual([]);
-    const e = canaryDown([{ '/': 'transport_failure' }, { '/': 'http_5xx' }]);
+describe('canaryDown (this run vs the preceding completed run)', () => {
+  it('failure in the previous completed run + failure now -> alert (critical)', () => {
+    const e = canaryDown({ '/': 'http_5xx' }, { '/': 'transport_failure' });
     expect(e).toHaveLength(1);
-    expect(e[0].severity).toBe('critical');
+    expect(e[0]).toMatchObject({ rule: 'canary_down', severity: 'critical', evidence: { now: 'http_5xx', previous: 'transport_failure' } });
+  });
+
+  it('failure in the previous completed run + recovery now -> no alert', () => {
+    expect(canaryDown({ '/': 'ok' }, { '/': 'http_5xx' })).toEqual([]);
+  });
+
+  it('one isolated failure -> no alert (previous ok, or no previous completed run)', () => {
+    expect(canaryDown({ '/': 'http_5xx' }, { '/': 'ok' })).toEqual([]);
+    expect(canaryDown({ '/': 'http_5xx' }, null)).toEqual([]);
+  });
+
+  it('judges each canary independently', () => {
+    const e = canaryDown({ '/': 'http_5xx', '/today': 'noindex', '/pricing': 'ok' }, { '/': 'http_5xx', '/today': 'ok', '/pricing': 'http_5xx' });
+    expect(e.map((x) => x.key)).toEqual(['/']);
   });
 });
 

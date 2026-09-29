@@ -1,14 +1,14 @@
 /**
- * Header-only cron auth for the SEO health routes: the dispatcher's
- * `Authorization: Bearer CRON_SECRET`, or Vercel's `x-vercel-cron: 1`.
+ * Auth for the SEO health routes: `Authorization: Bearer CRON_SECRET` and nothing else.
  *
- * Deliberately NO `?password=` query parameter: a secret in a URL leaks into access logs,
- * analytics, browser history and Referer headers.
+ * These routes are scheduled through `cron_jobs`; the dispatcher always sends that bearer.
+ * Deliberately NOT accepted:
+ *   - `x-vercel-cron: 1`: any caller can set that header, so it proves nothing
+ *   - `?password=`: a secret in a URL leaks into access logs, analytics and Referer headers
+ * With CRON_SECRET unset, nothing is authorized (fail closed).
  */
-export function cronHeaderAuthorized(headers: Headers, env: Record<string, string | undefined> = process.env): boolean {
-  if (headers.get('x-vercel-cron') === '1') return true;
+export function cronBearerAuthorized(headers: Headers, env: Record<string, string | undefined> = process.env): boolean {
   const secret = env.CRON_SECRET;
   if (!secret) return false;
-  const auth = headers.get('authorization') ?? '';
-  return auth === `Bearer ${secret}`;
+  return (headers.get('authorization') ?? '') === `Bearer ${secret}`;
 }

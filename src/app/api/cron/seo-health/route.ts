@@ -9,8 +9,9 @@
  *
  * Scheduling: a `cron_jobs` row (dispatcher), inserted only AFTER this route is deployed
  * and verified returning 200 + real JSON in production. No vercel.json cron.
- * Auth: header only (x-vercel-cron, or Authorization: Bearer CRON_SECRET). No ?password=: secrets
- * in URLs leak into logs and analytics. Completion is monitored by /api/cron/seo-health-watchdog,
+ * Auth: `Authorization: Bearer CRON_SECRET` only (what the cron_jobs dispatcher sends). Not x-vercel-cron
+ * (caller-controlled) and not ?password= (secrets
+ * in URLs leak into logs). Completion is monitored by /api/cron/seo-health-watchdog,
  * because this job outlives the dispatcher's 55s await cap.
  *
  * HTTP: 200 for ok/partial (details in the body), 500 for failed, so the dispatcher's
@@ -22,7 +23,7 @@ import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 import { postSlackMessage } from '@/lib/slack/post-message';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { runSeoHealth } from '@/lib/seo-health/run';
-import { cronHeaderAuthorized } from '@/lib/seo-health/auth';
+import { cronBearerAuthorized } from '@/lib/seo-health/auth';
 import { fetchDatePageRowsPaged } from '@/lib/seo-health/observe';
 import { createStore } from '@/lib/seo-health/store';
 
@@ -31,7 +32,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  if (!cronHeaderAuthorized(req.headers)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!cronBearerAuthorized(req.headers)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const channel = process.env.SEO_SLACK_CHANNEL || '#seo';
   const result = await runSeoHealth({

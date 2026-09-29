@@ -6,14 +6,14 @@
  * problem it also posts to Slack #mindy-ops (MINDY_OPS_SLACK_CHANNEL), falling back to the
  * existing ops alert channel when that is unset, so it is never silent.
  *
- * Auth: header only (x-vercel-cron, or Authorization: Bearer CRON_SECRET). No secrets in URLs.
+ * Auth: `Authorization: Bearer CRON_SECRET` only. Not x-vercel-cron (caller-controlled), not ?password=.
  * Read-only: one SELECT on seo_health_runs.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { postSlackMessage } from '@/lib/slack/post-message';
 import { getReadClient } from '@/lib/supabase/server-clients';
-import { cronHeaderAuthorized } from '@/lib/seo-health/auth';
+import { cronBearerAuthorized } from '@/lib/seo-health/auth';
 import { createStore } from '@/lib/seo-health/store';
 import { evaluateCompletion } from '@/lib/seo-health/watchdog';
 
@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-  if (!cronHeaderAuthorized(req.headers)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!cronBearerAuthorized(req.headers)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   let verdict;
   try {

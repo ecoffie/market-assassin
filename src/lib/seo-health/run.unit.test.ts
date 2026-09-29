@@ -41,7 +41,7 @@ function memoryStore(overrides: Partial<SeoHealthStore> = {}) {
     insertChecks: async (_id, cs) => { checks.push(...cs); return new Set(cs.map((c) => c.url)); },
     upsertStratumDaily: async (rows) => { upserts.push(...rows); },
     crawlHistory: async () => [],
-    canaryHistory: async () => [],
+    previousCompletedCanaries: async () => null,
     previousRunSummary: async () => null,
     inspections: async () => [],
     latestRuns: async () => [],
@@ -135,6 +135,23 @@ describe('runSeoHealth (stratified)', () => {
     expect(next).toContain(seen[1]); // the URL that hit the 429 is observed next run
   });
 
+  it('an inspection timeout (status 0) stops the stream without advancing past that URL', async () => {
+    const m = memoryStore();
+    const seen: string[] = [];
+    let n = 0;
+    const inspect = async (u: string) => {
+      seen.push(u);
+      return ++n === 2 ? { ok: false as const, status: 0, error: 'timed out after 15000ms' } : { ok: true as const, result: { verdict: 'PASS', coverageState: 'Submitted and indexed' } };
+    };
+    const r = await runSeoHealth(deps(m.store, { gsc: { datePageRows: completeGsc, inspect } }));
+    expect(r.status).toBe('partial');
+    expect(seen).toHaveLength(2); // nothing further was attempted in this run
+    expect(r.problems.join(' ')).toMatch(/transient inspection error \(HTTP network\)/);
+    const next: string[] = [];
+    await runSeoHealth(deps(m.store, { gsc: { datePageRows: completeGsc, inspect: async (u) => { next.push(u); return { ok: true as const, result: { verdict: 'PASS' } }; } } }));
+    expect(next).toContain(seen[1]); // the timed-out URL is retried next run
+  });
+
   it('a permanent per-URL inspection error is recorded and moved past', async () => {
     const m = memoryStore();
     const r = await runSeoHealth(deps(m.store, { gsc: { datePageRows: completeGsc, inspect: async () => ({ ok: false as const, status: 400, error: 'not in property' }) } }));
@@ -178,6 +195,39 @@ describe('runSeoHealth (stratified)', () => {
     expect(r.slack).toBe('failed');
     expect(m.runs[0].slack_state).toBe('failed');
     expect(String(m.runs[0].error)).toMatch(/not_in_channel/);
+  });
+
+  describe('canary escalation uses THIS run against the preceding completed run', () => {
+    const HOME = `${ORIGIN}/`;
+    const siteWithHome = (homeStatus: number) => (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/sitemap-index.xml')) return siteFetch()(input);
+      if (url === HOME) return homeStatus === 200 ? new Response(goodHtml(url), { status: 200 }) : new Response('down', { status: homeStatus });
+      return new Response(goodHtml(url), { status: 200 });
+    }) as typeof fetch;
+    const run = async (homeStatus: number, previous: Record<string, 'ok' | 'http_5xx'> | null) => {
+      const asked: number[] = [];
+      const m = memoryStore({ previousCompletedCanaries: async (id) => { asked.push(id); return previous ? Object.fromEntries(Object.entries(previous).map(([k, v]) => [k, v])) : null; } });
+      const r = await runSeoHealth(deps(m.store, { fetch: siteWithHome(homeStatus) }));
+      return { r, asked, canary: r.escalations.filter((e) => e.rule === 'canary_down') };
+    };
+
+    it('failure yesterday + failure today -> alert, from the current run (not two older runs)', async () => {
+      const { canary, asked, r } = await run(503, { [HOME]: 'http_5xx' });
+      expect(canary.map((e) => e.key)).toEqual([HOME]);
+      expect(canary[0].evidence).toMatchObject({ now: 'http_5xx', previous: 'http_5xx' });
+      expect(asked).toEqual([r.runId]); // looked up the run BEFORE this one
+    });
+
+    it('failure yesterday + recovery today -> no alert', async () => {
+      const { canary } = await run(200, { [HOME]: 'http_5xx' });
+      expect(canary).toEqual([]);
+    });
+
+    it('one isolated failure (yesterday fine, or no previous completed run) -> no alert', async () => {
+      expect((await run(503, { [HOME]: 'ok' })).canary).toEqual([]);
+      expect((await run(503, null)).canary).toEqual([]);
+    });
   });
 
   it('a store that cannot start a run fails fast and touches nothing', async () => {

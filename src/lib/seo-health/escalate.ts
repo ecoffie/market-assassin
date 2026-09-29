@@ -3,7 +3,7 @@
  * observation: every rule needs the same signal across multiple runs or days.
  *
  *   url_persistent        one URL, same our-side failure class in >= 2 of its last 3 crawls
- *   canary_down           a canary page failing our-side checks in 2 consecutive runs
+ *   canary_down           a canary failing our-side checks in THIS run and the preceding completed run
  *   stratum_failures      a stratum's crawl failure rate > 5% (min 20 URLs) in this run AND the previous run
  *   gsc_stratum_drop      a stratum's Search Console impressions > 40% below its baseline for 3
  *                         consecutive MATURE calendar days (see stratumImpressionDrop)
@@ -61,13 +61,18 @@ export function urlPersistent(history: CheckHistoryRow[]): Escalation[] {
   return out;
 }
 
-/** canaryRuns[i] = outcomes per canary URL for run i, newest first. */
-export function canaryDown(canaryRuns: Array<Record<string, Outcome>>): Escalation[] {
-  if (canaryRuns.length < 2) return [];
-  const [now, prev] = canaryRuns;
-  return Object.entries(now)
-    .filter(([url, o]) => isCrawlFailure(o) && prev[url] !== undefined && isCrawlFailure(prev[url]))
-    .map(([url, o]) => ({ rule: 'canary_down' as const, severity: 'critical' as const, key: url, message: `canary failing 2 runs in a row (${prev[url]} then ${o})`, evidence: { url, now: o, previous: prev[url] } }));
+/**
+ * Canary failing in THIS run and in the immediately preceding completed run.
+ * `current` is this run's canary checks (the run is still in progress, so it is passed in,
+ * not read back from storage); `previous` is the last run that finished ok/partial before it,
+ * or null when there is none. A failure today after a pass yesterday, or a recovery today
+ * after a failure yesterday, does not escalate.
+ */
+export function canaryDown(current: Record<string, Outcome>, previous: Record<string, Outcome> | null): Escalation[] {
+  if (!previous) return [];
+  return Object.entries(current)
+    .filter(([url, o]) => isCrawlFailure(o) && previous[url] !== undefined && isCrawlFailure(previous[url]))
+    .map(([url, o]) => ({ rule: 'canary_down' as const, severity: 'critical' as const, key: url, message: `canary failing in this run and the previous completed run (${previous[url]} then ${o})`, evidence: { url, now: o, previous: previous[url] } }));
 }
 
 export interface StratumRate { total: number; failures: number }

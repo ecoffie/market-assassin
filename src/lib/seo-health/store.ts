@@ -40,7 +40,8 @@ export interface SeoHealthStore {
   insertChecks(runId: number, checks: UrlCheck[]): Promise<Set<string>>;
   upsertStratumDaily(rows: Array<{ day: string; stratum: Stratum; clicks: number; impressions: number; pages: number }>): Promise<void>;
   crawlHistory(urls: string[], sinceIso: string): Promise<Array<{ url: string; outcome: Outcome; checked_at: string }>>;
-  canaryHistory(runs: number): Promise<Array<Record<string, Outcome>>>;
+  /** Canary outcomes of the last run that completed ok/partial before `beforeRunId`, or null. */
+  previousCompletedCanaries(beforeRunId: number): Promise<Record<string, Outcome> | null>;
   previousRunSummary(beforeRunId: number): Promise<Record<string, unknown> | null>;
   inspections(sinceIso: string): Promise<Array<{ stratum: Stratum; outcome: Outcome; checked_at: string }>>;
   /** Most recent runs, newest first (watchdog). */
@@ -105,17 +106,23 @@ export function createStore(db: SupabaseClient): SeoHealthStore {
       return out;
     },
 
-    async canaryHistory(runs) {
-      const { data, error } = await db.from('seo_health_runs').select('id').neq('status', 'running').order('id', { ascending: false }).limit(runs + 1);
-      if (error) fail('canaryHistory runs', error);
-      const ids = ((data as Array<{ id: number }>) ?? []).map((r) => r.id);
-      if (!ids.length) return [];
-      const rows = await fetchAllPaged<{ run_id: number; url: string; outcome: Outcome }>(() =>
-        db.from('seo_health_url_checks').select('run_id, url, outcome').in('run_id', ids).eq('source', 'crawl').eq('detail->>canary', 'true').order('id'),
+    async previousCompletedCanaries(beforeRunId) {
+      const { data, error } = await db
+        .from('seo_health_runs')
+        .select('id')
+        .lt('id', beforeRunId)
+        .in('status', ['ok', 'partial'])
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) fail('previousCompletedCanaries run', error);
+      const prevId = (data as { id: number } | null)?.id;
+      if (!prevId) return null;
+      const rows = await fetchAllPaged<{ url: string; outcome: Outcome }>(() =>
+        db.from('seo_health_url_checks').select('url, outcome').eq('run_id', prevId).eq('source', 'crawl').eq('detail->>canary', 'true').order('id'),
       );
-      const byRun = new Map<number, Record<string, Outcome>>();
-      for (const r of rows) byRun.set(r.run_id, { ...(byRun.get(r.run_id) ?? {}), [r.url]: r.outcome });
-      return ids.map((id) => byRun.get(id)).filter((x): x is Record<string, Outcome> => !!x).slice(0, runs);
+      if (!rows.length) return null; // that run did not crawl (e.g. crawl skipped): nothing to compare
+      return Object.fromEntries(rows.map((r) => [r.url, r.outcome]));
     },
 
     async previousRunSummary(beforeRunId) {
