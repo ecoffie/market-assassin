@@ -148,6 +148,6 @@ share a cause.
 
 ## Follow-ups from the first multi-user subscription deal (Sep 29, 2026)
 
-- [ ] **Pooled Team credits (priority).** `mcp_credit_pool` has 0 rows in production; `payer.ts` resolves every caller to `personal`. Multi-user deals are currently delivered as plan + sponsored entitlement, which grants extra credits instead of splitting one allowance. Fund pools (PR 4B) so one payment can back a team, then offer Team as a standard SKU.
+- [ ] **Pooled Team credits (priority).** Spec: `tasks/PRD-pooled-team-credits.md` (PRD only). `mcp_credit_pool` has 0 rows in production; `payer.ts` resolves every caller to `personal`. Multi-user deals are currently delivered as plan + sponsored entitlement, which grants extra credits instead of splitting one allowance. Fund pools (PR 4B) so one payment can back a team, then offer Team as a standard SKU.
 - [ ] **Conference discovery.** `search_federal_events` with `include_ai_discovery` returned 0 association conferences (e.g. SAME SBC, DON Gold Coast). Decide whether to ingest major federal-industry conference calendars.
 - [ ] **Grants.gov integration** reported not working; removed from proposal copy until verified.
