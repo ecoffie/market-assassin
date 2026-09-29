@@ -18,6 +18,7 @@
  * Every read binds its error and throws: an unknown answer is never rendered as "no org"
  * or "0 seats" (Bug Prevention Rule #11).
  */
+import { readAllPages } from '@/lib/paged-read';
 import { createHash, randomBytes } from 'crypto';
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { POOLED_PLAN_DEFAULTS } from './packages';
@@ -463,7 +464,7 @@ export async function removeMember(orgId: string, ownerEmail: string, memberEmai
   const db = getWriteClient();
   const { data: rows, error } = await db
     .from('org_members')
-    .update({ status: 'removed' })
+    .update({ status: 'removed' }) // truncation-ok: one member of one org, at most one row
     .eq('org_id', orgId)
     .eq('user_email', member)
     .eq('role', TEAM_MEMBER_ROLE)
@@ -471,7 +472,7 @@ export async function removeMember(orgId: string, ownerEmail: string, memberEmai
   if (error) throw new Error(`team-pools: remove failed: ${error.message}`);
   const { data: inv, error: iErr } = await db
     .from('org_member_invites')
-    .update({ status: 'revoked' })
+    .update({ status: 'revoked' }) // truncation-ok: unique index = one pending invite per org + email
     .eq('org_id', orgId)
     .eq('invited_email', member)
     .eq('status', 'pending')
@@ -492,7 +493,8 @@ export interface TeamView {
   /** null = no pool exists yet (a provisioning gap) — never rendered as 0. */
   poolBalance: number | null;
   monthlyCredits: number;
-  members: { email: string; role: string; credits30d: number; calls30d: number }[];
+  /** credits30d/calls30d null = usage could not be established — render as unknown, never 0. */
+  members: { email: string; role: string; credits30d: number | null; calls30d: number | null }[];
   pendingInvites: { email: string; expiresAt: string }[];
 }
 
@@ -529,22 +531,30 @@ export async function teamViewFor(email: string): Promise<TeamView[]> {
       .in('role', [...TEAM_ROLES]);
     if (mErr) throw new Error(`team-pools: member list failed: ${mErr.message}`);
 
-    const usageByActor = new Map<string, { credits: number; calls: number }>();
+    // null = usage not established (read failed or never proved complete) — the console
+    // shows "unknown", never a fabricated 0 (Bug Prevention Rule #11).
+    let usageByActor: Map<string, { credits: number; calls: number }> | null = new Map();
     if (pool?.pool_id) {
-      const { data: spend, error: sErr } = await db
-        .from('mcp_credit_ledger')
-        .select('actor_email, delta')
-        .eq('charged_pool_id', pool.pool_id)
-        .eq('reason', 'tool_call')
-        .gte('created_at', since)
-        .limit(5000);
-      if (sErr) throw new Error(`team-pools: usage read failed: ${sErr.message}`);
-      for (const r of spend ?? []) {
+      const spend = await readAllPages<{ actor_email: string | null; delta: number }>(() =>
+        db
+          .from('mcp_credit_ledger')
+          .select('actor_email, delta')
+          .eq('charged_pool_id', pool.pool_id)
+          .eq('reason', 'tool_call')
+          .gte('created_at', since)
+          .order('id'),
+        { maxRows: 100_000 },
+      );
+      if (spend.error || !spend.exhausted) {
+        console.error(`[team-pools] usage read incomplete for pool ${pool.pool_id}: ${spend.error ?? 'not exhausted'}`);
+        usageByActor = null;
+      }
+      for (const r of usageByActor ? spend.rows : []) {
         const k = normalizeEmail((r.actor_email as string) ?? '');
-        const cur = usageByActor.get(k) ?? { credits: 0, calls: 0 };
+        const cur = usageByActor!.get(k) ?? { credits: 0, calls: 0 };
         cur.credits += -Number(r.delta ?? 0);
         cur.calls += 1;
-        usageByActor.set(k, cur);
+        usageByActor!.set(k, cur);
       }
     }
 
@@ -563,6 +573,8 @@ export async function teamViewFor(email: string): Promise<TeamView[]> {
     const members = (memberRows ?? [])
       .filter((r) => isOwner || normalizeEmail(r.user_email as string) === me)
       .map((r) => {
+        if (!usageByActor) return { email: r.user_email as string, role: r.role as string, credits30d: null, calls30d: null };
+        // A complete read with no rows for this member is a real zero.
         const u = usageByActor.get(normalizeEmail(r.user_email as string)) ?? { credits: 0, calls: 0 };
         return { email: r.user_email as string, role: r.role as string, credits30d: u.credits, calls30d: u.calls };
       });

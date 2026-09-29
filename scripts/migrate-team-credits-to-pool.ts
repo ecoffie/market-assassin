@@ -79,7 +79,7 @@ async function main() {
 
     const { data: bal, error: bErr } = await db
       .from('mcp_credit_balance')
-      .select('balance, purchased_balance')
+      .select('balance, purchased_balance') // unranged-ok: one row, keyed by user_email (PK)
       .eq('user_email', email)
       .maybeSingle();
     if (bErr) throw new Error(`balance read failed for ${email}: ${bErr.message}`);

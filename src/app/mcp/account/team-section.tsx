@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 
-interface TeamMember { email: string; role: string; credits30d: number; calls30d: number }
+interface TeamMember { email: string; role: string; credits30d: number | null; calls30d: number | null }
 interface Team {
   orgId: string; name: string; role: string; isOwner: boolean; seatLimit: number;
   seats: { active: number; pending: number; used: number };
@@ -158,8 +158,8 @@ export function TeamSection({ email }: { email: string | null }) {
               {t.members.map((m) => (
                 <tr key={m.email}>
                   <td className="py-2 text-slate-200">{m.email}{m.role === 'team_owner' ? <span className="ml-2 text-[11px] text-slate-500">owner</span> : null}</td>
-                  <td className="py-2 text-right text-slate-300">{nf(m.credits30d)}</td>
-                  <td className="py-2 text-right text-slate-300">{nf(m.calls30d)}</td>
+                  <td className="py-2 text-right text-slate-300">{m.credits30d === null ? 'unknown' : nf(m.credits30d)}</td>
+                  <td className="py-2 text-right text-slate-300">{m.calls30d === null ? 'unknown' : nf(m.calls30d)}</td>
                   {t.isOwner && (
                     <td className="py-2 text-right">
                       {m.role !== 'team_owner' && (
