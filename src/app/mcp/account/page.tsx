@@ -21,6 +21,7 @@ import {
   type UsageSummary, type McpCall,
 } from '../usage-charts';
 import { TeamSection } from './team-section';
+import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
 
 type Section = 'usage' | 'activity' | 'billing' | 'team' | 'keys' | 'crm' | 'referrals' | 'settings';
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
@@ -43,11 +44,12 @@ interface AutoRecharge {
 interface ApiKeyRow { id: string; key_prefix: string; label: string | null; created_at: string; last_used_at: string | null; revoked_at: string | null }
 interface BillingRow { id: string; date: string; label: string; credits: number; balanceAfter: number; free: boolean }
 
-// Refill packs — must match CREDIT_PACKAGES ids/credits in src/lib/mcp/packages.ts.
-// Single premium top-up SKU (GOS #015); legacy 'plus'/'scale' were retired.
-const REFILL_PACKS: { id: string; label: string }[] = [
-  { id: 'refill', label: '500 credits ($119)' },
-];
+// Refill packs, derived from CREDIT_PACKAGES so the label can never drift from what the
+// pack actually grants (it once read "500 credits" after the pack became 1,000).
+const REFILL_PACKS: { id: string; label: string }[] = CREDIT_PACKAGES.map((p) => ({
+  id: p.id,
+  label: `${p.credits.toLocaleString()} credits ($${p.usd})`,
+}));
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
