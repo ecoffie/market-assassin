@@ -4,6 +4,20 @@ Rules and patterns to prevent repeated mistakes.
 
 ---
 
+## Client proposals: claim only what the product delivers today (Sep 29, 2026)
+
+**Always verify a proposal's promises against the code and live data, not against the last proposal, because a sales document is a contract offer.** Found while writing a Mindy subscription proposal for a two-user client (full framework lives in the PRIVATE `ecoffie/govcon-proposals` repo, never here: this repo is public).
+
+- **Price and credit amounts come from `src/lib/mcp/packages.ts`**, not a prior proposal. The sample promised 42,000 + a "7,000 bonus" annual credits; no bonus exists anywhere in code.
+- **Credits belong to one account.** Shared team pools exist in code (`src/lib/mcp/payer.ts`) but production has **0 funded pools**, so "credits shared across your team" was false. Multi-user deals are delivered as the paid plan on one account plus a **sponsored entitlement** (`sponsor_entitlements`) for the second user.
+- **Test the tool before claiming the capability.** `search_federal_contacts` is strong (10,117 USACE contacts, per-district, with emails). `search_federal_events` returns SAM industry days/RFIs; its AI discovery found **0 association conferences**, so conference plans must pair Mindy contacts with the event's own published agenda. Grants.gov was removed from copy because it is not working.
+- **"Submission-ready" overclaims** `export_proposal`: it produces an editable .docx draft.
+- **No em dashes in client-facing copy** (reads as AI-written). **ROI as capacity returned** ("500 hours a year"), never a per-hour dollar figure that reads like a wage.
+- **Client capability statements are public via the SBA certifications API**: `https://search.certifications.sba.gov/_api/v2/profile/<UEI>/<CAGE>` (narrative, keywords, target agencies, bonding). The web page renders with JS; use the API.
+- **Beta users often sign up with a personal email.** Search Mindy tables by last name, not only the company domain.
+
+---
+
 ## PERSIST vs QUERY: never store the broad expansion (Jul 27, 2026)
 
 **Always widen taxonomy codes at QUERY time, never at PERSIST time, because storing the broadened set silently rewrites the user's own choices.**
