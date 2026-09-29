@@ -58,49 +58,58 @@ afterEach(() => {
 });
 
 describe('GET /api/health', () => {
-  it('returns 200 ok with no-store when the database and KV both answer', async () => {
+  it('returns exactly { ok: true, status: "ok" } with no-store when the database and KV both answer', async () => {
     const { res, body } = await callHealth();
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store, max-age=0');
-    expect(body.ok).toBe(true);
-    expect(body.status).toBe('ok');
-    expect(body.checks.database.ok).toBe(true);
-    expect(body.checks.cache.ok).toBe(true);
+    expect(body).toEqual({ ok: true, status: 'ok' });
   });
 
-  it('returns 503 degraded when the database returns an error', async () => {
+  it('returns exactly { ok: false, status: "degraded" } (503) when the database errors, detail only in the private log', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     db.result = { error: { message: 'relation does not exist' } };
     const { res, body } = await callHealth();
     expect(res.status).toBe(503);
-    expect(body.ok).toBe(false);
-    expect(body.checks.database).toMatchObject({ ok: false, error: 'error' });
-    expect(body.checks.cache.ok).toBe(true);
+    expect(body).toEqual({ ok: false, status: 'degraded' });
+    expect(warn.mock.calls.map((c) => c.join(' ')).join('\n')).toMatch(/"database":\{"ok":false[^}]*"error":"error"/);
+    warn.mockRestore();
   });
 
-  it('returns 503 with error=timeout when a dependency hangs past the 2s budget', async () => {
+  it('returns 503 degraded when a dependency hangs past the 2s budget (logged as timeout)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.useFakeTimers();
     db.delayMs = 10_000;
     const pending = callHealth();
     await vi.advanceTimersByTimeAsync(2_001);
     const { res, body } = await pending;
     expect(res.status).toBe(503);
-    expect(body.checks.database).toMatchObject({ ok: false, error: 'timeout' });
+    expect(body).toEqual({ ok: false, status: 'degraded' });
+    expect(warn.mock.calls.join(' ')).toMatch(/"error":"timeout"/);
+    warn.mockRestore();
   });
 
-  it('reports unconfigured instead of throwing when env is missing', async () => {
+  it('reports degraded instead of throwing when env is missing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     db.throws = true;
     delete process.env.KV_REST_API_URL;
     const { res, body } = await callHealth();
     expect(res.status).toBe(503);
-    expect(body.checks.database.error).toBe('unconfigured');
-    expect(body.checks.cache.error).toBe('unconfigured');
+    expect(body).toEqual({ ok: false, status: 'degraded' });
+    expect(warn.mock.calls.join(' ')).toMatch(/unconfigured/);
+    warn.mockRestore();
   });
 
-  it('never leaks the underlying error message on a public route', async () => {
+  it('publishes nothing beyond ok/status: no commit, region, dependency names, latency, config or error text', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.VERCEL_GIT_COMMIT_SHA = 'abcdef1234567';
+    process.env.VERCEL_REGION = 'iad1';
     cache.reject = true;
     const { body } = await callHealth();
-    expect(body.checks.cache).toMatchObject({ ok: false, error: 'error' });
-    expect(JSON.stringify(body)).not.toContain('secret-host');
+    expect(Object.keys(body).sort()).toEqual(['ok', 'status']);
+    const text = JSON.stringify(body);
+    for (const leak of ['abcdef1', 'iad1', 'database', 'cache', 'ms', 'secret-host', 'unconfigured', 'timeout']) expect(text).not.toContain(leak);
+    delete process.env.VERCEL_GIT_COMMIT_SHA;
+    delete process.env.VERCEL_REGION;
   });
 
   it('only reads: one KV GET, no KV writes', async () => {

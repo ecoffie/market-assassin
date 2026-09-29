@@ -10,8 +10,12 @@
  * of a key nothing writes. It never touches BigQuery, never writes KV or the DB,
  * and never revalidates or regenerates pages, so an uptime monitor hitting it every
  * few minutes from several regions cannot change product or SEO state or run up
- * query cost. Errors are reported as a short code ('timeout' | 'error' |
- * 'unconfigured'), never the underlying message, because this route is public.
+ * query cost.
+ *
+ * The public body is deliberately minimal: `{ ok, status }` and nothing else. No
+ * commit, region, dependency names, per-dependency latency or configuration state.
+ * On a failure the per-dependency detail (code + latency) goes to the private runtime
+ * log only, never the response.
  */
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
@@ -77,15 +81,9 @@ async function probeKv(): Promise<void> {
 export async function GET() {
   const [database, cache] = await Promise.all([timed(probeDatabase), timed(probeKv)]);
   const ok = database.ok && cache.ok;
+  if (!ok) console.warn('[health] degraded', JSON.stringify({ database, cache }));
   return NextResponse.json(
-    {
-      ok,
-      status: ok ? 'ok' : 'degraded',
-      checks: { database, cache },
-      version: (process.env.VERCEL_GIT_COMMIT_SHA || 'local').slice(0, 7),
-      region: process.env.VERCEL_REGION || 'local',
-      time: new Date().toISOString(),
-    },
+    { ok, status: ok ? 'ok' : 'degraded' },
     {
       status: ok ? 200 : 503,
       headers: { 'Cache-Control': 'no-store, max-age=0' },

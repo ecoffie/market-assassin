@@ -32,10 +32,11 @@ sets noindex, regenerates pages or calls IndexNow.
 
 ## `/api/health`
 
-Public and read-only. It runs one single-row Supabase SELECT and one KV GET, each
-with a 2 s budget, in parallel. It returns 200 `{ ok: true }`, or 503 `{ ok: false }`
-with a per-dependency code (`timeout`, `error`, `unconfigured`). It never returns
-the underlying error text, never writes, and never touches BigQuery.
+Public and read-only. It runs one single-row Supabase SELECT and one KV GET, each with a
+2 s budget, in parallel. The public body is minimal: 200 `{"ok":true,"status":"ok"}` or
+503 `{"ok":false,"status":"degraded"}`. No commit, region, dependency names, latency or
+configuration state is published. Which dependency failed, and how, goes to the private
+runtime log (`[health] degraded …`). It never writes and never touches BigQuery.
 
 ## Manual activation (one time)
 
