@@ -1,0 +1,33 @@
+{
+  "$comment": "Better Stack Uptime monitors for getmindy.ai. Applied by scripts/betterstack-sync.ts (dry-run by default, --apply to write; never deletes). Every monitor name starts with namePrefix, which is how the sync script recognises monitors it owns. Availability: a failure must persist through confirmation_period (300s, about 2 consecutive 5-minute checks) before an incident opens. Latency: a response slower than request_timeout (3s) counts as a failure, and it must persist 900s (about 3 consecutive checks) before an incident opens. Budget: 10 monitors, the Better Stack free-tier limit. Incidents route to Slack #mindy-ops through the Better Stack Slack integration (a manual one-time setup; see monitoring/README.md). Uptime results never touch SEO state.",
+  "namePrefix": "[mindy]",
+  "baseUrl": "https://getmindy.ai",
+  "defaults": {
+    "check_frequency": 300,
+    "regions": ["us", "eu"],
+    "http_method": "get",
+    "follow_redirects": true,
+    "verify_ssl": true,
+    "recovery_period": 180,
+    "email": false,
+    "sms": false,
+    "call": false,
+    "push": false
+  },
+  "profiles": {
+    "availability": { "request_timeout": 10, "confirmation_period": 300 },
+    "latency": { "request_timeout": 3, "confirmation_period": 900 }
+  },
+  "monitors": [
+    { "key": "home", "name": "Home", "path": "/", "profile": "availability", "monitor_type": "keyword", "required_keyword": "Mindy" },
+    { "key": "today", "name": "Today's Intel", "path": "/today", "profile": "availability", "monitor_type": "status" },
+    { "key": "sitemap", "name": "Sitemap", "path": "/sitemap.xml", "profile": "availability", "monitor_type": "keyword", "required_keyword": "<urlset" },
+    { "key": "contractor", "name": "Contractor page (Boeing)", "path": "/contractors/the-boeing-company", "profile": "availability", "monitor_type": "keyword", "required_keyword": "The Boeing Company" },
+    { "key": "health", "name": "Health endpoint", "path": "/api/health", "profile": "availability", "monitor_type": "status" },
+    { "key": "home-latency", "name": "Latency: Home", "path": "/", "profile": "latency", "monitor_type": "status" },
+    { "key": "today-latency", "name": "Latency: Today's Intel", "path": "/today", "profile": "latency", "monitor_type": "status" },
+    { "key": "sitemap-latency", "name": "Latency: Sitemap", "path": "/sitemap.xml", "profile": "latency", "monitor_type": "status" },
+    { "key": "contractor-latency", "name": "Latency: Contractor page (Boeing)", "path": "/contractors/the-boeing-company", "profile": "latency", "monitor_type": "status" },
+    { "key": "health-latency", "name": "Latency: Health endpoint", "path": "/api/health", "profile": "latency", "monitor_type": "status" }
+  ]
+}

@@ -45,6 +45,8 @@ const knownPublicOrTokenized = [
   '/api/track/',
   '/api/webhooks/',
   '/api/beginner/search/',
+  // Public by design: read-only uptime probe for Better Stack (no writes, no BigQuery, no internal errors).
+  '/api/health/',
 ];
 
 function routeName(file) {
