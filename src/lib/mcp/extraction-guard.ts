@@ -19,6 +19,7 @@
  * a guard bug can never take down the paid API. Enforcement vs log-only is decided by the
  * caller via `mcpFlags.extractionEnforce`.
  */
+import { resolvePayer } from './payer';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
 /**
@@ -75,7 +76,12 @@ async function hasPaidStanding(userEmail: string): Promise<boolean> {
     .in('reason', PAID_REASONS as unknown as string[])
     .limit(1);
   if (error) throw error;
-  return (data?.length ?? 0) > 0;
+  if ((data?.length ?? 0) > 0) return true;
+  // A member of a pooled (multi-seat) subscription is paid for by their organization:
+  // their personal ledger holds no paid grant, but their calls bill a funded team pool.
+  // (tasks/PRD-pooled-team-credits.md) Without this every team member reads as free-tier.
+  const payer = await resolvePayer(userEmail);
+  return payer.kind === 'pool';
 }
 
 /** Count DELIVERED proprietary results for this account since `sinceMs` ago. */

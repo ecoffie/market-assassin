@@ -162,6 +162,31 @@ export const TEAM_MONTHLY_CREDITS = Math.max(
 );
 
 /**
+ * POOLED (multi-seat) plan configuration — tasks/PRD-pooled-team-credits.md.
+ *
+ * A credit pool is a capability of ANY subscription configured with more than one seat
+ * (Eric, 2026-09-29) — not of one price. These are the DEFAULTS a newly provisioned
+ * organization receives; the live values are stored on the organization
+ * (`seat_limit`, `pool_monthly_credits`) so a negotiated deal (e.g. a 2-seat Growth
+ * subscription) is configured per org via the admin provisioning endpoint.
+ *
+ * ⚠️ NOT TARGET PRICING. Team is seeded with today's economics (5 seats, the
+ * TEAM_MONTHLY_CREDITS allowance) only so existing behaviour is unchanged when a pool
+ * replaces the personal grant. Eric explicitly rejected 1,000 credits / 5 seats as the
+ * target; the seat-and-credit pricing proposal comes back to him before any public
+ * pricing change, and changing a number here is that change.
+ *
+ * A plan absent from this map is single-seat by default (no pool) until configured.
+ */
+export interface PooledPlanDefault {
+  seats: number;
+  monthlyCredits: number;
+}
+export const POOLED_PLAN_DEFAULTS: Readonly<Record<string, PooledPlanDefault>> = {
+  team: { seats: 5, monthlyCredits: TEAM_MONTHLY_CREDITS },
+};
+
+/**
  * Internal team (Eric, Branden, the dev team) monthly comp allowance — deliberately HIGH so
  * internal never runs out while building/testing (Eric, 2026-07-19). Cost to us is ~$0 (the
  * $15/user/mo LLM cap governs real spend regardless of balance). Env-overridable.

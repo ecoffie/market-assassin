@@ -28,6 +28,9 @@
  * Credits resolve SERVER-SIDE from the price amount, never from metadata.
  */
 import type Stripe from 'stripe';
+import {
+  findPooledOrgBySubscription, provisionPooledOrg, replenishPool, isPoolSchemaMissing, subscriptionIdFromInvoice,
+} from './team-pools';
 import { applyCreditOnce } from './credits';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from './packages';
 import { getStripe } from '@/lib/stripe';
@@ -93,9 +96,41 @@ export async function handleAppTierSubscriptionInvoice(
     return { handled: true, tier, error: 'no_email' };
   }
 
+  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+  // TEAM → the organization's POOL (tasks/PRD-pooled-team-credits.md). Provision the
+  // pooled org here (idempotent) rather than waiting for checkout provisioning: if this
+  // invoice arrived first and granted personally, the pool would be granted again later
+  // and the first month's allowance would be paid twice.
+  if (tier === 'team') {
+    const subscriptionId = subscriptionIdFromInvoice(invoice);
+    if (subscriptionId) {
+      try {
+        let org = await findPooledOrgBySubscription(subscriptionId);
+        if (!org) {
+          const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id ?? null;
+          await provisionPooledOrg({ subscriptionId, customerId, ownerEmail: email, planKey: 'team' });
+          org = await findPooledOrgBySubscription(subscriptionId);
+        }
+        if (org) {
+          const r = await replenishPool(org, month);
+          console.log(`[app-tier:sub] pool ${org.orgId} +${r.granted} (team, ${reason}, applied=${r.applied}) invoice ${invoice.id}`);
+          return { handled: true, applied: r.applied, credits: r.granted, email, tier, newBalance: r.newBalance };
+        }
+      } catch (e) {
+        if (!isPoolSchemaMissing(e)) {
+          // Pools exist but this one could not be resolved: grant NOTHING personally
+          // (that would double-pay once the pool is found). The daily cron self-heals.
+          console.error('[app-tier:sub] pool grant failed, deferring to cron:', (e as Error).message);
+          return { handled: true, tier, email, error: 'pool_grant_failed' };
+        }
+        // Migration not applied yet → legacy personal grant below.
+      }
+    }
+  }
+
   // SAME key shape as the monthly cron — this is what makes the two paths safe
   // together. See the header note.
-  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
   const key = `pro:${email}:${month}`;
   const { applied, newBalance } = await applyCreditOnce(key, email, credits, `app_tier_${tier}`);
   console.log(

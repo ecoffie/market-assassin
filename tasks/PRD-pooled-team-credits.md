@@ -1,10 +1,21 @@
 # PRD: Pooled Team Credits
 
-**Status:** PRD only (see end of doc)
+**Status:** Approved to build (2026-09-29), with the decisions below. Stop before any production migration or public pricing change.
 **Owner:** Eric / Engineering
 **Date:** September 29, 2026
 **Trigger:** The first multi-user subscription deal (a two-user client, proposal sent Sep 29, 2026) could not be sold as "one plan, shared credits," because credits only live on individual accounts. It is being delivered with a workaround (paid plan on one account plus a sponsored entitlement for the second user). Client details live in the private `ecoffie/govcon-proposals` repo, never here: this repo is public.
 **Prior work this completes:** the "Teams shared-MCP" sequence, PRs 2 through 4A (migrations `20260908_mcp_credit_pool.sql`, `20260909_mcp_pool_debit.sql`, resolver `src/lib/mcp/payer.ts`). PR 4B (fund the pools) was never built.
+
+---
+
+## 0. Decisions (Eric, 2026-09-29) — these override anything below
+
+1. **Pools belong to any multi-seat subscription, not Team only.** A pool is an organization/subscription capability for **any plan configured with more than one seat**. Seat count is a property of the organization's subscription (`organizations.seat_limit`), defaulted from the plan and overridable for a negotiated deal (e.g. a 2-seat Growth subscription).
+2. **Explicit membership only.** Billing membership comes from `org_members` rows created by an owner invite that the invitee accepts by proving the address. Never email-domain grouping.
+3. **Current Team economics are not the target.** 1,000 credits / 5 seats is NOT preserved as target pricing. Architecture proceeds with credits and seats read from configuration; a Team / Growth / Agency seat-and-credit **pricing proposal** comes back to Eric before any public pricing change.
+4. **Annual pooled subscriptions replenish monthly**, even when billed annually (unlike personal annual plans, which grant 12x up front).
+5. **Migration of the existing Team subscriber:** move only their **remaining Team-entitlement credits** into the new pool, through an **idempotent, audited** migration. Unrelated personal or purchased credits stay personal.
+6. **Stop gates:** build through the PRD phases, then stop for approval before (a) running any migration or data move against production and (b) changing public pricing.
 
 ---
 
@@ -163,7 +174,41 @@ Because no organization is linked to a Team subscription, `resolvePayer()` retur
 - **2026-09-15** Purchased vs allowance accounting; allowance spends first.
 - **2026-09-29** First multi-user deal delivered as plan + sponsored entitlement because pools are unfunded; sales copy must not say "shared across your team" until this ships. This PRD opened.
 - **2026-09-29** Billing membership must come from explicit `org_members`, never the domain-derived app workspace (616 workspaces measured).
+- **2026-09-29** Approved to build (Eric): pools for any multi-seat plan; explicit membership; monthly replenishment for annual pooled plans; audited migration of only the remaining Team-entitlement credits; pricing proposal before any public price change; stop before production migration.
 
 ---
 
-**Status:** ☑ PRD only: do NOT execute yet · ☐ Approved to build
+**Status:** ☐ PRD only · ☑ Approved to build (2026-09-29) — stop before production migration or public pricing change
+
+---
+
+## 10. Build status (2026-09-29) — built, NOT deployed, migration NOT applied
+
+| Phase | Delivered | Where |
+|---|---|---|
+| 1. Provision on purchase | Org + `team_owner` + pool, idempotent on the subscription; checkout AND first invoice both provision (whichever arrives first); admin endpoint for negotiated multi-seat deals on any plan | `src/lib/mcp/team-pools.ts` `provisionPooledOrg`, `api/stripe-webhook`, `lib/mcp/app-tier-subscription.ts`, `api/admin/team-pools` |
+| 2. Monthly pool funding | `mcp_replenish_pool` (top-up to allowance, (month, ceiling) claim, never stacked, never refilled by spending, annual replenishes monthly); cron routes pooled subscriptions to their pool and never also grants the buyer personally; MCP-plan invoices fund the pool instead of the personal (12x annual) grant | migration `20260929_pooled_team_credits.sql`, `api/cron/grant-mcp-pro-credits`, `lib/mcp/stripe-subscription.ts` |
+| 3. Membership | Owner invites by email (single-use hashed token, 7-day expiry, seat cap counts active + pending), accept only when the signed-in address equals the invited one, remove/revoke; distinct `team_owner`/`team_member` roles so coach-mode lookups are untouched | `team-pools.ts`, `api/mcp/team`, `lib/mcp/team-invite-email.ts` |
+| 4. Console | `/mcp/account` → Team: shared balance, allowance, seats, per-member 30-day usage (owner), invites, accept-from-link | `app/mcp/account/team-section.tsx` |
+| 5. Migration | Audited, idempotent personal → pool transfer (allowance only; purchased credits refused by the SQL); FIFO ledger replay decides the Team-entitlement amount; dry-run default | `mcp_transfer_personal_to_pool`, `scripts/migrate-team-credits-to-pool.ts`, `lib/mcp/team-pool-migration.ts` |
+
+**Defects fixed on the way** (repair ledger, 2026-09-29): an empty pool showed the personal paywall; a low pool would have fired the member's personal auto-recharge; uncharged pooled calls reported the personal balance; pooled members read as free-tier to the extraction guard.
+
+**Proof:** `tsc` clean; full unit suite 746 files / 8,759 tests green; new tests: payer (12), team-pools pure (15), PGlite SQL over the real migration chain (12), pooled metering (4), pooled invoices (3); an injected regression was confirmed red.
+
+**Dry runs (read-only, production):**
+- `npm run migrate -- --only 20260929_pooled_team_credits.sql` → exactly 1 pending file; the unrelated pending `20260924_saved_search_forecast_watermark.sql` stays untouched.
+- `scripts/migrate-team-credits-to-pool.ts` → 1 active Team subscriber; ledger replay: 2 Team grants (Aug 3 `app_tier_team` +1,000; Sep 1 `pro_monthly` +1,000, which was the Team allowance because Pro was 250 then), 0 spent, 0 purchased, no replay mismatch → **would move 2,000** and mark September's 1,000 as already paid. The subscriber ALSO holds an active Pro subscription, so the script refuses by default; `--email <x> --allow-pro-overlap` proceeds after human verification (recorded in the audit row).
+
+**Pricing:** the Team / Growth / Agency seat-and-credit proposal is in the PRIVATE repo `ecoffie/govcon-proposals` at `mindy-pricing/seat-credit-pricing-proposal-2026-09-29.md` (kept out of this public repo). No public pricing, copy or `POOLED_PLAN_DEFAULTS` change until Eric approves it.
+
+## 11. Rollout runbook — each step needs Eric's approval
+
+1. **Merge + deploy the code.** Safe before the migration: with no `seat_limit` column, every path runs in the legacy mode (no team roles exist, so the payer resolves personal; the cron and invoice paths detect the missing schema and keep today's personal grants; provisioning is non-fatal).
+2. **Apply the migration:** `npm run migrate -- --go --only 20260929_pooled_team_credits.sql`, then verify with `npm run db:check -- organizations seat_limit` and `npm run db:check -- mcp_pool_grants idempotency_key`.
+3. **Migrate the existing Team subscriber** (same day, before their next renewal on the 3rd): dry run, then `npx tsx scripts/migrate-team-credits-to-pool.ts --email <subscriber> --allow-pro-overlap --go`. Verify: personal balance 0, pool 2,000, two ledger rows (`pool_migration_out` / `pool_migration_in`), one `mcp_pool_grants` audit row plus the September claim.
+4. **Configure negotiated deals** (e.g. STOI Growth, 2 seats) with `POST /api/admin/team-pools` (`dryRun` first).
+5. **Live acceptance** (criteria 1 to 10 above) on production with a test org, then invite a real member.
+6. **Pricing:** decide the proposal; only then change `POOLED_PLAN_DEFAULTS` and public copy.
+
+**Known follow-ups (not in this PR):** the subscriber pays for BOTH Pro ($149) and Team ($499), and Team already includes Pro features, so this is worth a support check; `/mcp/account` Billing still labels the refill pack "500 credits ($119)" while `packages.ts` grants 1,000 (a customer-visible number, left for its own change); Stripe per-seat quantity billing (self-serve "add a seat") is unbuilt.

@@ -144,3 +144,52 @@ describe('runMeteredTool', () => {
     expect(credits.logCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'success', creditsCharged: 50 }));
   });
 });
+
+describe('runMeteredTool — pooled team credits (PRD-pooled-team-credits)', () => {
+  const pool = { kind: 'pool', poolId: 'p1', orgId: 'o1', orgName: 'Acme' };
+
+  it('an empty TEAM pool refuses with a team message — never the personal paywall', async () => {
+    const payer = await import('./payer');
+    m(payer.resolvePayer).mockResolvedValueOnce(pool);
+    m(payer.getPoolBalance).mockResolvedValueOnce(2);
+    m(registry.creditsFor).mockReturnValue(5);
+    const r = await runMeteredTool('get_contractor_profile', {}, ctx);
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error.code).toBe('team_pool_insufficient_credits');
+    expect(r.ok === false && r.error.message).toMatch(/Acme/);
+    expect(r.ok === false && r.error.commercial).toBeUndefined(); // no personal checkout
+    expect(registry.runMcpTool).not.toHaveBeenCalled();
+    expect(credits.getBalance).not.toHaveBeenCalled(); // personal balance is irrelevant
+  });
+
+  it('a pooled debit never signals PERSONAL auto-recharge, even when the pool runs low', async () => {
+    const payer = await import('./payer');
+    m(payer.resolvePayer).mockResolvedValueOnce(pool);
+    m(payer.getPoolBalance).mockResolvedValueOnce(100);
+    m(registry.creditsFor).mockReturnValue(5);
+    m(registry.runMcpTool).mockResolvedValue({ result: { a: 1 }, credits: 5 });
+    m(payer.debitResolvedPayer).mockResolvedValueOnce({ ok: true, newBalance: 1, payer: 'pool', poolId: 'p1' });
+    const r = await runMeteredTool('get_contractor_profile', {}, ctx);
+    expect(r).toMatchObject({ ok: true, creditsCharged: 5, balance: 1, needsRecharge: false });
+  });
+
+  it('a personal debit still signals auto-recharge when low (unchanged behaviour)', async () => {
+    m(registry.creditsFor).mockReturnValue(5);
+    m(credits.getBalance).mockResolvedValue(10);
+    m(registry.runMcpTool).mockResolvedValue({ result: { a: 1 }, credits: 5 });
+    m(credits.debitCredits).mockResolvedValue({ ok: true, newBalance: 1 });
+    const r = await runMeteredTool('get_contractor_profile', {}, ctx);
+    expect(r).toMatchObject({ ok: true, needsRecharge: true });
+  });
+
+  it('an uncharged pooled call reports the POOL balance, not the personal one', async () => {
+    const payer = await import('./payer');
+    m(payer.resolvePayer).mockResolvedValueOnce(pool);
+    m(payer.getPoolBalance).mockResolvedValue(700);
+    m(registry.creditsFor).mockReturnValue(5);
+    m(registry.runMcpTool).mockResolvedValue({ result: { _meta: { degraded: true, grounded: false } }, credits: 5 });
+    const r = await runMeteredTool('get_contractor_profile', {}, ctx);
+    expect(r).toMatchObject({ ok: true, creditsCharged: 0, balance: 700 });
+    expect(credits.getBalance).not.toHaveBeenCalled();
+  });
+});

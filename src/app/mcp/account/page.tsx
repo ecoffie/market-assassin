@@ -20,12 +20,14 @@ import {
   UsageKpis, UsageOverTime, SpendByTool, ActivityLog,
   type UsageSummary, type McpCall,
 } from '../usage-charts';
+import { TeamSection } from './team-section';
 
-type Section = 'usage' | 'activity' | 'billing' | 'keys' | 'crm' | 'referrals' | 'settings';
+type Section = 'usage' | 'activity' | 'billing' | 'team' | 'keys' | 'crm' | 'referrals' | 'settings';
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'usage', label: 'Usage', icon: '◧' },
   { id: 'activity', label: 'Activity', icon: '≡' },
   { id: 'billing', label: 'Billing', icon: '◈' },
+  { id: 'team', label: 'Team', icon: '⚇' },
   { id: 'keys', label: 'API keys', icon: '⚿' },
   { id: 'crm', label: 'CRM', icon: '⇄' },
   { id: 'referrals', label: 'Refer & earn', icon: '◇' },
@@ -291,7 +293,7 @@ export default function McpAccountPage() {
 
   // ---- Section bodies --------------------------------------------------------
   const sectionTitle: Record<Section, string> = {
-    usage: 'Usage', activity: 'Activity', billing: 'Billing', keys: 'API keys', crm: 'CRM connection', referrals: 'Refer & earn', settings: 'Settings',
+    usage: 'Usage', activity: 'Activity', billing: 'Billing', team: 'Team', keys: 'API keys', crm: 'CRM connection', referrals: 'Refer & earn', settings: 'Settings',
   };
 
   const usageBody = (
@@ -593,7 +595,7 @@ export default function McpAccountPage() {
   );
 
   const bodies: Record<Section, React.ReactNode> = {
-    usage: usageBody, activity: activityBody, billing: billingBody, keys: keysBody, crm: crmBody, referrals: referralsBody, settings: settingsBody,
+    usage: usageBody, activity: activityBody, billing: billingBody, team: <TeamSection email={email} />, keys: keysBody, crm: crmBody, referrals: referralsBody, settings: settingsBody,
   };
 
   return (

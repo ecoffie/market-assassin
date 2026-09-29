@@ -1,13 +1,10 @@
 /**
  * WHO PAYS for an MCP call — personal balance, or an organization pool?
  *
- * Built in PR 3; WIRED into `runMeteredTool` in PR 4A. It does not fund pools
- * (PR 4B), does not change the Team allowance, and does not touch customer-facing copy.
- *
- * ⚠️ Production has ZERO pools, so `resolvePayer` returns `personal` for every real
- * caller today and the wiring is observable-behaviour-neutral by construction. That
- * ordering is the point: prove the resolver is genuinely in the call path while no
- * money can move, THEN fund a pool.
+ * Built in PR 3; WIRED into `runMeteredTool` in PR 4A. PR 4B (tasks/PRD-pooled-team-credits.md)
+ * generalised eligibility from "a Team-priced subscription" to "any subscription whose
+ * organization is configured with more than one seat" (Eric, 2026-09-29), and funds pools
+ * via src/lib/mcp/team-pools.ts.
  *
  * ── THE BILLING INVARIANT ────────────────────────────────────────────────────
  * PERSONAL may be selected only when we POSITIVELY ESTABLISH that no eligible paid
@@ -25,7 +22,7 @@
  * charged" — which is true, actionable, and cannot be mistaken for a purchase.
  *
  * ── THE RESOLUTION RULE ──────────────────────────────────────────────────────
- *   no membership / no active Team sub  → PERSONAL      (an ESTABLISHED personal case)
+ *   no TEAM membership / no active multi-seat sub → PERSONAL (an ESTABLISHED personal case)
  *   exactly one eligible org + pool     → POOL
  *   2+ eligible orgs                    → SELECTION_REQUIRED  · charge nothing
  *   any query failure                   → UNAVAILABLE          · charge nothing
@@ -50,8 +47,7 @@
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { debitCredits, type DebitResult } from './credits';
 
-/** Stripe unit_amount values that mean "Team plan". Cents. */
-const TEAM_AMOUNTS = new Set([49900, 499000]);
+import { TEAM_ROLES, isPoolEligibleConfig } from './team-pools';
 
 export type PayerKind = 'personal' | 'pool';
 
@@ -97,12 +93,14 @@ export async function resolvePayer(userEmail: string): Promise<PayerResolution> 
 
   const db = getReadClient();
 
-  // 1. EXPLICIT memberships only. No domain inference, ever.
+  // 1. EXPLICIT TEAM memberships only. No domain inference, ever — and never a coach-mode
+  //    role (coach / org_admin): those orgs are not billing relationships.
   const { data: memberships, error: mErr } = await db
     .from('org_members')
     .select('org_id, status')
     .eq('user_email', email)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .in('role', [...TEAM_ROLES]);
   if (mErr) {
     console.error('[mcp:payer] org_members lookup failed:', mErr.message);
     return { kind: 'unavailable', reason: 'org_members_query_failed' };
@@ -112,35 +110,40 @@ export async function resolvePayer(userEmail: string): Promise<PayerResolution> 
   if (!orgIds.length) return { kind: 'personal' };
 
   // 2. Of those, which are linked to a subscription at all?
-  const { data: orgs, error: oErr } = await db
+  const { data: linked, error: oErr } = await db
     .from('organizations')
-    .select('id, name, stripe_subscription_id')
+    .select('id, name, stripe_subscription_id, seat_limit')
     .in('id', orgIds)
     .not('stripe_subscription_id', 'is', null);
   if (oErr) {
     console.error('[mcp:payer] organizations lookup failed:', oErr.message);
     return { kind: 'unavailable', reason: 'organizations_query_failed' };
   }
-  // ESTABLISHED: member of orgs, none of which is billed. Personal.
-  if (!orgs?.length) return { kind: 'personal' };
+  // Only orgs CONFIGURED for more than one seat can pay for a member's work.
+  const orgs = (linked ?? []).filter((o) => isPoolEligibleConfig(o.seat_limit as number | null));
+  // ESTABLISHED: member of orgs, none of which is a billed multi-seat subscription. Personal.
+  if (!orgs.length) return { kind: 'personal' };
 
-  // 3. The subscription must be ACTIVE and Team-priced *right now*. Re-read rather
-  //    than trusting the org row, so a cancelled Team plan stops paying immediately.
+  // 3. The subscription must be ACTIVE *right now* (any plan). Re-read rather than
+  //    trusting the org row, so a cancelled subscription stops paying immediately.
   const subIds = orgs.map((o) => o.stripe_subscription_id as string);
   const { data: subs, error: sErr } = await db
     .from('stripe_subscriptions')
-    .select('id, status, plan_amount')
-    .in('id', subIds)
-    .eq('status', 'active');
+    .select('id, status')
+    .in('id', subIds);
   if (sErr) {
     console.error('[mcp:payer] stripe_subscriptions lookup failed:', sErr.message);
     return { kind: 'unavailable', reason: 'subscriptions_query_failed' };
   }
-  const activeTeamSubs = new Set(
-    (subs ?? []).filter((s) => TEAM_AMOUNTS.has(Number(s.plan_amount))).map((s) => s.id as string),
-  );
-  const eligibleOrgs = orgs.filter((o) => activeTeamSubs.has(o.stripe_subscription_id as string));
-  // ESTABLISHED: no ACTIVE paid Team context. Personal.
+  const known = new Map((subs ?? []).map((s) => [s.id as string, s.status as string]));
+  // A multi-seat org whose subscription row we cannot see is UNKNOWN, not "inactive":
+  // treating it as personal would bill an individual for work their employer pays for.
+  if (subIds.some((id) => !known.has(id))) {
+    console.error(`[mcp:payer] subscription state unknown for: ${subIds.filter((id) => !known.has(id)).join(',')}`);
+    return { kind: 'unavailable', reason: 'subscription_state_unknown' };
+  }
+  const eligibleOrgs = orgs.filter((o) => known.get(o.stripe_subscription_id as string) === 'active');
+  // ESTABLISHED: the multi-seat subscription exists and is not active. Personal.
   if (!eligibleOrgs.length) return { kind: 'personal' };
 
   // 4. From here the user IS in a paid Team context, so personal is no longer a
@@ -159,7 +162,7 @@ export async function resolvePayer(userEmail: string): Promise<PayerResolution> 
   });
 
   if (withPool.length === 0) {
-    // A paid Team org with no pool is a PROVISIONING GAP, not a personal user.
+    // A paid multi-seat org with no pool is a PROVISIONING GAP, not a personal user.
     // Charging their personal balance here would bill an individual for work their
     // employer has already paid for, because of an operational oversight on our side.
     console.error(`[mcp:payer] eligible Team org(s) have no pool: ${eligibleOrgs.map((o) => o.id).join(',')}`);
