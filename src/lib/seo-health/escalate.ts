@@ -2,27 +2,27 @@
  * Escalation rules. Pure functions over stored history. Nothing escalates on a single
  * observation: every rule needs the same signal across multiple runs or days.
  *
- *   url_persistent       one URL, same our-side failure class in >= 2 of its last 3 crawls
- *   canary_down          a canary page failing our-side checks in 2 consecutive runs
- *   section_failures     a section's crawl failure rate > 5% (min 20 URLs) in this run AND the previous run
- *   gsc_section_drop     a section's Search Console impressions > 40% below its trailing
- *                        28-day daily average for 3 consecutive days (baseline >= 20/day)
- *   google_indexed_drop  share of inspected URLs Google reports as indexed fell > 10 points,
- *                        last 7 days vs the 7 before (>= 50 inspections in each window)
+ *   url_persistent        one URL, same our-side failure class in >= 2 of its last 3 crawls
+ *   canary_down           a canary page failing our-side checks in 2 consecutive runs
+ *   stratum_failures      a stratum's crawl failure rate > 5% (min 20 URLs) in this run AND the previous run
+ *   gsc_stratum_drop      a stratum's Search Console impressions > 40% below its baseline for 3
+ *                         consecutive MATURE calendar days (see stratumImpressionDrop)
+ *   google_indexed_drop   within ONE stratum, Google's indexed share of inspected URLs fell
+ *                         > 10 points, last 7 days vs the 7 before (>= 50 inspections each)
  *
- * Google's indexing decisions are reported as a trend and escalate only through the last
- * rule. A "crawled - not indexed" verdict on one URL is Google's call, not an incident.
+ * Google's indexing decisions are compared only within a stratum. A global indexed share
+ * would move whenever the mix of page types in the sample moves.
  */
-import { CRAWL_FAILURES, type CrawlOutcome, type Outcome } from './types';
+import { CRAWL_FAILURES, type CrawlOutcome, type Outcome, type Stratum } from './types';
 
 export const URL_PERSIST = { window: 3, minHits: 2 };
-export const SECTION_FAILURE_RATE = 0.05;
-export const SECTION_MIN_SAMPLE = 20;
-export const GSC_DROP = { ratio: 0.4, consecutiveDays: 3, baselineDays: 28, minBaselinePerDay: 20 };
+export const STRATUM_FAILURE_RATE = 0.05;
+export const STRATUM_MIN_SAMPLE = 20;
+export const GSC_DROP = { ratio: 0.4, recentDays: 3, baselineDays: 28, minBaselinePerDay: 20, lagDays: 3 };
 export const INDEXED_DROP = { points: 0.1, windowDays: 7, minPerWindow: 50 };
 
 export interface Escalation {
-  rule: 'url_persistent' | 'canary_down' | 'section_failures' | 'gsc_section_drop' | 'google_indexed_drop';
+  rule: 'url_persistent' | 'canary_down' | 'stratum_failures' | 'gsc_stratum_drop' | 'google_indexed_drop';
   severity: 'warning' | 'critical';
   key: string;
   message: string;
@@ -36,6 +36,8 @@ export interface CheckHistoryRow {
 }
 
 const isCrawlFailure = (o: Outcome) => CRAWL_FAILURES.has(o as CrawlOutcome);
+const DAY_MS = 86_400_000;
+const dayStr = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** history: crawl checks for the URLs of interest, any order, including this run. */
 export function urlPersistent(history: CheckHistoryRow[]): Escalation[] {
@@ -68,74 +70,102 @@ export function canaryDown(canaryRuns: Array<Record<string, Outcome>>): Escalati
     .map(([url, o]) => ({ rule: 'canary_down' as const, severity: 'critical' as const, key: url, message: `canary failing 2 runs in a row (${prev[url]} then ${o})`, evidence: { url, now: o, previous: prev[url] } }));
 }
 
-export interface SectionRate { total: number; failures: number }
+export interface StratumRate { total: number; failures: number }
 
-/** Per-section crawl failure counts for this run and the previous run. */
-export function sectionFailures(now: Record<string, SectionRate>, prev: Record<string, SectionRate> | null): Escalation[] {
+/** Per-stratum crawl failure counts for this run and the previous run. */
+export function stratumFailures(now: Partial<Record<Stratum, StratumRate>>, prev: Partial<Record<Stratum, StratumRate>> | null): Escalation[] {
   if (!prev) return [];
-  const bad = (r?: SectionRate) => !!r && r.total >= SECTION_MIN_SAMPLE && r.failures / r.total > SECTION_FAILURE_RATE;
-  return Object.keys(now)
+  const bad = (r?: StratumRate) => !!r && r.total >= STRATUM_MIN_SAMPLE && r.failures / r.total > STRATUM_FAILURE_RATE;
+  return (Object.keys(now) as Stratum[])
     .filter((s) => bad(now[s]) && bad(prev[s]))
     .map((s) => ({
-      rule: 'section_failures' as const,
+      rule: 'stratum_failures' as const,
       severity: 'warning' as const,
       key: s,
-      message: `${s}: ${(100 * now[s].failures / now[s].total).toFixed(1)}% of crawled URLs failing, 2 runs in a row`,
+      message: `${s}: ${(100 * now[s]!.failures / now[s]!.total).toFixed(1)}% of crawled URLs failing, 2 runs in a row`,
       evidence: { now: now[s], previous: prev[s] },
     }));
 }
 
-export interface SectionDay { day: string; section: string; impressions: number }
+/** The last mature day: Search Console data for more recent days is still filling in. */
+export function matureEndDay(nowMs: number, lagDays = GSC_DROP.lagDays): string {
+  return dayStr(nowMs - lagDays * DAY_MS);
+}
 
-/** daily: Search Console rows (any order). Evaluates each section's most recent consecutive days. */
-export function gscSectionDrop(daily: SectionDay[]): Escalation[] {
-  const bySection = new Map<string, Map<string, number>>();
-  for (const r of daily) {
-    const m = bySection.get(r.section) ?? new Map<string, number>();
-    m.set(r.day, (m.get(r.day) ?? 0) + r.impressions);
-    bySection.set(r.section, m);
-  }
-  const out: Escalation[] = [];
-  for (const [section, m] of bySection) {
-    const days = [...m.keys()].sort();
-    if (days.length < GSC_DROP.consecutiveDays + 7) continue; // not enough history to judge
-    const recent = days.slice(-GSC_DROP.consecutiveDays);
-    const base = days.slice(0, -GSC_DROP.consecutiveDays).slice(-GSC_DROP.baselineDays);
-    const baseline = base.reduce((s, d) => s + (m.get(d) ?? 0), 0) / base.length;
-    if (baseline < GSC_DROP.minBaselinePerDay) continue;
+/** Calendar days (YYYY-MM-DD, UTC) ending at `endDay`, oldest first. */
+export function calendar(endDay: string, days: number): string[] {
+  const end = Date.parse(`${endDay}T00:00:00Z`);
+  return Array.from({ length: days }, (_, i) => dayStr(end - (days - 1 - i) * DAY_MS));
+}
+
+export interface StratumDay { day: string; stratum: Stratum; impressions: number }
+
+/**
+ * Search Console impression drop per stratum, over a COMPLETE calendar.
+ *
+ * Call this only with rows from a Search Console response that paginated to completion.
+ * Search Console omits zero-impression (day, page) combinations, so a stratum with no row on a
+ * day had zero impressions that day. That is only true if the query completed, which is why
+ * `complete` must be passed and an incomplete response returns no verdict at all.
+ *
+ * Window: the 3 most recent MATURE days (ending lagDays before today) vs the 28 mature days
+ * before them. A stratum is "established" when that 28-day baseline averages >= 20/day. An
+ * established stratum that vanished entirely (zero rows) is therefore caught.
+ */
+export function stratumImpressionDrop(rows: StratumDay[], opts: { complete: boolean; endDay: string; strata: readonly Stratum[] }): { evaluated: boolean; escalations: Escalation[]; baselines: Partial<Record<Stratum, number>> } {
+  if (!opts.complete) return { evaluated: false, escalations: [], baselines: {} };
+  const days = calendar(opts.endDay, GSC_DROP.baselineDays + GSC_DROP.recentDays);
+  const baseDays = days.slice(0, GSC_DROP.baselineDays);
+  const recentDays = days.slice(GSC_DROP.baselineDays);
+  const byKey = new Map<string, number>();
+  for (const r of rows) byKey.set(`${r.stratum}|${r.day}`, (byKey.get(`${r.stratum}|${r.day}`) ?? 0) + r.impressions);
+  const value = (s: Stratum, d: string) => byKey.get(`${s}|${d}`) ?? 0; // zero-fill: valid only because complete
+
+  const escalations: Escalation[] = [];
+  const baselines: Partial<Record<Stratum, number>> = {};
+  for (const s of opts.strata) {
+    const baseline = baseDays.reduce((sum, d) => sum + value(s, d), 0) / baseDays.length;
+    baselines[s] = Math.round(baseline * 10) / 10;
+    if (baseline < GSC_DROP.minBaselinePerDay) continue; // not established: too small to judge
     const floor = baseline * (1 - GSC_DROP.ratio);
-    if (recent.every((d) => (m.get(d) ?? 0) < floor)) {
-      out.push({
-        rule: 'gsc_section_drop',
+    const recent = recentDays.map((d) => ({ day: d, impressions: value(s, d) }));
+    if (recent.every((r) => r.impressions < floor)) {
+      escalations.push({
+        rule: 'gsc_stratum_drop',
         severity: 'warning',
-        key: section,
-        message: `${section}: impressions below ${Math.round(floor)}/day (40% under the ${Math.round(baseline)}/day baseline) for ${GSC_DROP.consecutiveDays} days`,
-        evidence: { baseline: Math.round(baseline), recent: recent.map((d) => ({ day: d, impressions: m.get(d) ?? 0 })) },
+        key: s,
+        message: `${s}: impressions below ${Math.round(floor)}/day (40% under the ${Math.round(baseline)}/day 28-day baseline) on ${recentDays.length} consecutive mature days ending ${opts.endDay}`,
+        evidence: { baseline: Math.round(baseline), floor: Math.round(floor), recent, window: { baseline: [baseDays[0], baseDays[baseDays.length - 1]], recent: [recentDays[0], recentDays[recentDays.length - 1]] } },
       });
     }
   }
-  return out;
+  return { evaluated: true, escalations, baselines };
 }
 
-export interface InspectionRow { outcome: Outcome; checked_at: string }
+export interface InspectionRow { stratum: Stratum; outcome: Outcome; checked_at: string }
 
-/** inspections: URL Inspection rows from roughly the last 14 days. `now` is injectable for tests. */
-export function googleIndexedDrop(inspections: InspectionRow[], now = Date.now()): Escalation[] {
-  const dayMs = 86_400_000;
-  const w = INDEXED_DROP.windowDays * dayMs;
+export interface StratumIndexShare { stratum: Stratum; current: { share: number | null; n: number }; previous: { share: number | null; n: number } }
+
+/** Indexed share per stratum, this 7-day window vs the previous one. Never mixed across strata. */
+export function indexedShareByStratum(inspections: InspectionRow[], strata: readonly Stratum[], now = Date.now()): StratumIndexShare[] {
+  const w = INDEXED_DROP.windowDays * DAY_MS;
   const valid = inspections.filter((r) => r.outcome !== 'inspection_error');
-  const cur = valid.filter((r) => now - Date.parse(r.checked_at) < w);
-  const prev = valid.filter((r) => { const age = now - Date.parse(r.checked_at); return age >= w && age < 2 * w; });
-  if (cur.length < INDEXED_DROP.minPerWindow || prev.length < INDEXED_DROP.minPerWindow) return [];
-  const share = (rows: InspectionRow[]) => rows.filter((r) => r.outcome === 'indexed').length / rows.length;
-  const a = share(prev);
-  const b = share(cur);
-  if (a - b <= INDEXED_DROP.points) return [];
-  return [{
-    rule: 'google_indexed_drop',
-    severity: 'warning',
-    key: 'indexed_share',
-    message: `Google indexed share of inspected URLs fell from ${(100 * a).toFixed(1)}% to ${(100 * b).toFixed(1)}% week over week`,
-    evidence: { previous: { share: a, n: prev.length }, current: { share: b, n: cur.length } },
-  }];
+  const share = (rows: InspectionRow[]) => ({ share: rows.length ? rows.filter((r) => r.outcome === 'indexed').length / rows.length : null, n: rows.length });
+  return strata.map((stratum) => {
+    const mine = valid.filter((r) => r.stratum === stratum);
+    const age = (r: InspectionRow) => now - Date.parse(r.checked_at);
+    return { stratum, current: share(mine.filter((r) => age(r) < w)), previous: share(mine.filter((r) => age(r) >= w && age(r) < 2 * w)) };
+  });
+}
+
+export function googleIndexedDrop(shares: StratumIndexShare[]): Escalation[] {
+  return shares
+    .filter((s) => s.current.n >= INDEXED_DROP.minPerWindow && s.previous.n >= INDEXED_DROP.minPerWindow && s.previous.share! - s.current.share! > INDEXED_DROP.points)
+    .map((s) => ({
+      rule: 'google_indexed_drop' as const,
+      severity: 'warning' as const,
+      key: s.stratum,
+      message: `${s.stratum}: Google indexed share of inspected URLs fell from ${(100 * s.previous.share!).toFixed(1)}% to ${(100 * s.current.share!).toFixed(1)}% week over week`,
+      evidence: { current: s.current, previous: s.previous },
+    }));
 }

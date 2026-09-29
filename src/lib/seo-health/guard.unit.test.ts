@@ -22,8 +22,8 @@ vi.mock('@vercel/kv', () => { throw new Error('seo-health reached @vercel/kv'); 
 vi.mock('next/cache', () => { throw new Error('seo-health reached next/cache (revalidate)'); });
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const ROUTE = join(SRC, 'app/api/cron/seo-health/route.ts');
-const ALLOWED_TABLES = new Set(['seo_health_runs', 'seo_health_url_checks', 'seo_health_cursors', 'seo_health_section_daily']);
+const ROUTES = [join(SRC, 'app/api/cron/seo-health/route.ts'), join(SRC, 'app/api/cron/seo-health-watchdog/route.ts')];
+const ALLOWED_TABLES = new Set(['seo_health_runs', 'seo_health_url_checks', 'seo_health_cursors', 'seo_health_stratum_daily']);
 
 function resolveImport(from: string, spec: string): string | null {
   let base: string;
@@ -43,10 +43,10 @@ function resolveImport(from: string, spec: string): string | null {
   return null;
 }
 
-function importGraph(entry: string) {
+function importGraph(entries: string[]) {
   const files = new Set<string>();
   const packages = new Set<string>();
-  const stack = [entry];
+  const stack = [...entries];
   while (stack.length) {
     const f = stack.pop()!;
     if (files.has(f)) continue;
@@ -63,12 +63,12 @@ function importGraph(entry: string) {
   return { files: [...files], packages: [...packages] };
 }
 
-describe('seo-health import graph (static)', () => {
-  const graph = importGraph(ROUTE);
+describe('seo-health import graph (static): the job AND its watchdog', () => {
+  const graph = importGraph(ROUTES);
   const rel = graph.files.map((f) => relative(SRC, f));
 
   it('includes the job code it is meant to guard', () => {
-    expect(rel).toEqual(expect.arrayContaining(['app/api/cron/seo-health/route.ts', 'lib/seo-health/run.ts', 'lib/seo-health/store.ts', 'lib/seo-health/observe.ts']));
+    expect(rel).toEqual(expect.arrayContaining(['app/api/cron/seo-health/route.ts', 'app/api/cron/seo-health-watchdog/route.ts', 'lib/seo-health/run.ts', 'lib/seo-health/store.ts', 'lib/seo-health/observe.ts', 'lib/seo-health/watchdog.ts']));
   });
 
   it('never reaches BigQuery, KV, page regeneration, IndexNow, the sitemap generator or cache warmers', () => {
@@ -106,6 +106,7 @@ describe('seo-health at runtime', () => {
   it('runs end to end with only GETs to the public site, read-only Google calls, and seo_health_* writes', async () => {
     // The route module graph imports cleanly with BigQuery/KV/next-cache stubbed to throw.
     await expect(import('@/app/api/cron/seo-health/route')).resolves.toHaveProperty('GET');
+    await expect(import('@/app/api/cron/seo-health-watchdog/route')).resolves.toHaveProperty('GET');
 
     const { runSeoHealth } = await import('./run');
     const { createStore } = await import('./store');
@@ -141,7 +142,7 @@ describe('seo-health at runtime', () => {
     const result = await runSeoHealth({
       fetch: fetchSpy,
       gsc: {
-        datePageRows: async () => [{ keys: ['2026-09-20', 'https://getmindy.ai/a'], clicks: 1, impressions: 10 }],
+        datePageRows: async () => ({ rows: [{ keys: ['2026-09-20', 'https://getmindy.ai/a'], clicks: 1, impressions: 10 }], pages: 1, rowCount: 1, complete: true }),
         inspect: async () => ({ ok: true as const, result: { verdict: 'PASS', coverageState: 'Submitted and indexed' } }),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,7 +177,7 @@ describe('seo-health at runtime', () => {
         crawled.push(url);
         return new Response('', { status: 200 });
       }) as typeof fetch,
-      gsc: { datePageRows: async () => [], inspect: async () => ({ ok: true as const, result: {} }) },
+      gsc: { datePageRows: async () => ({ rows: [], pages: 1, rowCount: 0, complete: true }), inspect: async () => ({ ok: true as const, result: {} }) },
       store,
       postSlack: async () => ({ ok: true }),
       now: Date.now,
@@ -187,19 +188,36 @@ describe('seo-health at runtime', () => {
   });
 });
 
+describe('seo-health routes: header-only auth', () => {
+  it('reject ?password=ADMIN_PASSWORD (secrets never travel in URLs), and a missing or wrong bearer', async () => {
+    process.env.ADMIN_PASSWORD = 'admin-pw';
+    process.env.CRON_SECRET = 'cron-secret';
+    const { NextRequest } = await import('next/server');
+    for (const path of ['@/app/api/cron/seo-health/route', '@/app/api/cron/seo-health-watchdog/route']) {
+      const { GET } = await import(path);
+      const byQuery = await GET(new NextRequest('https://getmindy.ai/api/cron/x?password=admin-pw'));
+      expect({ path, status: byQuery.status }).toEqual({ path, status: 401 });
+      const wrong = await GET(new NextRequest('https://getmindy.ai/api/cron/x', { headers: { authorization: 'Bearer admin-pw' } }));
+      expect({ path, status: wrong.status }).toEqual({ path, status: 401 });
+    }
+    delete process.env.ADMIN_PASSWORD;
+    delete process.env.CRON_SECRET;
+  });
+});
+
 // Minimal in-memory store for the runtime guard.
 function memoryStore() {
   return {
     startRun: async () => 1,
     updateRun: async () => {},
-    loadCursor: async (stream: 'crawl' | 'inspect') => ({ stream, last_url: null, cycle: 0 }),
+    loadCursor: async (stream: 'crawl' | 'inspect', stratum: 'hub') => ({ stream, stratum, last_url: null, cycle: 0 }),
     saveCursor: async () => {},
     insertChecks: async (_id: number, checks: Array<{ url: string }>) => new Set(checks.map((c) => c.url)),
-    upsertSectionDaily: async () => {},
+    upsertStratumDaily: async () => {},
     crawlHistory: async () => [],
     canaryHistory: async () => [],
     previousRunSummary: async () => null,
-    sectionDaily: async () => [],
     inspections: async () => [],
+    latestRuns: async () => [],
   };
 }

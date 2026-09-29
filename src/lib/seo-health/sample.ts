@@ -73,3 +73,10 @@ export function advanceCursor(cursor: Cursor, batch: Batch, completed: ReadonlyS
     advancedBy: k,
   };
 }
+
+/** Split a (sorted) population into per-stratum populations, each still sorted. */
+export function partitionByStratum<S extends string>(population: string[], stratumOf: (url: string) => S, strata: readonly S[]): Record<S, string[]> {
+  const out = Object.fromEntries(strata.map((s) => [s, [] as string[]])) as Record<S, string[]>;
+  for (const url of population) out[stratumOf(url)].push(url);
+  return out;
+}

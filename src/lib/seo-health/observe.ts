@@ -7,7 +7,7 @@
  * generator code, so observing it cannot trigger a sitemap rebuild or a BigQuery scan.
  */
 import { classifyCrawl } from './classify';
-import { CRAWL_USER_AGENT, SITE_ORIGIN, URL_TIMEOUT_MS, sectionOf, type UrlCheck } from './types';
+import { CRAWL_USER_AGENT, SITE_ORIGIN, URL_TIMEOUT_MS, stratumOf, type Stratum, type UrlCheck } from './types';
 
 export type FetchFn = typeof fetch;
 
@@ -47,7 +47,7 @@ export async function fetchSitemapUrls(fetchFn: FetchFn, origin = SITE_ORIGIN): 
 /** GET one URL without following redirects; classify. Never throws. */
 export async function crawlUrl(fetchFn: FetchFn, url: string, extraDetail: Record<string, unknown> = {}): Promise<UrlCheck> {
   const started = Date.now();
-  const base = { url, section: sectionOf(url), source: 'crawl' as const };
+  const base = { url, stratum: stratumOf(url), source: 'crawl' as const };
   try {
     const res = await fetchFn(url, {
       method: 'GET',
@@ -85,20 +85,61 @@ export async function pooled<T, R>(items: T[], concurrency: number, deadline: nu
   return results;
 }
 
-export interface SectionDayRow { day: string; section: string; clicks: number; impressions: number; pages: number }
+export interface StratumDayRow { day: string; stratum: Stratum; clicks: number; impressions: number; pages: number }
 
-/** Search Console date x page rows -> per-day, per-section totals. */
-export function aggregateSections(rows: Array<{ keys: string[]; clicks: number; impressions: number }>): SectionDayRow[] {
-  const agg = new Map<string, SectionDayRow>();
+/** Search Console date x page rows -> per-day, per-stratum totals. */
+export function aggregateStrata(rows: Array<{ keys: string[]; clicks: number; impressions: number }>): StratumDayRow[] {
+  const agg = new Map<string, StratumDayRow>();
   for (const r of rows) {
     const [day, page] = r.keys;
-    const section = sectionOf(page);
-    const k = `${day}|${section}`;
-    const cur = agg.get(k) ?? { day, section, clicks: 0, impressions: 0, pages: 0 };
+    const stratum = stratumOf(page);
+    const k = `${day}|${stratum}`;
+    const cur = agg.get(k) ?? { day, stratum, clicks: 0, impressions: 0, pages: 0 };
     cur.clicks += r.clicks;
     cur.impressions += r.impressions;
     cur.pages += 1;
     agg.set(k, cur);
   }
-  return [...agg.values()].sort((a, b) => (a.day + a.section).localeCompare(b.day + b.section));
+  return [...agg.values()].sort((a, b) => (a.day + a.stratum).localeCompare(b.day + b.stratum));
+}
+
+export type GscRow = { keys: string[]; clicks: number; impressions: number };
+
+export interface PagedGscResult {
+  rows: GscRow[];
+  pages: number;
+  rowCount: number;
+  /** True only when the final page was a partial page and no request failed. */
+  complete: boolean;
+  error?: string;
+}
+
+// Search Console returns at most 25,000 rows per request.
+export const GSC_PAGE_SIZE = 25_000;
+// Hard stop so a runaway pager cannot loop forever; a hit is reported as incomplete.
+export const GSC_MAX_PAGES = 40;
+
+/**
+ * searchAnalytics date x page, paginated with startRow until a final partial page.
+ * Never throws: failures come back as complete=false with the rows fetched so far,
+ * and callers must not compute trends from an incomplete result.
+ */
+export async function fetchDatePageRowsPaged(
+  query: (body: Record<string, unknown>) => Promise<{ rows?: GscRow[] }>,
+  startDate: string,
+  endDate: string,
+  pageSize = GSC_PAGE_SIZE,
+): Promise<PagedGscResult> {
+  const rows: GscRow[] = [];
+  for (let page = 0; page < GSC_MAX_PAGES; page++) {
+    let batch: GscRow[];
+    try {
+      batch = (await query({ startDate, endDate, dimensions: ['date', 'page'], rowLimit: pageSize, startRow: page * pageSize, dataState: 'final' })).rows ?? [];
+    } catch (e) {
+      return { rows, pages: page, rowCount: rows.length, complete: false, error: `page ${page + 1} failed: ${(e as Error).message}` };
+    }
+    rows.push(...batch);
+    if (batch.length < pageSize) return { rows, pages: page + 1, rowCount: rows.length, complete: true };
+  }
+  return { rows, pages: GSC_MAX_PAGES, rowCount: rows.length, complete: false, error: `stopped after ${GSC_MAX_PAGES} full pages` };
 }

@@ -8,9 +8,9 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
-import type { Cursor, Outcome, Stream, UrlCheck } from './types';
+import type { Cursor, Outcome, Stratum, Stream, UrlCheck } from './types';
 
-export const SEO_HEALTH_TABLES = ['seo_health_runs', 'seo_health_url_checks', 'seo_health_cursors', 'seo_health_section_daily'] as const;
+export const SEO_HEALTH_TABLES = ['seo_health_runs', 'seo_health_url_checks', 'seo_health_cursors', 'seo_health_stratum_daily'] as const;
 
 export interface RunRecord {
   status: 'running' | 'ok' | 'partial' | 'failed';
@@ -34,16 +34,17 @@ export interface RunRecord {
 export interface SeoHealthStore {
   startRun(): Promise<number>;
   updateRun(id: number, patch: RunRecord): Promise<void>;
-  loadCursor(stream: Stream): Promise<Cursor>;
+  loadCursor(stream: Stream, stratum: Stratum): Promise<Cursor>;
   saveCursor(cursor: Cursor, runId: number): Promise<void>;
   /** Inserts checks; returns the URLs whose rows were actually written. */
   insertChecks(runId: number, checks: UrlCheck[]): Promise<Set<string>>;
-  upsertSectionDaily(rows: Array<{ day: string; section: string; clicks: number; impressions: number; pages: number }>): Promise<void>;
+  upsertStratumDaily(rows: Array<{ day: string; stratum: Stratum; clicks: number; impressions: number; pages: number }>): Promise<void>;
   crawlHistory(urls: string[], sinceIso: string): Promise<Array<{ url: string; outcome: Outcome; checked_at: string }>>;
   canaryHistory(runs: number): Promise<Array<Record<string, Outcome>>>;
   previousRunSummary(beforeRunId: number): Promise<Record<string, unknown> | null>;
-  sectionDaily(sinceDay: string): Promise<Array<{ day: string; section: string; impressions: number }>>;
-  inspections(sinceIso: string): Promise<Array<{ outcome: Outcome; checked_at: string }>>;
+  inspections(sinceIso: string): Promise<Array<{ stratum: Stratum; outcome: Outcome; checked_at: string }>>;
+  /** Most recent runs, newest first (watchdog). */
+  latestRuns(limit: number): Promise<Array<{ id: number; status: string; started_at: string; finished_at: string | null }>>;
 }
 
 function fail(what: string, error: { message: string }): never {
@@ -63,16 +64,16 @@ export function createStore(db: SupabaseClient): SeoHealthStore {
       if (error) fail('updateRun', error);
     },
 
-    async loadCursor(stream) {
-      const { data, error } = await db.from('seo_health_cursors').select('stream, last_url, cycle').eq('stream', stream).maybeSingle();
+    async loadCursor(stream, stratum) {
+      const { data, error } = await db.from('seo_health_cursors').select('stream, stratum, last_url, cycle').eq('stream', stream).eq('stratum', stratum).maybeSingle();
       if (error) fail('loadCursor', error);
-      return (data as Cursor | null) ?? { stream, last_url: null, cycle: 0 };
+      return (data as Cursor | null) ?? { stream, stratum, last_url: null, cycle: 0 };
     },
 
     async saveCursor(cursor, runId) {
       const { error } = await db
         .from('seo_health_cursors')
-        .upsert({ stream: cursor.stream, last_url: cursor.last_url, cycle: cursor.cycle, updated_at: new Date().toISOString(), updated_by_run: runId }, { onConflict: 'stream' });
+        .upsert({ stream: cursor.stream, stratum: cursor.stratum, last_url: cursor.last_url, cycle: cursor.cycle, updated_at: new Date().toISOString(), updated_by_run: runId }, { onConflict: 'stream,stratum' });
       if (error) fail('saveCursor', error);
     },
 
@@ -87,10 +88,10 @@ export function createStore(db: SupabaseClient): SeoHealthStore {
       return written;
     },
 
-    async upsertSectionDaily(rows) {
+    async upsertStratumDaily(rows) {
       if (!rows.length) return;
-      const { error } = await db.from('seo_health_section_daily').upsert(rows.map((r) => ({ ...r, fetched_at: new Date().toISOString() })), { onConflict: 'day,section' });
-      if (error) fail('upsertSectionDaily', error);
+      const { error } = await db.from('seo_health_stratum_daily').upsert(rows.map((r) => ({ ...r, fetched_at: new Date().toISOString() })), { onConflict: 'day,stratum' });
+      if (error) fail('upsertStratumDaily', error);
     },
 
     async crawlHistory(urls, sinceIso) {
@@ -130,16 +131,16 @@ export function createStore(db: SupabaseClient): SeoHealthStore {
       return (data as { summary: Record<string, unknown> } | null)?.summary ?? null;
     },
 
-    async sectionDaily(sinceDay) {
-      return fetchAllPaged<{ day: string; section: string; impressions: number }>(() =>
-        db.from('seo_health_section_daily').select('day, section, impressions').gte('day', sinceDay).order('day').order('section'),
+    async inspections(sinceIso) {
+      return fetchAllPaged<{ stratum: Stratum; outcome: Outcome; checked_at: string }>(() =>
+        db.from('seo_health_url_checks').select('stratum, outcome, checked_at').eq('source', 'inspect').gte('checked_at', sinceIso).order('id'),
       );
     },
 
-    async inspections(sinceIso) {
-      return fetchAllPaged<{ outcome: Outcome; checked_at: string }>(() =>
-        db.from('seo_health_url_checks').select('outcome, checked_at').eq('source', 'inspect').gte('checked_at', sinceIso).order('id'),
-      );
+    async latestRuns(limit) {
+      const { data, error } = await db.from('seo_health_runs').select('id, status, started_at, finished_at').order('id', { ascending: false }).limit(limit);
+      if (error) fail('latestRuns', error);
+      return (data as Array<{ id: number; status: string; started_at: string; finished_at: string | null }>) ?? [];
     },
   };
 }
