@@ -15,6 +15,14 @@ const sdk = vi.hoisted(() => ({
   rows: [] as unknown[],
 }));
 
+// The SDK below is fully mocked (MockBigQuery), so no network call is possible. This file
+// tests client.ts's retry/label/byte-cap wiring, so it opts out of the live-BigQuery guard
+// (which otherwise refuses the client under Vitest). The bq-CLI/REST tripwire stays active.
+vi.mock('./guard', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./guard')>()),
+  assertLiveBigQueryAllowed: () => {},
+}));
+
 vi.mock('@google-cloud/bigquery', () => ({
   BigQuery: class MockBigQuery {
     constructor(options: typeof sdk.constructorOptions) {

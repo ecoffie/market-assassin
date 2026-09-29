@@ -18,6 +18,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // The unit suite can never reach BigQuery (bq CLI or REST), unconditionally. Live BigQuery
+    // integration tests are *.bq-integration.test.ts, run only by vitest.bq-integration.config.ts.
+    setupFiles: ['./src/test/no-live-bigquery.setup.ts'],
     // Only pick up *.unit.test.ts(x). This deliberately avoids the existing
     // tests/*.test.ts protocol files (keyword-geo-filter.test.ts, office-name-
     // parity.test.mts) that were written for other runners.
@@ -35,7 +38,7 @@ export default defineConfig({
       // Distinct from *.unit.test.ts, which assert on source text and cannot detect a wrong answer.
       'src/mcp/decision-chain/**/*.{seam,live}.test.{ts,tsx}',
     ],
-    exclude: ['node_modules', '.next', 'tests/fixtures', 'scripts'],
+    exclude: ['node_modules', '.next', 'tests/fixtures', 'scripts', '**/*.bq-integration.test.ts'],
     // Keep runs snappy and deterministic for the pre-commit / CI path.
     //
     // ⏱ 10s → 45s (2026-09-21). This is ONE global clock shared by two very different kinds of

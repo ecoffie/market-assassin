@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { assertLiveBigQueryAllowed } from '@/lib/bigquery/guard';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace } from '@/lib/app/workspace';
 import { searchContractors } from '@/lib/contractor-database';
@@ -511,6 +512,8 @@ function mapContractorCandidates(search: string, naics: string, agency: string) 
 }
 
 async function queryBigQueryContacts(search: string, agency: string) {
+  // Raw REST path to BigQuery: same fail-closed guard as the shared client (build / unit suite).
+  assertLiveBigQueryAllowed('relationships contacts REST');
   const credentials = getBigQueryCredentials();
   if (!credentials) return { candidates: [] as RelationshipCandidate[], configured: false };
 

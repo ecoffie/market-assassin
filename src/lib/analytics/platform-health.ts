@@ -27,6 +27,7 @@
  * (which would assert a problem we haven't actually observed in the data).
  */
 import { createClient } from '@supabase/supabase-js';
+import { liveBigQueryBlockReason } from '@/lib/bigquery/guard';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -188,7 +189,12 @@ export async function getPlatformHealth(): Promise<PlatformHealth> {
   //   quota exhausted → UNKNOWN  ("we cannot verify"), never "stale"
   //   query succeeds  → healthy/degraded on the real age
   //   any other error → UNKNOWN with the real message
-  try {
+  // The live-BigQuery guard runs FIRST: before the SDK is loaded and before GCP_SA_JSON is read
+  // or decoded (guard.ts invariant: block before credentials are touched).
+  const guardReason = liveBigQueryBlockReason();
+  if (guardReason) {
+    unmeasured.push({ check: 'BigQuery awards freshness', blockedBy: guardReason });
+  } else try {
     const { BigQuery } = await import('@google-cloud/bigquery');
     // ⚠️ GCP_SA_JSON is stored BASE64-ENCODED in this project (measured: a raw JSON.parse threw
     // `Unexpected token 'e', "ewogICJ0eX"…` — that's `{"ty…` base64'd). Decode when it doesn't

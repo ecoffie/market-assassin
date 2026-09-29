@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "MINDY_BUILD=1 next build",
     "start": "next start",
     "lint": "eslint",
     "build:whitepaper": "node scripts/build-whitepaper-docx.mjs",
@@ -43,6 +43,7 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "test:bq-integration": "RUN_LIVE_BQ_TESTS=1 vitest run --config vitest.bq-integration.config.ts",
     "mcp:dev": "node scripts/mcp-dev.mjs",
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs",

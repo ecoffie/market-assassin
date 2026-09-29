@@ -59,28 +59,47 @@ describe('countNewForecastRows', () => {
 });
 
 const ROOTS = ['src', 'scripts'];
+// Parallel vitest suites create and delete probe files under src/ (verified-sender's
+// __selftest_probe__/) between walk() and read(). Skip the probe dir and anything that
+// vanishes mid-scan, the same fix verified-sender.unit.test.ts already uses.
 function walk(dir: string, out: string[] = []): string[] {
   for (const n of readdirSync(dir)) {
     const p = join(dir, n);
-    if (n === 'node_modules' || n.startsWith('.')) continue;
-    if (statSync(p).isDirectory()) walk(p, out);
+    if (n === 'node_modules' || n.startsWith('.') || n === '__selftest_probe__') continue;
+    let isDir: boolean;
+    try {
+      isDir = statSync(p).isDirectory();
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') continue;
+      throw err;
+    }
+    if (isDir) walk(p, out);
     else if (/\.(ts|tsx|js|mjs|cjs)$/.test(n) && !/\.test\.ts$/.test(n)) out.push(p);
   }
   return out;
 }
 const files = ROOTS.flatMap((r) => walk(join(process.cwd(), r))).map((p) => relative(process.cwd(), p));
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
+// For files found by the scan only: a file deleted since walk() is treated as empty.
+const readScanned = (p: string) => {
+  try {
+    return read(p);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return '';
+    throw err;
+  }
+};
 
 describe('bypass detection — the daily-sync identity cannot be borrowed', () => {
   it('only the sanctioned daily crons declare the daily_sync writer', () => {
     // writer.ts defines the function (and names the call in its own docs) — it is not a caller.
-    const declares = files.filter((p) => p !== 'src/lib/forecasts/writer.ts' && /forecastWriterClient\(\s*['"]daily_sync['"]\s*\)/.test(read(p)));
+    const declares = files.filter((p) => p !== 'src/lib/forecasts/writer.ts' && /forecastWriterClient\(\s*['"]daily_sync['"]\s*\)/.test(readScanned(p)));
     expect(declares.sort()).toEqual([...DAILY_SYNC_WRITERS].sort());
   });
   it('nothing else sets the writer header or the SQL writer setting by hand', () => {
     // (Test files are not scanned: floor-guard.pglite.unit.test.ts sets the header only on its in-process database.)
     const offenders = files.filter((p) => p !== 'src/lib/forecasts/writer.ts'
-      && (read(p).includes(FORECAST_WRITER_HEADER) || /app\.forecast_writer/.test(read(p))));
+      && (readScanned(p).includes(FORECAST_WRITER_HEADER) || /app\.forecast_writer/.test(readScanned(p))));
     expect(offenders).toEqual([]);
   });
   it('every daily writer uses the declared client — no raw createClient left to write forecasts undeclared', () => {

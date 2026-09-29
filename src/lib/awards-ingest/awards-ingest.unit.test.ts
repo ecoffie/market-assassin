@@ -20,7 +20,6 @@ import {
 import {
   buildBqLoadArgs,
   buildStagingLoadPlan,
-  loadCsvsIntoStaging,
 } from './staging-load';
 import { readBoundedCsvFirstRecord, readBoundedCsvFirstRecordVia } from './csv-first-record';
 import { buildStringStagingSchema } from './staging-schema';
@@ -280,68 +279,8 @@ describe('staging schema (deterministic STRING landing)', () => {
   });
 });
 
-const gcpReady = Boolean(process.env.GCP_SA_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS);
-const bqCliReady = (() => {
-  try {
-    const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
-    return spawnSync('bq', ['version'], { encoding: 'utf8' }).status === 0;
-  } catch {
-    return false;
-  }
-})();
+// The LIVE staging-load test moved to staging-load.bq-integration.test.ts (own Vitest process).
 
-describe.skipIf(!gcpReady || !bqCliReady)('staging load integration (two-member export)', () => {
-  const fixtureDir = join(process.cwd(), 'scripts/fixtures/awards-ingest');
-  const PROJECT = 'market-assasin';
-  const TABLE = 'awards_ingest_staging_fixture_test';
-
-  it('loads both CSV members into one complete staging table before MERGE', () => {
-    const paths = [
-      join(fixtureDir, 'two-member-fax-part1.csv'),
-      join(fixtureDir, 'two-member-fax-part2.csv'),
-    ];
-    const schemaPath = join(fixtureDir, '.staging-schema-test.json');
-    const loads: string[][] = [];
-
-    loadCsvsIntoStaging({
-      projectId: PROJECT,
-      dataset: 'usaspending',
-      stagingTable: TABLE,
-      csvPaths: paths,
-      schemaFilePath: schemaPath,
-      execLoad: (args) => {
-        loads.push(args);
-        const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
-        execFileSync('bq', args, { stdio: 'inherit' });
-      },
-    });
-
-    expect(loads).toHaveLength(2);
-    expect(loads[0]).toContain('--replace');
-    expect(loads[1]).toContain('--noreplace');
-    expect(loads.every((args) => !args.includes('--autodetect'))).toBe(true);
-
-    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
-    const countRaw = execFileSync('bq', [
-      '--project_id=' + PROJECT,
-      'query',
-      '--nouse_legacy_sql',
-      '--format=csv',
-      `SELECT COUNT(*) AS rows FROM \`${PROJECT}.usaspending.${TABLE}\``,
-    ], { encoding: 'utf8' });
-    expect(countRaw.trim().split('\n').pop()).toBe('2');
-
-    const faxRaw = execFileSync('bq', [
-      '--project_id=' + PROJECT,
-      'query',
-      '--nouse_legacy_sql',
-      '--format=csv',
-      `SELECT recipient_fax_number FROM \`${PROJECT}.usaspending.${TABLE}\` ORDER BY contract_transaction_unique_key`,
-    ], { encoding: 'utf8' });
-    const faxValues = faxRaw.trim().split('\n').slice(1);
-    expect(faxValues).toEqual(['6264402724', '(626) 440-2724']);
-  }, 120_000);
-});
 
 describe('recipients rebuild SQL', () => {
   it('matches the recipients sections in the gold-master build SQL exactly', () => {
