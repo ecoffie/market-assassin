@@ -630,7 +630,7 @@ export function routeSubscriptionGrants(
 /** True when an error means the pooled-credits migration has not been applied yet. */
 export function isPoolSchemaMissing(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
-  return /seat_limit|pool_monthly_credits|mcp_pool_grants|mcp_replenish_pool/.test(msg)
+  return /seat_limit|pool_monthly_credits|mcp_pool_credit_grants|mcp_replenish_pool/.test(msg)
     && /(does not exist|could not find|not find the|schema cache)/i.test(msg);
 }
 

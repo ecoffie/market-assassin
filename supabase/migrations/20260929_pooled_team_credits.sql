@@ -12,7 +12,9 @@
 --   2. org_member_invites — explicit, owner-issued, single-use invites. Billing
 --      membership is only ever created by an invitee accepting one while signed in
 --      as the invited address. Never inferred from an email domain.
---   3. mcp_pool_grants — the idempotency + audit table for every credit that ENTERS
+--   3. mcp_pool_credit_grants — (NOT mcp_pool_grants: an empty table of that name is
+--      left over in prod from the retired 20260909_mcp_grant_pool.sql and is untouched)
+--      the idempotency + audit table for every credit that ENTERS
 --      a pool (monthly replenishment, the one-time Team migration). A pool has no
 --      user_email, so mcp_credit_topups (user_email NOT NULL) cannot key it.
 --   4. mcp_replenish_pool() — monthly top-up to the pool's allowance. Mirrors the
@@ -79,7 +81,7 @@ CREATE POLICY org_member_invites_service ON org_member_invites
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- 3. Pool grant claims + audit ------------------------------------------------------
-CREATE TABLE IF NOT EXISTS mcp_pool_grants (
+CREATE TABLE IF NOT EXISTS mcp_pool_credit_grants (
   idempotency_key TEXT PRIMARY KEY,
   pool_id         UUID NOT NULL REFERENCES mcp_credit_pool(pool_id) ON DELETE RESTRICT,
   credits         INTEGER NOT NULL DEFAULT 0 CHECK (credits >= 0),
@@ -88,13 +90,13 @@ CREATE TABLE IF NOT EXISTS mcp_pool_grants (
   details         JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_mcp_pool_grants_pool
-  ON mcp_pool_grants (pool_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_pool_credit_grants_pool
+  ON mcp_pool_credit_grants (pool_id, created_at DESC);
 
-ALTER TABLE mcp_pool_grants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE mcp_pool_grants FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS mcp_pool_grants_service ON mcp_pool_grants;
-CREATE POLICY mcp_pool_grants_service ON mcp_pool_grants
+ALTER TABLE mcp_pool_credit_grants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mcp_pool_credit_grants FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS mcp_pool_credit_grants_service ON mcp_pool_credit_grants;
+CREATE POLICY mcp_pool_credit_grants_service ON mcp_pool_credit_grants
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- 4. Monthly replenishment ------------------------------------------------------------
@@ -125,7 +127,7 @@ BEGIN
   END IF;
 
   v_claim := p_key || ':c' || p_ceiling::TEXT;
-  INSERT INTO mcp_pool_grants(idempotency_key, pool_id, credits, reason)
+  INSERT INTO mcp_pool_credit_grants(idempotency_key, pool_id, credits, reason)
   VALUES (v_claim, p_pool_id, 0, p_reason)
   ON CONFLICT (idempotency_key) DO NOTHING;
   IF NOT FOUND THEN
@@ -136,7 +138,7 @@ BEGIN
   -- Never stacked, never refilled by spending: bounded by what this month already
   -- granted under ANY ceiling, and by the pool's actual shortfall.
   SELECT COALESCE(SUM(credits), 0) INTO v_granted_this_month
-    FROM mcp_pool_grants
+    FROM mcp_pool_credit_grants
    WHERE pool_id = p_pool_id
      AND idempotency_key LIKE p_key || ':c%';
 
@@ -155,7 +157,7 @@ BEGIN
    WHERE pool_id = p_pool_id
   RETURNING balance INTO v_balance;
 
-  UPDATE mcp_pool_grants SET credits = v_short WHERE idempotency_key = v_claim;
+  UPDATE mcp_pool_credit_grants SET credits = v_short WHERE idempotency_key = v_claim;
 
   INSERT INTO mcp_credit_ledger(user_email, delta, reason, balance_after, charged_pool_id)
   VALUES ('pool:' || p_pool_id::TEXT, v_short, p_reason, v_balance, p_pool_id);
@@ -181,7 +183,7 @@ BEGIN
     RAISE EXCEPTION 'mcp_transfer_personal_to_pool: amount must be positive (got %)', p_amount;
   END IF;
 
-  INSERT INTO mcp_pool_grants(idempotency_key, pool_id, credits, reason, source_email, details)
+  INSERT INTO mcp_pool_credit_grants(idempotency_key, pool_id, credits, reason, source_email, details)
   VALUES (p_key, p_pool_id, 0, 'pool_migration_in', lower(p_user), COALESCE(p_details, '{}'::jsonb))
   ON CONFLICT (idempotency_key) DO NOTHING;
   IF NOT FOUND THEN
@@ -223,7 +225,7 @@ BEGIN
   INSERT INTO mcp_credit_ledger(user_email, delta, reason, balance_after, charged_pool_id, actor_email)
   VALUES ('pool:' || p_pool_id::TEXT, p_amount, 'pool_migration_in', v_pool, p_pool_id, lower(p_user));
 
-  UPDATE mcp_pool_grants SET credits = p_amount WHERE idempotency_key = p_key;
+  UPDATE mcp_pool_credit_grants SET credits = p_amount WHERE idempotency_key = p_key;
 
   RETURN QUERY SELECT true, p_amount, v_personal, v_pool;
 END $$;
