@@ -15,6 +15,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * `?full=1` runs the old customers-then-subscriptions path (a periodic deep sync
  * to catch customers with no active subscription).
  *
+ * RECONCILIATION ONLY for stripe_subscriptions: the webhook and pooled-org provisioning
+ * mirror a subscription immediately (src/lib/stripe/subscription-mirror.ts). A new pooled
+ * subscription must never depend on this daily run to become usable.
+ *
  * Reuses /api/admin/backfill-stripe so there's ONE sync implementation. Fired by
  * the dispatcher (cron_jobs row) — never a vercel.json cron.
  *

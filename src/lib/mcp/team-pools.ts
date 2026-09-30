@@ -22,6 +22,7 @@ import { readAllPages } from '@/lib/paged-read';
 import { createHash, randomBytes } from 'crypto';
 import { getCountClient, getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { POOLED_PLAN_DEFAULTS } from './packages';
+import { mirrorSubscription, type MirrorResult } from '@/lib/stripe/subscription-mirror';
 
 export const TEAM_OWNER_ROLE = 'team_owner';
 export const TEAM_MEMBER_ROLE = 'team_member';
@@ -169,6 +170,8 @@ export interface ProvisionResult {
   created: boolean;
   seatLimit: number;
   monthlyCredits: number;
+  /** The subscription mirror write done as part of provisioning (the pool is only usable once it lands). */
+  mirror: MirrorResult;
 }
 
 /**
@@ -262,7 +265,12 @@ export async function provisionPooledOrg(input: ProvisionInput): Promise<Provisi
   const poolId = pools.get(orgId);
   if (!poolId) throw new Error('provisionPooledOrg: pool missing after create');
 
-  return { orgId, poolId, created, seatLimit: finalSeats, monthlyCredits: finalCredits };
+  // The payer only lets a pool spend once it can SEE the subscription as active, so a
+  // provisioned pool must not wait for the daily Stripe sync. Mirror it now, from Stripe.
+  const mirror = await mirrorSubscription(input.subscriptionId);
+  if (!mirror.ok) console.error(`[team-pools] subscription mirror failed for ${input.subscriptionId}:`, mirror.error ?? mirror.skipped);
+
+  return { orgId, poolId, created, seatLimit: finalSeats, monthlyCredits: finalCredits, mirror };
 }
 
 // ── Membership ──────────────────────────────────────────────────────────────────
