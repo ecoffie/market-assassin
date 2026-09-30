@@ -7,6 +7,7 @@
  * link graph.
  */
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
@@ -14,9 +15,10 @@ import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRollupBySlug,
   resolveCanonicalSlug,
-  getAllNaicsForRecipient,
+  getAllNaicsForRecipientWithState,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
+import { decideSubpage } from '@/lib/seo/subpage-contract';
 import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
@@ -40,26 +42,38 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+/**
+ * One load per request, shared by generateMetadata and the page body, so `robots`, the
+ * description and the rendered table can never disagree. Cache-only (no BigQuery).
+ */
+const loadNaicsSubpage = cache(async (slug: string) => {
+  const recipient = await getRollupBySlug(slug);
+  if (!recipient) return null;
+  const { rows, state } = await getAllNaicsForRecipientWithState(recipient.child_ueis, recipient.rollup_uei);
+  return { recipient, rows, decision: decideSubpage(state, rows.length, SUBPAGE_MIN_ROWS) };
+});
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) return { title: 'Contractor Not Found | Mindy' };
+  const loaded = await loadNaicsSubpage(slug);
+  if (!loaded) return { title: 'Contractor Not Found | Mindy' };
+  const { recipient, decision } = loaded;
 
   const name = fmtCompanyName(recipient.rollup_name);
   const title = `${name} NAICS Codes & Industry Activity | Mindy`;
-  const description = `${name} federal contract activity across ${recipient.distinct_naics_count} NAICS codes. See industry concentration, top codes, and award totals.`;
-
-  // Thin-content gate on the PARENT-rollup NAICS count: fewer than
-  // SUBPAGE_MIN_ROWS codes renders a near-empty table Google parks as
-  // "Crawled - currently not indexed". noindex,follow keeps it out of the
-  // index while preserving links to NAICS landing pages.
-  const isThin = (recipient.distinct_naics_count || 0) < SUBPAGE_MIN_ROWS;
+  // Claim a count ONLY when it is the rendered table's. The stored aggregate is never a
+  // headline: it stays confident while the row cache is cold (subpage-contract.ts).
+  const description = decision.headlineCount !== null
+    ? `${name} federal contract activity across ${decision.headlineCount} NAICS codes. See industry concentration, top codes, and award totals.`
+    : `${name} federal contracting by NAICS code. The detailed industry breakdown is being refreshed — see the contractor profile for totals and top agencies.`;
   const canonical = recipient.canonical_slug;
 
   return {
     title,
     description,
-    robots: isThin ? { index: false, follow: true } : undefined,
+    // noindex,follow unless the page renders a real, non-thin table. follow keeps equity
+    // flowing to the parent profile and NAICS landing pages.
+    robots: decision.indexable ? undefined : { index: false, follow: true },
     alternates: { canonical: `${SITE_URL}/contractors/${canonical}/naics` },
     openGraph: {
       title,
@@ -73,17 +87,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorNaicsPage({ params }: PageProps) {
   const { slug } = await params;
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) {
+  const loaded = await loadNaicsSubpage(slug);
+  if (!loaded) {
     const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
     if (canonical) permanentRedirect(`/contractors/${canonical}/naics`);
     notFound();
   }
+  const { recipient, rows: naicsRows, decision } = loaded;
   if (recipient.canonical_slug !== slug) {
     permanentRedirect(`/contractors/${recipient.canonical_slug}/naics`);
   }
-
-  const naicsRows = await getAllNaicsForRecipient(recipient.child_ueis, recipient.rollup_uei);
   const displayName = fmtCompanyName(recipient.rollup_name);
   const slugForLinks = recipient.canonical_slug;
 
@@ -112,47 +125,64 @@ export default async function ContractorNaicsPage({ params }: PageProps) {
       >
         <header className="mb-6">
           <h2 className="text-2xl font-bold">NAICS Codes & Industry Activity</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            All {recipient.distinct_naics_count} NAICS codes where {displayName} has federal contracting activity, sorted by total dollars.
-          </p>
+          {decision.headlineCount !== null && (
+            <p className="mt-1 text-sm text-slate-400">
+              {decision.headlineCount} NAICS {decision.headlineCount === 1 ? 'code' : 'codes'} where {displayName} has federal contracting activity, sorted by total dollars.
+            </p>
+          )}
         </header>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
-              <tr>
-                <th className="text-left px-4 py-3">NAICS</th>
-                <th className="text-left px-4 py-3">Industry</th>
-                <th className="text-right px-4 py-3">Awards</th>
-                <th className="text-right px-4 py-3">Total Obligated</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {naicsRows.map((n) => {
-                const codeContent = LINKABLE_NAICS.has(n.naics_code) ? (
-                  <Link href={`/naics/${n.naics_code}`} className="hover:text-purple-400">
-                    {n.naics_code}
-                  </Link>
-                ) : (
-                  n.naics_code
-                );
-                return (
-                  <tr key={n.naics_code} className="hover:bg-slate-800/40">
-                    <td className="px-4 py-3 font-mono text-slate-200">{codeContent}</td>
-                    <td className="px-4 py-3 text-slate-300">{n.naics_description || '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">{n.award_count.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
-                      {fmtMoney(Number(n.total_amount))}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {decision.showTable && (
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="text-left px-4 py-3">NAICS</th>
+                  <th className="text-left px-4 py-3">Industry</th>
+                  <th className="text-right px-4 py-3">Awards</th>
+                  <th className="text-right px-4 py-3">Total Obligated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {naicsRows.map((n) => {
+                  const codeContent = LINKABLE_NAICS.has(n.naics_code) ? (
+                    <Link href={`/naics/${n.naics_code}`} className="hover:text-purple-400">
+                      {n.naics_code}
+                    </Link>
+                  ) : (
+                    n.naics_code
+                  );
+                  return (
+                    <tr key={n.naics_code} className="hover:bg-slate-800/40">
+                      <td className="px-4 py-3 font-mono text-slate-200">{codeContent}</td>
+                      <td className="px-4 py-3 text-slate-300">{n.naics_description || '—'}</td>
+                      <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">{n.award_count.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                        {fmtMoney(Number(n.total_amount))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        {naicsRows.length === 0 && (
-          <p className="mt-6 text-slate-400 text-sm">No NAICS data available.</p>
+        {decision.notice === 'unavailable' && (
+          <div data-subpage-state="unavailable" className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-300">
+            <p>The full NAICS breakdown for {displayName} is being refreshed and isn&apos;t available right now.</p>
+            <p className="mt-2">
+              <Link href={`/contractors/${slugForLinks}`} className="text-purple-400 hover:text-purple-300">
+                See {displayName}&apos;s contractor profile
+              </Link>{' '}
+              for its federal award totals, top agencies and leading NAICS codes.
+            </p>
+          </div>
+        )}
+        {decision.notice === 'none' && (
+          <p data-subpage-state="none" className="text-slate-400 text-sm">
+            No NAICS-coded federal awards are recorded for {displayName} in this dataset.
+          </p>
         )}
 
         {/* CTA */}

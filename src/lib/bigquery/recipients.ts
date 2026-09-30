@@ -11,7 +11,7 @@
  * doesn't have to recompute when only the awards list changed.
  */
 import { BQ_TABLES, bqQuery } from './client';
-import { queryCached } from './cache';
+import { queryCached, bqResultState, type BqResultState } from './cache';
 import { bqUnavailable } from './cache';
 import { readServedPage } from '../awards-serving';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
@@ -1128,6 +1128,15 @@ export async function getPaginatedAwardsForRecipient(
 }
 
 /**
+ * Cache keys for the FULL sub-page datasets (/contractors/[slug]/naics and /agencies).
+ * One definition, used by the readers below, by the pages' state check, and by the
+ * sitemap's row-count probe (src/lib/seo/subpage-row-counts.ts). If these ever diverge,
+ * the sitemap asserts pages the renderer cannot fill — the defect this exists to prevent.
+ */
+export const allNaicsCacheKey = (rollupUei: string) => `rollup:${rollupUei}:all-naics:v2-m`;
+export const allAgenciesCacheKey = (rollupUei: string) => `rollup:${rollupUei}:all-agencies:v4-m`;
+
+/**
  * Full NAICS breakdown for a recipient — used on /contractors/[slug]/naics.
  * Returns all NAICS the contractor has activity in, not just top N.
  */
@@ -1136,7 +1145,7 @@ export async function getAllNaicsForRecipient(
   rollupUei: string,
 ): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
-    cacheKey: `rollup:${rollupUei}:all-naics:v2-m`,
+    cacheKey: allNaicsCacheKey(rollupUei),
     query: `
       SELECT
         naics_code,
@@ -1154,6 +1163,20 @@ export async function getAllNaicsForRecipient(
 }
 
 /**
+ * The rows PLUS what they mean. `rows.length === 0` alone is ambiguous: a cold cache
+ * (live BQ disabled) and a genuinely empty dataset both return []. Pages must decide
+ * indexing and copy from `state`, never from a stored aggregate count.
+ * Must be read immediately after the reader resolves (bqResultState contract).
+ */
+export async function getAllNaicsForRecipientWithState(
+  ueis: string[],
+  rollupUei: string,
+): Promise<{ rows: TopNaicsRow[]; state: BqResultState }> {
+  const rows = await getAllNaicsForRecipient(ueis, rollupUei);
+  return { rows, state: bqResultState(allNaicsCacheKey(rollupUei), rows.length) };
+}
+
+/**
  * Full agency breakdown for a recipient — used on /contractors/[slug]/agencies.
  * Returns all agencies, not just top N. Caller can paginate display-side.
  */
@@ -1162,7 +1185,7 @@ export async function getAllAgenciesForRecipient(
   rollupUei: string,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `rollup:${rollupUei}:all-agencies:v4-m`,
+    cacheKey: allAgenciesCacheKey(rollupUei),
     // Heaviest query on the site (82% of daily BQ scan per
     // INFORMATION_SCHEMA). Two fixes vs. the original:
     //  1) removed the correlated `WITH totals` subquery that scanned
@@ -1191,6 +1214,15 @@ export async function getAllAgenciesForRecipient(
     params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
+}
+
+/** See getAllNaicsForRecipientWithState. */
+export async function getAllAgenciesForRecipientWithState(
+  ueis: string[],
+  rollupUei: string,
+): Promise<{ rows: TopAgencyRow[]; state: BqResultState }> {
+  const rows = await getAllAgenciesForRecipient(ueis, rollupUei);
+  return { rows, state: bqResultState(allAgenciesCacheKey(rollupUei), rows.length) };
 }
 
 export async function getYearlyByAgencyForRecipient(

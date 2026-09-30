@@ -8,6 +8,7 @@
  * was missing.
  */
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
@@ -15,9 +16,10 @@ import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRollupBySlug,
   resolveCanonicalSlug,
-  getAllAgenciesForRecipient,
+  getAllAgenciesForRecipientWithState,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
+import { decideSubpage } from '@/lib/seo/subpage-contract';
 import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 
@@ -45,27 +47,37 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+/**
+ * One load per request, shared by generateMetadata and the page body, so `robots`, the
+ * description and the rendered table can never disagree. Cache-only (no BigQuery).
+ */
+const loadAgenciesSubpage = cache(async (slug: string) => {
+  const recipient = await getRollupBySlug(slug);
+  if (!recipient) return null;
+  const { rows, state } = await getAllAgenciesForRecipientWithState(recipient.child_ueis, recipient.rollup_uei);
+  return { recipient, rows, decision: decideSubpage(state, rows.length, SUBPAGE_MIN_ROWS) };
+});
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) return { title: 'Contractor Not Found | Mindy' };
+  const loaded = await loadAgenciesSubpage(slug);
+  if (!loaded) return { title: 'Contractor Not Found | Mindy' };
+  const { recipient, decision } = loaded;
 
   const name = fmtCompanyName(recipient.rollup_name);
   const title = `${name} Federal Agency Customers | Mindy`;
-  const description = `${recipient.distinct_agency_count} federal agencies have awarded ${name} contracts. See top customers, agency-by-agency breakdown, and award totals.`;
-
-  // Thin-content gate: an org with fewer than SUBPAGE_MIN_ROWS agencies renders
-  // a near-empty table. The gate now reads the PARENT-rollup agency count, so
-  // primes like Lockheed (27 agencies) correctly clear it instead of being
-  // suppressed by per-UEI scatter. noindex,follow keeps genuinely thin pages
-  // out of the index while letting Google walk links to agency profile pages.
-  const isThin = (recipient.distinct_agency_count || 0) < SUBPAGE_MIN_ROWS;
+  // Claim a count ONLY when it is the rendered table's (subpage-contract.ts).
+  const description = decision.headlineCount !== null
+    ? `${decision.headlineCount} federal agencies have awarded ${name} contracts. See top customers, agency-by-agency breakdown, and award totals.`
+    : `${name} federal agency customers. The agency-by-agency breakdown is being refreshed — see the contractor profile for totals and top agencies.`;
   const canonical = recipient.canonical_slug;
 
   return {
     title,
     description,
-    robots: isThin ? { index: false, follow: true } : undefined,
+    // noindex,follow unless the page renders a real, non-thin table. follow keeps equity
+    // flowing to the parent profile and agency profile pages.
+    robots: decision.indexable ? undefined : { index: false, follow: true },
     alternates: { canonical: `${SITE_URL}/contractors/${canonical}/agencies` },
     openGraph: {
       title,
@@ -79,17 +91,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorAgenciesPage({ params }: PageProps) {
   const { slug } = await params;
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) {
+  const loaded = await loadAgenciesSubpage(slug);
+  if (!loaded) {
     const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
     if (canonical) permanentRedirect(`/contractors/${canonical}/agencies`);
     notFound();
   }
+  const { recipient, rows: agencies, decision } = loaded;
   if (recipient.canonical_slug !== slug) {
     permanentRedirect(`/contractors/${recipient.canonical_slug}/agencies`);
   }
-
-  const agencies = await getAllAgenciesForRecipient(recipient.child_ueis, recipient.rollup_uei);
   const displayName = fmtCompanyName(recipient.rollup_name);
   const slugForLinks = recipient.canonical_slug;
 
@@ -118,45 +129,62 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
       >
         <header className="mb-6">
           <h2 className="text-2xl font-bold">Federal Agency Customers</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            All {recipient.distinct_agency_count} federal agencies that have awarded contracts to {displayName}, sorted by total dollars.
-          </p>
+          {decision.headlineCount !== null && (
+            <p className="mt-1 text-sm text-slate-400">
+              {decision.headlineCount} federal {decision.headlineCount === 1 ? 'agency has' : 'agencies have'} awarded contracts to {displayName}, sorted by total dollars.
+            </p>
+          )}
         </header>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
-              <tr>
-                <th className="text-left px-4 py-3">Agency</th>
-                <th className="text-right px-4 py-3">% of Total</th>
-                <th className="text-right px-4 py-3">Total Obligated</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {agencies.map((a) => (
-                <tr key={a.awarding_agency} className="hover:bg-slate-800/40">
-                  <td className="px-4 py-3 text-slate-200">
-                    <Link
-                      href={`/agencies/${agencySlug(a.awarding_agency)}`}
-                      className="hover:text-purple-400"
-                    >
-                      {a.awarding_agency}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">
-                    {(Number(a.pct_of_total) * 100).toFixed(1)}%
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
-                    {fmtMoney(Number(a.total_amount))}
-                  </td>
+        {decision.showTable && (
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="text-left px-4 py-3">Agency</th>
+                  <th className="text-right px-4 py-3">% of Total</th>
+                  <th className="text-right px-4 py-3">Total Obligated</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {agencies.map((a) => (
+                  <tr key={a.awarding_agency} className="hover:bg-slate-800/40">
+                    <td className="px-4 py-3 text-slate-200">
+                      <Link
+                        href={`/agencies/${agencySlug(a.awarding_agency)}`}
+                        className="hover:text-purple-400"
+                      >
+                        {a.awarding_agency}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">
+                      {(Number(a.pct_of_total) * 100).toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                      {fmtMoney(Number(a.total_amount))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        {agencies.length === 0 && (
-          <p className="mt-6 text-slate-400 text-sm">No agency data available.</p>
+        {decision.notice === 'unavailable' && (
+          <div data-subpage-state="unavailable" className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-300">
+            <p>The agency-by-agency breakdown for {displayName} is being refreshed and isn&apos;t available right now.</p>
+            <p className="mt-2">
+              <Link href={`/contractors/${slugForLinks}`} className="text-purple-400 hover:text-purple-300">
+                See {displayName}&apos;s contractor profile
+              </Link>{' '}
+              for its federal award totals and top agency customers.
+            </p>
+          </div>
+        )}
+        {decision.notice === 'none' && (
+          <p data-subpage-state="none" className="text-slate-400 text-sm">
+            No agency-attributed federal awards are recorded for {displayName} in this dataset.
+          </p>
         )}
 
         {/* CTA */}
