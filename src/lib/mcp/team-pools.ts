@@ -20,7 +20,7 @@
  */
 import { readAllPages } from '@/lib/paged-read';
 import { createHash, randomBytes } from 'crypto';
-import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
+import { getCountClient, getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { POOLED_PLAN_DEFAULTS } from './packages';
 
 export const TEAM_OWNER_ROLE = 'team_owner';
@@ -303,7 +303,9 @@ export interface SeatUsage {
 
 /** Seats in use = active team members + unexpired pending invites. */
 export async function seatUsage(orgId: string): Promise<SeatUsage> {
-  const db = getReadClient();
+  // HEAD-only counts MUST use the primary: the read replica rejects every HEAD with an
+  // empty 400, which broke every production invite (found by the billing canary).
+  const db = getCountClient();
   const { count: active, error: aErr } = await db
     .from('org_members')
     .select('id', { count: 'exact', head: true })
