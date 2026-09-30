@@ -29,6 +29,8 @@ import { getServedContractsUeis } from '@/lib/awards-serving';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
+import { getSubpageRowCounts } from '@/lib/seo/subpage-row-counts';
+import { subpageSitemapEligible } from '@/lib/seo/subpage-contract';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { COMPETITORS } from '@/data/competitors';
@@ -190,6 +192,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // ignore. Only recipients with a live page-1 serving row are asserted.
   const servedUeis = await getServedContractsUeis();
 
+  // NAICS / AGENCY TAB GATE (2026-09-30). The tabs used to emit when the profile's STORED
+  // aggregate (distinct_naics_count / distinct_agency_count) cleared SUBPAGE_MIN_ROWS — but the
+  // pages render from a separate `all-naics` / `all-agencies` cache key that nothing warmed, so
+  // all 12,985 advertised tabs rendered an empty table. Emit a tab only when the renderer's own
+  // row cache holds >= SUBPAGE_MIN_ROWS rows: the same predicate the page uses for `indexable`.
+  // KV EVAL_RO only (row counts, no payloads, no BigQuery); fails closed.
+  const tabUeis = recipients.map((c) => c.rollup_uei).filter((u): u is string => !!u);
+  const [naicsRowCounts, agencyRowCounts] = await Promise.all([
+    getSubpageRowCounts('naics', tabUeis),
+    getSubpageRowCounts('agencies', tabUeis),
+  ]);
+
   for (const c of recipients) {
     if (!c.recipient_name) continue;
     const slug = recipientSlug(c.recipient_name);
@@ -254,8 +268,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const subPagePriority = Math.max(priority - 0.1, 0.2);
     const tabs: string[] = [];
     if (servedUeis.has(c.rollup_uei)) tabs.push('contracts');
-    if ((c.distinct_agency_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('agencies');
-    if ((c.distinct_naics_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('naics');
+    if (subpageSitemapEligible(agencyRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) tabs.push('agencies');
+    if (subpageSitemapEligible(naicsRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) tabs.push('naics');
     for (const tab of tabs) {
       contractorEntries.push({
         url: `${SITE_URL}/contractors/${slug}/${tab}`,
