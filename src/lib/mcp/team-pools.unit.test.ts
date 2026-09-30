@@ -5,10 +5,11 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@/lib/supabase/server-clients', () => ({ getReadClient: vi.fn(), getWriteClient: vi.fn() }));
+vi.mock('@/lib/supabase/server-clients', () => ({ getReadClient: vi.fn(), getWriteClient: vi.fn(), getCountClient: vi.fn() }));
 
+import { getCountClient, getReadClient } from '@/lib/supabase/server-clients';
 import {
-  routeSubscriptionGrants, subscriptionIdFromInvoice, isPoolSchemaMissing, poolReplenishKey,
+  seatUsage, routeSubscriptionGrants, subscriptionIdFromInvoice, isPoolSchemaMissing, poolReplenishKey,
   hashInviteToken, isPoolEligibleConfig, type PooledOrg,
 } from './team-pools';
 import { computeTeamEntitlement, planTeamTransfer } from './team-pool-migration';
@@ -111,5 +112,27 @@ describe('computeTeamEntitlement (migration attribution)', () => {
     const r = computeTeamEntitlement([{ created_at: '2026-08-01', delta: 1000, reason: 'app_tier_team' }], isTeam);
     const plan = planTeamTransfer(r, 600, 0); // live balance disagrees with the replay
     expect(plan).toMatchObject({ amount: 600, replayMismatch: true });
+  });
+});
+
+describe('seatUsage', () => {
+  // A chainable PostgREST stand-in that resolves every HEAD count to `result`.
+  const client = (result: { count: number | null; error: { message: string } | null }) => {
+    const b: Record<string, unknown> = {};
+    for (const m of ['from', 'select', 'eq', 'in', 'gt']) b[m] = () => b;
+    b.then = (resolve: (r: typeof result) => unknown) => resolve(result);
+    return b as never;
+  };
+
+  it('counts on the PRIMARY: the read replica rejects every HEAD with an empty 400', async () => {
+    // What the replica really returns for a head count (measured on prod 2026-09-30).
+    vi.mocked(getReadClient).mockReturnValue(client({ count: null, error: { message: '' } }));
+    vi.mocked(getCountClient).mockReturnValue(client({ count: 1, error: null }));
+    expect(await seatUsage('org-1')).toEqual({ active: 1, pending: 1, used: 2 });
+  });
+
+  it('a null count is unknown, never zero', async () => {
+    vi.mocked(getCountClient).mockReturnValue(client({ count: null, error: null }));
+    await expect(seatUsage('org-1')).rejects.toThrow('seat count unknown');
   });
 });
