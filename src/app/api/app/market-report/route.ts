@@ -27,6 +27,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { recordSearchAxes } from '@/lib/search-history';
+import { hasPaidProductTier } from '@/lib/access/tier-rank';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -62,7 +63,8 @@ export async function POST(request: NextRequest) {
   // Tier gate: generating is Pro (real compute). Free tier → 402 teaser the UI
   // renders as the upgrade wall. Reading a report (/reports/<id>) stays free.
   const access = await verifyMIAccess(email);
-  const isPro = access.tier === 'pro' || access.isStaff === true;
+  // Pro OR ABOVE: Team and Enterprise inherit every Pro capability.
+  const isPro = hasPaidProductTier(access.tier) || access.isStaff === true;
   if (!isPro) {
     return NextResponse.json(
       {

@@ -27,6 +27,7 @@ import { verifyMIAccess } from '@/lib/api-auth';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import primeDb from '@/data/prime-contractors-database.json';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { hasPaidProductTier } from '@/lib/access/tier-rank';
 
 /** Distinct federal agencies BUYING this market (USASpending). Scopes on PSC ("what was bought")
  *  when a specific/dominant PSC is in hand — else the NAICS set. Best-effort — an external hiccup
@@ -397,7 +398,7 @@ export async function GET(request: NextRequest) {
 
   // 3) Viewer tier — counts + $ are free for everyone; tier only tells the UI
   //    whether to render the locked-chip CTA (Pro/Team see the real detail).
-  type ViewerTier = 'free' | 'pro' | 'team' | 'none';
+  type ViewerTier = 'free' | 'pro' | 'team' | 'enterprise' | 'none';
   let tier: ViewerTier = 'free';
   if (email) {
     try {
@@ -405,7 +406,7 @@ export async function GET(request: NextRequest) {
       tier = (access?.tier as ViewerTier) || 'free';
     } catch { /* default free */ }
   }
-  const isPaid = tier === 'pro' || tier === 'team';
+  const isPaid = hasPaidProductTier(tier);
 
   const tiles: Tile[] = [
     // Omitted when the query failed OR scope not established (null): a tile

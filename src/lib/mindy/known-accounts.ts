@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { hasPaidProductTier } from '@/lib/access/tier-rank';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,8 +19,7 @@ export async function isKnownMindyAccount(email: string): Promise<boolean> {
   try {
     const access = await verifyMIAccess(email);
     const hasPaidEntitlement =
-      access.tier === 'pro' ||
-      access.tier === 'team' ||
+      hasPaidProductTier(access.tier) ||
       access.isStaff === true ||
       Object.values(access.sources || {}).some(Boolean);
     if (hasPaidEntitlement) return true;

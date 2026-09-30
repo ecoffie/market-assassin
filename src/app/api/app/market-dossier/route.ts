@@ -18,6 +18,7 @@ import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { hasPaidProductTier } from '@/lib/access/tier-rank';
 
 export const dynamic = 'force-dynamic';
 
@@ -190,7 +191,7 @@ export async function GET(request: NextRequest) {
   //    Enterprise get the whole dossier.
   const access = await verifyMIAccess(email).catch(() => null);
   const tier = access?.tier || 'free';
-  const isPaid = tier === 'pro' || tier === 'team' || tier === 'enterprise';
+  const isPaid = hasPaidProductTier(tier);
 
   const FREE_OPEN_CAP = 5;
   const FREE_RECOMPETE_CAP = 3;
