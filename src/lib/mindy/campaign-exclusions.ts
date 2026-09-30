@@ -19,9 +19,22 @@ export const COMP_TESTIMONIAL_EMAILS = new Set([
 ]);
 
 /**
+ * Internal synthetic accounts of the permanent production billing canary
+ * ("Mindy Billing Acceptance (INTERNAL CANARY)", Stripe sub_1ULJM4K5zyiZ50PBRFojExdX,
+ * a real Growth subscription at 100% off). Its mirror row carries the $399 list price,
+ * so without this the MRR goal chart would count $399 of revenue that does not exist.
+ * See docs/engineering/billing-canary.md.
+ */
+export const INTERNAL_CANARY_EMAILS = new Set([
+  'billing-canary-owner@getmindy.ai',
+  'billing-canary-member@getmindy.ai',
+  'billing-canary-outsider@getmindy.ai',
+]);
+
+/**
  * The full set of NON-CUSTOMER special accounts that must not be sold to OR
  * counted as customers: comp/testimonial demo accounts + advocates + partner
- * contacts. Per Eric's model, advocates ARE partners and vice-versa, so the two
+ * contacts + internal billing-canary accounts. Per Eric's model, advocates ARE partners and vice-versa, so the two
  * are one class. Adding any of them anywhere flows through here.
  */
 export function isSpecialAccount(email: string | null | undefined): boolean {
@@ -29,6 +42,7 @@ export function isSpecialAccount(email: string | null | undefined): boolean {
   if (!normalized) return false;
   return (
     COMP_TESTIMONIAL_EMAILS.has(normalized) ||
+    INTERNAL_CANARY_EMAILS.has(normalized) ||
     isAdvocateAccount(normalized) ||
     isPartnerContactEmail(normalized)
   );
