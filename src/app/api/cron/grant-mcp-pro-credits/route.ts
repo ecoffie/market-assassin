@@ -30,6 +30,7 @@ import { collectCreditHealth, claimAlertOnce } from '@/lib/mcp/credit-health';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
+import { proAllowanceDecision } from '@/lib/mcp/pro-allowance';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import {
   listPooledOrgsBySubscription, replenishPool, routeSubscriptionGrants, isPoolSchemaMissing,
@@ -113,7 +114,9 @@ async function pooledOrgs(): Promise<{ bySub: Map<string, PooledOrg>; poolMode: 
 async function buildTargets(): Promise<{
   targets: Target[]; pools: PooledOrg[]; subError: string | null; sponsorError: string | null;
   poolError: string | null; poolMode: 'active' | 'legacy';
+  proSuppressed: { email: string; reason: string; detail: string }[];
 }> {
+  const proSuppressed: { email: string; reason: string; detail: string }[] = [];
   const byEmail = new Map<string, Target>();
   // NO STACKING (policy, Eric 2026-09-15): one grant per account per month, the HIGHEST
   // applicable allowance across every source. This dedupe IS the rule — adding a source
@@ -137,13 +140,19 @@ async function buildTargets(): Promise<{
     // Pool lookup failed (not merely "not migrated yet"): withhold TEAM personal grants this
     // run so a pooled subscription can never be granted twice. Pro grants are unaffected.
     if (poolError && s.group === 'team-sub') continue;
+    // Team supersedes Pro: a Pro allowance for someone whose calls bill a TEAM pool is
+    // credit they can never spend, so it is not granted (src/lib/mcp/pro-allowance.ts).
+    if (s.group === 'pro-sub') {
+      const d = await proAllowanceDecision(s.email);
+      if (!d.grant) { proSuppressed.push({ email: s.email, reason: d.reason, detail: d.detail }); continue; }
+    }
     consider(s.email, s.amount, s.group as Group);
   }
   // Sponsored accounts. A smaller paid plan must not reduce a sponsored benefit, and the
   // sponsorship stands until its own expiry — both follow from taking the higher amount.
   const { entitlements, error: sponsorError } = await activeSponsorEntitlements();
   for (const ent of entitlements) consider(ent.userEmail, ent.monthlyAllowance, 'sponsored', 'topup');
-  return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode };
+  return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode, proSuppressed };
 }
 
 export async function GET(request: NextRequest) {
@@ -161,12 +170,16 @@ export async function GET(request: NextRequest) {
   // granted). On any other day it is the DAILY SELF-HEAL pass: idempotent by the
   // same pro:<email>:<YYYY-MM> key, so it grants only whoever upstream missed.
   const isMonthStart = now.getUTCDate() === 1;
-  const { targets, pools, subError, sponsorError, poolError, poolMode } = await buildTargets();
+  const { targets, pools, subError, sponsorError, poolError, poolMode, proSuppressed } = await buildTargets();
+  // An account whose billing context could not be established got NO Pro grant this run.
+  // That is a deferral (the daily self-heal retries), but it must be loud, never silent.
+  const proDeferred = proSuppressed.filter((p) => p.reason === 'payer_unresolved');
   const byGroup = targets.reduce<Record<string, number>>((a, t) => { a[t.group] = (a[t.group] || 0) + 1; return a; }, {});
 
   if (preview) {
     return NextResponse.json({
       success: true, preview: true, month, audience: targets.length, byGroup, subError, sponsorError, poolError, poolMode,
+      proSuppressed,
       pools: pools.map((p) => ({ orgId: p.orgId, name: p.name, seatLimit: p.seatLimit, monthlyCredits: p.monthlyCredits })),
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
       targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group, mode: t.mode })),
@@ -229,12 +242,13 @@ export async function GET(request: NextRequest) {
   const tooSmall = targets.length < INTERNAL_TEAM.length;
   // A failed sponsor read is an anomaly for the same reason a failed Stripe read is: it
   // silently drops a whole audience from the grant while the run still reports success.
-  const anomaly = Boolean(subError) || Boolean(sponsorError) || Boolean(poolError) || errors.length > 0 || nothingHappened || tooSmall;
+  const anomaly = Boolean(subError) || Boolean(sponsorError) || Boolean(poolError) || proDeferred.length > 0 || errors.length > 0 || nothingHappened || tooSmall;
 
   const summary = {
     month, audience: targets.length, byGroup, granted, alreadyHad, subError, sponsorError,
     sponsoredSatisfied,
     poolMode, poolError, pools: pools.length, poolsReplenished, poolsAlreadyFull, poolCreditsGranted,
+    proSuppressed,
     errors: errors.slice(0, 10),
     mode: isMonthStart ? 'monthly-grant' : 'daily-self-heal',
     healed: healed.slice(0, 20),

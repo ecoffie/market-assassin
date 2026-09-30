@@ -32,6 +32,7 @@ import {
   findPooledOrgBySubscription, provisionPooledOrg, replenishPool, isPoolSchemaMissing, subscriptionIdFromInvoice,
 } from './team-pools';
 import { applyCreditOnce } from './credits';
+import { proAllowanceDecision } from './pro-allowance';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from './packages';
 import { getStripe } from '@/lib/stripe';
 
@@ -47,6 +48,8 @@ export interface AppTierInvoiceOutcome {
   tier?: 'pro' | 'team';
   newBalance?: number;
   error?: string;
+  /** Set when the allowance was deliberately NOT granted (e.g. team_pool_supersedes_pro). */
+  skipped?: string;
 }
 
 /** Resolve the payer email: invoice field first, then the customer record. */
@@ -126,6 +129,18 @@ export async function handleAppTierSubscriptionInvoice(
         }
         // Migration not applied yet → legacy personal grant below.
       }
+    }
+  }
+
+  // Team supersedes Pro: a Pro allowance for someone whose calls bill a TEAM pool is
+  // credit they can never spend. Same rule as the monthly cron (src/lib/mcp/pro-allowance.ts),
+  // so the renewal invoice cannot grant what the cron withheld.
+  // tier-display-ok: billing — which PRICE was paid decides the allowance; not a capability gate.
+  if (tier === 'pro') {
+    const d = await proAllowanceDecision(email);
+    if (!d.grant) {
+      console.log(`[app-tier:sub] ${email} Pro allowance NOT granted (${d.reason}: ${d.detail}) invoice ${invoice.id}`);
+      return { handled: true, applied: false, credits: 0, email, tier, skipped: d.reason };
     }
   }
 
