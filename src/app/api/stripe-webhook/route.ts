@@ -725,6 +725,21 @@ export async function POST(request: NextRequest) {
   if (event.type === 'invoice.paid') {
     const invoice = event.data.object as Stripe.Invoice;
 
+    // Keep the subscription mirror current NOW (the first invoice.paid is how a new
+    // subscription announces itself here). The payer reads the mirror to let a pooled
+    // team spend; waiting for the daily sync left new pools unusable for up to a day.
+    try {
+      const { subscriptionIdFromInvoice } = await import('@/lib/mcp/team-pools');
+      const subId = subscriptionIdFromInvoice(invoice);
+      if (subId) {
+        const { mirrorSubscription } = await import('@/lib/stripe/subscription-mirror');
+        const m = await mirrorSubscription(subId);
+        if (!m.ok) console.error('[stripe-webhook] subscription mirror failed (non-fatal):', m);
+      }
+    } catch (mirrorErr) {
+      console.error('[stripe-webhook] subscription mirror failed (non-fatal):', mirrorErr);
+    }
+
     // MCP annual subscription credit grant — runs on BOTH the initial charge
     // (subscription_create) and each renewal (subscription_cycle), so it must be
     // BEFORE the subscription_create early-return below. Idempotent by invoice id;
@@ -792,6 +807,17 @@ export async function POST(request: NextRequest) {
   if (event.type === 'customer.subscription.deleted' ||
       event.type === 'customer.subscription.updated') {
     const subscription = event.data.object as Stripe.Subscription;
+
+    // Mirror EVERY status change immediately (not only cancellations): a cancelled
+    // pooled subscription must stop paying for its members at once, and a reactivated
+    // one must resume. Re-reads Stripe, so event order cannot regress the row.
+    try {
+      const { mirrorSubscription } = await import('@/lib/stripe/subscription-mirror');
+      const m = await mirrorSubscription(subscription.id);
+      if (!m.ok) console.error('[stripe-webhook] subscription mirror failed (non-fatal):', m);
+    } catch (mirrorErr) {
+      console.error('[stripe-webhook] subscription mirror failed (non-fatal):', mirrorErr);
+    }
 
     // Only process if subscription is canceled/ended
     if (event.type === 'customer.subscription.updated' &&

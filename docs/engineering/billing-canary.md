@@ -51,7 +51,10 @@ balances are what make a wrong personal fallback visible.
   real-time mirror webhook (`tools.govcongiants.org/api/webhooks/stripe`) is DISABLED in Stripe,
   so a newly bought multi-seat subscription has no mirror row, and `resolvePayer` charges
   nothing (`subscription_state_unknown`) until the next sync. The canary's row was written by
-  hand. This must be solved before a customer self-serves a pooled plan.
+  hand. **Fixed** (fix/subscription-mirror-immediate): the webhook (invoice.paid,
+  customer.subscription.updated/deleted) and pooled-org provisioning now mirror the
+  subscription from Stripe at once (`src/lib/stripe/subscription-mirror.ts`); the daily job is
+  reconciliation only.
 - Creating the subscription with **no customer email** kept the first $0 invoice from granting
   3,500 personal credits before the pool existed; the email was added after provisioning.
 - **Open:** the in-chat credit footer on a POOLED call still says "Top up → getmindy.ai/mcp"
