@@ -183,16 +183,6 @@ export async function provisionPooledOrg(input: ProvisionInput): Promise<Provisi
   const owner = normalizeEmail(input.ownerEmail);
   if (!input.subscriptionId) throw new Error('provisionPooledOrg: subscriptionId required');
   if (!owner) throw new Error('provisionPooledOrg: ownerEmail required');
-  const defaults = POOLED_PLAN_DEFAULTS[input.planKey];
-  const seatLimit = input.seatLimit ?? defaults?.seats;
-  const monthlyCredits = input.monthlyCredits ?? defaults?.monthlyCredits;
-  if (!isPoolEligibleConfig(seatLimit)) {
-    throw new Error(`provisionPooledOrg: plan "${input.planKey}" has no multi-seat configuration (seats=${seatLimit ?? 'unset'})`);
-  }
-  if (typeof monthlyCredits !== 'number' || monthlyCredits < 0) {
-    throw new Error(`provisionPooledOrg: plan "${input.planKey}" has no monthly credit allowance configured`);
-  }
-
   const db = getWriteClient();
   const { data: existing, error: eErr } = await db
     .from('organizations')
@@ -200,6 +190,21 @@ export async function provisionPooledOrg(input: ProvisionInput): Promise<Provisi
     .eq('stripe_subscription_id', input.subscriptionId)
     .maybeSingle();
   if (eErr) throw new Error(`provisionPooledOrg: lookup failed: ${eErr.message}`);
+
+  // Re-affirming an ALREADY-configured pool needs no plan defaults: its stored config
+  // stands. (Validating defaults first made a no-override call fail for any plan without
+  // built-in defaults, e.g. Growth — found re-provisioning the billing canary.)
+  const existingConfigured = !!existing && isPoolEligibleConfig(existing.seat_limit as number | null);
+  const defaults = POOLED_PLAN_DEFAULTS[input.planKey];
+  const seatLimit = input.seatLimit ?? (existingConfigured ? (existing!.seat_limit as number) : defaults?.seats);
+  const monthlyCredits = input.monthlyCredits
+    ?? (existingConfigured ? ((existing!.pool_monthly_credits as number | null) ?? defaults?.monthlyCredits) : defaults?.monthlyCredits);
+  if (!isPoolEligibleConfig(seatLimit)) {
+    throw new Error(`provisionPooledOrg: plan "${input.planKey}" has no multi-seat configuration (seats=${seatLimit ?? 'unset'})`);
+  }
+  if (typeof monthlyCredits !== 'number' || monthlyCredits < 0) {
+    throw new Error(`provisionPooledOrg: plan "${input.planKey}" has no monthly credit allowance configured`);
+  }
 
   let orgId: string;
   let created = false;
