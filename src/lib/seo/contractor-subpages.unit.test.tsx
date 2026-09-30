@@ -63,6 +63,7 @@ for (const P of PAGES) {
       P.set([], 'unavailable');
       const meta = await P.mod.generateMetadata(params());
       expect(meta.robots).toEqual({ index: false, follow: true });
+      expect(meta.alternates?.canonical).toBe(`https://getmindy.ai/contractors/acme-defense-inc/${P.name}`);
       expect(String(meta.description)).not.toMatch(/\b(227|31)\b/);
       const out = await html(P.mod);
       expect(out).toContain('data-subpage-state="unavailable"');
@@ -74,31 +75,42 @@ for (const P of PAGES) {
 
     it('stored count > 0 + genuinely zero rows ⇒ noindex, honest "none" copy, no table, no stored count', async () => {
       P.set([], 'empty');
-      expect((await P.mod.generateMetadata(params())).robots).toEqual({ index: false, follow: true });
+      const meta = await P.mod.generateMetadata(params());
+      expect(meta.robots).toEqual({ index: false, follow: true });
+      expect(meta.alternates?.canonical).toBe(`https://getmindy.ai/contractors/acme-defense-inc/${P.name}`);
       const out = await html(P.mod);
       expect(out).toContain('data-subpage-state="none"');
       expect(out).not.toContain('<table');
       expect(out).not.toMatch(P.storedClaim);
     });
 
-    it('populated rows ⇒ indexable, and the headline count equals the rendered rows (not the stored 227/31)', async () => {
-      P.set(P.rows(12), 'hit');
-      const meta = await P.mod.generateMetadata(params());
-      expect(meta.robots).toBeUndefined();
-      expect(String(meta.description)).toContain('12');
-      const out = await html(P.mod);
-      expect((out.match(/<tbody[\s\S]*?<\/tbody>/)?.[0].match(/<tr/g) ?? []).length).toBe(12);
-      expect(out).toMatch(/>12 (NAICS codes|federal agencies have)/);
-      expect(out).not.toMatch(P.storedClaim);
-      expect(out).not.toContain('data-subpage-state');
+    it('5+ real rows ⇒ indexable, self-canonical, headline count equals rendered rows (not the stored 227/31)', async () => {
+      for (const n of [5, 12]) {
+        P.set(P.rows(n), 'hit');
+        const meta = await P.mod.generateMetadata(params());
+        expect(meta.robots).toBeUndefined();
+        expect(meta.alternates?.canonical).toBe(`https://getmindy.ai/contractors/acme-defense-inc/${P.name}`);
+        expect(String(meta.description)).toContain(String(n));
+        const out = await html(P.mod);
+        expect((out.match(/<tbody[\s\S]*?<\/tbody>/)?.[0].match(/<tr/g) ?? []).length).toBe(n);
+        expect(out).toMatch(new RegExp(`>${n} (NAICS codes|federal agencies have)`));
+        expect(out).not.toMatch(P.storedClaim);
+        expect(out).not.toContain('data-subpage-state');
+      }
     });
 
-    it('a real small dataset (1 row) is rendered, not replaced — noindexed only by the thin floor', async () => {
-      P.set(P.rows(1), 'hit');
-      expect((await P.mod.generateMetadata(params())).robots).toEqual({ index: false, follow: true });
-      const out = await html(P.mod);
-      expect((out.match(/<tbody[\s\S]*?<\/tbody>/)?.[0].match(/<tr/g) ?? []).length).toBe(1);
-      expect(out).toMatch(/>1 (NAICS code |federal agency has)/);
+    it('1–4 real rows ⇒ real rows rendered with their true count, self-canonical, noindex,follow', async () => {
+      for (const n of [1, 4]) {
+        P.set(P.rows(n), 'hit');
+        const meta = await P.mod.generateMetadata(params());
+        expect(meta.robots).toEqual({ index: false, follow: true });
+        expect(meta.alternates?.canonical).toBe(`https://getmindy.ai/contractors/acme-defense-inc/${P.name}`);
+        const out = await html(P.mod);
+        expect((out.match(/<tbody[\s\S]*?<\/tbody>/)?.[0].match(/<tr/g) ?? []).length).toBe(n);
+        expect(out).toMatch(new RegExp(`>${n} (NAICS codes? |federal agenc(y has|ies have))`));
+        expect(out).not.toMatch(P.storedClaim);
+        expect(out).not.toContain('data-subpage-state');
+      }
     });
   });
 }

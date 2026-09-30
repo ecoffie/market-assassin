@@ -26,27 +26,24 @@ describe('stored count > 0 but the page has nothing to render', () => {
   });
 });
 
-describe('real rows are preserved', () => {
-  it('one real row ⇒ indexable and sitemap-eligible when the floor is one row (the /contracts contract)', () => {
-    expect(decideSubpage('hit', 1, 1)).toEqual({ indexable: true, showTable: true, notice: null, headlineCount: 1 });
-    expect(subpageSitemapEligible(1, 1)).toBe(true);
-  });
+describe('1–4 real rows (below the five-row floor)', () => {
+  for (const n of [1, 2, 3, 4]) {
+    it(`${n} row(s) ⇒ rendered with its real count, noindex, absent from the sitemap`, () => {
+      expect(decideSubpage('hit', n, MIN)).toEqual({ indexable: false, showTable: true, notice: null, headlineCount: n });
+      expect(subpageSitemapEligible(n, MIN)).toBe(false);
+    });
+  }
+});
 
-  it('a small real dataset below the NAICS/agency thin floor is still RENDERED (not replaced), just not indexed', () => {
-    const d = decideSubpage('hit', 2, MIN);
-    expect(d.showTable).toBe(true);
-    expect(d.headlineCount).toBe(2);
-    expect(d.indexable).toBe(false);
-    expect(subpageSitemapEligible(2, MIN)).toBe(false);
-  });
+describe('5+ real rows', () => {
+  for (const n of [5, 17, 242]) {
+    it(`${n} rows ⇒ indexable, sitemap-eligible, headline count equals rendered rows`, () => {
+      expect(decideSubpage('hit', n, MIN)).toEqual({ indexable: true, showTable: true, notice: null, headlineCount: n });
+      expect(subpageSitemapEligible(n, MIN)).toBe(true);
+    });
+  }
 
-  it('populated rows ⇒ the headline count IS the rendered row count', () => {
-    for (const n of [5, 17, 242]) expect(decideSubpage('hit', n, MIN)).toMatchObject({ indexable: true, showTable: true, headlineCount: n });
-    expect(subpageSitemapEligible(5, MIN)).toBe(true);
-    expect(subpageSitemapEligible(4, MIN)).toBe(false);
-  });
-
-  it('the sitemap predicate and the page predicate agree for every row count', () => {
+  it('the sitemap predicate and the page predicate agree at every row count (0–300)', () => {
     for (const n of [0, 1, 4, 5, 6, 300]) expect(subpageSitemapEligible(n, MIN)).toBe(decideSubpage('hit', n, MIN).indexable);
   });
 });
