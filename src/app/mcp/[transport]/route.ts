@@ -41,6 +41,8 @@ import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
 import { mcpFlags } from '@/lib/mcp/flags';
 import { mcpToolResultFromMeteredError } from '@/lib/mcp/commercial-refusal';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
+import { creditFooter, LOW_BALANCE_THRESHOLD, type PoolFooterContext } from '@/lib/mcp/credit-footer';
+import { teamMembershipsFor, TEAM_OWNER_ROLE } from '@/lib/mcp/team-pools';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
 // client (neither runs on Edge). force-dynamic: never cache an MCP response.
@@ -50,7 +52,6 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 // Below this balance, the in-chat footer escalates from an FYI to a top-up nudge.
-const LOW_BALANCE_THRESHOLD = 20;
 
 /**
  * The server's identity in the MCP handshake.
@@ -86,17 +87,6 @@ const SERVER_INFO: Implementation = {
  * Returns null for free tools (charged 0, no balance) so we don't add noise to
  * get_balance et al. Escalates to a top-up nudge when the balance runs low.
  */
-function creditFooter(charged: number, balance: number | null): string | null {
-  if (balance === null) return null; // free tool — nothing to meter
-  const used = charged > 0 ? ` · this call used ${charged} credit${charged === 1 ? '' : 's'}` : '';
-  if (balance <= 0) {
-    return `⚠️ Mindy credits: 0 left${used}. Top up to keep going → getmindy.ai/mcp`;
-  }
-  if (balance <= LOW_BALANCE_THRESHOLD) {
-    return `⚠️ Mindy credits: ${balance} left${used} — running low. Top up → getmindy.ai/mcp`;
-  }
-  return `Mindy credits: ${balance} remaining${used}.`;
-}
 
 const baseHandler = createMcpHandler(
   (server) => {
@@ -172,7 +162,19 @@ const baseHandler = createMcpHandler(
           const content: { type: 'text'; text: string }[] = [
             { type: 'text', text: JSON.stringify(outcome.result, null, 2) },
           ];
-          const footer = creditFooter(outcome.creditsCharged, outcome.balance);
+          // Pooled calls get the TEAM footer (never a personal top-up link). Ownership is
+          // only looked up when the pool is low, where the remedy differs by role.
+          let pool: PoolFooterContext | undefined;
+          if (outcome.funding?.kind === 'pool') {
+            let isOwner: boolean | null = null;
+            if (outcome.balance !== null && outcome.balance <= LOW_BALANCE_THRESHOLD) {
+              isOwner = await teamMembershipsFor(identity.userEmail!)
+                .then((ms) => ms.some((m) => m.orgId === outcome.funding!.orgId && m.role === TEAM_OWNER_ROLE))
+                .catch(() => null);
+            }
+            pool = { orgName: outcome.funding.orgName, isOwner };
+          }
+          const footer = creditFooter(outcome.creditsCharged, outcome.balance, pool);
           if (footer) content.push({ type: 'text', text: footer });
 
           // Auto-recharge: the balance dipped low → try to refill AFTER the response is

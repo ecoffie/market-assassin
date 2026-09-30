@@ -36,11 +36,15 @@ export type MeteredError = {
   commercial?: CommercialRefusal;
 };
 
+export interface PoolFunding { kind: 'pool'; orgId: string; orgName: string | null }
+
 export type MeteredOutcome =
   // `needsRecharge` = the post-debit balance dipped under AUTORECHARGE_SIGNAL_FLOOR, so
   // the transport should fire maybeAutoRecharge() (post-response, via after()). It's just
   // a numeric signal here — the engine decides whether the user actually has it enabled.
-  | { ok: true; result: Record<string, unknown>; creditsCharged: number; balance: number | null; needsRecharge: boolean }
+  // `funding` = who paid (or would have paid): present only for a TEAM pool, so the
+  // transport never shows a pooled caller a personal top-up link.
+  | { ok: true; result: Record<string, unknown>; creditsCharged: number; balance: number | null; needsRecharge: boolean; funding?: PoolFunding }
   | { ok: false; error: MeteredError; creditsCharged: 0; balance?: number };
 
 export async function runMeteredTool(
@@ -169,8 +173,8 @@ export async function runMeteredTool(
           code: 'team_pool_insufficient_credits',
           message:
             `Your team's shared credits${payer.orgName ? ` (${payer.orgName})` : ''} are too low for this request ` +
-            `(${cost} needed, ${balance} left). Your team owner can add credits, or the pool refills at the start ` +
-            'of next month. Nothing was charged.',
+            `(${cost} needed, ${balance} left). The pool refills at the start of next month; ask your team owner ` +
+            'about adding credits. Nothing was charged.',
         },
         creditsCharged: 0,
         balance,
@@ -267,7 +271,7 @@ export async function runMeteredTool(
     // Report the balance of the payer that WOULD have paid — a pooled member's personal
     // balance is not the number that governs their calls.
     const payerBalance = payer.kind === 'pool' ? await getPoolBalance(payer.poolId!) : await getBalance(ctx.userEmail);
-    return { ok: true, result, creditsCharged: 0, balance: payerBalance, needsRecharge: false };
+    return { ok: true, result, creditsCharged: 0, balance: payerBalance, needsRecharge: false, funding: poolFunding(payer) };
   }
 
   // 3) Priced tool → debit the RESOLVED payer on success (atomic).
@@ -282,14 +286,18 @@ export async function runMeteredTool(
   const recharge = (bal: number) => debit.payer === 'personal' && bal < AUTORECHARGE_SIGNAL_FLOOR;
   if (debit.ok) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId });
-    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance) };
+    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance), funding: poolFunding(payer) };
   }
 
   // Edge race: balance dropped below cost between pre-check and debit (concurrent
   // calls at a near-empty balance). The result is already produced — deliver it, but
   // charge 0 and mark it uncharged for reconciliation. Balance is never negative.
   await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
-  return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance) };
+  return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance), funding: poolFunding(payer) };
+}
+
+function poolFunding(payer: PayerResolution): PoolFunding | undefined {
+  return payer.kind === 'pool' && payer.orgId ? { kind: 'pool', orgId: payer.orgId, orgName: payer.orgName ?? null } : undefined;
 }
 
 /**

@@ -157,6 +157,8 @@ describe('runMeteredTool — pooled team credits (PRD-pooled-team-credits)', () 
     expect(r.ok).toBe(false);
     expect(r.ok === false && r.error.code).toBe('team_pool_insufficient_credits');
     expect(r.ok === false && r.error.message).toMatch(/Acme/);
+    // No pool top-up purchase exists, so nothing may promise the owner can buy more.
+    expect(r.ok === false && r.error.message).not.toMatch(/can add credits|top up|getmindy\.ai\/mcp/i);
     expect(r.ok === false && r.error.commercial).toBeUndefined(); // no personal checkout
     expect(registry.runMcpTool).not.toHaveBeenCalled();
     expect(credits.getBalance).not.toHaveBeenCalled(); // personal balance is irrelevant
@@ -171,6 +173,8 @@ describe('runMeteredTool — pooled team credits (PRD-pooled-team-credits)', () 
     m(payer.debitResolvedPayer).mockResolvedValueOnce({ ok: true, newBalance: 1, payer: 'pool', poolId: 'p1' });
     const r = await runMeteredTool('get_contractor_profile', {}, ctx);
     expect(r).toMatchObject({ ok: true, creditsCharged: 5, balance: 1, needsRecharge: false });
+    // The transport shows the TEAM footer only if it knows the pool paid.
+    expect(r).toMatchObject({ funding: { kind: 'pool', orgId: 'o1', orgName: 'Acme' } });
   });
 
   it('a personal debit still signals auto-recharge when low (unchanged behaviour)', async () => {
@@ -180,6 +184,7 @@ describe('runMeteredTool — pooled team credits (PRD-pooled-team-credits)', () 
     m(credits.debitCredits).mockResolvedValue({ ok: true, newBalance: 1 });
     const r = await runMeteredTool('get_contractor_profile', {}, ctx);
     expect(r).toMatchObject({ ok: true, needsRecharge: true });
+    expect(r.ok && r.funding).toBeUndefined(); // personal calls carry no pool funding
   });
 
   it('an uncharged pooled call reports the POOL balance, not the personal one', async () => {

@@ -57,7 +57,9 @@ balances are what make a wrong personal fallback visible.
   reconciliation only.
 - Creating the subscription with **no customer email** kept the first $0 invoice from granting
   3,500 personal credits before the pool existed; the email was added after provisioning.
-- **Open:** the in-chat credit footer on a POOLED call still says "Top up → getmindy.ai/mcp"
-  when the pool runs low. A personal top-up cannot fund the pool, so for a member that nudge
-  sells credits their pooled calls can never use (the same defect class as the empty-pool
-  paywall fixed in #1761). The empty-pool refusal itself is correct.
+- The in-chat credit footer on a POOLED call said "Top up → getmindy.ai/mcp" when the pool
+  ran low, selling members credits their pooled calls could never use. **Fixed**
+  (fix/pooled-low-credit-cta, `src/lib/mcp/credit-footer.ts`): pooled calls get a team footer
+  with no purchase link (members: ask your team owner; owner: monthly refill, support to raise
+  the allowance), and the empty-pool refusal no longer claims the owner can add credits (no
+  pool top-up purchase exists).
