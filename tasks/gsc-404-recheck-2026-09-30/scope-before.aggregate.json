@@ -1,0 +1,30 @@
+{
+ "measured_at": "2026-09-30T09:00:34.774Z",
+ "data_version": "v4-2026-08-28",
+ "sitemap_urls_total": 35348,
+ "contractor_slugs_with_tabs": 8228,
+ "kv_mget_calls": 108,
+ "naics": {
+  "sitemap_listed": 7864,
+  "profile_unavailable": 0,
+  "rows_unavailable": 7864,
+  "rows_true_zero": 0,
+  "renderable": 0,
+  "renderable_below_min5": 0,
+  "stored_vs_rendered_mismatch": 0,
+  "renderable_rows_total": 0,
+  "empty_or_unavailable": 7864
+ },
+ "agencies": {
+  "sitemap_listed": 5121,
+  "profile_unavailable": 0,
+  "rows_unavailable": 5121,
+  "rows_true_zero": 0,
+  "renderable": 0,
+  "renderable_below_min5": 0,
+  "stored_vs_rendered_mismatch": 0,
+  "renderable_rows_total": 0,
+  "empty_or_unavailable": 5121
+ },
+ "note": "Aggregate only. Per-contractor examples removed. Source: measure-subpage-scope.mjs (KV read-only token, MGET only, no BigQuery)."
+}
