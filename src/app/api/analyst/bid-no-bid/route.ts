@@ -42,6 +42,7 @@ import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import { callLLM } from '@/lib/llm/call-llm';
 import { findPredecessorAward, summarizePredecessor } from '@/lib/usaspending/find-predecessor';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
+import { hasPaidProductTier } from '@/lib/access/tier-rank';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -195,7 +196,8 @@ export async function POST(request: NextRequest) {
   // teaser (no LLM call, no DB write). UI uses this to render an
   // "Upgrade to unlock Mindy Analyst" block.
   const access = await verifyMIAccess(email);
-  const isPro = access.tier === 'pro' || access.isStaff === true;
+  // Pro OR ABOVE: Team and Enterprise inherit every Pro capability.
+  const isPro = hasPaidProductTier(access.tier) || access.isStaff === true;
   if (!isPro) {
     return NextResponse.json(
       {

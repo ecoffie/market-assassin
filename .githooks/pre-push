@@ -345,6 +345,19 @@ else
   fail=1
 fi
 
+# 7a) HARD BLOCK: no NEW exact tier comparison. A capability gate written as
+#     `tier === 'pro'` silently drops every higher plan (Team got 402 on Mindy Analyst and
+#     market reports, 2026-09-30). Gates use src/lib/access/tier-rank.ts; display-only
+#     lines carry `// tier-display-ok:`. Baseline-gated; self-test: --self-test.
+echo -e "  ${BOLD}7a/13${NC} exact tier-gate audit…"
+if node scripts/audit-exact-tier-gates.mjs > /tmp/mindy-prepush-tiergates.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new exact tier gates${NC}"
+else
+  echo -e "      ${RED}✗ new exact tier gate — a higher plan may lose this feature — push blocked${NC}"
+  cat /tmp/mindy-prepush-tiergates.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 7b) HARD BLOCK: no NEW destructive writer of `usaspending.awards`. CREATE [OR REPLACE] TABLE /
 #     DROP / TRUNCATE / WRITE_TRUNCATE / bq load --replace / bq cp -f / RENAME / DROP COLUMN on the
 #     63M-row awards table rebuilds it from some other column list and data cut — every column the

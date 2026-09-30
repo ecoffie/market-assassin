@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { hasPaidProductTier } from '@/lib/access/tier-rank';
 
 interface Tile {
   key: string;
@@ -95,7 +96,7 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
     );
   }
 
-  const isPaid = data.tier === 'pro' || data.tier === 'team';
+  const isPaid = hasPaidProductTier(data.tier);
   const m = data.market;
 
   return (
