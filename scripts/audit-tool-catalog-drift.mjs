@@ -100,6 +100,22 @@ if (mirror) {
   }
 }
 
+// ── 1b. the generated Tool Map (docs/mcp-tool-map.html, published to the artifact) ──────
+// Built by scripts/build-tool-map-artifact.ts. It must list exactly the public tools.
+const MAP = 'docs/mcp-tool-map.html';
+if (existsSync(MAP)) {
+  const mapNames = [...readFileSync(MAP, 'utf8').matchAll(/<code class="tname">([a-z0-9_]+)<\/code>/g)].map((m) => m[1]);
+  const mapMissing = live.filter((n) => !mapNames.includes(n));
+  const mapExtra = mapNames.filter((n) => !live.includes(n));
+  if (mapMissing.length || mapExtra.length) {
+    problems.push(
+      `${MAP} is out of sync with the public catalog — rerun: npx tsx scripts/build-tool-map-artifact.ts (then republish the artifact)` +
+        (mapMissing.length ? `\n      missing: ${mapMissing.join(', ')}` : '') +
+        (mapExtra.length ? `\n      not public: ${mapExtra.join(', ')}` : ''),
+    );
+  }
+}
+
 // ── 2. prose counts ──────────────────────────────────────────────────────────
 for (const { file, re } of PROSE_SURFACES) {
   if (!existsSync(file)) continue;

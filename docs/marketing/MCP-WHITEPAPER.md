@@ -31,7 +31,7 @@ Wrapping a public API is the price of entry. The moat is the intelligence that t
 
 ---
 
-## What Mindy MCP gives an agent — 64 tools across four layers
+## What Mindy MCP gives an agent — 53 tools across four layers
 Among them: `get_current_acquisition_intelligence` (8 credits) — what changed about how a buyer is buying for a capability, and what to do differently (LIVE compose only). `match_company_to_pathways` (8 credits) — which of those doors a company’s public record can support (two-sided PATHWAY FIT; `no_proven_door` is success).
 
 
@@ -47,14 +47,12 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_keyword_coverage` | Measured FY description-match market $ + NAICS/PSC distribution (shares are not market identity; does not set company NAICS, forecast/recompete scope, or opportunity eligibility) |
 | `search_grants` | Federal grant (assistance) opportunities |
 | `get_agency_forecasts` | Planned procurements 6–18 months before solicitation |
-| `search_sbir` | SBIR/STTR small-business R&D awards + open notices |
 | `get_current_acquisition_intelligence` | What changed about how a buyer is buying + what to do differently (LIVE) |
 | `match_company_to_pathways` | Which CAI doors a company’s public record can support (PATHWAY FIT) |
 | `get_expiring_contracts` | Contracts expiring within a window — recompete targets |
 | `match_recompete_sow` | Given an expiring contract's scope, the open solicitation that is likely its recompete — by semantic SOW similarity, not keywords |
 | `search_idv_contracts` | IDIQ / GWAC / BPA vehicles + the task orders flowing through them |
 | `get_solicitation_documents` | Full SOW/PWS + attachments for a notice |
-| `extract_statement_of_work` | The SOW/PWS/SOO pulled out as clean text — recovers scope buried in a Section C blob, with a CLIN-scope fallback |
 | `search_federal_events` | Industry days, matchmaking, sources-sought for an agency |
 | `get_federal_event_series` | The recurring event calendar (AFCEA, NDIA, SAME, APEX…) — where a market networks year over year |
 
@@ -66,7 +64,6 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `search_contractors` | The competitive landscape by keyword / NAICS / state |
 | `find_capable_contractors` | "Who can actually win this" — capable-firm scan |
 | `get_contractor_award_history` | A named firm's obligations, trend, top agencies/NAICS |
-| `get_incumbent_financials` | Public-filer financials from SEC EDGAR (revenue, margin, 10-K) |
 | `get_pricing_intel` | GSA CALC price-to-win labor rates (p25/p50/p75, small-vs-large gap) |
 | `get_sblo_contact` | The Small Business Liaison Officer at a prime — the teaming front door (curated roster → live BigQuery prime-verification fallback) |
 | `lookup_sam_entity` | Live SAM registration (UEI/CAGE, status, certifications) |
@@ -78,10 +75,8 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_agency_intel` | Agency identity, pain points, live obligations, and the NDAA legislative record (stage + law status per version) |
 | `get_agency_spending_detail` | Sub-agency (component) breakdown + set-aside distribution |
 | `get_sba_goaling_share` | Statutory small-business goals vs. the agency's actual set-aside obligations — "is this a good small-business market?" |
-| `get_agency_budget_trends` | FY-over-FY discretionary budget-authority trend (growing / cut) |
 | `get_award_detail` | Obligated-to-ceiling, parent IDV, period of performance, recipient |
 | `find_predecessor_award` | The likely incumbent for an open opportunity |
-| `get_regulatory_demand` | Federal Register signals — "demand before SAM," 6–18 months early |
 | `get_legislation_status` | Where a bill stands in Congress — NDAA / H.R. / S. / public law: each version's stage and law status, latest stored action, congress.gov links (status only — bill text not held) |
 | `lookup_federal_osbp` | The small-business front door (OSBP office + director) for a command |
 | `search_agency_opps_by_office` | Open opportunities anchored to a *specific* buying office |
@@ -96,7 +91,6 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `search_podcast_lessons` | Real lessons from contractor/agency podcast guests |
 | `evaluate_bid_decision` | The 5-gate / 10-factor bid / no-bid framework, scored |
 | `extract_compliance_matrix` | Every shall/must + Section L/M/C requirement, harvested into a structured matrix |
-| `build_proposal_structure` | The compliance matrix → the volume/section outline the proposal must follow |
 | `scan_proposal_compliance` | Pre-submit disqualification scan (deadline, page limits, reps/certs) |
 | `referee_proposal_compliance` | An *independent* model reviews the draft against the matrix — met / partial / missing |
 | `derive_company_keywords` | A company's own words → the search keywords buyers use |
@@ -111,7 +105,7 @@ An agent that confidently invents a contract number or an incumbent's revenue is
 - **`degraded = true` is distinct from empty.** It means an upstream source *errored* (surfaced honestly as "unavailable"), not that the answer is $0.
 - **Data first.** The raw grounded data is the product. Optional narration is off by default — Mindy hands the agent facts, not a pre-written story.
 
-**Worked example.** An agent calls `get_incumbent_financials("Acme Integrated LLC")`. Acme is a private contractor with no SEC filing. A naïve tool would hallucinate a revenue figure. Mindy returns `grounded: false` and the honest instruction: *no EDGAR filing exists — the company is likely private; do not invent financials; use the contractor-profile tool for its federal award history instead.* The agent tells the truth because the data told the truth.
+**Worked example.** An agent calls `get_contractor_profile("Acme Integrated LLC")`. Acme has no rows in the federal award index. A naïve tool would hallucinate an award history. Mindy returns `resolution: none_in_award_corpus` and the honest instruction: *zero rows in this dataset is not proof the company has no federal awards; do not invent figures; check its SAM registration with the entity tool instead.* The agent tells the truth because the data told the truth.
 
 ---
 
@@ -128,11 +122,10 @@ Mindy resolves the **real buying office** beneath that label. Ask for the contac
 Most MCP servers stop at search. Mindy carries an agent through the actual proposal, as a chain of composable tools it can run on inputs it already holds:
 
 1. **`extract_compliance_matrix`** harvests every shall/must obligation and Section L/M/C requirement from the solicitation into a structured matrix — the foundation nothing downstream can skip.
-2. **`build_proposal_structure`** turns that matrix into the volume → section outline the proposal must follow, with the critical deadline/cert items surfaced up front and the cross-cutting format rules that apply to every volume.
-3. The agent drafts each section — using its own model, grounded in the requirements.
-4. **`referee_proposal_compliance`** runs the assembled draft past an **independent** model that did *not* write it, for a per-requirement verdict — met / partial / missing, with evidence and a compliance score. Independence is the point: the drafter thinks it's done; a fresh referee catches the unmet "shall" items before submission.
+2. The agent drafts each section — using its own model, grounded in the requirements.
+3. **`referee_proposal_compliance`** runs the assembled draft past an **independent** model that did *not* write it, for a per-requirement verdict — met / partial / missing, with evidence and a compliance score. Independence is the point: the drafter thinks it's done; a fresh referee catches the unmet "shall" items before submission.
 
-Alongside the chain, **`match_recompete_sow`** closes the recompete loop — hand it an expiring contract's scope and it finds the open solicitation that is likely its recompete by semantic SOW similarity, and **`extract_statement_of_work`** pulls a clean scope out of a combined solicitation to hand to subs.
+Alongside the chain, **`match_recompete_sow`** closes the recompete loop — hand it an expiring contract's scope and it finds the open solicitation that is likely its recompete by semantic SOW similarity, and **`get_solicitation_documents`** pulls the full SOW/PWS and attachments as text to hand to subs.
 
 One line stays deliberately fixed: the actual **drafting of proprietary content** — the evidence-weave from a company's private past performance — stays inside Mindy's authenticated Vault, which an external agent can't and shouldn't reach. The MCP hands over the *inputs, structure, and independent judgment*; the customer's own agent does the writing. That boundary is what keeps private data private and the moat defensible.
 
@@ -140,7 +133,7 @@ One line stays deliberately fixed: the actual **drafting of proprietary content*
 
 ## Pricing — credit-metered, pay only for a successful call
 
-An agent connects, and its owner funds a credit balance; each call debits on success. A failed or empty call costs nothing.
+An agent connects, and its owner funds a credit balance; each call debits when Mindy does the research. A measured search that honestly finds nothing is still a paid answer. A call that does no work (a refused request, a failure on Mindy's side, or a call stopped before it runs) costs nothing.
 
 - **100 free credits on your first connect** — roughly one real evaluation, so an agent can prove value before anyone pays.
 - **Debit-on-success only.** The credit ledger is atomic at the database layer — a hundred concurrent calls can't corrupt a balance, and a balance never goes negative.
@@ -192,7 +185,7 @@ Public data is labeled public; curated intelligence is labeled curated; an hones
 
 ## The bottom line
 
-Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **64 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
+Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **53 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
 
 - **Commodity done right** — the public-data tools are fast, cached, and useful on call one.
 - **Moat where it counts** — winning playbooks, office-level buying contacts, SBLO teaming, and podcast lessons that took eight years to build.

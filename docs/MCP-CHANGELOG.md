@@ -5,9 +5,39 @@ non-obvious findings behind them. **Ingest target for Mindy Chat v2** — the go
 Mindy Chat can answer any "what does the MCP do / cost / where's the data from" question
 accurately from this file.
 
-Authoritative tool count: **`listMcpTools()` = 64** (never trust a grep — tools register
-via two paths: explicit `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the
-TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 64.
+Authoritative counts (never trust a grep — tools register via two paths: explicit
+`*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the TIER1/TIER2 chat defs):
+- **Internal registry, `listMcpTools()` = 64.** Mindy Chat and tool-to-tool composition use it.
+- **Public catalog, `listPublicMcpTools()` = 53.** What the hosted HTTP edge lists and accepts.
+  The difference is the hidden set in `src/lib/mcp/public-catalog-config.ts`.
+
+---
+
+## October 2026 — public catalog allowlist + outcome telemetry (public 64 → 53, internal stays 64)
+
+**Public catalog.** External MCP hosts now see a fail-closed allowlist (`PUBLIC_MCP_TOOLS`), not
+the whole registry. 11 tools are hidden from external hosts, with their implementations kept, still
+registered for Mindy Chat and still composed inside other tools: `verify_m_scale` (QA oracle),
+`add_contacts_to_crm` and `one_click_proposal` + `get_proposal_job` (hidden until proven end to end),
+`search_sbir` (coverage 1 of ~11 agencies), `get_agency_budget_trends` (ratio reported as a percent),
+`export_proposal` and `build_proposal_structure` (pipeline steps), `extract_statement_of_work`
+(subset of `get_solicitation_documents`), `get_regulatory_demand` (hidden, to be reconsidered with
+telemetry) and `get_incumbent_financials` (composed inside `build_pursuit_dossier`).
+`match_company_to_pathways` stays public: it is the CAI → Pathway Fit step of the Potato journey.
+
+**Outcome telemetry.** Every `mcp_call_log` row now records what the call produced: `outcome`
+(grounded / no_result / degraded / refused / error / blocked / unclassified) plus `grounded`,
+`degraded`, `billing_outcome`, `error_code`, read only from structured result fields.
+
+**Billing.** A measured search that honestly finds nothing is still billed (a paid answer). A call
+that does no work is not: refused input, an account not set up (e.g. no CRM connected), a failure on
+Mindy's side, or a call stopped before it runs.
+
+Source: `tasks/mcp-tool-portfolio-audit-2026-10-02.md` (Phase 0 + Phase 1).
+
+### Docs kept in sync
+
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 53 tools.
 
 ---
 
