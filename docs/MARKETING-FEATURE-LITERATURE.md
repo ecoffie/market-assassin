@@ -7407,3 +7407,36 @@ bill tracker for contractors.
 2026-07-22), S. 4784 reported in the Senate with S. Rept. 119-127. FY2026 → enacted as S. 1071,
 Public Law 119-60.
 
+
+---
+
+## Mindy inside ChatGPT: a read-only federal research connector (coming — not yet submitted) (2026-10-02)
+
+**What.** A ChatGPT-specific Mindy connector at `mcp.getmindy.ai/chatgpt/mcp`. A ChatGPT user
+who signs in with their Mindy account can ask federal contracting questions in plain English and
+get answers from public government records: open SAM.gov solicitations, contracts coming up for
+recompete, agency forecasts, past awards, award detail, the likely incumbent behind a solicitation,
+contractor award history, SAM.gov registrations and certifications, grants, agency research,
+industry days, and NDAA status in Congress. Fifteen read-only tools, each described for what the
+user is trying to do.
+
+**Why it matters.** Many small businesses already ask ChatGPT about federal contracting and get
+answers from memory or the open web. This connector grounds those answers in the actual records,
+with notice IDs, contract numbers and sam.gov / usaspending.gov / grants.gov / congress.gov links the
+user can check, and it says "not found" or "unavailable" instead of filling gaps.
+
+**Honest scope.** Not yet submitted to OpenAI and not yet tested against a live ChatGPT connection.
+Read-only research only: no proposal drafting, no CRM, no saved searches or alerts, no maps or
+widgets inside ChatGPT. It uses an existing Mindy account and its existing credits; it does not
+create free credits and shows no prices or purchase links inside ChatGPT. Submission waits on
+OpenAI's answer about using an existing account balance.
+
+**SEO.** federal contracting ChatGPT plugin / SAM.gov in ChatGPT / find government contracts with
+ChatGPT / who holds this federal contract ChatGPT.
+
+**Proof.** Tool behaviour is the same code the Claude connector already runs. Unit tests prove:
+exactly 15 tools on the ChatGPT endpoint and 64 unchanged on the Claude endpoint; tokens for one
+endpoint are rejected by the other; no price, purchase link or credit line in any ChatGPT
+description, result or refusal; no free-credit grant and no automatic card recharge triggered from
+a ChatGPT call. Result projection is tested on real captured tool output (find_opportunities,
+lookup_solicitation, get_legislation_status).

@@ -1,0 +1,514 @@
+{
+  "query_summary": {
+    "query": "cybersecurity",
+    "location": "FL",
+    "agency": null,
+    "timeframe": {
+      "open_closing_days": null,
+      "recompete_months": 18,
+      "forecast_include_past": false
+    },
+    "set_aside": null,
+    "horizons_requested": [
+      "open_now",
+      "coming_back",
+      "coming_soon"
+    ],
+    "interpreted_as": {
+      "open_now": "Canonical discovery (text_or_taxonomy): ALL(cybersecurity); buyer = whole-word identity on department OR sub_tier; geo = place-of-performance OR buying-office state; rank = evidence tier → breadth → score → deadline",
+      "coming_back": "Canonical discovery (industry_preset): ALL(cybersecurity); buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window ≤18mo",
+      "coming_soon": "Canonical discovery (text): ALL(cybersecurity); agency = forecast identity codes; geo = pop_state; current + future fiscal years; unresolved publisher → unavailable, not zero"
+    },
+    "region": {
+      "requested": [
+        "FL"
+      ],
+      "states": [
+        "FL"
+      ],
+      "unresolved": []
+    }
+  },
+  "market_interpretation": {
+    "customer_phrase": "cybersecurity",
+    "buyer": {
+      "requested": null,
+      "canonical": null,
+      "aliases": [],
+      "needles": [],
+      "kind": "none",
+      "parent_department_applied": false,
+      "reason": "No buyer named."
+    },
+    "capability": {
+      "requested": "cybersecurity",
+      "kind": "cyber_with_related_it",
+      "direct": {
+        "source": "Cybersecurity",
+        "naics": [
+          "518210"
+        ],
+        "psc": [
+          "DJ01",
+          "DJ10"
+        ],
+        "terms": [
+          "Cybersecurity",
+          "cyber",
+          "information security",
+          "network security",
+          "infosec",
+          "zero trust",
+          "SIEM"
+        ],
+        "reason": "Direct cyber taxonomy: PSC IT Security & Compliance plus hosting NAICS 518210. Not the IT-services family."
+      },
+      "related_market": {
+        "source": "IT Services",
+        "naics": [
+          "541511",
+          "541512",
+          "541513",
+          "541519"
+        ],
+        "psc": [],
+        "terms": [],
+        "reason": "Cyber has no NAICS home. These IT-service codes can contain the requested cyber work, but they are not cybersecurity. Rows retrieved only this way are RELATED_MARKET_CANDIDATE."
+      },
+      "excluded": [
+        {
+          "phrase": "physical security",
+          "reason": "Physical security, access-control doors, and generic “security” are not cyber DIRECT_MATCH."
+        }
+      ]
+    },
+    "retrieval_plan": {
+      "buyer_is_normalization": true,
+      "related_market_applied": true,
+      "related_market_reason": "Cyber has no NAICS home. These IT-service codes can contain the requested cyber work, but they are not cybersecurity. Rows retrieved only this way are RELATED_MARKET_CANDIDATE."
+    },
+    "truth": {
+      "what_was_requested": {
+        "phrase": "cybersecurity",
+        "buyer": null
+      },
+      "what_was_consumed": [
+        "phrase:cybersecurity",
+        "direct_taxonomy:Cybersecurity",
+        "related_market:IT Services"
+      ],
+      "what_was_expanded": [
+        "related_market:IT Services naics 541511,541512,541513,541519"
+      ],
+      "why": "No buyer named. Cyber has no NAICS home. These IT-service codes can contain the requested cyber work, but they are not cybersecurity. Rows retrieved only this way are RELATED_MARKET_CANDIDATE.",
+      "what_remains_unsupported": [],
+      "records": {
+        "DIRECT_MATCH": [
+          "CONT_AWD_FA875024CB003_9700_-NONE-_-NONE-",
+          "CONT_AWD_N0018923CZ014_9700_-NONE-_-NONE-"
+        ],
+        "RELATED_MARKET_CANDIDATE": []
+      }
+    }
+  },
+  "presentation_note": "I looked for confirmed cybersecurity work, then also listed this buyer’s broader IT contracts as related-market candidates — not as confirmed cyber demand. I found 15 contracts with direct cybersecurity evidence and 70 related-market candidates worth reviewing. Do not call the combined 85 \"cybersecurity contracts\". 2 more matched only on the holder's name — holder signals, not cybersecurity demand.",
+  "horizons": {
+    "open_now": {
+      "status": "grounded",
+      "matched_count": 5,
+      "returned_count": 2,
+      "items": [
+        {
+          "horizon": "open_now",
+          "title": "Space Warfighter Training, Modeling, and Simulation Support",
+          "buyer": "DEPT OF DEFENSE",
+          "location_label": "Colorado Springs, CO",
+          "relevant_date": "2026-10-08T16:00:00+00:00",
+          "relevant_date_label": "response_deadline",
+          "value_label": null,
+          "source": "sam_opportunities",
+          "why_this_matched": "Direct match for “cybersecurity” — the record itself establishes relevance.",
+          "identity": {
+            "kind": "notice_id",
+            "id": "4004f21e9c8f410f96a7d43fa1a045c7"
+          },
+          "evidence_class": "DIRECT_MATCH",
+          "match_basis": [
+            "buy_side_text"
+          ],
+          "notice_id": "4004f21e9c8f410f96a7d43fa1a045c7",
+          "solicitation_number": "FA254927R0002",
+          "response_deadline": "2026-10-08T16:00:00+00:00",
+          "set_aside": null,
+          "sam_url": "https://sam.gov/workspace/contract/opp/4004f21e9c8f410f96a7d43fa1a045c7/view",
+          "notice_type": "Sources Sought",
+          "naics_code": null,
+          "psc_code": null,
+          "sub_agency": "DEPT OF THE AIR FORCE"
+        },
+        {
+          "horizon": "open_now",
+          "title": "Combined Synopsis/Solicitation for Commercial Items Agile Professional Services (\"APS”) Department of the Army",
+          "buyer": "DEPT OF DEFENSE",
+          "location_label": "Orlando, FL",
+          "relevant_date": "2026-10-14T03:59:00+00:00",
+          "relevant_date_label": "response_deadline",
+          "value_label": null,
+          "source": "sam_opportunities",
+          "why_this_matched": "Direct match for “cybersecurity” — the record itself establishes relevance.",
+          "identity": {
+            "kind": "notice_id",
+            "id": "9cd1af28a6f7414b9c23823d9fd7e6c5"
+          },
+          "evidence_class": "DIRECT_MATCH",
+          "match_basis": [
+            "buy_side_text"
+          ],
+          "notice_id": "9cd1af28a6f7414b9c23823d9fd7e6c5",
+          "solicitation_number": "W900KK-26-R-A023",
+          "response_deadline": "2026-10-14T03:59:00+00:00",
+          "set_aside": "Small Business Set Aside - Total",
+          "sam_url": "https://sam.gov/workspace/contract/opp/9cd1af28a6f7414b9c23823d9fd7e6c5/view",
+          "notice_type": "Combined Synopsis/Solicitation",
+          "naics_code": "541990",
+          "psc_code": "R499",
+          "sub_agency": "DEPT OF THE ARMY"
+        }
+      ],
+      "source": "sam_opportunities",
+      "as_of": "2026-10-03T01:00:34.301978+00:00",
+      "filters_consumed": [
+        "canonical_discovery:v2",
+        "eligibility:ALL(cybersecurity)",
+        "location→pop_or_office(FL)",
+        "status=active",
+        "query→text∪direct_taxonomy",
+        "rank→evidence_tier·breadth·score·date"
+      ],
+      "filters_unsupported": [],
+      "unmapped_count": 0,
+      "error": null,
+      "allowed_handoffs": [
+        "incumbent",
+        "bid_fit",
+        "dossier",
+        "documents",
+        "draft_response",
+        "agency_intel",
+        "market_intel",
+        "prepare_positioning",
+        "monitor_market",
+        "monitor_notice"
+      ],
+      "semantics_note": "Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.",
+      "evidence_counts": {
+        "DIRECT_MATCH": 2,
+        "RELATED_MARKET_CANDIDATE": 0
+      }
+    },
+    "coming_back": {
+      "status": "grounded",
+      "matched_count": 87,
+      "returned_count": 2,
+      "items": [
+        {
+          "horizon": "coming_back",
+          "title": "CROMULENCE LLC",
+          "buyer": "Department of the Air Force",
+          "location_label": "FL",
+          "award_kind": "standalone_contract",
+          "capture_start_date": "2026-02-11",
+          "capture_start_basis": "derived: period_of_performance_current_end − 12 months (Mindy capture lead rule)",
+          "relevant_date": "2027-02-11",
+          "relevant_date_label": "current_end",
+          "value_label": "$18.3M",
+          "source": "recompete_opportunities",
+          "why_this_matched": "Direct match for “cybersecurity” — the record itself establishes relevance.",
+          "identity": {
+            "kind": "contract_id",
+            "id": "CONT_AWD_FA875024CB003_9700_-NONE-_-NONE-"
+          },
+          "evidence_class": "DIRECT_MATCH",
+          "match_basis": [
+            "buy_side_text"
+          ],
+          "contract_id": "CONT_AWD_FA875024CB003_9700_-NONE-_-NONE-",
+          "piid": "FA875024CB003",
+          "incumbent_name": "CROMULENCE LLC",
+          "incumbent_uei": "EBFVNANTLLK7",
+          "current_end": "2027-02-11",
+          "potential_total_value": 18267102,
+          "total_obligation": 18267102,
+          "recompete_likelihood": "high",
+          "set_aside_type": "Full & Open",
+          "naics_code": "541715",
+          "psc_code": "AC12",
+          "description": "HEPHAESTUS IS TO RESEARCH AND DEVELOP TRANSFORMATIVE TOOLS TO FIND, EXPLOIT, AND PATCH VULNERABILITIES IN MEDIUM-COMPLEXITY CYBER-SYSTEMS.",
+          "awarding_sub_agency": "Department of the Air Force"
+        },
+        {
+          "horizon": "coming_back",
+          "title": "ODME SOLUTIONS, LLC",
+          "buyer": "Department of the Navy",
+          "location_label": "FL",
+          "award_kind": "standalone_contract",
+          "capture_start_date": "2026-03-27",
+          "capture_start_basis": "derived: period_of_performance_current_end − 12 months (Mindy capture lead rule)",
+          "relevant_date": "2027-03-27",
+          "relevant_date_label": "current_end",
+          "value_label": "$3.1M",
+          "source": "recompete_opportunities",
+          "why_this_matched": "Direct match for “cybersecurity” — the record itself establishes relevance.",
+          "identity": {
+            "kind": "contract_id",
+            "id": "CONT_AWD_N0018923CZ014_9700_-NONE-_-NONE-"
+          },
+          "evidence_class": "DIRECT_MATCH",
+          "match_basis": [
+            "buy_side_code"
+          ],
+          "contract_id": "CONT_AWD_N0018923CZ014_9700_-NONE-_-NONE-",
+          "piid": "N0018923CZ014",
+          "incumbent_name": "ODME SOLUTIONS, LLC",
+          "incumbent_uei": "F3U6Q6NH6V98",
+          "current_end": "2027-03-27",
+          "potential_total_value": 3118573.83,
+          "total_obligation": 3118573.83,
+          "recompete_likelihood": "high",
+          "set_aside_type": "8(a)",
+          "naics_code": "541512",
+          "psc_code": "R499",
+          "description": "OPNAV SITE R CYBERSECURITY",
+          "awarding_sub_agency": "Department of the Navy"
+        }
+      ],
+      "source": "recompete_opportunities",
+      "as_of": "2026-10-03T02:25:28.726+00:00",
+      "filters_consumed": [
+        "canonical_discovery:v2",
+        "eligibility:ALL(cybersecurity)",
+        "location→place_of_performance_state(FL)",
+        "quality_flag=null",
+        "pop_end≥today",
+        "recompete_via=industry_preset",
+        "timeframe.recompete_months=18",
+        "rank→evidence_tier·breadth·score·date"
+      ],
+      "filters_unsupported": [],
+      "unmapped_count": 24,
+      "error": null,
+      "allowed_handoffs": [
+        "incumbent",
+        "agency_intel",
+        "contract_history",
+        "recompete_planning",
+        "market_intel",
+        "prepare_positioning",
+        "monitor_market"
+      ],
+      "semantics_note": "DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is this buyer’s broader IT market — not confirmed cybersecurity. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet. DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder's name. Task/delivery orders under a contract vehicle are excluded — they are not re-competed on their own.",
+      "evidence_counts": {
+        "DIRECT_MATCH": 15,
+        "RELATED_MARKET_CANDIDATE": 70,
+        "HOLDER_SIGNAL": 2
+      },
+      "orders_excluded": 240
+    },
+    "coming_soon": {
+      "status": "grounded",
+      "matched_count": 3,
+      "returned_count": 2,
+      "items": [
+        {
+          "horizon": "coming_soon",
+          "title": "GT-NASTP-OMN-SB-Akima System Engineering-Cyber CSS Support FY27",
+          "buyer": "NAVY",
+          "location_label": "FL",
+          "relevant_date": null,
+          "relevant_date_label": "anticipated_award_date",
+          "value_label": "< $2M",
+          "source": "agency_forecasts",
+          "why_this_matched": "Matched agency forecast for “cybersecurity”",
+          "identity": {
+            "kind": "forecast_id",
+            "id": "289f699a-db4a-488a-8200-002b6099eb29"
+          },
+          "match_basis": [
+            "buy_side_text"
+          ],
+          "forecast_id": "289f699a-db4a-488a-8200-002b6099eb29",
+          "anticipated_award_date": null,
+          "solicitation_date": null,
+          "fiscal_year": "FY2027",
+          "anticipated_quarter": "Q3",
+          "acquisition_status": "forecasted",
+          "forecast_source_agency": "NAVY",
+          "set_aside_type": "Small Business",
+          "naics_code": null,
+          "incumbent_name": null,
+          "contracting_office": "N61340"
+        },
+        {
+          "horizon": "coming_soon",
+          "title": "USN-TS-H-60-APN7-LB-TBD-FY27 CYBER OS UPGRADES",
+          "buyer": "NAVY",
+          "location_label": "FL",
+          "relevant_date": null,
+          "relevant_date_label": "anticipated_award_date",
+          "value_label": "No Range Specified",
+          "source": "agency_forecasts",
+          "why_this_matched": "Matched agency forecast for “cybersecurity”",
+          "identity": {
+            "kind": "forecast_id",
+            "id": "0f22745a-4946-4b3d-8db3-2588d786acae"
+          },
+          "match_basis": [
+            "buy_side_text"
+          ],
+          "forecast_id": "0f22745a-4946-4b3d-8db3-2588d786acae",
+          "anticipated_award_date": null,
+          "solicitation_date": null,
+          "fiscal_year": "FY2027",
+          "anticipated_quarter": "Q2",
+          "acquisition_status": "forecasted",
+          "forecast_source_agency": "NAVY",
+          "set_aside_type": "Sole Source",
+          "naics_code": null,
+          "incumbent_name": null,
+          "contracting_office": "N61340"
+        }
+      ],
+      "source": "agency_forecasts",
+      "as_of": "2026-10-02T13:00:31.547+00:00",
+      "filters_consumed": [
+        "canonical_discovery:v2",
+        "eligibility:ALL(cybersecurity)",
+        "location→pop_state(FL)",
+        "exclude_past_fy",
+        "forecast_via=text",
+        "rank→evidence_tier·breadth·score·date"
+      ],
+      "filters_unsupported": [],
+      "unmapped_count": 0,
+      "error": null,
+      "allowed_handoffs": [
+        "agency_intel",
+        "market_intel",
+        "prepare_positioning",
+        "monitor_market"
+      ],
+      "semantics_note": "Canonical discovery eligibility (word-bounded). Current and future fiscal years unless opted in. Ranked by how many of the query’s concepts a forecast carries, then anticipated award date. Geography: pop_state only; many forecasts have no location."
+    }
+  },
+  "summary": {
+    "open_now": {
+      "status": "grounded",
+      "matched_count": 5
+    },
+    "coming_back": {
+      "status": "grounded",
+      "matched_count": 87,
+      "direct_match": 15,
+      "related_market_candidate": 70,
+      "holder_signal": 2
+    },
+    "coming_soon": {
+      "status": "grounded",
+      "matched_count": 3
+    },
+    "headline": "5 open now (2 direct · 0 related-market) · 87 coming back (15 direct · 70 related-market · 2 holder-name only) · 3 coming soon",
+    "claim_hygiene": "Related-market rows are labeled RELATED_MARKET_CANDIDATE and are not confirmed capability demand. Counts are per-horizon matches under this query — not unique procurements across horizons. Do not call combined raw rows unique opportunities. Do not count RELATED_MARKET_CANDIDATE as confirmed cybersecurity demand."
+  },
+  "_meta": {
+    "grounded": true,
+    "degraded": false,
+    "composition": "opportunity_map_horizons_v1",
+    "expansion_note": "Related-market expansion recorded: Cyber has no NAICS home. These IT-service codes can contain the requested cyber work, but they are not cybersecurity. Rows retrieved only this way are RELATED_MARKET_CANDIDATE.",
+    "watch_coverage": [
+      "open_now",
+      "coming_soon"
+    ],
+    "find_shape": "specific",
+    "discovery": {
+      "plan_version": 2,
+      "status": "ok",
+      "refinement": null,
+      "eligibility": "ALL(cybersecurity)"
+    }
+  },
+  "_next": [
+    {
+      "prompt": "Want me to show you what this customer cares about and what you should say to them?",
+      "tool": "understand_customer",
+      "credits": 5,
+      "requires_confirmation": true,
+      "suggested_args": {
+        "notice_id": "4004f21e9c8f410f96a7d43fa1a045c7",
+        "agency": "DEPT OF DEFENSE"
+      },
+      "missing_inputs": []
+    },
+    {
+      "prompt": "Want me to monitor this market for new and upcoming opportunities? (Watch covers Open now + Coming soon — Coming back / recompetes are not emailed yet.)",
+      "tool": "schedule_market_search",
+      "credits": 0,
+      "requires_confirmation": true,
+      "suggested_args": {
+        "watch_coverage": [
+          "open_now",
+          "coming_soon"
+        ]
+      }
+    }
+  ],
+  "presentation": {
+    "host_rules": [
+      "FIRST VALUE: present this result immediately. Do not ask questions before showing it.",
+      "HERE'S WHERE I SEE THE MONEY — use presentation.sections titles in order: Open now, Coming back, Coming soon. Report each horizon's own status. An unavailable or failed horizon is a coverage gap — never zero / none / empty demand.",
+      "WHERE I WOULD START: one evidence-supported point from the returned items (prefer a live Open hit if grounded; else Coming back; else Coming soon). Do not invent a solicitation for a recompete or forecast.",
+      "WHY: 1–3 concise reasons from this result's evidence only.",
+      "WHAT I CAN'T ESTABLISH YET: one material limitation if any (sparse coverage, unavailable horizon, broad query).",
+      "ONE FIND: this call is the first-value FIND. Do not call find_opportunities again before presenting. Do not fan out parallel FIND variants.",
+      "Then ask at most ONE plain-English refinement (what they actually sell). WAIT. Do not auto-call understand_customer or get_current_acquisition_intelligence even if `_next` offers them — those are confirmation-gated after first value.",
+      "Do not ask company identity, UEI, CAGE, certifications, clearance, FCL, set-aside, vehicle, or desired deliverable before presenting this. Do not expose NAICS/PSC/ATO/CNO/CEMA/CSO/OT/PAE/FCL in the refinement unless the user already used that word.",
+      "Do not web-search or create an artifact on this turn. Do not ask market map vs access-path vs capability statement.",
+      "Clearance is not a first-value question. Do not call it a hard gate because the buyer is SOCOM.",
+      "EVIDENCE CLASS: DIRECT_MATCH is confirmed relevance to what they asked to sell. RELATED_MARKET_CANDIDATE is this buyer’s broader market that can contain that work. Never count related-market rows as confirmed cyber (or other capability) demand. Never mix the two into one “cyber contracts” number. Explain the distinction in plain English. Do not dump NAICS/PSC.",
+      "COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say “N contracts with direct cybersecurity evidence and M related SOCOM IT contracts worth reviewing.” Never say “N+M cybersecurity recompetes/contracts.” presentation_note and summary.headline already split the counts — use them.",
+      "INTERPRETATION: use presentation_note / market_interpretation.truth. Buyer alias (SOCOM = U.S. Special Operations Command) is spelling, not a wider department. Never say you searched all of DoD. Never claim the entire IT-services market is cybersecurity.",
+      "COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.",
+      "COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured — never say they have zero upcoming buys.",
+      "HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent's NAME (e.g. a firm called “… Machining and Fabrication”). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder's name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely."
+    ],
+    "sections": {
+      "open_now": {
+        "display_title": "Open now",
+        "provenance_label": "Live solicitations for this query — grounded, empty, or unavailable (unavailable is not zero)"
+      },
+      "coming_back": {
+        "display_title": "Coming back",
+        "provenance_label": "Contracts likely to recompete — not a live solicitation number"
+      },
+      "coming_soon": {
+        "display_title": "Coming soon",
+        "provenance_label": "Agency forecasts / planned demand — not a live solicitation number"
+      },
+      "start": {
+        "display_title": "Where I would start",
+        "provenance_label": "One item from the returned evidence — not a new lookup"
+      },
+      "why": {
+        "display_title": "Why",
+        "provenance_label": "1–3 reasons from this result only"
+      },
+      "gaps": {
+        "display_title": "What I can't establish yet",
+        "provenance_label": "Coverage gap or query limit — never fabricated as zero"
+      },
+      "related": {
+        "display_title": "Related market — not confirmed",
+        "provenance_label": "RELATED_MARKET_CANDIDATE rows. Broader market at this buyer; not confirmed capability demand"
+      }
+    }
+  }
+}

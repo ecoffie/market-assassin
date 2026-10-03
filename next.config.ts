@@ -155,6 +155,14 @@ const nextConfig: NextConfig = {
           source: '/.well-known/oauth-protected-resource',
           destination: '/api/oauth/metadata/protected-resource',
         },
+        // The ChatGPT profile resource (https://mcp.getmindy.ai/chatgpt/mcp) gets its OWN
+        // RFC 9728 document — resource = the ChatGPT URL — so ChatGPT requests a token for
+        // that audience. MUST sit above the generic :path* rule, which serves the full
+        // endpoint's metadata to every other suffix (Claude's /mcp included) unchanged.
+        {
+          source: '/.well-known/oauth-protected-resource/chatgpt/mcp',
+          destination: '/api/oauth/metadata/protected-resource/chatgpt',
+        },
         {
           source: '/.well-known/oauth-protected-resource/:path*',
           destination: '/api/oauth/metadata/protected-resource',

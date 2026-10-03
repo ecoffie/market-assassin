@@ -2916,6 +2916,32 @@ dedicated `MCP_OAUTH_SIGNING_SECRET`.
 
 ---
 
+## Mindy MCP Server — `/chatgpt/mcp` profile (ChatGPT plugin Path A, 2026-10-02)
+
+A SECOND MCP handler at `https://mcp.getmindy.ai/chatgpt/mcp` (`src/app/chatgpt/mcp/route.ts`),
+beside — not replacing — the full edge. Plan + owner decisions + open items:
+**`tasks/chatgpt-plugin-path-a.md`** (read it before touching either endpoint).
+
+- **Allowlist lives in `src/lib/mcp/chatgpt-profile.ts`** (`CHATGPT_TOOL_ALLOWLIST`, exactly 15),
+  with ChatGPT-only titles/descriptions/annotations, server instructions, the result projection
+  (`_meta` ALLOWLIST, `_next` credits stripped, find_opportunities ranking internals dropped) and the
+  neutral-refusal mapping (`chatgpt-refusals.ts`). Input schemas are reused from
+  `mcpRegistrationList()` verbatim — never redefine them there.
+- **Billing seam still holds:** calls go through `runMeteredTool(..., { channel: 'chatgpt' })`, so an
+  existing balance is pre-checked and debited exactly like Claude. The channel only suppresses
+  commerce side effects (`recordPaywallAttempt`, paywall copy, continue_url). No footer, no
+  `_meta.credits`, no `grantSignupCreditsIfFirst`, no in-request `maybeAutoRecharge`.
+- **OAuth:** one authorization server, two resources (`src/lib/mcp/oauth/resources.ts`). The token
+  endpoint mints `aud` = the ChatGPT resource only for a ChatGPT grant (no signup/referral credits);
+  each handler accepts only its own audience. Metadata: `/.well-known/oauth-protected-resource/chatgpt/mcp`.
+- **⚠️ The Claude/general endpoint must stay EXACTLY as it was** (64 tools, copy, footer, paywall).
+  Guarded by `src/app/mcp/[transport]/__tests__/route.claude-unchanged.unit.test.ts`. Never "clean up"
+  commerce on the full endpoint as a side effect of ChatGPT work.
+- **Open:** the hourly `/api/cron/mcp-autorecharge` backstop is balance-based and channel-blind
+  (decision pending — see the task file). Not submitted to OpenAI.
+
+---
+
 ## Mindy MCP Server — usage visibility + tool grouping (2026-07-15, PR #247)
 
 Three additive UX fixes (from Eric's Higgsfield comparison) so users can see spend

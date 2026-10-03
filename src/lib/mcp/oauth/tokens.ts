@@ -8,6 +8,7 @@
  * random strings; only their sha256 is persisted.
  */
 import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { OAUTH_RESOURCE } from './resources';
 
 /** Origin that issues + protects tokens. Same-origin AS+RS (scope decision #1). */
 export const OAUTH_ISSUER = (process.env.MCP_OAUTH_ISSUER || 'https://getmindy.ai').replace(/\/$/, '');
@@ -26,7 +27,11 @@ export const OAUTH_ISSUER = (process.env.MCP_OAUTH_ISSUER || 'https://getmindy.a
  *
  * Keep byte-identical to MCP_URL in src/app/mcp/catalog-ui.tsx.
  */
-export const OAUTH_RESOURCE = (process.env.MCP_OAUTH_RESOURCE || 'https://mcp.getmindy.ai/mcp').replace(/\/$/, '');
+//
+// The value now lives in ./resources.ts (alongside the ChatGPT profile resource) so the
+// client-side consent page can share the resource logic without node:crypto. Re-exported
+// here so every existing import keeps working unchanged.
+export { OAUTH_RESOURCE, OAUTH_RESOURCE_CHATGPT } from './resources';
 export const ACCESS_TTL_SEC = 3600; // 1 hour — refresh tokens renew
 export const REFRESH_TTL_SEC = 60 * 60 * 24 * 60; // 60 days
 export const CODE_TTL_SEC = 300; // 5 minutes, single-use
@@ -65,11 +70,21 @@ export interface AccessTokenClaims {
   jti: string;
 }
 
-export function issueAccessToken(userEmail: string, clientId: string, scope = MCP_SCOPE): { token: string; expiresIn: number } {
+/**
+ * Mint an access token. `audience` defaults to the full MCP resource, so every existing
+ * caller mints exactly what it minted before; the token endpoint passes the ChatGPT
+ * resource only when the grant was made for it (see resources.ts resolveTokenAudience).
+ */
+export function issueAccessToken(
+  userEmail: string,
+  clientId: string,
+  scope = MCP_SCOPE,
+  audience: string = OAUTH_RESOURCE,
+): { token: string; expiresIn: number } {
   const now = Math.floor(Date.now() / 1000);
   const claims: AccessTokenClaims = {
     sub: userEmail.toLowerCase(),
-    aud: OAUTH_RESOURCE,
+    aud: audience,
     client_id: clientId,
     scope,
     iat: now,
@@ -82,8 +97,18 @@ export function issueAccessToken(userEmail: string, clientId: string, scope = MC
   return { token: `${header}.${payload}.${sig}`, expiresIn: ACCESS_TTL_SEC };
 }
 
-/** Verify signature + exp + audience. Returns claims or null (never throws). */
-export function verifyAccessToken(token: string | null | undefined): AccessTokenClaims | null {
+/**
+ * Verify signature + exp + audience. Returns claims or null (never throws).
+ *
+ * `expectedAudience` defaults to the full MCP resource — the Claude/general edge calls this
+ * with no second argument and so still rejects anything not minted for it (including a
+ * ChatGPT-audience token). The ChatGPT edge passes OAUTH_RESOURCE_CHATGPT and so rejects
+ * every full-endpoint token. One audience per handler.
+ */
+export function verifyAccessToken(
+  token: string | null | undefined,
+  expectedAudience: string = OAUTH_RESOURCE,
+): AccessTokenClaims | null {
   if (!token || token.split('.').length !== 3) return null;
   const [header, payload, sig] = token.split('.');
   const expected = b64url(createHmac('sha256', signingSecret()).update(`${header}.${payload}`).digest());
@@ -94,7 +119,7 @@ export function verifyAccessToken(token: string | null | undefined): AccessToken
   try {
     const claims = JSON.parse(Buffer.from(payload, 'base64').toString('utf8')) as AccessTokenClaims;
     if (!claims.sub || !claims.exp || claims.exp < Math.floor(Date.now() / 1000)) return null;
-    if (claims.aud !== OAUTH_RESOURCE) return null; // reject tokens minted for another resource
+    if (claims.aud !== expectedAudience) return null; // reject tokens minted for another resource
     return claims;
   } catch {
     return null;
