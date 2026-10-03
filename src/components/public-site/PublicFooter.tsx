@@ -1,4 +1,5 @@
 import { SITE_LINK_GROUPS } from '@/lib/seo/site-links';
+import { MP_FOOTER_TAGLINE } from '@/lib/public-site/chrome';
 
 /** The homepage footer (siteFooterHtml in src/lib/seo/site-links.ts), as JSX. */
 export default function PublicFooter() {
@@ -18,9 +19,7 @@ export default function PublicFooter() {
           </div>
         ))}
       </div>
-      <div className="mp-foot-b">
-        Mindy — federal market intelligence built on SAM.gov, USASpending and agency forecast data.
-      </div>
+      <div className="mp-foot-b">{MP_FOOTER_TAGLINE}</div>
     </footer>
   );
 }

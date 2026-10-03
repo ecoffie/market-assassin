@@ -10,9 +10,11 @@
  *  - it CITES OBS-001 / OBS-002 by their permanent Observatory ids,
  *  - the edition + version + generated date are shown (the URL is permanent; the edition evolves).
  *
- * No external assets (CSP-clean): inline CSS, system fonts, no webfonts/CDN.
+ * Visual system: the Mindy public site (src/lib/public-site) — shared header/footer, self-hosted
+ * fonts (no CDN) and the `--mp-*` roles. Print hides the shared chrome so the report prints alone.
  */
 import type { Benchmark, AgencyRow } from './sb-participation-benchmark';
+import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -58,57 +60,61 @@ export function renderSbBenchmarkHtml(b: Benchmark, opts: { edition: string; ver
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(canonical)}">
 <meta name="robots" content="index,follow">
+${mpRawHeadHtml()}
 <style>
-  :root{
-    --navy:#0b1f3a; --ink:#101828; --muted:#667085; --line:#e4e7ec; --bg:#ffffff;
-    --accent:#7c3aed; --green:#059669; --chip:#f2f4f7; --track:#eef2f6;
-  }
-  *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    line-height:1.55;font-size:16px}
-  .wrap{max-width:920px;margin:0 auto;padding:0 22px 80px}
-  header.masthead{border-bottom:1px solid var(--line);padding:22px 0 18px;margin-bottom:8px}
-  .inst{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.02em;color:var(--navy)}
-  .inst .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
-  .inst .sub{font-weight:600;color:var(--muted);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
-  .hero{padding:34px 0 10px}
-  .kicker{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
-  h1{font-size:34px;line-height:1.15;margin:8px 0 6px;letter-spacing:-.01em;color:var(--navy);text-wrap:balance}
-  .lede{font-size:17px;color:#344054;max-width:680px;margin:6px 0 0}
-  .meta{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 4px}
-  .chip{font-size:12px;color:#344054;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-weight:600}
-  .chip.cite{background:#f5f0ff;border-color:#e6dbff;color:#5b2bb8;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  .headline{display:flex;gap:26px;flex-wrap:wrap;margin:26px 0 6px;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fafafb}
-  .headline .stat{min-width:140px}
-  .headline .big{font-size:30px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums}
-  .headline .lab{font-size:12.5px;color:var(--muted);margin-top:2px}
-  h2{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:38px 0 12px;font-weight:700}
-  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
-  table{border-collapse:collapse;width:100%;min-width:640px}
-  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:14.5px}
-  th{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;background:#fcfcfd}
-  tr:last-child td{border-bottom:none}
-  td.rank{color:var(--muted);width:34px;font-variant-numeric:tabular-nums}
-  td.dept{font-weight:600;color:var(--ink)}
-  td.num{text-align:right;font-variant-numeric:tabular-nums;color:#344054;width:120px}
-  th.num{text-align:right}
-  td.pct{width:220px}
-  .pctwrap{position:relative;display:flex;align-items:center;gap:10px}
-  .pctwrap .bar{height:9px;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#059669);min-width:2px}
-  .pctval{font-weight:700;font-variant-numeric:tabular-nums;color:var(--navy);white-space:nowrap}
-  .method{margin-top:14px;font-size:14.5px;color:#475467}
-  .method p{margin:10px 0}
-  .method b{color:var(--ink)}
-  .disclose{margin-top:16px;padding:14px 16px;border-left:3px solid var(--accent);background:#faf8ff;border-radius:0 10px 10px 0;font-size:14px;color:#475467}
-  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
-  footer a{color:var(--accent);text-decoration:none}
-  @media (max-width:560px){ h1{font-size:27px} .headline{gap:16px} }
+  body{margin:0;line-height:1.55;font-size:16px}
+  .sbb.wrap{max-width:920px;margin:0 auto;padding:0 22px 24px;color:var(--mp-ink)}
+  .sbb header.masthead{border-bottom:1px solid var(--mp-line);padding:22px 0 18px;margin-bottom:8px}
+  .sbb .inst{display:flex;align-items:center;gap:9px;font-family:var(--mp-font-serif);font-weight:700;letter-spacing:.01em;color:var(--mp-ink)}
+  .sbb .inst .dot{width:9px;height:9px;border-radius:0;background:var(--mp-accent)}
+  .sbb .inst .sub{font-family:var(--mp-font-sans);font-weight:600;color:var(--mp-muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  .sbb .hero{padding:34px 0 10px}
+  .sbb .kicker{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--mp-accent)}
+  .sbb h1{font:700 34px/1.18 var(--mp-font-serif);margin:10px 0 8px;letter-spacing:-.012em;color:var(--mp-ink);text-wrap:balance}
+  .sbb .lede{font:400 17px/1.6 var(--mp-font-serif);color:var(--mp-body);max-width:680px;margin:6px 0 0}
+  .sbb .lede b{color:var(--mp-ink)}
+  .sbb .meta{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 4px}
+  .sbb .chip{font-size:12px;color:var(--mp-body);background:var(--mp-wash);border:1px solid var(--mp-line);border-radius:var(--mp-radius-chip);padding:3px 9px;font-weight:600}
+  .sbb .chip.cite{background:var(--mp-navy-wash);border-color:var(--mp-line);color:var(--mp-navy);font-family:var(--mp-font-mono);font-weight:500}
+  .sbb .headline{display:flex;gap:26px;flex-wrap:wrap;margin:26px 0 6px;padding:18px 20px;border:1px solid var(--mp-line);border-radius:0;background:var(--mp-surface)}
+  .sbb .headline .stat{min-width:140px}
+  .sbb .headline .big{font:600 30px/1.1 var(--mp-font-mono);letter-spacing:-.03em;color:var(--mp-ink);font-variant-numeric:tabular-nums}
+  .sbb .headline .lab{font-size:12.5px;color:var(--mp-muted);margin-top:4px}
+  .sbb h2{font:700 11px var(--mp-font-sans);letter-spacing:.18em;text-transform:uppercase;color:var(--mp-muted);margin:38px 0 12px}
+  .sbb .tablewrap{overflow-x:auto;border:1px solid var(--mp-line);border-radius:0;background:var(--mp-surface)}
+  .sbb table{border-collapse:collapse;width:100%;min-width:640px}
+  .sbb th,.sbb td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--mp-hair);font-size:14.5px}
+  .sbb th{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mp-muted);font-weight:600;background:var(--mp-wash);border-bottom-color:var(--mp-line)}
+  .sbb tr:last-child td{border-bottom:none}
+  .sbb td.rank{color:var(--mp-muted);width:34px;font-family:var(--mp-font-mono);font-variant-numeric:tabular-nums}
+  .sbb td.dept{font-weight:600;color:var(--mp-ink)}
+  .sbb td.num{text-align:right;font-family:var(--mp-font-mono);font-variant-numeric:tabular-nums;color:var(--mp-body);width:120px}
+  .sbb th.num{text-align:right}
+  .sbb td.pct{width:220px}
+  .sbb .pctwrap{position:relative;display:flex;align-items:center;gap:10px}
+  .sbb .pctwrap .bar{height:9px;border-radius:0;background:var(--mp-navy);min-width:2px}
+  .sbb .pctval{font-family:var(--mp-font-mono);font-weight:600;font-variant-numeric:tabular-nums;color:var(--mp-ink);white-space:nowrap}
+  .sbb .method{margin-top:14px;font-size:14.5px;color:var(--mp-body)}
+  .sbb .method p{margin:10px 0}
+  .sbb .method b{color:var(--mp-ink)}
+  .sbb .disclose{margin-top:16px;padding:14px 16px;border-left:3px solid var(--mp-navy);background:var(--mp-wash);border-radius:0;font-size:14px;color:var(--mp-body)}
+  .sbb .disclose b{color:var(--mp-ink)}
+  .sbb footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--mp-line);font-size:12.5px;color:var(--mp-muted)}
+  .sbb footer b{color:var(--mp-body)}
+  .sbb footer a{color:var(--mp-navy);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+  @media (max-width:560px){ .sbb h1{font-size:27px} .sbb .headline{gap:16px} }
+  @media print{
+    [data-mp-chrome]{display:none!important}
+    .mp-site,html body{background:#fff}
+    .sbb .tablewrap{overflow:visible}
+    .sbb .pctwrap .bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
+${mpRawBodyOpen()}
+<div class="sbb wrap">
   <header class="masthead">
     <div class="inst"><span class="dot"></span>The Mindy Institute<span class="sub">· Procurement Observatory</span></div>
   </header>
@@ -163,6 +169,7 @@ ${rowsHtml}
     <p>Edition ${esc(edition)} · ${esc(version)} · generated ${esc(generatedDate)}. To cite: "Small-Business Participation Benchmark, Edition ${esc(edition)}, The Mindy Institute (OBS-001, OBS-002)."</p>
   </footer>
 </div>
+${mpRawBodyClose()}
 </body>
 </html>`;
 }

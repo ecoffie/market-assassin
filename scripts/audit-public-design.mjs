@@ -10,11 +10,14 @@
  *     which resolve to its dark palette;
  *   - opt out of automatic dark mode (no `dark:` variants, no prefers-color-scheme: dark);
  *   - stay at or below font weight 700;
+ *   - render no transparent or background-clipped text (removing a gradient from clipped text
+ *     leaves it invisible; this shipped once in the /mcp migration and was caught at runtime);
  *   - name no font family other than Libre Baskerville, Inter and IBM Plex Mono (plus their
  *     system fallbacks), and load no fonts from a CDN;
  *   - use only hex colours from src/lib/public-site/tokens.ts;
- *   - render inside the shared system: an app file must import it or sit under a family
- *     layout.tsx that renders PublicShell. Components listed here render only inside the shell.
+ *   - render inside the shared system: an app file must import it (directly, or through a family
+ *     module such as src/lib/gov/shell.ts that does) or sit under a family layout.tsx that renders
+ *     PublicShell. Components listed here render only inside the shell.
  *
  * Directories are walked, so a migrated route family stays guarded when pages are added to it.
  * Generated social images (opengraph-image, twitter-image, icon) are metadata, not page UI, and
@@ -65,6 +68,37 @@ function underShellLayout(file) {
   return false;
 }
 
+/**
+ * Resolves `@/…` and relative imports to source files. Raw-HTML route handlers reach the shared
+ * system through a family module (src/lib/gov/shell.ts → src/lib/public-site/html.ts), so the
+ * shared-import rule follows imports a few hops instead of requiring a direct import.
+ */
+function resolveImport(from, spec) {
+  let base;
+  if (spec.startsWith('@/')) base = join('src', spec.slice(2));
+  else if (spec.startsWith('.')) base = join(dirname(from), spec);
+  else return null;
+  for (const ext of ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.tsx']) {
+    const f = base + ext;
+    if (existsSync(join(ROOT, f)) && statSync(join(ROOT, f)).isFile()) return f;
+  }
+  return null;
+}
+
+const PUBLIC_SITE_IMPORT = /@\/(?:lib|components)\/public-site\//;
+
+export function reachesPublicSite(file, src, depth = 3, seen = new Set()) {
+  if (PUBLIC_SITE_IMPORT.test(src)) return true;
+  if (depth === 0 || seen.has(file)) return false;
+  seen.add(file);
+  for (const m of src.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
+    const target = resolveImport(file, m[1]);
+    if (!target || SHARED_DIRS.some((d) => target.startsWith(d))) continue;
+    if (reachesPublicSite(target, readFileSync(join(ROOT, target), 'utf8'), depth - 1, seen)) return true;
+  }
+  return false;
+}
+
 function hexToRgb(hex) {
   let h = hex.slice(1);
   if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('');
@@ -107,6 +141,7 @@ const RULES = [
   { id: 'weight', re: /(?<![-\w])font-(?:extrabold|black)\b|font-weight\s*:\s*[89]00\b|\bfont\s*:\s*(?:italic\s+)?[89]00\b|fontWeight\s*:\s*['"]?[89]00/g, msg: 'font weight above 700' },
   { id: 'font-family', re: /\b(?:Newsreader|JetBrains|Roboto|Poppins|Montserrat|Lato|Open Sans|Playfair|Merriweather|Source Serif|Space Grotesk|DM Sans|Helvetica Neue|Arial)\b|(?<![-\w])font-(?:mono|serif)\b/g, msg: 'font outside Libre Baskerville / Inter / IBM Plex Mono' },
   { id: 'app-theme', re: /(?<![\w(-])(?:[a-z-]+:)*(?:bg|text|border|ring|divide|placeholder|from|via|to|fill|stroke|outline)-(?:ground(?:-deep)?|surface(?:-2)?|input|hairline|ink(?:-soft)?|muted|faint|accent(?:-[a-z]+)?|navy(?:-\d{3}|-hover)?)(?![\w(-])/g, msg: 'authenticated-app theme token (dark @theme); use the --mp-* roles' },
+  { id: 'transparent-text', re: /(?<![-\w])text-transparent\b|(?<![-\w])color\s*:\s*transparent\b|bg-clip-text|background-clip\s*:\s*text/g, msg: 'transparent / clipped text (what a removed gradient headline leaves behind: invisible text)' },
   { id: 'font-cdn', re: /fonts\.googleapis\.com|fonts\.gstatic\.com|use\.typekit\.net/g, msg: 'font loaded from a CDN (use src/lib/public-site/fonts.ts)' },
 ];
 
@@ -131,8 +166,8 @@ export function auditSource(file, src, palette) {
   }
   const shared = SHARED_DIRS.some((d) => file.startsWith(d));
   const appFile = file.startsWith('src/app/');
-  if (!shared && appFile && /\.(tsx?|jsx?)$/.test(file) && !/@\/(?:lib|components)\/public-site\//.test(src) && !underShellLayout(file)) {
-    findings.push({ file, line: 1, rule: 'shared-import', msg: 'opted-in route neither imports the public design system nor sits under a PublicShell layout', text: '' });
+  if (!shared && appFile && /\.(tsx?|jsx?)$/.test(file) && !underShellLayout(file) && !reachesPublicSite(file, src)) {
+    findings.push({ file, line: 1, rule: 'shared-import', msg: 'opted-in route neither reaches the public design system (directly or through a family shell) nor sits under a PublicShell layout', text: '' });
   }
   return findings;
 }
@@ -144,6 +179,7 @@ function selfTest() {
     'className="dark:bg-black"', 'font-weight:800', 'className="font-black"', 'color:#7c3aed', 'color:#123456',
     "font-family:'Newsreader'", 'rgba(124,58,237,.5)', '@import url(https://fonts.googleapis.com/css2)',
     'className="font-mono text-sm"', 'className="bg-ground-deep text-ink"', 'className="hover:bg-accent-hover"', 'className="border-hairline"',
+    'className="bg-(--mp-wash) font-bold text-transparent"', 'color:transparent', '-webkit-background-clip:text;background-clip:text',
   ];
   const good = [
     'color:#1B3A6B', 'background:#fff', 'font:700 16px Inter', '/* #7c3aed in a comment */', 'href="https://x.y/z" // note',
@@ -159,6 +195,12 @@ function selfTest() {
     const f = auditSource('src/lib/public-site/x.ts', s, palette);
     if (f.length) { ok = false; console.error(`self-test: unexpected finding for ${s}: ${f.map((x) => x.rule)}`); }
   }
+  // shared-import: a raw-HTML route reaches the system through its family shell; one that
+  // reaches nothing is blocked.
+  const via = auditSource('src/app/zz-selftest/route.ts', "import { govPage } from '@/lib/gov/shell';", palette);
+  if (via.some((f) => f.rule === 'shared-import')) { ok = false; console.error('self-test: family-shell import should satisfy shared-import'); }
+  const none = auditSource('src/app/zz-selftest/route.ts', "import { NextResponse } from 'next/server';", palette);
+  if (!none.some((f) => f.rule === 'shared-import')) { ok = false; console.error('self-test: a route with no path to the system should fail shared-import'); }
   console.log(ok ? 'self-test passed' : 'self-test FAILED');
   process.exit(ok ? 0 : 1);
 }

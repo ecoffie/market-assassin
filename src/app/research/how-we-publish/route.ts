@@ -21,35 +21,35 @@ function tierLabel(lc: string): string {
 const PAGE_CSS = `
   .article{padding:64px 0 40px;max-width:800px;margin:0 auto}
   .article .wrap{max-width:800px}
-  .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:500;color:var(--muted);text-decoration:none;margin-bottom:28px}
-  .back:hover{color:var(--teal-deep)}
+  .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:500;color:var(--mp-muted);text-decoration:none;margin-bottom:28px}
+  .back:hover{color:var(--mp-navy)}
   .article h1{font-size:clamp(30px,4.6vw,42px);margin:18px 0 0;max-width:18ch}
-  .lead{font-family:var(--serif);font-size:clamp(19px,2.4vw,23px);line-height:1.4;color:var(--ink);margin:24px 0 0;font-weight:500}
+  .lead{font-family:var(--mp-font-serif);font-size:clamp(19px,2.4vw,23px);line-height:1.4;color:var(--mp-ink);margin:24px 0 0;font-weight:400}
   .prose{margin-top:26px}
-  .prose p{color:var(--ink-soft);font-size:17px;line-height:1.65;margin:0 0 18px}
-  .prose b,.prose strong{color:var(--ink);font-weight:600}
+  .prose p{color:var(--mp-body);font-size:17px;line-height:1.65;margin:0 0 18px}
+  .prose b,.prose strong{color:var(--mp-ink);font-weight:600}
   .prose em{font-style:italic}
-  .prose h2{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-deep);font-weight:700;margin:40px 0 16px}
+  .prose h2{font-family:var(--mp-font-sans);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--mp-accent);font-weight:700;margin:40px 0 16px}
   .ladder{display:flex;flex-direction:column;gap:14px}
-  .tier{border:1px solid var(--line);border-radius:14px;padding:20px 22px;border-left-width:3px;background:var(--paper)}
-  .tier--production{border-left-color:var(--teal)}
-  .tier--beta{border-left-color:var(--gold)}
-  .tier--collecting{border-left-color:#c4a035}
-  .tier--research{border-left-color:var(--red)}
+  .tier{border:1px solid var(--mp-line);border-radius:0;padding:20px 22px;border-left-width:3px;background:var(--mp-surface)}
+  .tier--production{border-left-color:var(--mp-navy)}
+  .tier--beta{border-left-color:var(--mp-warn)}
+  .tier--collecting{border-left-color:var(--mp-faint)}
+  .tier--research{border-left-color:var(--mp-accent)}
   .tier-head{display:flex;align-items:center;gap:10px}
-  .tier-label{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--ink)}
-  .tier-count{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums}
-  .tier-blurb{font-size:14.5px;color:var(--ink-soft);margin:8px 0 12px;line-height:1.5}
-  .tier-empty{font-size:14px;color:var(--muted);font-style:italic;margin:0}
+  .tier-label{font-family:var(--mp-font-serif);font-size:18px;font-weight:700;color:var(--mp-ink)}
+  .tier-count{margin-left:auto;font-family:var(--mp-font-mono);font-size:12px;font-weight:600;color:var(--mp-muted);background:var(--mp-wash);border:1px solid var(--mp-line);border-radius:var(--mp-radius-chip);padding:2px 10px;font-variant-numeric:tabular-nums}
+  .tier-blurb{font-size:14.5px;color:var(--mp-body);margin:8px 0 12px;line-height:1.5}
+  .tier-empty{font-size:14px;color:var(--mp-muted);font-style:italic;margin:0}
   .metrics{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
-  .metric{border-top:1px solid var(--hair);padding-top:12px}
+  .metric{border-top:1px solid var(--mp-hair);padding-top:12px}
   .metric:first-child{border-top:none;padding-top:0}
   .metric-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-  .metric-id{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--teal-deep);background:var(--teal-wash);border-radius:5px;padding:2px 8px}
-  .metric-name{font-size:15.5px;font-weight:600;color:var(--ink)}
-  .metric-def{font-size:14px;color:var(--ink-soft);margin:6px 0 0;line-height:1.5}
-  .metric-reason{font-size:13.5px;color:var(--muted);margin:6px 0 0;line-height:1.5}
-  .metric-reason .why{font-weight:600;color:var(--ink-soft)}
+  .metric-id{font-family:var(--mp-font-mono);font-size:11.5px;font-weight:600;color:var(--mp-navy);background:var(--mp-navy-wash);border-radius:var(--mp-radius-chip);padding:2px 8px}
+  .metric-name{font-size:15.5px;font-weight:600;color:var(--mp-ink)}
+  .metric-def{font-size:14px;color:var(--mp-body);margin:6px 0 0;line-height:1.5}
+  .metric-reason{font-size:13.5px;color:var(--mp-muted);margin:6px 0 0;line-height:1.5}
+  .metric-reason .why{font-weight:600;color:var(--mp-body)}
   .cta-row{margin-top:36px}
 `;
 

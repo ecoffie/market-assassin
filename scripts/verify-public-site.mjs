@@ -190,6 +190,10 @@ async function auditFocus(page, where) {
   const seen = [];
   for (let i = 0; i < 30; i++) {
     await page.keyboard.press('Tab');
+    // Let the focus style settle. Under reduced motion every transition is .01ms, but on a slow
+    // (Rosetta-translated) Chrome the read can still land before it: the outline width then reads
+    // 0px and a visible ring is reported missing. Measured on prod /today, unchanged since PR 1.
+    await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
     const r = await page.evaluate(() => {
       const el = document.activeElement;
       if (!el || el === document.body || el.tagName === 'IFRAME') return null;

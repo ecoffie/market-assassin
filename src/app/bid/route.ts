@@ -13,8 +13,13 @@
  *   closing CTA.
  * Every feature named is real (Bid/No-Bid, M-Win, Proposal Assist, incumbent + pricing
  * intel, teaming). No fabrication. Brand = Mindy (exit-safe — no "Eric Coffie").
+ *
+ * Visual system: the Mindy public site (src/lib/public-site) — shared header/footer, self-hosted
+ * fonts, `--mp-*` roles. The Zillow-style dark/teal bands became wash chapters (no dark surfaces
+ * on public pages); the page's own Open / Past / Contacts bar stays under the shared header.
  */
 import { NextResponse } from 'next/server';
+import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,103 +27,106 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bid with confidence — Mindy</title>
 <meta name="description" content="Finding the opportunity is step one. Mindy helps you decide, draft, and win federal bids — bid/no-bid, win-probability (M-Win), proposal drafting, and incumbent intel.">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+${mpRawHeadHtml()}
 <style>
-/* Brand palette matches the map/app: navy #1e3a8a → purple #7c3aed, blue #3b82f6, green #10b981.
-   Inter loaded above (was falling back to serif because Inter was never imported). */
-:root{--ink:#111c26;--sub:#42505f;--faint:#6b7787;--line:#e6eaef;--blue:#3b82f6;--navy:#1e3a8a;--navy2:#1e3a8a;--purple:#7c3aed;--teal:#1e3a8a;--green:#10b981;--cyan:#a5b4fc;--wash:#f5f7f9}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased;line-height:1.5}
-.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:15px 28px;border-bottom:1px solid var(--line);background:#fff}
-.top .nav{display:flex;gap:24px;align-items:center}
-.top .nav a{font:600 14px Inter;color:var(--ink);text-decoration:none;white-space:nowrap}
-.top .nav a:hover{color:var(--blue)}.top .nav a.on{color:var(--blue)}
-.brand{display:flex;align-items:center;gap:8px;font:700 19px Inter;letter-spacing:-.02em;text-decoration:none;color:var(--ink)}
-.brand img{height:24px}
-@media(max-width:720px){.top .nav a:not(.on){display:none}}
-.btn{display:inline-flex;align-items:center;gap:9px;background:var(--blue);color:#fff;font:700 16px Inter;padding:15px 26px;border-radius:10px;text-decoration:none;transition:filter .15s;border:0;cursor:pointer}
-.btn:hover{filter:brightness(.94)}
-.btn.white{background:#fff;color:var(--blue)}
-.btn.sm{font-size:14.5px;padding:13px 22px}
-h1{font:800 clamp(42px,6.4vw,72px) Inter;letter-spacing:-.03em;line-height:1.0}
-.hi-cyan{color:#c4b5fd}.hi-green{color:#6ee7b7}
+/* Mindy public system (src/lib/public-site): page rules use only the --mp-* roles. Every rule is
+   scoped to .bid so the shared header and footer keep their own styles. */
+.bid{color:var(--mp-ink);line-height:1.5}
+.bid *{margin:0;padding:0}
+.bid .top{display:flex;align-items:center;justify-content:space-between;padding:12px 28px;border-bottom:1px solid var(--mp-line);background:var(--mp-surface)}
+.bid .top .nav{display:flex;gap:24px;align-items:center}
+.bid .top .nav a{font:600 14px var(--mp-font-sans);color:var(--mp-body);text-decoration:none;white-space:nowrap}
+.bid .top .nav a:hover{color:var(--mp-navy)}.bid .top .nav a.on{color:var(--mp-navy)}
+.bid .brand{display:flex;align-items:center;gap:8px;font:700 17px var(--mp-font-sans);letter-spacing:-.02em;text-decoration:none;color:var(--mp-ink)}
+.bid .brand img{height:22px}
+@media(max-width:720px){.bid .top .nav a:not(.on){display:none}.bid .top{padding:12px 16px}}
+.bid .btn{display:inline-flex;align-items:center;gap:9px;background:var(--mp-navy);color:var(--mp-surface);font:600 16px var(--mp-font-sans);padding:15px 26px;border-radius:0;text-decoration:none;transition:background .15s;border:1px solid transparent;cursor:pointer}
+.bid .btn:hover{background:var(--mp-navy-hover)}
+.bid .btn.white{background:var(--mp-navy);color:var(--mp-surface)}
+.bid .btn.white:hover{background:var(--mp-navy-hover)}
+.bid .btn.sm{font-size:14.5px;padding:13px 22px}
+.bid h1{font:700 clamp(40px,5.6vw,64px)/1.08 var(--mp-font-serif);letter-spacing:-.015em;color:var(--mp-ink)}
+.bid .hi-cyan,.bid .hi-green{color:var(--mp-accent)}
 /* HERO */
-.hero{max-width:1180px;margin:0 auto;padding:72px 28px 58px;display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
-@media(max-width:880px){.hero{grid-template-columns:1fr;padding:46px 22px 40px;gap:30px}}
-.hero .lead{font:400 18px/1.55 Inter;color:var(--sub);max-width:46ch;margin:20px 0 30px}
-.heroart{background:linear-gradient(135deg,#eef4ff,#f4f0fe);border:1px solid var(--line);border-radius:22px;padding:26px;min-height:340px;display:flex;flex-direction:column;justify-content:center;gap:14px}
-.mock{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 12px 34px -14px rgba(16,24,40,.24)}
-.mock .r{display:flex;justify-content:space-between;align-items:center}
-.mock .t{font:700 14.5px Inter;margin:9px 0 3px}.mock .s{font:500 12px Inter;color:var(--faint)}
-.mwin{display:inline-flex;align-items:baseline;gap:6px;font:800 14px Inter;color:var(--navy2)}.mwin b{font:800 24px Inter;color:var(--green)}
-.bar{height:8px;border-radius:6px;background:#e9eef5;overflow:hidden;margin:10px 0 6px}.bar i{display:block;height:100%;width:72%;background:linear-gradient(90deg,#12805c,#22a06b)}
-.tag{display:inline-block;font:600 11px Inter;padding:3px 9px;border-radius:6px}
-.tag.n{color:var(--navy2);background:#eef2ff}.tag.g{color:var(--green);background:#e7f4ee}.tag.b{color:var(--blue);background:#eef4ff}
-/* Zestimate strip */
-.strip{background:var(--wash);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.strip .in{max-width:1180px;margin:0 auto;padding:18px 28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;font:500 15px Inter;color:var(--sub)}
-.strip a{color:var(--blue);font-weight:700;text-decoration:none}
-/* TEAL featured band */
-.feature{background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;padding:64px 28px 68px}
-.feature .in{max-width:1180px;margin:0 auto}
-.feature h2{text-align:center;font:800 clamp(30px,4.2vw,48px) Inter;letter-spacing:-.02em;margin-bottom:36px}
-.feature .cards{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-@media(max-width:820px){.feature .cards{grid-template-columns:1fr}}
-.fcard{background:#fff;color:var(--ink);border-radius:18px;padding:34px 32px;text-align:center}
-.fcard .ic{width:88px;height:88px;border-radius:50%;background:#eef2ff;margin:0 auto 22px;display:flex;align-items:center;justify-content:center}
-.fcard .ic svg{width:40px;height:40px;stroke:#4f46e5;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.fcard h3{font:800 22px Inter;margin-bottom:12px}
-.fcard p{font:400 15.5px/1.55 Inter;color:var(--sub);max-width:38ch;margin:0 auto}
-.fcard a{color:var(--blue);font-weight:700;text-decoration:none}
-.feature .cta{text-align:center;margin-top:34px}.feature .note{text-align:center;font:400 15px Inter;color:#d6ece6;max-width:64ch;margin:26px auto 0}
+.bid .hero{max-width:1180px;margin:0 auto;padding:72px 28px 58px;display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
+@media(max-width:880px){.bid .hero{grid-template-columns:1fr;padding:46px 22px 40px;gap:30px}}
+.bid .hero .lead{font:400 18px/1.6 var(--mp-font-serif);color:var(--mp-body);max-width:46ch;margin:22px 0 30px}
+.bid .heroart{background:var(--mp-wash);border:1px solid var(--mp-line);border-radius:0;padding:26px;min-height:340px;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.bid .mock{background:var(--mp-surface);border:1px solid var(--mp-line);border-radius:0;padding:16px 18px}
+.bid .mock .r{display:flex;justify-content:space-between;align-items:center}
+.bid .mock .t{font:700 14.5px var(--mp-font-sans);margin:9px 0 3px;color:var(--mp-ink)}.bid .mock .s{font:500 12px var(--mp-font-sans);color:var(--mp-subtle)}
+.bid .mwin{display:inline-flex;align-items:baseline;gap:6px;font:700 14px var(--mp-font-sans);color:var(--mp-ink)}.bid .mwin b{font:600 24px var(--mp-font-mono);color:var(--mp-ok);font-variant-numeric:tabular-nums}
+.bid .bar{height:8px;border-radius:0;background:var(--mp-hair);overflow:hidden;margin:10px 0 6px}.bid .bar i{display:block;height:100%;width:72%;background:var(--mp-ok)}
+.bid .tag{display:inline-block;font:600 11px var(--mp-font-sans);padding:3px 9px;border-radius:var(--mp-radius-chip);border:1px solid var(--mp-line)}
+.bid .tag.n{color:var(--mp-navy);background:var(--mp-navy-wash)}.bid .tag.g{color:var(--mp-ok);background:var(--mp-ok-bg);border-color:var(--mp-ok-line)}.bid .tag.b{color:var(--mp-body);background:var(--mp-wash)}
+.bid .mock .ok-text{color:var(--mp-ok)}
+/* M-Win strip */
+.bid .strip{background:var(--mp-wash);border-top:1px solid var(--mp-line);border-bottom:1px solid var(--mp-line)}
+.bid .strip .in{max-width:1180px;margin:0 auto;padding:18px 28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;font:400 15px var(--mp-font-sans);color:var(--mp-body)}
+.bid .strip strong{color:var(--mp-ink)}
+.bid .strip a{color:var(--mp-navy);font-weight:600;text-decoration:none}.bid .strip a:hover{text-decoration:underline}
+/* Featured band: a wash chapter, not a dark band */
+.bid .feature{background:var(--mp-wash);color:var(--mp-ink);padding:64px 28px 68px;border-bottom:1px solid var(--mp-line)}
+.bid .feature .in{max-width:1180px;margin:0 auto}
+.bid .feature h2{text-align:center;font:700 clamp(28px,3.8vw,42px)/1.2 var(--mp-font-serif);letter-spacing:-.01em;margin-bottom:36px;color:var(--mp-ink)}
+.bid .feature .cards{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--mp-line);border:1px solid var(--mp-line)}
+@media(max-width:820px){.bid .feature .cards{grid-template-columns:1fr}}
+.bid .fcard{background:var(--mp-surface);color:var(--mp-ink);border-radius:0;padding:34px 32px;text-align:center}
+.bid .fcard .ic{width:80px;height:80px;border-radius:50%;background:var(--mp-navy-wash);margin:0 auto 22px;display:flex;align-items:center;justify-content:center}
+.bid .fcard .ic svg{width:38px;height:38px;stroke:var(--mp-navy);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bid .fcard h3{font:700 21px/1.3 var(--mp-font-serif);margin-bottom:12px}
+.bid .fcard p{font:400 15.5px/1.6 var(--mp-font-sans);color:var(--mp-body);max-width:38ch;margin:0 auto}
+.bid .fcard a{color:var(--mp-navy);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.bid .feature .cta{text-align:center;margin-top:34px}.bid .feature .note{text-align:center;font:400 15px var(--mp-font-sans);color:var(--mp-muted);max-width:64ch;margin:26px auto 0}
 /* Explore split panels */
-.explore{max-width:1180px;margin:0 auto;padding:72px 28px 20px;text-align:center}
-.explore h2{font:800 clamp(30px,4vw,46px) Inter;letter-spacing:-.02em;margin-bottom:12px}
-.explore>p{font:400 17px Inter;color:var(--sub);margin-bottom:8px}
-.panels{max-width:1180px;margin:0 auto;padding:22px 28px}
-.panel{display:grid;grid-template-columns:1fr 1fr;background:linear-gradient(135deg,#1e3a8a,#312e81);border-radius:22px;overflow:hidden;margin-bottom:26px;min-height:400px}
-.panel .pc{padding:52px 48px;color:#fff;display:flex;flex-direction:column;justify-content:center}
-.panel .pi{background-size:cover;background-position:center;min-height:280px}
-.panel.rev .pc{order:2}.panel.rev .pi{order:1}
-@media(max-width:820px){.panel,.panel.rev{grid-template-columns:1fr}.panel .pc{order:2;padding:34px 26px}.panel .pi{order:1;min-height:200px}}
-.panel h3{font:800 clamp(28px,3.4vw,40px) Inter;letter-spacing:-.02em;margin-bottom:22px}
-.panel ul{list-style:none;display:flex;flex-direction:column;gap:16px;margin-bottom:26px}
-.panel li{position:relative;padding-left:34px;font:400 16px/1.45 Inter;color:#e6ecff}
-.panel li:before{content:"";position:absolute;left:0;top:3px;width:16px;height:10px;border-left:2.6px solid var(--cyan);border-bottom:2.6px solid var(--cyan);transform:rotate(-45deg)}
-.panel li b{color:#fff}
-.panel .sub2{font:400 15px/1.5 Inter;color:#c3ccec;margin-top:4px}
-.panel .go{align-self:flex-start;margin-top:6px}
+.bid .explore{max-width:1180px;margin:0 auto;padding:72px 28px 20px;text-align:center}
+.bid .explore h2{font:700 clamp(28px,3.6vw,42px)/1.2 var(--mp-font-serif);letter-spacing:-.01em;margin-bottom:12px}
+.bid .explore>p{font:400 17px var(--mp-font-sans);color:var(--mp-body);margin-bottom:8px}
+.bid .panels{max-width:1180px;margin:0 auto;padding:22px 28px}
+.bid .panel{display:grid;grid-template-columns:1fr 1fr;background:var(--mp-surface);border:1px solid var(--mp-line);border-radius:0;overflow:hidden;margin-bottom:26px;min-height:400px}
+.bid .panel .pc{padding:52px 48px;color:var(--mp-ink);display:flex;flex-direction:column;justify-content:center}
+.bid .panel .pi{background:var(--mp-navy-wash);border-left:1px solid var(--mp-line);min-height:280px}
+.bid .panel.rev .pc{order:2}.bid .panel.rev .pi{order:1;border-left:0;border-right:1px solid var(--mp-line)}
+@media(max-width:820px){.bid .panel,.bid .panel.rev{grid-template-columns:1fr}.bid .panel .pc{order:2;padding:34px 26px}.bid .panel .pi,.bid .panel.rev .pi{order:1;min-height:120px;border:0;border-bottom:1px solid var(--mp-line)}}
+.bid .panel h3{font:700 clamp(26px,3vw,36px)/1.2 var(--mp-font-serif);letter-spacing:-.01em;margin-bottom:22px}
+.bid .panel ul{list-style:none;display:flex;flex-direction:column;gap:16px;margin-bottom:26px}
+.bid .panel li{position:relative;padding-left:34px;font:400 16px/1.5 var(--mp-font-sans);color:var(--mp-body)}
+.bid .panel li:before{content:"";position:absolute;left:0;top:3px;width:16px;height:10px;border-left:2.6px solid var(--mp-navy);border-bottom:2.6px solid var(--mp-navy);transform:rotate(-45deg)}
+.bid .panel li b{color:var(--mp-ink)}
+.bid .panel .sub2{font:400 15px/1.5 var(--mp-font-sans);color:var(--mp-muted);margin-top:4px}
+.bid .panel .go{align-self:flex-start;margin-top:6px}
 /* Resources */
-.res{background:var(--wash);padding:64px 28px 66px}
-.res .in{max-width:1180px;margin:0 auto}
-.res h2{font:800 30px Inter;letter-spacing:-.02em;margin-bottom:6px}.res .sub{color:var(--faint);font:400 15px Inter;margin-bottom:28px}
-.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
-.rc{background:#fff;border-radius:16px;overflow:hidden;text-decoration:none;color:inherit;box-shadow:0 8px 24px -14px rgba(16,24,40,.2);transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column}
-.rc:hover{transform:translateY(-3px);box-shadow:0 16px 32px -14px rgba(16,24,40,.26)}
-.rc .thumb{height:150px;background:linear-gradient(135deg,#1e3a8a,#7c3aed)}
-.rc .b{padding:18px 20px 22px;display:flex;flex-direction:column;gap:10px;flex:1}
-.rc .pill{align-self:flex-start;font:700 11px Inter;color:#0b6b86;background:#d6f2fb;padding:3px 10px;border-radius:999px}
-.rc h4{font:700 16.5px Inter;line-height:1.3}
-.rc .read{color:var(--blue);font:700 14px Inter;margin-top:auto}
-.res .guide{margin-top:26px;font:400 15px Inter;color:var(--sub)}.res .guide a{color:var(--ink);font-weight:700}
+.bid .res{background:var(--mp-wash);padding:64px 28px 66px;border-top:1px solid var(--mp-line);border-bottom:1px solid var(--mp-line)}
+.bid .res .in{max-width:1180px;margin:0 auto}
+.bid .res h2{font:700 28px/1.25 var(--mp-font-serif);letter-spacing:-.01em;margin-bottom:6px}.bid .res .sub{color:var(--mp-muted);font:400 15px var(--mp-font-sans);margin-bottom:28px}
+.bid .rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:var(--mp-line);border:1px solid var(--mp-line)}
+.bid .rc{background:var(--mp-surface);border-radius:0;overflow:hidden;text-decoration:none;color:inherit;transition:background .15s;display:flex;flex-direction:column}
+.bid .rc:hover{background:var(--mp-paper)}
+.bid .rc .thumb{height:120px;background:var(--mp-navy-wash);border-bottom:1px solid var(--mp-line)}
+.bid .rc .b{padding:18px 20px 22px;display:flex;flex-direction:column;gap:10px;flex:1}
+.bid .rc .pill{align-self:flex-start;font:600 11px var(--mp-font-sans);color:var(--mp-muted);background:var(--mp-wash);border:1px solid var(--mp-line);padding:3px 8px;border-radius:var(--mp-radius-chip)}
+.bid .rc h4{font:700 16.5px/1.35 var(--mp-font-serif);color:var(--mp-ink)}
+.bid .rc .read{color:var(--mp-navy);font:600 14px var(--mp-font-sans);margin-top:auto}
+.bid .res .guide{margin-top:26px;font:400 15px var(--mp-font-sans);color:var(--mp-body)}.bid .res .guide a{color:var(--mp-navy);font-weight:600}
 /* FAQ */
-.faq{max-width:920px;margin:0 auto;padding:64px 28px 30px}
-.faq h2{font:800 30px Inter;letter-spacing:-.02em;margin-bottom:20px;text-align:center}
-details{border-bottom:1px solid var(--line);padding:18px 4px}
-details summary{font:700 17px Inter;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
-details summary::-webkit-details-marker{display:none}
-details summary:after{content:"+";font-weight:400;font-size:24px;color:var(--faint)}
-details[open] summary:after{content:"\\2013"}
-details p{font:400 15px/1.62 Inter;color:var(--sub);padding-top:12px;max-width:74ch}
-details a{color:var(--blue)}
-/* Close */
-.close{background:linear-gradient(135deg,#0b1f66,#7c3aed);color:#fff;margin-top:44px}
-.close .in{max-width:1180px;margin:0 auto;padding:64px 28px;text-align:center}
-.close h2{font:800 clamp(28px,3.6vw,42px) Inter;letter-spacing:-.02em;margin-bottom:12px;color:#fff}
-.close p{font:400 17px Inter;color:#dbe4ff;max-width:58ch;margin:0 auto 26px}
-.foot{max-width:1180px;margin:0 auto;padding:30px 28px 60px;color:#9aa5b3;font:400 12.5px/1.6 Inter}
+.bid .faq{max-width:920px;margin:0 auto;padding:64px 28px 30px}
+.bid .faq h2{font:700 28px/1.25 var(--mp-font-serif);letter-spacing:-.01em;margin-bottom:20px;text-align:center}
+.bid details{border-bottom:1px solid var(--mp-line);padding:18px 4px}
+.bid details summary{font:600 17px var(--mp-font-sans);color:var(--mp-ink);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.bid details summary::-webkit-details-marker{display:none}
+.bid details summary:after{content:"+";font-weight:400;font-size:24px;color:var(--mp-muted)}
+.bid details[open] summary:after{content:"\\2013"}
+.bid details p{font:400 15px/1.65 var(--mp-font-sans);color:var(--mp-body);padding-top:12px;max-width:74ch}
+.bid details a{color:var(--mp-navy)}
+/* Close: a quiet wash chapter with one navy button */
+.bid .close{background:var(--mp-wash);color:var(--mp-ink);margin-top:44px;border-top:1px solid var(--mp-line);border-bottom:1px solid var(--mp-line)}
+.bid .close .in{max-width:1180px;margin:0 auto;padding:64px 28px;text-align:center}
+.bid .close h2{font:700 clamp(26px,3.4vw,38px)/1.2 var(--mp-font-serif);letter-spacing:-.01em;margin-bottom:12px;color:var(--mp-ink)}
+.bid .close p{font:400 17px var(--mp-font-sans);color:var(--mp-body);max-width:58ch;margin:0 auto 26px}
+.bid .foot{max-width:1180px;margin:0 auto;padding:30px 28px 8px;color:var(--mp-subtle);font:400 12.5px/1.6 var(--mp-font-sans)}
 </style></head><body>
+${mpRawBodyOpen()}
+<div class="bid">
 <header class="top">
   <nav class="nav">
     <a href="/opportunity-map">Open</a>
@@ -145,7 +153,7 @@ details a{color:var(--blue)}
       <div class="r" style="margin-top:2px"><span class="mwin">M-Win <b>72</b></span><span class="s">5 days left</span></div>
     </div>
     <div class="mock" style="opacity:.94">
-      <div class="r"><span class="tag b">Bid / No-Bid</span><span class="s" style="font-weight:700;color:var(--green)">Go</span></div>
+      <div class="r"><span class="tag b">Bid / No-Bid</span><span class="s ok-text" style="font-weight:700">Go</span></div>
       <div class="s" style="margin-top:8px">Incumbent: L3Harris · ceiling $21.9M · recompetes in 8 mo</div>
     </div>
   </div>
@@ -193,7 +201,7 @@ details a{color:var(--blue)}
       <p class="sub2" style="margin-bottom:18px">Check any opportunity in seconds. No commitment.</p>
       <a class="btn white sm go" href="/opportunity-map">Check an opportunity →</a>
     </div>
-    <div class="pi" style="background:linear-gradient(135deg,#12805c,#0b1f66)"></div>
+    <div class="pi"></div>
   </div>
   <div class="panel rev">
     <div class="pc">
@@ -206,7 +214,7 @@ details a{color:var(--blue)}
       <p class="sub2" style="margin-bottom:18px">Set up your Vault once; reuse it on every bid.</p>
       <a class="btn white sm go" href="/app?panel=vault">Set up your Vault →</a>
     </div>
-    <div class="pi" style="background:linear-gradient(135deg,#7c3aed,#0b1f66)"></div>
+    <div class="pi"></div>
   </div>
   <div class="panel">
     <div class="pc">
@@ -219,7 +227,7 @@ details a{color:var(--blue)}
       <p class="sub2" style="margin-bottom:18px">Turn a listing into a capture plan.</p>
       <a class="btn white sm go" href="/app?panel=pipeline">Build your pipeline →</a>
     </div>
-    <div class="pi" style="background:linear-gradient(135deg,#1e3a8a,#12805c)"></div>
+    <div class="pi"></div>
   </div>
 </div>
 
@@ -255,6 +263,8 @@ details a{color:var(--blue)}
 </div></div>
 
 <p class="foot">Mindy by GovCon Giants AI. M-Win is a directional win-probability estimate, not a guarantee. Incumbent, ceiling, and pricing figures are sourced from public federal data (USASpending, GSA).</p>
+</div>
+${mpRawBodyClose()}
 </body></html>`;
 
 export async function GET() {

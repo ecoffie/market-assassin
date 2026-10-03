@@ -55,7 +55,8 @@ export function mpA11yCss(scope: string): string {
     + 'transition-duration:.01ms!important;scroll-behavior:auto!important}}';
 }
 
-const SITE_COMPONENTS = [
+/** The `mp-*` component rules (shell, header, footer, typography, controls). Shared by React and raw HTML. */
+export const MP_COMPONENTS_CSS = [
   // Shell
   `.mp-site{${mpTokenDeclarations()};min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;`
     + 'background:var(--mp-paper);color:var(--mp-ink);font-family:var(--mp-font-sans);'
@@ -196,7 +197,19 @@ const SITE_COMPONENTS = [
 /** Everything a React public page needs, scoped to `.mp-site`. Font faces exclude Inter (see fonts.ts). */
 export const MP_SITE_CSS =
   mpFontFaceCss({ includeInter: false })
-  + SITE_COMPONENTS
+  + MP_COMPONENTS_CSS
+  + ACCOUNT_MENU_CSS
+  + MP_ACCOUNT_OVERRIDES_CSS
+  + mpA11yCss('.mp-site');
+
+/**
+ * The same stylesheet for raw-HTML route handlers (/gov, /institute, /research, /bid, the
+ * Observatory report). Identical rules to MP_SITE_CSS plus the static Inter file, because a
+ * route handler cannot use the root layout's next/font Inter. Pair it with MP_ROOT_PAINT_CSS.
+ */
+export const MP_RAW_SITE_CSS =
+  mpFontFaceCss({ includeInter: true })
+  + MP_COMPONENTS_CSS
   + ACCOUNT_MENU_CSS
   + MP_ACCOUNT_OVERRIDES_CSS
   + mpA11yCss('.mp-site');

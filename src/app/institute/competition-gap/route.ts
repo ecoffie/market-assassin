@@ -9,6 +9,7 @@
  */
 import { NextResponse } from 'next/server';
 import { GOV_CSS, govBrand } from '@/lib/gov/shell';
+import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 import { conceptBanner, conceptFooter, CONCEPT_CSS } from '@/lib/gov/paper';
 
 // The Competition Gap is a RESEARCH CONCEPT, not an Institute publication — it awaits OBS-008
@@ -21,75 +22,75 @@ export const dynamic = 'force-static';
 
 const PAPER_CSS = `
   /* Screen layout — a document, not a landing page. */
-  body{background:var(--paper-2)}
-  .doc{max-width:820px;margin:0 auto;background:var(--paper);box-shadow:0 1px 0 var(--line),0 30px 60px -40px rgba(15,27,45,.35)}
-  .docbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--hair)}
+  .mp-main{background:var(--mp-wash)}
+  .doc{max-width:820px;margin:0 auto;background:var(--mp-paper);border-left:1px solid var(--mp-line);border-right:1px solid var(--mp-line)}
+  .docbar{position:sticky;top:var(--mp-header-height);z-index:30;background:color-mix(in srgb,var(--mp-paper) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--mp-hair)}
   .docbar .in{max-width:820px;margin:0 auto;padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-  .docbar .dl{font-family:var(--sans);font-weight:600;font-size:13.5px;color:var(--paper);background:var(--teal-deep);padding:9px 15px;border-radius:8px;text-decoration:none;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
-  .docbar .dl:hover{background:var(--teal)}
-  .docbar .back{font-family:var(--sans);font-size:13.5px;color:var(--ink-soft);text-decoration:none;font-weight:500}
-  .docbar .back:hover{color:var(--teal-deep)}
+  .docbar .dl{font-family:var(--mp-font-sans);font-weight:600;font-size:13.5px;color:var(--mp-surface);background:var(--mp-navy);padding:9px 15px;border-radius:0;text-decoration:none;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .docbar .dl:hover{background:var(--mp-navy-hover)}
+  .docbar .back{font-family:var(--mp-font-sans);font-size:13.5px;color:var(--mp-body);text-decoration:none;font-weight:500}
+  .docbar .back:hover{color:var(--mp-navy)}
 
   .page{padding:56px 64px}
-  .page + .page{border-top:1px solid var(--hair)}
-  .paper-h1{font-family:var(--serif);font-size:44px;line-height:1.1;font-weight:600;letter-spacing:-.015em}
-  .paper-h2{font-family:var(--serif);font-size:26px;line-height:1.2;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
-  .paper-h3{font-family:var(--serif);font-size:19px;font-weight:600;margin:26px 0 0}
-  .snum{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--teal-deep);font-weight:700;text-transform:uppercase}
-  .paper p{font-size:16.5px;line-height:1.66;color:var(--ink-soft);margin:14px 0 0}
+  .page + .page{border-top:1px solid var(--mp-hair)}
+  .paper-h1{font-family:var(--mp-font-serif);font-size:44px;line-height:1.1;font-weight:700;letter-spacing:-.015em}
+  .paper-h2{font-family:var(--mp-font-serif);font-size:26px;line-height:1.2;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+  .paper-h3{font-family:var(--mp-font-serif);font-size:19px;font-weight:700;margin:26px 0 0}
+  .snum{font-family:var(--mp-font-sans);font-size:11px;letter-spacing:.18em;color:var(--mp-accent);font-weight:700;text-transform:uppercase}
+  .paper p{font-size:16.5px;line-height:1.66;color:var(--mp-body);margin:14px 0 0}
   .paper p.first{margin-top:18px}
-  .paper b{color:var(--ink);font-weight:600}
-  .paper .lead{font-size:18.5px;line-height:1.6;color:var(--ink)}
-  .cite{font-family:var(--mono);font-size:11px;color:var(--muted);vertical-align:super;padding:0 1px}
+  .paper b{color:var(--mp-ink);font-weight:600}
+  .paper .lead{font-size:18.5px;line-height:1.6;color:var(--mp-ink)}
+  .cite{font-family:var(--mp-font-mono);font-size:11px;color:var(--mp-muted);vertical-align:super;padding:0 1px}
 
   /* Cover */
   .cover{padding:96px 64px 72px;position:relative;min-height:60vh}
-  .cover .tag{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-deep);font-weight:600}
-  .cover .sub{font-family:var(--serif);font-size:22px;font-style:italic;color:var(--ink-soft);margin-top:14px;max-width:30ch}
-  .cover .meta{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);line-height:1.9}
-  .cover .rule{width:64px;height:3px;background:var(--teal);margin:28px 0 0}
+  .cover .tag{font-family:var(--mp-font-sans);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--mp-accent);font-weight:700}
+  .cover .sub{font-family:var(--mp-font-serif);font-size:22px;font-style:italic;color:var(--mp-body);margin-top:14px;max-width:30ch}
+  .cover .meta{margin-top:44px;padding-top:22px;border-top:1px solid var(--mp-line);font-family:var(--mp-font-mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--mp-muted);line-height:1.9}
+  .cover .rule{width:64px;height:3px;background:var(--mp-navy);margin:28px 0 0}
 
   /* Exhibits */
-  .exhibit{margin:26px 0 6px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--paper)}
-  .exhibit .cap{background:var(--paper-2);border-bottom:1px solid var(--line);padding:12px 18px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+  .exhibit{margin:26px 0 6px;border:1px solid var(--mp-line);border-radius:0;overflow:hidden;background:var(--mp-paper)}
+  .exhibit .cap{background:var(--mp-wash);border-bottom:1px solid var(--mp-line);padding:12px 18px;font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mp-body);font-weight:600}
   .exhibit .body{padding:22px 20px}
   .statrow{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;text-align:center}
-  .statrow .s .n{font-family:var(--serif);font-size:40px;font-weight:600;line-height:1;color:var(--red);font-variant-numeric:tabular-nums}
-  .statrow .s.up .n{color:var(--teal-deep)}
-  .statrow .s .l{margin-top:8px;font-size:13px;color:var(--ink-soft);line-height:1.4}
-  .statrow .s .src{margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+  .statrow .s .n{font-family:var(--mp-font-mono);font-size:40px;font-weight:600;line-height:1;color:var(--mp-accent);font-variant-numeric:tabular-nums}
+  .statrow .s.up .n{color:var(--mp-navy)}
+  .statrow .s .l{margin-top:8px;font-size:13px;color:var(--mp-body);line-height:1.4}
+  .statrow .s .src{margin-top:8px;font-family:var(--mp-font-mono);font-size:9.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--mp-muted)}
 
   /* Bar exhibit (DoD vendor decline) */
   .bars{display:flex;align-items:flex-end;gap:26px;height:190px;padding:0 10px}
   .bars .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-  .bars .col .bar{width:74px;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--teal),var(--teal-deep))}
-  .bars .col.down .bar{background:linear-gradient(180deg,#d47a7e,var(--red))}
-  .bars .col .v{font-family:var(--serif);font-weight:600;font-size:18px;margin-bottom:8px;color:var(--ink)}
-  .bars .col .yr{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--muted)}
-  .barnote{margin-top:14px;font-size:13px;color:var(--muted);text-align:center;font-style:italic}
+  .bars .col .bar{width:74px;border-radius:0;background:var(--mp-navy)}
+  .bars .col.down .bar{background:var(--mp-accent)}
+  .bars .col .v{font-family:var(--mp-font-mono);font-weight:600;font-size:18px;margin-bottom:8px;color:var(--mp-ink)}
+  .bars .col .yr{margin-top:10px;font-family:var(--mp-font-mono);font-size:12px;color:var(--mp-muted)}
+  .barnote{margin-top:14px;font-size:13px;color:var(--mp-muted);text-align:center;font-style:italic}
 
-  .pull{margin:26px 0 6px;border-left:3px solid var(--teal);padding:6px 0 6px 22px}
-  .pull .q{font-family:var(--serif);font-size:22px;line-height:1.35;font-style:italic;color:var(--ink)}
-  .pull .who{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .pull{margin:26px 0 6px;border-left:3px solid var(--mp-navy);padding:6px 0 6px 22px}
+  .pull .q{font-family:var(--mp-font-serif);font-size:22px;line-height:1.35;font-style:italic;color:var(--mp-ink)}
+  .pull .who{margin-top:10px;font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mp-muted)}
 
   .keylist{margin:16px 0 0;padding:0;list-style:none}
-  .keylist li{position:relative;padding:12px 0 12px 30px;border-top:1px solid var(--hair);font-size:16px;line-height:1.55;color:var(--ink-soft)}
+  .keylist li{position:relative;padding:12px 0 12px 30px;border-top:1px solid var(--mp-hair);font-size:16px;line-height:1.55;color:var(--mp-body)}
   .keylist li:first-child{border-top:0}
-  .keylist li::before{content:"";position:absolute;left:2px;top:19px;width:9px;height:9px;border-radius:50%;background:var(--teal)}
-  .keylist li b{color:var(--ink)}
+  .keylist li::before{content:"";position:absolute;left:2px;top:19px;width:9px;height:9px;border-radius:0;background:var(--mp-navy)}
+  .keylist li b{color:var(--mp-ink)}
 
-  .toc{margin-top:26px;border-top:1px solid var(--line)}
-  .toc a{display:flex;justify-content:space-between;gap:20px;padding:13px 0;border-bottom:1px solid var(--hair);text-decoration:none;color:var(--ink)}
-  .toc a:hover{color:var(--teal-deep)}
-  .toc a .t{font-family:var(--serif);font-size:17px;font-weight:500}
-  .toc a .p{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .toc{margin-top:26px;border-top:1px solid var(--mp-line)}
+  .toc a{display:flex;justify-content:space-between;gap:20px;padding:13px 0;border-bottom:1px solid var(--mp-hair);text-decoration:none;color:var(--mp-ink)}
+  .toc a:hover{color:var(--mp-navy)}
+  .toc a .t{font-family:var(--mp-font-serif);font-size:17px;font-weight:400}
+  .toc a .p{font-family:var(--mp-font-mono);font-size:12px;color:var(--mp-muted)}
 
   /* Sources */
   .refs{margin-top:18px;counter-reset:ref}
-  .refs .r{position:relative;padding:14px 0 14px 40px;border-top:1px solid var(--hair);font-size:14px;line-height:1.55;color:var(--ink-soft)}
+  .refs .r{position:relative;padding:14px 0 14px 40px;border-top:1px solid var(--mp-hair);font-size:14px;line-height:1.55;color:var(--mp-body)}
   .refs .r:first-child{border-top:0}
-  .refs .r::before{counter-increment:ref;content:counter(ref);position:absolute;left:0;top:14px;width:24px;height:24px;border-radius:6px;background:var(--paper-2);border:1px solid var(--line);font-family:var(--mono);font-size:12px;font-weight:700;color:var(--teal-deep);display:grid;place-items:center}
-  .refs .r b{color:var(--ink)}
+  .refs .r::before{counter-increment:ref;content:counter(ref);position:absolute;left:0;top:14px;width:24px;height:24px;border-radius:var(--mp-radius-chip);background:var(--mp-wash);border:1px solid var(--mp-line);font-family:var(--mp-font-mono);font-size:12px;font-weight:600;color:var(--mp-navy);display:grid;place-items:center}
+  .refs .r b{color:var(--mp-ink)}
 
   @media (max-width:760px){
     .page,.cover{padding-left:26px;padding-right:26px}
@@ -102,21 +103,21 @@ const PAPER_CSS = `
   /* ── PRINT: clean paginated PDF ── */
   @media print{
     @page{size:letter;margin:0.7in 0.75in}
-    :root{--paper:#fff;--paper-2:#fff}
-    body{background:#fff;font-size:11pt}
+    html body,.mp-site,.mp-main,.doc{background:#fff}
+    body{font-size:11pt}
     .docbar{display:none}
-    .top,footer.gov{display:none}
-    .doc{max-width:none;box-shadow:none;margin:0}
+    .top,footer.gov,[data-mp-chrome],.mp-head,.mp-foot,.mp-skip{display:none}
+    .doc{max-width:none;border:0;margin:0}
     .page,.cover{padding:0;min-height:0}
     .page{break-before:page;padding-top:0}
     .cover{break-after:page}
     .paper-h1{font-size:30pt}
     .paper-h2{font-size:17pt}
-    .paper p{font-size:10.5pt;line-height:1.5;color:#1a2433}
+    .paper p{font-size:10.5pt;line-height:1.5;color:var(--mp-ink)}
     .exhibit,.pull,.bars,.statrow{break-inside:avoid}
     .paper-h2,.paper-h3{break-after:avoid}
-    a{color:#0a5c5b;text-decoration:none}
-    .cite{color:#666}
+    a{color:var(--mp-navy);text-decoration:none}
+    .cite{color:var(--mp-muted)}
   }
 `;
 
@@ -312,7 +313,7 @@ const BODY = `
       <div class="r"><b>U.S. Government Accountability Office.</b> <em>Small Business Contracting: Actions Needed to Implement and Monitor DoD's Small Business Strategy</em>, GAO&#8209;22&#8209;104621 (2022). Documents the decline in DoD small-business vendors from 42,723 (2011) to 24,296 (2020) alongside rising small-business obligations. gao.gov.</div>
       <div class="r"><b>Office of Management and Budget.</b> Memorandum M&#8209;23&#8209;11, <em>Creating a More Diverse and Resilient Federal Marketplace</em> (2023). Directs agencies to increase attention on new-entrant participation, where the supplier-base decline has been especially acute. whitehouse.gov.</div>
     </div>
-    <p style="margin-top:26px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)">The Mindy Institute &middot; The research arm of Mindy, operated by GovCon Giants AI &middot; getmindy.ai/research</p>
+    <p style="margin-top:26px;font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mp-muted)">The Mindy Institute &middot; The research arm of Mindy, operated by GovCon Giants AI &middot; getmindy.ai/research</p>
   </section>
 
   ${conceptFooter(GAP_CONCEPT)}
@@ -325,10 +326,13 @@ const HTML = `<!doctype html><html lang="en"><head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Competition Gap — A White Paper on Supplier Discovery in Federal Procurement</title>
 <meta name="description" content="Why public agencies struggle to reach qualified small businesses — and what it costs. A grounded white paper from The Mindy Institute for Public Procurement.">
+${mpRawHeadHtml()}
 <style>${GOV_CSS}</style>
 </head><body>
+${mpRawBodyOpen()}
 <div class="top"><div class="wrap" style="justify-content:space-between">${govBrand()}<a class="topcta" href="/pilot">Run a pilot</a></div></div>
 ${BODY}
+${mpRawBodyClose()}
 </body></html>`;
 
 export function GET() {

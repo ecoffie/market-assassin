@@ -29,14 +29,14 @@ function html(body: string, status = 200): NextResponse {
 
 function notFound(): NextResponse {
   return html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Not found — The Mindy Institute</title><meta name="robots" content="noindex"></head><body style="font-family:-apple-system,system-ui,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#101828"><h1 style="color:#0b1f3a">Publication not found</h1><p style="color:#667085">No published Mindy Institute research exists at this address.</p></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Not found — The Mindy Institute</title><meta name="robots" content="noindex"></head><body style="font-family:Inter,system-ui,-apple-system,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#12100E;background:#FBFAF7"><h1 style="font-family:'Libre Baskerville',Georgia,serif;font-weight:700;color:#12100E">Publication not found</h1><p style="color:#6B6459">No published Mindy Institute research exists at this address.</p></body></html>`,
     404,
   );
 }
 
 function errorPage(): NextResponse {
   return html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Temporarily unavailable — The Mindy Institute</title><meta name="robots" content="noindex"></head><body style="font-family:-apple-system,system-ui,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#101828"><h1 style="color:#0b1f3a">Temporarily unavailable</h1><p style="color:#667085">This benchmark regenerates from live federal data and the source is momentarily unavailable. Please try again shortly — we do not publish partial or estimated figures.</p></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Temporarily unavailable — The Mindy Institute</title><meta name="robots" content="noindex"></head><body style="font-family:Inter,system-ui,-apple-system,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#12100E;background:#FBFAF7"><h1 style="font-family:'Libre Baskerville',Georgia,serif;font-weight:700;color:#12100E">Temporarily unavailable</h1><p style="color:#6B6459">This benchmark regenerates from live federal data and the source is momentarily unavailable. Please try again shortly — we do not publish partial or estimated figures.</p></body></html>`,
     503,
   );
 }
