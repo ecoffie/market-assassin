@@ -17,7 +17,9 @@ const INTERNAL_BRIEFING_EMAILS = new Set([
   'usamashraf2@gmail.com',
 ]);
 
-export type BriefingProgramType = 'daily_brief' | 'weekly_deep_dive' | 'pursuit_brief';
+// Pursuit Brief is RETIRED (2026-10-03). It is not a program type and never gates rotation:
+// a retired feature must not block a cohort from completing.
+export type BriefingProgramType = 'daily_brief' | 'weekly_deep_dive';
 
 export type BriefingRolloutMode = 'beta_all' | 'rollout';
 
@@ -85,7 +87,6 @@ export interface BriefingRolloutConfig {
   includeSmartProfiles: boolean;
   requiredDailyBriefs: number;
   requiredWeeklyDeepDives: number;
-  requiredPursuitBriefs: number;
   updatedAt: string;
 }
 
@@ -103,10 +104,8 @@ export interface BriefingCohortMemberProgress {
   email: string;
   dailyBriefsSent: number;
   weeklyDeepDivesSent: number;
-  pursuitBriefsSent: number;
   lastDailyBriefAt?: string;
   lastWeeklyDeepDiveAt?: string;
-  lastPursuitBriefAt?: string;
   complete: boolean;
 }
 
@@ -119,12 +118,10 @@ export interface BriefingCohortProgressSummary {
   requirements: {
     dailyBriefs: number;
     weeklyDeepDives: number;
-    pursuitBriefs: number;
   };
   remainingByType: {
     dailyBriefs: number;
     weeklyDeepDives: number;
-    pursuitBriefs: number;
   };
   incompleteMembersSample: BriefingCohortMemberProgress[];
 }
@@ -417,7 +414,6 @@ export async function getBriefingRolloutConfig(): Promise<BriefingRolloutConfig>
     includeSmartProfiles: stored?.includeSmartProfiles ?? true,
     requiredDailyBriefs: clampNumber(stored?.requiredDailyBriefs || 2, 1, 14),
     requiredWeeklyDeepDives: clampNumber(stored?.requiredWeeklyDeepDives || 2, 1, 8),
-    requiredPursuitBriefs: clampNumber(stored?.requiredPursuitBriefs || 2, 1, 14),
     updatedAt: stored?.updatedAt || new Date().toISOString(),
   };
 }
@@ -426,16 +422,18 @@ export async function saveBriefingRolloutConfig(
   partial: Partial<BriefingRolloutConfig>
 ): Promise<BriefingRolloutConfig> {
   const current = await getBriefingRolloutConfig();
+  // Drop any legacy requiredPursuitBriefs a caller still sends, so it is never re-persisted.
+  const { requiredPursuitBriefs: _retired, ...rest } = partial as Partial<BriefingRolloutConfig> & { requiredPursuitBriefs?: unknown };
+  void _retired;
   const next: BriefingRolloutConfig = {
     ...current,
-    ...partial,
+    ...rest,
     cohortSize: clampNumber(partial.cohortSize ?? current.cohortSize, 25, 2000),
     stickyDays: clampNumber(partial.stickyDays ?? current.stickyDays, 14, 30),
     cooldownDays: clampNumber(partial.cooldownDays ?? current.cooldownDays, 1, 90),
     maxFallbackPercent: clampNumber(partial.maxFallbackPercent ?? current.maxFallbackPercent, 0, 100),
     requiredDailyBriefs: clampNumber(partial.requiredDailyBriefs ?? current.requiredDailyBriefs, 1, 14),
     requiredWeeklyDeepDives: clampNumber(partial.requiredWeeklyDeepDives ?? current.requiredWeeklyDeepDives, 1, 8),
-    requiredPursuitBriefs: clampNumber(partial.requiredPursuitBriefs ?? current.requiredPursuitBriefs, 1, 14),
     updatedAt: new Date().toISOString(),
   };
 
@@ -457,14 +455,13 @@ async function getActiveCohort(): Promise<BriefingRolloutCohort | null> {
   };
 }
 
-function isMemberComplete(
+export function isMemberComplete(
   progress: Omit<BriefingCohortMemberProgress, 'email' | 'complete'>,
   config: BriefingRolloutConfig
 ): boolean {
   return (
     progress.dailyBriefsSent >= config.requiredDailyBriefs &&
-    progress.weeklyDeepDivesSent >= config.requiredWeeklyDeepDives &&
-    progress.pursuitBriefsSent >= config.requiredPursuitBriefs
+    progress.weeklyDeepDivesSent >= config.requiredWeeklyDeepDives
   );
 }
 
@@ -484,10 +481,8 @@ async function getCohortProgressSummary(
     const base = {
       dailyBriefsSent: typeof row?.dailyBriefsSent === 'number' ? row.dailyBriefsSent : 0,
       weeklyDeepDivesSent: typeof row?.weeklyDeepDivesSent === 'number' ? row.weeklyDeepDivesSent : 0,
-      pursuitBriefsSent: typeof row?.pursuitBriefsSent === 'number' ? row.pursuitBriefsSent : 0,
       lastDailyBriefAt: row?.lastDailyBriefAt,
       lastWeeklyDeepDiveAt: row?.lastWeeklyDeepDiveAt,
-      lastPursuitBriefAt: row?.lastPursuitBriefAt,
     };
 
     return {
@@ -503,10 +498,9 @@ async function getCohortProgressSummary(
     (acc, member) => {
       if (member.dailyBriefsSent < config.requiredDailyBriefs) acc.dailyBriefs++;
       if (member.weeklyDeepDivesSent < config.requiredWeeklyDeepDives) acc.weeklyDeepDives++;
-      if (member.pursuitBriefsSent < config.requiredPursuitBriefs) acc.pursuitBriefs++;
       return acc;
     },
-    { dailyBriefs: 0, weeklyDeepDives: 0, pursuitBriefs: 0 }
+    { dailyBriefs: 0, weeklyDeepDives: 0 }
   );
 
   return {
@@ -518,7 +512,6 @@ async function getCohortProgressSummary(
     requirements: {
       dailyBriefs: config.requiredDailyBriefs,
       weeklyDeepDives: config.requiredWeeklyDeepDives,
-      pursuitBriefs: config.requiredPursuitBriefs,
     },
     remainingByType,
     incompleteMembersSample: members.filter(member => !member.complete).slice(0, 25),
@@ -538,10 +531,8 @@ export async function recordBriefingProgramDelivery(
   const next = {
     dailyBriefsSent: existing?.dailyBriefsSent || 0,
     weeklyDeepDivesSent: existing?.weeklyDeepDivesSent || 0,
-    pursuitBriefsSent: existing?.pursuitBriefsSent || 0,
     lastDailyBriefAt: existing?.lastDailyBriefAt,
     lastWeeklyDeepDiveAt: existing?.lastWeeklyDeepDiveAt,
-    lastPursuitBriefAt: existing?.lastPursuitBriefAt,
   };
 
   if (type === 'daily_brief') {
@@ -550,9 +541,6 @@ export async function recordBriefingProgramDelivery(
   } else if (type === 'weekly_deep_dive') {
     next.weeklyDeepDivesSent += 1;
     next.lastWeeklyDeepDiveAt = now;
-  } else if (type === 'pursuit_brief') {
-    next.pursuitBriefsSent += 1;
-    next.lastPursuitBriefAt = now;
   }
 
   await kv.set(key, next, { ex: 60 * 60 * 24 * 120 });

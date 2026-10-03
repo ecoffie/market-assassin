@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       usesFallback: user.usesFallback,
     })),
     guidance: {
-      safeRollout: 'POST ?password=xxx&mode=rollout&cohortSize=250&stickyDays=14&cooldownDays=21&maxFallbackPercent=15&requiredDailyBriefs=2&requiredWeeklyDeepDives=2&requiredPursuitBriefs=2',
+      safeRollout: 'POST ?password=xxx&mode=rollout&cohortSize=250&stickyDays=14&cooldownDays=21&maxFallbackPercent=15&requiredDailyBriefs=2&requiredWeeklyDeepDives=2',
       revertToBetaAll: 'POST ?password=xxx&mode=beta_all',
       rotateCohort: 'POST ?password=xxx&rotate=true',
       forceRotateCohort: 'POST ?password=xxx&rotate=true&force=true',
@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
   const maxFallbackPercent = parseNumber(request.nextUrl.searchParams.get('maxFallbackPercent'));
   const requiredDailyBriefs = parseNumber(request.nextUrl.searchParams.get('requiredDailyBriefs'));
   const requiredWeeklyDeepDives = parseNumber(request.nextUrl.searchParams.get('requiredWeeklyDeepDives'));
-  const requiredPursuitBriefs = parseNumber(request.nextUrl.searchParams.get('requiredPursuitBriefs'));
   const includeSmartProfiles = parseBoolean(request.nextUrl.searchParams.get('includeSmartProfiles'));
   const rotate = request.nextUrl.searchParams.get('rotate') === 'true';
   const force = request.nextUrl.searchParams.get('force') === 'true';
@@ -103,7 +102,6 @@ export async function POST(request: NextRequest) {
     maxFallbackPercent,
     requiredDailyBriefs,
     requiredWeeklyDeepDives,
-    requiredPursuitBriefs,
     includeSmartProfiles,
   });
 
