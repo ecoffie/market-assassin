@@ -50,11 +50,11 @@ describe('P3 presentation contract', () => {
     const rules = HOST_RULES_FIND_FIRST_VALUE.join('\n');
     expect(rules).toMatch(/DIRECT_MATCH/);
     expect(rules).toMatch(/RELATED_MARKET_CANDIDATE/);
-    expect(rules).toMatch(/Never count related-market rows as confirmed cyber/i);
-    expect(rules).toMatch(/Never say you searched all of DoD/i);
+    expect(rules).toMatch(/Never count related-market rows as confirmed demand for what they asked to sell/i);
+    expect(rules).toMatch(/Never say you searched the whole parent department/i);
     expect(rules).toMatch(/coverage not established/i);
     expect(rules).toMatch(/COMING BACK SPLIT/);
-    expect(rules).toMatch(/Never say “N\+M cybersecurity recompetes/i);
+    expect(rules).toMatch(/Never say “N\+M <what they asked for> recompetes/i);
     expect(POTATO_JOURNEY_INSTRUCTIONS).toMatch(/broader IT contracts, not confirmed cybersecurity/i);
     const p = buildFindPresentation();
     expect(p.sections.related.display_title).toMatch(/Related market/i);
