@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-02 — lookup_solicitation: caller pursuits no longer injected ahead of real matches
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-02 | MCP / lookup_solicitation | Every caller pursuit got +1000 in `rankScore`, and the pursuit prefilter admitted any pipeline row sharing ONE query word ("services"), so an account with 2,135 pursuits asking "Navy janitorial services Norfolk" got 10 of its own unrelated pursuits (leaf removal, OASIS+, A/E services, microscopy) and no Navy janitorial notice. Ownership is now a tie-break (+30, only on records that already match on their own merits); a pursuit enters the candidate set only if the record itself matches; a title is a strong match only if it carries most of the query's words (whole-word, so "masa" is not "Masan"); pursuit-document filenames no longer match on one generic word. Recall: a capability plus a bare place name ("janitorial ... Norfolk") is now a buyer place without "at", and the parsed-but-unused named buyer ("Navy") is a small same-tier nudge. KNOWN_ID / confirm path untouched | `if (why.includes('user_pursuit') && hasOwnMerit(why)) score += PURSUIT_TIE_BONUS;` → `src/lib/sam/lookup-solicitation.ts` | lookup-solicitation.unit.test.ts: repro tests a/b (non-matching pursuits absent; matching pursuit wins its tie, provenance user_pipeline) red on old code, green on fix; 29/29 incl. live test. Local read-only run vs live DB, same account: Norfolk query 10/10 unrelated pursuits → top hit "Custodial/Janitorial Services (Norfolk, VA)", 0 unrelated pursuits; "the bid we submitted for Cleaning Control Towers Windows" 3 → 1 (the pursuit); N4008526R0187 still 1 RESOLVED_SOLICITATION | On branch fix/lookup-solicitation-pursuit-contamination |
+
 ## 2026-09-29 — Pooled team credits (PR 4B): pools funded, payer generalised, three pooled-billing defects fixed
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

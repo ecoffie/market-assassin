@@ -12,7 +12,10 @@ import {
   lookupSolicitation,
   parseLookupQuery,
   pickHandoff,
+  BUYER_ORG_BONUS,
+  PURSUIT_TIE_BONUS,
   rankScore,
+  titleCoversQuery,
   whyMatchedFor,
   type LookupItem,
 } from '@/lib/sam/lookup-solicitation';
@@ -265,10 +268,40 @@ describe('lookup ranking + collapse (unit)', () => {
     expect(masa[0].notice_id).toBe(AMD3_ID);
   });
 
-  it('USER_PURSUIT outranks public corpus', () => {
-    expect(rankScore(['user_pursuit', 'strong_title'], null, NOW)).toBeGreaterThan(
+  it('ownership is a tie-break, never relevance: a pursuit cannot jump a relevance tier', () => {
+    // Was +1000: any pursuit outranked every public match (2026-10-02 Norfolk repro).
+    expect(rankScore(['user_pursuit', 'strong_title'], null, NOW)).toBeLessThan(
       rankScore(['buyer_capability_date'], null, NOW),
     );
+    expect(rankScore(['user_pursuit', 'weaker_token'], null, NOW)).toBe(
+      rankScore(['weaker_token'], null, NOW),
+    );
+    // Same relevance → the pursuit wins, even against a newer public record.
+    expect(rankScore(['user_pursuit', 'buyer_capability_date'], '2025-01-01T00:00:00Z', NOW)).toBeGreaterThan(
+      rankScore(['buyer_capability_date'], '2026-09-17T00:00:00Z', NOW),
+    );
+    expect(PURSUIT_TIE_BONUS).toBeGreaterThan(20);
+    expect(PURSUIT_TIE_BONUS).toBeLessThan(BUYER_ORG_BONUS);
+    expect(PURSUIT_TIE_BONUS + BUYER_ORG_BONUS + 20).toBeLessThan(200);
+    // Named buyer outranks a same-tier pursuit at another buyer.
+    expect(rankScore(['buyer_capability_date'], null, NOW, true)).toBeGreaterThan(
+      rankScore(['user_pursuit', 'buyer_capability_date'], null, NOW, false),
+    );
+  });
+
+  it('a title sharing one generic word is not a strong title match', () => {
+    const tokens = parseLookupQuery('Navy janitorial services Norfolk').tokens;
+    expect(titleCoversQuery('Custodial Services KS019', tokens)).toBe(false);
+    expect(titleCoversQuery('One Acquisition Solution for Integrated Services Plus (OASIS+)', tokens)).toBe(false);
+    expect(titleCoversQuery('Custodial/Janitorial Services (Norfolk, VA)', tokens)).toBe(true);
+    expect(titleCoversQuery('Masan Ammo Site', ['masa'])).toBe(false);
+  });
+
+  it('a capability plus a bare place name is a buyer place without "at"', () => {
+    const n = parseLookupQuery('Navy janitorial services Norfolk');
+    expect(n.capability).toEqual(['janitorial']);
+    expect(n.buyerGeo).toEqual(['Norfolk']);
+    expect(parseLookupQuery('the bid we submitted for Cleaning Control Towers Windows').buyerGeo).toEqual([]);
   });
 
   it('program acronym does not match Masan as MASA', () => {
@@ -419,6 +452,150 @@ describe('lookupSolicitation blinds A–G (stub corpus)', () => {
     expect(result.items[0].latest_amendment).toMatch(/0003/);
     expect(result.items[0].contact?.name).toBe('Diane Hicks');
     expect(result.items[0].identifiers.some((id) => /N0017426R1003/i.test(id))).toBe(true);
+  });
+});
+
+describe('caller pursuits never inject non-matching records (2026-10-02 repro)', () => {
+  const NAVY_NORFOLK_JAN = masaRow({
+    notice_id: '33333333333333333333333333333333',
+    solicitation_number: 'N3220526Q0101',
+    title: 'Custodial/Janitorial Services (Norfolk, VA)',
+    agency_hierarchy: 'DEPT OF DEFENSE.DEPT OF THE NAVY.NAVFAC.NAVFAC MID-ATLANTIC',
+    office_address: { city: 'Norfolk', state: 'VA' },
+    posted_date: '2026-07-14T00:00:00+00:00',
+    description: 'Janitorial services Norfolk',
+    points_of_contact: [],
+  });
+  const USCG_BRAKES = masaRow({
+    notice_id: '44444444444444444444444444444444',
+    solicitation_number: '70Z03826QB0001',
+    title: 'HC-130J Aircraft Brake Assembly Overhaul Services',
+    agency_hierarchy: 'HOMELAND SECURITY.US COAST GUARD',
+    office_address: { city: 'Elizabeth City', state: 'NC' },
+    posted_date: '2026-09-15T00:00:00+00:00',
+    description: 'Brake overhaul',
+    points_of_contact: [],
+  });
+  const EMBASSY_AE = masaRow({
+    notice_id: '55555555555555555555555555555555',
+    solicitation_number: '19AQMM26R0001',
+    title: 'Architect-Engineer Services for Embassy Design',
+    agency_hierarchy: 'STATE, DEPARTMENT OF.OBO',
+    office_address: { city: 'Arlington', state: 'VA' },
+    posted_date: '2026-09-16T00:00:00+00:00',
+    description: 'A/E services',
+    points_of_contact: [],
+  });
+  const CUSTODIAL_KS = masaRow({
+    notice_id: '66666666666666666666666666666666',
+    solicitation_number: 'W9128F26Q0019',
+    title: 'Custodial Services KS019',
+    agency_hierarchy: 'DEPT OF DEFENSE.DEPT OF THE ARMY',
+    office_address: { city: 'Topeka', state: 'KS' },
+    posted_date: '2026-09-17T00:00:00+00:00',
+    description: 'Custodial',
+    points_of_contact: [],
+  });
+  const PURSUED_NORFOLK_JAN = masaRow({
+    notice_id: '77777777777777777777777777777777',
+    solicitation_number: 'N4008526Q0777',
+    title: 'Janitorial Services Norfolk Naval Shipyard',
+    agency_hierarchy: 'DEPT OF DEFENSE.DEPT OF THE NAVY.NAVFAC.NAVFAC MID-ATLANTIC',
+    office_address: { city: 'Norfolk', state: 'VA' },
+    posted_date: '2025-11-01T00:00:00+00:00',
+    description: 'Janitorial',
+    points_of_contact: [],
+  });
+  const CCT_WINDOWS = masaRow({
+    notice_id: '88888888888888888888888888888888',
+    solicitation_number: 'FA462026Q0042',
+    title: "Cleaning Control Towers' Windows",
+    agency_hierarchy: 'DEPT OF DEFENSE.DEPT OF THE AIR FORCE',
+    office_address: { city: 'Fairchild', state: 'WA' },
+    posted_date: '2026-06-01T00:00:00+00:00',
+    description: 'Window cleaning',
+    points_of_contact: [],
+  });
+  const BLDG_WINDOWS = masaRow({
+    notice_id: '99999999999999999999999999999999',
+    solicitation_number: 'W912DY26R0066',
+    title: 'BLDG 66 Windows Replacement',
+    agency_hierarchy: 'DEPT OF DEFENSE.DEPT OF THE ARMY',
+    office_address: { city: 'Huntsville', state: 'AL' },
+    posted_date: '2026-09-10T00:00:00+00:00',
+    description: 'Windows',
+    points_of_contact: [],
+  });
+  const SAM = [
+    ...CORPUS, NAVY_NORFOLK_JAN, USCG_BRAKES, EMBASSY_AE, CUSTODIAL_KS, PURSUED_NORFOLK_JAN, CCT_WINDOWS, BLDG_WINDOWS,
+  ];
+  const unrelated = [USCG_BRAKES, EMBASSY_AE, CUSTODIAL_KS, CCT_WINDOWS, BLDG_WINDOWS];
+  const pipe = (rows: Array<{ notice_id: string; title: string }>) =>
+    rows.map((r) => ({ user_email: CALLER_A, notice_id: r.notice_id, title: r.title, agency: 'DEPT OF DEFENSE' }));
+
+  it('a: non-matching pursuits do not appear for a query they do not match', async () => {
+    const db = makeDb({
+      sam: SAM as never,
+      pipeline: pipe(unrelated),
+      docs: [{ user_email: CALLER_A, notice_id: USCG_BRAKES.notice_id, filename: 'Services_Capability_Statement.pdf' }],
+    });
+    const r = await lookupSolicitation({
+      query: 'Navy janitorial services Norfolk',
+      userEmail: CALLER_A,
+      client: db as never,
+      now: NOW,
+    });
+    const ids = r.items.map((i) => i.notice_id);
+    for (const u of unrelated) expect(ids).not.toContain(u.notice_id);
+    expect(r.items.some((i) => i.why_matched.includes('user_pursuit'))).toBe(false);
+    expect(r.items[0]?.notice_id).toBe(NAVY_NORFOLK_JAN.notice_id);
+    expect(r.items[0]?.kind).toBe('MATCHED_CANDIDATE');
+    expect(r.items[0]?.provenance).toBe('sam_opportunities');
+  });
+
+  it('b: a matching pursuit still surfaces and wins the tie, attributed to the caller', async () => {
+    const db = makeDb({
+      sam: SAM as never,
+      pipeline: pipe([...unrelated, PURSUED_NORFOLK_JAN]),
+    });
+    const r = await lookupSolicitation({
+      query: 'Navy janitorial services Norfolk',
+      userEmail: CALLER_A,
+      client: db as never,
+      now: NOW,
+    });
+    expect(r.items[0]?.notice_id).toBe(PURSUED_NORFOLK_JAN.notice_id);
+    expect(r.items[0]?.why_matched).toEqual(expect.arrayContaining(['user_pursuit', 'buyer_capability_date']));
+    expect(r.items[0]?.provenance).toBe('user_pipeline+sam_opportunities');
+    expect(r.items.map((i) => i.notice_id)).toContain(NAVY_NORFOLK_JAN.notice_id);
+    for (const u of unrelated) expect(r.items.map((i) => i.notice_id)).not.toContain(u.notice_id);
+    expect(r.items.every((i) => i.kind === 'MATCHED_CANDIDATE')).toBe(true);
+  });
+
+  it('b2: "the bid we submitted for <title>" still finds that pursuit, and only it', async () => {
+    const db = makeDb({ sam: SAM as never, pipeline: pipe(unrelated) });
+    const r = await lookupSolicitation({
+      query: 'the bid we submitted for Cleaning Control Towers Windows',
+      userEmail: CALLER_A,
+      client: db as never,
+      now: NOW,
+    });
+    expect(r.intent).toBe('HISTORICAL');
+    expect(r.items.map((i) => i.notice_id)).toEqual([CCT_WINDOWS.notice_id]);
+    expect(r.items[0].why_matched).toEqual(expect.arrayContaining(['user_pursuit', 'strong_title']));
+  });
+
+  it('c: a known identifier still resolves to one RESOLVED_SOLICITATION for a caller with pursuits', async () => {
+    const db = makeDb({ sam: SAM as never, pipeline: pipe(unrelated) });
+    const r = await lookupSolicitation({
+      query: 'N4008526R0187',
+      userEmail: CALLER_A,
+      client: db as never,
+      now: NOW,
+    });
+    expect(r.items).toHaveLength(1);
+    expect(r.items[0].kind).toBe('RESOLVED_SOLICITATION');
+    expect(r.items[0].notice_id).toBe(CONSTRUCTION.notice_id);
   });
 });
 
