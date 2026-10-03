@@ -16,6 +16,8 @@ import {
   CHATGPT_SERVER_INSTRUCTIONS,
   CHATGPT_META_ALLOW,
   CHATGPT_META_DENY_DOCUMENTED,
+  CHATGPT_PARAM_COPY,
+  chatgptInputSchema,
   chatgptRegistrationList,
   chatgptToolResultFromMeteredError,
   isChatgptTool,
@@ -80,10 +82,55 @@ describe('allowlist', () => {
     }
   });
 
-  it('reuses the registry input schemas verbatim (same object, no redefinition)', () => {
+  it('reuses the registry input schemas (same params; only description text may differ)', () => {
     const full = new Map(mcpRegistrationList().map((e) => [e.name, e]));
     for (const e of chatgptRegistrationList()) {
       expect(Object.keys(e.inputSchema).sort()).toEqual(Object.keys(full.get(e.name)!.inputSchema).sort());
+    }
+  });
+});
+
+describe('ChatGPT-only parameter descriptions (owner decision 2)', () => {
+  // zod 4 keeps .describe() text on the inner type of an optional()
+  const descOf = (s: unknown): string | undefined => {
+    const t = s as { unwrap?: () => { description?: string }; description?: string; isOptional(): boolean };
+    return t.description ?? (typeof t.unwrap === 'function' ? t.unwrap().description : undefined);
+  };
+  const registryParams = (tool: string) =>
+    new Set(Object.keys(mcpRegistrationList().find((e) => e.name === tool)!.inputSchema));
+
+  it('every override names an allowlisted tool and a parameter the registry really has', () => {
+    for (const [tool, params] of Object.entries(CHATGPT_PARAM_COPY)) {
+      expect(isChatgptTool(tool)).toBe(true);
+      const known = registryParams(tool);
+      for (const p of Object.keys(params ?? {})) expect(known.has(p), `${tool}.${p}`).toBe(true);
+    }
+  });
+
+  it('drift guard: an override for a nonexistent parameter throws', () => {
+    const base = mcpRegistrationList().find((e) => e.name === 'search_grants')!.inputSchema;
+    expect(() => chatgptInputSchema('search_grants', base, { not_a_param: 'x' })).toThrow(/search_grants\.not_a_param/);
+  });
+
+  it('does not mutate the registry shape it is given', () => {
+    const base = mcpRegistrationList().find((e) => e.name === 'search_contractors')!.inputSchema;
+    const before = descOf((base as Record<string, unknown>).limit);
+    const mine = chatgptInputSchema('search_contractors', base);
+    expect(descOf((base as Record<string, unknown>).limit)).toBe(before);
+    expect(descOf((mine as Record<string, unknown>).limit)).not.toBe(before);
+    expect(before).toMatch(/per-call cost/); // the registry (Claude) text is still the registry text
+  });
+
+  it('overridden params keep optionality; the description is the ChatGPT text', () => {
+    const full = new Map(mcpRegistrationList().map((e) => [e.name, e]));
+    for (const e of chatgptRegistrationList()) {
+      const overrides = CHATGPT_PARAM_COPY[e.name as keyof typeof CHATGPT_PARAM_COPY] ?? {};
+      for (const [p, text] of Object.entries(overrides)) {
+        const mine = (e.inputSchema as Record<string, { isOptional(): boolean; description?: string }>)[p];
+        const theirs = (full.get(e.name)!.inputSchema as Record<string, { isOptional(): boolean }>)[p];
+        expect(mine.isOptional(), `${e.name}.${p}`).toBe(theirs.isOptional());
+        expect(descOf(mine)).toBe(text);
+      }
     }
   });
 });

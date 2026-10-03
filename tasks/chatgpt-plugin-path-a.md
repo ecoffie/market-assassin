@@ -1,6 +1,9 @@
 # Mindy ChatGPT Plugin: Path A (ChatGPT-specific MCP profile)
 
-Status: **Phase 1 built (PR open, not merged, not deployed). Not submitted to OpenAI.**
+Status: **Phase 1 built + ChatGPT-only param descriptions (draft PR #1776, not merged, not deployed). Not submitted to OpenAI.**
+
+> ⛔ **#1776 must NOT merge until Phase 0 production acceptance passes** (the tools' own
+> correctness on prod: lookup_solicitation scoring, find_opportunities copy, recompete dedupe).
 Owner: Eric. Started 2026-10-02.
 
 Path A = expose a curated, commerce-free subset of the existing Mindy MCP server to
@@ -31,13 +34,69 @@ different resource/audience and a different handler. No ChatGPT-specific UI.
    capability_market_match, get_keyword_coverage. Any other name on `/chatgpt/mcp` is
    unknown: never dispatched, never billed.
 
+## Phase 2 owner decisions on the open items (2026-10-02/03)
+
+Numbered as Eric answered them; they map onto the "Open items" list below.
+
+1. **Auto-recharge out-of-band path (open item 1) — MODIFY.** Attribution design (record the
+   spending channel so the hourly cron can tell a ChatGPT-caused threshold crossing apart)
+   is **pending owner review**. **Fallback if that design is not approved:** refuse the
+   ChatGPT call that would take an opted-in (auto-recharge enabled) user's balance across
+   their auto-recharge threshold. Not implemented yet.
+2. **ChatGPT-only parameter descriptions (open item 2) — GO (2026-10-02).** Implemented:
+   `CHATGPT_PARAM_COPY` in `src/lib/mcp/chatgpt-profile.ts`, applied by
+   `chatgptInputSchema()` when building the ChatGPT registration. Only description TEXT
+   changes; type / required / enum / bounds are the registry's zod types, cloned. An override
+   naming a parameter the registry lacks throws (drift guard). Claude/general endpoint input
+   schemas proven byte-identical (tools/list SHA before = after, plus a per-param registry
+   equality test in `route.claude-unchanged.unit.test.ts`). 17 overrides across 8 tools; see
+   "Parameter description inventory" below.
+3. **Follow-up offers filtered to the allowlist (open item 6) — GO (2026-10-03).** Already
+   implemented in Phase 1 (`projectNext` + host_rules filter); tests in
+   `chatgpt-profile.unit.test.ts` (find_opportunities projection). Unchanged.
+4. **OAuth-only on `/chatgpt/mcp` (open item 4) — GO (2026-10-03).** Already implemented in
+   Phase 1; test "rejects an mcp_live_ API key (OAuth-only surface)" in
+   `src/app/chatgpt/mcp/__tests__/route.unit.test.ts`. Unchanged.
+
+### Parameter description inventory (2026-10-02)
+
+Every description emitted in the 15 tools' input schemas on `/chatgpt/mcp` was walked at
+every depth (properties, array items, records, unions): **65 descriptions, all top-level**
+(the registry→zod bridge emits no nested descriptions: array items carry a type only, objects
+become typed records). Offending strings, now overridden on ChatGPT only:
+
+| Tool.param | Offending text | Why |
+|---|---|---|
+| get_expiring_contracts.limit | "Local table — a larger set has no per-call cost." | cost + internal storage |
+| search_contractors.limit | "Cached index — a larger set has no per-call cost." | cost + internal storage |
+| search_federal_events.limit | "Local table — a larger set has no per-call cost." | cost + internal storage |
+| search_contractors.keyword | "Free-text company-name match" | "free" (commerce word) |
+| find_opportunities.uei | "FIND is company-anchored", "company_registered_psc / company_registered_naics", "ELIGIBLE \| NOT_ELIGIBLE (+reason) \| UNKNOWN", "never ask for it before first value" | internal labels, enum constants, journey jargon |
+| find_opportunities.states | "reported in query_summary.region.unresolved" | internal field path |
+| find_opportunities.stage | "MARKET_RESEARCH … VEHICLE_SOLICITATIONS … NON_FAR", "a labelled secondary signal" | enum constants in prose (the enum itself is unchanged) |
+| find_opportunities.agency | "Optional buying agency" | commerce-adjacent wording (buy) |
+| find_opportunities.advanced | "power-user codes … for customers" | internal jargon |
+| find_opportunities.location | "Semantics differ by horizon (documented in result)" | jargon |
+| find_opportunities.limit_per_horizon | "Not a cross-horizon merge." | jargon |
+| lookup_solicitation.confirm_notice_id | "a MATCHED_CANDIDATE", "upgrade to current truth" | result-enum label, jargon, "upgrade" |
+| get_award_detail.id | "USASpending generated_internal_id … (skips the resolve)" | internal field name |
+| search_grants.agency | "(client-side prefix filter)" | implementation detail |
+| search_federal_events.agency | "Messy raw names resolve via normalization." | implementation jargon |
+| search_federal_events.include_ics | "`ics` … VCALENDAR … _meta.ics_skipped_undated" | internal key names |
+| capability_market_match.client_name | "label for the deliverable header" | internal jargon |
+
+Remaining enum VALUES quoted in a description (e.g. `search_contractors.sort_by` "default
+total_obligated", `search_past_contracts.state_scope` "pop") are kept: they are the literal
+values the model must pass. Test `route.unit.test.ts` bans commerce terms and the labels above
+on every ChatGPT parameter description, so a future registry edit that adds one fails CI.
+
 ## Phases
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Correctness of the tools themselves (lookup_solicitation scoring, find_opportunities copy, recompete dedupe) | other branches, in flight |
 | 1 | This profile: routing, OAuth audience binding, 15-tool allowlist, descriptions, annotations, instructions, projection, neutral refusals, tests | **built (this PR)** |
-| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | not started |
+| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **pending owner review**; rest not started |
 | 3 | Reviewer account + submission package (annotations.json, test prompts, screenshots of ChatGPT itself, privacy/terms review) | not started |
 
 ## Hard stops
@@ -79,7 +138,7 @@ different resource/audience and a different handler. No ChatGPT-specific UI.
      most recent below-threshold crossing came from a ChatGPT debit (billing-schema change).
    - (d) Disable auto-recharge entirely for accounts that have ever connected ChatGPT.
    Not implemented in Phase 1 (none is a trivial channel-scoped guard).
-2. **Param descriptions are the registry's, verbatim** (owner rule: schemas identical). A few
+2. **[RESOLVED 2026-10-02 — decision 2 GO, see above]** Param descriptions were the registry's, verbatim (owner rule: schemas identical). A few
    mention cost ("a larger set has no per-call cost": get_expiring_contracts.limit,
    search_contractors.limit, search_federal_events.limit) or internal labels
    (find_opportunities.uei). Phase 2: decide whether to allow ChatGPT-only param-description

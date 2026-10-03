@@ -7,8 +7,9 @@
  *
  * What differs from the Claude/general endpoint — and nothing else does:
  *   · TOOLS: exactly the 15-tool allowlist in src/lib/mcp/chatgpt-profile.ts, with
- *     ChatGPT-specific titles/descriptions/annotations. Input schemas are the registry's,
- *     unchanged. Any other tool name is unknown here and is never dispatched or billed.
+ *     ChatGPT-specific titles/descriptions/annotations. Input schemas are the registry's
+ *     (types/required/enums unchanged); only some parameter DESCRIPTIONS are reworded
+ *     (CHATGPT_PARAM_COPY). Any other tool name is unknown here and is never dispatched or billed.
  *   · AUTH: OAuth access tokens minted for the ChatGPT resource ONLY. Full-endpoint tokens
  *     and mcp_live_ API keys are rejected (one audience per handler).
  *   · COMMERCE: none. No credit footer, no `_meta.credits`, no purchase links, no

@@ -12,14 +12,16 @@
  *   5. Exactly the 15 tools in CHATGPT_TOOL_ALLOWLIST.
  *
  * Input schemas are NOT redefined here: chatgptRegistrationList() reuses the registry's
- * mcpRegistrationList() entries verbatim and overrides only title / description /
- * annotations. So a schema fix in the registry reaches ChatGPT automatically, and the
- * ChatGPT surface can never accept an argument the dispatcher doesn't.
+ * mcpRegistrationList() entries and overrides only title / description / annotations,
+ * plus the DESCRIPTION TEXT of selected parameters (CHATGPT_PARAM_COPY — types, required,
+ * enums and bounds unchanged). So a schema fix in the registry reaches ChatGPT
+ * automatically, and the ChatGPT surface can never accept an argument the dispatcher doesn't.
  *
  * Annotation justifications (per tool, per hint) live in docs/chatgpt-plugin/annotations.json
  * for the submission package; a unit test keeps that file and this module in agreement.
  */
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
+import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
 import { mcpRegistrationList, type McpRegistrationEntry, type McpToolAnnotations } from './tool-schemas';
 import { buildChatgptRefusal, CHATGPT_REFUSAL_CODES, type ChatgptRefusal } from './chatgpt-refusals';
 
@@ -169,10 +171,89 @@ export function chatgptAnnotationsFor(name: ChatgptToolName): McpToolAnnotations
   return { title: copy.title, ...BASE_HINTS, openWorldHint: copy.openWorldHint };
 }
 
+// ── 2b. ChatGPT-only PARAMETER descriptions (owner decision 2, GO 2026-10-02) ──
+//
+// Only the `description` TEXT of a parameter changes on /chatgpt/mcp. Type, required,
+// enum values, defaults and bounds stay exactly the registry's (the zod type is cloned
+// with a new description, never rebuilt). Overrides remove per-call cost talk, internal
+// table/field names, result-enum labels and journey jargon. Parameters without an entry
+// here keep the registry text (it was audited clean on 2026-10-02; the unit test bans
+// commerce terms on every ChatGPT parameter, so a future registry edit that adds one
+// fails CI instead of shipping). An override naming a parameter the registry does not
+// have THROWS (drift guard) — a renamed param must never silently lose its override.
+
+export const CHATGPT_PARAM_COPY: Readonly<Partial<Record<ChatgptToolName, Readonly<Record<string, string>>>>> = {
+  find_opportunities: {
+    location:
+      'Optional state, as a name or 2-letter code ("Florida" or "FL"). Each horizon applies it slightly differently; the result says how.',
+    agency: 'Optional government customer the user wants to sell to ("Navy", "VA", "Department of Defense").',
+    limit_per_horizon: 'Maximum items returned for each horizon (default 5, max 25). Each horizon is limited separately.',
+    advanced: 'Optional specialist codes (for example NAICS or PSC). Prefer a plain-English query.',
+    uei:
+      'Optional 12-character SAM.gov UEI of the user\'s company, only if the user already gave it (do not ask for it before showing results). When provided, the company\'s registered NAICS and PSC codes widen the search (shown as a company-registration match, never as a direct match), and each item is marked eligible, not eligible (with the reason) or unknown, based on the company\'s size standard for that notice\'s NAICS code.',
+    states:
+      'Optional region: several states at once, as names or 2-letter codes (["GA","AL","TN"]). Combined with location. There is no radius or military-installation lookup; a value that is not a US state is reported back in the result and never widens the search.',
+    stage:
+      'Optional acquisition stage, applied to open solicitations only: market research (RFIs and sources sought), contract-vehicle solicitations (IDIQ, MACC, MATOC, JOC, SABER, BPA) or non-FAR awards (CSO, OTA, BAA). Matched on the SAM.gov notice type first, then on title wording; notices with no recognizable type are left out and counted. Recompetes and forecasts are not filtered by stage. Only pass it when the user asked for a stage.',
+  },
+  lookup_solicitation: {
+    confirm_notice_id:
+      'After the user confirms a suggested match ("yes, that\'s the one"), pass that notice ID to get the confirmed, current record.',
+  },
+  get_award_detail: {
+    id: 'USASpending award ID, if already known (for example from a USASpending link). Otherwise pass piid.',
+  },
+  get_expiring_contracts: {
+    limit: 'Maximum results (default 50, max 200).',
+  },
+  search_grants: {
+    agency: 'Top-level agency code, for example "DOD" or "HHS". Matches agencies whose code starts with it.',
+  },
+  search_contractors: {
+    keyword: 'Company-name text to match, for example "Booz".',
+    limit: 'Maximum results (default 50, max 100).',
+  },
+  search_federal_events: {
+    agency: 'Agency name, for example "Department of Defense", "Navy" or "GSA". Common variations of agency names are recognized.',
+    limit: 'Maximum SAM.gov events returned (default 50, max 100).',
+    include_ics:
+      'Also return a calendar file (base64-encoded .ics) of the matching events, for import into Google, Outlook or Apple Calendar. Only events with a real published date are included; undated events are counted in the result, never assigned a guessed date. Default false.',
+  },
+  capability_market_match: {
+    client_name: 'Optional company name to show at the top of the result.',
+  },
+};
+
+/** Clone a zod param with a new description; optional() is re-applied around the clone. */
+function withDescription(schema: ZodTypeAny, description: string): ZodTypeAny {
+  if (schema instanceof z.ZodOptional) {
+    return (schema.unwrap() as ZodTypeAny).describe(description).optional();
+  }
+  return schema.describe(description);
+}
+
+/** Apply CHATGPT_PARAM_COPY to one tool's registry shape (new object; registry untouched). */
+export function chatgptInputSchema(
+  name: ChatgptToolName,
+  base: ZodRawShape,
+  overrides: Readonly<Record<string, string>> | undefined = CHATGPT_PARAM_COPY[name],
+): ZodRawShape {
+  if (!overrides) return base;
+  const shape: Record<string, ZodTypeAny> = { ...(base as Record<string, ZodTypeAny>) };
+  for (const [param, description] of Object.entries(overrides)) {
+    const current = shape[param];
+    if (!current) {
+      throw new Error(`chatgpt-profile: CHATGPT_PARAM_COPY overrides "${name}.${param}", which is not a parameter in the MCP registry`);
+    }
+    shape[param] = withDescription(current, description);
+  }
+  return shape as ZodRawShape;
+}
+
 /**
  * The 15 registration entries for the ChatGPT handler — registry schemas, ChatGPT copy.
  * Throws if an allowlisted tool is missing from the registry (a rename must fail loudly,
- * never silently ship a 14-tool profile).
+ * never silently ship a 14-tool profile), or if a param override names an unknown param.
  */
 export function chatgptRegistrationList(): McpRegistrationEntry[] {
   const byName = new Map(mcpRegistrationList().map((e) => [e.name, e]));
@@ -184,7 +265,7 @@ export function chatgptRegistrationList(): McpRegistrationEntry[] {
       name,
       title: annotations.title,
       description: CHATGPT_TOOL_COPY[name].description,
-      inputSchema: base.inputSchema,
+      inputSchema: chatgptInputSchema(name, base.inputSchema),
       annotations,
     };
   });

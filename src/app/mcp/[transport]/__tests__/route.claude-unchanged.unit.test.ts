@@ -31,6 +31,7 @@ vi.mock('next/server', async (orig) => ({
 const { POST } = await import('../route');
 const { issueAccessToken, OAUTH_RESOURCE_CHATGPT } = await import('@/lib/mcp/oauth/tokens');
 const { mcpRegistrationList } = await import('@/lib/mcp/tool-schemas');
+const { listMcpTools } = await import('@/lib/mcp/tool-registry');
 
 const claudeToken = () => issueAccessToken('buyer@example.com', 'mcpc_claude').token;
 const chatgptToken = () => issueAccessToken('buyer@example.com', 'mcpc_chatgpt', 'mcp', OAUTH_RESOURCE_CHATGPT).token;
@@ -73,6 +74,34 @@ describe('Claude/general MCP endpoint — unchanged', () => {
     }
     // registry copy still carries its credit pricing language — untouched by the profile
     expect(tools.some((t) => /Credits: \d+/.test(String(t.description)))).toBe(true);
+  });
+
+  it('param descriptions are byte-identical to the registry for all 64 tools, before and after the ChatGPT profile is built', async () => {
+    const list = async () =>
+      ((await rpcResult(await POST(rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, claudeToken())))).result as { tools: Record<string, unknown>[] }).tools;
+    const before = JSON.stringify((await list()).map((t) => [t.name, t.inputSchema]));
+    // Build the ChatGPT registration (applies CHATGPT_PARAM_COPY) — must not leak into the full endpoint.
+    const { chatgptRegistrationList } = await import('@/lib/mcp/chatgpt-profile');
+    expect(chatgptRegistrationList()).toHaveLength(15);
+    const tools = await list();
+    expect(JSON.stringify(tools.map((t) => [t.name, t.inputSchema]))).toBe(before);
+
+    const raw = new Map(listMcpTools().map((r) => {
+      const fn = (r as { function: { name: string; parameters?: { properties?: Record<string, { description?: string }> } } }).function;
+      return [fn.name, fn.parameters?.properties ?? {}] as const;
+    }));
+    let checked = 0;
+    for (const t of tools) {
+      const props = (t.inputSchema as { properties?: Record<string, { description?: string }> }).properties ?? {};
+      for (const [p, rp] of Object.entries(raw.get(String(t.name)) ?? {})) {
+        expect(props[p]?.description, `${t.name}.${p}`).toBe(rp.description);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+    // the exact registry strings the ChatGPT profile overrides are still served here
+    const limit = (tools.find((t) => t.name === 'search_contractors')!.inputSchema as { properties: Record<string, { description: string }> }).properties.limit;
+    expect(limit.description).toBe('Max rows (default 50, max 100). Cached index — a larger set has no per-call cost.');
   });
 
   it('works on the apex/preview direct path too (/mcp/mcp)', async () => {

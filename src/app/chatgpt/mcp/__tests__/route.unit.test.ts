@@ -30,6 +30,7 @@ const verifyApiKey = vi.fn(async (raw?: string | null) =>
 vi.mock('@/lib/mcp/api-keys', () => ({ verifyApiKey: (r?: string | null) => verifyApiKey(r) }));
 
 const { POST } = await import('../route');
+const { POST: CLAUDE_POST } = await import('@/app/mcp/[transport]/route');
 const { issueAccessToken, OAUTH_RESOURCE, OAUTH_RESOURCE_CHATGPT } = await import('@/lib/mcp/oauth/tokens');
 
 const chatgptToken = () => issueAccessToken('buyer@example.com', 'mcpc_chatgpt', 'mcp', OAUTH_RESOURCE_CHATGPT).token;
@@ -107,6 +108,82 @@ describe('/chatgpt/mcp — tools/list', () => {
       expect(String(t.description)).not.toMatch(/Credits:|Mindy Pro|\$/);
       expect(t.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
     }
+  });
+});
+
+/** Every `description` in a JSON schema, at any depth (properties, items, records, unions). */
+function schemaDescriptions(s: unknown, path = '', out: [string, string][] = []): [string, string][] {
+  if (!s || typeof s !== 'object') return out;
+  const o = s as Record<string, unknown>;
+  if (typeof o.description === 'string') out.push([path, o.description]);
+  for (const [k, v] of Object.entries((o.properties as Record<string, unknown>) ?? {})) schemaDescriptions(v, path ? `${path}.${k}` : k, out);
+  if (o.items) schemaDescriptions(o.items, `${path}[]`, out);
+  if (o.additionalProperties && typeof o.additionalProperties === 'object') schemaDescriptions(o.additionalProperties, `${path}{}`, out);
+  for (const key of ['anyOf', 'oneOf', 'allOf']) ((o[key] as unknown[]) ?? []).forEach((x, i) => schemaDescriptions(x, `${path}|${i}`, out));
+  return out;
+}
+function withoutDescriptions(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(withoutDescriptions);
+  if (!v || typeof v !== 'object') return v;
+  return Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'description').map(([k, x]) => [k, withoutDescriptions(x)]));
+}
+
+/** Commerce + internal-label terms banned from every ChatGPT PARAMETER description (owner decision 2). */
+const PARAM_BANNED: RegExp[] = [
+  /\bcredits?\b/i, /\bprices?\b/i, /\bpricing\b/i, /\$/, /\bfree\b/i, /\bcosts?\b/i, /\bPro\b/, /\bupgrad/i,
+  /\bsubscri/i, /\bbuy\b/i, /\bpurchas/i, /\bcheckout\b/i, /\btop[ -]?up\b/i,
+  // internal labels / constants / table + field names / journey jargon found in the 2026-10-02 inventory
+  /company_registered_/, /\bNOT_ELIGIBLE\b/, /\bELIGIBLE\b/, /\bUNKNOWN\b/, /MATCHED_CANDIDATE/, /\bFIND\b/,
+  /generated_internal_id/, /query_summary/, /_meta\b/, /local table/i, /cached index/i, /client-side/i,
+  /normalization/i, /first value/i, /current truth/i, /power-user/i, /\bper-call\b/i, /VCALENDAR/,
+  /sam_opportunities|recompete_opportunities|agency_forecasts|BigQuery/,
+];
+
+describe('/chatgpt/mcp — parameter descriptions (owner decision 2)', () => {
+  const listBoth = async () => {
+    const mine = (await rpcResult(await POST(listTools(chatgptToken())))).result as { tools: Record<string, unknown>[] };
+    const claudeReq = new NextRequest('https://mcp.getmindy.ai/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18', authorization: `Bearer ${claudeToken()}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    const claude = (await rpcResult(await CLAUDE_POST(claudeReq))).result as { tools: Record<string, unknown>[] };
+    return { mine: mine.tools, claude: new Map(claude.tools.map((t) => [String(t.name), t])) };
+  };
+
+  it('no emitted parameter description (any depth) carries commerce or internal labels', async () => {
+    const { mine } = await listBoth();
+    const hits: string[] = [];
+    let n = 0;
+    for (const t of mine) {
+      for (const [path, d] of schemaDescriptions(t.inputSchema)) {
+        n++;
+        for (const re of PARAM_BANNED) if (re.test(d)) hits.push(`${t.name}.${path}: ${re}`);
+      }
+    }
+    expect(n).toBeGreaterThan(50); // the walk really saw the parameters
+    expect(hits).toEqual([]);
+  });
+
+  it('schema shape is identical to the Claude endpoint apart from description text', async () => {
+    const { mine, claude } = await listBoth();
+    for (const t of mine) {
+      const c = claude.get(String(t.name))!;
+      expect(c, String(t.name)).toBeDefined();
+      expect(withoutDescriptions(t.inputSchema), String(t.name)).toEqual(withoutDescriptions(c.inputSchema));
+    }
+  });
+
+  it('the overrides really reach the wire (and the Claude endpoint keeps the registry text)', async () => {
+    const { mine, claude } = await listBoth();
+    const prop = (tools: Record<string, unknown> | undefined, p: string) =>
+      ((tools!.inputSchema as { properties: Record<string, { description?: string }> }).properties[p]).description;
+    const myLimit = prop(mine.find((t) => t.name === 'get_expiring_contracts'), 'limit');
+    const theirLimit = prop(claude.get('get_expiring_contracts'), 'limit');
+    expect(myLimit).toBe('Maximum results (default 50, max 200).');
+    expect(theirLimit).toMatch(/no per-call cost/);
+    expect(prop(claude.get('find_opportunities'), 'uei')).toMatch(/company_registered_psc/);
+    expect(prop(mine.find((t) => t.name === 'find_opportunities'), 'uei')).not.toMatch(/company_registered_psc/);
   });
 });
 
