@@ -33,6 +33,7 @@ const WRAPPERS: Record<string, number> = { applyCreditOnce: 3, grantCredits: 2, 
 const DYNAMIC_SITES: Record<string, string[]> = {
   'src/lib/mcp/stripe-subscription.ts::ledgerReason': ['mcp_sub_annual', 'mcp_sub_monthly'],
   'src/lib/mcp/app-tier-subscription.ts::`app_tier_${tier}`': ['app_tier_pro', 'app_tier_team'],
+  'src/app/api/cron/grant-mcp-pro-credits/route.ts::allowanceReason': ['comp_monthly', 'pro_monthly'],
 };
 
 /** Split a call's argument text on top-level commas. */
@@ -120,6 +121,8 @@ describe('every grant reason in code is classified', () => {
     expect(sub).toMatch(/ledgerReason = grant\.interval === 'year' \? 'mcp_sub_annual' : 'mcp_sub_monthly'/);
     const tier = readFileSync(join(ROOT, 'src/lib/mcp/app-tier-subscription.ts'), 'utf8');
     expect(tier).toMatch(/let tier: 'pro' \| 'team' \| null/);
+    const cron = readFileSync(join(ROOT, 'src/app/api/cron/grant-mcp-pro-credits/route.ts'), 'utf8');
+    expect(cron).toMatch(/allowanceReason = group === 'internal' \|\| group === 'advocate' \? 'comp_monthly' : 'pro_monthly'/);
   });
 
   it('grant RPCs are only invoked through their wrappers', () => {

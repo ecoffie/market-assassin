@@ -26,11 +26,12 @@ const REASON_LABEL: Record<string, string> = {
   mcp_sub_annual: 'MCP Pro — annual',
   signup_grant: 'Free signup credits',
   admin_grant: 'Complimentary credits',
+  comp_monthly: 'Complimentary monthly credits',
 };
 
 /** Genuinely-free grants (no purchase behind them). Everything else — top-up,
  *  auto-recharge, Pro allowance, subscription grants — sits under a paid plan. */
-const FREE_REASONS = new Set(['signup_grant', 'admin_grant']);
+const FREE_REASONS = new Set(['signup_grant', 'admin_grant', 'comp_monthly']);
 
 function labelFor(reason: string): string {
   return REASON_LABEL[reason] ?? reason.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();

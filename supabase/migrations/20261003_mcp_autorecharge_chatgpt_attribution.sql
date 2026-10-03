@@ -75,8 +75,10 @@ COMMENT ON COLUMN mcp_credit_ledger.channel IS
 -- ---- 3. THE ONE ALLOWLIST: grant reasons that are independent funding events -----
 -- RESET = new customer entitlement the customer paid for (directly or by subscription).
 -- Everything else — admin/debug, promo/free/signup, referral, refunds/corrections,
--- migrations, pool transfers, comp resets, sponsor top-ups (pending owner
--- classification), and ANY reason not listed here — does NOT reset.
+-- migrations, pool transfers, comp resets, comp monthly allowances (comp_monthly),
+-- sponsor top-ups with no recorded payment (sponsor_monthly), the one-time Sept 2026
+-- Pro supplement (pro_monthly_supplement), and ANY reason not listed here — does NOT
+-- reset (owner classification 2026-10-03).
 -- Mirrored (and test-asserted equal) in src/lib/mcp/grant-reasons.ts.
 CREATE OR REPLACE FUNCTION mcp_grant_resets_chatgpt_window(p_reason TEXT)
 RETURNS BOOLEAN
@@ -275,7 +277,7 @@ BEGIN
 END $$;
 
 -- ---- 9. Sponsor ceiling top-up: + the same allowlist check -----------------------
--- Its only reason today is 'sponsor_monthly' → NO RESET (pending owner classification);
+-- Its only reason today is 'sponsor_monthly' → NO RESET (no recorded sponsor payment);
 -- reclassifying it is a one-line change to the allowlist above, nothing here.
 CREATE OR REPLACE FUNCTION mcp_topup_to_ceiling(
   p_key TEXT, p_user TEXT, p_ceiling INTEGER, p_reason TEXT

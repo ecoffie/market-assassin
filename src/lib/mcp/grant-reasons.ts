@@ -36,11 +36,10 @@ export const GRANT_REASONS: Record<string, GrantReasonEntry> = {
   mcp_sub_monthly: { class: 'reset', why: 'MCP subscription renewal credit grant (monthly)', source: 'stripe-subscription.ts' },
   mcp_sub_annual: { class: 'reset', why: 'MCP subscription renewal credit grant (annual)', source: 'stripe-subscription.ts' },
 
-  // ---- NEEDS OWNER CLASSIFICATION (treated as NO RESET until decided) --------------
-  sponsor_monthly: { class: 'needs_owner', why: 'sponsor-funded monthly top-up to a ceiling: paid, but by a third-party sponsor, not the customer', source: 'cron/grant-mcp-pro-credits → mcp_topup_to_ceiling' },
-  pro_monthly_supplement: { class: 'needs_owner', why: 'one-off allowance supplement (40 rows, 2026-09-08); subscription-related but not a normal refill', source: 'historical (prod ledger only)' },
-
   // ---- NO RESET ---------------------------------------------------------------------
+  comp_monthly: { class: 'no_reset', why: 'complimentary monthly allowance (internal team, advocates): no customer payment behind it (owner 2026-10-03)', source: 'cron/grant-mcp-pro-credits (comp groups)' },
+  sponsor_monthly: { class: 'no_reset', why: 'sponsored top-up with no recorded payment: the only entitlement (Encore Funding, 2026-09-15) is an owner-approved arrangement; no Stripe customer exists for the sponsor contact or the beneficiary, so it is not a paid funding event. Reclassify only when the sponsorship carries a recorded payment', source: 'cron/grant-mcp-pro-credits → mcp_topup_to_ceiling' },
+  pro_monthly_supplement: { class: 'no_reset', why: 'one-time 250 -> 1,500 transition write (scripts/pro-supplement-2026-09.mts, 2026-09-08): not a renewal, and its audience was every Sept pro_monthly 250 recipient, which included comp advocates (5 of 40). Never produced again', source: 'scripts/pro-supplement-2026-09.mts (historical, one run)' },
   signup_grant: { class: 'no_reset', why: 'free signup/welcome credits (promotional)', source: 'mcp_grant_signup_credits (fixed reason)' },
   referral: { class: 'no_reset', why: 'referral bonus (promotional)', source: 'referrals.ts' },
   admin_grant: { class: 'no_reset', why: 'admin/debug grant', source: 'api/admin/mcp-credits, acceptance scripts' },

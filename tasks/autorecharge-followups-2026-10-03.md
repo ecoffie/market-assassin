@@ -89,3 +89,10 @@ The earlier design snapshotted S at claim and forgave only that amount at grant.
 reset semantics (S := 0 on a funding event) replace it, so the column was never created. ChatGPT
 spend between claim and grant now belongs to the old window, as the owner specified, and the
 "engine died mid-recharge" snapshot edge case no longer exists.
+
+## Owner classification — 2026-10-03 (resolved)
+
+- **Reset-list principle approved.** RESET = auto_recharge, stripe_topup, pro_monthly, app_tier_pro, app_tier_team, mcp_sub_monthly, mcp_sub_annual. Unknown reasons fail closed (NO RESET).
+- **Comp allowances = NO RESET.** The grant cron now writes `comp_monthly` (not `pro_monthly`) for the internal team and advocates. `comp_monthly` keeps the paid standing comp accounts already had for the extraction guard and is shown as "Complimentary monthly credits" in billing history.
+- **sponsor_monthly = NO RESET.** Traced: the only producer is the grant cron's sponsored top-up (`mcp_topup_to_ceiling`). The only entitlement is Encore Funding → one account, approved by Eric 2026-09-15. No Stripe customer exists for the sponsor contact or the beneficiary, so there is no recorded payment, and 0 `sponsor_monthly` ledger rows exist so far. Rule: reclassify to RESET only when a sponsorship carries a recorded payment.
+- **pro_monthly_supplement = NO RESET.** Traced: a one-time script (`scripts/pro-supplement-2026-09.mts`, commit 18cb5a6f) run on 2026-09-08 for the 250 → 1,500 allowance transition. It wrote 40 rows of +1,250. Its audience was every September `pro_monthly` 250 recipient, which included 5 comp advocates. It is not a renewal and is never produced again.
