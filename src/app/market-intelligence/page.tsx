@@ -269,7 +269,7 @@ function MarketIntelligenceContent() {
               }`}
             >
               Team
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${ /* tier-display-ok: pricing plan selector, not an entitlement */
                 tier === 'team' ? 'bg-(--mp-navy) text-white' : 'bg-(--mp-navy-wash) text-(--mp-navy)'
               }`}>5 SEATS</span>
             </button>
@@ -315,11 +315,7 @@ function MarketIntelligenceContent() {
             Team) per Eric's spec, with "billed annually as $X" as
             the secondary line. Team card uses a blue accent ring
             instead of purple to differentiate visually. */}
-        <div className={`bg-(--mp-wash) ${
-          tier === 'pro' ? 'border-(--mp-navy)' : 'border-(--mp-navy)'
-        } border-2 rounded-lg p-5 ${
-          tier === 'pro' ? '' : ''
-        }`}>
+        <div className="bg-(--mp-wash) border-(--mp-navy) border-2 rounded-lg p-5">
           <div className="text-center mb-4">
             {(() => {
               // Pricing table — single source of truth so future
@@ -365,13 +361,13 @@ function MarketIntelligenceContent() {
               <span className="text-(--mp-ok)">✓</span> Pursuit briefs
             </li>
             <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
-              <span className="text-(--mp-ok)">✓</span> {tier === 'team' ? 'Shared pipeline + CRM' : 'Saved target list + outreach log'}
+              <span className="text-(--mp-ok)">✓</span> {/* tier-display-ok: pricing plan selector */ tier === 'team' ? 'Shared pipeline + CRM' : 'Saved target list + outreach log'}
             </li>
             <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
               <span className="text-(--mp-ok)">✓</span> Mindy Says AI narrative
             </li>
             <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
-              <span className="text-(--mp-ok)">✓</span> {tier === 'team' ? 'Team admin dashboard' : 'FHC live training'}
+              <span className="text-(--mp-ok)">✓</span> {/* tier-display-ok: pricing plan selector */ tier === 'team' ? 'Team admin dashboard' : 'FHC live training'}
             </li>
             {tier === 'team' && (
               <li className="flex items-center gap-1.5 text-(--mp-navy) text-xs font-medium">
