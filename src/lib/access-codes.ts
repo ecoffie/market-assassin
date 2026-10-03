@@ -807,6 +807,10 @@ export async function grantBriefingAccess(email: string): Promise<void> {
           aggregated_profile: defaultProfile,
           timezone: 'America/New_York',
           briefing_frequency: 'daily',
+          // SEC-5b: explicit, never the column default. This is a PAID grant path; the
+          // default becomes false (20261003_briefings_enabled_default_false.sql), and a
+          // paying user whose row was seeded here must still be deliverable.
+          briefings_enabled: true,
           sms_enabled: false,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_email', ignoreDuplicates: true });
