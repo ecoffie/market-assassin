@@ -33,6 +33,7 @@ const { POST } = await import('../route');
 const { POST: CLAUDE_POST } = await import('@/app/mcp/[transport]/route');
 const { issueAccessToken, OAUTH_RESOURCE, OAUTH_RESOURCE_CHATGPT } = await import('@/lib/mcp/oauth/tokens');
 const { listMcpTools } = await import('@/lib/mcp/tool-registry');
+const { chatgptToolResultFromMeteredError } = await import('@/lib/mcp/chatgpt-profile');
 
 const chatgptToken = () => issueAccessToken('buyer@example.com', 'mcpc_chatgpt', 'mcp', OAUTH_RESOURCE_CHATGPT).token;
 const claudeToken = () => issueAccessToken('buyer@example.com', 'mcpc_claude').token;
@@ -188,6 +189,39 @@ describe('/chatgpt/mcp — parameter descriptions (owner decision 2)', () => {
     }
     const hits = strings.flatMap(([where, text]) => foreign.filter((n) => new RegExp(`\\b${n}\\b`).test(text)).map((n) => `${where}: ${n}`));
     expect(hits).toEqual([]);
+  });
+
+  it('every ChatGPT-facing copy string is commerce-free (owner term list; "credits" only in balance refusals)', async () => {
+    const { mine } = await listBoth();
+    const init = await rpcResult(await POST(rpc({
+      jsonrpc: '2.0', id: 9, method: 'initialize',
+      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } },
+    }, chatgptToken())));
+    const initResult = init.result as { instructions?: string; serverInfo?: Record<string, unknown> };
+    const copy: [string, string][] = [
+      ['instructions', String(initResult.instructions)],
+      ['serverInfo', JSON.stringify(initResult.serverInfo ?? {})],
+    ];
+    for (const t of mine) {
+      copy.push([`${t.name}.title`, String(t.title)], [`${t.name}.description`, String(t.description)], [`${t.name}.annotations`, JSON.stringify(t.annotations)]);
+      for (const [path, d] of schemaDescriptions(t.inputSchema)) copy.push([`${t.name}.${path}`, d]);
+    }
+    const COMMERCE: RegExp[] = [
+      /\$/, /\bprices?\b/i, /\bpricing\b/i, /\bbuy\b/i, /\bpurchas/i, /\btop[ -]up\b/i, /\bupgrad/i,
+      /\bsubscri/i, /\bcheckout\b/i, /\bstripe\b/i, /\bplans?\b/i, /\bPro\b/, /getmindy\.ai\/mcp/i, /continue_url/,
+    ];
+    const hits = copy.flatMap(([where, text]) => [...COMMERCE, /\bcredits?\b/i].filter((re) => re.test(text)).map((re) => `${where}: ${re}`));
+    expect(hits).toEqual([]);
+
+    // Refusal copy: commerce-free for every refusal code, even when the upstream message is a paywall.
+    for (const code of ['insufficient_credits', 'team_pool_insufficient_credits', 'requires_pro', 'requires_paid_credits', 'rate_limited', 'billing_account_unresolved']) {
+      const r = chatgptToolResultFromMeteredError('capability_market_match', {
+        code, message: 'Top up at getmindy.ai/mcp — $49, upgrade to Pro', commercial: { required_credits: 50, available_credits: 45 },
+      }, { requiredCredits: 50, availableCredits: 45 });
+      const text = JSON.stringify(r);
+      expect(COMMERCE.filter((re) => re.test(text)), code).toEqual([]);
+      if (!/insufficient_credits/.test(code)) expect(r.content[0].text, code).not.toMatch(/\bcredits?\b/i);
+    }
   });
 
   it('schema shape is identical to the Claude endpoint apart from description text', async () => {

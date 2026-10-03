@@ -17,9 +17,10 @@
  *     channel 'chatgpt'), neutral refusals (chatgpt-refusals.ts).
  *   · ACQUISITION: no signup-credit grant here (and none at token exchange for this
  *     audience — see src/app/oauth/token/route.ts).
- *   · AUTO-RECHARGE: never triggered in-request from this path. (The hourly
- *     /api/cron/mcp-autorecharge backstop is balance-based and channel-blind — see the
- *     open item in tasks/chatgpt-plugin-path-a.md.)
+ *   · AUTO-RECHARGE: never triggered in-request from this path. The hourly
+ *     /api/cron/mcp-autorecharge backstop excludes this path's spend: personal debits carry
+ *     channel 'chatgpt' (→ p_channel, chatgpt_spend_since_recharge) and the #1778 recharge
+ *     gate refuses a ChatGPT-caused crossing. Pooled calls debit the pool only.
  *
  * What is the SAME, on purpose: billing. Every call goes through runMeteredTool — the
  * billing seam — so an existing balance is pre-checked and debited exactly as on Claude.

@@ -36,7 +36,7 @@ export function neutralPoolInsufficientMessage(required: number | null, availabl
 }
 
 export const NEUTRAL_REQUIRES_PRO_MESSAGE =
-  "This tool isn't available on this account's current plan. Nothing was charged.";
+  "This tool isn't available with this account's current access. Nothing was charged.";
 
 export const NEUTRAL_REQUIRES_PAID_MESSAGE =
   "This tool isn't available to this account right now. Nothing was charged.";

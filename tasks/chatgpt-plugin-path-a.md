@@ -1,14 +1,16 @@
 # Mindy ChatGPT Plugin: Path A (ChatGPT-specific MCP profile)
 
-Status: **Phase 1 built + ChatGPT-only param descriptions + owner-FINAL 15 (2026-10-03), rebased onto #1777 (draft PR #1776, not merged, not deployed). Not submitted to OpenAI.**
+Status: **Phase 1 built + ChatGPT-only param descriptions + owner-FINAL 15 (2026-10-03), rebased onto
+main `9c24b306` (#1777 + #1778). Draft PR #1776, not merged, not deployed. Not submitted to OpenAI.**
 
-> ⛔ **#1776 is also BLOCKED on the auto-recharge attribution PR** (branch
-> `feat/autorecharge-chatgpt-attribution`; its migration is NOT applied). #1776 must not reach prod
-> before that migration AND its code are live — otherwise a ChatGPT debit can cross an opted-in
-> user's threshold and the channel-blind hourly cron charges their card.
-
-> ⛔ **#1776 must NOT merge until Phase 0 production acceptance passes** (the tools' own
-> correctness on prod: lookup_solicitation scoring, find_opportunities copy, recompete dedupe).
+Prerequisites, all satisfied 2026-10-03:
+- **Auto-recharge attribution (#1778)** — LIVE, merged `9c24b306`; migration applied 2026-10-03 via
+  `--only`; prod-accepted. ChatGPT personal debits carry `p_channel='chatgpt'`; the cron and engine
+  refuse a ChatGPT-caused threshold crossing. Route→RPC proof on this branch:
+  `src/app/chatgpt/mcp/__tests__/route.billing-chain.unit.test.ts`.
+- **Phase 0 tool correctness** — #1772 lookup_solicitation (`a31693cb`), #1773 FY rollover
+  (`e8c61d33`), #1774 FIND copy (`64d5b154`), #1775 recompete dedupe (`b6d69d89`): all LIVE,
+  prod-accepted 2026-10-03.
 Owner: Eric. Started 2026-10-02.
 
 Path A = expose a curated, commerce-free subset of the existing Mindy MCP server to
@@ -48,11 +50,10 @@ different resource/audience and a different handler. No ChatGPT-specific UI.
 
 Numbered as Eric answered them; they map onto the "Open items" list below.
 
-1. **Auto-recharge out-of-band path (open item 1) — MODIFY.** Attribution design (record the
-   spending channel so the hourly cron can tell a ChatGPT-caused threshold crossing apart)
-   is **pending owner review**. **Fallback if that design is not approved:** refuse the
-   ChatGPT call that would take an opted-in (auto-recharge enabled) user's balance across
-   their auto-recharge threshold. Not implemented yet.
+1. **Auto-recharge out-of-band path (open item 1) — DONE via attribution (#1778, LIVE).** Every
+   ChatGPT personal debit records its channel and grows `chatgpt_spend_since_recharge`; an
+   automatic payment is allowed only if the account would still qualify with that spend removed
+   (`mcp_recharge_gate` / `rechargeGate`). Pooled ChatGPT calls debit the pool only.
 2. **ChatGPT-only parameter descriptions (open item 2) — GO (2026-10-02).** Implemented:
    `CHATGPT_PARAM_COPY` in `src/lib/mcp/chatgpt-profile.ts`, applied by
    `chatgptInputSchema()` when building the ChatGPT registration. Only description TEXT
@@ -170,9 +171,9 @@ why the backfill is not draining the active NULL rows.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Correctness of the tools themselves (lookup_solicitation scoring, find_opportunities copy, recompete dedupe) | other branches, in flight |
+| 0 | Correctness of the tools themselves (lookup_solicitation scoring, find_opportunities copy, recompete dedupe) | **LIVE** (#1772–#1775, prod-accepted 2026-10-03) |
 | 1 | This profile: routing, OAuth audience binding, 15-tool allowlist, descriptions, annotations, instructions, projection, neutral refusals, tests | **built (this PR)** |
-| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **pending owner review**; rest not started |
+| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **LIVE (#1778)**; rest not started |
 | 3 | Reviewer account + submission package (annotations.json, test prompts, screenshots of ChatGPT itself, privacy/terms review) | not started |
 
 ## Hard stops
@@ -197,23 +198,11 @@ why the backfill is not draining the active NULL rows.
 
 ## Open items found during Phase 1 (for Phase 2+)
 
-1. **Auto-recharge out-of-band path (needs an Eric decision before submission).**
-   In-request auto-recharge is skipped on `/chatgpt/mcp`. But the hourly backstop
-   `GET /api/cron/mcp-autorecharge` (`src/app/api/cron/mcp-autorecharge/route.ts:36-46`)
-   calls `listRechargeCandidates()` (`src/lib/mcp/autorecharge.ts:361`), which selects every
-   user with auto-recharge enabled + a saved card whose PERSONAL balance is below their
-   threshold, and charges them via `maybeAutoRecharge()` (`autorecharge.ts:292`, off-session
-   Stripe PaymentIntent). It is balance-based and channel-blind: if a ChatGPT call takes an
-   opted-in user below threshold, the next cron tick charges their card. The ledger does not
-   record the call's channel, so the cron cannot tell. Options:
-   - (a) Accept: auto-recharge is a standing, user-configured mandate on the balance
-     regardless of which client spent it (Claude, API key, ChatGPT). Disclose it.
-   - (b) Refuse ChatGPT calls for users with auto-recharge enabled whose post-debit balance
-     would fall below threshold (channel-scoped pre-check; changes ChatGPT UX).
-   - (c) Record channel on the debit (ledger/call log) and have the cron skip users whose
-     most recent below-threshold crossing came from a ChatGPT debit (billing-schema change).
-   - (d) Disable auto-recharge entirely for accounts that have ever connected ChatGPT.
-   Not implemented in Phase 1 (none is a trivial channel-scoped guard).
+1. **[RESOLVED 2026-10-03 — #1778 LIVE]** Auto-recharge out-of-band path. The hourly backstop
+   `GET /api/cron/mcp-autorecharge` used to be balance-based and channel-blind. #1778 added
+   channel attribution (option c): ChatGPT personal debits pass `p_channel='chatgpt'`, and the
+   cron pre-filter, the engine and `mcp_autorecharge_claim` all apply the same gate
+   (`balance < T AND balance + S < T`). This route still never calls `maybeAutoRecharge`.
 2. **[RESOLVED 2026-10-02 — decision 2 GO, see above]** Param descriptions were the registry's, verbatim (owner rule: schemas identical). A few
    mention cost ("a larger set has no per-call cost": get_expiring_contracts.limit,
    search_contractors.limit, search_federal_events.limit) or internal labels
