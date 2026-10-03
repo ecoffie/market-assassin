@@ -176,7 +176,7 @@ why the backfill is not draining the active NULL rows.
 |---|---|---|
 | 0 | Correctness of the tools themselves (lookup_solicitation scoring, find_opportunities copy, recompete dedupe) | **LIVE** (#1772–#1775, prod-accepted 2026-10-03) |
 | 1 | This profile: routing, OAuth audience binding, 15-tool allowlist, descriptions, annotations, instructions, projection, neutral refusals, tests | **LIVE** (#1776 → `6f1e74ce`, production-proven 2026-10-03) |
-| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **LIVE (#1778)**; `mcp_call_log.channel` telemetry (#1781); developer-mode acceptance **next** |
+| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **LIVE (#1778)**; `mcp_call_log.channel` telemetry **LIVE** (#1781 → `ed98e8c6`, proven: ChatGPT refusal row `channel=chatgpt`, Claude `get_balance` row NULL); developer-mode acceptance **next** (`tasks/chatgpt-devmode-acceptance.md`) |
 | 3 | Reviewer account + submission package (annotations.json, test prompts, screenshots of ChatGPT itself, privacy/terms review) | not started |
 
 ## Hard stops
@@ -259,7 +259,7 @@ Run against `6f1e74ce` on prod with Eric's GO. Synthetic accounts only:
 | No auto-recharge / payment | PASS | 0 `mcp_autorecharge` rows, no Stripe customer, last Stripe charge unchanged (00:16 UTC). Weak form: no card on file, so a payment was impossible; the gate's input (S) is proven correct |
 | No signup grant | PASS | zero account: no balance row created, no `signup_grant` |
 | No saved purchase retry | PASS | 0 `mcp_paywall_attempts` rows after 10:35 anywhere, incl. after a 0-balance refusal |
-| Outcome telemetry | PASS (gap) | ChatGPT call `grounded`/`billable_success`; refusal `blocked`/`insufficient_credits`. Gap: no `channel` on `mcp_call_log` → fixed by #1781 |
+| Outcome telemetry | PASS (gap) | ChatGPT call `grounded`/`billable_success`; refusal `blocked`/`insufficient_credits`. Gap: no `channel` on `mcp_call_log` → closed by #1781 (LIVE 2026-10-03, `ed98e8c6`) |
 | No commerce copy | PASS | 0 price/link/upgrade/checkout/credit hits in tools/list, instructions, serverInfo, results; no footer, no `_meta.credits`. Only "credits" text is the neutral refusal |
 | Claude unchanged | PASS | footer present, `_meta.credits` present, ledger channel NULL (targeted check, not the full smoke: its 20-credit playbook probe would overdraw the account) |
 
