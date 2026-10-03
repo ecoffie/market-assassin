@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-03 — SEC-5d: partner trials only for a verified identity, once per account
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-03 | Security / partner referral trials (MDEAT, NCMBC) | /api/auth/mi-signup granted a 30-day partner Pro trial to the typed email BEFORE it was verified (4 of 7 historical MDEAT grants never verified), forced alerts_enabled on (re-subscribing unsubscribed users), and let an expired same-partner trial be renewed by re-posting. Now the ONLY grant path is POST /api/app/partner-referral/claim: identity from a verified session (signed Mindy session or verified Supabase/OAuth session), never a body/query/cookie/staff email; server-validated code; one promotional trial per account ever (partner_referral_claims primary key is the atomic gate; legacy partner tags count as consumed); no stacking on active Pro; writes only the trial window and attribution, never alerts or paid state; no settings row means profile_required (nothing consumed, never creates a row). mi-signup, save-profile and app/profile keep accepting the code but grant nothing; the browser keeps the code until a verified session claims it, clearing it only on a terminal answer. | `export async function claimPartnerReferral(` → `src/lib/mindy/partner-referral-claim.ts` | partner-referral-claim (14), claim route (10), handoff guards (15; 13/15 red on origin/main) unit tests; 171 files / 1,755 tests green; migration applied and verified via pg + PostgREST | 🟡 PR open |
+
 ## 2026-10-03 — ChatGPT-attributed auto-recharge suppression
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

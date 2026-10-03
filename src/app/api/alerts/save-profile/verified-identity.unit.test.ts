@@ -20,7 +20,6 @@ const db: {
   writes: Array<{ table: string; op: string; payload: Row }>;
 } = { settings: new Map(), bp: new Map(), invites: new Map(), writes: [] };
 const grants: string[] = [];
-const referrals: string[] = [];
 let failWrites = false;
 
 function builder(table: string) {
@@ -80,7 +79,7 @@ vi.mock('@/lib/send-email', () => ({ sendEmail: async () => true }));
 vi.mock('@/lib/briefings/pipelines/sam-gov', () => ({ fetchSamOpportunitiesFromCache: async () => ({ opportunities: [] }) }));
 vi.mock('@/lib/briefings/access', () => ({ grantBriefingsAccess: async (e: string) => { grants.push(e); } }));
 vi.mock('@/lib/mindy/apply-partner-referral', () => ({
-  applyPartnerReferralIfEligible: async (_db: unknown, email: string) => { referrals.push(email); return { applied: false }; },
+  // SEC-5d: the grant helper no longer exists; save-profile only labels attribution.
   partnerReferralSourceLabel: () => null,
 }));
 
@@ -127,7 +126,6 @@ beforeEach(() => {
   db.invites = new Map();
   db.writes = [];
   grants.length = 0;
-  referrals.length = 0;
   failWrites = false;
 });
 
@@ -352,13 +350,13 @@ describe('an anonymous signup cannot grant a Pro trial via a partner referral', 
   it('anonymous + referralCode → referral NOT applied', async () => {
     const r = await call('POST', { email: 'partner-anon@example.com', naicsCodes: ['541512'], source: 'free-signup', referralCode: 'MDEAT' });
     expect(r.status).toBe(200);
-    expect(referrals).toEqual([]);
     expect(db.settings.get('partner-anon@example.com')?.briefings_enabled).not.toBe(true);
     expect(db.settings.get('partner-anon@example.com')?.trial_ends_at).toBeUndefined();
   });
-  it('verified owner + referralCode → referral evaluated', async () => {
+  it('verified owner + referralCode → STILL no trial here (SEC-5d: only the claim endpoint grants)', async () => {
     const r = await call('POST', { email: A, naicsCodes: ['541512'], source: 'free-signup', referralCode: 'MDEAT' }, { 'x-mi-auth-token': tokenFor(A) });
     expect(r.status).toBe(200);
-    expect(referrals).toEqual([A]);
+    expect(db.settings.get(A)?.trial_ends_at).toBeUndefined();
+    expect(db.settings.get(A)?.trial_source).toBeUndefined();
   });
 });

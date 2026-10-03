@@ -158,6 +158,11 @@ export const ACCOUNT_MENU_JS = '<script>'
   // /app which finishes the Supabase session sign-out and shows the sign-in form.
   + 'var MAPS_HOME="' + MAPS_HOME_PATH + '";var out=document.getElementById("mindyAcctOut");if(out)out.onclick=function(){try{["mi_beta_auth_token","mi_beta_2fa_token","mi_beta_email","mi_beta_authenticated_at","mi_beta_2fa_verified_at","briefings_access_email"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}fetch("/api/auth/maps-signout",{method:"POST",credentials:"same-origin"}).catch(function(){}).then(function(){location.href=MAPS_HOME;});};'
   + '})();'
+  // SEC-5d partner-referral handoff for the server-rendered Map/Today pages (React pages use
+  // <PartnerReferralClaimer/>): a pending code + a verified session token → POST the claim; the
+  // server decides identity and eligibility. Cleared only on a terminal server answer. No `$`
+  // anywhere in this string (the map injects it via String.replace).
+  + '(function(){try{var K="mindy_partner_ref",T="mindy_partner_ref_claim_at";var code=null;try{code=localStorage.getItem(K);}catch(e){}if(!code){var m=document.cookie.match(/(?:^|; )mindy_partner_ref=([^;]*)/);code=m?decodeURIComponent(m[1]):null;}if(!code)return;var t=null;try{t=localStorage.getItem("mi_beta_auth_token");}catch(e){}if(!t)return;try{var last=Number(sessionStorage.getItem(T)||0);if(last&&Date.now()-last<20000)return;sessionStorage.setItem(T,String(Date.now()));}catch(e){}fetch("/api/app/partner-referral/claim",{method:"POST",headers:{"content-type":"application/json","x-mi-auth-token":t},body:JSON.stringify({code:String(code).trim().toUpperCase()})}).then(function(r){return r.json().catch(function(){return null;});}).then(function(j){if(j&&j.clearPending===true){try{localStorage.removeItem(K);}catch(e){}document.cookie="mindy_partner_ref=; path=/; max-age=0; SameSite=Lax";}}).catch(function(){});}catch(e){}})();'
   + '</script>'
   // Deploy identity so `verify:maps-account --live --expect-sha` can tell THIS
   // release from whichever production build is currently serving. Hex-only; the
