@@ -171,6 +171,17 @@ export function parseLookupQuery(raw: string, _now: Date = new Date()): LookupNe
   if (/\bnswc\b/i.test(q)) buyerOrg.push('NSWC');
   if (/\bnavsea\b/i.test(q)) buyerOrg.push('NAVSEA');
   const capability = CAPABILITY_HINTS.filter((c) => new RegExp(`\\b${c}\\b`, 'i').test(q));
+  // "Navy janitorial services Norfolk": a capability plus a bare proper noun is
+  // the buyer place even without "at". Only with a capability — the place is
+  // used solely to narrow a capability title search, never alone.
+  if (capability.length && !buyerGeo.length) {
+    for (const m of q.matchAll(/\b[A-Z][a-z]{2,}\b/g)) {
+      const w = m[0].toLowerCase();
+      if (STOP.has(w) || CAPABILITY_HINTS.includes(w)) continue;
+      buyerGeo.push(m[0]);
+      if (buyerGeo.length >= 2) break;
+    }
+  }
   let recentlyDays: number | null = null;
   if (/\blast month\b|\blast week\b/i.test(q)) recentlyDays = 45;
   else if (/\brecently\b|\brecent\b/i.test(q)) recentlyDays = 120;
@@ -238,6 +249,56 @@ function identifiersFor(query: string, row: LookupRow, extra: string[] = []): st
   return out.filter((id) => id !== query || extractIdentifierTokens(query).length > 0 || isNoticeUuid(query));
 }
 
+/** Whole-word query tokens present in `text` ("masa" does not hit "Masan"). */
+function tokenHits(text: string, tokens: string[]): number {
+  const hay = String(text || '').toLowerCase();
+  let n = 0;
+  for (const t of tokens) {
+    const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`(^|[^a-z0-9])${esc}($|[^a-z0-9])`).test(hay)) n++;
+  }
+  return n;
+}
+
+/**
+ * A title is a strong match when it carries most of the query's significant
+ * words — one shared generic word ("services") is not a match.
+ */
+export const TITLE_TOKEN_COVERAGE = 0.6;
+export function titleCoversQuery(text: string, tokens: string[]): boolean {
+  if (!tokens.length) return false;
+  const hits = tokenHits(text, tokens);
+  if (tokens.length === 1) return hits === 1;
+  return hits >= 2 && hits / tokens.length >= TITLE_TOKEN_COVERAGE;
+}
+
+/** Signals that come from the record itself matching the query — not who owns it. */
+const MERIT: WhyMatched[] = [
+  'exact_identifier', 'exact_title', 'program_acronym', 'filename', 'buyer_capability_date', 'strong_title',
+];
+export function hasOwnMerit(why: WhyMatched[]): boolean {
+  return why.some((w) => MERIT.includes(w));
+}
+
+/**
+ * Ownership is a tie-break, never relevance: larger than the recency nudge
+ * (max 20) so a pursuit wins a tie, smaller than the smallest gap between two
+ * relevance signal weights (50) so it cannot jump a relevance tier. Applied
+ * only when the record already matches (hasOwnMerit).
+ */
+export const PURSUIT_TIE_BONUS = 30;
+
+/**
+ * The named buyer ("Navy") in the record's own hierarchy. A nudge, larger
+ * than ownership: a Navy match outranks a non-Navy pursuit of the same
+ * relevance. Only on records that already match (hasOwnMerit).
+ */
+export const BUYER_ORG_BONUS = 40;
+export function buyerOrgHit(row: { agency_hierarchy?: string | null; sub_tier?: string | null }, needles: LookupNeedles): boolean {
+  const hay = `${row.agency_hierarchy || ''} ${row.sub_tier || ''}`.toUpperCase();
+  return needles.buyerOrg.some((o) => hay.includes(o));
+}
+
 export function whyMatchedFor(
   row: LookupRow,
   needles: LookupNeedles,
@@ -270,20 +331,22 @@ export function whyMatchedFor(
   );
   const capHit = needles.capability.some((c) => (row.title || '').toLowerCase().includes(c));
   if (geoHit && capHit) why.push('buyer_capability_date');
-  else if (capHit) why.push('strong_title');
-  if (!why.length) why.push('weaker_token');
+  else if (capHit || titleCoversQuery(row.title || '', needles.tokens)) why.push('strong_title');
+  if (!hasOwnMerit(why)) why.push('weaker_token');
   return [...new Set(why)];
 }
 
-export function rankScore(why: WhyMatched[], posted: string | null, now: Date): number {
+export function rankScore(why: WhyMatched[], posted: string | null, now: Date, buyerOrg = false): number {
   let score = 0;
-  if (why.includes('user_pursuit')) score += 1000;
   if (why.includes('exact_identifier')) score += 800;
   if (why.includes('exact_title') || why.includes('program_acronym')) score += 600;
   if (why.includes('filename')) score += 550;
   if (why.includes('buyer_capability_date')) score += 400;
   if (why.includes('strong_title')) score += 200;
   if (why.includes('weaker_token') && score === 0) score += 50;
+  // Ownership only breaks ties among records that match on their own merits.
+  if (why.includes('user_pursuit') && hasOwnMerit(why)) score += PURSUIT_TIE_BONUS;
+  if (buyerOrg && hasOwnMerit(why)) score += BUYER_ORG_BONUS;
   const postedMs = dateMs(posted);
   if (Number.isFinite(postedMs) && postedMs > 0) {
     const ageDays = Math.max(0, (now.getTime() - postedMs) / 86400000);
@@ -491,9 +554,12 @@ async function searchHistory(
   if (dErr) throw dErr;
   for (const row of (docs || []) as Array<{ notice_id?: string; filename?: string }>) {
     const fn = (row.filename || '').toLowerCase();
-    const hit = hayNeedles.some((n) => n.length >= 3 && fn.includes(n.toLowerCase()))
-      || needles.acronyms.some((a) => fn.includes(a.toLowerCase()))
-      || needles.identifiers.some((id) => fn.includes(id.toLowerCase()));
+    // A filename sharing one generic word ("services") is not a match.
+    const fnWords = fn.replace(/[_\-.]+/g, ' ');
+    const hit = needles.acronyms.some((a) => fn.includes(a.toLowerCase()))
+      || needles.identifiers.some((id) => fn.includes(id.toLowerCase()))
+      || needles.capability.some((c) => fnWords.includes(c))
+      || titleCoversQuery(fnWords, needles.tokens);
     if (hit) {
       add(row.notice_id);
       if (row.notice_id) filenameHits.add(row.notice_id);
@@ -639,7 +705,15 @@ export async function lookupSolicitation(
 
   let historyRows: LookupRow[] = [];
   if (historyIds.length) {
-    historyRows = await fetchByNoticeIds(sb, historyIds);
+    // A pursuit enters the candidate set only if the record itself matches the
+    // query. Owning it is not relevance — otherwise every pursuit sharing a
+    // generic word ("services") was injected ahead of the real matches.
+    historyRows = (await fetchByNoticeIds(sb, historyIds)).filter((r) =>
+      hasOwnMerit(whyMatchedFor(r, needles, {
+        fromHistory: false,
+        fromFilename: filenameHits.has(r.notice_id) || filenameHits.has(normalizeNoticeUuid(r.notice_id)),
+      })),
+    );
     pushRows(historyRows);
   }
 
@@ -661,7 +735,7 @@ export async function lookupSolicitation(
       fromHistory: historySet.has(normalizeNoticeUuid(row.notice_id)) || historyFamilyKeys.has(family),
       fromFilename: filenameHits.has(row.notice_id) || filenameFamilyKeys.has(family),
     });
-    return { row, why, score: rankScore(why, row.posted_date, now) };
+    return { row, why, score: rankScore(why, row.posted_date, now, buyerOrgHit(row, needles)) };
   });
   preScored.sort((a, b) => b.score - a.score || dateMs(b.row.posted_date) - dateMs(a.row.posted_date));
 
@@ -696,7 +770,7 @@ export async function lookupSolicitation(
           fromHistory: historySet.has(normalizeNoticeUuid(row.notice_id)) || historyFamilyKeys.has(family),
           fromFilename: filenameHits.has(row.notice_id) || filenameFamilyKeys.has(family),
         });
-        upgraded.push({ row, why, score: rankScore(why, row.posted_date, now) });
+        upgraded.push({ row, why, score: rankScore(why, row.posted_date, now, buyerOrgHit(row, needles)) });
         continue;
       }
     }
@@ -708,7 +782,7 @@ export async function lookupSolicitation(
 
   const uniqueFamilies = new Set(scored.map((s) => listingKey(s.row)));
   const items: LookupItem[] = scored.map((s) => {
-    const provenance = historySet.has(normalizeNoticeUuid(s.row.notice_id))
+    const provenance = s.why.includes('user_pursuit')
       ? 'user_pipeline+sam_opportunities'
       : 'sam_opportunities';
     return toItem(
