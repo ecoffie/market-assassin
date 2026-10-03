@@ -4,7 +4,6 @@ import { verifyUserSession } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { normalizeNAICSForPersist } from '@/lib/utils/naics-expansion';
 import { checkAmplification } from '@/lib/data-invariants/amplification';
-import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { sanitizeKeywords } from '@/lib/keywords/sanitize';
 import { resolveAlertsEnabledWrite } from '@/lib/alerts/alerts-enabled-write';
@@ -240,13 +239,9 @@ export async function POST(request: NextRequest) {
       updateData.alerts_enabled = alertsEnabledWrite;
     }
 
-    if (referralCode && !existingSettings?.invitation_source?.startsWith('partner_')) {
-      try {
-        await applyPartnerReferralIfEligible(supabase, normalizedEmail, referralCode);
-      } catch (partnerError) {
-        console.warn('[Mindy Profile] Partner referral apply failed:', partnerError);
-      }
-    }
+    // SEC-5d: partner trials are granted ONLY by POST /api/app/partner-referral/claim (verified
+    // session, one per account ever, never touches alerts). A referralCode sent here is ignored.
+    void referralCode;
 
     // AUTO-SEED target agencies from the profile (Eric 2026-07-02) — the OTHER slurpee
     // save path (this route == /api/mindy/profile). Mirror the keyword-first seed added

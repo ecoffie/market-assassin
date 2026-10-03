@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveMx } from 'dns/promises';
 import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import { sendEmail } from '@/lib/send-email';
-import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 import { enqueuePendingSignup } from '@/lib/resilience/signup-queue';
 import { normalizeAttribution, pushLeadToGhl, isYouTubeSource } from '@/lib/mindy/lead-attribution';
@@ -155,7 +154,7 @@ function buildWelcomeEmailHtml(setupUrl: string, partnerTrialDays?: number): str
     ? `
             <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:16px; margin:0 0 22px;">
               <p style="font-size:14px; line-height:1.5; margin:0; color:#047857;">
-                <strong>Partner offer active:</strong> You have ${partnerTrialDays} days of Mindy Pro — AI briefings, forecasts, and capture intelligence.
+                <strong>Partner offer:</strong> your ${partnerTrialDays}-day Mindy Pro trial activates when you finish setting up your account and sign in.
               </p>
             </div>`
     : '';
@@ -257,16 +256,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: emailError }, { status: 400 });
     }
 
+    // SEC-5d (P0): an anonymous signup NEVER grants a partner trial — the email here is only a
+    // claim, not a verified identity (4 of 7 historical MDEAT grants went to accounts that never
+    // verified). The code is still accepted (the browser keeps it as mindy_partner_ref) and the
+    // trial is granted after sign-in by POST /api/app/partner-referral/claim. No trial, no alerts
+    // write, no paid/Pro state change happens here.
     const partner = getPartnerReferralByCode(referralCode);
-    if (referralCode && partner) {
-      try {
-        // Bounded — this hits the DB; during an outage it must not hang the POST
-        // (the setup-link fallback below will still queue the email either way).
-        await withTimeout(applyPartnerReferralIfEligible(getSupabaseAdmin(), email, referralCode), SETUP_LINK_TIMEOUT_MS, 'applyPartnerReferral');
-      } catch (partnerError) {
-        console.warn('[Mindy Signup] Partner referral apply failed:', partnerError);
-      }
-    }
 
     // Generate setup link. This calls supabase.auth.admin.generateLink, which
     // needs the database — during a Supabase outage it hangs. Bound it, and if

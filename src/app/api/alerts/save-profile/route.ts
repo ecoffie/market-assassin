@@ -17,7 +17,7 @@ import {
   extractIpAddress,
   extractUserAgent,
 } from '@/lib/signup-events';
-import { applyPartnerReferralIfEligible, partnerReferralSourceLabel } from '@/lib/mindy/apply-partner-referral';
+import { partnerReferralSourceLabel } from '@/lib/mindy/apply-partner-referral';
 import { defaultAlertModeForNewUser, mergeAlertModeIntoAggregated } from '@/lib/alerts/alert-mode';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 import { saveProfileAlertDeliveryPatch } from '@/lib/alerts/paused-delivery';
@@ -261,37 +261,12 @@ export async function POST(request: NextRequest) {
     // Production does not have user_notification_settings.business_description yet.
     // Store the description in user_business_profiles below until the migration is applied.
 
-    // Partner referral (e.g. NCMBC) — 30-day Pro trial, tagged cohort
-    let partnerReferralApplied = false;
-    // A partner referral grants a 30-day Pro trial, so it requires a VERIFIED identity — an
-    // anonymous signup cannot grant Pro (P0 2026-09-28). A verified sign-up still gets it via
-    // /api/auth/mi-signup or /api/app/profile.
-    if (referralCode && anonymous) {
-      console.log(`[Alerts] Partner referral not applied to an anonymous signup (sign-in required): ${verifiedEmail}`);
-    }
-    if (referralCode && !anonymous) {
-      try {
-        const partnerResult = await applyPartnerReferralIfEligible(
-          getSupabase(),
-          verifiedEmail,
-          referralCode,
-        );
-        partnerReferralApplied = partnerResult.applied;
-        if (partnerResult.applied && partnerResult.partner) {
-          upsertPayload.briefings_enabled = true;
-          upsertPayload.treatment_type = 'briefings';
-          upsertPayload.invitation_source = partnerResult.partner.invitationSource;
-          upsertPayload.trial_source = partnerResult.partner.trialSource;
-          upsertPayload.trial_ends_at = partnerResult.trialEndsAt;
-          console.log(`[Alerts] Partner referral ${partnerResult.partner.code} applied: ${verifiedEmail}`);
-        }
-      } catch (partnerError) {
-        console.warn('[Alerts] Partner referral apply failed:', partnerError);
-      }
-    }
+    // SEC-5d: this route never grants a partner trial — not even to a verified caller. The ONLY
+    // grant path is POST /api/app/partner-referral/claim (verified session, one per account ever).
+    // referralCode is still accepted here for signup attribution (partnerReferralSourceLabel).
 
     // free_signup = MI Free tier signup (alerts only, no AI briefings)
-    if (source === 'free_signup' && !partnerReferralApplied) {
+    if (source === 'free_signup') {
       upsertPayload.briefings_enabled = false;
       upsertPayload.treatment_type = 'alerts';
       console.log(`[Alerts] MI Free signup: ${email} - Daily Alerts only, no briefings`);

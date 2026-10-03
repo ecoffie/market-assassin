@@ -65,7 +65,6 @@ vi.mock('@/lib/briefings/pipelines/sam-gov', () => ({
 }));
 vi.mock('@/lib/briefings/access', () => ({ grantBriefingsAccess: async () => {} }));
 vi.mock('@/lib/mindy/apply-partner-referral', () => ({
-  applyPartnerReferralIfEligible: async () => ({ applied: false }),
   partnerReferralSourceLabel: () => null,
 }));
 
