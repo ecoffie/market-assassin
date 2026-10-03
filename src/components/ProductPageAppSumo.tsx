@@ -57,9 +57,14 @@ interface ProductPageProps {
   title: string;
   tagline: string;
   description: string;
-  primaryColor: string;
-  gradientFrom: string;
-  gradientTo: string;
+  /**
+   * Retired per-product colours. Public pages render on the Mindy public system
+   * (src/lib/public-site), so the component no longer reads them; kept optional so an older
+   * caller still type-checks.
+   */
+  primaryColor?: string;
+  gradientFrom?: string;
+  gradientTo?: string;
   price: string;
   originalPrice: string;
   checkoutUrl: string;
@@ -92,9 +97,6 @@ export default function ProductPageAppSumo({
   title,
   tagline,
   description,
-  primaryColor,
-  gradientFrom,
-  gradientTo,
   price,
   originalPrice,
   checkoutUrl,
@@ -216,43 +218,43 @@ export default function ProductPageAppSumo({
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-(--mp-paper) text-(--mp-ink)">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-(--mp-surface) border-b border-(--mp-line)">
         <div className="max-w-7xl mx-auto px-6">
-          <nav className="flex items-center justify-between h-16">
-            <Link href="/" className="text-2xl font-bold text-blue-800">
+          <nav className="flex items-center justify-between h-14">
+            <Link href="/" className="font-(family-name:--mp-font-serif) text-xl font-bold text-(--mp-ink) hover:text-(--mp-navy)">
               GovCon Giants
             </Link>
             <ul className="hidden md:flex items-center gap-8">
-              <li><Link href="/#tools" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Tools</Link></li>
-              <li><Link href="/#databases" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Databases</Link></li>
-              <li><Link href="/free-resources" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Free Resources</Link></li>
+              <li><Link href="/#tools" className="text-(--mp-body) hover:text-(--mp-navy) font-medium text-sm">Tools</Link></li>
+              <li><Link href="/#databases" className="text-(--mp-body) hover:text-(--mp-navy) font-medium text-sm">Databases</Link></li>
+              <li><Link href="/free-resources" className="text-(--mp-body) hover:text-(--mp-navy) font-medium text-sm">Free Resources</Link></li>
             </ul>
           </nav>
         </div>
       </header>
 
       {/* Product Nav */}
-      <div className="border-b border-gray-200 bg-white">
+      <div className="border-b border-(--mp-line) bg-(--mp-surface)">
         <div className="max-w-7xl mx-auto px-6 flex gap-8 items-center">
-          <a href="#overview" className="py-4 text-sm font-medium border-b-2 border-transparent hover:border-gray-300" style={{ borderColor: primaryColor, color: primaryColor }}>Overview</a>
-          <a href="#features" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Features</a>
-          <a href="#pricing" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Pricing</a>
-          <a href="#reviews" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Reviews</a>
+          <a href="#overview" className="py-4 text-sm font-semibold border-b-2 border-(--mp-navy) text-(--mp-navy)">Overview</a>
+          <a href="#features" className="py-4 text-(--mp-muted) text-sm font-medium border-b-2 border-transparent hover:border-(--mp-line) hover:text-(--mp-ink)">Features</a>
+          <a href="#pricing" className="py-4 text-(--mp-muted) text-sm font-medium border-b-2 border-transparent hover:border-(--mp-line) hover:text-(--mp-ink)">Pricing</a>
+          <a href="#reviews" className="py-4 text-(--mp-muted) text-sm font-medium border-b-2 border-transparent hover:border-(--mp-line) hover:text-(--mp-ink)">Reviews</a>
           {isResourceUrl(checkoutUrl) ? (
             <button
               onClick={() => handleFreeResourceClick(checkoutUrl)}
-              className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all"
+              className="ml-auto px-6 py-2 bg-(--mp-navy) text-white rounded-none font-semibold text-sm hover:bg-(--mp-navy-hover) transition-colors"
             >
               Download Free
             </button>
           ) : checkoutUrl.startsWith('/') ? (
-            <Link href={checkoutUrl} className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all">
+            <Link href={checkoutUrl} className="ml-auto px-6 py-2 bg-(--mp-navy) text-white rounded-none font-semibold text-sm hover:bg-(--mp-navy-hover) transition-colors">
               Get Access
             </Link>
           ) : (
-            <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all">
+            <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="ml-auto px-6 py-2 bg-(--mp-navy) text-white rounded-none font-semibold text-sm hover:bg-(--mp-navy-hover) transition-colors">
               Get Access
             </a>
           )}
@@ -264,14 +266,14 @@ export default function ProductPageAppSumo({
         {/* Left Column */}
         <div id="overview">
           <div className="mb-6">
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-3 leading-tight text-gray-900">{title}</h1>
-            <p className="text-xl text-gray-500">{tagline}</p>
+            <h1 className="font-(family-name:--mp-font-serif) text-4xl md:text-5xl font-bold mb-3 leading-tight tracking-[-0.01em] text-(--mp-ink)">{title}</h1>
+            <p className="font-(family-name:--mp-font-serif) text-xl text-(--mp-body)">{tagline}</p>
           </div>
 
           {/* Video/Media Section */}
           <div className="mb-10">
             {/* Main Image/Video Display */}
-            <div className="w-full rounded-xl aspect-video mb-4 relative overflow-hidden border-2 border-gray-200">
+            <div className="w-full rounded-none aspect-video mb-4 relative overflow-hidden border border-(--mp-line)">
               {videoUrl && selectedImage === 0 ? (
                 // YouTube embed
                 <iframe
@@ -287,17 +289,14 @@ export default function ProductPageAppSumo({
                 <img
                   src={screenshots.length > 0 ? screenshots[selectedImage] : mainImage}
                   alt={`${title} screenshot ${selectedImage + 1}`}
-                  className="w-full h-full object-contain bg-gray-100"
+                  className="w-full h-full object-contain bg-(--mp-wash)"
                 />
               ) : (
-                // Fallback gradient placeholder (no fake video button)
-                <div
-                  className="w-full h-full flex items-center justify-center"
-                  style={{ background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)` }}
-                >
-                  <div className="text-center text-white p-10">
-                    <h2 className="text-2xl font-bold mb-2">{videoTitle || title}</h2>
-                    <p className="text-lg opacity-90">{videoSubtitle || tagline}</p>
+                // Fallback placeholder (no fake video button)
+                <div className="w-full h-full flex items-center justify-center bg-(--mp-wash)">
+                  <div className="text-center text-(--mp-ink) p-10">
+                    <h2 className="font-(family-name:--mp-font-serif) text-2xl font-bold mb-2">{videoTitle || title}</h2>
+                    <p className="text-lg text-(--mp-body)">{videoSubtitle || tagline}</p>
                   </div>
                 </div>
               )}
@@ -310,20 +309,20 @@ export default function ProductPageAppSumo({
                   <div
                     key={i}
                     onClick={() => setSelectedImage(i)}
-                    className={`aspect-video rounded-lg overflow-hidden cursor-pointer transition-all border-2 ${
-                      selectedImage === i ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400'
+                    className={`aspect-video rounded-none overflow-hidden cursor-pointer transition-colors border-2 ${
+                      selectedImage === i ? 'border-(--mp-navy)' : 'border-(--mp-line) hover:border-(--mp-faint)'
                     }`}
                   >
                     <img
                       src={screenshot}
                       alt={`${title} thumbnail ${i + 1}`}
-                      className="w-full h-full object-contain bg-gray-100"
+                      className="w-full h-full object-contain bg-(--mp-wash)"
                     />
                   </div>
                 ))
               ) : (
                 thumbnails.slice(0, 4).map((thumb, i) => (
-                  <div key={i} className="aspect-video bg-gray-100 border-2 border-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-500 cursor-pointer hover:border-gray-400 transition-all">
+                  <div key={i} className="aspect-video bg-(--mp-wash) border border-(--mp-line) rounded-none flex items-center justify-center text-sm font-medium text-(--mp-muted) cursor-pointer hover:border-(--mp-faint) transition-colors">
                     {thumb}
                   </div>
                 ))
@@ -334,10 +333,10 @@ export default function ProductPageAppSumo({
           {/* Additional Videos Section */}
           {videos.length > 0 && (
             <div className="mb-10">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Watch How It Works</h3>
+              <h3 className="font-(family-name:--mp-font-serif) text-xl font-bold text-(--mp-ink) mb-4">Watch How It Works</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {videos.map((video, i) => (
-                  <div key={i} className="rounded-xl overflow-hidden border-2 border-gray-200 hover:border-gray-400 transition-all">
+                  <div key={i} className="rounded-none overflow-hidden border border-(--mp-line) hover:border-(--mp-faint) transition-colors">
                     <div className="aspect-video">
                       <iframe
                         className="w-full h-full"
@@ -350,8 +349,8 @@ export default function ProductPageAppSumo({
                         allowFullScreen
                       />
                     </div>
-                    <div className="p-3 bg-gray-50">
-                      <p className="font-medium text-gray-800 text-sm">{video.title}</p>
+                    <div className="p-3 bg-(--mp-wash)">
+                      <p className="font-medium text-(--mp-ink) text-sm">{video.title}</p>
                     </div>
                   </div>
                 ))}
@@ -360,32 +359,32 @@ export default function ProductPageAppSumo({
           )}
 
           {/* Description */}
-          <div className="text-lg leading-relaxed mb-8 text-gray-700">
+          <div className="text-lg leading-relaxed mb-8 text-(--mp-body)">
             <p>{description}</p>
           </div>
 
           {/* TL;DR */}
-          <div className="bg-gray-50 rounded-lg p-6 mb-8" style={{ borderLeft: `4px solid ${primaryColor}` }}>
-            <div className="text-xl font-bold mb-4 text-gray-900">TL;DR</div>
+          <div className="bg-(--mp-surface) border border-(--mp-line) border-l-4 border-l-(--mp-navy) rounded-none p-6 mb-8">
+            <div className="font-(family-name:--mp-font-serif) text-xl font-bold mb-4 text-(--mp-ink)">TL;DR</div>
             <ul className="space-y-2">
               {tldr.map((item, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <span className="font-bold text-xl" style={{ color: primaryColor }}>&#10003;</span>
-                  <span className="text-gray-800">{item}</span>
+                  <span className="font-bold text-xl text-(--mp-navy)">&#10003;</span>
+                  <span className="text-(--mp-ink)">{item}</span>
                 </li>
               ))}
             </ul>
           </div>
 
           {/* At-a-glance */}
-          <div className="bg-gray-50 rounded-xl p-6 mb-8">
-            <div className="text-lg font-bold mb-4 text-gray-900">At-a-glance</div>
+          <div className="bg-(--mp-wash) rounded-none p-6 mb-8">
+            <div className="font-(family-name:--mp-font-serif) text-lg font-bold mb-4 text-(--mp-ink)">At-a-glance</div>
             {glanceItems.map((item, i) => (
-              <div key={i} className="flex justify-between py-3 border-b border-gray-200 last:border-b-0">
-                <span className="font-semibold text-gray-500">{item.label}</span>
-                <span className="text-gray-900">
+              <div key={i} className="flex justify-between py-3 border-b border-(--mp-line) last:border-b-0">
+                <span className="font-semibold text-(--mp-muted)">{item.label}</span>
+                <span className="text-(--mp-ink)">
                   {item.link ? (
-                    <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: primaryColor }}>{item.value}</a>
+                    <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-(--mp-navy) underline underline-offset-2">{item.value}</a>
                   ) : item.value}
                 </span>
               </div>
@@ -394,12 +393,12 @@ export default function ProductPageAppSumo({
 
           {/* Categories */}
           {categories && categoriesTitle && (
-            <div className="bg-gray-50 rounded-xl p-6 mb-8">
-              <h3 className="text-xl font-bold mb-4 text-gray-900">{categoriesTitle}</h3>
+            <div className="bg-(--mp-wash) rounded-none p-6 mb-8">
+              <h3 className="font-(family-name:--mp-font-serif) text-xl font-bold mb-4 text-(--mp-ink)">{categoriesTitle}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {categories.map((cat, i) => (
-                  <div key={i} className="bg-white p-3 rounded-lg border border-gray-200 text-sm">
-                    <span className={`${cat.highlight ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
+                  <div key={i} className="bg-(--mp-surface) p-3 rounded-none border border-(--mp-line) text-sm">
+                    <span className={`${cat.highlight ? 'font-bold text-(--mp-ink)' : 'text-(--mp-body)'}`}>
                       {cat.title}
                     </span>
                   </div>
@@ -410,13 +409,13 @@ export default function ProductPageAppSumo({
 
           {/* Features Section */}
           <div className="my-16" id="features">
-            <h2 className="text-3xl font-bold mb-8 text-gray-900">Key Features</h2>
+            <h2 className="font-(family-name:--mp-font-serif) text-3xl font-bold mb-8 text-(--mp-ink)">Key Features</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {features.map((feature, i) => (
-                <div key={i} className="p-6 bg-white border border-gray-200 rounded-xl">
+                <div key={i} className="p-6 bg-(--mp-surface) border border-(--mp-line) rounded-none">
                   <div className="text-3xl mb-3">{feature.icon}</div>
-                  <div className="text-lg font-bold mb-2 text-gray-900">{feature.title}</div>
-                  <div className="text-gray-500 leading-relaxed">{feature.description}</div>
+                  <div className="text-lg font-bold mb-2 text-(--mp-ink)">{feature.title}</div>
+                  <div className="text-(--mp-muted) leading-relaxed">{feature.description}</div>
                 </div>
               ))}
             </div>
@@ -432,7 +431,7 @@ export default function ProductPageAppSumo({
                 >
                   {/* Image */}
                   <div className="w-full md:w-1/2">
-                    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                    <div className="rounded-none overflow-hidden border border-(--mp-line)">
                       {feature.image ? (
                         <img
                           src={feature.image}
@@ -440,7 +439,7 @@ export default function ProductPageAppSumo({
                           className="w-full h-auto"
                         />
                       ) : (
-                        <div className="w-full h-64 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <div className="w-full h-64 bg-(--mp-wash) flex items-center justify-center">
                           <span className="text-6xl">📄</span>
                         </div>
                       )}
@@ -449,14 +448,14 @@ export default function ProductPageAppSumo({
 
                   {/* Text Content */}
                   <div className="w-full md:w-1/2">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900">{feature.title}</h3>
-                    <p className="text-gray-600 leading-relaxed mb-4">{feature.description}</p>
+                    <h3 className="font-(family-name:--mp-font-serif) text-2xl font-bold mb-4 text-(--mp-ink)">{feature.title}</h3>
+                    <p className="text-(--mp-body) leading-relaxed mb-4">{feature.description}</p>
                     {feature.bullets && feature.bullets.length > 0 && (
                       <ul className="space-y-2">
                         {feature.bullets.map((bullet, j) => (
                           <li key={j} className="flex items-start gap-3">
-                            <span className="text-green-500 font-bold mt-1">✓</span>
-                            <span className="text-gray-700">{bullet}</span>
+                            <span className="text-(--mp-navy) font-bold mt-1">✓</span>
+                            <span className="text-(--mp-body)">{bullet}</span>
                           </li>
                         ))}
                       </ul>
@@ -469,29 +468,29 @@ export default function ProductPageAppSumo({
 
           {/* Highlight Box */}
           {highlightTitle && highlightText && (
-            <div className="bg-gradient-to-r from-yellow-50 to-amber-100 border-2 border-amber-400 rounded-xl p-6 mb-8">
-              <h3 className="text-xl font-bold mb-3 text-amber-900">{highlightTitle}</h3>
-              <p className="text-amber-800 leading-relaxed">{highlightText}</p>
+            <div className="bg-(--mp-wash) border-t-2 border-(--mp-ink) rounded-none p-6 mb-8">
+              <h3 className="font-(family-name:--mp-font-serif) text-xl font-bold mb-3 text-(--mp-ink)">{highlightTitle}</h3>
+              <p className="text-(--mp-body) leading-relaxed">{highlightText}</p>
             </div>
           )}
 
           {/* Reviews Section */}
           <div className="my-16" id="reviews">
-            <h2 className="text-3xl font-bold mb-8 text-gray-900">What users are saying</h2>
+            <h2 className="font-(family-name:--mp-font-serif) text-3xl font-bold mb-8 text-(--mp-ink)">What users are saying</h2>
             <div className="flex items-center gap-4 mb-8">
-              <div className="text-2xl text-yellow-400">★★★★★</div>
-              <div className="text-lg font-semibold text-gray-700">{reviews.length} reviews</div>
+              <div className="text-2xl text-(--mp-accent)">★★★★★</div>
+              <div className="text-lg font-semibold text-(--mp-body)">{reviews.length} reviews</div>
             </div>
             {reviews.map((review, i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
+              <div key={i} className="bg-(--mp-surface) border border-(--mp-line) rounded-none p-6 mb-4">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <div className="font-bold text-gray-900">{review.name}</div>
-                    <div className="text-gray-500 text-sm">{review.date}</div>
+                    <div className="font-bold text-(--mp-ink)">{review.name}</div>
+                    <div className="text-(--mp-muted) text-sm">{review.date}</div>
                   </div>
-                  <div className="text-yellow-400">{'*'.repeat(review.rating)}</div>
+                  <div className="text-(--mp-accent)">{'*'.repeat(review.rating)}</div>
                 </div>
-                <p className="text-gray-700">{review.text}</p>
+                <p className="text-(--mp-body)">{review.text}</p>
               </div>
             ))}
           </div>
@@ -499,26 +498,23 @@ export default function ProductPageAppSumo({
 
         {/* Right Column - Pricing Sidebar */}
         <div id="pricing" className="lg:sticky lg:top-24 h-fit">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
+          <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none p-6">
             {/* Product Header */}
             <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold"
-                style={{ background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)` }}
-              >
+              <div className="w-12 h-12 rounded-none flex items-center justify-center bg-(--mp-navy) text-white font-(family-name:--mp-font-serif) text-xl font-bold">
                 {title.charAt(0)}
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">{title}</h3>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">{title}</h3>
                 <div className="flex items-center gap-1">
-                  <span className="text-yellow-400 text-sm">★★★★★</span>
-                  <span className="text-blue-600 text-sm font-medium">{reviews.length} reviews</span>
+                  <span className="text-(--mp-accent) text-sm">★★★★★</span>
+                  <span className="text-(--mp-navy) text-sm font-medium">{reviews.length} reviews</span>
                 </div>
               </div>
             </div>
 
             {/* Tagline */}
-            <p className="text-gray-600 text-sm mb-6">{tagline}</p>
+            <p className="text-(--mp-body) text-sm mb-6">{tagline}</p>
 
             {/* Tier Selector (if tiers available) */}
             {pricingTiers && pricingTiers.length > 1 && (
@@ -528,21 +524,21 @@ export default function ProductPageAppSumo({
                     <button
                       key={i}
                       onClick={() => setSelectedTier(i)}
-                      className={`p-3 rounded-lg border-2 text-left transition-all ${
+                      className={`p-3 rounded-none border-2 text-left transition-colors ${
                         selectedTier === i
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-(--mp-navy) bg-(--mp-navy-wash)'
+                          : 'border-(--mp-line) hover:border-(--mp-faint)'
                       }`}
                     >
-                      <div className={`font-bold text-sm ${selectedTier === i ? 'text-blue-600' : 'text-gray-700'}`}>{tier.name}</div>
-                      <div className="text-lg font-extrabold" style={{ color: selectedTier === i ? '#2563eb' : '#111' }}>
+                      <div className={`font-bold text-sm ${selectedTier === i ? 'text-(--mp-navy)' : 'text-(--mp-body)'}`}>{tier.name}</div>
+                      <div className={`font-(family-name:--mp-font-mono) text-lg font-semibold ${selectedTier === i ? 'text-(--mp-navy)' : 'text-(--mp-ink)'}`}>
                         {tier.price}
                       </div>
                     </button>
                   ))}
                 </div>
                 {pricingTiers[selectedTier].description && (
-                  <p className="text-xs text-gray-500 mt-2">{pricingTiers[selectedTier].description}</p>
+                  <p className="text-xs text-(--mp-muted) mt-2">{pricingTiers[selectedTier].description}</p>
                 )}
               </div>
             )}
@@ -550,11 +546,11 @@ export default function ProductPageAppSumo({
             {/* Price Section */}
             <div className="mb-4">
               <div className="flex items-baseline gap-2">
-                <span className="text-green-600 font-bold text-lg">
+                <span className="text-(--mp-ok) font-bold text-lg">
                   {currentPrice === 'FREE' ? '' : `-${Math.round((1 - parseInt(currentPrice.replace(/\D/g, '')) / parseInt(currentOriginalPrice.replace(/\D/g, ''))) * 100)}%`}
                 </span>
-                <span className="text-4xl font-extrabold text-gray-900">{currentPrice}</span>
-                <span className="text-gray-400 line-through text-lg">{currentOriginalPrice.replace(' value', '')}</span>
+                <span className="font-(family-name:--mp-font-mono) text-4xl font-semibold tracking-[-0.03em] text-(--mp-ink)">{currentPrice}</span>
+                <span className="text-(--mp-muted) line-through text-lg">{currentOriginalPrice.replace(' value', '')}</span>
               </div>
             </div>
 
@@ -562,14 +558,14 @@ export default function ProductPageAppSumo({
             {isResourceUrl(currentCheckoutUrl) ? (
               <button
                 onClick={() => handleFreeResourceClick(currentCheckoutUrl)}
-                className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
+                className="block w-full text-center py-4 rounded-none text-lg font-semibold text-white mb-6 transition-colors bg-(--mp-navy) hover:bg-(--mp-navy-hover)"
               >
                 {hasAccess ? 'Download Free' : 'Get Free Access'}
               </button>
             ) : currentCheckoutUrl.startsWith('/') ? (
               <Link
                 href={currentCheckoutUrl}
-                className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
+                className="block w-full text-center py-4 rounded-none text-lg font-semibold text-white mb-6 transition-colors bg-(--mp-navy) hover:bg-(--mp-navy-hover)"
               >
                 {currentPrice === 'FREE' ? 'Get Free Access' : 'Buy now'}
               </Link>
@@ -578,7 +574,7 @@ export default function ProductPageAppSumo({
                 href={currentCheckoutUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
+                className="block w-full text-center py-4 rounded-none text-lg font-semibold text-white mb-6 transition-colors bg-(--mp-navy) hover:bg-(--mp-navy-hover)"
               >
                 {currentPrice === 'FREE' ? 'Get Free Access' : 'Buy now'}
               </a>
@@ -588,26 +584,26 @@ export default function ProductPageAppSumo({
             <div className="space-y-3 mb-6">
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-lg">∞</span>
-                <span className="text-gray-700">Lifetime access</span>
+                <span className="text-(--mp-body)">Lifetime access</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="text-lg text-green-500">↩</span>
-                <span className="text-gray-700">Refundable up to 30 days</span>
+                <span className="text-lg text-(--mp-navy)">↩</span>
+                <span className="text-(--mp-body)">Refundable up to 30 days</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="text-lg text-pink-500">♥</span>
-                <span className="text-gray-700">Money-back guarantee</span>
+                <span className="text-lg text-(--mp-accent)">♥</span>
+                <span className="text-(--mp-body)">Money-back guarantee</span>
               </div>
             </div>
 
             {/* Divider */}
-            <div className="border-t border-gray-200 pt-6">
-              <h4 className="font-bold text-gray-900 mb-4">What&apos;s included:</h4>
+            <div className="border-t border-(--mp-line) pt-6">
+              <h4 className="font-bold text-(--mp-ink) mb-4">What&apos;s included:</h4>
               <ul className="space-y-3">
                 {(pricingTiers ? pricingTiers[selectedTier].features : benefits.slice(0, 8)).map((item, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm">
-                    <span className="text-green-500 font-bold">✓</span>
-                    <span className="text-gray-700">{item}</span>
+                    <span className="text-(--mp-navy) font-bold">✓</span>
+                    <span className="text-(--mp-body)">{item}</span>
                   </li>
                 ))}
               </ul>
@@ -615,25 +611,25 @@ export default function ProductPageAppSumo({
 
             {/* Upgrade Product Section */}
             {upgradeProduct && (
-              <div className="border-t border-gray-200 pt-6 mt-6">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
-                  <h4 className="font-bold text-blue-900 mb-2">Want More?</h4>
-                  <p className="text-sm text-blue-800 mb-3">{upgradeProduct.description}</p>
+              <div className="border-t border-(--mp-line) pt-6 mt-6">
+                <div className="bg-(--mp-navy-wash) border border-(--mp-line) rounded-none p-4">
+                  <h4 className="font-bold text-(--mp-ink) mb-2">Want More?</h4>
+                  <p className="text-sm text-(--mp-body) mb-3">{upgradeProduct.description}</p>
                   <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-2xl font-extrabold text-blue-900">{upgradeProduct.price}</span>
-                    <span className="text-gray-400 line-through text-sm">{upgradeProduct.originalPrice}</span>
+                    <span className="font-(family-name:--mp-font-mono) text-2xl font-semibold text-(--mp-ink)">{upgradeProduct.price}</span>
+                    <span className="text-(--mp-muted) line-through text-sm">{upgradeProduct.originalPrice}</span>
                   </div>
                   <a
                     href={upgradeProduct.checkoutUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full text-center py-3 rounded-lg text-sm font-bold text-white mb-2 hover:opacity-90 transition-all bg-blue-600 hover:bg-blue-700"
+                    className="block w-full text-center py-3 rounded-none text-sm font-semibold text-white mb-2 transition-colors bg-(--mp-navy) hover:bg-(--mp-navy-hover)"
                   >
                     Upgrade to {upgradeProduct.title}
                   </a>
                   <Link
                     href={upgradeProduct.linkUrl}
-                    className="block w-full text-center py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-all"
+                    className="block w-full text-center py-2 text-sm font-medium text-(--mp-navy) hover:text-(--mp-navy-hover) hover:underline transition-colors"
                   >
                     Learn more →
                   </Link>
@@ -646,13 +642,13 @@ export default function ProductPageAppSumo({
 
       {/* Email Gate Modal */}
       {showEmailModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-(--mp-ink)/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Get Free Access</h3>
+              <h3 className="font-(family-name:--mp-font-serif) text-lg font-bold text-(--mp-ink)">Get Free Access</h3>
               <button
                 onClick={() => setShowEmailModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-(--mp-muted) hover:text-(--mp-ink)"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -660,13 +656,13 @@ export default function ProductPageAppSumo({
               </button>
             </div>
 
-            <p className="text-gray-600 mb-6">
+            <p className="text-(--mp-body) mb-6">
               Enter your email to download <strong>{title}</strong> for free.
             </p>
 
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-(--mp-ink) mb-1">
                   Email Address *
                 </label>
                 <input
@@ -675,12 +671,12 @@ export default function ProductPageAppSumo({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-2 border border-(--mp-line) rounded-[8px] bg-(--mp-surface) placeholder:text-(--mp-subtle) focus:border-(--mp-navy) text-(--mp-ink)"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-(--mp-ink) mb-1">
                   Name (optional)
                 </label>
                 <input
@@ -688,12 +684,12 @@ export default function ProductPageAppSumo({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-2 border border-(--mp-line) rounded-[8px] bg-(--mp-surface) placeholder:text-(--mp-subtle) focus:border-(--mp-navy) text-(--mp-ink)"
                 />
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                <div className="bg-(--mp-warn-bg) border border-(--mp-warn-line) text-(--mp-warn) px-4 py-2 rounded-none text-sm">
                   {error}
                 </div>
               )}
@@ -701,12 +697,12 @@ export default function ProductPageAppSumo({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                className="w-full px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-none transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? 'Processing...' : 'Download Free'}
               </button>
 
-              <p className="text-xs text-gray-500 text-center">
+              <p className="text-xs text-(--mp-muted) text-center">
                 By submitting, you agree to receive occasional emails from GovCon Giants.
                 Unsubscribe anytime.
               </p>
@@ -716,9 +712,9 @@ export default function ProductPageAppSumo({
       )}
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-6 mt-20">
+      <footer className="border-t border-(--mp-line) py-8 px-6 mt-20">
         <div className="max-w-7xl mx-auto text-center">
-          <p className="text-gray-500 text-sm">&copy; {new Date().getFullYear()} GovCon Giants. All rights reserved.</p>
+          <p className="text-(--mp-muted) text-sm">&copy; {new Date().getFullYear()} GovCon Giants. All rights reserved.</p>
         </div>
       </footer>
     </div>

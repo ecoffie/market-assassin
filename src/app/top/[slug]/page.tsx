@@ -152,52 +152,52 @@ export default async function ListiclePage({ params }: PageProps) {
   const totalAggregated = rows.reduce((sum, r) => sum + Number(r.total_amount || 0), 0);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
-        <Link href="/" className="hover:text-purple-400">Home</Link>
+      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <Link href="/top" className="hover:text-purple-400">Top Lists</Link>
+        <Link href="/top" className="hover:text-(--mp-navy-hover)">Top Lists</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">{listicle.shortTitle}</span>
+        <span className="text-(--mp-body)">{listicle.shortTitle}</span>
       </div>
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 pt-6 pb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-accent)">
           Federal Contractor Ranking
         </p>
-        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">{listicle.title}</h1>
-        <p className="mt-4 max-w-3xl text-lg text-slate-300">{listicle.intro}</p>
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight font-(family-name:--mp-font-serif)">{listicle.title}</h1>
+        <p className="mt-4 max-w-3xl text-lg text-(--mp-body)">{listicle.intro}</p>
         <div className="mt-5">
-          <ShareButton url={`${SITE_URL}/top/${slug}`} title={listicle.title} />
+          <ShareButton appearance="public" url={`${SITE_URL}/top/${slug}`} title={listicle.title} />
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3 max-w-3xl">
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <div className="text-2xl font-bold text-purple-300">{rows.length}</div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">Contractors Ranked</div>
+          <div className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-4">
+            <div className="text-2xl font-semibold font-(family-name:--mp-font-mono) text-(--mp-ink) tabular-nums">{rows.length}</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">Contractors Ranked</div>
           </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <div className="text-2xl font-bold text-white">{fmtMoney(totalAggregated)}</div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">Combined Obligated</div>
+          <div className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-4">
+            <div className="text-2xl font-semibold font-(family-name:--mp-font-mono) text-(--mp-ink) tabular-nums">{fmtMoney(totalAggregated)}</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">Combined Obligated</div>
           </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <div className="truncate text-sm font-medium text-slate-300">{listicle.cohort}</div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">Cohort</div>
+          <div className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-4">
+            <div className="truncate text-sm font-medium text-(--mp-body)">{listicle.cohort}</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">Cohort</div>
           </div>
         </div>
       </section>
 
       {/* Ranked list */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+        <div className="overflow-x-auto rounded-none border border-(--mp-line) bg-(--mp-surface)">
           <table className="w-full text-sm">
-            <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+            <thead className="bg-(--mp-wash) text-xs uppercase tracking-wider text-(--mp-muted)">
               <tr>
                 <th className="text-left px-4 py-3 w-12">Rank</th>
                 <th className="text-left px-4 py-3">Contractor</th>
@@ -205,14 +205,14 @@ export default async function ListiclePage({ params }: PageProps) {
                 <th className="text-right px-4 py-3">Total Obligated</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-(--mp-line)">
               {rows.map((row, idx) => (
                 <tr
                   key={row.recipient_uei}
                   className={
                     idx < 3
-                      ? 'bg-amber-400/[0.04] hover:bg-amber-400/[0.08]'
-                      : 'hover:bg-slate-800/40'
+                      ? 'bg-(--mp-wash) hover:bg-(--mp-wash)'
+                      : 'hover:bg-(--mp-wash)'
                   }
                 >
                   <td className="px-4 py-3 text-base font-semibold whitespace-nowrap">
@@ -220,35 +220,35 @@ export default async function ListiclePage({ params }: PageProps) {
                       {idx < 3 ? (
                         <span className="text-xl" aria-label={`Rank ${idx + 1}`}>{MEDALS[idx]}</span>
                       ) : (
-                        <span className="font-mono text-slate-400">#{idx + 1}</span>
+                        <span className="font-(family-name:--mp-font-mono) text-(--mp-muted)">#{idx + 1}</span>
                       )}
                       {(() => {
                         const mv = rankMovement(baseline, row.recipient_uei, idx + 1);
                         if (!mv || mv.dir === 'same') return null;
                         if (mv.dir === 'new')
-                          return <span className="rounded px-1.5 py-0.5 text-[10px] font-bold text-amber-300 bg-amber-400/10">NEW</span>;
+                          return <span className="rounded-[6px] px-1.5 py-0.5 text-[10px] font-bold text-(--mp-warn) bg-(--mp-warn-bg)">NEW</span>;
                         const up = mv.dir === 'up';
                         return (
-                          <span className={`text-[11px] font-bold ${up ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          <span className={`text-[11px] font-bold ${up ? 'text-(--mp-ok)' : 'text-(--mp-crit)'}`}>
                             {up ? '▲' : '▼'} {mv.delta}
                           </span>
                         );
                       })()}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-200">
+                  <td className="px-4 py-3 text-(--mp-ink)">
                     <Link
                       href={`/contractors/${recipientSlug(row.recipient_name)}`}
-                      className="hover:text-purple-400 font-medium"
+                      className="hover:text-(--mp-navy-hover) font-medium"
                     >
                       {fmtCompanyName(row.recipient_name)}
                     </Link>
-                    <p className="font-mono text-xs text-slate-500 mt-0.5">UEI {row.recipient_uei}</p>
+                    <p className="font-(family-name:--mp-font-mono) text-xs text-(--mp-muted) mt-0.5">UEI {row.recipient_uei}</p>
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-300 hidden md:table-cell whitespace-nowrap">
+                  <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) tabular-nums text-(--mp-body) hidden md:table-cell whitespace-nowrap">
                     {Number(row.award_count).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                  <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) font-semibold tabular-nums text-(--mp-ink) whitespace-nowrap">
                     {fmtMoney(Number(row.total_amount))}
                   </td>
                 </tr>
@@ -257,7 +257,7 @@ export default async function ListiclePage({ params }: PageProps) {
           </table>
         </div>
 
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-(--mp-muted)">
           Source: USAspending.gov, FY2016–FY2026. Mindy aggregates by contractor legal name and rolls up parent +
           subsidiary UEI relationships. Click any row to view full contracting profile.
         </p>
@@ -265,7 +265,7 @@ export default async function ListiclePage({ params }: PageProps) {
 
       {/* Cross-link to other listicles */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-4">Other Top Contractor Lists</h2>
+        <h2 className="text-2xl font-bold mb-4 font-(family-name:--mp-font-serif)">Other Top Contractor Lists</h2>
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           {LISTICLES.filter((l) => l.slug !== slug)
             .slice(0, 6)
@@ -273,10 +273,10 @@ export default async function ListiclePage({ params }: PageProps) {
               <Link
                 key={l.slug}
                 href={`/top/${l.slug}`}
-                className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+                className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-4 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors"
               >
-                <p className="text-sm font-medium text-slate-100">{l.shortTitle}</p>
-                <p className="mt-1 text-xs text-slate-500">{l.cohort}</p>
+                <p className="text-sm font-medium text-(--mp-ink)">{l.shortTitle}</p>
+                <p className="mt-1 text-xs text-(--mp-muted)">{l.cohort}</p>
               </Link>
             ))}
         </div>
@@ -284,16 +284,16 @@ export default async function ListiclePage({ params }: PageProps) {
 
       {/* CTA */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-2xl font-bold">Want to compete with the companies on this list?</h2>
-          <p className="mt-3 mb-6 max-w-2xl mx-auto text-slate-300">
+        <div className="rounded-none border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">Want to compete with the companies on this list?</h2>
+          <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
             Their contracts won&apos;t last forever. When the government re-awards that work, Mindy
             tells you up to a year early — so you have time to get ready and go after it.
           </p>
-          <MemberAwareCta memberHref="/app" memberLabel="Open Mindy →">
+          <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open Mindy →">
             <Link
               href="/signup"
-              className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+              className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
             >
               Start free →
             </Link>
