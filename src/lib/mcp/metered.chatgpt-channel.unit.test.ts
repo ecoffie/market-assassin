@@ -123,3 +123,31 @@ describe('outcome telemetry on the ChatGPT channel (#1777)', () => {
     }));
   });
 });
+
+describe('call-log channel (20261003_mcp_call_log_channel)', () => {
+  const rows = () => m(credits.logCall).mock.calls.map((c: unknown[]) => c[0] as Record<string, unknown>);
+
+  it('every ChatGPT row carries channel chatgpt: charged, refused, degraded and thrown', async () => {
+    m(credits.getBalance).mockResolvedValue(100);
+    m(registry.runMcpTool).mockResolvedValueOnce({ result: { _meta: { grounded: true } }, credits: 50 });
+    await runMeteredTool('capability_market_match', { description: 'x' }, { userEmail: 'u@x.com', channel: 'chatgpt' });
+    m(registry.runMcpTool).mockResolvedValueOnce({ result: { _meta: { grounded: false, degraded: true } }, credits: 50 });
+    await runMeteredTool('get_solicitation_documents', { notice_id: 'x' }, { userEmail: 'u@x.com', channel: 'chatgpt' });
+    m(registry.runMcpTool).mockRejectedValueOnce(new Error('boom'));
+    await runMeteredTool('assess_market_depth', { naics: '238220' }, { userEmail: 'u@x.com', channel: 'chatgpt' });
+    m(credits.getBalance).mockResolvedValue(1);
+    await runMeteredTool('capability_market_match', { description: 'x' }, { userEmail: 'u@x.com', channel: 'chatgpt' });
+    expect(rows()).toHaveLength(4);
+    for (const r of rows()) expect(r.channel).toBe('chatgpt');
+  });
+
+  it('the Claude/general edge passes no channel (its rows stay NULL)', async () => {
+    m(credits.getBalance).mockResolvedValue(100);
+    m(registry.runMcpTool).mockResolvedValueOnce({ result: { _meta: { grounded: true } }, credits: 50 });
+    await runMeteredTool('capability_market_match', { description: 'x' }, { userEmail: 'u@x.com' });
+    m(credits.getBalance).mockResolvedValue(1);
+    await runMeteredTool('capability_market_match', { description: 'x' }, { userEmail: 'u@x.com' });
+    expect(rows()).toHaveLength(2);
+    for (const r of rows()) expect(r.channel).toBeUndefined();
+  });
+});

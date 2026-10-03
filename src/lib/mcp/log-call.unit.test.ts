@@ -50,6 +50,31 @@ describe('logCall', () => {
     expect(insert).toHaveBeenCalledTimes(1); // no outcome → nothing different to retry
   });
 
+  it('writes channel=chatgpt only for a ChatGPT call; Claude rows carry no channel key (NULL)', async () => {
+    insert.mockResolvedValue({ error: null });
+    await logCall({ ...base, outcome, channel: 'chatgpt' });
+    await logCall({ ...base, outcome });
+    expect(insert.mock.calls[0][0]).toMatchObject({ channel: 'chatgpt', outcome: 'grounded' });
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('channel');
+  });
+
+  it('writes channel even when the call has no outcome (a ChatGPT call is still measurable)', async () => {
+    insert.mockResolvedValue({ error: null });
+    await logCall({ ...base, channel: 'chatgpt' });
+    expect(insert.mock.calls[0][0]).toMatchObject({ user_email: 'u@x.com', channel: 'chatgpt' });
+    expect(insert.mock.calls[0][0]).not.toHaveProperty('outcome');
+  });
+
+  it('a rejected channel insert retries in the legacy shape (column missing never loses the call)', async () => {
+    insert
+      .mockResolvedValueOnce({ error: { message: 'column "channel" of relation "mcp_call_log" does not exist' } })
+      .mockResolvedValueOnce({ error: null });
+    await logCall({ ...base, outcome, channel: 'chatgpt' });
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('channel');
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('outcome');
+  });
+
   it('never throws', async () => {
     insert.mockRejectedValue(new Error('network'));
     await expect(logCall({ ...base, outcome })).resolves.toBeUndefined();
