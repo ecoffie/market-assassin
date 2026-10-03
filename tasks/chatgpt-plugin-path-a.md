@@ -1,7 +1,10 @@
 # Mindy ChatGPT Plugin: Path A (ChatGPT-specific MCP profile)
 
-Status: **Phase 1 built + ChatGPT-only param descriptions + owner-FINAL 15 (2026-10-03), rebased onto
-main `9c24b306` (#1777 + #1778). Draft PR #1776, not merged, not deployed. Not submitted to OpenAI.**
+Status: **Phase 1 LIVE and production-proven (2026-10-03).** #1776 merged from reviewed head
+`c48e4879` as `6f1e74ce` (10:19:30 UTC); Git-triggered production deploy
+`dpl_DWxdwxwErsp1RHGihPLfFUXBgXGT` READY 10:22:59 UTC, aliased to getmindy.ai + mcp.getmindy.ai; no
+manual deploy. Production proof passed every item (see "Production proof" below). **Not submitted to
+OpenAI. No reviewer account, no domain token.** Next: ChatGPT developer-mode acceptance (Phase 2).
 
 Prerequisites, all satisfied 2026-10-03:
 - **Auto-recharge attribution (#1778)** — LIVE, merged `9c24b306`; migration applied 2026-10-03 via
@@ -172,8 +175,8 @@ why the backfill is not draining the active NULL rows.
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Correctness of the tools themselves (lookup_solicitation scoring, find_opportunities copy, recompete dedupe) | **LIVE** (#1772–#1775, prod-accepted 2026-10-03) |
-| 1 | This profile: routing, OAuth audience binding, 15-tool allowlist, descriptions, annotations, instructions, projection, neutral refusals, tests | **built (this PR)** |
-| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **LIVE (#1778)**; rest not started |
+| 1 | This profile: routing, OAuth audience binding, 15-tool allowlist, descriptions, annotations, instructions, projection, neutral refusals, tests | **LIVE** (#1776 → `6f1e74ce`, production-proven 2026-10-03) |
+| 2 | OAuth / public readiness: real ChatGPT developer-mode connect, consent page review, DCR behaviour with OpenAI's client, auto-recharge decision, param-description cleanup | param descriptions **done**; auto-recharge attribution **LIVE (#1778)**; `mcp_call_log.channel` telemetry **LIVE** (#1781 → `ed98e8c6`, proven: ChatGPT refusal row `channel=chatgpt`, Claude `get_balance` row NULL); developer-mode acceptance **next** (`tasks/chatgpt-devmode-acceptance.md`) |
 | 3 | Reviewer account + submission package (annotations.json, test prompts, screenshots of ChatGPT itself, privacy/terms review) | not started |
 
 ## Hard stops
@@ -237,7 +240,34 @@ why the backfill is not draining the active NULL rows.
   `runMeteredTool` writes a call-log row and a debit. The projected sample came from a direct,
   read-only `get_legislation_status` call passed through `projectChatgptResult`.
 
-## Post-deploy proof plan (after merge + deploy, by Eric's go-ahead)
+## Production proof (2026-10-03, 10:31–10:36 UTC) — ALL PASS
+
+Run against `6f1e74ce` on prod with Eric's GO. Synthetic accounts only:
+`credit-integrity-acceptance@getmindy.ai` (funded, 15 credits) and `chatgpt-proof-zero@getmindy.ai`
+(new, no balance row, needed so the no-grant / no-retry checks are not vacuous).
+
+| Item | Result | Evidence |
+|---|---|---|
+| `/chatgpt/mcp` serving | PASS | ChatGPT token → 200; serverInfo "Mindy", websiteUrl getmindy.ai |
+| Exactly the approved 15 | PASS | exact name match, 0 missing / 0 extra; tools/list sha256 `778957a9…`; `draft_proposal` → "Tool not found" |
+| Normal `/mcp` at 53 | PASS | equals `listPublicMcpTools()` at the SHA |
+| Audience isolation, both directions | PASS | Claude token on `/chatgpt/mcp` 401; ChatGPT token on `mcp.getmindy.ai/mcp` and `getmindy.ai/mcp/mcp` 401; ChatGPT grant exchanged for the Claude resource → `invalid_target` |
+| API key on `/chatgpt/mcp` | PASS | 401 (same key 200 on `/mcp` as control; key revoked after) |
+| Unauthenticated metadata | PASS | 401 `resource_metadata` → `…/oauth-protected-resource/chatgpt/mcp` → ChatGPT resource; Claude document unchanged |
+| Controlled debit `channel=chatgpt` | PASS | ledger −5 `get_legislation_status` `channel=chatgpt`, 1,095 ms |
+| `chatgpt_spend_since_recharge` | PASS | 0 → 5; the Claude debit did not move it |
+| No auto-recharge / payment | PASS | 0 `mcp_autorecharge` rows, no Stripe customer, last Stripe charge unchanged (00:16 UTC). Weak form: no card on file, so a payment was impossible; the gate's input (S) is proven correct |
+| No signup grant | PASS | zero account: no balance row created, no `signup_grant` |
+| No saved purchase retry | PASS | 0 `mcp_paywall_attempts` rows after 10:35 anywhere, incl. after a 0-balance refusal |
+| Outcome telemetry | PASS (gap) | ChatGPT call `grounded`/`billable_success`; refusal `blocked`/`insufficient_credits`. Gap: no `channel` on `mcp_call_log` → closed by #1781 (LIVE 2026-10-03, `ed98e8c6`) |
+| No commerce copy | PASS | 0 price/link/upgrade/checkout/credit hits in tools/list, instructions, serverInfo, results; no footer, no `_meta.credits`. Only "credits" text is the neutral refusal |
+| Claude unchanged | PASS | footer present, `_meta.credits` present, ledger channel NULL (targeted check, not the full smoke: its 20-credit playbook probe would overdraw the account) |
+
+Credit movement: funded account 15 → 10 (ChatGPT) → 5 (Claude); zero account unchanged (no row).
+Cleanup: all 6 proof refresh tokens revoked, temp API key revoked; access JWTs expire on their own (1h);
+DCR client row `mcpc_hRQ_…` remains (not a credential).
+
+## Post-deploy proof plan (after merge + deploy, by Eric's go-ahead) — EXECUTED above
 
 1. `curl -si -X POST https://mcp.getmindy.ai/chatgpt/mcp` → 401 + the ChatGPT `resource_metadata`.
 2. `curl -s https://mcp.getmindy.ai/.well-known/oauth-protected-resource/chatgpt/mcp` → ChatGPT resource;
