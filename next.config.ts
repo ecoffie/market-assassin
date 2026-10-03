@@ -134,6 +134,16 @@ const nextConfig: NextConfig = {
       '/api/app/market-research/download/**/*': downloadExcludes,
     };
   })(),
+  // Public-site fonts live under a versioned path, so a new font version ships
+  // as /v2/ and the year-long immutable cache can never serve a stale file.
+  async headers() {
+    return [
+      {
+        source: '/fonts/mp/v1/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+    ];
+  },
   // Rewrites for host-based routing
   async rewrites() {
     return {

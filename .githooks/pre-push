@@ -423,6 +423,18 @@ else
   echo -e "      ${YEL}  (not blocking — see /tmp/mindy-prepush-tokens.log; accept with: node scripts/audit-design-tokens.mjs --update-baseline)${NC}"
 fi
 
+# 10b) HARD BLOCK: files opted into the public design system (src/lib/public-site/opt-in.json)
+#      may use only its tokens: no purple family, gradients, dark backgrounds, auto dark mode,
+#      weights above 700, other font families or off-palette hex. No baseline; opted-in = clean.
+echo -e "  ${BOLD}10b/13${NC} public design system…"
+if node scripts/audit-public-design.mjs > /tmp/mindy-prepush-public-design.log 2>&1; then
+  echo -e "      ${GREEN}✓ $(tail -1 /tmp/mindy-prepush-public-design.log)${NC}"
+else
+  echo -e "      ${RED}✗ public design system violation — push blocked${NC}"
+  sed 's/^/        /' /tmp/mindy-prepush-public-design.log | head -20
+  fail=1
+fi
+
 # 11) Repair-ledger coverage. HARD half: every recorded fix's proof anchor must still resolve (a
 #     vanished anchor = a revert). WARN half: a substantive src/ feat|fix push that adds no ledger
 #     row is flagged (never blocks — refactors/reverts/merges legitimately add none).

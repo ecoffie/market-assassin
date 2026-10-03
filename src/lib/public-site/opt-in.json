@@ -1,0 +1,11 @@
+{
+  "$comment": "Files and routes that use the Mindy public design system. scripts/audit-public-design.mjs lints every entry in `files` (directories are walked). scripts/verify-public-site.mjs runs runtime checks on `runtimeRoutes`; scripts/verify-public-parity.mjs diffs raw HTML for `parityRoutes`. A route migration adds its owning files and routes here in the same PR. The homepage is listed as /today: getmindy.ai/ rewrites there by host, so on localhost / is a different page.",
+  "files": [
+    "src/lib/public-site",
+    "src/components/public-site",
+    "src/app/design-fixtures/public-site/page.tsx",
+    "src/app/today/route.ts"
+  ],
+  "runtimeRoutes": ["/today", "/design-fixtures/public-site"],
+  "parityRoutes": ["/today"]
+}
