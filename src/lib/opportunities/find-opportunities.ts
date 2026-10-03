@@ -303,13 +303,13 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'Then ask at most ONE plain-English refinement (what they actually sell). WAIT. Do not auto-call understand_customer or get_current_acquisition_intelligence even if `_next` offers them — those are confirmation-gated after first value.',
   'Do not ask company identity, UEI, CAGE, certifications, clearance, FCL, set-aside, vehicle, or desired deliverable before presenting this. Do not expose NAICS/PSC/ATO/CNO/CEMA/CSO/OT/PAE/FCL in the refinement unless the user already used that word.',
   'Do not web-search or create an artifact on this turn. Do not ask market map vs access-path vs capability statement.',
-  'Clearance is not a first-value question. Do not call it a hard gate because the buyer is SOCOM.',
-  'EVIDENCE CLASS: DIRECT_MATCH is confirmed relevance to what they asked to sell. RELATED_MARKET_CANDIDATE is this buyer’s broader market that can contain that work. Never count related-market rows as confirmed cyber (or other capability) demand. Never mix the two into one “cyber contracts” number. Explain the distinction in plain English. Do not dump NAICS/PSC.',
-  'COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say “N contracts with direct cybersecurity evidence and M related SOCOM IT contracts worth reviewing.” Never say “N+M cybersecurity recompetes/contracts.” presentation_note and summary.headline already split the counts — use them.',
-  'INTERPRETATION: use presentation_note / market_interpretation.truth. Buyer alias (SOCOM = U.S. Special Operations Command) is spelling, not a wider department. Never say you searched all of DoD. Never claim the entire IT-services market is cybersecurity.',
+  'Clearance is not a first-value question. Do not call it a hard gate merely because of who the buyer is.',
+  'EVIDENCE CLASS: DIRECT_MATCH is confirmed relevance to what they asked to sell. RELATED_MARKET_CANDIDATE is this buyer’s broader market that can contain that work. Never count related-market rows as confirmed demand for what they asked to sell. Never mix the two into one combined count for the requested capability. Explain the distinction in plain English. Do not dump NAICS/PSC.',
+  'COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say “N contracts with direct <what they asked for> evidence and M related-market contracts at this buyer worth reviewing.” Never say “N+M <what they asked for> recompetes/contracts.” presentation_note and summary.headline already split the counts — use them.',
+  'INTERPRETATION: use presentation_note / market_interpretation.truth. A buyer alias (an acronym or short name resolved to the full agency name) is spelling, not a wider department. Never say you searched the whole parent department. Never claim a broader related market is the requested capability.',
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
   'COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured — never say they have zero upcoming buys.',
-  'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (e.g. a firm called “… Machining and Fabrication”). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
+  'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (the company name contains the search words). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
 ] as const;
 
 /** Added to host_rules ONLY for a company-anchored call (input.uei). The beginner first turn is unchanged. */
@@ -1092,7 +1092,7 @@ async function queryComingBack(
     });
 
     const note = related
-      ? 'DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is this buyer’s broader IT market — not confirmed cybersecurity. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet.'
+      ? `DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is this buyer’s broader related market — not confirmed ${cap.requested ? `“${cap.requested}”` : 'capability'} demand. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet.`
       : 'Geography: place of performance only (not buying-office). Not a live solicitation — do not draft a proposal as if an RFP exists. Watch/email for this horizon is not available yet.';
     const orderNote = ' Task/delivery orders under a contract vehicle are excluded — they are not re-competed on their own.';
 
@@ -1589,7 +1589,8 @@ export async function findOpportunities(
       headline: headlineFor(horizons),
       claim_hygiene:
         relatedNote +
-        'Counts are per-horizon matches under this query — not unique procurements across horizons. Do not call combined raw rows unique opportunities. Do not count RELATED_MARKET_CANDIDATE as confirmed cybersecurity demand.',
+        'Counts are per-horizon matches under this query — not unique procurements across horizons. Do not call combined raw rows unique opportunities. ' +
+        `Do not count RELATED_MARKET_CANDIDATE as confirmed ${interpreted.searchText ? `“${interpreted.searchText}”` : 'capability'} demand.`,
     },
     _meta: {
       grounded,
