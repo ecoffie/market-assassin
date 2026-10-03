@@ -35,22 +35,26 @@ describe('map deep link — ?opp= opens the listing drawer', () => {
     expect(SRC).toMatch(/\[\?&\]opp=/);
   });
 
+  // ?opp= has ONE owner — the SHARED-LINK OPEN handler (2026-09-28: a second boot handler opened
+  // the drawer twice; see opp-deeplink-single-owner.unit.test.ts, which EXECUTES the handlers).
+  const owner = () => {
+    const s = SRC.indexOf('SHARED-LINK OPEN (?opp=');
+    return SRC.slice(s, SRC.indexOf('window.openOppDrawer=function', s));
+  };
+
   it('calls openOppDrawer with the parsed notice id', () => {
-    // Anchor on the HANDLER call, not on match(/[?&]opp=/): that regex now also lives in the
-    // typed-address horizon isolator (first fetchView must not merge all three corpora).
-    const at = SRC.indexOf('window.openOppDrawer(nid)');
-    const handler = SRC.slice(at - 280, at + 80);
-    expect(handler).toContain("match(/[?&]opp=([^&]+)/)");
-    expect(handler).toContain('decodeURIComponent');
-    expect(handler).toContain('openOppDrawer');
+    const handler = owner();
+    expect(handler).toContain("_sp.get('opp')");          // URLSearchParams decodes the id
+    expect(handler).toContain('new URLSearchParams(location.search)');
+    expect(handler).toContain('window.openOppDrawer(_id,true)');
   });
 
   it('RETRIES until openOppDrawer exists — the drawer JS defines it asynchronously', () => {
     // Without the retry the handler races the map boot and silently no-ops on a cold load,
     // which would look like "the deep link is broken" only sometimes — the worst failure mode.
-    const at = SRC.indexOf('window.openOppDrawer(nid)');
-    const handler = SRC.slice(at - 280, at + 200);
-    expect(handler).toMatch(/tries\+\+|setTimeout/);
+    const handler = owner();
+    expect(handler).toContain('setInterval');
+    expect(handler).toContain("typeof window.openOppDrawer==='function'");
   });
 
   it('/today Featured cards emit the param this handler consumes (both ends agree)', () => {
