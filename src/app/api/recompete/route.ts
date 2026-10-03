@@ -36,6 +36,7 @@ import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resil
 import { getVocabulary } from '@/lib/market/vocabulary';
 import { getNaics } from '@/lib/codes/lookup';
 import { annotateRecompeteRow } from '@/lib/recompete/annotate';
+import { dedupeRecompeteRows } from '@/lib/recompete/dedupe-orders';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -478,7 +479,13 @@ async function handleRecompeteGet(request: NextRequest) {
     console.warn('[recompete] filtered query failed — retrying without quality_flag:', error.message);
     ({ rows: allFiltered, error } = await fetchAllFiltered(false));
   }
-  const contracts = allFiltered; // (kept name for the rest of the handler)
+  // The same award can sit in the table under two contract_ids (a re-parented order whose
+  // old id the sync orphaned, or a legacy April id) — collapse to the freshest-synced row BEFORE
+  // the summary + vehicle rollup, or one order is counted (and its ceiling summed) twice.
+  // `capped` below still reads the RAW scan length: the cap is about scan truncation.
+  const rawScanned = allFiltered.length;
+  const deduped = dedupeRecompeteRows(allFiltered);
+  const contracts = deduped.rows; // (kept name for the rest of the handler)
 
   if (error) {
     console.error('Recompete query error:', error);
@@ -636,12 +643,13 @@ async function handleRecompeteGet(request: NextRequest) {
       // Count is now VEHICLES (de-inflated), not raw awardee rows.
       total: vehicleTotal,
       hasMore: (offset + limit) < vehicleTotal,
-      rawRowTotal: contracts?.length || 0,  // pre-rollup count (for transparency)
+      rawRowTotal: contracts?.length || 0,  // pre-rollup count (for transparency), after duplicate-id collapse
+      duplicatesCollapsed: deduped.collapsed, // same award under another contract_id, folded out
       // TRUE if the filtered set hit GROUP_FETCH_CAP — then `total` is a FLOOR, not
       // a count (the scan stopped early), and a client must render it as "N+".
       // Without this a broad filter (e.g. no NAICS) reports the cap as if it were
       // the whole market — the same class of lie as the old static-file count.
-      capped: (contracts?.length || 0) >= GROUP_FETCH_CAP,
+      capped: rawScanned >= GROUP_FETCH_CAP,
     },
     summary: {
       resultCount: vehicles.length,         // vehicles on this page

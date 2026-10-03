@@ -8,6 +8,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
+import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
 import {
   interpretMarket,
   evidenceWhy,
@@ -1011,8 +1012,11 @@ async function queryComingBack(
     // Belt and braces: the same rule in JS (parseAwardLineage), so a row the SQL predicate let
     // through can still never become an individual Coming Back item.
     const unioned = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id');
-    const rawRows = unioned.filter((r) => parseAwardLineage(r as { contract_id?: string; contract_type?: string }).award_kind !== 'order_under_vehicle');
-    const ordersDroppedInJs = unioned.length - rawRows.length;
+    const lineageOk = unioned.filter((r) => parseAwardLineage(r as { contract_id?: string; contract_type?: string }).award_kind !== 'order_under_vehicle');
+    // The same award can sit under a legacy April id AND its CONT_AWD_ id (dedupe-orders.ts) —
+    // e.g. definitive contract 36C10X23C0057. One award, one Coming Back item.
+    const { rows: rawRows, collapsed: duplicatesCollapsed } = dedupeRecompeteRows(lineageOk as Array<Record<string, unknown> & DedupeableRecompeteRow>);
+    const ordersDroppedInJs = unioned.length - lineageOk.length;
     // Ranking reads BUY-SIDE fields only — the holder's name must not lift a row (it used to).
     const scores = new Map(rankRecords(p.plan, rawRows, ['description', 'psc_description', 'naics_description', 'awarding_agency', 'awarding_sub_agency']).map((s) => [s.row, s]));
     const anchor = p.company?.anchor ?? null;
@@ -1098,7 +1102,8 @@ async function queryComingBack(
 
     return {
       status: 'grounded',
-      matched_count: count ?? null,
+      // Row count minus duplicate-id rows collapsed in the fetched window (never below the true distinct count).
+      matched_count: count == null ? null : Math.max(count - duplicatesCollapsed, items.length),
       returned_count: items.length,
       items,
       source,
