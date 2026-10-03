@@ -165,14 +165,14 @@ export default function ContinuePage() {
   const canAfford = attempt?.balance != null && attempt.balance >= cost;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6 py-16">
-      {state === 'loading' && <p className="text-slate-400">Finding your saved request…</p>}
+    <main className="mx-auto flex max-w-xl flex-col justify-center px-6 py-16">
+      {state === 'loading' && <p className="text-(--mp-muted)">Finding your saved request…</p>}
 
       {state === 'error' && (
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Nothing to continue</h1>
-          <p className="mt-3 text-slate-400">{message}</p>
-          <Link href="/mcp/pricing" className="mt-6 inline-block text-emerald-400 underline">
+          <h1 className="text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Nothing to continue</h1>
+          <p className="mt-3 text-(--mp-muted)">{message}</p>
+          <Link href="/mcp/pricing" className="mt-6 inline-block text-(--mp-navy) underline">
             See plans
           </Link>
         </div>
@@ -180,38 +180,38 @@ export default function ContinuePage() {
 
       {attempt && (state === 'ready' || state === 'running') && (
         <div>
-          <h1 className="text-3xl font-bold leading-tight text-slate-100">
+          <h1 className="text-3xl font-bold leading-tight text-(--mp-ink) font-(family-name:--mp-font-serif)">
             Your {label} is ready to run.
           </h1>
 
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="font-mono text-[11px] uppercase tracking-widest text-slate-500">
+          <div className="mt-6 rounded-none border border-(--mp-line) bg-(--mp-surface) p-5">
+            <div className="font-(family-name:--mp-font-mono) text-[11px] uppercase tracking-widest text-(--mp-muted)">
               Saved request
             </div>
-            <div className="mt-2 text-lg font-semibold text-slate-100">
+            <div className="mt-2 text-lg font-semibold text-(--mp-ink)">
               {describeArgs(attempt.args)}
             </div>
           </div>
 
           {attempt.alreadyRun ? (
-            <p className="mt-6 text-slate-400">This one has already been run.</p>
+            <p className="mt-6 text-(--mp-muted)">This one has already been run.</p>
           ) : canAfford ? (
             <>
               <button
                 onClick={run}
                 disabled={state === 'running'}
-                className="mt-6 w-full rounded-xl bg-emerald-500 px-5 py-3.5 text-[15px] font-bold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60"
+                className="mt-6 w-full rounded-none bg-(--mp-navy) px-5 py-3.5 text-[15px] font-bold text-white hover:bg-(--mp-navy-hover) disabled:opacity-60"
               >
                 {state === 'running' ? 'Running…' : `Run ${label} →`}
               </button>
-              <p className="mt-4 text-center text-sm text-slate-500">
+              <p className="mt-4 text-center text-sm text-(--mp-muted)">
                 {cost} credits · {attempt.balance} available
               </p>
             </>
           ) : (
             <>
-              <div className="mt-6 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-5 py-4">
-                <p className="text-[15px] text-amber-100">
+              <div className="mt-6 rounded-none border border-(--mp-warn-line) bg-(--mp-warn-bg) px-5 py-4">
+                <p className="text-[15px] text-(--mp-warn)">
                   This {label.toLowerCase()} costs <strong>{cost} credits</strong>.
                   {attempt.balance === null
                     ? ' Add credits below and it runs immediately.'
@@ -224,7 +224,7 @@ export default function ContinuePage() {
                   type="button"
                   disabled={buying !== null}
                   onClick={() => buy('entry')}
-                  className="block w-full text-left rounded-xl bg-emerald-500 px-5 py-4 text-[#06120c] transition hover:bg-emerald-400 disabled:opacity-60"
+                  className="block w-full text-left rounded-none bg-(--mp-navy) px-5 py-4 text-white transition hover:bg-(--mp-navy-hover) disabled:opacity-60"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-[15px] font-bold">
@@ -244,17 +244,17 @@ export default function ContinuePage() {
                   type="button"
                   disabled={buying !== null}
                   onClick={() => buy('refill')}
-                  className="block w-full text-left rounded-xl border border-white/15 px-5 py-4 transition hover:bg-white/5 disabled:opacity-60"
+                  className="block w-full text-left rounded-none border border-(--mp-line) px-5 py-4 transition hover:bg-(--mp-wash) disabled:opacity-60"
                 >
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[15px] font-semibold text-slate-100">
+                    <span className="text-[15px] font-semibold text-(--mp-ink)">
                       One-time top-up — ${TOPUP.usd}
                     </span>
-                    <span className="text-sm text-slate-400">
+                    <span className="text-sm text-(--mp-muted)">
                       {TOPUP.credits.toLocaleString()} credits
                     </span>
                   </div>
-                  <div className="mt-1 text-[13px] text-slate-400">
+                  <div className="mt-1 text-[13px] text-(--mp-muted)">
                     No subscription. Credits do not expire.
                   </div>
                 </button>
@@ -262,10 +262,10 @@ export default function ContinuePage() {
 
               {buyError ? (
                 <div
-                  className={`mt-3 rounded-lg border px-4 py-3 text-[14px] ${
+                  className={`mt-3 rounded-none border px-4 py-3 text-[14px] ${
                     buyErrorKind === 'done'
-                      ? 'border-emerald-400/30 bg-emerald-400/[0.07] text-emerald-100'
-                      : 'border-amber-400/30 bg-amber-400/[0.07] text-amber-100'
+                      ? 'border-(--mp-ok-line) bg-(--mp-ok-bg) text-(--mp-ok)'
+                      : 'border-(--mp-warn-line) bg-(--mp-warn-bg) text-(--mp-warn)'
                   }`}
                 >
                   <p>{buyError}</p>
@@ -285,11 +285,11 @@ export default function ContinuePage() {
                 </div>
               ) : null}
 
-              <p className="mt-4 text-center text-sm text-slate-500">
+              <p className="mt-4 text-center text-sm text-(--mp-muted)">
                 Your request stays saved — it runs the moment your credits land.
               </p>
               <p className="mt-3 text-center text-sm">
-                <Link href="/mcp/pricing" className="text-slate-400 underline hover:text-slate-300">
+                <Link href="/mcp/pricing" className="text-(--mp-muted) underline hover:text-(--mp-body)">
                   Compare all plans
                 </Link>
               </p>
@@ -297,25 +297,25 @@ export default function ContinuePage() {
               <button
                 onClick={run}
                 disabled={state === 'running'}
-                className="mt-5 w-full rounded-lg border border-white/10 px-5 py-2.5 text-sm text-slate-400 transition hover:bg-white/5 disabled:opacity-60"
+                className="mt-5 w-full rounded-none border border-(--mp-line) px-5 py-2.5 text-sm text-(--mp-muted) transition hover:bg-(--mp-wash) disabled:opacity-60"
               >
                 {state === 'running' ? 'Checking…' : 'Already purchased? Run it now'}
               </button>
             </>
           )}
 
-          {message && <p className="mt-4 text-center text-sm text-amber-300">{message}</p>}
+          {message && <p className="mt-4 text-center text-sm text-(--mp-warn)">{message}</p>}
         </div>
       )}
 
       {state === 'done' && (
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Done — it is running now.</h1>
-          <p className="mt-3 text-slate-400">
+          <h1 className="text-3xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Done — it is running now.</h1>
+          <p className="mt-3 text-(--mp-muted)">
             Your {label} for {attempt ? describeArgs(attempt.args) : 'your market'} is complete. Ask
             Mindy for it in your assistant, or open it in the app.
           </p>
-          <Link href="/app" className="mt-6 inline-block text-emerald-400 underline">
+          <Link href="/app" className="mt-6 inline-block text-(--mp-navy) underline">
             Open Mindy
           </Link>
         </div>

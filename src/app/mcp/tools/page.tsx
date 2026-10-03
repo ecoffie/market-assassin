@@ -24,7 +24,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
-import { Catalog, Tool, McpNav, MCP_URL } from '../catalog-ui';
+import { Catalog, Tool, MCP_URL } from '../catalog-ui';
+import { McpPublicNav } from '../public-ui';
 import { TOOL_GROUPS, GROUPED_TOOL_NAMES, UNGROUPED_LABEL } from './tool-groups';
 
 /** A group with its tools resolved against the live catalog. */
@@ -125,39 +126,39 @@ export default function McpToolsReference() {
   const freeCount = tools.filter((t) => t.credits === 0).length;
 
   return (
-    <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
+    <main className="min-h-dvh bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-        <McpNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
+        <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
 
         {/* Header */}
         <header className="mt-10">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">Reference</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-(--mp-muted)">Reference</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl font-(family-name:--mp-font-serif)">
             {tools.length > 0 ? `${tools.length} tools` : 'Every tool'}, grouped by the job
           </h1>
-          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-slate-400">
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-(--mp-muted)">
             Every tool the Mindy MCP server exposes, with its live credit price. Read straight from the
             running catalog — if the server changes, this page changes with it.
           </p>
-          <p className="mt-3 text-[13px] text-slate-500">
-            Endpoint <code className="font-mono text-slate-400">{MCP_URL}</code> ·{' '}
-            <Link href="/mcp" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">Connect</Link>{' '}
+          <p className="mt-3 text-[13px] text-(--mp-muted)">
+            Endpoint <code className="font-(family-name:--mp-font-mono) text-(--mp-muted)">{MCP_URL}</code> ·{' '}
+            <Link href="/mcp" className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">Connect</Link>{' '}
             ·{' '}
-            <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">Pricing</Link>
+            <Link href="/mcp/pricing" className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">Pricing</Link>
           </p>
         </header>
 
         {/* Honesty contract — the thing a developer actually needs to trust */}
-        <section className="mt-7 rounded-xl border border-white/[0.07] bg-[#101728] p-4 sm:p-5">
-          <h2 className="text-[13px] font-semibold text-slate-200">Two rules that hold for every tool</h2>
-          <ul className="mt-2 space-y-1.5 text-[13.5px] leading-relaxed text-slate-400">
+        <section className="mt-7 rounded-none border border-(--mp-line) bg-(--mp-surface) p-4 sm:p-5">
+          <h2 className="text-[13px] font-semibold text-(--mp-ink)">Two rules that hold for every tool</h2>
+          <ul className="mt-2 space-y-1.5 text-[13.5px] leading-relaxed text-(--mp-muted)">
             <li>
-              <span className="font-mono text-[12.5px] text-slate-300">grounded=false</span> means
-              {' '}<span className="text-slate-300">we found nothing</span> — never a fabricated answer. Each tool states
+              <span className="font-(family-name:--mp-font-mono) text-[12.5px] text-(--mp-body)">grounded=false</span> means
+              {' '}<span className="text-(--mp-body)">we found nothing</span> — never a fabricated answer. Each tool states
               exactly what it will not invent.
             </li>
             <li>
-              <span className="text-slate-300">A failed call costs 0.</span> Credits debit only on success, atomically
+              <span className="text-(--mp-body)">A failed call costs 0.</span> Credits debit only on success, atomically
               at the database layer.
             </li>
           </ul>
@@ -170,9 +171,9 @@ export default function McpToolsReference() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter tools…"
             aria-label="Filter tools"
-            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-[#0b1120] px-3 py-2 text-[13.5px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/40 focus:outline-none"
+            className="min-w-0 flex-1 rounded-[8px] border border-(--mp-line) bg-(--mp-wash) px-3 py-2 text-[13.5px] text-(--mp-ink) placeholder:text-(--mp-muted) focus:border-(--mp-navy) focus:outline-none"
           />
-          <span className="text-[12.5px] tabular-nums text-slate-500">
+          <span className="text-[12.5px] tabular-nums text-(--mp-muted)">
             {query ? `${shown} of ${tools.length}` : `${tools.length} tools`}
             {freeCount > 0 && <> · {freeCount} free</>}
             {proCount > 0 && <> · {proCount} Pro</>}
@@ -181,7 +182,7 @@ export default function McpToolsReference() {
 
         {/* Loading / failure */}
         {tools.length === 0 && (
-          <p className="mt-10 text-[14px] text-slate-500">
+          <p className="mt-10 text-[14px] text-(--mp-muted)">
             {loadFailed
               ? 'The live catalog could not be reached. Reload, or see the tool list on the pricing page.'
               : 'Loading the live catalog…'}
@@ -191,36 +192,36 @@ export default function McpToolsReference() {
         {/* Groups */}
         {filtered.map((g) => (
           <section key={g.id} className="mt-10">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-white/[0.07] pb-2.5">
-              <h2 className="text-[17px] font-semibold tracking-tight text-slate-100">{g.label}</h2>
-              <span className="font-mono text-[11.5px] tabular-nums text-slate-600">{g.tools.length} tools</span>
-              <p className="w-full text-[13px] leading-relaxed text-slate-500">{g.blurb}</p>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-(--mp-line) pb-2.5">
+              <h2 className="text-[17px] font-semibold tracking-tight text-(--mp-ink)">{g.label}</h2>
+              <span className="font-(family-name:--mp-font-mono) text-[11.5px] tabular-nums text-(--mp-muted)">{g.tools.length} tools</span>
+              <p className="w-full text-[13px] leading-relaxed text-(--mp-muted)">{g.blurb}</p>
             </div>
 
-            <ul className="divide-y divide-white/[0.05]">
+            <ul className="divide-y divide-(--mp-line)">
               {g.tools.map((t) => (
                 <li key={t.name} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 py-4">
-                  <code className="min-w-0 break-words font-mono text-[14px] font-semibold text-slate-100">{t.name}</code>
+                  <code className="min-w-0 break-words font-(family-name:--mp-font-mono) text-[14px] font-semibold text-(--mp-ink)">{t.name}</code>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {t.tier === 'pro' && (
                       <span
-                        className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-300"
+                        className="rounded-[6px] border border-(--mp-warn-line) bg-(--mp-warn-bg) px-2 py-0.5 font-(family-name:--mp-font-mono) text-[11px] font-semibold text-(--mp-warn)"
                         title={enforceTiers ? 'Mindy Pro required' : 'Marked Pro — enforcement is currently off'}
                       >
                         PRO
                       </span>
                     )}
                     <span
-                      className={`rounded-full px-2 py-0.5 font-mono text-[11.5px] font-semibold tabular-nums ${
+                      className={`rounded-[6px] px-2 py-0.5 font-(family-name:--mp-font-mono) text-[11.5px] font-semibold tabular-nums ${
                         t.credits === 0
-                          ? 'border border-emerald-400/25 bg-emerald-400/10 text-emerald-300'
-                          : 'border border-white/10 bg-white/[0.06] text-slate-300'
+                          ? 'border border-(--mp-navy) bg-(--mp-navy-wash) text-(--mp-navy)'
+                          : 'border border-(--mp-line) bg-(--mp-surface) text-(--mp-body)'
                       }`}
                     >
                       {t.credits === 0 ? 'free' : `${t.credits} cr`}
                     </span>
                   </div>
-                  <p className="col-span-2 max-w-[80ch] text-[13.5px] leading-relaxed text-slate-400">{t.description}</p>
+                  <p className="col-span-2 max-w-[80ch] text-[13.5px] leading-relaxed text-(--mp-muted)">{t.description}</p>
                 </li>
               ))}
             </ul>
@@ -228,17 +229,17 @@ export default function McpToolsReference() {
         ))}
 
         {query && shown === 0 && tools.length > 0 && (
-          <p className="mt-10 text-[14px] text-slate-500">
+          <p className="mt-10 text-[14px] text-(--mp-muted)">
             No tool matches “{query}”. Clear the filter to see all {tools.length}.
           </p>
         )}
 
-        <footer className="mt-14 border-t border-white/[0.06] pt-5 text-[12.5px] text-slate-500">
+        <footer className="mt-14 border-t border-(--mp-line) pt-5 text-[12.5px] text-(--mp-muted)">
           Prices are credits per successful call.{' '}
           {proCount > 0 && !enforceTiers && (
             <>Pro-marked tools are labelled but not currently enforced — every tool is callable with credits. </>
           )}
-          <Link href="/mcp" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Connect an agent →</Link>
+          <Link href="/mcp" className="text-(--mp-muted) underline underline-offset-2 hover:text-(--mp-body)">Connect an agent →</Link>
         </footer>
       </div>
     </main>

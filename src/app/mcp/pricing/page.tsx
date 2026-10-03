@@ -17,7 +17,8 @@
  */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Catalog, SubPlan, Pkg, McpNav, workupCostFrom, workups, toolCr, exampleCost } from '../catalog-ui';
+import { McpPublicNav } from '../public-ui';
+import { Catalog, SubPlan, Pkg, workupCostFrom, workups, toolCr, exampleCost } from '../catalog-ui';
 
 const APP_PRICING_URL = '/pricing'; // where the App Free/Pro/Team tiers live
 const ENTERPRISE_MAILTO = 'mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20%2F%20API%20inquiry';
@@ -47,19 +48,19 @@ const PACK_BLURB: Record<string, string> = {
 interface PlanTheme { tag: string; accent: string; card: string; badge: string; box: string; boxText: string; check: string; cta: string }
 const PLAN_THEME: Record<string, PlanTheme> = {
   entry: {
-    tag: 'Popular', accent: 'text-emerald-300', card: 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]',
-    badge: 'bg-emerald-500 text-[#06120c]', box: 'border-emerald-400/15 bg-emerald-400/[0.04]', boxText: 'text-emerald-100',
-    check: 'text-emerald-400', cta: 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400',
+    tag: 'Popular', accent: 'text-(--mp-navy)', card: 'border-(--mp-navy) bg-(--mp-surface)',
+    badge: 'bg-(--mp-navy) text-white', box: 'border-(--mp-line) bg-(--mp-navy-wash)', boxText: 'text-(--mp-navy)',
+    check: 'text-(--mp-navy)', cta: 'bg-(--mp-navy) text-white hover:bg-(--mp-navy-hover)',
   },
   mid: {
-    tag: 'Best for daily use', accent: 'text-indigo-300', card: 'border-indigo-400/40 bg-indigo-400/[0.06] shadow-[0_0_0_1px_rgba(99,102,241,0.15)]',
-    badge: 'bg-indigo-500 text-white', box: 'border-indigo-400/15 bg-indigo-400/[0.05]', boxText: 'text-indigo-100',
-    check: 'text-indigo-300', cta: 'bg-indigo-500 text-white hover:bg-indigo-400',
+    tag: 'Best for daily use', accent: 'text-(--mp-navy)', card: 'border-(--mp-line) bg-(--mp-surface)',
+    badge: 'bg-(--mp-navy) text-white', box: 'border-(--mp-line) bg-(--mp-navy-wash)', boxText: 'text-(--mp-navy)',
+    check: 'text-(--mp-navy)', cta: 'bg-(--mp-navy) text-white hover:bg-(--mp-navy-hover)',
   },
   agency: {
-    tag: 'For agencies · high volume', accent: 'text-purple-300', card: 'border-purple-400/40 bg-purple-400/[0.06]',
-    badge: 'bg-purple-500 text-white', box: 'border-purple-400/15 bg-purple-400/[0.05]', boxText: 'text-purple-100',
-    check: 'text-purple-300', cta: 'bg-purple-500 text-white hover:bg-purple-400',
+    tag: 'For agencies · high volume', accent: 'text-(--mp-navy)', card: 'border-(--mp-line) bg-(--mp-surface)',
+    badge: 'bg-(--mp-navy) text-white', box: 'border-(--mp-line) bg-(--mp-navy-wash)', boxText: 'text-(--mp-navy)',
+    check: 'text-(--mp-navy)', cta: 'bg-(--mp-navy) text-white hover:bg-(--mp-navy-hover)',
   },
 };
 const FALLBACK_THEME: PlanTheme = PLAN_THEME.entry;
@@ -217,47 +218,47 @@ export default function McpPricing() {
   const toggle = (id: string) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
 
   return (
-    <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
+    <main className="min-h-dvh bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-6">
-        <McpNav active="pricing" />
+        <McpPublicNav active="pricing" />
 
         {/* Hero */}
         <section className="mt-12 text-center">
-          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Start free. Pay as you grow.</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
+          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1] font-(family-name:--mp-font-serif)">Start free. Pay as you grow.</h1>
+          <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-(--mp-muted) sm:text-[15px]">
             Metered federal-contracting credits for any AI agent. Start with a free trial, then pick a monthly or annual plan — every tool is charged per successful call, so you never pay for a miss. {tools.length ? `${toolCount} tools live today.` : 'Dozens of tools live today.'}
           </p>
           <div className="mt-6 flex flex-col items-center gap-2">
-            <a href="/app" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-[15px] font-bold text-[#06120c] shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
+            <a href="/app" className="inline-flex items-center justify-center gap-2 rounded-none bg-(--mp-navy) px-5 py-3 text-[15px] font-bold text-white hover:bg-(--mp-navy-hover)">
               Sign up free — {trial} credits, no card
             </a>
-            <span className="text-[12px] text-slate-500">Granted the moment you connect · no credit card required</span>
+            <span className="text-[12px] text-(--mp-muted)">Granted the moment you connect · no credit card required</span>
           </div>
         </section>
 
         {/* Refer-a-friend — prominent, right under the hero (paired with the free-signup offer) */}
-        <div className="mx-auto mt-5 flex max-w-2xl flex-col items-center justify-between gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/[0.06] px-5 py-4 text-center sm:flex-row sm:text-left">
-          <span className="text-[14px] text-slate-200">
-            <b className="font-bold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
+        <div className="mx-auto mt-5 flex max-w-2xl flex-col items-center justify-between gap-2 rounded-none border border-(--mp-line) bg-(--mp-wash) px-5 py-4 text-center sm:flex-row sm:text-left">
+          <span className="text-[14px] text-(--mp-ink)">
+            <b className="font-bold text-(--mp-ink)">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
           </span>
-          <Link href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-[13px] font-semibold text-amber-100 hover:bg-amber-300/20">
+          <Link href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-2 text-[13px] font-semibold text-(--mp-ink) hover:border-(--mp-ink)">
             Get your link →
           </Link>
         </div>
 
         {/* Wayfinding to the plan finder */}
         <div className="mt-8 flex justify-center">
-          <a href="#find-plan" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[13px] font-medium text-slate-300 hover:border-white/20 hover:text-slate-100">
-            <span className="text-slate-500">⤳</span> Not sure which plan? <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">Size it</span>
+          <a href="#find-plan" className="inline-flex items-center gap-2 rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-2 text-[13px] font-medium text-(--mp-body) hover:border-(--mp-line) hover:text-(--mp-ink)">
+            <span className="text-(--mp-muted)">⤳</span> Not sure which plan? <span className="rounded-[6px] bg-(--mp-navy-wash) px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-(--mp-navy)">Size it</span>
           </a>
         </div>
 
         {/* Billing toggle — Monthly / Annual (annual = 2 months free, credits granted 12× upfront) */}
         <div className="mt-3 flex justify-center">
-          <div className={`inline-flex items-center rounded-xl border p-1 text-[13px] transition ${annual ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
-            <button type="button" onClick={() => setAnnual(false)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${!annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>Monthly</button>
-            <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-lg px-4 py-1.5 font-semibold transition ${annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
-              Annual {annualPct > 0 && <span className="rounded-full bg-pink-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm shadow-pink-500/40">Save {annualPct}%</span>}
+          <div className={`inline-flex items-center rounded-none border p-1 text-[13px] transition ${annual ? 'border-(--mp-navy) bg-(--mp-navy-wash)' : 'border-(--mp-line) bg-(--mp-surface)'}`}>
+            <button type="button" onClick={() => setAnnual(false)} className={`rounded-none px-4 py-1.5 font-semibold transition ${!annual ? 'bg-(--mp-surface) text-(--mp-ink)' : 'text-(--mp-muted) hover:text-(--mp-ink)'}`}>Monthly</button>
+            <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-none px-4 py-1.5 font-semibold transition ${annual ? 'bg-(--mp-surface) text-(--mp-ink)' : 'text-(--mp-muted) hover:text-(--mp-ink)'}`}>
+              Annual {annualPct > 0 && <span className="rounded-[6px] bg-(--mp-crit) px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Save {annualPct}%</span>}
             </button>
           </div>
         </div>
@@ -269,60 +270,60 @@ export default function McpPricing() {
           {planRows.map((p) => {
             const t = PLAN_THEME[p.id] ?? FALLBACK_THEME;
             return (
-              <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${t.card}`}>
-                <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
+              <div key={p.id} className={`relative flex flex-col rounded-none border p-6 ${t.card}`}>
+                <span className={`absolute -top-2.5 left-6 rounded-[6px] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
                 {p.annualBonus > 0 && annual && (
-                  <span className="absolute -top-3.5 right-4 rotate-3 rounded-full border-2 border-[#0a0f1e] bg-gradient-to-r from-amber-300 to-yellow-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#3a2a00] shadow-lg shadow-amber-500/20">
+                  <span className="absolute -top-3.5 right-4 rotate-3 rounded-[6px] border-2 border-(--mp-paper) px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-(--mp-ink) bg-(--mp-wash)">
                     +{p.annualBonus.toLocaleString()} bonus credits
                   </span>
                 )}
                 <div className="flex items-baseline justify-between gap-2">
                   <span className={`text-[12px] font-semibold uppercase tracking-wide ${t.accent}`}>{p.name}</span>
-                  <span className="text-[11px] text-slate-500">credits plan</span>
+                  <span className="text-[11px] text-(--mp-muted)">credits plan</span>
                 </div>
-                <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Every tool — charged on success.'}</div>
-                <div className={`mt-2 rounded-xl border p-3 ${t.box}`}>
+                <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-(--mp-muted)">{PACK_BLURB[p.id] ?? 'Every tool — charged on success.'}</div>
+                <div className={`mt-2 rounded-none border p-3 ${t.box}`}>
                   <div className={`flex items-baseline gap-1.5 ${t.boxText}`}>
                     <span aria-hidden>✦</span>
-                    <b className="font-mono text-[15px] font-semibold tabular-nums">{p.creditsPerMonth.toLocaleString()}</b>
+                    <b className="font-(family-name:--mp-font-mono) text-[15px] font-semibold tabular-nums">{p.creditsPerMonth.toLocaleString()}</b>
                     <span className="text-[13px] font-semibold">credits/mo</span>
                   </div>
-                  <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
-                    {outcomes(p.creditsPerMonth).map((o) => <li key={o} className="tabular-nums">· {o} <span className="text-slate-500">/mo</span></li>)}
+                  <ul className="mt-1.5 space-y-0.5 text-[12px] text-(--mp-body)">
+                    {outcomes(p.creditsPerMonth).map((o) => <li key={o} className="tabular-nums">· {o} <span className="text-(--mp-muted)">/mo</span></li>)}
                   </ul>
                 </div>
                 <div className="mt-4 flex items-baseline gap-2">
-                  {annual && p.hasAnnual && p.pct > 0 && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${p.monthlyUsd}</span>}
-                  <span className="font-mono text-4xl font-bold tabular-nums">${p.perMo}</span>
-                  <span className="text-[13px] text-slate-400">{annual && p.hasAnnual ? 'per mo, billed annually' : 'billed monthly'}</span>
+                  {annual && p.hasAnnual && p.pct > 0 && <span className="font-(family-name:--mp-font-mono) text-xl font-semibold tabular-nums text-(--mp-muted) line-through">${p.monthlyUsd}</span>}
+                  <span className="font-(family-name:--mp-font-mono) text-4xl font-bold tabular-nums">${p.perMo}</span>
+                  <span className="text-[13px] text-(--mp-muted)">{annual && p.hasAnnual ? 'per mo, billed annually' : 'billed monthly'}</span>
                 </div>
-                <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual && p.hasAnnual ? `$${p.perYear.toLocaleString()}/yr · ${p.annualCredits.toLocaleString()} credits upfront · 2 months free` : ''}</div>
-                <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
-                  <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} tools</b> — public data + the curated proprietary layer</span></li>
+                <div className="mt-1 h-4 text-[12px] text-(--mp-navy)">{annual && p.hasAnnual ? `$${p.perYear.toLocaleString()}/yr · ${p.annualCredits.toLocaleString()} credits upfront · 2 months free` : ''}</div>
+                <ul className="mt-4 flex-1 space-y-2 border-t border-(--mp-line) pt-4 text-[12.5px]">
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-(--mp-ink)">All {toolCount} tools</b> — public data + the curated proprietary layer</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Charged on success only · {p.creditsPerMonth.toLocaleString()} credits every month</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Top up any time · optional auto-recharge</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Keyless connect — sign in through your browser</span></li>
                 </ul>
-                <a href={p.href} className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${t.cta}`}>Get {p.name}</a>
+                <a href={p.href} className={`mt-5 inline-flex items-center justify-center rounded-none px-4 py-2.5 text-sm font-semibold ${t.cta}`}>Get {p.name}</a>
               </div>
             );
           })}
 
           {/* Enterprise / API — the 4th card in the 2×2 (inquiry-only, moat-doc feed buyers) */}
-          <div className="relative flex flex-col rounded-2xl border border-amber-300/30 bg-amber-300/[0.04] p-6">
-            <span className="absolute -top-2.5 left-6 rounded-full border border-amber-300/40 bg-[#0a0f1e] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">For primes · funds · partners</span>
+          <div className="relative flex flex-col rounded-none border border-(--mp-line) bg-(--mp-surface) p-6">
+            <span className="absolute -top-2.5 left-6 rounded-[6px] border border-(--mp-line) bg-(--mp-paper) px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-(--mp-ink)">For primes · funds · partners</span>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[12px] font-semibold uppercase tracking-wide text-amber-200">Enterprise / API</span>
-              <span className="text-[11px] text-slate-500">custom</span>
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-(--mp-accent)">Enterprise / API</span>
+              <span className="text-[11px] text-(--mp-muted)">custom</span>
             </div>
-            <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">For primes, agencies, funds, lenders &amp; partners who need the <b className="font-semibold text-slate-200">data as a feed or high-volume API</b> — not a seat.</div>
-            <div className="mt-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] p-3">
-              <div className="flex items-baseline gap-1.5 text-amber-100">
+            <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-(--mp-muted)">For primes, agencies, funds, lenders &amp; partners who need the <b className="font-semibold text-(--mp-ink)">data as a feed or high-volume API</b> — not a seat.</div>
+            <div className="mt-2 rounded-none border border-(--mp-line) bg-(--mp-wash) p-3">
+              <div className="flex items-baseline gap-1.5 text-(--mp-ink)">
                 <span aria-hidden>✦</span>
-                <b className="font-mono text-[15px] font-semibold">Custom</b>
+                <b className="font-(family-name:--mp-font-mono) text-[15px] font-semibold">Custom</b>
                 <span className="text-[13px] font-semibold">credit pool</span>
               </div>
-              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-(--mp-body)">
                 <li>· Sized to your team &amp; volume</li>
                 <li>· Feed license / high-volume API</li>
                 <li>· Pooled across every seat</li>
@@ -331,99 +332,99 @@ export default function McpPricing() {
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-4xl font-bold">Let&apos;s talk</span>
             </div>
-            <div className="mt-1 text-[12px] text-amber-200/80">Volume pricing · annual invoicing</div>
-            <ul className="mt-4 flex-1 space-y-2 border-t border-amber-300/15 pt-4 text-[12.5px]">
-              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>High-volume programmatic API access</span></li>
-              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>SSO / SAML · dedicated success manager · SLA</span></li>
-              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>Custom integrations · a data / feed license</span></li>
+            <div className="mt-1 text-[12px] text-(--mp-ink)">Volume pricing · annual invoicing</div>
+            <ul className="mt-4 flex-1 space-y-2 border-t border-(--mp-line) pt-4 text-[12.5px]">
+              <li className="flex gap-2"><span className="text-(--mp-accent)">◆</span> <span>High-volume programmatic API access</span></li>
+              <li className="flex gap-2"><span className="text-(--mp-accent)">◆</span> <span>SSO / SAML · dedicated success manager · SLA</span></li>
+              <li className="flex gap-2"><span className="text-(--mp-accent)">◆</span> <span>Custom integrations · a data / feed license</span></li>
             </ul>
-            <a href={ENTERPRISE_MAILTO} className="mt-5 inline-flex items-center justify-center rounded-lg border border-amber-300/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-300/10">Contact sales</a>
+            <a href={ENTERPRISE_MAILTO} className="mt-5 inline-flex items-center justify-center rounded-none border border-(--mp-line) px-4 py-2.5 text-sm font-semibold text-(--mp-ink) hover:bg-(--mp-wash)">Contact sales</a>
           </div>
         </section>
 
         {/* One-time top-up — slim full-width strip below the 2×2 */}
-        <section className="mt-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-[#101728] px-6 py-4 sm:flex-row">
+        <section className="mt-4 flex flex-col items-center justify-between gap-3 rounded-none border border-(--mp-line) bg-(--mp-surface) px-6 py-4 sm:flex-row">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">One-time top-up</span>
-            <span className="font-mono text-2xl font-bold tabular-nums">${topup.usd}</span>
-            <span className="text-[13px] text-emerald-300">{topup.credits.toLocaleString()} credits</span>
-            <span className="text-[12px] text-slate-500">· ran out mid-month? a refill, no plan change · powers auto-recharge</span>
+            <span className="text-[12px] font-semibold uppercase tracking-wide text-(--mp-body)">One-time top-up</span>
+            <span className="font-(family-name:--mp-font-mono) text-2xl font-bold tabular-nums">${topup.usd}</span>
+            <span className="text-[13px] text-(--mp-navy)">{topup.credits.toLocaleString()} credits</span>
+            <span className="text-[12px] text-(--mp-muted)">· ran out mid-month? a refill, no plan change · powers auto-recharge</span>
           </div>
-          <a href={topup.checkoutUrl} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/5">Buy top-up</a>
+          <a href={topup.checkoutUrl} className="inline-flex shrink-0 items-center justify-center rounded-none border border-(--mp-line) px-4 py-2 text-sm font-semibold text-(--mp-ink) hover:bg-(--mp-wash)">Buy top-up</a>
         </section>
 
         {/* App cross-sell note (taste) */}
         <div className="mt-4 flex justify-center">
-          <div className="max-w-2xl rounded-xl border border-indigo-400/25 bg-indigo-400/[0.05] px-5 py-3 text-center text-[13px] text-slate-300">
-            Already on the <b className="font-semibold text-indigo-200">Mindy app</b>? Pro (${PRO_APP_USD}/mo) includes <b className="font-semibold text-white">{cat?.tierCredits?.pro.credits ?? PRO_APP_CREDITS} MCP credits/mo</b> and Team (${TEAM_APP_USD}/mo) includes <b className="font-semibold text-white">{cat?.tierCredits?.teams.credits ?? TEAM_APP_CREDITS}</b> — connect the same account.{' '}
-            <Link href={APP_PRICING_URL} className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200">See app plans →</Link>
+          <div className="max-w-2xl rounded-none border border-(--mp-line) bg-(--mp-navy-wash) px-5 py-3 text-center text-[13px] text-(--mp-body)">
+            Already on the <b className="font-semibold text-(--mp-navy)">Mindy app</b>? Pro (${PRO_APP_USD}/mo) includes <b className="font-semibold text-(--mp-ink)">{cat?.tierCredits?.pro.credits ?? PRO_APP_CREDITS} MCP credits/mo</b> and Team (${TEAM_APP_USD}/mo) includes <b className="font-semibold text-(--mp-ink)">{cat?.tierCredits?.teams.credits ?? TEAM_APP_CREDITS}</b> — connect the same account.{' '}
+            <Link href={APP_PRICING_URL} className="font-semibold text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">See app plans →</Link>
           </div>
         </div>
 
-        <p className="mx-auto mt-6 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-          Mindy&apos;s <b className="font-medium text-slate-300">un-copyable layer</b> — {MOAT_LIST} — no public API has it. Every tool is open; you pay per successful call in credits, and plans differ only by monthly allowance.
+        <p className="mx-auto mt-6 max-w-2xl text-center text-[12px] leading-relaxed text-(--mp-muted)">
+          Mindy&apos;s <b className="font-medium text-(--mp-body)">un-copyable layer</b> — {MOAT_LIST} — no public API has it. Every tool is open; you pay per successful call in credits, and plans differ only by monthly allowance.
         </p>
-        <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-          A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and draft the proposal (~{workupCost} credits). Lighter lookups cost far less.
+        <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-(--mp-muted)">
+          A <span className="text-(--mp-muted)">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and draft the proposal (~{workupCost} credits). Lighter lookups cost far less.
         </p>
 
         {/* Plan finder */}
         <section id="find-plan" className="mt-16 scroll-mt-8">
-          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Find your plan</h2>
-          <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Tell us what your agent will do. We&apos;ll price it against the live catalog and point you at the right tier.</p>
-          <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101728]">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-(--mp-muted)">Find your plan</h2>
+          <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-(--mp-muted)">Tell us what your agent will do. We&apos;ll price it against the live catalog and point you at the right tier.</p>
+          <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-none border border-(--mp-line) bg-(--mp-surface)">
             <div className="grid gap-0 sm:grid-cols-5">
               {/* Inputs */}
-              <div className="border-b border-white/10 p-5 sm:col-span-3 sm:border-b-0 sm:border-r">
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-400">For each opportunity, my agent will…</div>
+              <div className="border-b border-(--mp-line) p-5 sm:col-span-3 sm:border-b-0 sm:border-r">
+                <div className="text-[12px] font-semibold uppercase tracking-wide text-(--mp-muted)">For each opportunity, my agent will…</div>
                 <div className="mt-3 space-y-2">
                   {ACTIVITIES.map((a) => {
                     const on = picked.has(a.id);
                     const cost = exampleCost(tools, a.tools);
                     return (
-                      <button key={a.id} type="button" onClick={() => toggle(a.id)} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/[0.08] bg-[#0b1120] hover:border-white/20'}`}>
-                        <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] ${on ? 'border-emerald-400 bg-emerald-500 text-[#06120c]' : 'border-white/25 text-transparent'}`}>✓</span>
+                      <button key={a.id} type="button" onClick={() => toggle(a.id)} className={`flex w-full items-center gap-3 rounded-none border px-3 py-2.5 text-left transition ${on ? 'border-(--mp-navy) bg-(--mp-navy-wash)' : 'border-(--mp-line) bg-(--mp-wash) hover:border-(--mp-line)'}`}>
+                        <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] ${on ? 'border-(--mp-navy) bg-(--mp-navy) text-white' : 'border-(--mp-line)'}`}><span className={on ? undefined : 'invisible'}>✓</span></span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-semibold text-slate-100">{a.label}</span>
-                          <span className="block truncate text-[11.5px] text-slate-500">{a.note}</span>
+                          <span className="block text-[13px] font-semibold text-(--mp-ink)">{a.label}</span>
+                          <span className="block truncate text-[11.5px] text-(--mp-muted)">{a.note}</span>
                         </span>
-                        <span className="shrink-0 font-mono text-[11.5px] tabular-nums text-slate-400">{cost} cr</span>
+                        <span className="shrink-0 font-(family-name:--mp-font-mono) text-[11.5px] tabular-nums text-(--mp-muted)">{cost} cr</span>
                       </button>
                     );
                   })}
                 </div>
                 <div className="mt-5">
-                  <div className="flex items-center justify-between text-[12px] text-slate-400">
+                  <div className="flex items-center justify-between text-[12px] text-(--mp-muted)">
                     <span>Opportunities worked per month</span>
-                    <span className="font-mono text-[15px] font-semibold tabular-nums text-slate-100">{oppsPerMonth}</span>
+                    <span className="font-(family-name:--mp-font-mono) text-[15px] font-semibold tabular-nums text-(--mp-ink)">{oppsPerMonth}</span>
                   </div>
-                  <input type="range" min={1} max={50} value={oppsPerMonth} onChange={(e) => setOppsPerMonth(Number(e.target.value))} className="mt-2 w-full accent-emerald-500" aria-label="Opportunities per month" />
-                  <div className="mt-1 flex justify-between text-[10px] text-slate-600"><span>1</span><span>50</span></div>
+                  <input type="range" min={1} max={50} value={oppsPerMonth} onChange={(e) => setOppsPerMonth(Number(e.target.value))} className="mt-2 w-full accent-(--mp-navy)" aria-label="Opportunities per month" />
+                  <div className="mt-1 flex justify-between text-[10px] text-(--mp-muted)"><span>1</span><span>50</span></div>
                 </div>
               </div>
               {/* Result */}
               <div className="flex flex-col justify-center p-5 sm:col-span-2">
                 {rec ? (
                   <>
-                    <div className="text-[12px] uppercase tracking-wide text-slate-500">We recommend</div>
-                    <div className={`mt-1 text-2xl font-bold ${rec.accent === 'amber' ? 'text-amber-200' : rec.accent === 'emerald' ? 'text-emerald-300' : 'text-slate-100'}`}>{rec.tier}</div>
-                    <div className="mt-3 text-[13px] text-slate-300">
-                      <span className="font-mono font-semibold tabular-nums text-slate-100">~{monthlyNeed.toLocaleString()}</span> credits/month
-                      <span className="text-slate-500"> — {perOppCost} cr × {oppsPerMonth} opps</span>
+                    <div className="text-[12px] uppercase tracking-wide text-(--mp-muted)">We recommend</div>
+                    <div className={`mt-1 text-2xl font-bold ${rec.accent === 'emerald' ? 'text-(--mp-navy)' : 'text-(--mp-ink)'}`}>{rec.tier}</div>
+                    <div className="mt-3 text-[13px] text-(--mp-body)">
+                      <span className="font-(family-name:--mp-font-mono) font-semibold tabular-nums text-(--mp-ink)">~{monthlyNeed.toLocaleString()}</span> credits/month
+                      <span className="text-(--mp-muted)"> — {perOppCost} cr × {oppsPerMonth} opps</span>
                     </div>
                     {rec.cap && (
                       <div className="mt-3">
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                          <div className="h-full rounded-full bg-emerald-400" style={{ width: `${usePct}%` }} />
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-(--mp-hair)">
+                          <div className="h-full rounded-full bg-(--mp-navy)" style={{ width: `${usePct}%` }} />
                         </div>
-                        <div className="mt-1 text-[11px] tabular-nums text-slate-500">{monthlyNeed.toLocaleString()} of {rec.cap.toLocaleString()} credits</div>
+                        <div className="mt-1 text-[11px] tabular-nums text-(--mp-muted)">{monthlyNeed.toLocaleString()} of {rec.cap.toLocaleString()} credits</div>
                       </div>
                     )}
-                    <p className="mt-3 text-[12px] leading-relaxed text-slate-400">{rec.sub}</p>
-                    <a href={rec.href} className={`mt-4 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-[13px] font-semibold ${rec.accent === 'amber' ? 'border border-amber-300/40 text-amber-100 hover:bg-amber-300/10' : 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400'}`}>{rec.cta}</a>
+                    <p className="mt-3 text-[12px] leading-relaxed text-(--mp-muted)">{rec.sub}</p>
+                    <a href={rec.href} className={`mt-4 inline-flex items-center justify-center rounded-none px-4 py-2.5 text-[13px] font-semibold ${rec.accent === 'amber' ? 'border border-(--mp-line) bg-(--mp-surface) text-(--mp-ink) hover:border-(--mp-ink) hover:bg-(--mp-wash)' : 'bg-(--mp-navy) text-white hover:bg-(--mp-navy-hover)'}`}>{rec.cta}</a>
                   </>
                 ) : (
-                  <div className="text-center text-[13px] text-slate-500">Pick at least one workflow to see your recommendation.</div>
+                  <div className="text-center text-[13px] text-(--mp-muted)">Pick at least one workflow to see your recommendation.</div>
                 )}
               </div>
             </div>
@@ -432,20 +433,20 @@ export default function McpPricing() {
 
         {/* Compare */}
         <section className="mt-16">
-          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Compare every plan</h2>
-          <div className="mx-auto mt-6 max-w-3xl overflow-x-auto rounded-2xl border border-white/[0.07] bg-[#101728]">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-(--mp-muted)">Compare every plan</h2>
+          <div className="mx-auto mt-6 max-w-3xl overflow-x-auto rounded-none border border-(--mp-line) bg-(--mp-surface)">
             <table className="w-full min-w-[680px] border-collapse text-[13px]">
               <thead>
-                <tr className="border-b border-white/10 text-left">
-                  <th className="p-4 font-medium text-slate-400">Feature</th>
-                  <th className="p-4 text-center font-semibold text-slate-300">Free</th>
-                  <th className="p-4 text-center font-semibold text-emerald-300">Entry</th>
-                  <th className="p-4 text-center font-semibold text-emerald-300">Mid</th>
-                  <th className="p-4 text-center font-semibold text-emerald-300">Agency</th>
-                  <th className="p-4 text-center font-semibold text-amber-200">Enterprise</th>
+                <tr className="border-b border-(--mp-line) text-left">
+                  <th className="p-4 font-medium text-(--mp-muted)">Feature</th>
+                  <th className="p-4 text-center font-semibold text-(--mp-body)">Free</th>
+                  <th className="p-4 text-center font-semibold text-(--mp-navy)">Entry</th>
+                  <th className="p-4 text-center font-semibold text-(--mp-navy)">Mid</th>
+                  <th className="p-4 text-center font-semibold text-(--mp-navy)">Agency</th>
+                  <th className="p-4 text-center font-semibold text-(--mp-ink)">Enterprise</th>
                 </tr>
               </thead>
-              <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
+              <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-(--mp-line)">
                 <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry={`${planCredits('entry')}/mo`} mid={`${planCredits('mid')}/mo`} growth={`${planCredits('growth')}/mo`} agency={`${planCredits('agency')}/mo`} ent="custom" />
                 {/*
                   Tool count is INTERPOLATED from the live catalog, never typed. This row once
@@ -467,27 +468,27 @@ export default function McpPricing() {
 
         {/* FAQ */}
         <section className="mt-16">
-          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Questions</h2>
-          <div className="mx-auto mt-6 max-w-2xl divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101728]">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-(--mp-muted)">Questions</h2>
+          <div className="mx-auto mt-6 max-w-2xl divide-y divide-(--mp-line) overflow-hidden rounded-none border border-(--mp-line) bg-(--mp-surface)">
             {FAQ.map((f) => (
               <details key={f.q} className="group px-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[14px] font-semibold text-slate-200 marker:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[14px] font-semibold text-(--mp-ink) marker:hidden">
                   {f.q}
-                  <span className="shrink-0 text-slate-500 transition group-open:rotate-45">＋</span>
+                  <span className="shrink-0 text-(--mp-muted) transition group-open:rotate-45">＋</span>
                 </summary>
-                <p className="pb-4 text-[13px] leading-relaxed text-slate-400">{f.a}</p>
+                <p className="pb-4 text-[13px] leading-relaxed text-(--mp-muted)">{f.a}</p>
               </details>
             ))}
           </div>
         </section>
 
         {/* Closing CTA */}
-        <section className="mt-16 rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-400/[0.08] to-indigo-500/[0.06] p-8 text-center">
-          <h2 className="text-balance text-xl font-bold sm:text-2xl">Point your agent at Mindy in five minutes.</h2>
-          <p className="mx-auto mt-2 max-w-md text-[13px] text-slate-400">Start with {trial} free credits — no card. Add a plan when you&apos;re ready.</p>
+        <section className="mt-16 rounded-none border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-balance text-xl font-bold sm:text-2xl font-(family-name:--mp-font-serif)">Point your agent at Mindy in five minutes.</h2>
+          <p className="mx-auto mt-2 max-w-md text-[13px] text-(--mp-muted)">Start with {trial} free credits — no card. Add a plan when you&apos;re ready.</p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Start free with {trial} credits</a>
-            <Link href="/mcp" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See it in action →</Link>
+            <a href="/app" className="inline-flex items-center justify-center rounded-none bg-(--mp-navy) px-5 py-2.5 text-sm font-semibold text-white hover:bg-(--mp-navy-hover)">Start free with {trial} credits</a>
+            <Link href="/mcp" className="inline-flex items-center justify-center rounded-none border border-(--mp-line) px-5 py-2.5 text-sm font-semibold text-(--mp-ink) hover:bg-(--mp-wash)">See it in action →</Link>
           </div>
         </section>
       </div>
@@ -498,13 +499,13 @@ export default function McpPricing() {
 /** One row of the compare matrix. Semantic cells: yes → colored check, no/— → muted, text → verbatim. */
 function CompareRow({ label, free, entry, mid, growth, agency, ent }: { label: string; free: string; entry: string; mid: string; growth: string; agency: string; ent: string }) {
   const cell = (v: string, accent: 'slate' | 'emerald' | 'amber') => {
-    if (v === 'yes') return <span className={accent === 'amber' ? 'text-amber-300' : accent === 'slate' ? 'text-slate-300' : 'text-emerald-400'}>✓</span>;
-    if (v === 'no') return <span className="text-slate-600">–</span>;
-    return <span className="text-[12px] tabular-nums text-slate-300">{v}</span>;
+    if (v === 'yes') return <span className={accent === 'amber' ? 'text-(--mp-ink)' : accent === 'slate' ? 'text-(--mp-body)' : 'text-(--mp-ok)'}>✓</span>;
+    if (v === 'no') return <span className="text-(--mp-muted)">–</span>;
+    return <span className="text-[12px] tabular-nums text-(--mp-body)">{v}</span>;
   };
   return (
     <tr>
-      <td className="text-slate-300">{label}</td>
+      <td className="text-(--mp-body)">{label}</td>
       <td>{cell(free, 'slate')}</td>
       <td>{cell(entry, 'emerald')}</td>
       <td>{cell(mid, 'emerald')}</td>

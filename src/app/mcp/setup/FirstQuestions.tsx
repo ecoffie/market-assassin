@@ -99,24 +99,24 @@ export default function FirstQuestions() {
       {JOBS.map((job, i) => {
         const q = job.q(naics, title);
         return (
-          <div key={job.label} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+          <div key={job.label} className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-4">
             <div className="flex items-baseline justify-between gap-3">
               <div>
-                <div className="text-[15px] font-semibold text-slate-100">{job.label}</div>
-                <div className="text-[13px] text-slate-500">{job.sub}</div>
+                <div className="text-[15px] font-semibold text-(--mp-ink)">{job.label}</div>
+                <div className="text-[13px] text-(--mp-muted)">{job.sub}</div>
               </div>
               <button
                 onClick={() => copy(q, i)}
-                className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                className="shrink-0 rounded-none border border-(--mp-navy) bg-(--mp-navy-wash) px-3 py-1.5 text-[12px] font-semibold text-(--mp-navy) hover:bg-(--mp-surface)"
               >
                 {copied === i ? 'Copied' : 'Copy question'}
               </button>
             </div>
-            <p className="mt-3 text-[14px] leading-relaxed text-slate-300">&ldquo;{q}&rdquo;</p>
+            <p className="mt-3 text-[14px] leading-relaxed text-(--mp-body)">&ldquo;{q}&rdquo;</p>
           </div>
         );
       })}
-      <p className="text-[13px] text-slate-500">
+      <p className="text-[13px] text-(--mp-muted)">
         Paste any of these into Claude or ChatGPT. {naics
           ? 'These use your saved market.'
           : 'Add your NAICS codes in Mindy and these get specific to your market.'}

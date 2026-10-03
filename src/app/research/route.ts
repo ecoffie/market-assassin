@@ -1,7 +1,7 @@
 /**
  * GET /research — The Mindy Institute front door (Class A, public + indexable).
  *
- * Uses the same civic shell as /gov and /institute (paper + teal + Newsreader) so the
+ * Uses the same shell as /gov and /institute (the Mindy public site system) so the
  * Institute reads as one brand family with the government marketing surface — not the
  * contractor app purple. Content is the publications registry (Standards → Benchmarks →
  * Research) plus the research-agenda concepts awaiting Observatory standards.
@@ -64,47 +64,47 @@ const PAGE_CSS = `
   .rhero{padding:72px 0 28px;position:relative;overflow:hidden}
   .rhero .wrap{position:relative;z-index:1}
   .rhero h1{font-size:clamp(36px,5.8vw,60px);margin:22px 0 0;max-width:16ch}
-  .rhero .sub{font-size:clamp(17px,2.2vw,21px);color:var(--ink-soft);max-width:58ch;margin:22px 0 0;line-height:1.5}
+  .rhero .sub{font-size:clamp(17px,2.2vw,21px);color:var(--mp-body);max-width:58ch;margin:22px 0 0;line-height:1.5}
   .rhero .cta-row{margin-top:28px}
   .hero-bg{position:absolute;inset:0;z-index:0;opacity:.45;pointer-events:none}
 
   .intro{padding:8px 0 8px}
-  .intro p{color:var(--ink-soft);font-size:17px;max-width:62ch;line-height:1.6}
-  .intro b{color:var(--ink);font-weight:600}
+  .intro p{color:var(--mp-body);font-size:17px;max-width:62ch;line-height:1.6}
+  .intro b{color:var(--mp-ink);font-weight:600}
 
-  .sec{padding:48px 0 8px;border-top:1px solid var(--hair);margin-top:40px}
+  .sec{padding:48px 0 8px;border-top:1px solid var(--mp-hair);margin-top:40px}
   .sec:first-of-type{border-top:0;margin-top:24px}
   .classhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:18px}
   .classhead h2{font-size:clamp(24px,3.2vw,32px)}
-  .classhead .blurb{font-size:14.5px;color:var(--muted)}
+  .classhead .blurb{font-size:14.5px;color:var(--mp-muted)}
 
-  .empty{color:var(--muted);font-size:15.5px;margin:8px 0 0}
-  .pubs{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-  .pub{background:var(--paper);padding:28px 26px;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:background .15s ease}
-  .pub.live:hover{background:var(--teal-wash)}
-  .pub.soon{background:var(--paper-2)}
+  .empty{color:var(--mp-muted);font-size:15.5px;margin:8px 0 0}
+  .pubs{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--mp-line);border:1px solid var(--mp-line);border-radius:0;overflow:hidden}
+  .pub{background:var(--mp-surface);padding:28px 26px;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:background .15s ease}
+  .pub.live:hover{background:var(--mp-wash)}
+  .pub.soon{background:var(--mp-wash)}
   .pub .toprow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-  .pub .tag{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--teal-deep)}
-  .pub .meta{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-  .pub .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
-  .pub h3{font-size:20px;margin:14px 0 0;line-height:1.25;color:var(--ink)}
-  .pub p{margin-top:10px;color:var(--ink-soft);font-size:15px;line-height:1.55}
-  .pub .read{margin-top:auto;padding-top:18px;font-size:14px;font-weight:600;color:var(--teal-deep)}
-  .pub.live:hover .read{color:var(--teal)}
+  .pub .tag{font-family:var(--mp-font-sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--mp-navy)}
+  .pub .meta{font-size:12.5px;color:var(--mp-muted);font-variant-numeric:tabular-nums}
+  .pub .pill{font-family:var(--mp-font-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--mp-muted);background:var(--mp-wash);border:1px solid var(--mp-line);border-radius:var(--mp-radius-chip);padding:3px 10px}
+  .pub h3{font-size:20px;margin:14px 0 0;line-height:1.25;color:var(--mp-ink)}
+  .pub p{margin-top:10px;color:var(--mp-body);font-size:15px;line-height:1.55}
+  .pub .read{margin-top:auto;padding-top:18px;font-size:14px;font-weight:600;color:var(--mp-navy)}
+  .pub.live:hover .read{color:var(--mp-navy)}
 
-  .subnote{font-size:15px;color:var(--ink-soft);max-width:58ch;margin:0 0 22px;line-height:1.55}
-  .subnote b{color:var(--ink);font-weight:600}
-  .subnote a{color:var(--teal-deep);font-weight:600;text-decoration:none}
+  .subnote{font-size:15px;color:var(--mp-body);max-width:58ch;margin:0 0 22px;line-height:1.55}
+  .subnote b{color:var(--mp-ink);font-weight:600}
+  .subnote a{color:var(--mp-navy);font-weight:600;text-decoration:none}
   .subnote a:hover{text-decoration:underline}
 
-  .agenda{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--line)}
-  .arow{display:grid;grid-template-columns:160px 1fr 24px;gap:18px;align-items:center;padding:18px 22px;background:var(--paper);text-decoration:none;color:inherit;transition:background .15s ease}
-  .arow:hover{background:var(--teal-wash)}
-  .arow .await{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+  .agenda{display:flex;flex-direction:column;gap:2px;border:1px solid var(--mp-line);border-radius:0;overflow:hidden;background:var(--mp-line)}
+  .arow{display:grid;grid-template-columns:160px 1fr 24px;gap:18px;align-items:center;padding:18px 22px;background:var(--mp-surface);text-decoration:none;color:inherit;transition:background .15s ease}
+  .arow:hover{background:var(--mp-wash)}
+  .arow .await{font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--mp-muted);font-variant-numeric:tabular-nums}
   .arow .body{display:flex;flex-direction:column;gap:4px;min-width:0}
-  .arow .body b{font-family:var(--serif);font-size:17px;font-weight:500;color:var(--ink);letter-spacing:-.01em}
-  .arow .claim{font-size:14.5px;color:var(--ink-soft);line-height:1.45}
-  .arow .arrow{color:var(--muted);font-weight:700;text-align:right}
+  .arow .body b{font-family:var(--mp-font-serif);font-size:17px;font-weight:700;color:var(--mp-ink);letter-spacing:-.01em}
+  .arow .claim{font-size:14.5px;color:var(--mp-body);line-height:1.45}
+  .arow .arrow{color:var(--mp-muted);font-weight:700;text-align:right}
 
   @media (max-width:720px){
     .pubs{grid-template-columns:1fr}
@@ -138,7 +138,7 @@ function buildBody(): string {
 
 <header class="rhero">
   <svg class="hero-bg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="var(--hair)" stroke-width="1"/></pattern></defs>
+    <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="var(--mp-hair)" stroke-width="1"/></pattern></defs>
     <rect width="1200" height="400" fill="url(#grid)"/>
   </svg>
   <div class="wrap">

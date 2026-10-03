@@ -1,7 +1,7 @@
 /**
  * getmindy.ai/mcp/setup — the picture-by-picture connect guide.
  *
- * Lives INSIDE the MCP environment (McpNav, the /mcp dark design system) rather than as a
+ * Lives INSIDE the MCP environment (McpPublicNav, the /mcp public design system) rather than as a
  * static file at the site root, so it reads as a native sibling of Connect / Overview /
  * Pricing and inherits the same header, theme and navigation.
  *
@@ -17,7 +17,7 @@ import Link from 'next/link';
 import FirstQuestions from './FirstQuestions';
 import Image from 'next/image';
 import type { Metadata } from 'next';
-import { McpNav } from '../catalog-ui';
+import { McpPublicNav } from '../public-ui';
 
 export const metadata: Metadata = {
   title: 'Add Mindy to Claude or ChatGPT — setup guide | Mindy MCP',
@@ -44,7 +44,7 @@ interface Step { n: number; title: string; body: string; img?: string }
 function emphasize(body: string) {
   return body.split(/(\*[^*]+\*)/g).map((part, i) =>
     part.startsWith('*') && part.endsWith('*') && part.length > 2
-      ? <strong key={i} className="font-semibold text-slate-200">{part.slice(1, -1)}</strong>
+      ? <strong key={i} className="font-semibold text-(--mp-ink)">{part.slice(1, -1)}</strong>
       : <span key={i}>{part}</span>,
   );
 }
@@ -75,14 +75,14 @@ function StepList({ steps }: { steps: Step[] }) {
       {steps.map((s) => (
         <li key={s.n}>
           <div className="flex items-start gap-3">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-[13px] font-bold text-[#06120c]">{s.n}</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-(--mp-navy) text-[13px] font-bold text-white">{s.n}</span>
             <div className="min-w-0">
-              <h3 className="text-[15px] font-semibold text-slate-100">{s.title}</h3>
-              <p className="mt-1 text-[14px] leading-relaxed text-slate-400">{emphasize(s.body)}</p>
+              <h3 className="text-[15px] font-semibold text-(--mp-ink)">{s.title}</h3>
+              <p className="mt-1 text-[14px] leading-relaxed text-(--mp-muted)">{emphasize(s.body)}</p>
             </div>
           </div>
           {s.img && (
-            <div className="mt-3 max-w-[460px] overflow-hidden rounded-xl border border-white/[0.08] bg-white sm:ml-10">
+            <div className="mt-3 max-w-[460px] overflow-hidden rounded-none border border-(--mp-line) bg-white sm:ml-10">
               <Image
                 src={`/mcp-setup/${s.img}`}
                 alt={s.title}
@@ -101,60 +101,60 @@ function StepList({ steps }: { steps: Step[] }) {
 
 export default function McpSetupPage() {
   return (
-    <main className="min-h-screen bg-[#0a0f1e] text-slate-200">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-6">
-        <McpNav active="connect" />
+        <McpPublicNav active="connect" />
 
         <div className="mt-10">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-emerald-400">Setup guide</p>
-          <h1 className="mt-2 text-[30px] font-bold leading-tight text-white sm:text-[36px]">Put Mindy inside your AI assistant</h1>
-          <p className="mt-3 text-[16px] leading-relaxed text-slate-400">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-(--mp-navy)">Setup guide</p>
+          <h1 className="mt-2 text-[30px] font-bold leading-tight text-(--mp-ink) sm:text-[36px] font-(family-name:--mp-font-serif)">Put Mindy inside your AI assistant</h1>
+          <p className="mt-3 text-[16px] leading-relaxed text-(--mp-muted)">
             Ask Mindy for real federal-contracting data right inside Claude or ChatGPT. One-time setup. No coding.
           </p>
         </div>
 
         {/* The address, once, up top */}
-        <div className="mt-6 rounded-xl border border-white/[0.08] bg-[#101728] px-4 py-3">
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">The address you&rsquo;ll paste</p>
-          <code className="mt-1 block truncate font-mono text-[14px] text-emerald-300">{MCP_URL}</code>
+        <div className="mt-6 rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3">
+          <p className="text-[11px] uppercase tracking-wide text-(--mp-muted)">The address you&rsquo;ll paste</p>
+          <code className="mt-1 block truncate font-(family-name:--mp-font-mono) text-[14px] text-(--mp-navy)">{MCP_URL}</code>
         </div>
 
         {/* Which one */}
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <a href="#claude" className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-3 transition hover:bg-emerald-500/[0.1]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Easiest — start here</p>
-            <p className="mt-1 text-[15px] font-semibold text-slate-100">Claude</p>
-            <p className="mt-0.5 text-[13px] text-slate-400">Built in. Connect, make a free account, allow, done.</p>
+          <a href="#claude" className="rounded-none border border-(--mp-navy) bg-(--mp-navy-wash) px-4 py-3 transition hover:bg-(--mp-surface)">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-(--mp-navy)">Easiest — start here</p>
+            <p className="mt-1 text-[15px] font-semibold text-(--mp-ink)">Claude</p>
+            <p className="mt-0.5 text-[13px] text-(--mp-muted)">Built in. Connect, make a free account, allow, done.</p>
           </a>
-          <a href="#chatgpt" className="rounded-xl border border-white/[0.08] bg-[#101728] px-4 py-3 transition hover:bg-white/[0.04]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Also works</p>
-            <p className="mt-1 text-[15px] font-semibold text-slate-100">ChatGPT</p>
-            <p className="mt-0.5 text-[13px] text-slate-400">More steps: Developer mode, add Mindy, sign in, permissions.</p>
+          <a href="#chatgpt" className="rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3 transition hover:bg-(--mp-wash)">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-(--mp-muted)">Also works</p>
+            <p className="mt-1 text-[15px] font-semibold text-(--mp-ink)">ChatGPT</p>
+            <p className="mt-0.5 text-[13px] text-(--mp-muted)">More steps: Developer mode, add Mindy, sign in, permissions.</p>
           </a>
         </div>
 
         <section id="claude" className="mt-14 scroll-mt-6">
-          <h2 className="text-[22px] font-bold text-white">Claude — connect Mindy</h2>
-          <p className="mt-1 text-[14px] text-slate-400">In the Claude desktop or web app. This is the easy one.</p>
+          <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Claude — connect Mindy</h2>
+          <p className="mt-1 text-[14px] text-(--mp-muted)">In the Claude desktop or web app. This is the easy one.</p>
           <StepList steps={CLAUDE} />
-          <div className="mt-6 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3">
-            <p className="text-[14px] text-slate-300">
-              <span className="font-semibold text-emerald-300">That&rsquo;s it for Claude.</span> Ask:{' '}
-              <span className="text-slate-200">&ldquo;Use Mindy to find contracts expiring in my NAICS in the next 6 months.&rdquo;</span>
+          <div className="mt-6 rounded-none border border-(--mp-ok-line) bg-(--mp-ok-bg) px-4 py-3">
+            <p className="text-[14px] text-(--mp-body)">
+              <span className="font-semibold text-(--mp-ok)">That&rsquo;s it for Claude.</span> Ask:{' '}
+              <span className="text-(--mp-ink)">&ldquo;Use Mindy to find contracts expiring in my NAICS in the next 6 months.&rdquo;</span>
             </p>
           </div>
-          <p className="mt-3 text-[13px] text-slate-500">
-            Don&rsquo;t see Mindy in the directory? In the Add menu choose <span className="text-slate-300">Add custom connector</span> and paste{' '}
-            <code className="font-mono text-emerald-300">{MCP_URL}</code>.
+          <p className="mt-3 text-[13px] text-(--mp-muted)">
+            Don&rsquo;t see Mindy in the directory? In the Add menu choose <span className="text-(--mp-body)">Add custom connector</span> and paste{' '}
+            <code className="font-(family-name:--mp-font-mono) text-(--mp-navy)">{MCP_URL}</code>.
           </p>
         </section>
 
         <section id="chatgpt" className="mt-16 scroll-mt-6">
-          <h2 className="text-[22px] font-bold text-white">ChatGPT — connect Mindy</h2>
-          <p className="mt-1 text-[14px] text-slate-400">On the web (chatgpt.com). More steps than Claude — do them once, in order.</p>
+          <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">ChatGPT — connect Mindy</h2>
+          <p className="mt-1 text-[14px] text-(--mp-muted)">On the web (chatgpt.com). More steps than Claude — do them once, in order.</p>
           <StepList steps={CHATGPT} />
-          <div className="mt-6 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3">
-            <p className="text-[14px] font-semibold text-emerald-300">That&rsquo;s it for ChatGPT.</p>
+          <div className="mt-6 rounded-none border border-(--mp-ok-line) bg-(--mp-ok-bg) px-4 py-3">
+            <p className="text-[14px] font-semibold text-(--mp-ok)">That&rsquo;s it for ChatGPT.</p>
           </div>
         </section>
 
@@ -162,8 +162,8 @@ export default function McpSetupPage() {
             No. There is no magic word, and users cannot self-diagnose this — a chat that
             answers from model knowledge instead of calling Mindy looks like it worked. */}
         <section id="ask" className="mt-16 scroll-mt-6">
-          <h2 className="text-[22px] font-bold text-white">Ask Mindy your first question</h2>
-          <p className="mt-2 max-w-[52ch] text-[15px] leading-relaxed text-slate-400">
+          <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Ask Mindy your first question</h2>
+          <p className="mt-2 max-w-[52ch] text-[15px] leading-relaxed text-(--mp-muted)">
             You don&rsquo;t need special wording, and you don&rsquo;t have to say
             &ldquo;Mindy.&rdquo; Ask the way you&rsquo;d ask a person. When the question needs
             real federal contracting data, your assistant reaches for Mindy on its own.
@@ -171,17 +171,17 @@ export default function McpSetupPage() {
 
           <FirstQuestions />
 
-          <p className="mt-5 max-w-[52ch] text-[14px] leading-relaxed text-slate-500">
+          <p className="mt-5 max-w-[52ch] text-[14px] leading-relaxed text-(--mp-muted)">
             You also don&rsquo;t need to write a biography first. Give Mindy your company name,
             what you sell, your capabilities, any certifications and where you work &mdash;
             that&rsquo;s enough to start. Add past performance and the rest as you go.
           </p>
         </section>
 
-        <div className="mt-14 flex flex-wrap items-center gap-3 border-t border-white/[0.07] pt-6 text-[13px] text-slate-500">
-          <Link href="/mcp" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">Back to Connect</Link>
+        <div className="mt-14 flex flex-wrap items-center gap-3 border-t border-(--mp-line) pt-6 text-[13px] text-(--mp-muted)">
+          <Link href="/mcp" className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">Back to Connect</Link>
           <span>·</span>
-          <Link href="/mcp/pricing" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">See pricing</Link>
+          <Link href="/mcp/pricing" className="text-(--mp-muted) underline underline-offset-2 hover:text-(--mp-body)">See pricing</Link>
           <span>·</span>
           <span>Questions? support@getmindy.ai</span>
         </div>

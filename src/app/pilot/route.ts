@@ -14,60 +14,60 @@ export const dynamic = 'force-static';
 const PAGE_CSS = `
   .phero{padding:88px 0 20px}
   .phero h1{font-size:clamp(36px,5.6vw,60px);margin:22px 0 0;max-width:16ch}
-  .phero .sub{font-size:clamp(18px,2.3vw,22px);color:var(--ink-soft);max-width:58ch;margin:24px 0 0;line-height:1.5}
+  .phero .sub{font-size:clamp(18px,2.3vw,22px);color:var(--mp-body);max-width:58ch;margin:24px 0 0;line-height:1.5}
   .phero .cta-row{margin-top:32px}
 
-  .sec{padding:60px 0;border-top:1px solid var(--hair)}
+  .sec{padding:60px 0;border-top:1px solid var(--mp-hair)}
   .sec > .wrap > .eyebrow{display:block;margin-bottom:12px}
   .sec h2{font-size:clamp(24px,3.4vw,32px);max-width:18ch}
-  .sec .lede{color:var(--ink-soft);font-size:17.5px;max-width:56ch;margin:14px 0 0;line-height:1.6}
+  .sec .lede{color:var(--mp-body);font-size:17.5px;max-width:56ch;margin:14px 0 0;line-height:1.6}
 
   .qual{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:32px}
-  .qual .q{border:1px solid var(--line);border-radius:14px;padding:22px 20px;background:var(--paper)}
-  .qual .q .chk{width:26px;height:26px;border-radius:7px;background:var(--teal-wash);color:var(--teal-deep);display:grid;place-items:center;flex:none}
+  .qual .q{border:1px solid var(--mp-line);border-radius:0;padding:22px 20px;background:var(--mp-surface)}
+  .qual .q .chk{width:26px;height:26px;border-radius:0;background:var(--mp-navy-wash);color:var(--mp-navy);display:grid;place-items:center;flex:none}
   .qual .q .chk svg{width:15px;height:15px}
   .qual .q h3{font-size:16px;margin:14px 0 0}
-  .qual .q p{margin-top:8px;color:var(--ink-soft);font-size:14.5px;line-height:1.5}
+  .qual .q p{margin-top:8px;color:var(--mp-body);font-size:14.5px;line-height:1.5}
 
   .incl{margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:14px 32px}
-  .incl .row{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--hair)}
-  .incl .row .ic{color:var(--teal-deep);flex:none;margin-top:2px}
+  .incl .row{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--mp-hair)}
+  .incl .row .ic{color:var(--mp-navy);flex:none;margin-top:2px}
   .incl .row .ic svg{width:20px;height:20px}
-  .incl .row b{font-size:16px;color:var(--ink);font-weight:600;display:block}
-  .incl .row span{color:var(--ink-soft);font-size:15px;line-height:1.5}
+  .incl .row b{font-size:16px;color:var(--mp-ink);font-weight:600;display:block}
+  .incl .row span{color:var(--mp-body);font-size:15px;line-height:1.5}
 
-  .timeline{margin-top:32px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-  .tl{background:var(--paper);padding:24px 22px}
-  .tl .wk{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--teal-deep)}
+  .timeline{margin-top:32px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--mp-line);border:1px solid var(--mp-line);border-radius:0;overflow:hidden}
+  .tl{background:var(--mp-surface);padding:24px 22px}
+  .tl .wk{font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--mp-navy)}
   .tl h3{font-size:16px;margin:12px 0 0}
-  .tl p{margin-top:8px;color:var(--ink-soft);font-size:14px;line-height:1.5}
+  .tl p{margin-top:8px;color:var(--mp-body);font-size:14px;line-height:1.5}
 
   .metrics{margin-top:32px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-  .metric{border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:12px;padding:22px 20px;background:var(--paper)}
+  .metric{border:1px solid var(--mp-line);border-left:3px solid var(--mp-navy);border-radius:0;padding:22px 20px;background:var(--mp-surface)}
   .metric h3{font-size:16px}
-  .metric p{margin-top:8px;color:var(--ink-soft);font-size:14.5px;line-height:1.5}
-  .metric .how{margin-top:12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .metric p{margin-top:8px;color:var(--mp-body);font-size:14.5px;line-height:1.5}
+  .metric .how{margin-top:12px;font-family:var(--mp-font-mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--mp-muted)}
 
-  .casewrap{margin-top:28px;border:1px dashed color-mix(in srgb,var(--teal) 40%,var(--line));border-radius:16px;padding:28px 26px;background:var(--paper-2)}
-  .casewrap .note{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+  .casewrap{margin-top:28px;border:1px dashed var(--mp-faint);border-radius:0;padding:28px 26px;background:var(--mp-wash)}
+  .casewrap .note{font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mp-muted);margin-bottom:16px}
   .casegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-  .casegrid .c h3{font-size:15px;color:var(--teal-deep)}
-  .casegrid .c p{margin-top:8px;color:var(--ink-soft);font-size:13.5px;line-height:1.5}
+  .casegrid .c h3{font-size:15px;color:var(--mp-navy)}
+  .casegrid .c p{margin-top:8px;color:var(--mp-body);font-size:13.5px;line-height:1.5}
 
   .faq{margin-top:20px}
-  .faq details{border-top:1px solid var(--hair);padding:18px 0}
-  .faq details:last-child{border-bottom:1px solid var(--hair)}
-  .faq summary{font-family:var(--serif);font-size:19px;font-weight:500;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;color:var(--ink)}
+  .faq details{border-top:1px solid var(--mp-hair);padding:18px 0}
+  .faq details:last-child{border-bottom:1px solid var(--mp-hair)}
+  .faq summary{font-family:var(--mp-font-serif);font-size:19px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;color:var(--mp-ink)}
   .faq summary::-webkit-details-marker{display:none}
-  .faq summary .pm{font-family:var(--sans);color:var(--teal-deep);font-weight:700;flex:none;transition:transform .15s}
+  .faq summary .pm{font-family:var(--mp-font-sans);color:var(--mp-navy);font-weight:700;flex:none;transition:transform .15s}
   .faq details[open] summary .pm{transform:rotate(45deg)}
-  .faq details p{margin-top:12px;color:var(--ink-soft);font-size:16px;line-height:1.6;max-width:64ch}
+  .faq details p{margin-top:12px;color:var(--mp-body);font-size:16px;line-height:1.6;max-width:64ch}
 
   .close{padding:80px 0}
-  .closecard{background:var(--ink);color:var(--paper);border-radius:22px;padding:52px 46px;text-align:center}
-  .closecard .eyebrow{color:var(--teal)}
-  .closecard h2{color:var(--paper);font-size:clamp(26px,3.8vw,38px);margin:14px auto 0;max-width:18ch}
-  .closecard p{color:color-mix(in srgb,var(--paper) 80%,transparent);font-size:17px;max-width:50ch;margin:14px auto 0}
+  .closecard{background:var(--mp-wash);color:var(--mp-ink);border:1px solid var(--mp-line);border-top:2px solid var(--mp-ink);border-radius:0;padding:52px 46px;text-align:center}
+  .closecard .eyebrow{color:var(--mp-accent)}
+  .closecard h2{color:var(--mp-ink);font-size:clamp(26px,3.8vw,38px);margin:14px auto 0;max-width:18ch}
+  .closecard p{color:var(--mp-body);font-size:17px;max-width:50ch;margin:14px auto 0}
   .closecard .cta-row{justify-content:center;margin-top:28px}
 
   @media (max-width:820px){
@@ -178,7 +178,7 @@ const BODY = `
       <p>Tell us the requirement and the goal. We'll come back with the qualified suppliers your current channels aren't reaching.</p>
       <div class="cta-row">
         <a class="btn primary" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Pilot%20inquiry">Apply for Pilot &rarr;</a>
-        <a class="btn ghost" href="/institute" style="color:var(--paper);border-color:color-mix(in srgb,var(--paper) 30%,transparent)">About the Institute</a>
+        <a class="btn ghost" href="/institute">About the Institute</a>
       </div>
     </div>
   </div>
