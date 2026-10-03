@@ -2,8 +2,10 @@
  * REGRESSION GUARD — the Claude/general MCP endpoint is UNCHANGED by the ChatGPT profile.
  *
  * Owner decision 1 (tasks/chatgpt-plugin-path-a.md): commerce cleanup is /chatgpt/mcp
- * ONLY. mcp.getmindy.ai/mcp (and getmindy.ai/mcp/mcp) must keep exactly: all 64 registry
- * tools with their registry copy, the credit footer, `_meta.credits`, the signup grant,
+ * ONLY. mcp.getmindy.ai/mcp (and getmindy.ai/mcp/mcp) must keep exactly main's behaviour:
+ * the PUBLIC catalog (mcpRegistrationList → listPublicMcpTools, #1777; 53 of the 64
+ * registered tools on 2026-10-03, but asserted against main's own list, never a hardcoded
+ * count) with their registry copy, the credit footer, `_meta.credits`, the signup grant,
  * in-request auto-recharge, the commercial paywall refusal — and must keep rejecting
  * tokens minted for any other audience (now including the ChatGPT one).
  */
@@ -32,6 +34,7 @@ const { POST } = await import('../route');
 const { issueAccessToken, OAUTH_RESOURCE_CHATGPT } = await import('@/lib/mcp/oauth/tokens');
 const { mcpRegistrationList } = await import('@/lib/mcp/tool-schemas');
 const { listMcpTools } = await import('@/lib/mcp/tool-registry');
+const { listPublicMcpTools } = await import('@/lib/mcp/public-catalog');
 
 const claudeToken = () => issueAccessToken('buyer@example.com', 'mcpc_claude').token;
 const chatgptToken = () => issueAccessToken('buyer@example.com', 'mcpc_chatgpt', 'mcp', OAUTH_RESOURCE_CHATGPT).token;
@@ -60,12 +63,15 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(() => vi.restoreAllMocks());
 
 describe('Claude/general MCP endpoint — unchanged', () => {
-  it('still lists all 64 registry tools with the registry titles, descriptions and annotations', async () => {
+  it('lists exactly main\'s public catalog with the registry titles, descriptions and annotations', async () => {
     const body = await rpcResult(await POST(rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, claudeToken())));
     const tools = (body.result as { tools: Record<string, unknown>[] }).tools;
-    expect(tools).toHaveLength(64);
     const reg = new Map(mcpRegistrationList().map((e) => [e.name, e]));
-    expect(reg.size).toBe(64);
+    // exactly what main lists — same names, same order — whatever that count is
+    expect(tools.map((t) => t.name)).toEqual(mcpRegistrationList().map((e) => e.name));
+    expect(tools.map((t) => t.name)).toEqual(listPublicMcpTools().map((t) => (t as { function: { name: string } }).function.name));
+    // the three tools dropped from the ChatGPT 15 are still public here
+    for (const n of ['search_contractors', 'search_federal_events', 'get_award_detail']) expect(reg.has(n), n).toBe(true);
     for (const t of tools) {
       const e = reg.get(String(t.name))!;
       expect(t.title).toBe(e.title);
@@ -76,7 +82,7 @@ describe('Claude/general MCP endpoint — unchanged', () => {
     expect(tools.some((t) => /Credits: \d+/.test(String(t.description)))).toBe(true);
   });
 
-  it('param descriptions are byte-identical to the registry for all 64 tools, before and after the ChatGPT profile is built', async () => {
+  it('param descriptions are byte-identical to the registry for every listed tool, before and after the ChatGPT profile is built', async () => {
     const list = async () =>
       ((await rpcResult(await POST(rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, claudeToken())))).result as { tools: Record<string, unknown>[] }).tools;
     const before = JSON.stringify((await list()).map((t) => [t.name, t.inputSchema]));
@@ -100,8 +106,8 @@ describe('Claude/general MCP endpoint — unchanged', () => {
     }
     expect(checked).toBeGreaterThan(200);
     // the exact registry strings the ChatGPT profile overrides are still served here
-    const limit = (tools.find((t) => t.name === 'search_contractors')!.inputSchema as { properties: Record<string, { description: string }> }).properties.limit;
-    expect(limit.description).toBe('Max rows (default 50, max 100). Cached index — a larger set has no per-call cost.');
+    const limit = (tools.find((t) => t.name === 'find_capable_contractors')!.inputSchema as { properties: Record<string, { description: string }> }).properties.limit;
+    expect(limit.description).toMatch(/no per-call cost/);
   });
 
   it('works on the apex/preview direct path too (/mcp/mcp)', async () => {

@@ -2922,19 +2922,23 @@ A SECOND MCP handler at `https://mcp.getmindy.ai/chatgpt/mcp` (`src/app/chatgpt/
 beside — not replacing — the full edge. Plan + owner decisions + open items:
 **`tasks/chatgpt-plugin-path-a.md`** (read it before touching either endpoint).
 
-- **Allowlist lives in `src/lib/mcp/chatgpt-profile.ts`** (`CHATGPT_TOOL_ALLOWLIST`, exactly 15),
+- **Allowlist lives in `src/lib/mcp/chatgpt-profile.ts`** (`CHATGPT_TOOL_ALLOWLIST`, exactly 15 — owner-final
+  2026-10-03; every one must be in the PUBLIC catalog `listPublicMcpTools()`, or registration throws),
   with ChatGPT-only titles/descriptions/annotations, server instructions, the result projection
   (`_meta` ALLOWLIST, `_next` credits stripped, find_opportunities ranking internals dropped) and the
   neutral-refusal mapping (`chatgpt-refusals.ts`). Input schemas are reused from
-  `mcpRegistrationList()` verbatim — never redefine them there.
+  `mcpRegistrationList()` (= the public catalog since #1777) — never redefine them there; only
+  parameter DESCRIPTION text may be overridden (`CHATGPT_PARAM_COPY`).
 - **Billing seam still holds:** calls go through `runMeteredTool(..., { channel: 'chatgpt' })`, so an
   existing balance is pre-checked and debited exactly like Claude. The channel only suppresses
-  commerce side effects (`recordPaywallAttempt`, paywall copy, continue_url). No footer, no
+  commerce side effects (`recordPaywallAttempt`, paywall copy, continue_url); every row still writes
+  #1777's `outcome` telemetry, refusals included. No footer, no
   `_meta.credits`, no `grantSignupCreditsIfFirst`, no in-request `maybeAutoRecharge`.
 - **OAuth:** one authorization server, two resources (`src/lib/mcp/oauth/resources.ts`). The token
   endpoint mints `aud` = the ChatGPT resource only for a ChatGPT grant (no signup/referral credits);
   each handler accepts only its own audience. Metadata: `/.well-known/oauth-protected-resource/chatgpt/mcp`.
-- **⚠️ The Claude/general endpoint must stay EXACTLY as it was** (64 tools, copy, footer, paywall).
+- **⚠️ The Claude/general endpoint must stay EXACTLY as main has it** (main's public catalog — 53 of
+  64 on 2026-10-03, asserted against main's list, not a hardcoded count — copy, footer, paywall).
   Guarded by `src/app/mcp/[transport]/__tests__/route.claude-unchanged.unit.test.ts`. Never "clean up"
   commerce on the full endpoint as a side effect of ChatGPT work.
 - **Open:** the hourly `/api/cron/mcp-autorecharge` backstop is balance-based and channel-blind

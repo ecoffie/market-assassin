@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "count": 3,
+  "total": 4821,
+  "items": [
+    {
+      "name": "BRMI CORPORATION",
+      "uei": "RMGQM8WDNNK5",
+      "state": "MD",
+      "total_obligated": 24142948.870000005,
+      "award_count": 20,
+      "wins_set_asides": true,
+      "why": "Active in this industry (NAICS) \u00b7 set-aside winner"
+    },
+    {
+      "name": "AGILITY TECHNOLOGIES INC.",
+      "uei": "Z9M6NN4AQLF7",
+      "state": "VA",
+      "total_obligated": 22255694.780000005,
+      "award_count": 20,
+      "wins_set_asides": true,
+      "why": "Active in this industry (NAICS) \u00b7 set-aside winner"
+    },
+    {
+      "name": "SWAIN ONLINE INC",
+      "uei": "NM7FRKLLTKG3",
+      "state": "PA",
+      "total_obligated": 21544955.090000004,
+      "award_count": 48,
+      "wins_set_asides": true,
+      "why": "Active in this industry (NAICS) \u00b7 set-aside winner"
+    }
+  ]
+}

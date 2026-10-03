@@ -1,7 +1,7 @@
 {
   "surface": "https://mcp.getmindy.ai/chatgpt/mcp",
   "generated_for": "ChatGPT plugin submission package (Path A, Phase 1). Kept in agreement with src/lib/mcp/chatgpt-profile.ts by chatgpt-profile.unit.test.ts.",
-  "platform_side_effects_note": "Every call writes platform bookkeeping that is not a user-requested state change: a credit debit on the caller's existing balance (debit-on-success only, never on a refusal or a degraded empty result), a usage/call-log row, a search-history row for search-shaped arguments, and response-cache fills (sam_api_cache, mcp_external_cache, KV query cache) plus a rate-limit counter for warehouse lookups. None of these changes anything the user can see or act on in the external world, and repeating a call has the same effect on the user's data (none). No tool on this surface creates, edits, sends, deletes or publishes anything.",
+  "platform_side_effects_note": "Every call writes platform bookkeeping that is not a user-requested state change: a credit debit on the caller's existing balance (debit-on-success only, never on a refusal or a degraded empty result), a usage/call-log row, a search-history row for search-shaped arguments, and response-cache fills (sam_api_cache, mcp_external_cache, KV query cache) plus a rate-limit counter for warehouse lookups. get_solicitation_documents additionally fills Mindy's caches with public data when it reads a notice for the first time: the notice's public description is saved to Mindy's notice cache and its public SAM.gov attachments are copied to Mindy storage. None of these changes anything the user can see or act on in the external world, and repeating a call has the same effect on the user's data (none). No tool on this surface creates, edits, sends, deletes or publishes anything.",
   "hint_rules": {
     "readOnlyHint": "true for all 15: no tool writes to a user-visible business record or any external system.",
     "destructiveHint": "false for all 15: nothing is overwritten or deleted.",
@@ -21,17 +21,17 @@
       "idempotentHint": [true, "Same query or id resolves the same notice."],
       "openWorldHint": [false, "No external API call: reads only Mindy's stored copy of SAM notices."]
     },
+    "get_solicitation_documents": {
+      "readOnlyHint": [true, "Reads one public solicitation's text and attachments. Platform side effect only: a cold notice's public description is saved back to Mindy's notice cache, its public SAM.gov files are copied to Mindy storage and the extraction is cached, so the next read is served from cache. Nothing user-visible or external changes."],
+      "destructiveHint": [false, "No create, update or delete of user or external data; cache fills only overwrite Mindy's own copy of the same public file."],
+      "idempotentHint": [true, "Same notice and window return the same text for the same data; a repeat call reads the cache the first call filled."],
+      "openWorldHint": [true, "For a notice not yet cached it calls the live SAM.gov notice-description endpoint and downloads the attachments from SAM.gov."]
+    },
     "get_solicitation_incumbent": {
       "readOnlyHint": [true, "Looks up a notice and its likely prior award; writes nothing."],
       "destructiveHint": [false, "No create, update or delete."],
       "idempotentHint": [true, "Same solicitation number returns the same inference for the same data."],
       "openWorldHint": [true, "Calls the live SAM.gov Opportunities API, SAM public search and USASpending."]
-    },
-    "get_award_detail": {
-      "readOnlyHint": [true, "Reads one award; writes nothing."],
-      "destructiveHint": [false, "No create, update or delete."],
-      "idempotentHint": [true, "Same contract number returns the same award."],
-      "openWorldHint": [true, "Calls the live USASpending award API."]
     },
     "get_expiring_contracts": {
       "readOnlyHint": [true, "Reads stored contract records; the only write is a response-cache fill."],
@@ -51,10 +51,10 @@
       "idempotentHint": [true, "Same filters return the same listings for the same data."],
       "openWorldHint": [true, "Calls the live Grants.gov search API."]
     },
-    "search_contractors": {
-      "readOnlyHint": [true, "Reads Mindy's award warehouse; the only write is a query-cache fill."],
+    "find_capable_contractors": {
+      "readOnlyHint": [true, "Reads Mindy's award warehouse; writes only a query cache and a rate-limit counter."],
       "destructiveHint": [false, "No create, update or delete."],
-      "idempotentHint": [true, "Same filters return the same ranking for the same data."],
+      "idempotentHint": [true, "Same codes and state return the same ranking for the same data."],
       "openWorldHint": [false, "Reads only Mindy's stored BigQuery copy of USASpending awards; no external call."]
     },
     "get_contractor_profile": {
@@ -69,17 +69,17 @@
       "idempotentHint": [true, "Same UEI or name returns the same registration for the same data."],
       "openWorldHint": [true, "Calls the live SAM.gov Entity Management API (cache-first)."]
     },
+    "assess_market_depth": {
+      "readOnlyHint": [true, "Reads Mindy's stored SAM entity registrations and award warehouse; writes only a result cache and a query cache."],
+      "destructiveHint": [false, "No create, update or delete."],
+      "idempotentHint": [true, "Same NAICS, set-aside and state return the same determination for the same data."],
+      "openWorldHint": [false, "Reads only Mindy's stored copy of SAM.gov entity registrations (Postgres) and USASpending awards (BigQuery); no external call."]
+    },
     "get_agency_intel": {
       "readOnlyHint": [true, "Reads agency hierarchy, curated research and spending; writes nothing."],
       "destructiveHint": [false, "No create, update or delete."],
       "idempotentHint": [true, "Same agency returns the same read for the same data."],
       "openWorldHint": [true, "Calls the live USASpending spending_by_category API for fiscal-year spending."]
-    },
-    "search_federal_events": {
-      "readOnlyHint": [true, "Reads stored SAM event notices; writes nothing."],
-      "destructiveHint": [false, "No create, update or delete. The optional .ics is returned to the user, not written to any calendar."],
-      "idempotentHint": [true, "Same agency and window return the same events for the same data."],
-      "openWorldHint": [true, "With include_ai_discovery it runs a live web search and a model call to find association conferences."]
     },
     "get_legislation_status": {
       "readOnlyHint": [true, "Reads Mindy's stored Congress record; writes nothing."],

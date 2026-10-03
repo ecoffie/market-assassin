@@ -4,7 +4,7 @@
  *
  * Two resources, one authorization server (getmindy.ai):
  *
- *   · DEFAULT  https://mcp.getmindy.ai/mcp          — the full Claude/general endpoint (64 tools).
+ *   · DEFAULT  https://mcp.getmindy.ai/mcp          — the full Claude/general endpoint (the public catalog).
  *   · CHATGPT  https://mcp.getmindy.ai/chatgpt/mcp  — the ChatGPT plugin profile (15 read-only
  *              tools, no commerce). See src/lib/mcp/chatgpt-profile.ts + tasks/chatgpt-plugin-path-a.md.
  *

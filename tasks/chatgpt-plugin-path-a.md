@@ -1,6 +1,11 @@
 # Mindy ChatGPT Plugin: Path A (ChatGPT-specific MCP profile)
 
-Status: **Phase 1 built + ChatGPT-only param descriptions (draft PR #1776, not merged, not deployed). Not submitted to OpenAI.**
+Status: **Phase 1 built + ChatGPT-only param descriptions + owner-FINAL 15 (2026-10-03), rebased onto #1777 (draft PR #1776, not merged, not deployed). Not submitted to OpenAI.**
+
+> ⛔ **#1776 is also BLOCKED on the auto-recharge attribution PR** (branch
+> `feat/autorecharge-chatgpt-attribution`; its migration is NOT applied). #1776 must not reach prod
+> before that migration AND its code are live — otherwise a ChatGPT debit can cross an opted-in
+> user's threshold and the channel-blind hourly cron charges their card.
 
 > ⛔ **#1776 must NOT merge until Phase 0 production acceptance passes** (the tools' own
 > correctness on prod: lookup_solicitation scoring, find_opportunities copy, recompete dedupe).
@@ -14,8 +19,9 @@ different resource/audience and a different handler. No ChatGPT-specific UI.
 ## Owner decisions (frozen 2026-10-02; do not reinterpret)
 
 1. **Commerce cleanup is `/chatgpt/mcp`-ONLY.** The Claude/general endpoint
-   (`mcp.getmindy.ai/mcp`, `getmindy.ai/mcp/mcp`) behaves exactly as before: same 64
-   tools, same copy, same credit footer, same paywall. Guarded by
+   (`mcp.getmindy.ai/mcp`, `getmindy.ai/mcp/mcp`) behaves exactly as main has it: main's PUBLIC
+   catalog (#1777 — 53 of the 64 registered tools on 2026-10-03; the test asserts main's own list,
+   not a count), same copy, same credit footer, same paywall. Guarded by
    `src/app/mcp/[transport]/__tests__/route.claude-unchanged.unit.test.ts`.
 2. **No commerce on `/chatgpt/mcp`:** no prices, purchase/top-up links, upgrade pitches,
    checkout, `continue_url`, saved purchase retries (`recordPaywallAttempt` does not run
@@ -27,12 +33,16 @@ different resource/audience and a different handler. No ChatGPT-specific UI.
 4. **A ChatGPT call may decrement an existing balance** (via `runMeteredTool`, billing
    seam intact) **but never triggers auto-recharge in-request.** The out-of-band cron is
    an open item (below).
-5. **Exactly 15 tools:** find_opportunities, lookup_solicitation,
-   get_solicitation_incumbent, get_award_detail, get_expiring_contracts,
-   search_past_contracts, search_grants, search_contractors, get_contractor_profile,
-   lookup_sam_entity, get_agency_intel, search_federal_events, get_legislation_status,
-   capability_market_match, get_keyword_coverage. Any other name on `/chatgpt/mcp` is
-   unknown: never dispatched, never billed.
+5. **Exactly 15 tools — owner-confirmed FINAL (2026-10-03, ceiling unchanged):**
+   find_opportunities, lookup_solicitation, get_solicitation_documents,
+   get_solicitation_incumbent, get_expiring_contracts, search_past_contracts, search_grants,
+   find_capable_contractors, get_contractor_profile, lookup_sam_entity, assess_market_depth,
+   get_agency_intel, get_legislation_status, capability_market_match, get_keyword_coverage.
+   REMOVED from the Phase-1 list: search_contractors (replaced by find_capable_contractors),
+   search_federal_events, get_award_detail. get_legislation_status stays deliberately (owned,
+   provenance-aware corpus). Any other name on `/chatgpt/mcp` is unknown: never dispatched,
+   never billed. Every allowlisted tool must be in the PUBLIC catalog (`listPublicMcpTools()`,
+   #1777); `chatgptRegistrationList()` throws otherwise.
 
 ## Phase 2 owner decisions on the open items (2026-10-02/03)
 
@@ -49,7 +59,7 @@ Numbered as Eric answered them; they map onto the "Open items" list below.
    changes; type / required / enum / bounds are the registry's zod types, cloned. An override
    naming a parameter the registry lacks throws (drift guard). Claude/general endpoint input
    schemas proven byte-identical (tools/list SHA before = after, plus a per-param registry
-   equality test in `route.claude-unchanged.unit.test.ts`). 17 overrides across 8 tools; see
+   equality test in `route.claude-unchanged.unit.test.ts`). 17 overrides across 8 tools (15 across 8 after the final-15 swap, 2026-10-03); see
    "Parameter description inventory" below.
 3. **Follow-up offers filtered to the allowlist (open item 6) — GO (2026-10-03).** Already
    implemented in Phase 1 (`projectNext` + host_rules filter); tests in
@@ -68,9 +78,6 @@ become typed records). Offending strings, now overridden on ChatGPT only:
 | Tool.param | Offending text | Why |
 |---|---|---|
 | get_expiring_contracts.limit | "Local table — a larger set has no per-call cost." | cost + internal storage |
-| search_contractors.limit | "Cached index — a larger set has no per-call cost." | cost + internal storage |
-| search_federal_events.limit | "Local table — a larger set has no per-call cost." | cost + internal storage |
-| search_contractors.keyword | "Free-text company-name match" | "free" (commerce word) |
 | find_opportunities.uei | "FIND is company-anchored", "company_registered_psc / company_registered_naics", "ELIGIBLE \| NOT_ELIGIBLE (+reason) \| UNKNOWN", "never ask for it before first value" | internal labels, enum constants, journey jargon |
 | find_opportunities.states | "reported in query_summary.region.unresolved" | internal field path |
 | find_opportunities.stage | "MARKET_RESEARCH … VEHICLE_SOLICITATIONS … NON_FAR", "a labelled secondary signal" | enum constants in prose (the enum itself is unchanged) |
@@ -79,16 +86,85 @@ become typed records). Offending strings, now overridden on ChatGPT only:
 | find_opportunities.location | "Semantics differ by horizon (documented in result)" | jargon |
 | find_opportunities.limit_per_horizon | "Not a cross-horizon merge." | jargon |
 | lookup_solicitation.confirm_notice_id | "a MATCHED_CANDIDATE", "upgrade to current truth" | result-enum label, jargon, "upgrade" |
-| get_award_detail.id | "USASpending generated_internal_id … (skips the resolve)" | internal field name |
 | search_grants.agency | "(client-side prefix filter)" | implementation detail |
-| search_federal_events.agency | "Messy raw names resolve via normalization." | implementation jargon |
-| search_federal_events.include_ics | "`ics` … VCALENDAR … _meta.ics_skipped_undated" | internal key names |
 | capability_market_match.client_name | "label for the deliverable header" | internal jargon |
+| get_solicitation_documents.notice_id | "Get it from search_sam_opportunities results." | names a tool not on this surface |
+| find_capable_contractors.limit | "cached BigQuery rollup, so returning more has no per-call cost" | cost + internal storage |
+| assess_market_depth.set_aside | "Normalized label: …" | internal jargon (values unchanged) |
+| assess_market_depth.limit | "Max businesses to return in the list." | inaccurate: it also sizes the evaluation sample (default 200), and the list is capped at 15 |
 
-Remaining enum VALUES quoted in a description (e.g. `search_contractors.sort_by` "default
-total_obligated", `search_past_contracts.state_scope` "pop") are kept: they are the literal
+Final-15 re-inventory (2026-10-03): the three new tools emit 15 parameter descriptions; the four
+above were overridden, the rest kept (`text_limit` / `text_offset` / `documents` / `document_ids`
+carry the paging contract the model needs and name only the result's own `next_page`). Rows for
+the three dropped tools were removed. Total on the wire: 69 parameter descriptions. A test now
+fails if ANY ChatGPT-facing string (title, description, parameter description, server
+instructions, serverInfo) names a registered tool outside the 15.
+
+Remaining enum VALUES quoted in a description (e.g. `search_past_contracts.state_scope` "pop") are kept: they are the literal
 values the model must pass. Test `route.unit.test.ts` bans commerce terms and the labels above
 on every ChatGPT parameter description, so a future registry edit that adds one fails CI.
+
+## Final 15 (2026-10-03): annotations and overlaps
+
+| Tool | Title | openWorldHint | Why |
+|---|---|---|---|
+| find_opportunities | Find Opportunities | true | live SAM.gov Entity API when a UEI is given |
+| lookup_solicitation | Look Up a Solicitation | false | stored SAM notices only |
+| get_solicitation_documents | Solicitation Documents | true | cold notice: live SAM noticedesc + attachment download (fills Mindy's notice/storage/doc caches with public data — platform side effect) |
+| get_solicitation_incumbent | Solicitation Incumbent | true | live SAM + USASpending |
+| get_expiring_contracts | Expiring Contracts | true | live USASpending for task-order parent end dates |
+| search_past_contracts | Search Past Contracts | true | live USASpending |
+| search_grants | Search Grants | true | live Grants.gov |
+| find_capable_contractors | Find Capable Contractors | false | Mindy's BigQuery award warehouse only |
+| get_contractor_profile | Contractor Profile | false | BigQuery only |
+| lookup_sam_entity | SAM.gov Registration | true | live SAM Entity API |
+| assess_market_depth | Small-Business Market Depth (Rule of Two) | false | stored `sam_entities` + BigQuery only |
+| get_agency_intel | Agency Intel | true | live USASpending spending |
+| get_legislation_status | Legislation Status (NDAA) | false | stored Congress record |
+| capability_market_match | Capability Market Match | true | third-party embeddings + live USASpending |
+| get_keyword_coverage | Keyword Market Coverage | false | BigQuery only |
+
+Overlap routing written into the descriptions (tested):
+- **lookup_solicitation** identifies one notice → **get_solicitation_documents** reads it →
+  **get_solicitation_incumbent** says who holds its contract.
+- **find_capable_contractors** = "who could compete / who could I team with" for a NAICS (+PSC,
+  state); leans toward smaller firms (more than 25 million dollars of matching awards are left out
+  — `maxObligated` default in `findCapableSmallBusinesses`). **get_contractor_profile** = one named
+  company. **assess_market_depth** = the Rule-of-Two determination (capable small-business count,
+  met / not met / undetermined, sample coverage). **capability_market_match** starts from a company
+  description, not a code.
+
+Projection for the new tools (`_meta` allowlist additions):
+- get_solicitation_documents: `doc_count`, `signed_url_ttl_seconds`, `returned_chars`, `total_chars`,
+  `coverage_complete`, `attachments_listed`, `attachments_with_text`, `piee`, `piee_links`,
+  `retrieval_limitation`. `_meta.source` (cache / on_demand / none = Mindy's retrieval path) is
+  dropped for this tool. `next_page`, `coverage`, `documents[]` pass through untouched (the paging
+  contract). Captured fixture: notice 458091d7… (2 docs, SOW 44,468 chars → `next_page` non-null),
+  read with `SAM_DOCS_READONLY=on` on a warm notice (no writes).
+- assess_market_depth: `market_depth`, `capable_depth`, `rule_of_two_met`, `businesses_returned`,
+  `businesses_available` (all grounding/coverage; it emits no telemetry). Shape fixture built from
+  `src/mcp/tools/market-depth.ts` — a live call writes the KV result cache, so it was not run.
+- find_capable_contractors: emits no `_meta`; the projection derives `grounded` (ok + count > 0),
+  `degraded` (ok=false, i.e. warehouse lookup throttled) and `validation_error`
+  (`naics_or_psc_required`) from its own fields. Captured fixture: cache-only BigQuery read for
+  541512 (`liveBq:false`, no writes).
+- Removed with their tools: the search_federal_events keys (`sam_count`, `ai_count`, `ai_discovery`,
+  `ics_events`, `ics_skipped_undated`).
+- `host_rules` / `_next` filtering now checks against the FULL registry (64), so a rule that steers
+  to a tool hidden from the public catalog is filtered too.
+
+### get_solicitation_documents: notice-description behaviour (read-only check, 2026-10-03)
+
+The Sept 20 failure mode (SAM noticedesc 429s left the body empty) is now handled in code:
+`fetchNoticeDescriptionWithFailover` tries every distinct SAM key before giving up, and an empty
+body sets `_meta.degraded = true` plus a `retrieval_limitation` explaining that a missing body does
+not mean the notice has no scope (never a silent empty). But the backlog it falls back on is large:
+read-only counts on prod — **12,530 of 31,262 active notices (40%) have `description IS NULL`**
+(7,458 of those posted in the last 14 days) and **none of them has `description_checked_at` set**,
+while both `backfill-descriptions` crons report `success` (latest stamp 2026-10-03 04:05 UTC). So a
+ChatGPT read of a recent notice will often fall to the live, on-demand noticedesc fetch (quota-
+bound), and on a 429 day it returns degraded with the limitation. Worth a look outside this PR:
+why the backfill is not draining the active NULL rows.
 
 ## Phases
 
@@ -165,7 +241,7 @@ on every ChatGPT parameter description, so a future registry edit that adds one 
 - Local `next start` on the production build with a LOCAL-ONLY signing secret: unauthenticated
   POST `/chatgpt/mcp` → 401 with `resource_metadata="https://mcp.getmindy.ai/.well-known/oauth-protected-resource/chatgpt/mcp"`;
   that document returns `resource: https://mcp.getmindy.ai/chatgpt/mcp`; the default document is unchanged.
-- ChatGPT token: initialize → serverInfo websiteUrl `https://getmindy.ai`; tools/list → 15;
+- (Phase 1, pre-#1777) ChatGPT token: initialize → serverInfo websiteUrl `https://getmindy.ai`; tools/list → 15;
   tools/call `draft_proposal` → "Tool draft_proposal not found" (never dispatched).
 - Claude token on `/chatgpt/mcp` → 401; ChatGPT token on `/mcp/mcp` → 401; Claude token on `/mcp` → 64 tools.
 - No tools/call was run through the server locally: `.env.local` points at production Supabase, and
@@ -177,7 +253,7 @@ on every ChatGPT parameter description, so a future registry edit that adds one 
 1. `curl -si -X POST https://mcp.getmindy.ai/chatgpt/mcp` → 401 + the ChatGPT `resource_metadata`.
 2. `curl -s https://mcp.getmindy.ai/.well-known/oauth-protected-resource/chatgpt/mcp` → ChatGPT resource;
    `.../oauth-protected-resource/mcp` → unchanged.
-3. Claude connector smoke (`scripts/mcp-oauth-smoke.mjs`) still green: 64 tools, footer present.
+3. Claude connector smoke (`scripts/mcp-oauth-smoke.mjs`) still green: main's public catalog, footer present.
 4. ChatGPT developer mode → add connector `https://mcp.getmindy.ai/chatgpt/mcp` with a test account
    that already has credits → tools/list shows 15 → one cheap call → confirm the debit and that no
    signup grant row appeared.

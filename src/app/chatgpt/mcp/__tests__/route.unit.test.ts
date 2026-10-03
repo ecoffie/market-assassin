@@ -32,6 +32,7 @@ vi.mock('@/lib/mcp/api-keys', () => ({ verifyApiKey: (r?: string | null) => veri
 const { POST } = await import('../route');
 const { POST: CLAUDE_POST } = await import('@/app/mcp/[transport]/route');
 const { issueAccessToken, OAUTH_RESOURCE, OAUTH_RESOURCE_CHATGPT } = await import('@/lib/mcp/oauth/tokens');
+const { listMcpTools } = await import('@/lib/mcp/tool-registry');
 
 const chatgptToken = () => issueAccessToken('buyer@example.com', 'mcpc_chatgpt', 'mcp', OAUTH_RESOURCE_CHATGPT).token;
 const claudeToken = () => issueAccessToken('buyer@example.com', 'mcpc_claude').token;
@@ -99,10 +100,10 @@ describe('/chatgpt/mcp — tools/list', () => {
     expect(tools).toHaveLength(15);
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
-      'capability_market_match', 'find_opportunities', 'get_agency_intel', 'get_award_detail',
-      'get_contractor_profile', 'get_expiring_contracts', 'get_keyword_coverage', 'get_legislation_status',
-      'get_solicitation_incumbent', 'lookup_sam_entity', 'lookup_solicitation', 'search_contractors',
-      'search_federal_events', 'search_grants', 'search_past_contracts',
+      'assess_market_depth', 'capability_market_match', 'find_capable_contractors', 'find_opportunities',
+      'get_agency_intel', 'get_contractor_profile', 'get_expiring_contracts', 'get_keyword_coverage',
+      'get_legislation_status', 'get_solicitation_documents', 'get_solicitation_incumbent', 'lookup_sam_entity',
+      'lookup_solicitation', 'search_grants', 'search_past_contracts',
     ]);
     for (const t of tools) {
       expect(String(t.description)).not.toMatch(/Credits:|Mindy Pro|\$/);
@@ -165,6 +166,30 @@ describe('/chatgpt/mcp — parameter descriptions (owner decision 2)', () => {
     expect(hits).toEqual([]);
   });
 
+  it('no ChatGPT-facing string on the wire names a tool outside the 15', async () => {
+    const { mine } = await listBoth();
+    const allowed = new Set(mine.map((t) => String(t.name)));
+    const registry = listMcpTools().map((t) => (t as { function: { name: string } }).function.name);
+    const foreign = registry.filter((n) => !allowed.has(n));
+    expect(foreign.length).toBeGreaterThan(40);
+    const init = await rpcResult(await POST(rpc({
+      jsonrpc: '2.0', id: 9, method: 'initialize',
+      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } },
+    }, chatgptToken())));
+    const initResult = init.result as { instructions?: string; serverInfo?: Record<string, unknown> };
+    expect(initResult.instructions).toBeTruthy();
+    const strings: [string, string][] = [
+      ['instructions', String(initResult.instructions)],
+      ['serverInfo', JSON.stringify(initResult.serverInfo ?? {})],
+    ];
+    for (const t of mine) {
+      strings.push([`${t.name}.title`, String(t.title)], [`${t.name}.description`, String(t.description)]);
+      for (const [path, d] of schemaDescriptions(t.inputSchema)) strings.push([`${t.name}.${path}`, d]);
+    }
+    const hits = strings.flatMap(([where, text]) => foreign.filter((n) => new RegExp(`\\b${n}\\b`).test(text)).map((n) => `${where}: ${n}`));
+    expect(hits).toEqual([]);
+  });
+
   it('schema shape is identical to the Claude endpoint apart from description text', async () => {
     const { mine, claude } = await listBoth();
     for (const t of mine) {
@@ -189,7 +214,8 @@ describe('/chatgpt/mcp — parameter descriptions (owner decision 2)', () => {
 
 describe('/chatgpt/mcp — tools/call', () => {
   it('an unknown / non-allowlisted tool is rejected and NEVER dispatched or billed', async () => {
-    for (const name of ['get_balance', 'draft_proposal', 'add_contacts_to_crm', 'totally_unknown']) {
+    // includes the three tools dropped from the final 15 — public on Claude, unknown here
+    for (const name of ['search_contractors', 'search_federal_events', 'get_award_detail', 'get_balance', 'draft_proposal', 'add_contacts_to_crm', 'totally_unknown']) {
       const body = await rpcResult(await POST(callTool(chatgptToken(), name)));
       const result = body.result as { isError?: boolean } | undefined;
       // SDK answers unknown tools either as a JSON-RPC error or an isError tool result.

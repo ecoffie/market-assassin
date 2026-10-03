@@ -7415,10 +7415,11 @@ Public Law 119-60.
 **What.** A ChatGPT-specific Mindy connector at `mcp.getmindy.ai/chatgpt/mcp`. A ChatGPT user
 who signs in with their Mindy account can ask federal contracting questions in plain English and
 get answers from public government records: open SAM.gov solicitations, contracts coming up for
-recompete, agency forecasts, past awards, award detail, the likely incumbent behind a solicitation,
-contractor award history, SAM.gov registrations and certifications, grants, agency research,
-industry days, and NDAA status in Congress. Fifteen read-only tools, each described for what the
-user is trying to do.
+recompete, agency forecasts, the full text and attachments of a solicitation, past awards, the likely
+incumbent behind a solicitation, firms that have won work in a market (competitors or teaming
+partners), contractor award history, SAM.gov registrations and certifications, small-business market
+depth (the Rule of Two), grants, agency research, and NDAA status in Congress. Fifteen read-only
+tools, each described for what the user is trying to do.
 
 **Why it matters.** Many small businesses already ask ChatGPT about federal contracting and get
 answers from memory or the open web. This connector grounds those answers in the actual records,
@@ -7435,8 +7436,8 @@ OpenAI's answer about using an existing account balance.
 ChatGPT / who holds this federal contract ChatGPT.
 
 **Proof.** Tool behaviour is the same code the Claude connector already runs. Unit tests prove:
-exactly 15 tools on the ChatGPT endpoint and 64 unchanged on the Claude endpoint; tokens for one
+exactly 15 tools on the ChatGPT endpoint and the Claude endpoint's public catalog unchanged; tokens for one
 endpoint are rejected by the other; no price, purchase link or credit line in any ChatGPT
 description, result or refusal; no free-credit grant and no automatic card recharge triggered from
 a ChatGPT call. Result projection is tested on real captured tool output (find_opportunities,
-lookup_solicitation, get_legislation_status).
+lookup_solicitation, get_legislation_status, get_solicitation_documents, find_capable_contractors).

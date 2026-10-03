@@ -23,6 +23,8 @@
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
 import { mcpRegistrationList, type McpRegistrationEntry, type McpToolAnnotations } from './tool-schemas';
+import { listMcpTools } from './tool-registry';
+import { isPublicMcpTool } from './public-catalog-config';
 import { buildChatgptRefusal, CHATGPT_REFUSAL_CODES, type ChatgptRefusal } from './chatgpt-refusals';
 
 // ── 1. The allowlist ─────────────────────────────────────────────────────────
@@ -30,16 +32,16 @@ import { buildChatgptRefusal, CHATGPT_REFUSAL_CODES, type ChatgptRefusal } from 
 export const CHATGPT_TOOL_ALLOWLIST = [
   'find_opportunities',
   'lookup_solicitation',
+  'get_solicitation_documents',
   'get_solicitation_incumbent',
-  'get_award_detail',
   'get_expiring_contracts',
   'search_past_contracts',
   'search_grants',
-  'search_contractors',
+  'find_capable_contractors',
   'get_contractor_profile',
   'lookup_sam_entity',
+  'assess_market_depth',
   'get_agency_intel',
-  'search_federal_events',
   'get_legislation_status',
   'capability_market_match',
   'get_keyword_coverage',
@@ -80,19 +82,19 @@ export const CHATGPT_TOOL_COPY: Readonly<Record<ChatgptToolName, ChatgptToolCopy
   lookup_solicitation: {
     title: 'Look Up a Solicitation',
     description:
-      'Find and identify one specific federal solicitation. Paste a solicitation number or SAM.gov notice ID, or describe a past or closed one in your own words (for example "the Navy manufacturing bid at Indian Head we submitted"). Closed and archived notices are included, and closed does not mean awarded. A description returns a likely match for the user to confirm, not a confirmed identity; after they confirm, call again with confirm_notice_id. Amendments collapse to the latest version. For who holds the contract behind it, use get_solicitation_incumbent. To find new work, use find_opportunities.',
+      'Identify one specific federal solicitation. Paste a solicitation number or SAM.gov notice ID, or describe a past or closed one in your own words (for example "the Navy bid at Indian Head we submitted"). Closed and archived notices are included; closed does not mean awarded. A description returns a likely match for the user to confirm, not a certain one; after they confirm, call again with confirm_notice_id. Amendments collapse to the latest version. Then use get_solicitation_documents to read it, or get_solicitation_incumbent for its contract holder. To find new work, use find_opportunities.',
     openWorldHint: false,
+  },
+  get_solicitation_documents: {
+    title: 'Solicitation Documents',
+    description:
+      'Read the full text and attachments of one federal solicitation: the notice body, the statement of work and every attached file, each with a download link. Give a SAM.gov notice ID or solicitation number. Long documents arrive in windows: while next_page is present, call again with its document_ids and documents unchanged, and stop when it is empty. Text not yet read is unknown, not absent. Files hosted outside SAM.gov are named but not read, and the result says so. To identify the solicitation first, use lookup_solicitation.',
+    openWorldHint: true,
   },
   get_solicitation_incumbent: {
     title: 'Solicitation Incumbent',
     description:
-      'Who currently holds the contract behind a solicitation. Give a SAM.gov solicitation number (for example 140L6226Q0013) or notice ID. Returns the solicitation\'s current status and the likely prior award from USASpending: the incumbent company, contract number, value and ceiling, and end date. The incumbent is a best-match inference, and when no clear prior award exists it says so instead of guessing. A solicitation number is not a contract number; for the full detail of a known contract, use get_award_detail.',
-    openWorldHint: true,
-  },
-  get_award_detail: {
-    title: 'Award Detail',
-    description:
-      'Full public detail for one awarded federal contract, from USASpending: amount obligated and total ceiling, the parent contract vehicle a bidder would need to hold, period of performance and end date (recompete timing), the recipient, NAICS and PSC codes, and the funding account, with a USASpending link. Pass a contract number (PIID) or a USASpending award ID. A solicitation number is not a contract number; use get_solicitation_incumbent for those. When no award matches it says so instead of estimating.',
+      'Who currently holds the contract behind a solicitation. Give a SAM.gov solicitation number (for example 140L6226Q0013) or notice ID. Returns the solicitation\'s current status and the likely prior award from USASpending: the incumbent company, contract number, value and ceiling, and end date. The incumbent is a best-match inference, and when no clear prior award exists it says so instead of guessing. A solicitation number is not a contract number. To read the solicitation itself, use get_solicitation_documents.',
     openWorldHint: true,
   },
   get_expiring_contracts: {
@@ -113,16 +115,16 @@ export const CHATGPT_TOOL_COPY: Readonly<Record<ChatgptToolName, ChatgptToolCopy
       'Search federal grant opportunities on Grants.gov by keyword, agency or funding category, for example "rural broadband" or "veteran health". Returns title, agency, status, close date, award ceiling, assistance listing number and a Grants.gov link. Defaults to posted opportunities; forecasted, closed and archived ones are also available. Grants are financial assistance with a different application path from contracts; for contract opportunities, use find_opportunities.',
     openWorldHint: true,
   },
-  search_contractors: {
-    title: 'Search Contractors',
+  find_capable_contractors: {
+    title: 'Find Capable Contractors',
     description:
-      'Size up the competition or find teaming partners: the leading federal contractors for a NAICS code, company-name keyword or state, ranked by total obligated dollars, award count or name. Each firm comes back with its award totals and how many agencies it sells to (a broad seller versus one dependent on a single customer). Dollars are historical USASpending obligations, not a bid list. For one company in depth use get_contractor_profile; for its registration use lookup_sam_entity.',
+      'Who could compete for, or team on, work in a market? Give a 6-digit NAICS code, plus optionally a PSC product or service code for a sharper match and a 2-letter state for firms based there. Returns companies that have won federal awards in that market, closest past work first, each with UEI, state, award dollars and count, and whether it has won set-aside work. Leans toward smaller firms: companies with more than 25 million dollars of matching awards are left out. For one named company, use get_contractor_profile.',
     openWorldHint: false,
   },
   get_contractor_profile: {
     title: 'Contractor Profile',
     description:
-      'Federal award history for one company by name (for example "Leidos"): total awards, top customer agencies and recent contracts, from USASpending award data. When several companies match, it returns the candidates instead of picking one. No awards found means none in this award dataset; it is not proof the company has never won federal work and says nothing about its certifications. For registration status, UEI or certifications, use lookup_sam_entity.',
+      'Federal award history for one company by name (for example "Leidos"): total awards, top customer agencies and recent contracts, from USASpending award data. When several companies match, it returns the candidates instead of picking one. No awards found means none in this award dataset; it is not proof the company has never won federal work and says nothing about its certifications. For registration status, UEI or certifications, use lookup_sam_entity; for the firms active in a market, use find_capable_contractors.',
     openWorldHint: false,
   },
   lookup_sam_entity: {
@@ -131,16 +133,16 @@ export const CHATGPT_TOOL_COPY: Readonly<Record<ChatgptToolName, ChatgptToolCopy
       'Check a company\'s live SAM.gov registration: UEI and CAGE code, legal name, registration status, NAICS codes, small-business certifications (such as 8(a), HUBZone, WOSB and SDVOSB), location, and the names of its registered points of contact. Search by UEI for an exact match, or by company name with an optional state. SAM.gov does not publish contact emails or phone numbers, so only names are returned. Set-aside eligibility depends on the current status shown, not on past awards.',
     openWorldHint: true,
   },
+  assess_market_depth: {
+    title: 'Small-Business Market Depth (Rule of Two)',
+    description:
+      'Are there enough capable small businesses to set a requirement aside (the Rule of Two)? Give a 6-digit NAICS code, optionally a set-aside type and a state. Returns how many capable small businesses exist, whether the Rule of Two is met, not met or undetermined, how complete the underlying sample was, and up to 15 ranked firms with registration details. Firms registered but with no proven performance are counted separately and never satisfy the rule. Undetermined is not a negative finding. For a list of award winners in a market, use find_capable_contractors.',
+    openWorldHint: false,
+  },
   get_agency_intel: {
     title: 'Agency Intel',
     description:
       'Research a federal agency before pursuing it. Look it up by name, abbreviation or code (for example "VA", "Department of the Navy" or "069"). Returns where it sits in the federal hierarchy, curated challenges and priorities (Mindy\'s research, not official statements), its contract spending for the fiscal year with top NAICS codes when available, and the defense authorization bills on record for it with their status. Bill text is not held. For bill status not tied to an agency, use get_legislation_status.',
-    openWorldHint: true,
-  },
-  search_federal_events: {
-    title: 'Federal Events',
-    description:
-      'Upcoming federal contracting events for an agency: industry days, matchmaking sessions and pre-solicitation conferences from SAM.gov notices, each with date, location, registration link and the buying office. Optionally adds web-discovered association conferences (include_ai_discovery), which carry a confidence score and should be verified before attending, and optionally returns a calendar file of the dated events (include_ics). Looks ahead up to 12 months; widen months_ahead if nothing is found.',
     openWorldHint: true,
   },
   get_legislation_status: {
@@ -152,7 +154,7 @@ export const CHATGPT_TOOL_COPY: Readonly<Record<ChatgptToolName, ChatgptToolCopy
   capability_market_match: {
     title: 'Capability Market Match',
     description:
-      'Where does my company fit in the federal market? Describe what the company does in its own words, plus optional capabilities and past performance, and get its addressable market: the terms buyers use, total federal spending and the NAICS codes it flows through (marked verified or unverified), the competitors already winning there, upcoming agency forecasts and contracts expiring soon. Sections that run out of time are listed as omitted rather than shown as empty. Needs enough company description to work from.',
+      'Where does my company fit in the federal market? Describe what the company does in its own words, plus optional capabilities and past performance, and get its addressable market: the terms buyers use, total federal spending and the NAICS codes it flows through (marked verified or unverified), the competitors already winning there, upcoming agency forecasts and contracts expiring soon. Sections that run out of time are listed as omitted, not empty. Starts from a description; when the user already has a NAICS code, use find_capable_contractors or assess_market_depth.',
     openWorldHint: true,
   },
   get_keyword_coverage: {
@@ -200,27 +202,24 @@ export const CHATGPT_PARAM_COPY: Readonly<Partial<Record<ChatgptToolName, Readon
     confirm_notice_id:
       'After the user confirms a suggested match ("yes, that\'s the one"), pass that notice ID to get the confirmed, current record.',
   },
-  get_award_detail: {
-    id: 'USASpending award ID, if already known (for example from a USASpending link). Otherwise pass piid.',
-  },
   get_expiring_contracts: {
     limit: 'Maximum results (default 50, max 200).',
   },
   search_grants: {
     agency: 'Top-level agency code, for example "DOD" or "HHS". Matches agencies whose code starts with it.',
   },
-  search_contractors: {
-    keyword: 'Company-name text to match, for example "Booz".',
-    limit: 'Maximum results (default 50, max 100).',
-  },
-  search_federal_events: {
-    agency: 'Agency name, for example "Department of Defense", "Navy" or "GSA". Common variations of agency names are recognized.',
-    limit: 'Maximum SAM.gov events returned (default 50, max 100).',
-    include_ics:
-      'Also return a calendar file (base64-encoded .ics) of the matching events, for import into Google, Outlook or Apple Calendar. Only events with a real published date are included; undated events are counted in the result, never assigned a guessed date. Default false.',
-  },
   capability_market_match: {
     client_name: 'Optional company name to show at the top of the result.',
+  },
+  get_solicitation_documents: {
+    notice_id: 'SAM.gov notice ID or solicitation number, for example from lookup_solicitation or find_opportunities results.',
+  },
+  find_capable_contractors: {
+    limit: 'Maximum contractors returned (1 to 200, default 50).',
+  },
+  assess_market_depth: {
+    set_aside: "Optional set-aside to measure, one of '8(a)', 'HUBZone', 'SDVOSB', 'WOSB', 'EDWOSB' or 'Small Business'.",
+    limit: 'How many registered firms to evaluate (default 200). At most 15 are listed. A smaller value evaluates fewer firms, so the counts drawn from that sample can be lower.',
   },
 };
 
@@ -252,14 +251,18 @@ export function chatgptInputSchema(
 
 /**
  * The 15 registration entries for the ChatGPT handler — registry schemas, ChatGPT copy.
- * Throws if an allowlisted tool is missing from the registry (a rename must fail loudly,
+ * Throws if an allowlisted tool is missing from the PUBLIC catalog (a rename must fail loudly,
  * never silently ship a 14-tool profile), or if a param override names an unknown param.
  */
 export function chatgptRegistrationList(): McpRegistrationEntry[] {
+  // mcpRegistrationList() IS the public catalog (listPublicMcpTools, #1777): the ChatGPT
+  // profile is a subset of what external hosts may see, never a side door to a hidden tool.
   const byName = new Map(mcpRegistrationList().map((e) => [e.name, e]));
   return CHATGPT_TOOL_ALLOWLIST.map((name) => {
     const base = byName.get(name);
-    if (!base) throw new Error(`chatgpt-profile: allowlisted tool "${name}" is not in the MCP registry`);
+    if (!base || !isPublicMcpTool(name)) {
+      throw new Error(`chatgpt-profile: allowlisted tool "${name}" is not in the public MCP catalog`);
+    }
     const annotations = chatgptAnnotationsFor(name);
     return {
       name,
@@ -276,7 +279,7 @@ export function chatgptRegistrationList(): McpRegistrationEntry[] {
 export const CHATGPT_SERVER_INFO: Implementation = {
   name: 'Mindy',
   version: '1.0.0',
-  description: 'Federal contracting research from public government records: opportunities, awards, contractors, grants, agencies, events and NDAA status.',
+  description: 'Federal contracting research from public government records: opportunities, solicitation documents, awards, contractors, small-business market depth, grants, agencies and NDAA status.',
   websiteUrl: 'https://getmindy.ai',
   icons: [{ src: 'https://getmindy.ai/icon.png', mimeType: 'image/png', sizes: ['512x512'] }],
 };
@@ -286,11 +289,11 @@ export const CHATGPT_SERVER_INFO: Implementation = {
  * truncate); everything references only the 15 subset tools; no commerce.
  */
 export const CHATGPT_SERVER_INSTRUCTIONS = [
-  'Mindy answers federal contracting questions from public government records (SAM.gov, USASpending, Grants.gov, Congress). Pick one tool by intent: find_opportunities to find work for what a business sells; lookup_solicitation to identify a specific or past solicitation; get_solicitation_incumbent for who holds the contract behind one; get_legislation_status for NDAA or bill status. Report only what tools return. Unavailable is not zero; never invent records.',
+  'Mindy answers federal contracting questions from public government records (SAM.gov, USASpending, Grants.gov, Congress). Pick one tool by intent: find_opportunities to find work for what a business sells; lookup_solicitation to identify a specific or past solicitation; get_solicitation_documents to read its text and files; get_solicitation_incumbent for who holds its contract; get_legislation_status for NDAA or bill status. Report only what tools return. Unavailable is not zero; never invent records.',
   '',
   'Every result carries _meta grounding flags: grounded (real records were returned; get_solicitation_incumbent splits it into grounded_notice and grounded_incumbent) and degraded (a source failed or timed out). When a result is not grounded, say nothing was found or the source was unavailable, and suggest one way to broaden; do not fill the gap with estimates.',
   'Never invent solicitations, awards, companies, contacts, dollar amounts, dates or bill provisions. get_legislation_status and get_agency_intel hold bill status, not bill text: do not describe what a bill requires.',
-  'SAM.gov does not publish contact emails or phone numbers; do not supply them.',
+  'lookup_sam_entity returns registered point-of-contact names only (SAM.gov does not publish their emails or phone numbers); never supply contact details a tool did not return.',
   'Keep record identifiers (notice IDs, solicitation and contract numbers) and source links (sam.gov, usaspending.gov, grants.gov, congress.gov) in answers so the user can verify them.',
   'Show results first; ask at most one clarifying question afterwards.',
 ].join('\n');
@@ -328,8 +331,12 @@ export const CHATGPT_META_ALLOW: ReadonlySet<string> = new Set([
   // get_agency_intel
   'has_spending', 'spending_scope', 'sourced_pain_points', 'legacy_pain_points',
   'legislation_status', 'legislative_measures',
-  // search_federal_events
-  'sam_count', 'ai_count', 'ai_discovery', 'ics_events', 'ics_skipped_undated',
+  // get_solicitation_documents (paging + completeness disclosures; `source` is dropped
+  // for this tool by projectDocuments — it names Mindy's cache path, not a public source)
+  'doc_count', 'signed_url_ttl_seconds', 'returned_chars', 'total_chars', 'coverage_complete',
+  'attachments_listed', 'attachments_with_text', 'piee', 'piee_links', 'retrieval_limitation',
+  // assess_market_depth
+  'market_depth', 'capable_depth', 'rule_of_two_met', 'businesses_returned', 'businesses_available',
   // get_legislation_status
   'resolution_kind',
   // capability_market_match
@@ -380,7 +387,11 @@ function ruleMentionsForeignTool(rule: string): boolean {
   }
   return false;
 }
-const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set(mcpRegistrationList().map((e) => e.name));
+// The FULL registry (listMcpTools, 64), not just the public catalog: a rule that steers
+// to a hidden tool must be filtered too.
+const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set(
+  listMcpTools().map((t) => ((t as { function?: { name?: string } }).function?.name) ?? ''),
+);
 
 type Json = unknown;
 type Obj = Record<string, unknown>;
@@ -470,6 +481,36 @@ function stripScoring(v: Json): Json {
   return out;
 }
 
+/** get_solicitation_documents: drop `_meta.source` (cache / on_demand / none = Mindy's retrieval path). */
+function projectDocuments(r: Obj): Obj {
+  if (!isObj(r._meta)) return r;
+  const { source: _src, ...meta } = r._meta;
+  void _src;
+  return { ...r, _meta: meta };
+}
+
+/**
+ * Tier-2 tools emit no `_meta` (get_contractor_profile, find_capable_contractors): derive
+ * the two grounding flags from the tool's OWN fields, no inference beyond them.
+ */
+function deriveTier2Meta(tool: string, r: Obj): Obj | null {
+  if (isObj(r._meta)) return null;
+  if (tool === 'get_contractor_profile') {
+    // found=true ⇒ grounded; lookup_failed ⇒ degraded.
+    return { grounded: r.found === true, degraded: r.resolution === 'lookup_failed' };
+  }
+  if (tool === 'find_capable_contractors') {
+    // ok + a positive count ⇒ grounded. ok=false is either a missing code (validation) or the
+    // warehouse lookup being throttled (degraded: unavailable, never a market-wide zero).
+    const count = typeof r.count === 'number' ? r.count : 0;
+    if (r.ok === false && r.error === 'naics_or_psc_required') {
+      return { grounded: false, degraded: false, validation_error: 'naics_or_psc_required' };
+    }
+    return { grounded: r.ok === true && count > 0, degraded: r.ok === false };
+  }
+  return null;
+}
+
 function projectIncumbent(r: Obj): Obj {
   const out: Obj = { ...r };
   if ('incumbent' in out) out.incumbent = stripScoring(out.incumbent);
@@ -485,11 +526,9 @@ export function projectChatgptResult(tool: string, result: Record<string, unknow
   let r: Obj = { ...result };
   if (tool === 'find_opportunities') r = projectFind(r);
   if (tool === 'get_solicitation_incumbent') r = projectIncumbent(r);
-  if (tool === 'get_contractor_profile' && !isObj(r._meta)) {
-    // This tool emits no `_meta`; derive the two grounding flags from its OWN resolution
-    // fields (no inference beyond them): found=true ⇒ grounded; lookup_failed ⇒ degraded.
-    r._meta = { grounded: r.found === true, degraded: r.resolution === 'lookup_failed' };
-  }
+  if (tool === 'get_solicitation_documents') r = projectDocuments(r);
+  const derived = deriveTier2Meta(tool, r);
+  if (derived) r._meta = derived;
   if ('_next' in r) r._next = projectNext(r._next);
   const cleaned = deepClean(r) as Obj;
   // Every tool result keeps an object `_meta` (empty when the tool emits none — e.g.

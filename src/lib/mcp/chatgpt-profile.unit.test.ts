@@ -26,16 +26,24 @@ import {
 import { buildChatgptRefusal, CHATGPT_REFUSAL_CODES } from './chatgpt-refusals';
 import { mcpRegistrationList } from './tool-schemas';
 import { listMcpTools } from './tool-registry';
+import { isPublicMcpTool } from './public-catalog-config';
 
 const FIX = join(__dirname, '__fixtures__', 'chatgpt-profile');
 const load = (name: string) => JSON.parse(readFileSync(join(FIX, `${name}.json`), 'utf8')) as Record<string, unknown>;
 
+// Owner-confirmed FINAL Path A 15 (2026-10-03). Removed: search_contractors (replaced by
+// find_capable_contractors), search_federal_events, get_award_detail.
 const EXPECTED = [
-  'find_opportunities', 'lookup_solicitation', 'get_solicitation_incumbent', 'get_award_detail',
-  'get_expiring_contracts', 'search_past_contracts', 'search_grants', 'search_contractors',
-  'get_contractor_profile', 'lookup_sam_entity', 'get_agency_intel', 'search_federal_events',
+  'find_opportunities', 'lookup_solicitation', 'get_solicitation_documents', 'get_solicitation_incumbent',
+  'get_expiring_contracts', 'search_past_contracts', 'search_grants', 'find_capable_contractors',
+  'get_contractor_profile', 'lookup_sam_entity', 'assess_market_depth', 'get_agency_intel',
   'get_legislation_status', 'capability_market_match', 'get_keyword_coverage',
 ];
+const DROPPED = ['search_contractors', 'search_federal_events', 'get_award_detail'];
+const ALL_TOOL_NAMES = listMcpTools().map((t) => (t as { function: { name: string } }).function.name);
+/** Every registered tool name (full registry, 64) outside the 15 that a string mentions. */
+const foreignToolsIn = (text: string) =>
+  ALL_TOOL_NAMES.filter((n) => !EXPECTED.includes(n) && new RegExp(`\\b${n}\\b`).test(text));
 
 /** Commerce words banned from ChatGPT descriptions and refusal copy. Word-bounded so
  *  legitimate GovCon vocabulary ("buyer", "buying office") is not a false positive. */
@@ -44,6 +52,12 @@ const BANNED: RegExp[] = [
   /\bsubscri/i, /\bcheckout\b/i, /\bstripe\b/i, /getmindy\.ai\/mcp/i, /\bcontinue/i,
 ];
 const bannedHits = (text: string) => BANNED.filter((re) => re.test(text)).map(String);
+
+// zod 4 keeps .describe() text on the inner type of an optional()
+function descOf(s: unknown): string | undefined {
+  const t = s as { unwrap?: () => { description?: string }; description?: string };
+  return t.description ?? (typeof t.unwrap === 'function' ? t.unwrap().description : undefined);
+}
 
 function allKeys(v: unknown, out = new Set<string>()): Set<string> {
   if (Array.isArray(v)) v.forEach((x) => allKeys(x, out));
@@ -76,8 +90,16 @@ describe('allowlist', () => {
     for (const n of EXPECTED) expect(registryNames.has(n)).toBe(true);
   });
 
-  it('rejects other names (isChatgptTool)', () => {
-    for (const n of ['get_balance', 'draft_proposal', 'add_contacts_to_crm', 'schedule_market_search', 'get_winning_playbook', 'nope']) {
+  it('every allowlisted tool is in the PUBLIC MCP catalog (#1777), not just the registry', () => {
+    const publicNames = new Set(mcpRegistrationList().map((e) => e.name));
+    for (const n of EXPECTED) {
+      expect(isPublicMcpTool(n), n).toBe(true);
+      expect(publicNames.has(n), n).toBe(true);
+    }
+  });
+
+  it('rejects other names (isChatgptTool), including the three dropped from the final 15', () => {
+    for (const n of [...DROPPED, 'get_balance', 'draft_proposal', 'add_contacts_to_crm', 'schedule_market_search', 'get_winning_playbook', 'nope']) {
       expect(isChatgptTool(n)).toBe(false);
     }
   });
@@ -91,11 +113,6 @@ describe('allowlist', () => {
 });
 
 describe('ChatGPT-only parameter descriptions (owner decision 2)', () => {
-  // zod 4 keeps .describe() text on the inner type of an optional()
-  const descOf = (s: unknown): string | undefined => {
-    const t = s as { unwrap?: () => { description?: string }; description?: string; isOptional(): boolean };
-    return t.description ?? (typeof t.unwrap === 'function' ? t.unwrap().description : undefined);
-  };
   const registryParams = (tool: string) =>
     new Set(Object.keys(mcpRegistrationList().find((e) => e.name === tool)!.inputSchema));
 
@@ -113,9 +130,9 @@ describe('ChatGPT-only parameter descriptions (owner decision 2)', () => {
   });
 
   it('does not mutate the registry shape it is given', () => {
-    const base = mcpRegistrationList().find((e) => e.name === 'search_contractors')!.inputSchema;
+    const base = mcpRegistrationList().find((e) => e.name === 'find_capable_contractors')!.inputSchema;
     const before = descOf((base as Record<string, unknown>).limit);
-    const mine = chatgptInputSchema('search_contractors', base);
+    const mine = chatgptInputSchema('find_capable_contractors', base);
     expect(descOf((base as Record<string, unknown>).limit)).toBe(before);
     expect(descOf((mine as Record<string, unknown>).limit)).not.toBe(before);
     expect(before).toMatch(/per-call cost/); // the registry (Claude) text is still the registry text
@@ -154,6 +171,38 @@ describe('descriptions + titles', () => {
     });
   }
 
+  it('no ChatGPT-facing string names a tool outside the 15 (descriptions, titles, param descriptions, instructions, server info)', () => {
+    const hits: string[] = [];
+    for (const e of chatgptRegistrationList()) {
+      for (const t of foreignToolsIn(`${e.title}\n${e.description}`)) hits.push(`${e.name}: ${t}`);
+      for (const [p, schema] of Object.entries(e.inputSchema)) {
+        const d = descOf(schema) ?? '';
+        for (const t of foreignToolsIn(d)) hits.push(`${e.name}.${p}: ${t}`);
+      }
+    }
+    for (const t of foreignToolsIn(CHATGPT_SERVER_INSTRUCTIONS)) hits.push(`instructions: ${t}`);
+    for (const t of foreignToolsIn(String(CHATGPT_SERVER_INFO.description ?? ''))) hits.push(`serverInfo: ${t}`);
+    expect(hits).toEqual([]);
+    // the guard really sees a foreign name
+    expect(foreignToolsIn('then use get_award_detail')).toEqual(['get_award_detail']);
+  });
+
+  it('overlapping tools each state a distinct intent', () => {
+    const d = (n: keyof typeof CHATGPT_TOOL_COPY) => CHATGPT_TOOL_COPY[n].description;
+    // documents vs lookup vs incumbent
+    expect(d('get_solicitation_documents')).toMatch(/^Read the full text and attachments of one federal solicitation/);
+    expect(d('lookup_solicitation')).toMatch(/get_solicitation_documents/);
+    expect(d('get_solicitation_incumbent')).toMatch(/get_solicitation_documents/);
+    // capable contractors vs profile vs market depth vs capability match
+    expect(d('find_capable_contractors')).toMatch(/^Who could compete for, or team on, work in a market\?/);
+    expect(d('find_capable_contractors')).toMatch(/get_contractor_profile/);
+    expect(d('get_contractor_profile')).toMatch(/one company/);
+    expect(d('get_contractor_profile')).toMatch(/find_capable_contractors/);
+    expect(d('assess_market_depth')).toMatch(/Rule of Two/);
+    expect(d('assess_market_depth')).toMatch(/find_capable_contractors/);
+    expect(d('capability_market_match')).toMatch(/find_capable_contractors or assess_market_depth/);
+  });
+
   it('resolves the lookup vs incumbent routing conflict explicitly', () => {
     expect(CHATGPT_TOOL_COPY.lookup_solicitation.description).toMatch(/identify one specific/i);
     expect(CHATGPT_TOOL_COPY.lookup_solicitation.description).toMatch(/get_solicitation_incumbent/);
@@ -174,9 +223,12 @@ describe('annotations', () => {
     }
   });
 
-  it('get_legislation_status is the stored-record tool: openWorldHint false', () => {
-    const leg = chatgptRegistrationList().find((e) => e.name === 'get_legislation_status')!;
-    expect(leg.annotations.openWorldHint).toBe(false);
+  it('openWorldHint follows the implementation (live external call vs stored copy)', () => {
+    const ow = Object.fromEntries(chatgptRegistrationList().map((e) => [e.name, e.annotations.openWorldHint]));
+    expect(ow.get_legislation_status).toBe(false); // stored Congress record
+    expect(ow.get_solicitation_documents).toBe(true); // live SAM.gov download for a cold notice
+    expect(ow.find_capable_contractors).toBe(false); // Mindy's BigQuery award warehouse only
+    expect(ow.assess_market_depth).toBe(false); // stored SAM entities + BigQuery only
   });
 
   it('docs/chatgpt-plugin/annotations.json agrees with the module, with a justification per hint', () => {
@@ -335,9 +387,53 @@ describe('projection — shape fixtures for the other tools', () => {
     expect(p._meta).toEqual({ grounded: true, degraded: false, count: 1, total: 1, state_scope: 'pop', field_status: { naics: 'ok' } });
   });
 
-  it('get_award_detail: drops resolved_id', () => {
-    const p = projectChatgptResult('get_award_detail', { award: { awardId: 'X' }, _meta: { grounded: true, degraded: false, resolved_id: 'CONT_AWD_X' } });
+  it('get_solicitation_documents (real capture): keeps the paging contract + completeness, drops the cache-path label', () => {
+    const raw = load('get_solicitation_documents');
+    const p = projectChatgptResult('get_solicitation_documents', raw);
+    const rawMeta = raw._meta as Record<string, unknown>;
+    expect(rawMeta.source).toBe('cache');
+    const { source: _s, ...expected } = rawMeta;
+    void _s;
+    expect(p._meta).toEqual(expected);
+    expect(p._meta).not.toHaveProperty('source');
+    expect(p._meta).toMatchObject({ grounded: true, coverage_complete: false, signed_url_ttl_seconds: 3600, retrieval_limitation: null });
+    // the paging continuation survives verbatim — ChatGPT must be able to read the rest
+    expect(p.next_page).toEqual(raw.next_page);
+    expect((p.next_page as { document_ids: string[] }).document_ids.length).toBeGreaterThan(0);
+    expect(p.coverage).toEqual(raw.coverage);
+    expect(p.documents).toEqual(raw.documents);
+    for (const d of p.documents as Record<string, unknown>[]) expect(String(d.download_url)).toMatch(/^https:\/\/sam\.gov\//);
+  });
+
+  it('find_capable_contractors (real capture, no tool _meta): grounding derived from ok/count only', () => {
+    const raw = load('find_capable_contractors');
+    const p = projectChatgptResult('find_capable_contractors', raw);
     expect(p._meta).toEqual({ grounded: true, degraded: false });
+    expect(p.items).toEqual(raw.items);
+    expect(p.total).toBe(raw.total);
+    expect(projectChatgptResult('find_capable_contractors', { ok: true, count: 0, items: [], note: 'No contractors found for NAICS 999999.' })._meta)
+      .toEqual({ grounded: false, degraded: false });
+    expect(projectChatgptResult('find_capable_contractors', { ok: false, error: 'rate_limited', note: 'x', count: 0, items: [] })._meta)
+      .toEqual({ grounded: false, degraded: true });
+    expect(projectChatgptResult('find_capable_contractors', { ok: false, error: 'naics_or_psc_required', count: 0, items: [] })._meta)
+      .toEqual({ grounded: false, degraded: false, validation_error: 'naics_or_psc_required' });
+  });
+
+  it('assess_market_depth: keeps every grounding/coverage key it emits', () => {
+    // Shape from src/mcp/tools/market-depth.ts (a live call writes the KV result cache, so
+    // this is built from the code, not captured). Firm details are placeholders.
+    const meta = { grounded: true, degraded: false, market_depth: 41, capable_depth: 12, rule_of_two_met: true, businesses_returned: 15, businesses_available: 200 };
+    const raw = {
+      queried: { naics: '238220', state: 'AZ' }, market_depth: 41, capable_depth: 12, eligible_population: 310, matching_uei_count: 120,
+      sample_size: 200, sample_coverage: 0.65, rule_of_two_determination: 'met', rule_of_two_conclusive: true, rule_of_two_met: true,
+      counts: { active_performer: 7, capable: 5, emerging: 29 }, registered_only_count: 159,
+      businesses: [{ uei: 'UEI000000001', legalBusinessName: 'Example HVAC LLC', pocName: '[redacted]', tier: 'active_performer' }],
+      data_as_of: '2026-10-01', caveats: ['Set-aside eligibility uses SAM certifications.'], _meta: meta,
+    };
+    const p = projectChatgptResult('assess_market_depth', raw);
+    expect(p._meta).toEqual(meta);
+    expect(p.rule_of_two_determination).toBe('met');
+    expect(p.sample_coverage).toBe(0.65);
   });
 
   it('get_contractor_profile (no tool _meta): grounding derived from its own resolution fields only', () => {
@@ -364,7 +460,7 @@ describe('projection — shape fixtures for the other tools', () => {
   });
 
   it('no projected fixture carries a denied _meta key anywhere', () => {
-    for (const f of ['find_opportunities', 'lookup_solicitation', 'get_legislation_status']) {
+    for (const f of ['find_opportunities', 'lookup_solicitation', 'get_legislation_status', 'get_solicitation_documents', 'find_capable_contractors']) {
       const p = projectChatgptResult(f, load(f));
       for (const m of metaObjects(p)) for (const k of Object.keys(m)) expect(CHATGPT_META_ALLOW.has(k)).toBe(true);
       expect(JSON.stringify(p)).not.toMatch(/getmindy\.ai\/mcp|continue_url|"credits"/);
