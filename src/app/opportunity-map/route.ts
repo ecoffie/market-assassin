@@ -9243,10 +9243,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       }).catch(function(){});
   };
   window.__mapBootView();
-  // Deep-link: /opportunity-map?opp=<notice_id> auto-opens that opportunity's drawer (used by
-  // the Share link + the Favorites page). Retries until openOppDrawer is defined.
-  (function(){ try{ var m=(location.search||'').match(/[?&]opp=([^&]+)/); if(!m)return; var nid=decodeURIComponent(m[1]);
-    var tries=0; (function go(){ if(window.openOppDrawer){ window.openOppDrawer(nid); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+  // ?opp=<notice_id> has ONE owner: the SHARED-LINK OPEN handler (search "SHARED-LINK OPEN"), which
+  // waits for openOppDrawer and opens with force=true. A second handler here used to call
+  // openOppDrawer(nid) for the SAME param, so one typed link opened the drawer twice, fetched
+  // opportunity-detail twice and recorded two listing_open events (measured on prod 2026-09-28).
+  // The force=true open always landed second and won, so removing this one changes no end state.
   // Deep-link: /opportunity-map?company=<uei> switches to the Companies dataset and opens that
   // firm's drawer (used by the company Share link + a saved company). Switches mode first (so the
   // guard in openCompanyDrawer passes), then opens the drawer keyed by UEI directly (no need to

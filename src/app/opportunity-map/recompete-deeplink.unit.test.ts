@@ -100,11 +100,12 @@ describe('typed boot handlers — do not collapse IDs into openOppDrawer', () =>
 
 describe('typed-handler split — other deep links do not go through recompete', () => {
   it('?opp= still has its own handler that calls openOppDrawer, not openRecompeteDrawer', () => {
-    const at = routeSrc.indexOf('window.openOppDrawer(nid)');
-    expect(at).toBeGreaterThan(-1);
-    const handler = routeSrc.slice(at - 200, at + 200);
-    expect(handler).toContain("match(/[?&]opp=([^&]+)/)");
-    expect(handler).toContain('openOppDrawer');
+    // ONE owner since 2026-09-28: the SHARED-LINK OPEN handler.
+    const start = routeSrc.indexOf('SHARED-LINK OPEN (?opp=');
+    expect(start).toBeGreaterThan(-1);
+    const handler = routeSrc.slice(start, routeSrc.indexOf('window.openOppDrawer=function', start));
+    expect(handler).toContain("_sp.get('opp')");
+    expect(handler).toContain('openOppDrawer(_id,true)');
     expect(handler).not.toContain('openRecompeteDrawer');
     expect(handler).not.toContain('recompete-row');
   });
