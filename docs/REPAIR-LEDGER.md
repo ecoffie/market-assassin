@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-03 — C-5: surfaces say when email alerts are off
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-03 | Map settings drawer + Market Research / alert state | 8,674 users have alerts_enabled false with a daily/weekly frequency still stored. The Map settings drawer highlighted that frequency as if they were being emailed, and Market Research's "Save to profile" confirmed "Saved — your daily alerts now track X" (false for them, and "daily" was hardcoded). The drawer now shows "Email alerts are off" with an explicit Turn alerts on (the only path that sends alertsEnabled true; C-2's invariant that an unrelated save never re-enables is kept, and a move off a stored Paused shows it will turn on, mirroring resolveAlertsEnabledWrite). Market Research copy goes through `alert-state-copy.ts`: a delivery claim only when alerts are known on; off says so; unknown claims nothing. | `export function profileSavedMessage(` → `src/lib/alerts/alert-state-copy.ts` | `settings-drawer-alerts-off.unit.test.ts` runs the real drawer HTML+JS in jsdom, 5 cases (5 red on origin/main); `alert-state-copy.unit.test.ts` 3 cases; alerts + drawer suites 193/193; tsc clean | Draft PR, not merged |
+
 ## 2026-10-03 — SEC-5d: partner trials only for a verified identity, once per account
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

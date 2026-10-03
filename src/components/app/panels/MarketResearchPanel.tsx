@@ -22,6 +22,7 @@ import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { getProductVendorHint } from '@/lib/lookup-intent';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { alertStateFrom, profileSavedMessage, saveToProfileLabel, type AlertState } from '@/lib/alerts/alert-state-copy';
 
 interface MarketResearchPanelProps {
   email: string | null;
@@ -78,6 +79,8 @@ interface WorkspaceData {
 }
 
 interface AlertPreferencesData {
+  alertsEnabled?: boolean;
+  frequency?: string;
   naicsCodes?: string[];
   pscCodes?: string[];
   targetAgencies?: string[];
@@ -662,6 +665,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // market but it never reached my alerts."
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  // C-5: the user's real email-alert state. Copy may claim delivery only when it is 'on'.
+  const [alertState, setAlertState] = useState<AlertState>('unknown');
   // Has a report been explicitly run since entering Sport? Gates the whole
   // results area so the saved-profile report never shows in Sport (Eric).
   const [sportReportRan, setSportReportRan] = useState(false);
@@ -1150,14 +1155,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       const data = await res.json().catch(() => null);
       if (res.ok && data && !data.error) {
         setProfileSaved(true);
-        showToast({ message: '✅ Saved to your profile — your alerts now track this market.', variant: 'success' });
+        showToast({ message: profileSavedMessage(alertState, keyword || 'this market'), variant: 'success' });
       } else {
         showToast({ message: data?.error || 'Could not save to your profile.', variant: 'error' });
       }
     } catch {
       showToast({ message: 'Could not save to your profile — try again.', variant: 'error' });
     } finally { setSavingProfile(false); }
-  }, [email, getAuthHeaders, formData.businessType, showToast]);
+  }, [email, getAuthHeaders, formData.businessType, showToast, alertState]);
 
   // Deep-link: ?keyword=drones (from the global lookup bar) → open Sport mode,
   // pre-fill the keyword, and auto-build the market map. Runs once.
@@ -1312,6 +1317,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
         const workspaceProfile = workspace?.success ? buildSavedResearchProfile(workspace as WorkspaceData) : null;
         const prefsData = (prefs?.data || {}) as AlertPreferencesData;
+        setAlertState(prefs?.data ? alertStateFrom(prefsData) : 'unknown');
         const naicsCodes = uniqueStrings([
           ...(workspaceProfile?.naicsCodes || []),
           ...(prefsData.naicsCodes || []),
@@ -2097,7 +2103,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                           for "I researched my market but my alerts never changed." */}
                       {profileSaved ? (
                         <div className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 text-center">
-                          <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} /> Saved — your daily alerts now track &ldquo;{sportKeyword || 'this market'}&rdquo;
+                          <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} /> {profileSavedMessage(alertState, sportKeyword || 'this market')}
                         </div>
                       ) : (
                         <button
@@ -2107,7 +2113,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                           className="mt-2 w-full inline-flex items-center gap-1.5 justify-center rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
                           title="Replaces your current NAICS with this market's codes and adds the keyword to your alerts"
                         >
-                          {savingProfile ? 'Saving…' : <><Star className="h-4 w-4 shrink-0" strokeWidth={2} /> Save this market to my profile (updates my alerts)</>}
+                          {savingProfile ? 'Saving…' : <><Star className="h-4 w-4 shrink-0" strokeWidth={2} /> {saveToProfileLabel(alertState)}</>}
                         </button>
                       )}
                     </div>
