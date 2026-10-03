@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-03 — ChatGPT-attributed auto-recharge suppression (migration NOT applied)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-03 | MCP billing / auto-recharge | **A ChatGPT-drained balance could charge the user's saved card.** /chatgpt/mcp (#1776) bills the same personal balance as Claude, and the hourly cron (`/api/cron/mcp-autorecharge`) recharges any enabled account below threshold regardless of what drained it. Owner-approved invariant: an automatic payment is permitted only if the account would still be eligible with every ChatGPT-originated debit since the last successful recharge removed. New `mcp_credit_balance.chatgpt_spend_since_recharge` (S) grows in the same guarded UPDATE as a ChatGPT personal debit (`mcp_debit_credits` gains `p_channel DEFAULT NULL`); the claim refuses `chatgpt_caused` when `balance < T AND balance + S >= T`, BEFORE debounce/cap stamping; an applied `auto_recharge` grant subtracts the claim-time snapshot of S. Same rule in TS (`rechargeGate`) for the cron pre-filter and engine. Claude path sends the original 5 args (unchanged). | `export function rechargeGate(` → `src/lib/mcp/autorecharge.ts` | PGlite suite on the real migration chain (new migration applied twice): 24/24 named scenarios + seeded property test; 12/24 RED with the ChatGPT gate removed, 2/24 RED with full-reset instead of snapshot subtraction; vitest units 20/20; `npm run migrate` dry run lists the file as pending | 🟡 PR — migration NOT applied |
+
 ## 2026-10-02 — lookup_solicitation: caller pursuits no longer injected ahead of real matches
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

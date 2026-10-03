@@ -19,7 +19,7 @@ import type Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { getOrCreateStripeCustomerId } from '@/lib/stripe/resolve-customer';
 import { getWriteClient } from '@/lib/supabase/server-clients';
-import { getBalance, applyCreditOnce } from './credits';
+import { applyCreditOnce } from './credits';
 import { CREDIT_PACKAGES, creditsForPackage, type CreditPackage } from './packages';
 import { sendCreditReceiptEmail } from './credit-emails';
 import { sendEmail } from '@/lib/send-email';
@@ -242,11 +242,52 @@ function packFor(id: string): CreditPackage {
   return CREDIT_PACKAGES[0];
 }
 
+/**
+ * THE eligibility rule for an automatic payment — mirrored EXACTLY by the SQL
+ * `mcp_recharge_gate()` that the atomic claim (mcp_autorecharge_claim) enforces.
+ *
+ * Owner-approved invariant (frozen): an automatic payment is permitted only if the
+ * account would still be eligible if every ChatGPT-originated debit since the last
+ * successful recharge were removed. `chatgptSpend` is that sum (S =
+ * mcp_credit_balance.chatgpt_spend_since_recharge), so `balance + chatgptSpend` is the
+ * balance the account would have had without ChatGPT.
+ *
+ *   balance >= T                    → 'sufficient'
+ *   balance <  T, balance + S >= T  → 'chatgpt_caused'  (ChatGPT drained it — no charge)
+ *   balance <  T, balance + S <  T  → 'eligible'
+ *
+ * T is the CURRENT threshold. This TS copy is a fast pre-filter only; the SQL claim is
+ * authoritative (it re-reads both numbers under the settings-row lock).
+ */
+export type RechargeGateReason = 'eligible' | 'sufficient' | 'chatgpt_caused';
+export function rechargeGate(balance: number, chatgptSpend: number, threshold: number): RechargeGateReason {
+  const b = Number(balance) || 0;
+  const s = Number(chatgptSpend) || 0;
+  if (b >= threshold) return 'sufficient';
+  if (b + s >= threshold) return 'chatgpt_caused';
+  return 'eligible';
+}
+
+/**
+ * Balance + ChatGPT-attributed spend for the gate. Throws on a read error: a payment
+ * decision must never be made from an unknown number (fail CLOSED — no charge).
+ */
+async function getRechargeBalance(email: string): Promise<{ balance: number; chatgptSpend: number }> {
+  const { data, error } = await getWriteClient()
+    .from('mcp_credit_balance')
+    .select('balance, chatgpt_spend_since_recharge')
+    .eq('user_email', email)
+    .maybeSingle();
+  if (error) throw new Error(`getRechargeBalance failed: ${error.message}`);
+  const row = data as { balance: number; chatgpt_spend_since_recharge: number } | null;
+  return { balance: Number(row?.balance ?? 0), chatgptSpend: Number(row?.chatgpt_spend_since_recharge ?? 0) };
+}
+
 export interface RechargeOutcome {
   charged: boolean;
   credits?: number;
   newBalance?: number;
-  reason?: string; // when not charged: 'disabled' | 'sufficient' | 'debounced' | 'daily_cap' | 'declined' | ...
+  reason?: string; // when not charged: 'disabled' | 'sufficient' | 'chatgpt_caused' | 'debounced' | 'daily_cap' | 'declined' | ...
 }
 
 async function markSuccess(email: string): Promise<void> {
@@ -297,8 +338,9 @@ export async function maybeAutoRecharge(email: string): Promise<RechargeOutcome>
     if (!settings.hasCard || !settings.stripeCustomerId || !settings.stripePaymentMethodId) {
       return { charged: false, reason: 'no_card' };
     }
-    const balance = await getBalance(user);
-    if (balance >= settings.thresholdCredits) return { charged: false, reason: 'sufficient' };
+    const { balance, chatgptSpend } = await getRechargeBalance(user);
+    const gate = rechargeGate(balance, chatgptSpend, settings.thresholdCredits);
+    if (gate !== 'eligible') return { charged: false, reason: gate };
 
     // Atomic claim — the concurrency + debounce + daily-cap guard.
     const { data: claimRows } = await getWriteClient().rpc('mcp_autorecharge_claim', {
@@ -357,23 +399,33 @@ export async function maybeAutoRecharge(email: string): Promise<RechargeOutcome>
   }
 }
 
-/** Emails of users who are enabled, not paused, have a card, and are BELOW threshold. */
+/**
+ * Emails of users who are enabled, not paused, have a card, and pass rechargeGate()
+ * (below threshold AND below it even with ChatGPT-attributed spend added back). A read
+ * error THROWS so the cron fails loudly instead of reporting "0 candidates" as success.
+ */
 export async function listRechargeCandidates(limit = 200): Promise<string[]> {
-  const { data: settings } = await getWriteClient()
+  const { data: settings, error: settingsError } = await getWriteClient()
     .from('mcp_autorecharge')
     .select('user_email, threshold_credits')
     .eq('enabled', true)
     .eq('paused', false)
     .not('stripe_payment_method_id', 'is', null)
     .limit(limit);
+  if (settingsError) throw new Error(`listRechargeCandidates(settings) failed: ${settingsError.message}`);
   if (!settings?.length) return [];
   const emails = (settings as { user_email: string; threshold_credits: number }[]).map((s) => s.user_email);
-  const { data: balances } = await getWriteClient()
+  const { data: balances, error: balancesError } = await getWriteClient()
     .from('mcp_credit_balance')
-    .select('user_email, balance')
+    .select('user_email, balance, chatgpt_spend_since_recharge')
     .in('user_email', emails);
-  const balByEmail = new Map((balances as { user_email: string; balance: number }[] | null ?? []).map((b) => [b.user_email, b.balance]));
+  if (balancesError) throw new Error(`listRechargeCandidates(balances) failed: ${balancesError.message}`);
+  type BalRow = { user_email: string; balance: number; chatgpt_spend_since_recharge: number };
+  const balByEmail = new Map((balances as BalRow[] | null ?? []).map((b) => [b.user_email, b]));
   return (settings as { user_email: string; threshold_credits: number }[])
-    .filter((s) => (balByEmail.get(s.user_email) ?? 0) < s.threshold_credits)
+    .filter((s) => {
+      const b = balByEmail.get(s.user_email);
+      return rechargeGate(b?.balance ?? 0, b?.chatgpt_spend_since_recharge ?? 0, s.threshold_credits) === 'eligible';
+    })
     .map((s) => s.user_email);
 }

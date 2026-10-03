@@ -61,14 +61,20 @@ export interface DebitResult {
 export async function debitCredits(
   userEmail: string,
   amount: number,
-  meta: { reason: string; toolName: string; apiKeyId?: string | null },
+  meta: { reason: string; toolName: string; apiKeyId?: string | null; channel?: 'chatgpt' },
 ): Promise<DebitResult> {
+  // `p_channel` is sent ONLY for the ChatGPT surface. It grows
+  // chatgpt_spend_since_recharge (S) in the same guarded UPDATE as the debit, which is
+  // what keeps a ChatGPT-caused low balance from charging the user's card
+  // (20261003_mcp_autorecharge_chatgpt_attribution.sql). Every other caller sends the
+  // original 5 args, so the Claude path is byte-for-byte unchanged.
   const { data, error } = await getWriteClient().rpc('mcp_debit_credits', {
     p_user: userEmail.toLowerCase(),
     p_amount: Math.floor(amount),
     p_reason: meta.reason,
     p_tool: meta.toolName,
     p_api_key_id: meta.apiKeyId ?? null,
+    ...(meta.channel === 'chatgpt' ? { p_channel: 'chatgpt' } : {}),
   });
   if (error) throw new Error(`debitCredits failed: ${error.message}`);
   const row = Array.isArray(data) ? data[0] : data;

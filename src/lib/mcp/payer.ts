@@ -215,7 +215,7 @@ export interface PayerDebitResult extends DebitResult {
 export async function debitResolvedPayer(
   userEmail: string,
   amount: number,
-  meta: { reason: string; toolName: string; apiKeyId?: string | null },
+  meta: { reason: string; toolName: string; apiKeyId?: string | null; channel?: 'chatgpt' },
   resolution: PayerResolution,
 ): Promise<PayerDebitResult> {
   if (!isChargeable(resolution)) {
@@ -223,7 +223,10 @@ export async function debitResolvedPayer(
     throw new Error(resolution.kind);
   }
 
-  // PERSONAL — the existing path, entirely unchanged.
+  // PERSONAL — the existing path, entirely unchanged. `meta.channel` reaches
+  // debitCredits as-is (only 'chatgpt' changes anything: it attributes the spend so
+  // auto-recharge can exclude it). The POOL path below ignores channel by design: pool
+  // debits never touch mcp_credit_balance, so they can never move S.
   if (resolution.kind === 'personal') {
     const r = await debitCredits(userEmail, amount, meta);
     return { ...r, payer: 'personal' };

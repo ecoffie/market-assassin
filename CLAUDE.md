@@ -2741,6 +2741,21 @@ All of Phase 1 is merged to `main` + every migration run & verified live (PRs #1
 through **`runMeteredTool`**, NOT raw `runMcpTool`. Raw dispatch = tools run for free.
 Any new transport/entry point bills only if it goes through `runMeteredTool`.
 
+**⚠️ ChatGPT-attributed auto-recharge (PR pending, migration `20261003_mcp_autorecharge_chatgpt_attribution.sql`
+NOT applied yet):** an automatic card payment is permitted only if the account would still be
+eligible with every ChatGPT-originated debit since the last successful recharge removed.
+`mcp_credit_balance.chatgpt_spend_since_recharge` (S) grows only on a PERSONAL debit with
+`p_channel='chatgpt'` (same UPDATE as the debit); normal debits, pool debits and grants never
+move it. Eligible iff `balance < T AND balance + S < T` (current T) — one rule, in SQL
+`mcp_recharge_gate()` (enforced inside `mcp_autorecharge_claim`, before debounce/cap stamping)
+and TS `rechargeGate()` (cron pre-filter + engine). Only an APPLIED `auto_recharge` grant closes
+the window, by the S snapshotted at claim (`mcp_autorecharge.claimed_chatgpt_spend`); the list of
+resetting reasons is ONE line in `mcp_apply_credit` (`v_resets_window`). Any new surface that
+debits a personal balance on ChatGPT's behalf MUST pass `channel: 'chatgpt'` through
+`runMeteredTool` → `debitResolvedPayer` → `debitCredits`, or its spend can charge a card.
+Rollout: migration applied + this code live BEFORE `/chatgpt/mcp` (#1776) reaches prod.
+Open items: `tasks/autorecharge-followups-2026-10-03.md`.
+
 **Corpus extraction guard (Layers A+B, `src/lib/mcp/extraction-guard.ts`):** protects ONLY
 the proprietary tools (`PROPRIETARY_TOOLS` in `tool-registry.ts`: winning-playbook, podcast-
 lessons, sblo-contact, federal-osbp) from bulk export — the public-data wrappers stay ungated.
