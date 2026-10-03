@@ -2741,18 +2741,21 @@ All of Phase 1 is merged to `main` + every migration run & verified live (PRs #1
 through **`runMeteredTool`**, NOT raw `runMcpTool`. Raw dispatch = tools run for free.
 Any new transport/entry point bills only if it goes through `runMeteredTool`.
 
-**⚠️ ChatGPT-attributed auto-recharge (PR pending, migration `20261003_mcp_autorecharge_chatgpt_attribution.sql`
-NOT applied yet):** an automatic card payment is permitted only if the account would still be
-eligible with every ChatGPT-originated debit since the last successful recharge removed.
-`mcp_credit_balance.chatgpt_spend_since_recharge` (S) grows only on a PERSONAL debit with
-`p_channel='chatgpt'` (same UPDATE as the debit); normal debits, pool debits and grants never
-move it. Eligible iff `balance < T AND balance + S < T` (current T) — one rule, in SQL
-`mcp_recharge_gate()` (enforced inside `mcp_autorecharge_claim`, before debounce/cap stamping)
-and TS `rechargeGate()` (cron pre-filter + engine). Only an APPLIED `auto_recharge` grant closes
-the window, by the S snapshotted at claim (`mcp_autorecharge.claimed_chatgpt_spend`); the list of
-resetting reasons is ONE line in `mcp_apply_credit` (`v_resets_window`). Any new surface that
-debits a personal balance on ChatGPT's behalf MUST pass `channel: 'chatgpt'` through
-`runMeteredTool` → `debitResolvedPayer` → `debitCredits`, or its spend can charge a card.
+**⚠️ ChatGPT-attributed auto-recharge (PR #1778, migration `20261003_mcp_autorecharge_chatgpt_attribution.sql`
+NOT applied yet):** an automatic card payment is permitted only if the account would still qualify
+after removing all ChatGPT-originated consumption in the current ATTRIBUTION WINDOW — the window
+opened by the most recent INDEPENDENT FUNDING EVENT. `mcp_credit_balance.chatgpt_spend_since_recharge`
+(S) grows only on a PERSONAL debit with `p_channel='chatgpt'` (same UPDATE as the debit); normal and
+pool debits never move it. Eligible iff `balance < T AND balance + S < T` (current T) — one rule, in
+SQL `mcp_recharge_gate()` (enforced inside `mcp_autorecharge_claim`, before debounce/cap stamping)
+and TS `rechargeGate()` (cron pre-filter + engine). A grant whose reason is in the ONE SQL allowlist
+`mcp_grant_resets_chatgpt_window()` sets S := 0 in the grant's own statement (auto_recharge,
+stripe_topup, pro_monthly, app_tier_pro, app_tier_team, mcp_sub_monthly, mcp_sub_annual); every other
+reason — admin, signup/promo, referral, corrections, pool, sponsor, and ANY NEW reason — does not.
+**Adding a grant reason?** Classify it in `src/lib/mcp/grant-reasons.ts`; `grant-reasons.unit.test.ts`
+scans every `applyCreditOnce`/`grantCredits`/`topUpToCeiling` call and fails on an unclassified one.
+Any new surface that debits a personal balance on ChatGPT's behalf MUST pass `channel: 'chatgpt'`
+through `runMeteredTool` → `debitResolvedPayer` → `debitCredits`, or its spend can charge a card.
 Rollout: migration applied + this code live BEFORE `/chatgpt/mcp` (#1776) reaches prod.
 Open items: `tasks/autorecharge-followups-2026-10-03.md`.
 

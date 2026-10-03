@@ -246,11 +246,13 @@ function packFor(id: string): CreditPackage {
  * THE eligibility rule for an automatic payment — mirrored EXACTLY by the SQL
  * `mcp_recharge_gate()` that the atomic claim (mcp_autorecharge_claim) enforces.
  *
- * Owner-approved invariant (frozen): an automatic payment is permitted only if the
- * account would still be eligible if every ChatGPT-originated debit since the last
- * successful recharge were removed. `chatgptSpend` is that sum (S =
- * mcp_credit_balance.chatgpt_spend_since_recharge), so `balance + chatgptSpend` is the
- * balance the account would have had without ChatGPT.
+ * Owner-approved invariant: an automatic payment is permitted only if the account would
+ * still qualify after removing all ChatGPT-originated consumption in the current
+ * attribution window — the window opened by the most recent INDEPENDENT FUNDING EVENT
+ * (successful auto-recharge, customer-paid top-up, subscription allowance / renewal; the
+ * SQL allowlist mcp_grant_resets_chatgpt_window(), mirrored in ./grant-reasons.ts).
+ * `chatgptSpend` is that window's sum (S = mcp_credit_balance.chatgpt_spend_since_recharge),
+ * so `balance + chatgptSpend` is the balance the account would have had without ChatGPT.
  *
  *   balance >= T                    → 'sufficient'
  *   balance <  T, balance + S >= T  → 'chatgpt_caused'  (ChatGPT drained it — no charge)

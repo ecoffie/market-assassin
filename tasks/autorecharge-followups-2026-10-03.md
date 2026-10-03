@@ -31,7 +31,7 @@ email is not recorded here because this repo is public; find it with
 `refill` = 1,000 cr / $119). The engine charges it through the silent fallback in
 `packFor()` (`src/lib/mcp/autorecharge.ts:229-243`): `CREDIT_PACKAGES.find` misses, it logs
 a warning, and returns `CREDIT_PACKAGES[0]`. The PaymentIntent metadata then says
-`package: 'refill'` (`src/lib/mcp/autorecharge.ts:356`, the `paymentIntents.create`
+`package: 'refill'` (`src/lib/mcp/autorecharge.ts:358`, the `paymentIntents.create`
 call), so the webhook backstop (`src/app/api/stripe-webhook/route.ts:701`) grants
 correctly. Net effect: the first time this account drops below 100 it is charged **$119 for
 1,000 credits**, not whatever the "plus" pack was when they enabled it, and the
@@ -43,9 +43,9 @@ account's personal balance on 2026-10-03 was well above its threshold of 100. De
 ## (b) A pooled team member can still have their PERSONAL card auto-recharged
 
 `runMeteredTool` only raises `needsRecharge` for a personal payer
-(`src/lib/mcp/metered.ts:302`, `debit.payer === 'personal' && …`), so the
+(`src/lib/mcp/metered.ts:310`, `debit.payer === 'personal' && …`), so the
 in-request path is correct. But the hourly cron is not payer-aware:
-`listRechargeCandidates()` (`src/lib/mcp/autorecharge.ts:407`) selects every enabled/unpaused/carded row and compares only
+`listRechargeCandidates()` (`src/lib/mcp/autorecharge.ts:409`) selects every enabled/unpaused/carded row and compares only
 `mcp_credit_balance` (personal) to the threshold, and `maybeAutoRecharge()` /
 `mcp_autorecharge_claim` never consult `resolvePayer` (`src/lib/mcp/payer.ts`). A member who
 drained their personal balance below threshold BEFORE joining a team (or an owner whose
@@ -56,28 +56,36 @@ one-time Team migration can itself push a member under their threshold.) Decisio
 should active pool membership suppress personal auto-recharge (mirroring the in-request
 rule), or is a personal card mandate independent of team membership?
 
-## (c) OPEN QUESTION — should paid manual top-ups / subscription credits close the attribution window?
+## (c) Window reset classification: RESOLVED by owner decision, two reasons await classification
 
-The approved rule only resets S on an applied `auto_recharge` grant. Consequence, proven by
-the test `OPEN QUESTION — literal rule > indefinite suppression…` in
-`src/lib/mcp/autorecharge-chatgpt-attribution.pglite.unit.test.ts`: balance 1,000, T = 50;
-ChatGPT spends 100 (S = 100); Claude drains to 0 → `balance + S = 100 >= 50` →
-`chatgpt_caused`. Each month the user buys a manual top-up and Claude spends it back to 0:
-S stays 100, so the account is suppressed **indefinitely**, though they have since paid by
-hand and every recent debit was Claude's.
+The owner decided on 2026-10-03 that the window resets on any **independent funding event**:
+- successful auto-recharge
+- customer-paid manual top-up
+- subscription allowance / refill
+- subscription renewal credit grant
 
-The fix, if wanted, is a one-line change: add the reason(s) to
-`v_resets_window BOOLEAN := p_reason IN ('auto_recharge')` in `mcp_apply_credit`. Any reason
-added there forgives ALL of S (only `auto_recharge` forgives just its claim snapshot).
-Candidates: `stripe_topup` (paid manual top-up), the subscription grant reasons written by
-`stripe-subscription.ts` / `app-tier-subscription.ts`, `pro_monthly`.
+Admin/debug grants, promo/signup credits, referrals, refunds/corrections, migrations, pool
+transfers and comp resets do NOT reset it, and neither does any unknown reason. This is
+implemented with one SQL allowlist, `mcp_grant_resets_chatgpt_window()`, mirrored in
+`src/lib/mcp/grant-reasons.ts`. A source-scan guard in `grant-reasons.unit.test.ts` fails on
+any unclassified reason.
 
-## (d) Minor, pre-existing: snapshot attribution when the engine dies mid-recharge
+Still **needs owner classification** (both treated as NO RESET until decided):
+- `sponsor_monthly`: a sponsor-funded monthly top-up to a ceiling
+  (`cron/grant-mcp-pro-credits` → `mcp_topup_to_ceiling`). The credits are paid for, but by a
+  third party, not the customer.
+- `pro_monthly_supplement`: 40 historical rows on 2026-09-08. No current code writes it.
 
-The claim snapshot lives on the settings row, not on the PaymentIntent. If the engine charges
-successfully but dies before `applyCreditOnce`, the balance stays low; after the 90s debounce a
-second claim may charge again (a pre-existing double-charge window this PR does not change) and
-overwrite the snapshot, so the delayed webhook grant for the FIRST PaymentIntent subtracts the
-second claim's S. It can only forgive ChatGPT spend that existed at a real claim decision, never
-more than S (floored at 0). Fully precise attribution would carry the snapshot in PaymentIntent
-metadata and pass it to the grant, which changes `mcp_apply_credit`'s signature.
+**Ambiguity inside a RESET reason:** `pro_monthly` is written by the same cron to paying Pro
+subscribers AND to the comp groups (internal team at 25,000/mo, and advocates), according to the
+route header `src/app/api/cron/grant-mcp-pro-credits/route.ts:2-9`. So a comp account's monthly
+allowance also resets the window. Making comp allowances NO RESET would mean the cron writes a
+distinct reason for its `internal`/`advocate` groups (e.g. `comp_monthly`), classified NO RESET.
+That is a one-line change in the cron plus one entry in `grant-reasons.ts`. Owner call.
+
+## (d) Removed: claim-time snapshot
+
+The earlier design snapshotted S at claim and forgave only that amount at grant. The owner's
+reset semantics (S := 0 on a funding event) replace it, so the column was never created. ChatGPT
+spend between claim and grant now belongs to the old window, as the owner specified, and the
+"engine died mid-recharge" snapshot edge case no longer exists.
