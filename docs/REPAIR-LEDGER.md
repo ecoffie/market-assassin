@@ -1376,3 +1376,17 @@ Resend-suppressed addresses were attempted ~60×/day. The daily-alert retry igno
 | Date | Area | Fix | Proof anchor | Verified | Status |
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-02 | Contractor history / activity status | On Oct 1 the wall clock rolled to FY2027, a year the warehouse holds no rows for (max action 2026-09-18), so the FY2026–FY2027 window was always `partial` and every contractor profile reported `activity_status: unknown`. Reference FY is now the FY of the warehouse's max action date, never later than the wall-clock FY (`activityReferenceFiscalYear`), at both call sites (`getBqContractorHistory`, tier-2 `get_contractor_profile`). Two calendar-sanitize fixtures written relative to 2026-09-25 now freeze the clock there instead of rotting. | `activityReferenceFiscalYear(warehouseCoverage?.clocks?.sourceActionMax)` → `src/lib/bigquery/recipients.ts` | `bq-history-completeness.unit.test.ts` new rollover test (wall clock 2026-10-15 → reference FY2026, `active`); `award-history-shape.unit.test.ts` helper tests; red without the fix (3 failing incl. the 2 that broke the pre-push gate on main), green with it | 🟡 PR |
+
+## 2026-10-02 — Recompete duplicate orders: one award, two `contract_id`s
+
+Measured read-only (186,535 rows): 27 groups / 54 rows share PIID + incumbent UEI + current end +
+total_obligation + awarding agency under different `contract_id`s; 21 groups visible to readers.
+Cause: (1) USASpending re-parented the order, which changes its `generated_internal_id`; the sync
+upserts on `contract_id`, so the old id is orphaned (frozen `last_synced_at`, USASpending 404 —
+e.g. `CONT_AWD_140D0426F0336_1406_20343125A00001_2036` 404 vs `…_140D0426A8062_1406` 200);
+(2) legacy April rows (`contract_id` = bare PIID) beside the per-contract sync's `CONT_AWD_` row.
+Canonical row = freshest `last_synced_at` → `CONT_AWD_` id → lowest `contract_id`. DB untouched.
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-02 | Recompete / duplicate award ids | Read-layer collapse on the natural key (PIID + UEI + end + value + agency; NAICS excluded — the Tyler pair is 511210 vs 541511) in the shared `queryExpiringContracts` (25-row headroom so a page never comes up short; `total` = row count − collapsed, `count` stays the raw exact row count, new `duplicates_collapsed`), the `/api/recompete` panel route (before vehicle rollup; `capped` still reads the raw scan), `find_opportunities` Coming Back (legacy definitive twins) and the Coming-Back alert section. PIID-keyed `set_aside_enriched` carried from the stale twin. | `const primary = dedupeRecompeteRows(` → `src/lib/recompete/query.ts` · `dedupeRecompeteRows(lineageOk` → `src/lib/opportunities/find-opportunities.ts` | `dedupe-orders.unit.test.ts` (9); live read-only before→after: DOI 541511 162→156 rows (6 dup groups→0), GAO 541511+511210 12→11 (Tyler pair→1); Coming-Back-eligible definitive twins 6→3; `verify:oracles --only recompete-count` 2/2 | 🟡 PR |

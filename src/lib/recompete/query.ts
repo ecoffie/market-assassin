@@ -10,12 +10,20 @@
 import { createClient } from '@supabase/supabase-js';
 import { getNaics } from '@/lib/codes/lookup';
 import { annotateRecompeteRow, type RecompeteRowAnnotations } from '@/lib/recompete/annotate';
+import { dedupeRecompeteRows } from '@/lib/recompete/dedupe-orders';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type,last_synced_at';
+
+/**
+ * Extra rows fetched beyond `limit` so collapsing a duplicate award (dedupe-orders.ts) never
+ * leaves a short page. Measured 2026-10-02: 21 visible duplicate pairs in the whole table, and a
+ * pair always sorts adjacent (same end date + value), so 25 spare rows is ample.
+ */
+const DEDUPE_HEADROOM = 25;
 
 /**
  * Digits-only NAICS codes, deduped, order preserved. Accepts a comma/space-separated
@@ -136,6 +144,8 @@ export interface ExpiringContract {
   estimated_recompete_date: string | null;
   lead_time_months: number | null;
   recompete_likelihood: string | null;
+  /** When the sync last refreshed this row — picks the canonical row among duplicate ids. */
+  last_synced_at?: string | null;
   /** FPDS award type as stored ("DELIVERY ORDER", "DEFINITIVE CONTRACT", …). */
   contract_type?: string | null;
   // ── IMI corrections (annotate.ts) — present on every row this query returns ──
@@ -150,9 +160,17 @@ export interface ExpiringContract {
 
 export interface ExpiringContractsResult {
   contracts: ExpiringContract[];
+  /**
+   * Matched awards: the exact DB row `count` MINUS the duplicate-id rows collapsed inside the
+   * fetched window. Exact when the window held the whole matched set; otherwise an UPPER bound
+   * that can over-state by at most the few duplicate pairs outside the window (21 table-wide,
+   * measured 2026-10-02) — never below the true distinct count.
+   */
   total: number;
-  /** Exact head count from `{ count: 'exact' }`. Null means unknown — never treat as 0. */
+  /** Exact DB ROW count from `{ count: 'exact' }` (duplicate ids included). Null = unknown, never 0. */
   count: number | null;
+  /** Rows folded into a canonical sibling because they were the same award under another id. */
+  duplicates_collapsed: number;
   degraded: boolean;
 }
 
@@ -240,7 +258,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     const ordered = input.orderBy === 'value'
       ? q.order('total_obligation', { ascending: false, nullsFirst: false })
       : q.order('period_of_performance_current_end', { ascending: true });
-    return ordered.limit(limit);
+    return ordered.limit(limit + DEDUPE_HEADROOM);
   };
 
   let res = await build(true);
@@ -250,10 +268,14 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   }
   if (res.error) {
     console.error('[recompete:query] supabase error:', res.error.message);
-    return { contracts: [], total: 0, count: null, degraded: true };
+    return { contracts: [], total: 0, count: null, duplicates_collapsed: 0, degraded: true };
   }
 
-  let rawContracts = (res.data || []) as unknown as ExpiringContract[];
+  // Same award under two contract_ids (a re-parented order / a legacy April id) → ONE row, chosen
+  // by freshest sync. Collapse BEFORE the limit cut so a duplicate never spends a slot, then trim
+  // the headroom back off. See dedupe-orders.ts for the measured root cause.
+  const primary = dedupeRecompeteRows((res.data || []) as unknown as ExpiringContract[]);
+  let rawContracts = primary.rows.slice(0, limit);
 
   // ── NS-2: pull the company's OWN vehicles into reach ──────────────────────────────────
   // A second query under the SAME market filters, scoped to the anchor prefixes, merged
@@ -299,6 +321,11 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   //     recompete date; estimated_recompete_date is NULL (the trigger column is overridden).
   //   - an order under a vehicle is labelled one and carries no standalone recompete date.
   //   - place_of_performance_state is exposed exactly as USASpending reports it.
+  // Anchored rows can be the stale twin of a general row — collapse again over the merged set.
+  const merged = dedupeRecompeteRows(rawContracts);
+  rawContracts = merged.rows;
+  const collapsed = primary.collapsed + merged.collapsed;
+
   const now = new Date();
   const contracts = rawContracts.map((c) => {
     // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
@@ -316,5 +343,6 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
     return annotateRecompeteRow({ ...c, set_aside_type, naics_description }, now);
   });
-  return { contracts, total: res.count ?? contracts.length, count: res.count ?? null, degraded: false };
+  const total = res.count != null ? Math.max(res.count - primary.collapsed, contracts.length) : contracts.length;
+  return { contracts, total, count: res.count ?? null, duplicates_collapsed: collapsed, degraded: false };
 }

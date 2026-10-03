@@ -21,6 +21,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
 import { parseNaicsCodes, naicsOrExpression, type ExpiringContract } from '@/lib/recompete/query';
+import { dedupeRecompeteRows } from '@/lib/recompete/dedupe-orders';
 import { annotateRecompeteRow } from '@/lib/recompete/annotate';
 import { parseAwardLineage } from '@/lib/recompete/award-lineage';
 
@@ -509,7 +510,7 @@ export function selectComingBackRows(input: {
 }
 
 const COMING_BACK_COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type,last_synced_at';
 
 function marketOrExpression(naics: string[], pscs: string[]): string | null {
   const parts: string[] = [];
@@ -560,7 +561,8 @@ async function pageComingBackMarket(naics: string[], pscs: string[]): Promise<
 
   const now = new Date();
   // Same corrected row every recompete surface shows (timing / lineage / PoP — annotate.ts).
-  const contracts = (rows as unknown as ExpiringContract[]).map((c) => {
+  // One award under two contract_ids (re-parented order / legacy id) → one row (dedupe-orders.ts).
+  const contracts = dedupeRecompeteRows(rows as unknown as ExpiringContract[]).rows.map((c) => {
     const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
     return annotateRecompeteRow({ ...c, naics_description }, now);
   });
