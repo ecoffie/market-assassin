@@ -29,18 +29,18 @@ export default function FoundersSeats() {
   return (
     <div className="max-w-md mx-auto mb-8">
       <div className="flex items-baseline justify-center gap-2 mb-2">
-        <span className={`text-3xl font-black ${low ? 'text-amber-400' : 'text-emerald-400'}`}>
+        <span className={`text-3xl font-bold ${low ? 'text-(--mp-warn)' : 'text-(--mp-ink)'}`}>
           {seats.remaining}
         </span>
-        <span className="text-slate-300 text-sm">of {seats.cap} founding seats remaining</span>
+        <span className="text-(--mp-body) text-sm">of {seats.cap} founding seats remaining</span>
       </div>
-      <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+      <div className="h-2 w-full rounded-none bg-(--mp-wash) overflow-hidden">
         <div
-          className={`h-full rounded-full ${low ? 'bg-amber-400' : 'bg-emerald-500'}`}
+          className={`h-full rounded-none bg-(--mp-navy)`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-center text-slate-500 text-xs mt-2">{seats.taken} founders claimed{low ? ' — closing soon' : ''}</p>
+      <p className="text-center text-(--mp-muted) text-xs mt-2">{seats.taken} founders claimed{low ? ' — closing soon' : ''}</p>
     </div>
   );
 }

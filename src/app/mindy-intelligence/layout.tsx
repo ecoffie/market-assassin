@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
   title: "Mindy's Living Intelligence Layer | How Mindy Works",
@@ -23,5 +24,5 @@ export default function MindyIntelligenceLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <PublicShell contentElement="div">{children}</PublicShell>;
 }

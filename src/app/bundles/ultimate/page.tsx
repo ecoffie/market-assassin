@@ -6,9 +6,6 @@ export default function UltimateBundlePage() {
       title="Ultimate GovCon Bundle"
       tagline="The complete arsenal for dominating federal contracting"
       description="Get EVERYTHING. Every premium tool, every database, every report, and lifetime Market Intelligence access. The Ultimate Bundle is for contractors who are serious about building a dominant GovCon business and want no limitations."
-      primaryColor="#f59e0b"
-      gradientFrom="#f59e0b"
-      gradientTo="#ea580c"
       price={1497}
       originalPrice={3285}
       checkoutUrl="/pricing"
