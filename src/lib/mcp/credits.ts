@@ -115,6 +115,11 @@ export async function logCall(entry: {
   latencyMs?: number;
   apiKeyId?: string | null;
   outcome?: OutcomeTelemetry;
+  /**
+   * The MCP surface the call arrived on. Only 'chatgpt' is written; the Claude/general
+   * edge passes nothing, so its rows keep channel NULL (migration 20261003_mcp_call_log_channel).
+   */
+  channel?: 'chatgpt';
 }): Promise<void> {
   const legacy = {
     user_email: entry.userEmail.toLowerCase(),
@@ -124,16 +129,21 @@ export async function logCall(entry: {
     latency_ms: entry.latencyMs ?? null,
     api_key_id: entry.apiKeyId ?? null,
   };
-  const row = entry.outcome
-    ? {
-        ...legacy,
-        outcome: entry.outcome.outcome,
-        grounded: entry.outcome.grounded,
-        degraded: entry.outcome.degraded,
-        billing_outcome: entry.outcome.billingOutcome,
-        error_code: entry.outcome.errorCode,
-      }
-    : legacy;
+  // The newer columns ride only on the enriched row; `legacy` stays the pre-telemetry
+  // shape so the retry below still lands if a newer column is ever missing.
+  const enriched = {
+    ...(entry.outcome
+      ? {
+          outcome: entry.outcome.outcome,
+          grounded: entry.outcome.grounded,
+          degraded: entry.outcome.degraded,
+          billing_outcome: entry.outcome.billingOutcome,
+          error_code: entry.outcome.errorCode,
+        }
+      : {}),
+    ...(entry.channel === 'chatgpt' ? { channel: 'chatgpt' as const } : {}),
+  };
+  const row = Object.keys(enriched).length ? { ...legacy, ...enriched } : legacy;
   try {
     const { error } = await getWriteClient().from('mcp_call_log').insert(row);
     if (!error) return;
