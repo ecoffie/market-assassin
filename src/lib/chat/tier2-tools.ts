@@ -47,6 +47,7 @@ import {
   classifyModNumber,
   dateRangeValidFlag,
   deriveActivityFromSeries,
+  activityReferenceFiscalYear,
   describeCoverageTimestamp,
   isModificationAction,
   SHORT_TOTALS_NOTE,
@@ -367,7 +368,9 @@ export function makeTier2Tools(email: string) {
       deobligations: y.deobligations == null ? undefined : Number(y.deobligations),
       awardCount: Number(y.award_count || 0),
     }));
-    const activity = deriveActivityFromSeries(series);
+    const activity = deriveActivityFromSeries(series, {
+    referenceFiscalYear: activityReferenceFiscalYear(warehouseCoverage?.clocks?.sourceActionMax),
+  });
     const counting = buildCountingBases({
       uniqueAwards: profile.award_count ?? 0,
       series,

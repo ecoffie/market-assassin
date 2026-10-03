@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activityReferenceFiscalYear,
   assessDateRange,
   buildCountingBases,
   classifyAgencyYearObligations,
@@ -383,5 +384,19 @@ describe('SHORT_TOTALS_NOTE', () => {
   it('stays short enough for customer-facing copy', () => {
     expect(SHORT_TOTALS_NOTE.length).toBeLessThan(160);
     expect(SHORT_TOTALS_NOTE).toMatch(/Do not treat the two totals/);
+  });
+});
+
+describe('activityReferenceFiscalYear', () => {
+  it('follows the warehouse data clock across the Oct 1 rollover', () => {
+    const oct15 = new Date('2026-10-15T00:00:00Z');
+    expect(activityReferenceFiscalYear('2026-09-18', oct15)).toBe(2026);
+    expect(activityReferenceFiscalYear('2026-10-02', oct15)).toBe(2027);
+  });
+  it('never exceeds the wall-clock FY and falls back on missing/invalid dates', () => {
+    const sep = new Date('2026-09-25T00:00:00Z');
+    expect(activityReferenceFiscalYear('2027-03-01', sep)).toBe(2026);
+    expect(activityReferenceFiscalYear(null, sep)).toBe(2026);
+    expect(activityReferenceFiscalYear('not-a-date', sep)).toBe(2026);
   });
 });

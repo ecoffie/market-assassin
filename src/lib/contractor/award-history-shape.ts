@@ -70,6 +70,23 @@ export function currentFederalFiscalYear(now: Date = new Date()): number {
 }
 
 /**
+ * Reference FY for activity classification: the FY the WAREHOUSE has data for,
+ * never later than the wall-clock FY. On Oct 1 the wall clock rolls to a fiscal
+ * year the warehouse holds no rows for yet, which made every contractor's
+ * activity "unknown" (missing reference-year coverage). The data clock decides.
+ */
+export function activityReferenceFiscalYear(
+  warehouseMaxActionDate: string | null | undefined,
+  now: Date = new Date(),
+): number {
+  const wall = currentFederalFiscalYear(now);
+  if (!warehouseMaxActionDate) return wall;
+  const d = new Date(`${String(warehouseMaxActionDate).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return wall;
+  return Math.min(wall, currentFederalFiscalYear(d));
+}
+
+/**
  * Classify a modification number.
  * Only explicit `0` / `00` / `000` is base. Null/blank stays unknown —
  * the warehouse does not establish that blank means base.

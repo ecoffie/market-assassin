@@ -21,6 +21,7 @@ import {
   dateRangeValidFlag,
   assessDateRange,
   deriveActivityFromSeries,
+  activityReferenceFiscalYear,
   describeCoverageTimestamp,
   isModificationAction,
   classifyModNumber,
@@ -1819,7 +1820,9 @@ export async function getBqContractorHistory(opts: {
   const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
   const topAgency = agencies[0]?.awarding_agency || null;
   const totalObligations = Number(profile.total_obligated || 0);
-  const activity = deriveActivityFromSeries(series);
+  const activity = deriveActivityFromSeries(series, {
+    referenceFiscalYear: activityReferenceFiscalYear(warehouseCoverage?.clocks?.sourceActionMax),
+  });
   const counting = buildCountingBases({
     uniqueAwards: awardCount,
     series,
