@@ -59,6 +59,22 @@ if ! ROOT="$("$HOOK_DIR/resolve-checkout.sh" "$HOOK_DIR")"; then
 fi
 cd "$ROOT" || { echo "✗ pre-push gate: cannot enter $ROOT — blocking." >&2; exit 1; }
 
+# ── Per-run diagnostics directory ─────────────────────────────────────────────
+# Every log used to be a FIXED name ($PREPUSH_LOG_DIR/unit.log …). With several
+# worktrees/agents pushing at once, one run overwrote another's logs mid-read, so a
+# failure could be reported with someone else's output. Each run now owns a unique
+# directory keyed by checkout identity (basename + hash of the physical path) and
+# run identity (timestamp + PID). Logs are kept after the run for diagnosis.
+_gate_root_id="$(printf '%s' "$ROOT" | shasum 2>/dev/null | cut -c1-8)"
+_gate_base="$(printf '%s' "$(basename "$ROOT")" | tr -c 'A-Za-z0-9._-' '_')"
+_gate_tmp="${TMPDIR:-/tmp}"
+PREPUSH_LOG_DIR="${_gate_tmp%/}/mindy-prepush/${_gate_base}-${_gate_root_id:-noid}-$(date +%Y%m%dT%H%M%S)-$$"
+if ! mkdir -p "$PREPUSH_LOG_DIR"; then
+  echo "✗ pre-push gate: cannot create log dir $PREPUSH_LOG_DIR — blocking." >&2
+  exit 1
+fi
+export PREPUSH_LOG_DIR
+
 BOLD='\033[1m'; RED='\033[0;31m'; GREEN='\033[0;32m'; YEL='\033[0;33m'; NC='\033[0m'
 fail=0
 
@@ -68,25 +84,47 @@ GATE_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '<detached>')
 echo -e "${BOLD}── pre-push gate ──${NC}"
 echo -e "  ${BOLD}checkout${NC} $ROOT"
 echo -e "  ${BOLD}HEAD${NC}     $GATE_HEAD ($GATE_BRANCH)"
+echo -e "  ${BOLD}logs${NC}     $PREPUSH_LOG_DIR"
+
+# 0b) HARD BLOCK: this checkout must have its OWN dependency install.
+#     A linked worktree under .claude/worktrees/ sits INSIDE the primary checkout, so with
+#     no local node_modules Node silently resolves every package — vitest, tsc, tsx — from
+#     the PRIMARY's install. The gate then runs the pushed code against another tree's
+#     dependencies, and the tests that correctly assert a local install (the tsx-binary and
+#     shared-registry tests) fail for a reason unrelated to the branch (measured 2026-09-28).
+#     A symlinked node_modules is refused too: `npm ci` through that link deletes the
+#     primary's install (incident 2026-09-25). DETECTION ONLY — this never installs,
+#     links or deletes anything; the fix it prints is safe because the path it names is
+#     this checkout's own (absent) node_modules.
+if [ -L node_modules ]; then
+  echo -e "  ${RED}✗ node_modules is a SYMLINK (shared install) — refusing to run the gate on borrowed dependencies.${NC}"
+  echo -e "      Fix: remove ONLY the link (\`rm $ROOT/node_modules\` — never rm -rf through it), then run \`npm ci\` in $ROOT"
+  exit 1
+fi
+if [ ! -x node_modules/.bin/vitest ] || [ ! -x node_modules/.bin/tsc ]; then
+  echo -e "  ${RED}✗ this checkout has no dependency install of its own ($ROOT/node_modules).${NC}"
+  echo -e "      Fix: run \`npm ci\` in $ROOT, then push again."
+  exit 1
+fi
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
 echo -e "  ${BOLD}1/13${NC} typecheck (tsc --noEmit)…"
-if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
+if npx tsc --noEmit > $PREPUSH_LOG_DIR/tsc.log 2>&1; then
   echo -e "      ${GREEN}✓ typecheck clean${NC}"
 else
   echo -e "      ${RED}✗ typecheck FAILED — push blocked${NC}"
-  grep "error TS" /tmp/mindy-prepush-tsc.log | head -15 | sed 's/^/        /'
+  grep "error TS" $PREPUSH_LOG_DIR/tsc.log | head -15 | sed 's/^/        /'
   fail=1
 fi
 
 # 1a) HARD BLOCK: the gate must validate the checkout being pushed. If this
 # regresses, every other step in this file reports on the wrong tree.
 echo -e "  ${BOLD}1a/13${NC} pre-push checkout selection…"
-if bash tests/pre-push-worktree-selection.test.sh > /tmp/mindy-prepush-selection.log 2>&1; then
+if bash tests/pre-push-worktree-selection.test.sh > $PREPUSH_LOG_DIR/selection.log 2>&1; then
   echo -e "      ${GREEN}✓ gate validates the pushed checkout (worktree-safe)${NC}"
 else
   echo -e "      ${RED}✗ checkout-selection regression — push blocked${NC}"
-  grep -aE "✗|FAIL" /tmp/mindy-prepush-selection.log | head -8 | sed 's/^/        /'
+  grep -aE "✗|FAIL" $PREPUSH_LOG_DIR/selection.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 
@@ -95,16 +133,16 @@ fi
 # clean, passes the gate, and ships DEAD — the inline <script> throws on load and every function
 # after the break (openOppDrawer, the drawers) never binds. #495 shipped exactly this (an extra ')').
 echo -e "  ${BOLD}1b/13${NC} client <script> syntax (opportunity-map)…"
-if node scripts/check-drawer-js.mjs > /tmp/mindy-prepush-drawerjs.log 2>&1; then
+if node scripts/check-drawer-js.mjs > $PREPUSH_LOG_DIR/drawerjs.log 2>&1; then
   echo -e "      ${GREEN}✓ client scripts parse clean${NC}"
 else
   echo -e "      ${RED}✗ a served client script has a JS syntax error — push blocked${NC}"
-  cat /tmp/mindy-prepush-drawerjs.log | head -8 | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/drawerjs.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 
 echo -e "  ${BOLD}1c/13${NC} template-html.ts in sync with template.html…"
-if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1; then
+if node scripts/gen-template-html.mjs --check > $PREPUSH_LOG_DIR/tmpl.log 2>&1; then
   echo -e "      ${GREEN}✓ served template matches source${NC}"
 else
   echo -e "      ${RED}✗ template.html was edited but template-html.ts (the file the map SERVES) wasn't regenerated — push blocked${NC}"
@@ -115,21 +153,21 @@ fi
 # 1d) HARD BLOCK: the core.hooksPath drift detector (step 0) must keep
 # detecting. Hermetic: disposable repos under a validated temp dir only.
 echo -e "  ${BOLD}1d/13${NC} core.hooksPath drift detector…"
-if bash tests/check-hooks-path.test.sh > /tmp/mindy-prepush-hookspath.log 2>&1; then
+if bash tests/check-hooks-path.test.sh > $PREPUSH_LOG_DIR/hookspath.log 2>&1; then
   echo -e "      ${GREEN}✓ hooksPath detector regression passes${NC}"
 else
   echo -e "      ${RED}✗ hooksPath detector regression — push blocked${NC}"
-  grep -aE "✗|FAIL" /tmp/mindy-prepush-hookspath.log | head -8 | sed 's/^/        /'
+  grep -aE "✗|FAIL" $PREPUSH_LOG_DIR/hookspath.log | head -8 | sed 's/^/        /'
   fail=1
 fi
 
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
 echo -e "  ${BOLD}2/13${NC} client auth-header audit…"
-if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
+if node scripts/audit-client-auth.mjs > $PREPUSH_LOG_DIR/auth.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
 else
   echo -e "      ${RED}✗ new unauthenticated gated fetch — push blocked${NC}"
-  cat /tmp/mindy-prepush-auth.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/auth.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -138,11 +176,11 @@ fi
 #    query → generic/empty result for the user). This is the loadBidderProfile /
 #    user_briefing_profile dead-table class. Baseline-gated: only NEW ones block.
 echo -e "  ${BOLD}3/13${NC} supabase swallowed-error audit…"
-if node scripts/audit-supabase-errors.mjs > /tmp/mindy-prepush-sberr.log 2>&1; then
+if node scripts/audit-supabase-errors.mjs > $PREPUSH_LOG_DIR/sberr.log 2>&1; then
   echo -e "      ${GREEN}✓ no new swallowed-error reads${NC}"
 else
   echo -e "      ${RED}✗ new swallowed-error read — push blocked${NC}"
-  cat /tmp/mindy-prepush-sberr.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/sberr.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -156,11 +194,11 @@ fi
 #     numbers disagree caught the last one. That is not a control; this is.
 #     Baseline-gated: the 46 pre-existing ones are recorded, only NEW ones block.
 echo -e "  ${BOLD}3b/13${NC} un-ranged selects in writing scripts…"
-if node scripts/audit-unranged-selects.mjs > /tmp/mindy-prepush-unranged.log 2>&1; then
+if node scripts/audit-unranged-selects.mjs > $PREPUSH_LOG_DIR/unranged.log 2>&1; then
   echo -e "      ${GREEN}✓ no new un-ranged list selects${NC}"
 else
   echo -e "      ${RED}✗ new un-ranged select in a writing script — push blocked${NC}"
-  cat /tmp/mindy-prepush-unranged.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/unranged.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -173,11 +211,11 @@ fi
 #     Targets the dangerous SHAPE only (unbounded list read -> population metric), so it
 #     flags 131 of 935 selects rather than becoming noise someone disables.
 echo -e "  ${BOLD}3c/13${NC} API 1,000-row truncation…"
-if node scripts/audit-api-truncation.mjs > /tmp/mindy-prepush-apitrunc.log 2>&1; then
+if node scripts/audit-api-truncation.mjs > $PREPUSH_LOG_DIR/apitrunc.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unpaginated population reads${NC}"
 else
   echo -e "      ${RED}✗ new unpaginated population read in an API route — push blocked${NC}"
-  cat /tmp/mindy-prepush-apitrunc.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/apitrunc.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -191,11 +229,11 @@ fi
 #     written to guard against the bug. A repo scan then found 52 more, including
 #     observatory.ts requesting 200,000 rows from an 84,033-row table.
 echo -e "  ${BOLD}3e/13${NC} oversized PostgREST .limit(n)…"
-if node scripts/audit-oversized-limits.mjs > /tmp/mindy-prepush-limits.log 2>&1; then
+if node scripts/audit-oversized-limits.mjs > $PREPUSH_LOG_DIR/limits.log 2>&1; then
   echo -e "      ${GREEN}✓ no new oversized limits${NC}"
 else
   echo -e "      ${RED}✗ new .limit(n) above the 1,000-row cap — push blocked${NC}"
-  cat /tmp/mindy-prepush-limits.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/limits.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -205,11 +243,11 @@ fi
 #     the recompete prune counted a payload against a 137,186-row candidate set. Proven by
 #     re-injecting that exact code from dde08aab and watching this gate block it.
 echo -e "  ${BOLD}3d/13${NC} INT-005 mutation receipts…"
-if node scripts/audit-mutation-receipts.mjs > /tmp/mindy-prepush-int005.log 2>&1; then
+if node scripts/audit-mutation-receipts.mjs > $PREPUSH_LOG_DIR/int005.log 2>&1; then
   echo -e "      ${GREEN}✓ no new mutation-receipt counts${NC}"
 else
   echo -e "      ${RED}✗ INT-005: a mutation RETURNING payload is being counted — push blocked${NC}"
-  cat /tmp/mindy-prepush-int005.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/int005.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -218,11 +256,11 @@ fi
 #     reach the batch cursor, so re-running never helps. Real incident: weekly-alerts left
 #     ~1,028 eligible users unqueued on EVERY cycle. Proven by re-injecting the pre-fix read.
 echo -e "  ${BOLD}3e/13${NC} INT-011 audience reachability…"
-if node scripts/audit-audience-reachability.mjs > /tmp/mindy-prepush-int011.log 2>&1; then
+if node scripts/audit-audience-reachability.mjs > $PREPUSH_LOG_DIR/int011.log 2>&1; then
   echo -e "      ${GREEN}✓ no unreachable-audience reads${NC}"
 else
   echo -e "      ${RED}✗ INT-011: audience truncated before batching — push blocked${NC}"
-  cat /tmp/mindy-prepush-int011.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/int011.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -234,22 +272,27 @@ fi
 #     tool. Proven by injection: a raw `sections: drafts` AND the deceptive
 #     `compliance_count: compliance.map(c => c.requirement).join(' ')` both block.
 echo -e "  ${BOLD}3f/13${NC} proposal telemetry content leak…"
-if node scripts/audit-proposal-telemetry.mjs > /tmp/mindy-prepush-proptel.log 2>&1; then
+if node scripts/audit-proposal-telemetry.mjs > $PREPUSH_LOG_DIR/proptel.log 2>&1; then
   echo -e "      ${GREEN}✓ no proposal content in telemetry${NC}"
 else
   echo -e "      ${RED}✗ proposal CONTENT is being written to analytics — push blocked${NC}"
-  cat /tmp/mindy-prepush-proptel.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/proptel.log | sed 's/^/        /'
   fail=1
 fi
 
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
 echo -e "  ${BOLD}4/13${NC} unit tests (vitest run)…"
-if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
+if npm run --silent test:unit > $PREPUSH_LOG_DIR/unit.log 2>&1; then
   echo -e "      ${GREEN}✓ unit tests pass${NC}"
 else
   echo -e "      ${RED}✗ unit tests FAILED — push blocked${NC}"
-  grep -E "✗|FAIL|Error|expected|AssertionError" /tmp/mindy-prepush-unit.log | head -15 | sed 's/^/        /'
+  # Name what failed: failing test lines, then unhandled (non-test) errors — a green
+  # test count with an unhandled error still fails the run and must say so.
+  grep -aE "^ *(FAIL|×) " $PREPUSH_LOG_DIR/unit.log | head -25 | sed 's/^/        /'
+  grep -aE -A1 "Unhandled (Error|Rejection)" $PREPUSH_LOG_DIR/unit.log | grep -avE "^(--|⎯+)$" | head -6 | sed 's/^/        /'
+  grep -aE "^ +(Test Files|Tests|Errors) " $PREPUSH_LOG_DIR/unit.log | sed 's/^/        /'
+  echo -e "      full log: $PREPUSH_LOG_DIR/unit.log"
   fail=1
 fi
 
@@ -261,11 +304,11 @@ fi
 #     serving host). After production Ready: `--live --expect-sha <release>`.
 #     Missing HMAC secrets = NOT TESTED; configured 401 = FAIL.
 echo -e "  ${BOLD}4b/13${NC} maps account chrome (source)…"
-if node scripts/verify-maps-account.mjs > /tmp/mindy-prepush-maps-account.log 2>&1; then
+if node scripts/verify-maps-account.mjs > $PREPUSH_LOG_DIR/maps-account.log 2>&1; then
   echo -e "      ${GREEN}✓ HMAC decoder, never \"?\", Players=companies${NC}"
 else
   echo -e "      ${RED}✗ maps account chrome FAILED — push blocked${NC}"
-  cat /tmp/mindy-prepush-maps-account.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/maps-account.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -275,11 +318,11 @@ fi
 #    via sendEmail(). Zero-tolerance — the only sanctioned nodemailer use is the
 #    fallback inside send-email.ts. See memory: mindy-email-sender-architecture.
 echo -e "  ${BOLD}5/13${NC} email-sender (no office365 direct sends)…"
-if node scripts/audit-email-sender.mjs > /tmp/mindy-prepush-email.log 2>&1; then
+if node scripts/audit-email-sender.mjs > $PREPUSH_LOG_DIR/email.log 2>&1; then
   echo -e "      ${GREEN}✓ all email goes through sendEmail()/Resend${NC}"
 else
   echo -e "      ${RED}✗ direct office365 send found — push blocked${NC}"
-  cat /tmp/mindy-prepush-email.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/email.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -288,11 +331,11 @@ fi
 #    (2026-07-17: registry 49, artifact 46, changelog 41, whitepaper 40). A wrong
 #    tool count ships to customers, so it is a gate now rather than a paragraph.
 echo -e "  ${BOLD}6/13${NC} MCP tool-catalog drift…"
-if node scripts/audit-tool-catalog-drift.mjs > /tmp/mindy-prepush-catalog.log 2>&1; then
+if node scripts/audit-tool-catalog-drift.mjs > $PREPUSH_LOG_DIR/catalog.log 2>&1; then
   echo -e "      ${GREEN}✓ all catalog surfaces agree${NC}"
 else
   echo -e "      ${RED}✗ tool-catalog DRIFT — push blocked${NC}"
-  sed 's/^/        /' /tmp/mindy-prepush-catalog.log
+  sed 's/^/        /' $PREPUSH_LOG_DIR/catalog.log
   fail=1
 fi
 
@@ -311,11 +354,11 @@ fi
 #     "$6.2B allocated for hypersonic weapons" reached a generated proposal under
 #     the heading "Stated strategic priorities".
 echo -e "  ${BOLD}6b/13${NC} strategic-claim provenance bypass…"
-if node scripts/audit-strategic-claim-bypass.mjs > /tmp/mindy-prepush-claimbypass.log 2>&1; then
+if node scripts/audit-strategic-claim-bypass.mjs > $PREPUSH_LOG_DIR/claimbypass.log 2>&1; then
   echo -e "      ${GREEN}✓ no new raw strategic-corpus reads${NC}"
 else
   echo -e "      ${RED}✗ new strategic-claim provenance bypass — push blocked${NC}"
-  cat /tmp/mindy-prepush-claimbypass.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/claimbypass.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -328,20 +371,20 @@ fi
 #     So: it reports here, and exits non-zero when run directly (or after a
 #     merge) where the finding IS actionable.
 echo -e "  ${BOLD}6c/13${NC} cron route credentials (warn only — reads live rows)…"
-if node scripts/audit-cron-route-credentials.mjs > /tmp/mindy-prepush-croncreds.log 2>&1; then
+if node scripts/audit-cron-route-credentials.mjs > $PREPUSH_LOG_DIR/croncreds.log 2>&1; then
   echo -e "      ${GREEN}✓ no credentials embedded in cron routes${NC}"
 else
   echo -e "      ${YEL}⚠ credential stored in a live cron_jobs.route:${NC}"
-  cat /tmp/mindy-prepush-croncreds.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/croncreds.log | sed 's/^/        /'
   echo -e "${YEL}        (not blocking — fix the ROW via migration, then re-run this check)${NC}"
 fi
 
 echo -e "  ${BOLD}7/13${NC} rank-then-filter audit…"
-if node scripts/audit-rank-then-filter.mjs > /tmp/mindy-prepush-rankfilter.log 2>&1; then
+if node scripts/audit-rank-then-filter.mjs > $PREPUSH_LOG_DIR/rankfilter.log 2>&1; then
   echo -e "      ${GREEN}✓ no new rank-globally-then-filter sites${NC}"
 else
   echo -e "      ${RED}✗ new rank-then-filter site — push blocked${NC}"
-  cat /tmp/mindy-prepush-rankfilter.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/rankfilter.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -366,11 +409,11 @@ fi
 #     awards-schema guard) and a fully-commented 99-rollback.sql are allowlisted.
 #     Baseline-gated: only NEW ones block. Self-test: --self-test.
 echo -e "  ${BOLD}7b/13${NC} awards destructive-writer audit…"
-if node scripts/audit-awards-schema-writers.mjs > /tmp/mindy-prepush-awardswriters.log 2>&1; then
+if node scripts/audit-awards-schema-writers.mjs > $PREPUSH_LOG_DIR/awardswriters.log 2>&1; then
   echo -e "      ${GREEN}✓ no new destructive writer of usaspending.awards${NC}"
 else
   echo -e "      ${RED}✗ new destructive writer of usaspending.awards — push blocked${NC}"
-  cat /tmp/mindy-prepush-awardswriters.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/awardswriters.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -381,11 +424,11 @@ fi
 #    passed, because the expander was correct and just called in the wrong PLACE.
 #    Baseline-gated: only NEW ones block. Self-test: --self-test.
 echo -e "  ${BOLD}8/13${NC} persist-vs-query expansion audit…"
-if node scripts/audit-persist-expansion.mjs > /tmp/mindy-prepush-persist.log 2>&1; then
+if node scripts/audit-persist-expansion.mjs > $PREPUSH_LOG_DIR/persist.log 2>&1; then
   echo -e "      ${GREEN}✓ no new persisted query-time expansions${NC}"
 else
   echo -e "      ${RED}✗ new persisted query-time expansion — push blocked${NC}"
-  cat /tmp/mindy-prepush-persist.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/persist.log | sed 's/^/        /'
   fail=1
 fi
 
@@ -394,19 +437,19 @@ fi
 #     A broken skill pointer is the same class as catalog drift — confident instructions
 #     aimed at missing truth. Does not drive the Map or call live APIs.
 echo -e "  ${BOLD}8b/13${NC} ma-skills layer (verify:ma-skills)…"
-if npm run --silent verify:ma-skills > /tmp/mindy-prepush-ma-skills.log 2>&1; then
+if npm run --silent verify:ma-skills > $PREPUSH_LOG_DIR/ma-skills.log 2>&1; then
   echo -e "      ${GREEN}✓ skill layer intact (paths + on-demand frontmatter)${NC}"
 else
   echo -e "      ${RED}✗ ma-skills layer FAILED — push blocked${NC}"
-  cat /tmp/mindy-prepush-ma-skills.log | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/ma-skills.log | sed 's/^/        /'
   fail=1
 fi
 
 echo -e "  ${BOLD}9/13${NC} schema-sync (warn only)…"
-if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
+if npm run --silent test:schema > $PREPUSH_LOG_DIR/schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"
 else
-  echo -e "      ${YEL}⚠ schema-sync reported drift (not blocking — review /tmp/mindy-prepush-schema.log)${NC}"
+  echo -e "      ${YEL}⚠ schema-sync reported drift (not blocking — review $PREPUSH_LOG_DIR/schema.log)${NC}"
 fi
 
 # 5) WARN ONLY: design-token drift (new arbitrary [#hex] / raw slate-gray colors).
@@ -415,12 +458,12 @@ fi
 #    blocks a hotfix; a false positive shouldn't gate a genuine fix while the large
 #    baseline still exists. Accept an intentional change with --update-baseline.
 echo -e "  ${BOLD}10/13${NC} design-token drift (warn only)…"
-if node scripts/audit-design-tokens.mjs > /tmp/mindy-prepush-tokens.log 2>&1; then
+if node scripts/audit-design-tokens.mjs > $PREPUSH_LOG_DIR/tokens.log 2>&1; then
   echo -e "      ${GREEN}✓ no new color drift${NC}"
 else
   echo -e "      ${YEL}⚠ new raw color(s) added — prefer semantic tokens (bg-surface/border-hairline/text-muted/bg-navy/text-accent):${NC}"
-  grep -E ": \+" /tmp/mindy-prepush-tokens.log | head -8 | sed 's/^/        /'
-  echo -e "      ${YEL}  (not blocking — see /tmp/mindy-prepush-tokens.log; accept with: node scripts/audit-design-tokens.mjs --update-baseline)${NC}"
+  grep -E ": \+" $PREPUSH_LOG_DIR/tokens.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}  (not blocking — see $PREPUSH_LOG_DIR/tokens.log; accept with: node scripts/audit-design-tokens.mjs --update-baseline)${NC}"
 fi
 
 # 10b) HARD BLOCK: files opted into the public design system (src/lib/public-site/opt-in.json)
@@ -439,15 +482,15 @@ fi
 #     vanished anchor = a revert). WARN half: a substantive src/ feat|fix push that adds no ledger
 #     row is flagged (never blocks — refactors/reverts/merges legitimately add none).
 echo -e "  ${BOLD}11/13${NC} repair-ledger coverage…"
-if node scripts/audit-ledger-coverage.mjs > /tmp/mindy-prepush-ledger.log 2>&1; then
+if node scripts/audit-ledger-coverage.mjs > $PREPUSH_LOG_DIR/ledger.log 2>&1; then
   echo -e "      ${GREEN}✓ ledger anchors intact${NC}"
-  grep -E "^⚠" /tmp/mindy-prepush-ledger.log > /dev/null 2>&1 && { \
+  grep -E "^⚠" $PREPUSH_LOG_DIR/ledger.log > /dev/null 2>&1 && { \
     echo -e "      ${YEL}⚠ this push may be missing a REPAIR-LEDGER.md row:${NC}"; \
-    grep -E "^    •" /tmp/mindy-prepush-ledger.log | head -6 | sed 's/^/      /'; \
+    grep -E "^    •" $PREPUSH_LOG_DIR/ledger.log | head -6 | sed 's/^/      /'; \
     echo -e "      ${YEL}  (not blocking — add a row w/ a proof anchor, or ignore for a refactor/revert)${NC}"; }
 else
   echo -e "      ${RED}✗ a recorded fix's proof anchor VANISHED (possible revert) — push blocked${NC}"
-  cat /tmp/mindy-prepush-ledger.log | tail -12 | sed 's/^/        /'
+  cat $PREPUSH_LOG_DIR/ledger.log | tail -12 | sed 's/^/        /'
   fail=1
 fi
 
@@ -465,12 +508,27 @@ fi
 echo -e "  ${BOLD}12/13${NC} data-correctness oracles (warn only)…"
 if [ ! -f .env.local ]; then
   echo -e "      ${YEL}— skipped: no .env.local (run \`vercel env pull .env.local\` to enable; live DB required)${NC}"
-elif npm run --silent verify:oracles > /tmp/mindy-prepush-oracles.log 2>&1; then
+elif npm run --silent verify:oracles > $PREPUSH_LOG_DIR/oracles.log 2>&1; then
   echo -e "      ${GREEN}✓ all oracle checks passed (numbers reconcile with source)${NC}"
 else
   echo -e "      ${YEL}⚠ an oracle check FAILED or was UNMEASURED — a data regression may be shipping (NOT blocking):${NC}"
-  grep -E "FAIL|threw|UNMEASURED" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
+  grep -E "FAIL|threw|UNMEASURED" $PREPUSH_LOG_DIR/oracles.log | head -8 | sed 's/^/        /'
   echo -e "      ${YEL}  (review with: npm run verify:oracles — a transient DB/network blip can also cause this)${NC}"
+fi
+
+# 12b) WARN ONLY: live-data tests (*.live.test.ts → vitest.live.config.ts).
+#      They reach real services (Supabase, SAM), so they are NOT part of the deterministic
+#      unit run in step 4 — a quota blip or a data change must not block an unrelated
+#      branch. They still RUN on every push; a failure is reported loudly, like step 12.
+echo -e "  ${BOLD}12b/13${NC} live-data tests (warn only)…"
+if [ ! -e .env.local ] && [ ! -L .env.local ]; then
+  echo -e "      ${YEL}— skipped: no .env.local on this machine (live tests need real credentials)${NC}"
+elif npm run --silent test:live > $PREPUSH_LOG_DIR/live.log 2>&1; then
+  echo -e "      ${GREEN}✓ live-data tests pass${NC}"
+else
+  echo -e "      ${YEL}⚠ live-data tests FAILED (NOT blocking — network/data dependent):${NC}"
+  grep -aE "^ *(FAIL|×) " $PREPUSH_LOG_DIR/live.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}  full log: $PREPUSH_LOG_DIR/live.log${NC}"
 fi
 
 # 13) WARN ONLY: .env.local usability (verify:env). Catches the STRUCTURAL breakage that
@@ -485,16 +543,17 @@ fi
 echo -e "  ${BOLD}13/13${NC} .env.local usability (warn only)…"
 if [ ! -e .env.local ] && [ ! -L .env.local ]; then
   echo -e "      ${YEL}— skipped: no .env.local on this machine${NC}"
-elif npm run --silent verify:env > /tmp/mindy-prepush-env.log 2>&1; then
+elif npm run --silent verify:env > $PREPUSH_LOG_DIR/env.log 2>&1; then
   echo -e "      ${GREEN}✓ .env.local is readable, populated, and correctly linked${NC}"
 else
   echo -e "      ${YEL}⚠ .env.local is NOT usable — local runners would load zero variables (NOT blocking):${NC}"
-  grep -E "^  \u2022" /tmp/mindy-prepush-env.log | head -4 | sed 's/^/        /'
+  grep -E "^  \u2022" $PREPUSH_LOG_DIR/env.log | head -4 | sed 's/^/        /'
   echo -e "      ${YEL}  (detail: npm run verify:env)${NC}"
 fi
 
 if [ "$fail" -ne 0 ]; then
   echo -e "${RED}${BOLD}✗ push blocked by pre-push gate.${NC} Fix the above, or \`git push --no-verify\` for a genuine emergency."
+  echo -e "  logs: $PREPUSH_LOG_DIR"
   exit 1
 fi
 echo -e "${GREEN}${BOLD}✓ pre-push gate passed.${NC}"

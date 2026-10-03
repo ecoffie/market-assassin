@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { spawnTsxSync } from './test-cli-spawn';
+import { spawnTsx } from './test-cli-spawn';
 import { lockDirForRegistry } from './lock';
 import { initRegistryFile, readRegistryFile } from './registry';
 import { createLease } from './lease';
@@ -41,7 +41,7 @@ function maSkillsEvidence(headSha = BASE_SHA) {
   ];
 }
 
-function run(args: string[], regPath: string) {
+async function run(args: string[], regPath: string) {
   const cmd = args[0];
   const base = [...args, '--registry', regPath, '--no-git'];
   if (cmd === 'claim' && !args.includes('--current-main')) {
@@ -50,14 +50,14 @@ function run(args: string[], regPath: string) {
   if ((cmd === 'integration-handoff' || cmd === 'approve') && !args.includes('--current-main')) {
     base.push(...noGitFlags());
   }
-  return spawnTsxSync(SCRIPT, base, {
+  return spawnTsx(SCRIPT, base, {
     cwd: ROOT,
     env: { ...process.env, AGENT_TASK_SKIP_GIT: '1' },
     encoding: 'utf8',
   });
 }
 
-function expectOk(r: ReturnType<typeof run>, label: string) {
+function expectOk(r: Awaited<ReturnType<typeof run>>, label: string) {
   if (r.status !== 0) {
     throw new Error(`${label} failed (${r.status}): ${r.stderr || r.stdout}`);
   }
@@ -69,7 +69,7 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
   let cpDir: string;
   const taskId = 'TASK-E2E-001';
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'agent-cli-e2e-'));
     regPath = join(dir, 'registry.json');
     cpDir = join(dir, 'cps');
@@ -84,12 +84,12 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     const seedPath = join(dir, 'seed.json');
     writeFileSync(seedPath, JSON.stringify(fixture, null, 2));
     expectOk(
-      run(['seed-task', '--file', seedPath, '--actor', 'admin', '--role', 'administrator'], regPath),
+      await run(['seed-task', '--file', seedPath, '--actor', 'admin', '--role', 'administrator'], regPath),
       'seed-task',
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     rmSync(lockDirForRegistry(regPath), { recursive: true, force: true });
     rmSync(dir, { recursive: true, force: true });
   });
@@ -100,17 +100,17 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     return p;
   }
 
-  it('runs full operator lifecycle via real CLI', () => {
+  it('runs full operator lifecycle via real CLI', async () => {
     expectOk(
-      run(
+      await run(
         ['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'prd:phase3a'],
         regPath,
       ),
       'promote',
     );
 
-    expectOk(run(['claim', taskId, '--owner', 'builder-a', '--role', 'builder'], regPath), 'claim builder');
-    expectOk(run(['heartbeat', taskId, '--owner', 'builder-a'], regPath), 'heartbeat');
+    expectOk(await run(['claim', taskId, '--owner', 'builder-a', '--role', 'builder'], regPath), 'claim builder');
+    expectOk(await run(['heartbeat', taskId, '--owner', 'builder-a'], regPath), 'heartbeat');
 
     const progressCp = writeCp('progress.json', {
       id: 'cp-progress',
@@ -126,7 +126,7 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
       authorizationConsumed: ['repo_files'],
       nextRequestedAction: 'continue',
     });
-    expectOk(run(['checkpoint', taskId, '--owner', 'builder-a', '--file', progressCp], regPath), 'checkpoint progress');
+    expectOk(await run(['checkpoint', taskId, '--owner', 'builder-a', '--file', progressCp], regPath), 'checkpoint progress');
 
     const handoffCp = writeCp('verify-ready.json', {
       id: 'cp-rfv',
@@ -150,9 +150,9 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
       authorizationConsumed: ['repo_files'],
       nextRequestedAction: 'verifier review',
     });
-    expectOk(run(['checkpoint', taskId, '--owner', 'builder-a', '--file', handoffCp], regPath), 'checkpoint rfv');
+    expectOk(await run(['checkpoint', taskId, '--owner', 'builder-a', '--file', handoffCp], regPath), 'checkpoint rfv');
 
-    expectOk(run(['claim', taskId, '--owner', 'verifier-a', '--role', 'verifier'], regPath), 'claim verifier');
+    expectOk(await run(['claim', taskId, '--owner', 'verifier-a', '--role', 'verifier'], regPath), 'claim verifier');
 
     const verifiedCp = writeCp('verified.json', {
       id: 'cp-verified',
@@ -176,20 +176,20 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
       authorizationConsumed: [],
       nextRequestedAction: 'integrator',
     });
-    expectOk(run(['checkpoint', taskId, '--owner', 'verifier-a', '--file', verifiedCp], regPath), 'checkpoint verified');
+    expectOk(await run(['checkpoint', taskId, '--owner', 'verifier-a', '--file', verifiedCp], regPath), 'checkpoint verified');
 
-    expectOk(run(['claim', taskId, '--owner', 'integrator-a', '--role', 'integrator', '--branch', 'fix/e2e-test', '--worktree', '.claude/worktrees/e2e-test'], regPath), 'claim integrator');
+    expectOk(await run(['claim', taskId, '--owner', 'integrator-a', '--role', 'integrator', '--branch', 'fix/e2e-test', '--worktree', '.claude/worktrees/e2e-test'], regPath), 'claim integrator');
     expectOk(
-      run(['integration-handoff', taskId, '--owner', 'integrator-a', '--role', 'integrator', ...noGitFlags()], regPath),
+      await run(['integration-handoff', taskId, '--owner', 'integrator-a', '--role', 'integrator', ...noGitFlags()], regPath),
       'handoff',
     );
 
     expectOk(
-      run(['approve', taskId, '--actor', 'eric', '--role', 'administrator', '--evidence', 'review:ok', ...noGitFlags()], regPath),
+      await run(['approve', taskId, '--actor', 'eric', '--role', 'administrator', '--evidence', 'review:ok', ...noGitFlags()], regPath),
       'approve',
     );
     expectOk(
-      run([
+      await run([
         'record-merged',
         taskId,
         '--actor',
@@ -206,7 +206,7 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
       'record-merged',
     );
     expectOk(
-      run([
+      await run([
         'record-deployed',
         taskId,
         '--actor',
@@ -232,9 +232,9 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     }
   });
 
-  it('rejects stale main on claim when git metadata diverges', () => {
+  it('rejects stale main on claim when git metadata diverges', async () => {
     expectOk(
-      run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
     const read = readRegistryFile(regPath);
@@ -243,7 +243,7 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     read.value.tasks[taskId].baseSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     writeFileSync(regPath, JSON.stringify(read.value, null, 2));
 
-    const r = run(
+    const r = await run(
       [
         'claim',
         taskId,
@@ -262,7 +262,7 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     expect(r.stderr || r.stdout).toMatch(/stale_main/);
   });
 
-  it('rejects path collision on claim', () => {
+  it('rejects path collision on claim', async () => {
     const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'));
     fixture.id = 'TASK-E2E-002';
     fixture.state = 'in_progress';
@@ -271,33 +271,33 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     fixture.lease = createLease('other', 'builder', Date.now());
     const p2 = join(dir, 'task2.json');
     writeFileSync(p2, JSON.stringify(fixture, null, 2));
-    expectOk(run(['seed-task', '--file', p2, '--actor', 'admin', '--role', 'administrator'], regPath), 'seed 2');
+    expectOk(await run(['seed-task', '--file', p2, '--actor', 'admin', '--role', 'administrator'], regPath), 'seed 2');
 
     expectOk(
-      run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
-    const r = run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath);
+    const r = await run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath);
     expect(r.status).not.toBe(0);
     expect(r.stderr || r.stdout).toMatch(/path_collision/);
   });
 
-  it('rejects malformed checkpoint file', () => {
+  it('rejects malformed checkpoint file', async () => {
     expectOk(
-      run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
-    expectOk(run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath), 'claim');
+    expectOk(await run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath), 'claim');
     const bad = join(cpDir, 'bad.json');
     writeFileSync(bad, JSON.stringify({ id: 'only-id' }));
-    const r = run(['checkpoint', taskId, '--owner', 'b', '--file', bad], regPath);
+    const r = await run(['checkpoint', taskId, '--owner', 'b', '--file', bad], regPath);
     expect(r.status).not.toBe(0);
     expect(r.stderr || r.stdout).toMatch(/malformed_checkpoint/);
   });
 
-  it('recovers expired lease on subsequent claim', () => {
+  it('recovers expired lease on subsequent claim', async () => {
     expectOk(
-      run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
     const read0 = readRegistryFile(regPath);
@@ -309,31 +309,31 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     task.state = 'in_progress';
     writeFileSync(regPath, JSON.stringify({ ...read0.value, tasks: { ...read0.value.tasks, [taskId]: task } }, null, 2));
 
-    expectOk(run(['claim', taskId, '--owner', 'new-builder', '--role', 'builder'], regPath), 'claim after expiry');
+    expectOk(await run(['claim', taskId, '--owner', 'new-builder', '--role', 'builder'], regPath), 'claim after expiry');
     const read1 = readRegistryFile(regPath);
     expect(read1.ok).toBe(true);
     if (read1.ok) expect(read1.value.tasks[taskId].lease?.owner).toBe('new-builder');
   });
 
-  it('block command sets blocked state', () => {
+  it('block command sets blocked state', async () => {
     expectOk(
-      run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
-    expectOk(run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath), 'claim');
-    expectOk(run(['block', taskId, '--owner', 'b', '--reason', 'waiting on dependency'], regPath), 'block');
+    expectOk(await run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath), 'claim');
+    expectOk(await run(['block', taskId, '--owner', 'b', '--reason', 'waiting on dependency'], regPath), 'block');
     const read = readRegistryFile(regPath);
     expect(read.ok).toBe(true);
     if (read.ok) expect(read.value.tasks[taskId].state).toBe('blocked');
   });
 
-  it('release returns task to ready', () => {
+  it('release returns task to ready', async () => {
     expectOk(
-      run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', taskId, '--state', 'ready', '--actor', 'eric', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
-    expectOk(run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath), 'claim');
-    expectOk(run(['release', taskId, '--owner', 'b'], regPath), 'release');
+    expectOk(await run(['claim', taskId, '--owner', 'b', '--role', 'builder'], regPath), 'claim');
+    expectOk(await run(['release', taskId, '--owner', 'b'], regPath), 'release');
     const read = readRegistryFile(regPath);
     expect(read.ok).toBe(true);
     if (read.ok) expect(read.value.tasks[taskId].state).toBe('ready');
@@ -345,7 +345,7 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
   let regPath: string;
   let cpDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'agent-cli-verify-'));
     regPath = join(dir, 'registry.json');
     cpDir = join(dir, 'cps');
@@ -358,20 +358,20 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
     fixture.baseSha = BASE_SHA;
     const p = join(dir, 'seed.json');
     writeFileSync(p, JSON.stringify(fixture, null, 2));
-    expectOk(run(['seed-task', '--file', p, '--actor', 'admin', '--role', 'administrator'], regPath), 'seed');
+    expectOk(await run(['seed-task', '--file', p, '--actor', 'admin', '--role', 'administrator'], regPath), 'seed');
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     rmSync(lockDirForRegistry(regPath), { recursive: true, force: true });
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('integration-handoff rejects missing command evidence', () => {
+  it('integration-handoff rejects missing command evidence', async () => {
     expectOk(
-      run(['promote', 'TASK-VERIFY-001', '--state', 'ready', '--actor', 'a', '--role', 'administrator', '--evidence', 'x'], regPath),
+      await run(['promote', 'TASK-VERIFY-001', '--state', 'ready', '--actor', 'a', '--role', 'administrator', '--evidence', 'x'], regPath),
       'promote',
     );
-    expectOk(run(['claim', 'TASK-VERIFY-001', '--owner', 'builder', '--role', 'builder'], regPath), 'claim b');
+    expectOk(await run(['claim', 'TASK-VERIFY-001', '--owner', 'builder', '--role', 'builder'], regPath), 'claim b');
     const progress = join(cpDir, 'progress.json');
     writeFileSync(
       progress,
@@ -390,7 +390,7 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
         nextRequestedAction: 'continue',
       }),
     );
-    expectOk(run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'builder', '--file', progress], regPath), 'progress');
+    expectOk(await run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'builder', '--file', progress], regPath), 'progress');
     const rfv = join(cpDir, 'rfv.json');
     writeFileSync(
       rfv,
@@ -417,8 +417,8 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
         nextRequestedAction: 'verify',
       }),
     );
-    expectOk(run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'builder', '--file', rfv], regPath), 'rfv');
-    expectOk(run(['claim', 'TASK-VERIFY-001', '--owner', 'verifier', '--role', 'verifier'], regPath), 'claim v');
+    expectOk(await run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'builder', '--file', rfv], regPath), 'rfv');
+    expectOk(await run(['claim', 'TASK-VERIFY-001', '--owner', 'verifier', '--role', 'verifier'], regPath), 'claim v');
     const verified = join(cpDir, 'v.json');
     writeFileSync(
       verified,
@@ -448,7 +448,7 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
     // integration-handoff. It is now refused at SUBMISSION, while the verifier still holds
     // its lease and can simply resubmit a complete checkpoint. Same intent as before —
     // verification without evidence must not stand — enforced three transitions sooner.
-    const verifiedRun = run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'verifier', '--file', verified], regPath);
+    const verifiedRun = await run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'verifier', '--file', verified], regPath);
     expect(verifiedRun.status).not.toBe(0);
     expect(verifiedRun.stderr || verifiedRun.stdout).toMatch(/verification_incomplete/);
 

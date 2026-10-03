@@ -42,6 +42,7 @@
     "audit:email-sender": "node scripts/audit-email-sender.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "test:unit": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "test:unit:watch": "vitest",
     "test:bq-integration": "RUN_LIVE_BQ_TESTS=1 vitest run --config vitest.bq-integration.config.ts",
     "mcp:dev": "node scripts/mcp-dev.mjs",

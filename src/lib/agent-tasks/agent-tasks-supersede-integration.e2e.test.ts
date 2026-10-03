@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { spawnTsxSync } from './test-cli-spawn';
+import { spawnTsx } from './test-cli-spawn';
 import { sanitizedGitEnv } from './git-evidence';
 import { testProvenance } from './test-registry-fixture';
 import { lockDirForRegistry } from './lock';
@@ -90,8 +90,8 @@ function seed(tasks: TaskRecord[], revision = 19) {
   writeFileSync(reg, JSON.stringify(r, null, 2));
 }
 
-function run(args: string[]) {
-  return spawnTsxSync(SCRIPT, [...args, '--registry', reg], {
+async function run(args: string[]) {
+  return spawnTsx(SCRIPT, [...args, '--registry', reg], {
     cwd: ROOT,
     env: process.env,
     encoding: 'utf8',
@@ -116,19 +116,19 @@ const OK_ARGS = [
   '--confirm',
 ];
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'pstack-3a6-e2e-'));
   reg = join(dir, 'registry.json');
 });
 
-afterEach(() => {
+afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
 describe('3A.6 CLI — lease-free integration supersession', () => {
-  it('supersedes a lease-free integration source onto REAL current main', () => {
+  it('supersedes a lease-free integration source onto REAL current main', async () => {
     seed([task()]);
-    const r = run(OK_ARGS);
+    const r = await run(OK_ARGS);
     expect(r.status, r.stderr).toBe(0);
 
     const out = JSON.parse(r.stdout);
@@ -144,46 +144,46 @@ describe('3A.6 CLI — lease-free integration supersession', () => {
     expect(out.successor.baseSha).not.toBe(STALE_BASE);
   });
 
-  it('rejects the same case BEFORE 3A.6 semantics: an ACTIVE lease still blocks', () => {
+  it('rejects the same case BEFORE 3A.6 semantics: an ACTIVE lease still blocks', async () => {
     // Built with the real helper, not a hand-shaped literal: a lease whose field names
     // drift from the schema fails as malformed_registry and would silently stop testing
     // the lease gate at all.
     seed([task({ lease: createLease('pstack-pilot-integrator-v2', 'integrator', Date.now()) })]);
     const before = sha256(reg);
-    const r = run(OK_ARGS);
+    const r = await run(OK_ARGS);
     expect(r.status).not.toBe(0);
     expect(`${r.stdout}${r.stderr}`).toContain('lease_conflict');
     expect(sha256(reg)).toBe(before);
   });
 
-  it('rejects a terminal (merged) source and leaves the registry byte-identical', () => {
+  it('rejects a terminal (merged) source and leaves the registry byte-identical', async () => {
     seed([task({ state: 'merged' })]);
     const before = sha256(reg);
-    const r = run(OK_ARGS);
+    const r = await run(OK_ARGS);
     expect(r.status).not.toBe(0);
     expect(`${r.stdout}${r.stderr}`).toContain('invalid_transition');
     expect(sha256(reg)).toBe(before);
   });
 
-  it('rejects a non-administrator role', () => {
+  it('rejects a non-administrator role', async () => {
     seed([task()]);
     const before = sha256(reg);
     const args = OK_ARGS.map((a) => (a === 'administrator' ? 'integrator' : a));
-    const r = run(args);
+    const r = await run(args);
     expect(r.status).not.toBe(0);
     expect(sha256(reg)).toBe(before);
   });
 
-  it('rejects a missing --confirm', () => {
+  it('rejects a missing --confirm', async () => {
     seed([task()]);
     const before = sha256(reg);
-    const r = run(OK_ARGS.filter((a) => a !== '--confirm'));
+    const r = await run(OK_ARGS.filter((a) => a !== '--confirm'));
     expect(r.status).not.toBe(0);
     expect(sha256(reg)).toBe(before);
   });
 
-  it('offers NO base/state override flags on supersede', () => {
-    const help = run(['--help']);
+  it('offers NO base/state override flags on supersede', async () => {
+    const help = await run(['--help']);
     const line = help.stdout
       .split('\n')
       .find((l) => l.trim().startsWith('supersede TASK-OLD'));
@@ -194,31 +194,31 @@ describe('3A.6 CLI — lease-free integration supersession', () => {
     expect(line).not.toContain('--state');
   });
 
-  it('ignores a caller-supplied --current-main and still uses real git', () => {
+  it('ignores a caller-supplied --current-main and still uses real git', async () => {
     seed([task()]);
     const bogus = '0000000000000000000000000000000000000000';
-    const r = run([...OK_ARGS, '--current-main', bogus]);
+    const r = await run([...OK_ARGS, '--current-main', bogus]);
     expect(r.status, r.stderr).toBe(0);
     const out = JSON.parse(r.stdout);
     expect(out.successor.baseSha).toBe(realMainSha());
     expect(out.successor.baseSha).not.toBe(bogus);
   });
 
-  it('leaves no lock directory behind after a successful run', () => {
+  it('leaves no lock directory behind after a successful run', async () => {
     seed([task()]);
-    expect(run(OK_ARGS).status).toBe(0);
+    expect((await run(OK_ARGS)).status).toBe(0);
     expect(existsSync(lockDirForRegistry(reg))).toBe(false);
   });
 
-  it('read-only diagnostics agree: chain, deps and collisions after supersession', () => {
+  it('read-only diagnostics agree: chain, deps and collisions after supersession', async () => {
     seed([task()]);
-    expect(run(OK_ARGS).status).toBe(0);
+    expect((await run(OK_ARGS)).status).toBe(0);
 
-    const deps = run(['deps', 'TASK-E2E-INT-003']);
+    const deps = await run(['deps', 'TASK-E2E-INT-003']);
     expect(deps.status).toBe(0);
     expect(JSON.parse(deps.stdout).ok).toBe(true);
 
-    const col = run(['collisions']);
+    const col = await run(['collisions']);
     expect(col.status).toBe(0);
     expect(JSON.parse(col.stdout).collisionCount).toBe(0);
 
