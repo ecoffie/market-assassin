@@ -28,6 +28,14 @@ import {
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
   apiKeyId?: string | null;
+  /**
+   * Which MCP surface the call arrived on. Absent = the Claude/general edge, whose
+   * behaviour is unchanged. 'chatgpt' = the /chatgpt/mcp profile: billing is identical
+   * (same payer resolution, same pre-check, same debit) but a refusal never saves a
+   * purchase retry (recordPaywallAttempt) and never carries purchase copy or a
+   * continue_url. Owner decision 2, tasks/chatgpt-plugin-path-a.md.
+   */
+  channel?: 'chatgpt';
 }
 
 export type MeteredError = {
@@ -286,7 +294,15 @@ export async function runMeteredTool(
   // With zero pools this is byte-for-byte the previous `debitCredits` call.
   const debit = await debitResolvedPayer(
     ctx.userEmail, cost,
-    { reason: 'tool_call', toolName: name, apiKeyId: ctx.apiKeyId },
+    // ChatGPT-originated personal debits are ATTRIBUTED (p_channel) so auto-recharge can
+    // exclude them: a balance ChatGPT drained must never charge the user's card. Only the
+    // 'chatgpt' channel adds the key — the Claude path's meta is unchanged.
+    {
+      reason: 'tool_call',
+      toolName: name,
+      apiKeyId: ctx.apiKeyId,
+      ...(ctx.channel === 'chatgpt' ? { channel: 'chatgpt' as const } : {}),
+    },
     payer,
   );
   // Auto-recharge is a PERSONAL card mandate. A low POOL must never trigger it: that

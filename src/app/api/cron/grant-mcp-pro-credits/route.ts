@@ -198,10 +198,14 @@ export async function GET(request: NextRequest) {
       // ONE key per account per month regardless of source — the no-stacking rule
       // enforced at the write, not just in the resolver above.
       const key = `pro:${email}:${month}`;
+      // Comp allowances (internal team, advocates) are not a customer funding event, so they
+      // carry their own reason and never reset the ChatGPT auto-recharge attribution window
+      // (owner decision 2026-10-03). Paid Pro/Team subscribers keep `pro_monthly`.
+      const allowanceReason = group === 'internal' || group === 'advocate' ? 'comp_monthly' : 'pro_monthly';
       const { applied, grantedAmount } = mode === 'topup'
         ? await topUpToCeiling(key, email, amount, 'sponsor_monthly')
             .then((r) => ({ applied: r.applied, grantedAmount: r.granted }))
-        : await applyCreditOnce(key, email, amount, 'pro_monthly')
+        : await applyCreditOnce(key, email, amount, allowanceReason)
             .then((r) => ({ applied: r.applied, grantedAmount: amount }));
       if (applied && mode === 'topup' && grantedAmount === 0) sponsoredSatisfied++;
       if (applied) {

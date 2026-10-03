@@ -2741,6 +2741,24 @@ All of Phase 1 is merged to `main` + every migration run & verified live (PRs #1
 through **`runMeteredTool`**, NOT raw `runMcpTool`. Raw dispatch = tools run for free.
 Any new transport/entry point bills only if it goes through `runMeteredTool`.
 
+**⚠️ ChatGPT-attributed auto-recharge (PR #1778, migration `20261003_mcp_autorecharge_chatgpt_attribution.sql`
+NOT applied yet):** an automatic card payment is permitted only if the account would still qualify
+after removing all ChatGPT-originated consumption in the current ATTRIBUTION WINDOW — the window
+opened by the most recent INDEPENDENT FUNDING EVENT. `mcp_credit_balance.chatgpt_spend_since_recharge`
+(S) grows only on a PERSONAL debit with `p_channel='chatgpt'` (same UPDATE as the debit); normal and
+pool debits never move it. Eligible iff `balance < T AND balance + S < T` (current T) — one rule, in
+SQL `mcp_recharge_gate()` (enforced inside `mcp_autorecharge_claim`, before debounce/cap stamping)
+and TS `rechargeGate()` (cron pre-filter + engine). A grant whose reason is in the ONE SQL allowlist
+`mcp_grant_resets_chatgpt_window()` sets S := 0 in the grant's own statement (auto_recharge,
+stripe_topup, pro_monthly, app_tier_pro, app_tier_team, mcp_sub_monthly, mcp_sub_annual); every other
+reason — admin, signup/promo, referral, corrections, pool, sponsor, and ANY NEW reason — does not.
+**Adding a grant reason?** Classify it in `src/lib/mcp/grant-reasons.ts`; `grant-reasons.unit.test.ts`
+scans every `applyCreditOnce`/`grantCredits`/`topUpToCeiling` call and fails on an unclassified one.
+Any new surface that debits a personal balance on ChatGPT's behalf MUST pass `channel: 'chatgpt'`
+through `runMeteredTool` → `debitResolvedPayer` → `debitCredits`, or its spend can charge a card.
+Rollout: migration applied + this code live BEFORE `/chatgpt/mcp` (#1776) reaches prod.
+Open items: `tasks/autorecharge-followups-2026-10-03.md`.
+
 **Corpus extraction guard (Layers A+B, `src/lib/mcp/extraction-guard.ts`):** protects ONLY
 the proprietary tools (`PROPRIETARY_TOOLS` in `tool-registry.ts`: winning-playbook, podcast-
 lessons, sblo-contact, federal-osbp) from bulk export — the public-data wrappers stay ungated.

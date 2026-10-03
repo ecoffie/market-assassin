@@ -34,6 +34,9 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 export const PAID_LEDGER_REASONS = [
   'stripe_topup',
   'pro_monthly',
+  // Comp allowances moved from `pro_monthly` to `comp_monthly` (2026-10-03) for the ChatGPT
+  // attribution window; they keep the standing they had before.
+  'comp_monthly',
   'admin_grant',
   'app_tier_pro',
   'app_tier_team',
