@@ -677,7 +677,7 @@ export default function Home() {
                   </div>
                 </div>
                 <a
-                  href="https://buy.stripe.com/6oU3cwff897ceND84UfnO0t"
+                  href="/pricing"
                   className="block w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-center rounded-lg font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-0.5 mb-3"
                 >
                   Get Ultimate Bundle

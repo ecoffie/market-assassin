@@ -1079,28 +1079,6 @@ export default function OpportunityHunterPage() {
 
                       {/* Upgrade Options */}
                       <div className="grid md:grid-cols-2 gap-4">
-                        {/* Alert Pro - Daily Alerts + Full Tool */}
-                        <div className="rounded-lg p-5 text-white relative bg-(--mp-navy)">
-                          <div className="absolute -top-2 -right-2 bg-(--mp-surface) text-(--mp-navy) border border-(--mp-line) text-xs font-bold px-3 py-1 rounded-lg">
-                            BEST VALUE
-                          </div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xl">⚡</span>
-                            <h4 className="font-bold">Alert Pro</h4>
-                          </div>
-                          <ul className="text-(--mp-navy) text-sm mb-3 space-y-1">
-                            <li>✓ <strong className="text-(--mp-ink)">Unlimited daily alerts</strong></li>
-                            <li>✓ All {results.agencies.length} agencies unlocked</li>
-                            <li>✓ Pain points + CSV export</li>
-                          </ul>
-                          <a
-                            href="https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y"
-                            className="block text-center bg-white text-(--mp-navy) px-4 py-2 rounded-lg font-semibold hover:bg-(--mp-navy-wash) transition-colors text-sm"
-                          >
-                            Go Pro - $19/mo
-                          </a>
-                        </div>
-
                         {/* Tool Pro - Unlock Features Only */}
                         <div className="rounded-lg p-5 text-(--mp-ink) bg-(--mp-wash)">
                           <div className="flex items-center gap-2 mb-2">

@@ -86,7 +86,11 @@ export const PRODUCTS = {
     id: 'contractor-database',
     name: 'Federal Contractor Database',
     price: 497,
-    stripeUrl: 'https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g',
+    // RETIRED 2026-09-27 — the $497 payment link was DEACTIVATED in the
+    // Stripe dashboard (Eric-authorized; reversible there). `stripeUrl` removed so no
+    // surface renders a dead checkout. Kept as a record so legacy buyers still resolve
+    // (bundle `includes`, webhook tier mapping, KV grants are untouched).
+    discontinued: true,
   },
   // DISCONTINUED 2026-07-16 (Eric: "no that is gone") — recompete is a Pro feature
   // now; the public pricing page sells Free/Pro/Teams only. Kept as a record so
@@ -164,7 +168,11 @@ export const PRODUCTS = {
     id: 'ultimate-govcon-bundle',
     name: 'Ultimate GovCon Bundle',
     price: 1497,
-    stripeUrl: 'https://buy.stripe.com/6oU3cwff897ceND84UfnO0t',
+    // RETIRED 2026-09-27 — the $1,497 payment link was DEACTIVATED in the
+    // Stripe dashboard (Eric-authorized; reversible there). `stripeUrl` removed so no
+    // surface renders a dead checkout. Kept as a record so legacy buyers still resolve
+    // (bundle `includes`, webhook tier mapping, KV grants are untouched).
+    discontinued: true,
     includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'market-assassin-premium'],
     includesDisplay: [
       { name: 'Content Reaper (Full Fix)', price: 397 },
