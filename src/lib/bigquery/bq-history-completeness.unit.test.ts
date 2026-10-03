@@ -2,7 +2,7 @@
  * getBqContractorHistory — source + detail-cache completeness.
  * Mocks queryCached via ./cache (same pattern as recipient-profile-fallback).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 type Q = { cacheKey: string; query: string; cacheOnly?: boolean };
 
@@ -298,5 +298,22 @@ describe('getBqContractorHistory — source + completeness', () => {
     expect(h.enrichment_status).toBe('complete');
     expect(h.partial).toBe(false);
     expect(h.summary.awardCount).toBe(0);
+  });
+});
+
+describe('getBqContractorHistory — FY rollover uses the warehouse data clock', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('after Oct 1, a warehouse current through FY2026 still classifies FY2025–FY2026 (not unknown)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-15T12:00:00Z')); // wall clock = FY2027
+    profileRows = [PROFILE];
+    seedCompleteDetails('FCJCDUZV7RM3');
+    const h = await getBqContractorHistory({ uei: 'FCJCDUZV7RM3', liveBq: false });
+    expect(h.summary.activity_observation_period.reference_fy).toBe(2026);
+    expect(h.summary.activity_observation_period.series_coverage).toBe('adequate');
+    expect(h.summary.activity_status).toBe('active');
   });
 });

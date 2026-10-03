@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   calendarEntriesFromSources,
   parseVerifiedDateIso,
@@ -8,6 +8,16 @@ import {
 } from './calendar-sanitize';
 
 describe('sanitizeBriefingCalendar — source-grounded, no year repair', () => {
+  // Fixture dates (2026-10-01, 2026-11-15, 2026-12-18) are written relative to
+  // 2026-09-25. Freeze the clock so "past" contracts stay past only by design.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-25T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const sources = [
     verifiedCalendarSource({
       sourceId: 'N00178-21-D-1234',
