@@ -7,6 +7,7 @@
  * concurrent debits can't corrupt the balance — app code NEVER does read-then-write.
  * See migration 20260712_mcp_credit_ledger.sql.
  */
+import type { OutcomeTelemetry } from '@/lib/mcp/call-outcome';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { sendCreditWelcomeEmail } from './credit-emails';
 
@@ -88,7 +89,18 @@ export type CallStatus =
   | 'shadow_requires_paid'
   | 'shadow_throttled';
 
-/** Append a call-log row (audit/analytics/abuse). Best-effort — never throws. */
+/**
+ * Append a call-log row (audit/analytics/abuse). Best-effort — never throws.
+ *
+ * `outcome` (call-outcome.ts) is the QUALITY axis: what the call actually produced.
+ * `status` stays the BILLING axis. Both are written; neither is inferred from the other.
+ *
+ * ⚠️ supabase-js RETURNS `{ error }` — it does not throw. This function used to wrap the
+ * insert in try/catch only, so a rejected insert vanished without a trace. The error is
+ * now bound. If the rejection is the outcome columns being absent (migration not yet
+ * applied, or rolled back), the row is retried in the legacy shape so the call is still
+ * counted — losing telemetry columns must never lose the call itself.
+ */
 export async function logCall(entry: {
   userEmail: string;
   toolName: string;
@@ -96,16 +108,34 @@ export async function logCall(entry: {
   creditsCharged: number;
   latencyMs?: number;
   apiKeyId?: string | null;
+  outcome?: OutcomeTelemetry;
 }): Promise<void> {
+  const legacy = {
+    user_email: entry.userEmail.toLowerCase(),
+    tool_name: entry.toolName,
+    status: entry.status,
+    credits_charged: entry.creditsCharged,
+    latency_ms: entry.latencyMs ?? null,
+    api_key_id: entry.apiKeyId ?? null,
+  };
+  const row = entry.outcome
+    ? {
+        ...legacy,
+        outcome: entry.outcome.outcome,
+        grounded: entry.outcome.grounded,
+        degraded: entry.outcome.degraded,
+        billing_outcome: entry.outcome.billingOutcome,
+        error_code: entry.outcome.errorCode,
+      }
+    : legacy;
   try {
-    await getWriteClient().from('mcp_call_log').insert({
-      user_email: entry.userEmail.toLowerCase(),
-      tool_name: entry.toolName,
-      status: entry.status,
-      credits_charged: entry.creditsCharged,
-      latency_ms: entry.latencyMs ?? null,
-      api_key_id: entry.apiKeyId ?? null,
-    });
+    const { error } = await getWriteClient().from('mcp_call_log').insert(row);
+    if (!error) return;
+    console.error('[mcp:credits] logCall insert rejected:', error.message);
+    if (row !== legacy) {
+      const { error: retryError } = await getWriteClient().from('mcp_call_log').insert(legacy);
+      if (retryError) console.error('[mcp:credits] logCall legacy retry rejected:', retryError.message);
+    }
   } catch (err) {
     console.error('[mcp:credits] logCall failed (non-fatal):', err);
   }

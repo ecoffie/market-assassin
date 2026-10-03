@@ -14,7 +14,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { McpNav } from '../catalog-ui';
-import { listMcpTools } from '@/lib/mcp/tool-registry';
+import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 
 export const metadata: Metadata = {
   title: 'What is Mindy MCP? — Federal contracting intelligence for your AI agent',
@@ -35,7 +35,7 @@ const LAYERS: { k: string; title: string; blurb: string; accent: string; tools: 
       { n: 'search_sam_opportunities', d: 'Open solicitations by keyword / NAICS / set-aside' },
       { n: 'get_expiring_contracts', d: 'Contracts expiring soon — your recompete targets' },
       { n: 'get_agency_forecasts', d: 'Planned buys 6–18 months before they hit SAM' },
-      { n: 'extract_statement_of_work', d: 'The SOW/PWS pulled out as clean text' },
+      { n: 'get_solicitation_documents', d: 'The full RFP — SOW/PWS and attachments as text' },
     ],
   },
   {
@@ -44,7 +44,7 @@ const LAYERS: { k: string; title: string; blurb: string; accent: string; tools: 
     accent: 'from-violet-400/80 to-violet-500/80',
     blurb: 'Who you’re up against and who to team with — the incumbent, the capable firms, the price-to-win, the teaming front door.',
     tools: [
-      { n: 'get_incumbent_financials', d: 'SEC-EDGAR financials of a public incumbent' },
+      { n: 'get_solicitation_incumbent', d: 'Who holds this contract now — the likely incumbent' },
       { n: 'get_pricing_intel', d: 'GSA CALC price-to-win labor rates (p25/p50/p75)' },
       { n: 'find_capable_contractors', d: '"Who can actually win this" — capable-firm scan' },
       { n: 'get_sblo_contact', d: 'The Small Business Liaison at a prime — the teaming door' },
@@ -59,14 +59,14 @@ const LAYERS: { k: string; title: string; blurb: string; accent: string; tools: 
       { n: 'search_federal_contacts', d: 'Named POCs at a specific buying office (~167K rows)' },
       { n: 'get_sba_goaling_share', d: 'Small-business goals vs. actual set-aside obligations' },
       { n: 'search_agency_opps_by_office', d: 'Opportunities anchored to one buying office' },
-      { n: 'get_regulatory_demand', d: 'Federal Register signals — demand before SAM' },
+      { n: 'get_agency_intel', d: 'The buyer brief — priorities, spend and angles' },
     ],
   },
   {
     k: '04',
     title: 'Proprietary & proposal',
     accent: 'from-emerald-400/80 to-emerald-500/80',
-    blurb: 'The moat — 8 years of GovCon coaching no public API holds, plus a full stateless bid loop: bid/no-bid → compliance matrix → outline → draft → independent referee.',
+    blurb: 'The moat — 8 years of GovCon coaching no public API holds, plus a full stateless bid loop: bid/no-bid → compliance matrix → draft → independent referee.',
     tools: [
       { n: 'get_winning_playbook', d: 'Grounded "how to win this" coaching — the moat' },
       { n: 'evaluate_bid_decision', d: 'The 5-gate / 10-factor bid/no-bid, scored' },
@@ -93,7 +93,7 @@ export default function McpAboutPage() {
    * Server component, so this is read at render time from the same registry that
    * feeds /mcp/tools and /api/mcp/catalog. Add a tool and every surface updates.
    */
-  const toolCount = listMcpTools().length;
+  const toolCount = listPublicMcpTools().length;
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">

@@ -13,7 +13,7 @@
  * glass, not a blank wall. No user data ever passes through this route.
  */
 import { NextResponse } from 'next/server';
-import { listMcpTools } from '@/lib/mcp/tool-registry';
+import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, SUBSCRIPTION_PLANS } from '@/lib/mcp/packages';
 import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -23,7 +23,8 @@ export const runtime = 'nodejs';
 export const revalidate = 3600;
 
 export function GET() {
-  const tools = listMcpTools().map((t) => {
+  // PUBLIC catalog only (public-catalog.ts) — hidden tools are not sold or documented here.
+  const tools = listPublicMcpTools().map((t) => {
     const fn = t.function as { name: string; description?: string };
     return {
       name: fn.name,

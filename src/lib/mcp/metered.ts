@@ -17,6 +17,7 @@ import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
 import { classifyBillingOutcome, isBillable, preflightPaidInput } from './credit-integrity';
+import { blockedOutcome, classifyCallOutcome, errorOutcome } from './call-outcome';
 import { recordPaywallAttempt, paywallMessage, RESUME_BASE } from './paywall';
 import {
   buildInsufficientCreditsRefusal,
@@ -62,7 +63,7 @@ export async function runMeteredTool(
   // else (tier gate, paywall capture, payer lookup): an invalid request is not a sale.
   const rejection = preflightPaidInput(name, args);
   if (rejection) {
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_invalid_input', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_invalid_input', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('invalid_input') });
     return { ok: false, error: { code: rejection.code, message: rejection.message }, creditsCharged: 0 };
   }
 
@@ -73,7 +74,7 @@ export async function runMeteredTool(
   if (mcpFlags.enforceTiers && isProTool(name)) {
     const pro = await isProForMcp(ctx.userEmail);
     if (!pro) {
-      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('requires_pro') });
       const gatedAttemptId = await recordPaywallAttempt({
         userEmail: ctx.userEmail,
         toolName: name,
@@ -115,6 +116,9 @@ export async function runMeteredTool(
         status: (enforce ? verdict.status : `shadow_${verdict.status}`) as CallStatus,
         creditsCharged: 0,
         apiKeyId: ctx.apiKeyId,
+        // A shadow row is an annotation beside the real call's row (the call still runs
+        // and logs its own outcome) — only an ENFORCED block is an outcome.
+        ...(enforce ? { outcome: blockedOutcome(verdict.status) } : {}),
       });
       if (enforce) {
         return { ok: false, error: { code: verdict.code, message: verdict.message }, creditsCharged: 0 };
@@ -142,7 +146,7 @@ export async function runMeteredTool(
     : { kind: 'personal' }; // free tools never bill; skip the lookup entirely.
 
   if (cost > 0 && !isChargeable(payer)) {
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'failed', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'failed', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('billing_account_unresolved') });
     return {
       ok: false,
       error: {
@@ -166,7 +170,7 @@ export async function runMeteredTool(
       // A pooled member's calls bill the TEAM pool, and nothing ever falls back to their
       // personal balance. So the personal paywall (buy credits for yourself) would sell
       // them credits this call can never use. Point them at the pool's owner instead.
-      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('insufficient_credits') });
       return {
         ok: false,
         error: {
@@ -181,7 +185,7 @@ export async function runMeteredTool(
       };
     }
     if (balance < cost) {
-      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('insufficient_credits') });
       // Save the request so it can be run verbatim after they upgrade, and so
       // "wanted another report but did not buy" is countable rather than inferred.
       const attemptId = await recordPaywallAttempt({
@@ -230,7 +234,7 @@ export async function runMeteredTool(
     result = run.result;
   } catch (err) {
     const latencyMs = Date.now() - startedAt;
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'failed', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'failed', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, outcome: errorOutcome() });
     return { ok: false, error: { code: 'tool_error', message: err instanceof Error ? err.message : String(err) }, creditsCharged: 0 };
   }
   const latencyMs = Date.now() - startedAt;
@@ -240,9 +244,13 @@ export async function runMeteredTool(
   // all pass through here. Fire-and-forget; a logging miss must not affect the call.
   recordMcpSearch(name, args, ctx.userEmail);
 
+  // What the call actually produced, read from structured fields only (never from
+  // "it didn't throw"). Computed once; written on every row below.
+  const telemetry = classifyCallOutcome(result);
+
   // 3) Free tool → success, no billing. (Free tools never trip auto-recharge.)
   if (cost <= 0) {
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, outcome: telemetry });
     return { ok: true, result, creditsCharged: 0, balance: null, needsRecharge: false };
   }
 
@@ -267,7 +275,7 @@ export async function runMeteredTool(
   // grounded on optional sections while the REQUIRED measurement failed). Nothing has
   // been debited yet, so a non-billable outcome is simply never charged — no refund.
   if (!isBillable(classifyBillingOutcome(result))) {
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, outcome: telemetry });
     // Report the balance of the payer that WOULD have paid — a pooled member's personal
     // balance is not the number that governs their calls.
     const payerBalance = payer.kind === 'pool' ? await getPoolBalance(payer.poolId!) : await getBalance(ctx.userEmail);
@@ -285,14 +293,14 @@ export async function runMeteredTool(
   // would charge an individual's card for their employer's shared allowance.
   const recharge = (bal: number) => debit.payer === 'personal' && bal < AUTORECHARGE_SIGNAL_FLOOR;
   if (debit.ok) {
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId });
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId, outcome: telemetry });
     return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance), funding: poolFunding(payer) };
   }
 
   // Edge race: balance dropped below cost between pre-check and debit (concurrent
   // calls at a near-empty balance). The result is already produced — deliver it, but
   // charge 0 and mark it uncharged for reconciliation. Balance is never negative.
-  await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
+  await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, outcome: telemetry });
   return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance), funding: poolFunding(payer) };
 }
 

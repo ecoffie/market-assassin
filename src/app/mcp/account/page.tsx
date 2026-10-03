@@ -22,9 +22,10 @@ import {
 } from '../usage-charts';
 import { TeamSection } from './team-section';
 import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
+import { isPublicMcpTool } from '@/lib/mcp/public-catalog-config';
 
 type Section = 'usage' | 'activity' | 'billing' | 'team' | 'keys' | 'crm' | 'referrals' | 'settings';
-const SECTIONS: { id: Section; label: string; icon: string }[] = [
+const SECTIONS: { id: Section; label: string; icon: string }[] = ([
   { id: 'usage', label: 'Usage', icon: '◧' },
   { id: 'activity', label: 'Activity', icon: '≡' },
   { id: 'billing', label: 'Billing', icon: '◈' },
@@ -33,7 +34,13 @@ const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'crm', label: 'CRM', icon: '⇄' },
   { id: 'referrals', label: 'Refer & earn', icon: '◇' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
-];
+] satisfies { id: Section; label: string; icon: string }[]).filter(
+// The CRM section only exists to set up add_contacts_to_crm. While that tool is hidden
+// from the public MCP catalog (public-catalog-config.ts), don't advertise a connection
+// for a tool hosts cannot call. ?section=crm still resolves, so an existing connection
+// can still be disconnected.
+  (s) => s.id !== 'crm' || isPublicMcpTool('add_contacts_to_crm'),
+);
 
 interface AccountData { balance: number; recentCalls: McpCall[]; usage: UsageSummary | null }
 interface AutoRecharge {

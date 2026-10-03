@@ -83,10 +83,10 @@ export const EYEBROW = 'text-[11px] font-medium uppercase tracking-[0.12em] text
 export const toolCr = (tools: Tool[], name: string, fallback: number) =>
   tools.find((t) => t.name === name)?.credits ?? fallback;
 
-/** An "opportunity work-up" = FIND + incumbent financials + who-can-win scan. */
+/** An "opportunity work-up" = FIND + who holds it now + who-can-win scan. */
 export const workupCostFrom = (tools: Tool[]) =>
   toolCr(tools, 'find_opportunities', 10) +
-  toolCr(tools, 'get_incumbent_financials', 2) +
+  toolCr(tools, 'get_solicitation_incumbent', 20) +
   toolCr(tools, 'find_capable_contractors', 25);
 
 export const workups = (credits: number, workupCost: number) => Math.max(1, Math.floor(credits / workupCost));
@@ -96,9 +96,9 @@ export const EXAMPLES: { title: string; desc: string; tools: string[] }[] = [
   { title: 'Find opportunities in my market', desc: 'Open now + coming back + coming soon — one FIND across Opportunity Map horizons.', tools: ['find_opportunities'] },
   { title: 'Understand this customer', desc: 'Opportunity says · agency research · what to emphasize — after a specific FIND hit.', tools: ['understand_customer'] },
   { title: 'Check today’s open solicitations only', desc: 'Advanced SAM/Open-only search when you only want live notices.', tools: ['search_sam_opportunities'] },
-  { title: 'Price your bid', desc: 'GSA labor-rate intel plus regulatory demand signals.', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
-  { title: 'Vet an incumbent', desc: 'Pull their SEC financials and a full contractor profile.', tools: ['get_incumbent_financials', 'get_contractor_profile'] },
-  { title: 'Full opportunity work-up', desc: 'Find it, read the incumbent, then scan who can win.', tools: ['find_opportunities', 'get_incumbent_financials', 'find_capable_contractors'] },
+  { title: 'Price your bid', desc: 'GSA labor-rate intel (p25 / p50 / p75) for your labor categories.', tools: ['get_pricing_intel'] },
+  { title: 'Vet an incumbent', desc: 'Find who holds it now, then pull a full contractor profile.', tools: ['get_solicitation_incumbent', 'get_contractor_profile'] },
+  { title: 'Full opportunity work-up', desc: 'Find it, read the incumbent, then scan who can win.', tools: ['find_opportunities', 'get_solicitation_incumbent', 'find_capable_contractors'] },
   { title: 'Build a teaming shortlist', desc: 'A who-can-win scan, then deep-profile your top three partners.', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile', 'get_contractor_profile'] },
 ];
 export const exampleCost = (tools: Tool[], names: string[]) => names.reduce((s, n) => s + toolCr(tools, n, 1), 0);

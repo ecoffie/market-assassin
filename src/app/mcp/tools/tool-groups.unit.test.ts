@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listMcpTools } from '@/lib/mcp/tool-registry';
+import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 import { TOOL_GROUPS, GROUPED_TOOL_NAMES, assertGroupCoverage } from './tool-groups';
 
 /**
@@ -10,7 +10,8 @@ import { TOOL_GROUPS, GROUPED_TOOL_NAMES, assertGroupCoverage } from './tool-gro
  * If you add a tool to the registry, add it to a group in tool-groups.ts.
  */
 describe('/mcp/tools — group coverage', () => {
-  const live = listMcpTools().map((t) => (t.function as { name: string }).name);
+  // The page renders the PUBLIC catalog (/api/mcp/catalog), so groups track that list.
+  const live = listPublicMcpTools().map((t) => (t.function as { name: string }).name);
 
   it('every live tool is filed into a group', () => {
     const { missing } = assertGroupCoverage(live);

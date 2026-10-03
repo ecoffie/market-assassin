@@ -12,7 +12,7 @@
  * default, so a schema quirk can never block an otherwise-valid tool call.
  */
 import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
-import { listMcpTools } from './tool-registry';
+import { listPublicMcpTools } from './public-catalog';
 import { SCHEDULE_MARKET_SEARCH_TITLE } from './schedule-discovery';
 
 interface JsonSchemaProp {
@@ -210,12 +210,14 @@ export interface McpRegistrationEntry {
 }
 
 /**
- * Every MCP tool as { name, description, Zod input shape } — ready to loop into
- * `server.registerTool`. Derived from `listMcpTools()`, so adding a tool to the
- * registry automatically surfaces it on the transport.
+ * Every PUBLIC MCP tool as { name, description, Zod input shape } — ready to loop into
+ * `server.registerTool` on the external transport. Derived from `listPublicMcpTools()`
+ * (public-catalog.ts), NOT listMcpTools(): a registered tool reaches external hosts only
+ * once it is on the public allowlist. Hidden tools are neither listed nor callable on
+ * the transport, but stay registered for Mindy Chat and internal composition.
  */
 export function mcpRegistrationList(): McpRegistrationEntry[] {
-  return listMcpTools().map((raw) => {
+  return listPublicMcpTools().map((raw) => {
     const fn = (raw as { function: { name: string; description?: string; parameters?: JsonSchema } }).function;
     const params = fn.parameters ?? { type: 'object', properties: {} };
     const required = new Set(params.required ?? []);
