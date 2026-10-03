@@ -223,6 +223,9 @@ Merged sequentially (#1789 → #1790 → #1791). Before each merge: rebased on c
 | #1789 admin Team grants | `fb7209d4` | Pro grant reads back; Team grant → `access_team=true`; failed grant → NOT APPLIED, never GRANTED; audit rows match outcomes; subjects restored | Commercial B1 root cause (applyMemberGrant) |
 | #1790 retired payment links | `9a82c155` | 0 refs to the 5 deactivated links (24 pages, 20 chunks); current checkout intact; Stripe objects untouched | Commercial D2 |
 | #1791 Pursuit Brief copy + auto-request | `d5b7be2c` | Copy absent on sales/onboarding/settings/glossary; Map and email save → no brief; unauthenticated save-profile → 401 | Commercial D1 (part 1) |
-| #1798 Pursuit Brief dead code | — | **Open, not merged** (awaiting approval): orphan endpoint, 3 crons, generator, watchdog routing, `send-all-briefings` branch, 3 admin email templates | Commercial D1 (part 2) |
+| #1798 Pursuit Brief dead code | `d21e4597` | 5 routes 404; generator gone; watchdog checks daily only; `send-all-briefings` daily + weekly; 3 admin email templates clean | Commercial D1 (part 2) |
+| #1800 rollout dependency | `d98e2cfc` | Rollout config and guidance carry no pursuit requirement; `beta_all`, no active cohort | Retired feature can't block rotation |
+| `cron_jobs` row | — (DB) | Disabled `precompute-pursuit-briefs` row (never run, 0 runs) deleted, with a snapshot; cron_jobs 101 → 100 | No restartable brief cron |
+| govcon-funnels #204 | `33f6eba4` | govcongiants.com `/mi`, `/features/ai-briefings`, `/market-intel/`: 0 mentions (were 2/10/3) | Marketing copy |
 
-**Open decisions:** `rollout.ts` `requiredPursuitBriefs` (dormant in `beta_all`; would stall rotation if `rollout` mode returns); the disabled `precompute-pursuit-briefs` `cron_jobs` row; govcon-funnels PR #204 (Pursuit copy on govcongiants.com).
+**Pursuit Brief: RETIRED — no customer remediation obligation.** All closeout items are done. The only remaining evidence is the first post-deploy daily run (10-04) and weekly run (10-09), which confirm normal sends.
