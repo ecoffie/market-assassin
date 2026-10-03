@@ -16,10 +16,16 @@
  *       node scripts/verify-public-parity.mjs --base https://getmindy.ai --head <url> --route /pricing
  *       node scripts/verify-public-parity.mjs --save snap.json --head <url>   (write a snapshot)
  *       node scripts/verify-public-parity.mjs --against snap.json --head <url> (compare to one)
+ *       --host-header <host>        Host sent to the candidate for `redirectRoutes` (default
+ *                                   getmindy.ai). next.config.ts redirects are host-conditional, so
+ *                                   without it a local build renders a page production 308s.
+ *                                   For redirects, status + Location are compared, not the body.
  * Routes default to `parityRoutes` in src/lib/public-site/opt-in.json. Exit 1 on any difference.
  */
 import { readFileSync, writeFileSync } from 'fs';
 import { JSDOM } from 'jsdom';
+import http from 'node:http';
+import https from 'node:https';
 
 const args = process.argv.slice(2);
 const arg = (name, dflt) => {
@@ -31,10 +37,14 @@ const flag = (name) => args.includes(`--${name}`);
 const BASE = arg('base', 'https://getmindy.ai');
 const HEAD = arg('head', 'http://localhost:3100');
 const EXACT_DIGITS = flag('exact-digits');
+// Production Host for redirectRoutes (next.config.ts redirects are host-conditional). Applied only
+// to those routes: ordinary pages compare as fetched, exactly as before.
+const HOST_HEADER = arg('host-header', 'getmindy.ai');
 const manifest = JSON.parse(readFileSync('src/lib/public-site/opt-in.json', 'utf8'));
+const REDIRECT_ROUTES = new Set(manifest.redirectRoutes || []);
 const routes = args.includes('--route')
   ? args.flatMap((a, i) => (a === '--route' ? [args[i + 1]] : []))
-  : manifest.parityRoutes;
+  : [...manifest.parityRoutes, ...REDIRECT_ROUTES];
 
 const UA = 'Mozilla/5.0 (compatible; MindyParity/1.0; +https://getmindy.ai)';
 
@@ -60,13 +70,16 @@ export function snapshot(html) {
       return { unparseable: s.textContent.trim() };
     }
   });
+  const title = document.title;
   const chromeHrefs = [...document.querySelectorAll('[data-mp-chrome] a[href]')].map((a) => a.getAttribute('href'));
-  for (const el of document.querySelectorAll('script, style, noscript, template, [data-mp-chrome]')) el.remove();
+  // `body title`: Next streams late metadata into <body>, so the same <title> can sit in head on one
+  // host and in body on the other. Its text is never visible; `title` is compared on its own above.
+  for (const el of document.querySelectorAll('script, style, noscript, template, [data-mp-chrome], body title')) el.remove();
   const hrefs = [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'));
   let text = (document.body?.textContent || '').replace(/\s+/g, ' ').trim();
   if (!EXACT_DIGITS) text = text.replace(/\d/g, '0');
   return {
-    title: document.title,
+    title,
     canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? null,
     robots: meta['name:robots'] ?? null,
     meta,
@@ -77,7 +90,28 @@ export function snapshot(html) {
   };
 }
 
+/** fetch() silently drops a Host header (forbidden in undici), so overriding it needs node:http. */
+function getWithHost(url, hostHeader) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const mod = u.protocol === 'https:' ? https : http;
+    const req = mod.get(u, { headers: { 'user-agent': UA, host: hostHeader, 'accept-encoding': 'identity' } }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks);
+        resolve({ status: res.statusCode, location: res.headers.location ?? null, text: body.toString('utf8') });
+      });
+    });
+    req.on('error', reject);
+  });
+}
+
 async function fetchSnapshot(host, route) {
+  if (HOST_HEADER && host === HEAD && REDIRECT_ROUTES.has(route)) {
+    const r = await getWithHost(new URL(route, host).href, HOST_HEADER);
+    return { status: r.status, location: r.location, ...snapshot(r.text) };
+  }
   const res = await fetch(new URL(route, host), { headers: { 'user-agent': UA }, redirect: 'manual' });
   return { status: res.status, location: res.headers.get('location'), ...snapshot(await res.text()) };
 }
@@ -88,11 +122,16 @@ function diffText(a, b) {
   return `first difference at char ${i}:\n      base: …${a.slice(Math.max(0, i - 60), i + 80)}…\n      head: …${b.slice(Math.max(0, i - 60), i + 80)}…`;
 }
 
+const isRedirect = (status) => status >= 300 && status < 400;
+
 export function compare(base, head) {
   const problems = [];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   if (base.status !== head.status) problems.push(`status ${base.status} → ${head.status}`);
   if (base.location !== head.location) problems.push(`redirect ${base.location} → ${head.location}`);
+  // Both sides redirect: status + Location ARE the contract. The body is platform filler (Vercel's
+  // edge says "Redirecting...", `next start` echoes the target) and no crawler reads it.
+  if (isRedirect(base.status) && isRedirect(head.status)) return problems;
   for (const k of ['title', 'canonical', 'robots']) {
     if (!same(base[k], head[k])) problems.push(`${k}: ${JSON.stringify(base[k])} → ${JSON.stringify(head[k])}`);
   }

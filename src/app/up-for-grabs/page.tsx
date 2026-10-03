@@ -51,9 +51,9 @@ function fmtDate(d: string | null): string {
 }
 
 const LIKELIHOOD: Record<string, { label: string; cls: string }> = {
-  high: { label: 'Likely recompete', cls: 'bg-emerald-400/10 text-emerald-300' },
-  medium: { label: 'Possible recompete', cls: 'bg-amber-400/10 text-amber-300' },
-  low: { label: 'Uncertain', cls: 'bg-slate-700/40 text-slate-400' },
+  high: { label: 'Likely recompete', cls: 'bg-(--mp-ok-bg) text-(--mp-ok)' },
+  medium: { label: 'Possible recompete', cls: 'bg-(--mp-warn-bg) text-(--mp-warn)' },
+  low: { label: 'Uncertain', cls: 'bg-(--mp-wash) text-(--mp-muted)' },
 };
 
 function sizeOf(c: ExpiringContract): number {
@@ -94,69 +94,69 @@ export default async function UpForGrabsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 text-sm text-slate-400">
-        <Link href="/" className="hover:text-purple-400">Home</Link>
+      <div className="mx-auto max-w-5xl px-6 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <Link href="/discover" className="hover:text-purple-400">Discover</Link>
+        <Link href="/discover" className="hover:text-(--mp-navy-hover)">Discover</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">Up For Grabs</span>
+        <span className="text-(--mp-body)">Up For Grabs</span>
       </div>
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pt-6 pb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">Discover · Expiring soon</p>
-        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">⏳ Up for grabs</h1>
-        <p className="mt-4 max-w-2xl text-lg text-slate-300">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-accent)">Discover · Expiring soon</p>
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight font-(family-name:--mp-font-serif)">⏳ Up for grabs</h1>
+        <p className="mt-4 max-w-2xl text-lg text-(--mp-body)">
           The government has to re-buy this work. Here are the biggest federal contracts expiring soon — the
           incumbent holding it now, the ceiling, and when the recompete window opens. Every one is real.
         </p>
         {top.length > 0 && (
           <div className="mt-6 flex flex-wrap items-center gap-6">
             <div>
-              <div className="text-3xl font-extrabold text-purple-300 tabular-nums">{fmtMoney(total)}</div>
-              <div className="text-xs uppercase tracking-wider text-slate-500">Coming up for grabs · top {top.length}, next 12 months</div>
+              <div className="text-3xl font-semibold font-(family-name:--mp-font-mono) text-(--mp-ink) tabular-nums">{fmtMoney(total)}</div>
+              <div className="text-xs uppercase tracking-wider text-(--mp-muted)">Coming up for grabs · top {top.length}, next 12 months</div>
             </div>
-            <ShareButton url={`${SITE_URL}/up-for-grabs`} title="Federal contracts up for grabs — the biggest recompetes coming soon" />
+            <ShareButton appearance="public" url={`${SITE_URL}/up-for-grabs`} title="Federal contracts up for grabs — the biggest recompetes coming soon" />
           </div>
         )}
       </section>
 
       {top.length === 0 ? (
         <section className="mx-auto max-w-5xl px-6 pb-16">
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-slate-400">Loading the latest expiring contracts…</div>
+          <div className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-8 text-(--mp-muted)">Loading the latest expiring contracts…</div>
         </section>
       ) : (
         <section className="mx-auto max-w-5xl px-6 pb-10">
-          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 divide-y divide-slate-800">
+          <div className="overflow-hidden rounded-none border border-(--mp-line) bg-(--mp-surface) divide-y divide-(--mp-line)">
             {top.map((c) => {
               const m = monthsUntil(c.period_of_performance_current_end);
               const like = c.recompete_likelihood ? LIKELIHOOD[c.recompete_likelihood] : null;
               return (
-                <a key={c.contract_id} href={`https://www.usaspending.gov/award/${c.contract_id}`} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors">
-                  <div className="w-24 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(sizeOf(c))}</div>
+                <a key={c.contract_id} href={`https://www.usaspending.gov/award/${c.contract_id}`} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 px-5 py-4 hover:bg-(--mp-wash) transition-colors">
+                  <div className="w-24 shrink-0 text-2xl font-semibold font-(family-name:--mp-font-mono) tabular-nums text-(--mp-ink)">{fmtMoney(sizeOf(c))}</div>
                   <div className="min-w-0 flex-1">
                     {/* Lead with WHAT the contract is for, not who holds it — people care about the work. */}
-                    <div className="truncate font-semibold text-white">{contractScope(c)}</div>
-                    <div className="truncate text-sm text-slate-400">
+                    <div className="truncate font-semibold text-(--mp-ink)">{contractScope(c)}</div>
+                    <div className="truncate text-sm text-(--mp-muted)">
                       {c.awarding_agency}{c.incumbent_name ? ` · held by ${fmtName(c.incumbent_name)}` : ''}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`rounded px-2 py-0.5 font-semibold ${m <= 6 ? 'bg-rose-400/10 text-rose-300' : 'bg-slate-700/40 text-slate-300'}`}>
+                      <span className={`rounded-[6px] px-2 py-0.5 font-semibold ${m <= 6 ? 'bg-(--mp-warn-bg) text-(--mp-warn)' : 'bg-(--mp-wash) text-(--mp-body)'}`}>
                         {m <= 0 ? 'Expiring now' : `Expires in ${m} mo · ${fmtDate(c.period_of_performance_current_end)}`}
                       </span>
-                      {like && <span className={`rounded px-2 py-0.5 font-semibold ${like.cls}`}>{like.label}</span>}
-                      {c.set_aside_type && <span className="rounded px-2 py-0.5 bg-slate-800 text-slate-400">{c.set_aside_type}</span>}
+                      {like && <span className={`rounded-[6px] px-2 py-0.5 font-semibold ${like.cls}`}>{like.label}</span>}
+                      {c.set_aside_type && <span className="rounded-[6px] px-2 py-0.5 bg-(--mp-wash) text-(--mp-muted)">{c.set_aside_type}</span>}
                     </div>
                   </div>
-                  <span className="hidden sm:inline-block shrink-0 text-xs font-semibold text-purple-400 group-hover:text-purple-300">Official record →</span>
+                  <span className="hidden sm:inline-block shrink-0 text-xs font-semibold text-(--mp-navy) group-hover:text-(--mp-navy-hover)">Official record →</span>
                 </a>
               );
             })}
           </div>
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-(--mp-muted)">
             Source: USAspending.gov — current contract data. A recompete typically posts 6–18 months before a
             contract ends; expiry dates are as reported. Click any row for the official record.
           </p>
@@ -165,13 +165,13 @@ export default async function UpForGrabsPage() {
 
       {/* CTA */}
       <section className="mx-auto max-w-5xl px-6 pb-16">
-        <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-2xl font-bold">This is a snapshot. Mindy tracks 129,000+ recompetes — and tells you 12 months early.</h2>
-          <p className="mt-3 mb-6 max-w-2xl mx-auto text-slate-300">
+        <div className="rounded-none border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">This is a snapshot. Mindy tracks 129,000+ recompetes — and tells you 12 months early.</h2>
+          <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
             Get alerts the moment a contract in your market is about to come up for grabs, with the incumbent and
             the whole history. Start free.
           </p>
-          <Link href="/signup" className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20">
+          <Link href="/signup" className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
             Start free →
           </Link>
         </div>

@@ -2,20 +2,20 @@ import Link from 'next/link';
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-(--mp-wash)">
       {/* Header */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-20">
+      <nav className="bg-white border-b border-(--mp-hair) sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-blue-700">GovCon</span>
-              <span className="text-xl font-bold text-amber-500">Giants</span>
+              <span className="text-xl font-bold text-(--mp-navy)">GovCon</span>
+              <span className="text-xl font-bold text-(--mp-accent)">Giants</span>
             </Link>
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-gray-600 hover:text-gray-900">
+              <Link href="/" className="text-(--mp-muted) hover:text-(--mp-ink)">
                 Tools
               </Link>
-              <Link href="/free-resources" className="text-gray-600 hover:text-gray-900">
+              <Link href="/free-resources" className="text-(--mp-muted) hover:text-(--mp-ink)">
                 Free Resources
               </Link>
             </div>
@@ -26,22 +26,22 @@ export default function AboutPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Hero */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             About GovCon Giants
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-(--mp-muted) max-w-2xl mx-auto">
             Empowering small businesses to win federal contracts with data-driven intelligence tools.
           </p>
         </div>
 
         {/* Mission */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Our Mission</h2>
-          <p className="text-gray-600 mb-4">
+        <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none p-8 mb-8">
+          <h2 className="text-2xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">Our Mission</h2>
+          <p className="text-(--mp-muted) mb-4">
             GovCon Giants was built to level the playing field for small businesses pursuing federal contracts.
             We believe that winning government contracts shouldn&apos;t require expensive consultants or insider connections.
           </p>
-          <p className="text-gray-600">
+          <p className="text-(--mp-muted)">
             Our suite of intelligence tools gives you the same data and insights that large contractors use,
             at a fraction of the cost. With lifetime access pricing, we&apos;re committed to making these tools
             accessible to every small business owner with federal contracting ambitions.
@@ -49,63 +49,63 @@ export default function AboutPage() {
         </div>
 
         {/* What We Offer */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">What We Offer</h2>
+        <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none p-8 mb-8">
+          <h2 className="text-2xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">What We Offer</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex items-start gap-3">
               <span className="text-2xl">🔍</span>
               <div>
-                <h3 className="font-bold text-gray-900">Opportunity Hunter</h3>
-                <p className="text-sm text-gray-600">Free agency discovery tool to find your best-fit agencies</p>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">Opportunity Hunter</h3>
+                <p className="text-sm text-(--mp-muted)">Free agency discovery tool to find your best-fit agencies</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-2xl">🏢</span>
               <div>
-                <h3 className="font-bold text-gray-900">Contractor Database</h3>
-                <p className="text-sm text-gray-600">200K+ federal contractors for teaming opportunities</p>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">Contractor Database</h3>
+                <p className="text-sm text-(--mp-muted)">200K+ federal contractors for teaming opportunities</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-2xl">📋</span>
               <div>
-                <h3 className="font-bold text-gray-900">Recompete Contracts</h3>
-                <p className="text-sm text-gray-600">Find expiring contracts before they hit the market</p>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">Recompete Contracts</h3>
+                <p className="text-sm text-(--mp-muted)">Find expiring contracts before they hit the market</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-2xl">🔎</span>
               <div>
-                <h3 className="font-bold text-gray-900">Prime Lookup</h3>
-                <p className="text-sm text-gray-600">Research prime contractors by agency</p>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">Prime Lookup</h3>
+                <p className="text-sm text-(--mp-muted)">Research prime contractors by agency</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-2xl">🤖</span>
               <div>
-                <h3 className="font-bold text-gray-900">Content Reaper</h3>
-                <p className="text-sm text-gray-600">Generate capability statements and proposals</p>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">Content Reaper</h3>
+                <p className="text-sm text-(--mp-muted)">Generate capability statements and proposals</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-2xl">🎯</span>
               <div>
-                <h3 className="font-bold text-gray-900">Federal Market Assassin</h3>
-                <p className="text-sm text-gray-600">Complete strategic intelligence system</p>
+                <h3 className="font-(family-name:--mp-font-serif) font-bold text-(--mp-ink)">Federal Market Assassin</h3>
+                <p className="text-sm text-(--mp-muted)">Complete strategic intelligence system</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Contact */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-8 text-white">
-          <h2 className="text-2xl font-bold mb-6">Contact Us</h2>
+        <div className="rounded-none p-8 text-(--mp-ink) bg-(--mp-wash)">
+          <h2 className="text-2xl font-bold mb-6 font-(family-name:--mp-font-serif)">Contact Us</h2>
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <span className="text-xl">📧</span>
               <div>
                 <p className="text-sm opacity-80">Email</p>
-                <a href="mailto:support@getmindy.ai" className="hover:text-amber-400 transition-colors">
+                <a href="mailto:support@getmindy.ai" className="hover:text-(--mp-navy) transition-colors">
                   support@getmindy.ai
                 </a>
               </div>
@@ -118,11 +118,11 @@ export default function AboutPage() {
               </div>
             </div>
           </div>
-          <div className="mt-8 pt-6 border-t border-slate-700">
+          <div className="mt-8 pt-6 border-t border-(--mp-line)">
             <p className="text-sm opacity-80 mb-4">Ready to start winning contracts?</p>
             <Link
               href="/"
-              className="inline-block px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors"
+              className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-bold rounded-none transition-colors"
             >
               Explore Our Tools →
             </Link>
@@ -131,15 +131,15 @@ export default function AboutPage() {
 
         {/* Back to Home */}
         <div className="mt-8 text-center">
-          <Link href="/" className="text-gray-500 hover:text-gray-700">
+          <Link href="/" className="text-(--mp-muted) hover:text-(--mp-body)">
             ← Back to all tools
           </Link>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-8 mt-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-600">
+      <footer className="bg-white border-t border-(--mp-hair) py-8 mt-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-(--mp-muted)">
           <p className="text-sm">
             © {new Date().getFullYear()} GovCon Giants. All rights reserved.
           </p>

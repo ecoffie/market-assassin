@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
   title: 'December Spend Forecast | Mindy',
@@ -10,5 +11,5 @@ export default function DecemberSpendLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <PublicShell>{children}</PublicShell>;
 }

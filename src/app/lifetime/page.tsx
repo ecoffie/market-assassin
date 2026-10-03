@@ -109,7 +109,7 @@ const jsonLd = {
 function CheckIcon({ highlighted = false }: { highlighted?: boolean }) {
   return (
     <svg
-      className={`w-5 h-5 shrink-0 mt-0.5 ${highlighted ? 'text-emerald-400' : 'text-purple-400'}`}
+      className={`w-5 h-5 shrink-0 mt-0.5 text-(--mp-navy)`}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -135,36 +135,36 @@ export default function LifetimePage() {
   const livePrice = FOUNDERS_LIFETIME_PRICE;
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/40 rounded-full mb-6">
-            <span className="text-amber-200 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-surface) border border-(--mp-line) rounded-[6px] mb-6">
+            <span className="text-(--mp-accent) text-sm font-semibold uppercase tracking-wide">
               {`Founders Lifetime · ${FOUNDERS_LIFETIME_CAP} seats`}
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             Join the first {FOUNDERS_LIFETIME_CAP}.<br />
-            <span className="text-emerald-400">Own Mindy forever.</span>
+            <span className="text-(--mp-accent)">Own Mindy forever.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-4">
+          <p className="text-xl text-(--mp-body) max-w-2xl mx-auto mb-4">
             One payment of{' '}
             {special && (
-              <span className="text-slate-500 line-through mr-1">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>
+              <span className="text-(--mp-muted) line-through mr-1">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>
             )}
-            <span className="text-white font-semibold">${fmt(livePrice)}</span>.{' '}
+            <span className="text-(--mp-ink) font-semibold">${fmt(livePrice)}</span>.{' '}
             {special
               ? 'Full Pro access for life — Mindy Day pricing, today only.'
               : 'Full Pro access for life — the same lifetime price our course buyers already trusted.'}
           </p>
-          <p className="text-slate-400 text-sm mb-10">
+          <p className="text-(--mp-muted) text-sm mb-10">
             Serious federal intelligence. Not a discount tool — a founding seat in the platform.
           </p>
 
@@ -172,70 +172,70 @@ export default function LifetimePage() {
 
           <Link
             href={checkoutHref}
-            className="inline-block bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-lg px-10 py-4 rounded-xl shadow-xl shadow-emerald-500/25 transition-colors"
+            className="inline-block hover:bg-(--mp-navy-hover) text-white font-bold text-lg px-10 py-4 rounded-none transition-colors bg-(--mp-navy)"
           >
             {special
               ? `Claim your lifetime seat — $${fmt(livePrice)} →`
               : `Become a Founding Member — $${fmt(FOUNDERS_LIFETIME_PRICE)} →`}
           </Link>
-          <p className="text-slate-400 text-sm mt-4">30-day money back · One-time payment</p>
+          <p className="text-(--mp-muted) text-sm mt-4">30-day money back · One-time payment</p>
         </div>
       </section>
 
       <section className="px-4 py-20">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-12 font-(family-name:--mp-font-serif)">
             The math at ${fmt(livePrice)}
           </h2>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase mb-3">Monthly Pro</h3>
-              <p className="text-4xl font-black text-white">${PRO_MONTHLY}<span className="text-lg text-slate-400">/mo</span></p>
-              <ul className="mt-4 space-y-2 text-sm text-slate-300 border-t border-slate-800 pt-4">
-                <li>5 years: <span className="text-white">${fmt(fiveYearMonthly)}</span></li>
-                <li>10 years: <span className="text-white">${fmt(PRO_MONTHLY * 120)}</span></li>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none p-6">
+              <h3 className="text-sm font-semibold text-(--mp-muted) uppercase mb-3">Monthly Pro</h3>
+              <p className="font-(family-name:--mp-font-mono) text-4xl font-semibold text-(--mp-ink)">${PRO_MONTHLY}<span className="text-lg text-(--mp-muted)">/mo</span></p>
+              <ul className="mt-4 space-y-2 text-sm text-(--mp-body) border-t border-(--mp-line) pt-4">
+                <li>5 years: <span className="text-(--mp-ink)">${fmt(fiveYearMonthly)}</span></li>
+                <li>10 years: <span className="text-(--mp-ink)">${fmt(PRO_MONTHLY * 120)}</span></li>
               </ul>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase mb-3">Annual Pro</h3>
-              <p className="text-4xl font-black text-white">${fmt(PRO_ANNUAL)}<span className="text-lg text-slate-400">/yr</span></p>
-              <ul className="mt-4 space-y-2 text-sm text-slate-300 border-t border-slate-800 pt-4">
-                <li>5 years: <span className="text-white">${fmt(fiveYearAnnual)}</span></li>
-                <li>10 years: <span className="text-white">${fmt(PRO_ANNUAL * 10)}</span></li>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none p-6">
+              <h3 className="text-sm font-semibold text-(--mp-muted) uppercase mb-3">Annual Pro</h3>
+              <p className="font-(family-name:--mp-font-mono) text-4xl font-semibold text-(--mp-ink)">${fmt(PRO_ANNUAL)}<span className="text-lg text-(--mp-muted)">/yr</span></p>
+              <ul className="mt-4 space-y-2 text-sm text-(--mp-body) border-t border-(--mp-line) pt-4">
+                <li>5 years: <span className="text-(--mp-ink)">${fmt(fiveYearAnnual)}</span></li>
+                <li>10 years: <span className="text-(--mp-ink)">${fmt(PRO_ANNUAL * 10)}</span></li>
               </ul>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border-2 border-emerald-500 rounded-2xl p-6 relative shadow-xl shadow-emerald-500/10">
+            <div className="border-2 border-(--mp-navy) rounded-none p-6 relative bg-(--mp-surface)">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-emerald-500 text-slate-950 text-xs font-bold px-4 py-1 rounded-full">
+                <span className="bg-(--mp-navy) text-white text-xs font-bold px-4 py-1 rounded-[6px]">
                   {special ? 'MINDY DAY' : 'FOUNDERS'}
                 </span>
               </div>
-              <h3 className="text-sm font-semibold text-emerald-300 uppercase mb-3">Lifetime</h3>
-              <p className="text-4xl font-black text-white">
+              <h3 className="text-sm font-semibold text-(--mp-navy) uppercase mb-3">Lifetime</h3>
+              <p className="font-(family-name:--mp-font-mono) text-4xl font-semibold text-(--mp-ink)">
                 {special && (
-                  <span className="text-2xl text-slate-500 line-through mr-2">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>
+                  <span className="text-2xl text-(--mp-muted) line-through mr-2">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>
                 )}
-                ${fmt(livePrice)}<span className="text-lg text-slate-400"> once</span>
+                ${fmt(livePrice)}<span className="text-lg text-(--mp-muted)"> once</span>
               </p>
-              <ul className="mt-4 space-y-2 text-sm text-slate-200 border-t border-emerald-500/30 pt-4">
-                <li>Break-even: <span className="text-emerald-300 font-semibold">~{Math.ceil(livePrice / PRO_MONTHLY)} months</span> vs monthly</li>
-                <li>5-year savings: <span className="text-emerald-300 font-semibold">${fmt(fiveYearMonthly - livePrice)}+</span></li>
+              <ul className="mt-4 space-y-2 text-sm text-(--mp-ink) border-t border-(--mp-line) pt-4">
+                <li>Break-even: <span className="text-(--mp-ink) font-semibold font-(family-name:--mp-font-mono)">~{Math.ceil(livePrice / PRO_MONTHLY)} months</span> vs monthly</li>
+                <li>5-year savings: <span className="text-(--mp-ink) font-semibold font-(family-name:--mp-font-mono)">${fmt(fiveYearMonthly - livePrice)}+</span></li>
               </ul>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="bg-slate-900/40 px-4 py-20">
+      <section className="bg-(--mp-wash) px-4 py-20">
         <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-12">
           <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Everything in Pro. Forever.</h2>
+            <h2 className="text-2xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">Everything in Pro. Forever.</h2>
             <div className="space-y-3">
               {proFeatures.map((f) => (
-                <div key={f} className="flex items-start gap-3 text-slate-200 text-sm">
+                <div key={f} className="flex items-start gap-3 text-(--mp-ink) text-sm">
                   <CheckIcon highlighted />
                   <span>{f}</span>
                 </div>
@@ -243,10 +243,10 @@ export default function LifetimePage() {
             </div>
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Founding member perks</h2>
+            <h2 className="text-2xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">Founding member perks</h2>
             <div className="space-y-3">
               {founderPerks.map((f) => (
-                <div key={f} className="flex items-start gap-3 text-slate-200 text-sm">
+                <div key={f} className="flex items-start gap-3 text-(--mp-ink) text-sm">
                   <CheckIcon />
                   <span>{f}</span>
                 </div>
@@ -257,8 +257,8 @@ export default function LifetimePage() {
       </section>
 
       <section className="px-4 py-16">
-        <div className="max-w-3xl mx-auto space-y-6 text-slate-300 text-lg leading-relaxed">
-          <h2 className="text-3xl font-bold text-white text-center mb-8">Why $4,997</h2>
+        <div className="max-w-3xl mx-auto space-y-6 text-(--mp-body) text-lg leading-relaxed">
+          <h2 className="text-3xl font-bold text-(--mp-ink) text-center mb-8 font-(family-name:--mp-font-serif)">Why $4,997</h2>
           <p>
             People paid $4,997 for lifetime access to our courses — videos and community, no daily AI,
             no live federal data. Mindy is the product now. One platform, one price, one decision.
@@ -268,24 +268,24 @@ export default function LifetimePage() {
             believers who help shape what Mindy becomes — not an unlimited discount that kills the
             recurring business we are building.
           </p>
-          <p className="text-white font-semibold">— Eric Coffie, founder</p>
+          <p className="text-(--mp-ink) font-semibold">— Eric Coffie, founder</p>
         </div>
       </section>
 
-      <section className="bg-slate-900/40 px-4 py-16">
+      <section className="bg-(--mp-wash) px-4 py-16">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-10">Questions</h2>
+          <h2 className="text-3xl font-bold text-(--mp-ink) text-center mb-10 font-(family-name:--mp-font-serif)">Questions</h2>
           <div className="space-y-3">
             {faqs.map((f) => (
               <details
                 key={f.q}
-                className="group bg-slate-900 border border-slate-800 rounded-xl px-6 py-4"
+                className="group bg-(--mp-surface) border border-(--mp-line) rounded-none px-6 py-4"
               >
-                <summary className="cursor-pointer list-none flex justify-between gap-4 text-white font-semibold">
+                <summary className="cursor-pointer list-none flex justify-between gap-4 text-(--mp-ink) font-semibold">
                   <span>{f.q}</span>
-                  <span className="text-emerald-400 group-open:rotate-45 transition-transform">+</span>
+                  <span className="text-(--mp-navy) group-open:rotate-45 transition-transform">+</span>
                 </summary>
-                <p className="mt-4 text-slate-300">{f.a}</p>
+                <p className="mt-4 text-(--mp-body)">{f.a}</p>
               </details>
             ))}
           </div>
@@ -293,23 +293,23 @@ export default function LifetimePage() {
       </section>
 
       <section className="px-4 py-20">
-        <div className="max-w-3xl mx-auto text-center rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-10">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto text-center rounded-none border border-(--mp-line) p-10 bg-(--mp-wash)">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             {`$${fmt(FOUNDERS_LIFETIME_PRICE)} once. ${FOUNDERS_LIFETIME_CAP} seats.`}
           </h2>
           <Link
             href={checkoutHref}
-            className="inline-block mt-6 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold text-lg px-10 py-4 rounded-xl"
+            className="inline-block mt-6 text-white font-bold text-lg px-10 py-4 rounded-none bg-(--mp-navy)"
           >
             {special ? `Claim your lifetime seat — $${fmt(livePrice)} →` : 'Claim Founders Lifetime →'}
           </Link>
-          <p className="mt-6 text-sm text-slate-400">
+          <p className="mt-6 text-sm text-(--mp-muted)">
             Not ready?{' '}
-            <Link href={MONTHLY_CHECKOUT} className="text-purple-300 hover:underline">
+            <Link href={MONTHLY_CHECKOUT} className="text-(--mp-navy) hover:underline">
               Pro at ${PRO_MONTHLY}/mo
             </Link>{' '}
             or{' '}
-            <Link href={ANNUAL_CHECKOUT} className="text-purple-300 hover:underline">
+            <Link href={ANNUAL_CHECKOUT} className="text-(--mp-navy) hover:underline">
               ${fmt(PRO_ANNUAL)}/yr
             </Link>
           </p>

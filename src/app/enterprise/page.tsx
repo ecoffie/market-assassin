@@ -22,73 +22,73 @@ const ENDPOINTS: { name: string; body: string; returns: string }[] = [
 
 export default function Enterprise() {
   return (
-    <main className="min-h-dvh bg-[#0b0f17] text-slate-100 [color-scheme:dark]">
+    <main className="min-h-dvh bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-400/80">Mindy · Enterprise / API</p>
-        <h1 className="mt-5 text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-          Everyone can see what <span className="italic text-slate-400">is</span>.<br />Nobody can see what <span className="text-amber-300">changed</span>.
+        <p className="font-(family-name:--mp-font-mono) text-[11px] uppercase tracking-[0.18em] text-(--mp-accent)">Mindy · Enterprise / API</p>
+        <h1 className="mt-5 text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl font-(family-name:--mp-font-serif)">
+          Everyone can see what <span className="italic text-(--mp-muted)">is</span>.<br />Nobody can see what <span className="text-(--mp-accent)">changed</span>.
         </h1>
-        <p className="mt-6 max-w-2xl text-[17px] leading-relaxed text-slate-300">
+        <p className="mt-6 max-w-2xl text-[17px] leading-relaxed text-(--mp-body)">
           USASpending has no “as of” query — it serves today’s state and forgets yesterday’s. So the
-          record of what <span className="text-slate-100">moved</span> — which contracts slipped, which ceilings grew, which incumbents
+          record of what <span className="text-(--mp-ink)">moved</span> — which contracts slipped, which ceilings grew, which incumbents
           quietly lost — does not exist anywhere, for anyone, unless someone was writing it down while it
-          happened. <span className="font-semibold text-white">We are writing it down.</span>
+          happened. <span className="font-semibold text-(--mp-ink)">We are writing it down.</span>
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <a href={CONTACT} className="inline-flex items-center justify-center rounded-lg bg-amber-400 px-5 py-3 text-[15px] font-bold text-[#231a02] hover:bg-amber-300">Talk to us about the feed →</a>
-          <span className="inline-flex items-center text-[13px] text-slate-500">Data license · volume-based · annual · not a seat</span>
+          <a href={CONTACT} className="inline-flex items-center justify-center rounded-none bg-(--mp-navy) px-5 py-3 text-[15px] font-semibold text-white hover:bg-(--mp-navy-hover)">Talk to us about the feed →</a>
+          <span className="inline-flex items-center text-[13px] text-(--mp-muted)">Data license · volume-based · annual · not a seat</span>
         </div>
 
         {/* Who it's for */}
         <section className="mt-20">
-          <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-slate-500">Who it’s for</h2>
-          <div className="mt-5 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] sm:grid-cols-2">
+          <h2 className="font-(family-name:--mp-font-mono) text-[12px] uppercase tracking-[0.14em] text-(--mp-muted)">Who it’s for</h2>
+          <div className="mt-5 grid gap-px overflow-hidden rounded-none border border-(--mp-line) bg-(--mp-surface) sm:grid-cols-2">
             {BUYERS.map((b) => (
-              <div key={b.who} className="border border-white/[0.06] p-6">
-                <div className="text-[13px] font-semibold uppercase tracking-wide text-amber-300/90">{b.who}</div>
-                <p className="mt-2 text-[15px] leading-relaxed text-slate-300">“{b.q}”</p>
+              <div key={b.who} className="border border-(--mp-line) p-6">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-(--mp-accent)">{b.who}</div>
+                <p className="mt-2 text-[15px] leading-relaxed text-(--mp-body)">“{b.q}”</p>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[13px] text-slate-500">None of them want a seat, a dashboard, or a login. They want the change, as a feed into their own systems, for their whole book at once.</p>
+          <p className="mt-4 text-[13px] text-(--mp-muted)">None of them want a seat, a dashboard, or a login. They want the change, as a feed into their own systems, for their whole book at once.</p>
         </section>
 
         {/* The feed */}
         <section className="mt-20">
-          <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-slate-500">The feed — bulk endpoints, not a UI</h2>
+          <h2 className="font-(family-name:--mp-font-mono) text-[12px] uppercase tracking-[0.14em] text-(--mp-muted)">The feed — bulk endpoints, not a UI</h2>
           <div className="mt-5 space-y-3">
             {ENDPOINTS.map((e) => (
-              <div key={e.name} className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+              <div key={e.name} className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-6">
                 <div className="flex flex-wrap items-baseline gap-x-3">
-                  <code className="font-mono text-[15px] font-semibold text-amber-200">{e.name}</code>
-                  <span className="font-mono text-[12px] text-slate-500">{e.body}</span>
+                  <code className="font-(family-name:--mp-font-mono) text-[15px] font-semibold text-(--mp-navy)">{e.name}</code>
+                  <span className="font-(family-name:--mp-font-mono) text-[12px] text-(--mp-muted)">{e.body}</span>
                 </div>
-                <p className="mt-2 text-[15px] leading-relaxed text-slate-300">{e.returns}</p>
+                <p className="mt-2 text-[15px] leading-relaxed text-(--mp-body)">{e.returns}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* The moat */}
-        <section className="mt-20 rounded-2xl border border-amber-300/20 bg-amber-300/[0.04] p-8">
-          <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-amber-400/80">Why it’s defensible</h2>
-          <p className="mt-4 text-[17px] leading-relaxed text-slate-200">
-            The data is public — SAM.gov, USASpending. The <span className="font-semibold text-white">recorded diff</span> is not. Every night the source
+        <section className="mt-20 rounded-none border border-(--mp-line) bg-(--mp-wash) p-8">
+          <h2 className="font-(family-name:--mp-font-mono) text-[12px] uppercase tracking-[0.14em] text-(--mp-accent)">Why it’s defensible</h2>
+          <p className="mt-4 text-[17px] leading-relaxed text-(--mp-ink)">
+            The data is public — SAM.gov, USASpending. The <span className="font-semibold text-(--mp-ink)">recorded diff</span> is not. Every night the source
             overwrites the row with the current truth and the past is gone; upstream keeps no copy. So we write
             the change to an append-only log first. In three years that log answers questions no amount of funding
-            can reconstruct — because the raw material stopped existing the day it changed. <span className="text-amber-200">A competitor starting in 2029 starts with an empty log in 2029.</span>
+            can reconstruct — because the raw material stopped existing the day it changed. <span className="font-semibold text-(--mp-ink)">A competitor starting in 2029 starts with an empty log in 2029.</span>
           </p>
         </section>
 
         {/* Contact */}
         <section className="mt-20 text-center">
-          <h2 className="text-balance text-2xl font-bold sm:text-3xl">Point your models at the change, not the state.</h2>
-          <p className="mx-auto mt-3 max-w-lg text-[15px] text-slate-400">Pricing is bespoke — volume, freshness, SLA, and integration. Tell us your book and how you ingest.</p>
-          <a href={CONTACT} className="mt-6 inline-flex items-center justify-center rounded-xl bg-amber-400 px-6 py-3 text-[15px] font-bold text-[#231a02] hover:bg-amber-300">Contact sales</a>
-          <p className="mt-4 font-mono text-[12px] text-slate-600">hello@getmindy.ai · typically replies within a business day</p>
+          <h2 className="text-balance text-2xl font-bold sm:text-3xl font-(family-name:--mp-font-serif)">Point your models at the change, not the state.</h2>
+          <p className="mx-auto mt-3 max-w-lg text-[15px] text-(--mp-muted)">Pricing is bespoke — volume, freshness, SLA, and integration. Tell us your book and how you ingest.</p>
+          <a href={CONTACT} className="mt-6 inline-flex items-center justify-center rounded-none bg-(--mp-navy) px-6 py-3 text-[15px] font-semibold text-white hover:bg-(--mp-navy-hover)">Contact sales</a>
+          <p className="mt-4 font-(family-name:--mp-font-mono) text-[12px] text-(--mp-muted)">hello@getmindy.ai · typically replies within a business day</p>
         </section>
 
-        <footer className="mt-24 border-t border-white/10 pt-6 font-mono text-[11px] leading-relaxed text-slate-600">
+        <footer className="mt-24 border-t border-(--mp-line) pt-6 font-(family-name:--mp-font-mono) text-[11px] leading-relaxed text-(--mp-muted)">
           Mindy · GovCon Giants AI. Figures verified against USASpending &amp; SAM.gov; contract data measured in production.
         </footer>
       </div>

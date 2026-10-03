@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import PublicShell from '@/components/public-site/PublicShell';
 
 /**
  * `/free-resources` is a `'use client'` page with no metadata export of its own,
@@ -26,5 +27,5 @@ export default function FreeResourcesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <PublicShell contentElement="div">{children}</PublicShell>;
 }
