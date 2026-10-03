@@ -2,7 +2,7 @@
  * Public Briefing API
  *
  * Returns a user's latest briefing(s) as JSON.
- * Auth: email + briefings entitlement check (KV and/or user_profiles).
+ * Auth: verified identity only (Mindy session, Supabase session or signed link) + Pro access.
  *
  * GET /api/briefings/latest?email=user@example.com         → latest briefing
  * GET /api/briefings/latest?email=user@example.com&days=7  → last 7 days (max 30)
@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
   }
 
-  // SECURITY: Verify user owns this email
-  const auth = await verifyUserOwnsEmail(request, email);
+  // SECURITY: Verify user owns this email. Strong auth only (Mindy session, Supabase session or a
+  // signed link): the plaintext ma_access_email cookie is never evidence of who is reading paid
+  // briefings — anyone can set it to any address (R1 migration, 2026-10-03).
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }

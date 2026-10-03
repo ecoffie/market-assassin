@@ -8,6 +8,15 @@ interface AccessLinkPayload {
   email: string;
   destination: AccessDestination;
   createdAt: string;
+  /** Where the browser lands after the link is consumed. Allowlisted (see ACCESS_RETURN_PATHS). */
+  returnTo?: AccessReturnPath;
+}
+
+/** The only post-link landing pages a request may ask for. Anything else is ignored. */
+export const ACCESS_RETURN_PATHS = ['/briefings'] as const;
+export type AccessReturnPath = (typeof ACCESS_RETURN_PATHS)[number];
+export function normalizeReturnTo(value: unknown): AccessReturnPath | undefined {
+  return (ACCESS_RETURN_PATHS as readonly unknown[]).includes(value) ? (value as AccessReturnPath) : undefined;
 }
 
 const ACCESS_LINK_PREFIX = 'access-link';
@@ -49,22 +58,23 @@ export async function validateAccessRequest(email: string, destination: AccessDe
   return { ok: true };
 }
 
-export async function createAccessLink(email: string, destination: AccessDestination): Promise<string> {
+export async function createAccessLink(email: string, destination: AccessDestination, returnTo?: AccessReturnPath): Promise<string> {
   const normalizedEmail = normalizeEmail(email);
   const token = crypto.randomUUID();
   const payload: AccessLinkPayload = {
     email: normalizedEmail,
     destination,
     createdAt: new Date().toISOString(),
+    ...(returnTo ? { returnTo } : {}),
   };
 
   await kv.set(`${ACCESS_LINK_PREFIX}:${token}`, payload, { ex: ACCESS_LINK_TTL_SECONDS });
   return token;
 }
 
-export async function createSecureAccessUrl(email: string, destination: AccessDestination): Promise<string> {
+export async function createSecureAccessUrl(email: string, destination: AccessDestination, returnTo?: AccessReturnPath): Promise<string> {
   try {
-    const token = await createAccessLink(email, destination);
+    const token = await createAccessLink(email, destination, returnTo);
     return buildAccessUrl(token);
   } catch (error) {
     console.warn('[access-links] KV unavailable while creating secure link; using direct fallback URL', {
@@ -79,15 +89,15 @@ export async function consumeAccessLink(token: string): Promise<AccessLinkPayloa
   if (!token) return null;
 
   const key = `${ACCESS_LINK_PREFIX}:${token}`;
-  const payload = await kv.get<AccessLinkPayload>(key);
-  if (!payload) return null;
-
-  await kv.del(key);
-  return payload;
+  // Atomic single use: GETDEL returns the payload to exactly one consumer. The old get-then-del
+  // let two concurrent consumes both succeed — which now matters, because consuming a briefings
+  // link mints a signed Mindy session.
+  const payload = await kv.getdel<AccessLinkPayload>(key);
+  return payload || null;
 }
 
-export async function sendAccessLinkEmail(email: string, destination: AccessDestination): Promise<void> {
-  const accessUrl = await createSecureAccessUrl(email, destination);
+export async function sendAccessLinkEmail(email: string, destination: AccessDestination, returnTo?: AccessReturnPath): Promise<void> {
+  const accessUrl = await createSecureAccessUrl(email, destination, returnTo);
   const destinationLabel = destination === 'briefings' ? 'Market Intelligence' : 'Email Preferences';
   const actionLabel = destination === 'briefings' ? 'Open Market Intelligence' : 'Manage Preferences';
 
