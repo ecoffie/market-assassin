@@ -15,6 +15,7 @@
  *     since we don't load grants/subawards yet)
  */
 import { useMemo, useState } from 'react';
+import { MP_COLORS } from '@/lib/public-site/tokens';
 import {
   Bar,
   BarChart,
@@ -59,20 +60,33 @@ interface Props {
 type View = 'trend' | 'drilldown' | 'treemap';
 type Period = '1Y' | '3Y' | '5Y' | '10Y' | 'ALL';
 
-// Tableau-style 10-color qualitative palette — visually distinct on dark
-// backgrounds, no awkward red/green ambiguity. Reserved colors[0] for
-// Mindy purple to anchor the brand.
+/** Mix a token colour toward white; `share` is the fraction of the token kept. */
+function tint(hex: string, share: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (shift: number) => Math.round(((n >> shift) & 255) * share + 255 * (1 - share));
+  return `#${[16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Categorical ramp derived from the public tokens: navy tints, then warm neutrals. Status and
+// accent colours stay out so a chart category never reads as a warning or an editorial mark.
 const AGENCY_COLORS = [
-  '#7c3aed', // mindy purple
-  '#06b6d4', // cyan
-  '#f59e0b', // amber
-  '#10b981', // emerald
-  '#ec4899', // pink
-  '#3b82f6', // blue
-  '#84cc16', // lime
-  '#f97316', // orange
+  MP_COLORS.navy,
+  tint(MP_COLORS.navy, 0.72),
+  tint(MP_COLORS.navy, 0.48),
+  tint(MP_COLORS.navy, 0.28),
+  MP_COLORS.body,
+  MP_COLORS.muted,
+  MP_COLORS.faint,
+  tint(MP_COLORS.body, 0.35),
 ];
-const OTHER_COLOR = '#64748b'; // slate
+const OTHER_COLOR = MP_COLORS.line;
+
+/** Ink or white, whichever reads on the given fill. */
+function labelOn(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const lum = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+  return lum > 150 ? MP_COLORS.ink : MP_COLORS.surface;
+}
 
 function fmtCompactCurrency(n: number): string {
   if (!n || n <= 0) return '$0';
@@ -120,15 +134,15 @@ function TrendTooltip({ active, payload }: TrendTooltipProps) {
         : `▼ ${(yoy * 100).toFixed(1)}% vs FY ${d.fiscal_year - 1}`;
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-sm">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-3 backdrop-blur-sm">
+      <p className="text-xs font-semibold uppercase tracking-wider text-(--mp-muted)">
         FY {d.fiscal_year}
-        {d.is_partial && <span className="ml-2 text-amber-400">(YTD)</span>}
+        {d.is_partial && <span className="ml-2 text-(--mp-warn)">(YTD)</span>}
       </p>
-      <p className="mt-1 text-base font-bold text-white">{fmtFullCurrency(d.total_obligated)}</p>
-      <p className="text-xs text-slate-400">{d.award_count.toLocaleString()} awards</p>
+      <p className="mt-1 text-base font-bold text-(--mp-ink)">{fmtFullCurrency(d.total_obligated)}</p>
+      <p className="text-xs text-(--mp-muted)">{d.award_count.toLocaleString()} awards</p>
       {yoyText && (
-        <p className={`mt-1 text-xs font-semibold ${(yoy ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <p className={`mt-1 text-xs font-semibold ${(yoy ?? 0) >= 0 ? 'text-(--mp-ok)' : 'text-(--mp-crit)'}`}>
           {yoyText}
         </p>
       )}
@@ -152,31 +166,31 @@ function TrendView({ data, currentFiscalYear }: { data: YearlyDatum[]; currentFi
     <div className="h-[360px] w-full">
       <ResponsiveContainer>
         <BarChart data={enriched} margin={{ top: 24, right: 16, left: 8, bottom: 8 }}>
-          <CartesianGrid stroke="#1e293b" strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={MP_COLORS.hair} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="fiscal_year"
-            tick={{ fill: '#94a3b8', fontSize: 12 }}
+            tick={{ fill: MP_COLORS.muted, fontSize: 12 }}
             tickFormatter={(v) => `FY${String(v).slice(-2)}`}
-            axisLine={{ stroke: '#334155' }}
+            axisLine={{ stroke: MP_COLORS.line }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            tick={{ fill: MP_COLORS.muted, fontSize: 11 }}
             tickFormatter={(v) => fmtCompactCurrency(Number(v))}
             axisLine={false}
             tickLine={false}
             width={56}
           />
-          <Tooltip content={<TrendTooltip />} cursor={{ fill: '#7c3aed', fillOpacity: 0.08 }} />
+          <Tooltip content={<TrendTooltip />} cursor={{ fill: MP_COLORS.navy, fillOpacity: 0.08 }} />
           <Bar dataKey="total_obligated" radius={[4, 4, 0, 0]} maxBarSize={64}>
             {enriched.map((entry, idx) => (
-              <Cell key={`c-${idx}`} fill="#7c3aed" fillOpacity={entry.is_partial ? 0.5 : 1} />
+              <Cell key={`c-${idx}`} fill={MP_COLORS.navy} fillOpacity={entry.is_partial ? 0.5 : 1} />
             ))}
             <LabelList
               dataKey="total_obligated"
               position="top"
               formatter={(v) => fmtCompactCurrency(Number(v ?? 0))}
-              fill="#e2e8f0"
+              fill={MP_COLORS.body}
               fontSize={11}
               fontWeight={600}
             />
@@ -227,9 +241,9 @@ function StackedTooltip({ active, payload, label }: StackedTooltipProps) {
   if (!active || !payload || !payload.length) return null;
   const total = payload.reduce((s, p) => s + (Number(p.value) || 0), 0);
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-sm max-w-[18rem]">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">FY {label}</p>
-      <p className="mt-1 text-sm font-bold text-white">{fmtFullCurrency(total)} total</p>
+    <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-3 backdrop-blur-sm max-w-[18rem]">
+      <p className="text-xs font-semibold uppercase tracking-wider text-(--mp-muted)">FY {label}</p>
+      <p className="mt-1 text-sm font-bold text-(--mp-ink)">{fmtFullCurrency(total)} total</p>
       <ul className="mt-2 space-y-1">
         {payload
           .slice()
@@ -239,9 +253,9 @@ function StackedTooltip({ active, payload, label }: StackedTooltipProps) {
             <li key={p.dataKey} className="flex items-center justify-between gap-3 text-xs">
               <span className="flex items-center gap-2 min-w-0">
                 <span className="h-2 w-2 rounded-sm shrink-0" style={{ background: p.color }} />
-                <span className="text-slate-300 truncate">{p.name}</span>
+                <span className="text-(--mp-body) truncate">{p.name}</span>
               </span>
-              <span className="text-slate-100 font-mono shrink-0">{fmtCompactCurrency(Number(p.value))}</span>
+              <span className="text-(--mp-ink) font-(family-name:--mp-font-mono) shrink-0">{fmtCompactCurrency(Number(p.value))}</span>
             </li>
           ))}
       </ul>
@@ -254,33 +268,33 @@ function DrilldownView({ rows }: { rows: YearlyByAgencyDatum[] }) {
   const stackKeys = [...topAgencies, 'Other'];
 
   if (data.length === 0) {
-    return <p className="text-slate-400 text-sm">No agency-level data available.</p>;
+    return <p className="text-(--mp-muted) text-sm">No agency-level data available.</p>;
   }
 
   return (
     <div className="h-[420px] w-full">
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 16, right: 16, left: 8, bottom: 8 }}>
-          <CartesianGrid stroke="#1e293b" strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={MP_COLORS.hair} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="fiscal_year"
-            tick={{ fill: '#94a3b8', fontSize: 12 }}
+            tick={{ fill: MP_COLORS.muted, fontSize: 12 }}
             tickFormatter={(v) => `FY${String(v).slice(-2)}`}
-            axisLine={{ stroke: '#334155' }}
+            axisLine={{ stroke: MP_COLORS.line }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            tick={{ fill: MP_COLORS.muted, fontSize: 11 }}
             tickFormatter={(v) => fmtCompactCurrency(Number(v))}
             axisLine={false}
             tickLine={false}
             width={56}
           />
-          <Tooltip content={<StackedTooltip />} cursor={{ fill: '#7c3aed', fillOpacity: 0.05 }} />
+          <Tooltip content={<StackedTooltip />} cursor={{ fill: MP_COLORS.navy, fillOpacity: 0.05 }} />
           <Legend
             wrapperStyle={{ paddingTop: 8 }}
             iconType="square"
-            formatter={(v) => <span className="text-xs text-slate-400">{v}</span>}
+            formatter={(v) => <span className="text-xs text-(--mp-muted)">{v}</span>}
           />
           {stackKeys.map((key, idx) => (
             <Bar
@@ -318,12 +332,12 @@ function TreemapCell(props: TreemapCellProps) {
   const showValue = width > 60 && height > 50;
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#0f172a" strokeWidth={2} />
+      <rect x={x} y={y} width={width} height={height} fill={fill} stroke={MP_COLORS.surface} strokeWidth={2} />
       {showLabel && (
         <text
           x={x + 8}
           y={y + 20}
-          fill="#fff"
+          fill={labelOn(fill)}
           fontSize={12}
           fontWeight={600}
           style={{ pointerEvents: 'none' }}
@@ -335,7 +349,8 @@ function TreemapCell(props: TreemapCellProps) {
         <text
           x={x + 8}
           y={y + 38}
-          fill="rgba(255,255,255,0.85)"
+          fill={labelOn(fill)}
+          fillOpacity={0.85}
           fontSize={11}
           style={{ pointerEvents: 'none' }}
         >
@@ -358,11 +373,11 @@ function TreemapTooltip({ active, payload }: TreemapTooltipProps) {
   if (!active || !payload || !payload.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-sm">
-      <p className="text-sm font-semibold text-white">{d.name}</p>
-      <p className="mt-1 text-xs text-slate-300">{fmtFullCurrency(Number(d.value))}</p>
+    <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-3 backdrop-blur-sm">
+      <p className="text-sm font-semibold text-(--mp-ink)">{d.name}</p>
+      <p className="mt-1 text-xs text-(--mp-body)">{fmtFullCurrency(Number(d.value))}</p>
       {typeof d.awards === 'number' && (
-        <p className="text-xs text-slate-400">{d.awards.toLocaleString()} awards</p>
+        <p className="text-xs text-(--mp-muted)">{d.awards.toLocaleString()} awards</p>
       )}
     </div>
   );
@@ -382,7 +397,7 @@ function TreemapView({ data }: { data: NaicsTreemapDatum[] }) {
   }));
 
   if (treemapData.length === 0) {
-    return <p className="text-slate-400 text-sm">No NAICS data for treemap.</p>;
+    return <p className="text-(--mp-muted) text-sm">No NAICS data for treemap.</p>;
   }
 
   return (
@@ -392,7 +407,7 @@ function TreemapView({ data }: { data: NaicsTreemapDatum[] }) {
           data={treemapData}
           dataKey="value"
           aspectRatio={4 / 3}
-          stroke="#0f172a"
+          stroke={MP_COLORS.surface}
           content={<TreemapCell />}
         >
           <Tooltip content={<TreemapTooltip />} />
@@ -429,13 +444,13 @@ export function ContractorAnalytics({
     <div>
       {/* Controls */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900 p-1">
+        <div className="inline-flex rounded-lg border border-(--mp-line) bg-(--mp-surface) p-1">
           {views.map((v) => (
             <button
               key={v.id}
               onClick={() => setView(v.id)}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                view === v.id ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                view === v.id ? 'bg-(--mp-navy) text-white' : 'text-(--mp-muted) hover:text-(--mp-ink)'
               }`}
             >
               {v.label}
@@ -443,13 +458,13 @@ export function ContractorAnalytics({
           ))}
         </div>
         {view !== 'treemap' && (
-          <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900 p-1">
+          <div className="inline-flex rounded-lg border border-(--mp-line) bg-(--mp-surface) p-1">
             {periods.map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md transition-colors ${
-                  period === p ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                className={`px-2.5 py-1 text-xs font-(family-name:--mp-font-mono) font-semibold rounded-md transition-colors ${
+                  period === p ? 'bg-(--mp-wash) text-(--mp-ink)' : 'text-(--mp-muted) hover:text-(--mp-body)'
                 }`}
               >
                 {p}
@@ -465,7 +480,7 @@ export function ContractorAnalytics({
       {view === 'treemap' && <TreemapView data={treemapNaics} />}
 
       {/* Footer hint */}
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-(--mp-muted)">
         {view === 'trend' && 'Hover any bar for YoY change + award count. Current fiscal year shown at reduced opacity (partial year).'}
         {view === 'drilldown' && 'Stacked by top 7 awarding agencies. "Other" rolls up the remainder. Hover for breakdown.'}
         {view === 'treemap' && 'All-time NAICS (line-of-business) mix. Rectangle area is proportional to total obligated dollars.'}

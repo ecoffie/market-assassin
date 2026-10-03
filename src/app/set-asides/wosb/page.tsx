@@ -127,34 +127,34 @@ export default function WosbPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumb */}
-      <nav className="max-w-4xl mx-auto px-4 pt-6 text-sm text-slate-500">
-        <Link href="/" className="hover:text-purple-300">Home</Link>
+      <nav className="max-w-4xl mx-auto px-4 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <Link href="/set-asides" className="hover:text-purple-300">Set-Asides</Link>
+        <Link href="/set-asides" className="hover:text-(--mp-navy-hover)">Set-Asides</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">WOSB</span>
+        <span className="text-(--mp-body)">WOSB</span>
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               Women-Owned Small Business
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-5xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             WOSB &amp; EDWOSB Set-Aside<br />
-            <span className="text-purple-400">Contract Opportunities</span>
+            <span className="text-(--mp-navy)">Contract Opportunities</span>
           </h1>
-          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             The federal government has a statutory 5% WOSB goal — and consistently
             misses it. That gap is your opportunity. Mindy maps WOSB and EDWOSB
             eligibility to the specific NAICS codes where the set-aside applies, so
@@ -162,93 +162,93 @@ export default function WosbPage() {
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Get Free WOSB Opportunity Alerts
           </Link>
-          <p className="text-slate-500 text-sm mt-4">First briefing lands tomorrow morning.</p>
+          <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
       </section>
 
       {/* Who qualifies */}
       <section className="py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Who Qualifies for WOSB and EDWOSB
           </h2>
-          <p className="text-slate-300 mb-4">
+          <p className="text-(--mp-body) mb-4">
             WOSB and EDWOSB are two tracks of the same program. Both require
             women ownership and control; EDWOSB adds an economic-disadvantage
             threshold that expands the eligible NAICS list.
           </p>
           <div className="grid sm:grid-cols-2 gap-4 mb-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-3">WOSB</h3>
-              <ul className="space-y-2 text-slate-300 text-sm">
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>51%+ owned and controlled by U.S. citizen women</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Day-to-day management by one or more women</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Small business size standards for your NAICS</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Operates in a WOSB-eligible NAICS code</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>SBA certification via certify.SBA.gov or approved third-party certifier</span></li>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-3">WOSB</h3>
+              <ul className="space-y-2 text-(--mp-body) text-sm">
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>51%+ owned and controlled by U.S. citizen women</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Day-to-day management by one or more women</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Small business size standards for your NAICS</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Operates in a WOSB-eligible NAICS code</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>SBA certification via certify.SBA.gov or approved third-party certifier</span></li>
               </ul>
             </div>
-            <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-3">EDWOSB <span className="text-purple-300 text-xs font-normal">(broader NAICS access)</span></h3>
-              <ul className="space-y-2 text-slate-300 text-sm">
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Everything required for WOSB, plus:</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Owner personal net worth under $850K</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Average AGI under $400K (last 3 years)</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Personal assets under $6.5M</span></li>
-                <li className="flex gap-2"><span className="text-purple-400">→</span><span>Access to a substantially broader list of eligible NAICS codes</span></li>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-3">EDWOSB <span className="text-(--mp-navy) text-xs font-normal">(broader NAICS access)</span></h3>
+              <ul className="space-y-2 text-(--mp-body) text-sm">
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Everything required for WOSB, plus:</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Owner personal net worth under $850K</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Average AGI under $400K (last 3 years)</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Personal assets under $6.5M</span></li>
+                <li className="flex gap-2"><span className="text-(--mp-navy)">→</span><span>Access to a substantially broader list of eligible NAICS codes</span></li>
               </ul>
             </div>
           </div>
-          <p className="text-slate-400 text-sm">
-            Source: SBA, <a className="underline hover:text-purple-300" href="https://www.sba.gov/federal-contracting/contracting-assistance-programs/women-owned-small-business-federal-contracting-program" target="_blank" rel="noopener noreferrer">WOSB Federal Contracting Program</a>. Self-certification was eliminated in October 2020 — you must be SBA-certified or third-party certified to bid on WOSB set-asides.
+          <p className="text-(--mp-muted) text-sm">
+            Source: SBA, <a className="underline hover:text-(--mp-navy-hover)" href="https://www.sba.gov/federal-contracting/contracting-assistance-programs/women-owned-small-business-federal-contracting-program" target="_blank" rel="noopener noreferrer">WOSB Federal Contracting Program</a>. Self-certification was eliminated in October 2020 — you must be SBA-certified or third-party certified to bid on WOSB set-asides.
           </p>
         </div>
       </section>
 
       {/* Where opportunities post */}
-      <section className="bg-slate-900/50 py-14 px-4">
+      <section className="bg-(--mp-wash) py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Where WOSB Opportunities Actually Live
           </h2>
-          <p className="text-slate-300 mb-6">
+          <p className="text-(--mp-body) mb-6">
             WOSB and EDWOSB opportunities show up across the standard federal
             channels — but the NAICS restriction means you have to filter
             carefully. Here&apos;s where to look:
           </p>
           <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">SAM.gov WOSB / EDWOSB set-asides</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">SAM.gov WOSB / EDWOSB set-asides</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Filter SAM.gov by &ldquo;WOSB Set-Aside&rdquo; or &ldquo;EDWOSB Set-Aside.&rdquo;
                 Sole-source variants exist for both. The set-aside type field on
                 each opportunity tells you exactly which track applies.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Full-and-open with small business consideration</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Full-and-open with small business consideration</h3>
+              <p className="text-(--mp-muted) text-sm">
                 On full-and-open contracts, WOSB certification helps you count
                 toward an agency&apos;s small-business and women-owned goals — making
                 you a preferred small-business teaming partner for large primes
                 building bids.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Agency forecasts</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Agency forecasts</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Most agency forecasts identify anticipated WOSB or EDWOSB set-aside
                 designations 6–18 months out. Use forecasts to start agency
                 conversations early — before the RFP locks the requirement.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Subcontracting opportunities</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Subcontracting opportunities</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Large primes on contracts over $750K must submit subcontracting
                 plans with small-business goals — including women-owned categories.
                 Certified WOSBs are sought-after teaming partners.
@@ -261,10 +261,10 @@ export default function WosbPage() {
       {/* Top agencies */}
       <section className="py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Top Agencies Awarding WOSB Contracts
           </h2>
-          <p className="text-slate-300 mb-6">
+          <p className="text-(--mp-body) mb-6">
             Because the federal government chronically misses the 5% WOSB goal,
             most agencies are actively trying to award more — but a handful drive
             the bulk of historical WOSB spend:
@@ -277,9 +277,9 @@ export default function WosbPage() {
               { name: 'Department of Health and Human Services', why: 'NIH, CDC, and CMS regularly use WOSB set-asides for research support, IT, and consulting.' },
               { name: 'Department of Veterans Affairs', why: 'WOSB applies after Veterans First priority is met — significant volume for women-owned firms that aren\'t also veteran-owned.' },
             ].map((a) => (
-              <div key={a.name} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-white font-semibold mb-1">{a.name}</h3>
-                <p className="text-slate-400 text-sm">{a.why}</p>
+              <div key={a.name} className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+                <h3 className="text-(--mp-ink) font-semibold mb-1">{a.name}</h3>
+                <p className="text-(--mp-muted) text-sm">{a.why}</p>
               </div>
             ))}
           </div>
@@ -287,24 +287,24 @@ export default function WosbPage() {
       </section>
 
       {/* Strategy */}
-      <section className="bg-slate-900/50 py-14 px-4">
+      <section className="bg-(--mp-wash) py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             How to Win WOSB Contracts: 6 Tactics That Actually Work
           </h2>
           <div className="space-y-5">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">1. Certify as EDWOSB if you qualify</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">1. Certify as EDWOSB if you qualify</h3>
+              <p className="text-(--mp-muted) text-sm">
                 EDWOSB unlocks a substantially broader list of eligible NAICS
                 codes than WOSB alone. If you meet the economic-disadvantage
                 thresholds, certify at the EDWOSB level — you still keep WOSB
                 eligibility and add the EDWOSB-only pool on top.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">2. Confirm your NAICS is eligible</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">2. Confirm your NAICS is eligible</h3>
+              <p className="text-(--mp-muted) text-sm">
                 The single biggest WOSB-strategy mistake is assuming the set-aside
                 applies to your work when your primary NAICS isn&apos;t on the
                 eligible list. Check the current SBA list before counting on the
@@ -312,36 +312,36 @@ export default function WosbPage() {
                 legitimately perform that work.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">3. Talk to OSDBU about the 5% gap</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">3. Talk to OSDBU about the 5% gap</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Every agency has a scorecard. Ask the OSDBU where they stand
                 against the 5% WOSB goal. If they&apos;re behind, they will actively
                 help you find work that closes the gap — including sole-source
                 consideration in NAICS where the agency has weak performance.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">4. Position as a teaming partner</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">4. Position as a teaming partner</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Large primes on $750K+ contracts must submit subcontracting plans
                 with women-owned goals. Certified WOSBs are sought-after teaming
                 partners — especially on contracts where the prime is below their
                 WOSB subcontracting commitments.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">5. Stack with other certifications</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">5. Stack with other certifications</h3>
+              <p className="text-(--mp-muted) text-sm">
                 EDWOSB + 8(a) is common because the economic-disadvantage
                 thresholds overlap. WOSB + HUBZone or WOSB + SDVOSB stack
                 cleanly and expand your eligible pipeline well beyond what
                 any single certification opens up.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">6. Track WOSB recompetes</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">6. Track WOSB recompetes</h3>
+              <p className="text-(--mp-muted) text-sm">
                 When a WOSB incumbent contract is expiring, the recompete will
                 almost always be re-set aside as WOSB or EDWOSB. Mindy flags
                 these 12 months in advance — incumbent name and award value
@@ -355,36 +355,36 @@ export default function WosbPage() {
       {/* How Mindy helps */}
       <section className="py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             How Mindy Helps WOSB and EDWOSB Firms
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">NAICS-aware filtering</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">NAICS-aware filtering</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Mindy maps your certification to the specific NAICS codes where
                 the WOSB or EDWOSB set-aside applies — no false positives from
                 ineligible NAICS.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">EDWOSB dedicated stream</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">EDWOSB dedicated stream</h3>
+              <p className="text-(--mp-muted) text-sm">
                 If you&apos;re EDWOSB-certified, Mindy surfaces the broader EDWOSB
                 NAICS pool in addition to WOSB so you see every opportunity your
                 tier unlocks.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">WOSB recompete alerts</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">WOSB recompete alerts</h3>
+              <p className="text-(--mp-muted) text-sm">
                 12-month advance notice when a WOSB or EDWOSB incumbent contract
                 is expiring — including incumbent name and award value.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Sole-source intel</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Sole-source intel</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Tracks which agencies actually use WOSB sole-source authority and
                 surfaces the forecasts most likely to convert.
               </p>
@@ -394,19 +394,19 @@ export default function WosbPage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-slate-900/50 py-14 px-4">
+      <section className="bg-(--mp-wash) py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-8 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-8 text-center font-(family-name:--mp-font-serif)">
             WOSB Frequently Asked Questions
           </h2>
           <div className="space-y-3">
             {faqs.map((f) => (
-              <details key={f.q} className="group bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <summary className="text-white font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
+              <details key={f.q} className="group bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+                <summary className="text-(--mp-ink) font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
                   <span>{f.q}</span>
-                  <span className="text-purple-400 text-xl group-open:rotate-45 transition-transform">+</span>
+                  <span className="text-(--mp-navy) text-xl group-open:rotate-45 transition-transform">+</span>
                 </summary>
-                <p className="text-slate-400 mt-3 leading-relaxed text-sm">{f.a}</p>
+                <p className="text-(--mp-muted) mt-3 leading-relaxed text-sm">{f.a}</p>
               </details>
             ))}
           </div>
@@ -414,36 +414,36 @@ export default function WosbPage() {
       </section>
 
       {/* Related */}
-      <section className="px-4 py-12 border-t border-slate-800">
+      <section className="px-4 py-12 border-t border-(--mp-line)">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-lg font-semibold text-white mb-4">Other Set-Aside Programs</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink) mb-4">Other Set-Aside Programs</h3>
           <div className="flex flex-wrap gap-6 justify-center mb-4">
-            <Link href="/set-asides/8a" className="text-slate-400 hover:text-purple-300 transition">8(a) Opportunities →</Link>
-            <Link href="/set-asides/hubzone" className="text-slate-400 hover:text-purple-300 transition">HUBZone Opportunities →</Link>
-            <Link href="/set-asides/sdvosb" className="text-slate-400 hover:text-purple-300 transition">SDVOSB Opportunities →</Link>
+            <Link href="/set-asides/8a" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">8(a) Opportunities →</Link>
+            <Link href="/set-asides/hubzone" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">HUBZone Opportunities →</Link>
+            <Link href="/set-asides/sdvosb" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">SDVOSB Opportunities →</Link>
           </div>
           <div className="flex flex-wrap gap-6 justify-center text-sm">
-            <Link href="/glossary/wosb" className="text-slate-500 hover:text-purple-300 transition">Full WOSB definition →</Link>
-            <Link href="/glossary/edwosb" className="text-slate-500 hover:text-purple-300 transition">EDWOSB definition →</Link>
-            <Link href="/compare/sam-gov" className="text-slate-500 hover:text-purple-300 transition">Mindy vs SAM.gov →</Link>
-            <Link href="/blog/how-to-find-federal-contracts" className="text-slate-500 hover:text-purple-300 transition">How to find federal contracts →</Link>
+            <Link href="/glossary/wosb" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">Full WOSB definition →</Link>
+            <Link href="/glossary/edwosb" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">EDWOSB definition →</Link>
+            <Link href="/compare/sam-gov" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">Mindy vs SAM.gov →</Link>
+            <Link href="/blog/how-to-find-federal-contracts" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">How to find federal contracts →</Link>
           </div>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Get WOSB opportunity alerts in your inbox.
           </h2>
-          <p className="text-lg text-slate-300 mb-8">
+          <p className="text-lg text-(--mp-body) mb-8">
             Daily briefings filtered to WOSB and EDWOSB set-asides in your
             eligible NAICS codes. Free. No credit card.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+            className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
             Get Free WOSB Alerts
           </Link>

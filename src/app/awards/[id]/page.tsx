@@ -125,14 +125,14 @@ export default async function AwardDetailPage({ params }: PageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[#f5f8fb] text-[#111c26]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <main className="bg-(--mp-wash) text-(--mp-ink)" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* breadcrumb */}
-      <div className="mx-auto max-w-5xl px-6 pt-6 text-[13px] font-medium text-[#6b7787]">
-        <Link href="/" className="text-[#2563eb] hover:underline">Home</Link>
+      <div className="mx-auto max-w-5xl px-6 pt-6 text-[13px] font-medium text-(--mp-muted)">
+        <Link href="/" className="text-(--mp-navy) hover:underline">Home</Link>
         <span className="mx-2">›</span>
-        <Link href="/awards" className="text-[#2563eb] hover:underline">Awards</Link>
+        <Link href="/awards" className="text-(--mp-navy) hover:underline">Awards</Link>
         <span className="mx-2">›</span>
         <span>{recipient}</span>
       </div>
@@ -140,12 +140,11 @@ export default async function AwardDetailPage({ params }: PageProps) {
       {/* hero */}
       <section className="mx-auto max-w-5xl px-6 pt-5 pb-6">
         <div className="flex items-start gap-4">
-          <div className="flex-none w-[52px] h-[52px] rounded-[13px] flex items-center justify-center text-white text-[18px] font-extrabold"
-            style={{ background: 'linear-gradient(135deg,#b45309,#f59e0b)' }}>$</div>
+          <div className="flex-none w-[52px] h-[52px] rounded-lg flex items-center justify-center bg-(--mp-navy) text-white text-[18px] font-bold">$</div>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#c2740a]">Federal Contract Award</p>
-            <h1 className="mt-1.5 text-[26px] md:text-[30px] font-extrabold tracking-[-0.02em] leading-tight">{recipient}</h1>
-            <p className="mt-1 text-[14px] text-[#6b7787]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-(--mp-navy)">Federal Contract Award</p>
+            <h1 className="mt-1.5 text-[26px] md:text-[30px] font-bold tracking-[-0.02em] leading-tight font-(family-name:--mp-font-serif)">{recipient}</h1>
+            <p className="mt-1 text-[14px] text-(--mp-muted)">
               {award.awarding_agency || 'Federal'} · {fmtDate(award.action_date)} · FY{award.fiscal_year}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -159,16 +158,16 @@ export default async function AwardDetailPage({ params }: PageProps) {
 
       {/* amount */}
       <section className="mx-auto max-w-5xl px-6 pb-6">
-        <div className="rounded-[13px] border border-[#e6ebf0] bg-white px-5 py-4 inline-block">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#6b7787]">Obligated</p>
-          <p className="mt-1 text-[26px] font-extrabold tracking-[-0.02em]">{fmtFullMoney(amount)}</p>
+        <div className="rounded-[13px] border border-(--mp-hair) bg-white px-5 py-4 inline-block">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-(--mp-muted)">Obligated</p>
+          <p className="mt-1 text-[26px] font-bold tracking-[-0.02em]">{fmtFullMoney(amount)}</p>
         </div>
       </section>
 
       {/* two columns: details + scope */}
       <section className="mx-auto max-w-5xl px-6 pb-6 grid gap-5 md:grid-cols-2">
-        <div className="rounded-[14px] border border-[#e6ebf0] bg-white p-5">
-          <h2 className="text-[15px] font-extrabold mb-1">Contract details</h2>
+        <div className="rounded-[14px] border border-(--mp-hair) bg-white p-5">
+          <h2 className="text-[15px] font-bold mb-1">Contract details</h2>
           <dl className="mt-2">
             <Row label="Award ID" value={award.award_id} mono />
             <Row label="PIID" value={award.piid || '—'} mono />
@@ -183,18 +182,18 @@ export default async function AwardDetailPage({ params }: PageProps) {
 
         <div className="flex flex-col gap-5">
           {award.description && (
-            <div className="rounded-[14px] border border-[#e6ebf0] bg-white p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#6b7787]">Scope</p>
-              <p className="mt-2 text-[14px] leading-relaxed text-[#3a4a5c]">{award.description}</p>
+            <div className="rounded-[14px] border border-(--mp-hair) bg-white p-5">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-(--mp-muted)">Scope</p>
+              <p className="mt-2 text-[14px] leading-relaxed text-(--mp-body)">{award.description}</p>
             </div>
           )}
           {/* Parent IDV / vehicle — the drill-down: is this a task order off a bigger vehicle? */}
           {award.parent_name && (
-            <div className="rounded-[14px] border border-[#e6ebf0] bg-white p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#6b7787]">Parent vehicle (IDV)</p>
+            <div className="rounded-[14px] border border-(--mp-hair) bg-white p-5">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-(--mp-muted)">Parent vehicle (IDV)</p>
               <p className="mt-2 text-[15px] font-bold">{fmtCompanyName(award.parent_name)}</p>
-              {award.parent_uei && <p className="mt-1 text-[12px] font-mono text-[#6b7787]">UEI {award.parent_uei}</p>}
-              <p className="mt-2 text-[12.5px] text-[#6b7787]">This award was placed as a task/delivery order under a larger contract vehicle.</p>
+              {award.parent_uei && <p className="mt-1 text-[12px] font-(family-name:--mp-font-mono) text-(--mp-muted)">UEI {award.parent_uei}</p>}
+              <p className="mt-2 text-[12.5px] text-(--mp-muted)">This award was placed as a task/delivery order under a larger contract vehicle.</p>
             </div>
           )}
         </div>
@@ -202,9 +201,9 @@ export default async function AwardDetailPage({ params }: PageProps) {
 
       {/* recipient + agency */}
       <section className="mx-auto max-w-5xl px-6 pb-6 grid gap-5 md:grid-cols-2">
-        <div className="rounded-[14px] border border-[#e6ebf0] bg-white p-5">
-          <h2 className="text-[15px] font-extrabold mb-2">Recipient</h2>
-          <Link href={firmHref} className="text-[#2563eb] hover:underline font-bold text-[15px]">{recipient} →</Link>
+        <div className="rounded-[14px] border border-(--mp-hair) bg-white p-5">
+          <h2 className="text-[15px] font-bold mb-2">Recipient</h2>
+          <Link href={firmHref} className="text-(--mp-navy) hover:underline font-bold text-[15px]">{recipient} →</Link>
           <dl className="mt-3">
             <Row label="UEI" value={award.recipient_uei} mono />
             {award.cage_code && <Row label="CAGE" value={award.cage_code} mono />}
@@ -215,10 +214,10 @@ export default async function AwardDetailPage({ params }: PageProps) {
           </dl>
         </div>
 
-        <div className="rounded-[14px] border border-[#e6ebf0] bg-white p-5">
-          <h2 className="text-[15px] font-extrabold mb-2">Awarding agency</h2>
+        <div className="rounded-[14px] border border-(--mp-hair) bg-white p-5">
+          <h2 className="text-[15px] font-bold mb-2">Awarding agency</h2>
           {award.awarding_agency && (
-            <Link href={`/agencies/${agencySlug(award.awarding_agency)}`} className="text-[#2563eb] hover:underline font-bold text-[15px]">
+            <Link href={`/agencies/${agencySlug(award.awarding_agency)}`} className="text-(--mp-navy) hover:underline font-bold text-[15px]">
               {award.awarding_agency} →
             </Link>
           )}
@@ -233,13 +232,13 @@ export default async function AwardDetailPage({ params }: PageProps) {
 
       {/* CTA */}
       <section className="mx-auto max-w-5xl px-6 pb-16">
-        <div className="rounded-[16px] border border-[#dbe7ff] bg-[#eff5ff] p-7 text-center">
-          <h2 className="text-[19px] font-extrabold text-[#111c26]">See every contract {recipient} has won</h2>
-          <p className="mt-2 max-w-xl mx-auto text-[#3a4a5c] text-[14px]">
+        <div className="rounded-[16px] border border-(--mp-line) bg-(--mp-navy-wash) p-7 text-center">
+          <h2 className="text-[19px] font-bold text-(--mp-ink)">See every contract {recipient} has won</h2>
+          <p className="mt-2 max-w-xl mx-auto text-(--mp-body) text-[14px]">
             Full contracting history, year-over-year trends, subaward graph, and recompete alerts.
           </p>
           <Link href={firmHref}
-            className="mt-4 inline-flex rounded-[11px] bg-[#2563eb] px-5 py-2.5 font-bold text-white hover:brightness-110"
+            className="mt-4 inline-flex rounded-[11px] bg-(--mp-navy) px-5 py-2.5 font-bold text-white hover:bg-(--mp-navy-hover)"
             style={{ boxShadow: '0 3px 10px -3px rgba(37,99,235,.5)' }}>
             View {recipient} profile →
           </Link>
@@ -257,19 +256,19 @@ function agencySlug(name: string): string {
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between gap-3 py-[9px] border-b border-[#f0f3f7] last:border-0 text-[14px]">
-      <dt className="text-[#6b7787]">{label}</dt>
-      <dd className={`font-bold text-right ${mono ? 'font-mono text-[12px]' : ''}`}>{value}</dd>
+    <div className="flex justify-between gap-3 py-[9px] border-b border-(--mp-hair) last:border-0 text-[14px]">
+      <dt className="text-(--mp-muted)">{label}</dt>
+      <dd className={`font-bold text-right ${mono ? 'font-(family-name:--mp-font-mono) text-[12px]' : ''}`}>{value}</dd>
     </div>
   );
 }
 
 function Pill({ children, mono, accent }: { children: React.ReactNode; mono?: boolean; accent?: 'open' }) {
   const cls = accent === 'open'
-    ? 'bg-[#fff7ec] text-[#c2740a] border-[#f0d9b5]'
-    : 'bg-[#f5f8fb] text-[#516072] border-[#e6ebf0]';
+    ? 'bg-(--mp-warn-bg) text-(--mp-warn) border-(--mp-warn-line)'
+    : 'bg-(--mp-wash) text-(--mp-body) border-(--mp-hair)';
   return (
-    <span className={`inline-flex items-center text-[11.5px] font-bold px-2.5 py-1 rounded-[14px] border ${cls} ${mono ? 'font-mono' : ''}`}>
+    <span className={`inline-flex items-center text-[11.5px] font-bold px-2.5 py-1 rounded-[14px] border ${cls} ${mono ? 'font-(family-name:--mp-font-mono)' : ''}`}>
       {children}
     </span>
   );

@@ -125,19 +125,19 @@ export default function RecompeteLockedPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-900 to-orange-800 p-5">
-      <div className="bg-white rounded-2xl p-10 max-w-lg text-center shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center p-5 bg-(--mp-wash)">
+      <div className="bg-white rounded-lg p-10 max-w-lg text-center">
         <div className="text-6xl mb-5">📋</div>
-        <h2 className="text-amber-800 mb-3 text-3xl font-bold">
+        <h2 className="text-(--mp-ink) mb-3 text-3xl font-bold font-(family-name:--mp-font-serif)">
           Recompete Tracker
         </h2>
-        <p className="text-gray-600 mb-6 text-base leading-relaxed">
+        <p className="text-(--mp-muted) mb-6 text-base leading-relaxed">
           Track expiring federal contracts and identify recompete opportunities before they hit the market.
         </p>
 
         {/* Already have access? - MOVED TO TOP */}
-        <div className="mb-8 pb-6 border-b border-gray-200">
-          <p className="text-gray-600 text-sm mb-4 font-medium">Already have access?</p>
+        <div className="mb-8 pb-6 border-b border-(--mp-hair)">
+          <p className="text-(--mp-muted) text-sm mb-4 font-medium">Already have access?</p>
 
           {/* Toggle between email and password */}
           <div className="flex justify-center gap-2 mb-4">
@@ -145,8 +145,8 @@ export default function RecompeteLockedPage() {
               onClick={() => setAccessMethod('email')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 accessMethod === 'email'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-(--mp-navy) text-white'
+                  : 'bg-(--mp-wash) text-(--mp-muted) hover:bg-(--mp-wash)'
               }`}
             >
               Email
@@ -155,8 +155,8 @@ export default function RecompeteLockedPage() {
               onClick={() => setAccessMethod('password')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 accessMethod === 'password'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-(--mp-navy) text-white'
+                  : 'bg-(--mp-wash) text-(--mp-muted) hover:bg-(--mp-wash)'
               }`}
             >
               Password
@@ -170,13 +170,13 @@ export default function RecompeteLockedPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                style={{ color: '#000000', backgroundColor: '#ffffff' }}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg"
+                style={{ color: 'var(--mp-ink)', backgroundColor: 'var(--mp-surface)' }}
+                className="flex-1 px-4 py-3 border border-(--mp-line) rounded-lg"
               />
               <button
                 type="submit"
                 disabled={loading || !email}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-6 py-3 bg-(--mp-wash) hover:bg-(--mp-wash) text-(--mp-ink) rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? '...' : 'Verify'}
               </button>
@@ -188,13 +188,13 @@ export default function RecompeteLockedPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
-                style={{ color: '#000000', backgroundColor: '#ffffff' }}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center"
+                style={{ color: 'var(--mp-ink)', backgroundColor: 'var(--mp-surface)' }}
+                className="flex-1 px-4 py-3 border border-(--mp-line) rounded-lg text-center"
               />
               <button
                 type="submit"
                 disabled={loading || !password}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-6 py-3 bg-(--mp-wash) hover:bg-(--mp-wash) text-(--mp-ink) rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? '...' : 'Unlock'}
               </button>
@@ -202,13 +202,13 @@ export default function RecompeteLockedPage() {
           )}
 
           {error && (
-            <p className="text-red-600 text-sm mt-3">{error}</p>
+            <p className="text-(--mp-crit) text-sm mt-3">{error}</p>
           )}
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8 text-left">
-          <h3 className="text-amber-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
-          <ul className="text-amber-700 m-0 pl-5 leading-loose text-sm">
+        <div className="bg-(--mp-wash) border border-(--mp-line) rounded-lg p-5 mb-8 text-left">
+          <h3 className="text-(--mp-navy) mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
+          <ul className="text-(--mp-body) m-0 pl-5 leading-loose text-sm">
             <li><strong>6,900+</strong> expiring contracts</li>
             <li><strong>36</strong> federal agencies</li>
             <li><strong>435</strong> NAICS codes</li>
@@ -220,13 +220,13 @@ export default function RecompeteLockedPage() {
 
         <a
           href="/pricing"
-          className="inline-block bg-amber-600 hover:bg-amber-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
+          className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
         >
           See Mindy Plans
         </a>
 
-        <p className="text-gray-400 text-xs mt-6">
-          <Link href="/" className="text-amber-600 hover:underline">
+        <p className="text-(--mp-muted) text-xs mt-6">
+          <Link href="/" className="text-(--mp-navy) hover:underline">
             ← Back to Home
           </Link>
         </p>

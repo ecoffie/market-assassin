@@ -35,28 +35,28 @@ export function BlogPostLayout({
   );
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       {/* Breadcrumb — visible nav + matches the BreadcrumbList JSON-LD
           on the post page so Google sees the same hierarchy crawlers
           and humans see. */}
       <nav
         aria-label="Breadcrumb"
-        className="max-w-3xl mx-auto px-4 pt-8 text-sm text-slate-400"
+        className="max-w-3xl mx-auto px-4 pt-8 text-sm text-(--mp-muted)"
       >
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/" className="hover:text-purple-300 transition">
+            <Link href="/" className="hover:text-(--mp-navy-hover) transition">
               Home
             </Link>
           </li>
           <li aria-hidden="true">/</li>
           <li>
-            <Link href="/blog" className="hover:text-purple-300 transition">
+            <Link href="/blog" className="hover:text-(--mp-navy-hover) transition">
               Blog
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li className="text-slate-500 truncate max-w-[18rem]" aria-current="page">
+          <li className="text-(--mp-muted) truncate max-w-[18rem]" aria-current="page">
             {meta.title}
           </li>
         </ol>
@@ -68,21 +68,21 @@ export function BlogPostLayout({
           {meta.tags.map((tag) => (
             <span
               key={tag}
-              className="text-xs font-medium uppercase tracking-wide text-purple-300 bg-purple-500/10 border border-purple-500/30 rounded-full px-3 py-1"
+              className="text-xs font-medium uppercase tracking-wide text-(--mp-navy) bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg px-3 py-1"
             >
               {tag}
             </span>
           ))}
         </div>
-        <h1 className="text-3xl md:text-5xl font-bold text-white leading-tight mb-6">
+        <h1 className="text-3xl md:text-5xl font-bold text-(--mp-ink) leading-tight mb-6 font-(family-name:--mp-font-serif)">
           {meta.title}
         </h1>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-400">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-(--mp-muted)">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-md bg-purple-600 flex items-center justify-center text-white text-xs font-bold">
+            <span className="w-7 h-7 rounded-md bg-(--mp-navy) flex items-center justify-center text-white text-xs font-bold">
               M
             </span>
-            <span className="text-slate-300">{meta.author}</span>
+            <span className="text-(--mp-body)">{meta.author}</span>
           </div>
           <span aria-hidden="true">·</span>
           <time dateTime={meta.publishedAt}>{publishedLabel}</time>
@@ -106,21 +106,21 @@ export function BlogPostLayout({
           reader who finished the article. "Start free, no credit card"
           is the wording the landing page uses, so we stay consistent. */}
       <section className="max-w-3xl mx-auto px-4 pb-16">
-        <div className="rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 p-8 md:p-10 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+        <div className="rounded-lg border border-(--mp-line) p-8 md:p-10 text-center bg-(--mp-wash)">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-3 font-(family-name:--mp-font-serif)">
             Stop reading about it. Start finding contracts.
           </h2>
-          <p className="text-slate-300 max-w-xl mx-auto mb-6">
+          <p className="text-(--mp-body) max-w-xl mx-auto mb-6">
             Mindy delivers a personalized briefing of federal opportunities matched
             to your business — every morning, before your first coffee.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-3 bg-white hover:bg-slate-100 text-purple-700 font-bold rounded-xl shadow-lg transition-all hover:scale-105"
+            className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
             Start Free — No Credit Card
           </Link>
-          <p className="text-xs text-slate-500 mt-4">
+          <p className="text-xs text-(--mp-muted) mt-4">
             Free forever plan. Upgrade to Pro ($149/mo) when you&apos;re ready.
           </p>
         </div>
@@ -129,7 +129,7 @@ export function BlogPostLayout({
       {/* Related posts */}
       {related.length > 0 && (
         <section className="max-w-3xl mx-auto px-4 pb-20">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-(--mp-muted) mb-4">
             Keep reading
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
@@ -137,15 +137,15 @@ export function BlogPostLayout({
               <Link
                 key={post.slug}
                 href={`/blog/${post.slug}`}
-                className="block rounded-xl border border-slate-800 hover:border-purple-500/50 bg-slate-900/50 hover:bg-slate-900 p-5 transition-all"
+                className="block rounded-lg border border-(--mp-line) hover:border-(--mp-navy) bg-(--mp-wash) hover:bg-(--mp-surface) p-5 transition-colors"
               >
-                <div className="text-xs text-purple-300 mb-2">
+                <div className="text-xs text-(--mp-navy) mb-2">
                   {post.tags[0]}
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2 leading-snug">
+                <h3 className="text-lg font-semibold text-(--mp-ink) mb-2 leading-snug">
                   {post.title}
                 </h3>
-                <p className="text-sm text-slate-400 line-clamp-2">{post.summary}</p>
+                <p className="text-sm text-(--mp-muted) line-clamp-2">{post.summary}</p>
               </Link>
             ))}
           </div>
@@ -155,31 +155,31 @@ export function BlogPostLayout({
       {/* Footer — matches landing page footer for brand consistency.
           Kept lean (no nav columns) because blog readers came here for
           the article, not the marketing site. */}
-      <footer className="border-t border-slate-800 py-8">
+      <footer className="border-t border-(--mp-line) py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
+            <div className="w-8 h-8 rounded-lg bg-(--mp-navy) flex items-center justify-center">
+              <span className="text-(--mp-surface) font-bold text-sm">M</span>
             </div>
-            <span className="text-white font-semibold">Mindy</span>
+            <span className="text-(--mp-ink) font-semibold">Mindy</span>
           </div>
-          <p className="text-slate-500 text-sm mb-2">
-            <Link href="/blog" className="text-slate-400 hover:text-white transition">
+          <p className="text-(--mp-muted) text-sm mb-2">
+            <Link href="/blog" className="text-(--mp-muted) hover:text-(--mp-ink) transition">
               Blog
             </Link>
             <span className="mx-3">·</span>
-            <Link href="/" className="text-slate-400 hover:text-white transition">
+            <Link href="/" className="text-(--mp-muted) hover:text-(--mp-ink) transition">
               Home
             </Link>
             <span className="mx-3">·</span>
             <a
               href="mailto:hello@getmindy.ai"
-              className="text-slate-400 hover:text-white transition"
+              className="text-(--mp-muted) hover:text-(--mp-ink) transition"
             >
               hello@getmindy.ai
             </a>
           </p>
-          <p className="text-slate-700 text-xs mt-2 italic">
+          <p className="text-(--mp-body) text-xs mt-2 italic">
             &quot;The big contractors have armies. You have Mindy.&quot;
           </p>
         </div>
@@ -202,7 +202,7 @@ export function H2({ children, id }: { children: ReactNode; id?: string }) {
   return (
     <h2
       id={id}
-      className="text-2xl md:text-3xl font-bold text-white mt-12 mb-4 scroll-mt-24"
+      className="text-2xl md:text-3xl font-bold text-(--mp-ink) mt-12 mb-4 scroll-mt-24 font-(family-name:--mp-font-serif)"
     >
       {children}
     </h2>
@@ -213,7 +213,7 @@ export function H3({ children, id }: { children: ReactNode; id?: string }) {
   return (
     <h3
       id={id}
-      className="text-xl md:text-2xl font-semibold text-white mt-8 mb-3 scroll-mt-24"
+      className="text-xl md:text-2xl font-semibold text-(--mp-ink) mt-8 mb-3 scroll-mt-24 font-(family-name:--mp-font-serif)"
     >
       {children}
     </h3>
@@ -221,14 +221,14 @@ export function H3({ children, id }: { children: ReactNode; id?: string }) {
 }
 
 export function P({ children }: { children: ReactNode }) {
-  return <p className="text-slate-300 leading-relaxed mb-5">{children}</p>;
+  return <p className="text-(--mp-body) leading-relaxed mb-5">{children}</p>;
 }
 
 export function Lead({ children }: { children: ReactNode }) {
   // Lead paragraph — bigger, lighter, sits right under the H1 to set
   // the tone before body copy starts.
   return (
-    <p className="text-lg md:text-xl text-slate-200 leading-relaxed mb-8">
+    <p className="text-lg md:text-xl text-(--mp-ink) leading-relaxed mb-8">
       {children}
     </p>
   );
@@ -236,7 +236,7 @@ export function Lead({ children }: { children: ReactNode }) {
 
 export function UL({ children }: { children: ReactNode }) {
   return (
-    <ul className="list-disc list-outside pl-6 mb-6 space-y-2 text-slate-300 marker:text-purple-400">
+    <ul className="list-disc list-outside pl-6 mb-6 space-y-2 text-(--mp-body) marker:text-(--mp-navy)">
       {children}
     </ul>
   );
@@ -244,7 +244,7 @@ export function UL({ children }: { children: ReactNode }) {
 
 export function OL({ children }: { children: ReactNode }) {
   return (
-    <ol className="list-decimal list-outside pl-6 mb-6 space-y-2 text-slate-300 marker:text-purple-400">
+    <ol className="list-decimal list-outside pl-6 mb-6 space-y-2 text-(--mp-body) marker:text-(--mp-navy)">
       {children}
     </ol>
   );
@@ -262,7 +262,7 @@ export function A({ href, children }: { href: string; children: ReactNode }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-purple-400 hover:text-purple-300 underline decoration-purple-400/40 hover:decoration-purple-300 underline-offset-2"
+        className="text-(--mp-navy) hover:text-(--mp-navy-hover) underline decoration-(--mp-navy) hover:decoration-(--mp-navy) underline-offset-2"
       >
         {children}
       </a>
@@ -271,7 +271,7 @@ export function A({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="text-purple-400 hover:text-purple-300 underline decoration-purple-400/40 hover:decoration-purple-300 underline-offset-2"
+      className="text-(--mp-navy) hover:text-(--mp-navy-hover) underline decoration-(--mp-navy) hover:decoration-(--mp-navy) underline-offset-2"
     >
       {children}
     </Link>
@@ -286,17 +286,17 @@ export function Callout({
   children: ReactNode;
 }) {
   return (
-    <aside className="my-8 rounded-xl border border-purple-500/30 bg-purple-500/5 p-5">
+    <aside className="my-8 rounded-lg border border-(--mp-line) bg-(--mp-navy-wash) p-5">
       {title && (
-        <div className="text-sm font-semibold uppercase tracking-wide text-purple-300 mb-2">
+        <div className="text-sm font-semibold uppercase tracking-wide text-(--mp-navy) mb-2">
           {title}
         </div>
       )}
-      <div className="text-slate-200 [&_p]:mb-2 [&_p:last-child]:mb-0">{children}</div>
+      <div className="text-(--mp-ink) [&_p]:mb-2 [&_p:last-child]:mb-0">{children}</div>
     </aside>
   );
 }
 
 export function Strong({ children }: { children: ReactNode }) {
-  return <strong className="text-white font-semibold">{children}</strong>;
+  return <strong className="text-(--mp-ink) font-semibold">{children}</strong>;
 }

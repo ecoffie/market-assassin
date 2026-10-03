@@ -17,11 +17,15 @@ import PublicFooter from './PublicFooter';
 export default function PublicShell({
   children,
   chrome = true,
+  contentElement = 'main',
 }: {
   children: ReactNode;
   /** false renders the canvas and styles without the header and footer. */
   chrome?: boolean;
+  /** 'div' when the pages render their own <main>, so the document keeps a single main landmark. */
+  contentElement?: 'main' | 'div';
 }) {
+  const Content = contentElement;
   for (const href of mpFontPreloadHrefs({ includeInter: false })) {
     preload(href, { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
   }
@@ -36,9 +40,9 @@ export default function PublicShell({
           </a>
         )}
         {chrome && <PublicHeader />}
-        <main id="mp-main" className="mp-main" tabIndex={-1}>
+        <Content id="mp-main" className="mp-main" tabIndex={-1}>
           {children}
-        </main>
+        </Content>
         {chrome && <PublicFooter />}
       </div>
     </>

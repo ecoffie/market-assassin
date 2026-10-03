@@ -296,32 +296,32 @@ export default async function ContractorPage({ params }: PageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <BackToAppHeader slug={recipient.canonical_slug} company={displayName} />
-      <MeetMindyStrip variant="banner" />
+      <MeetMindyStrip variant="banner" appearance="public" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
-        <Link href="/" className="hover:text-purple-400">Home</Link>
+      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <Link href="/contractors" className="hover:text-purple-400">Contractors</Link>
+        <Link href="/contractors" className="hover:text-(--mp-navy-hover)">Contractors</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">{displayName}</span>
+        <span className="text-(--mp-body)">{displayName}</span>
       </div>
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 pt-6 pb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-navy)">
           Federal Contractor Profile
         </p>
-        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight font-(family-name:--mp-font-serif)">
           {displayName}
         </h1>
-        <p className="mt-4 max-w-3xl text-lg text-slate-300">
+        <p className="mt-4 max-w-3xl text-lg text-(--mp-body)">
           Federal contracting record: {fmtMoney(recipient.total_obligated)} obligated across{' '}
           {Number(recipient.award_count || 0).toLocaleString()} awards from {Number(recipient.distinct_agency_count || 0)} agencies, FY{' '}
           {(yearly[0]?.fiscal_year ?? 2016)}–{(yearly[yearly.length - 1]?.fiscal_year ?? new Date().getFullYear())}.
@@ -338,25 +338,25 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* Tab nav — links to sub-pages */}
       <div className="mx-auto max-w-6xl px-6">
-        <div className="flex gap-1 border-b border-slate-800 overflow-x-auto">
-          <span className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-purple-500 text-white">
+        <div className="flex gap-1 border-b border-(--mp-line) overflow-x-auto">
+          <span className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-(--mp-navy) text-(--mp-ink)">
             Overview
           </span>
           <Link
             href={`/contractors/${slug}/contracts`}
-            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-(--mp-muted) hover:text-(--mp-ink) hover:border-(--mp-line) transition-colors"
           >
             Contracts
           </Link>
           <Link
             href={`/contractors/${slug}/agencies`}
-            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-(--mp-muted) hover:text-(--mp-ink) hover:border-(--mp-line) transition-colors"
           >
             Agencies
           </Link>
           <Link
             href={`/contractors/${slug}/naics`}
-            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-(--mp-muted) hover:text-(--mp-ink) hover:border-(--mp-line) transition-colors"
           >
             NAICS
           </Link>
@@ -365,8 +365,8 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* Company Profile */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-4">Company Profile</h2>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 grid gap-4 md:grid-cols-2">
+        <h2 className="text-2xl font-bold mb-4 font-(family-name:--mp-font-serif)">Company Profile</h2>
+        <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6 grid gap-4 md:grid-cols-2">
           <Field label="Parent UEI (Unique Entity Identifier)" value={rollupUei} mono />
           {recipient.cage_code && <Field label="CAGE Code" value={recipient.cage_code} mono />}
           {recipient.child_count > 1 && (
@@ -388,11 +388,11 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* Year over Year + Drilldown + Treemap */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-1">Federal Sales Analytics</h2>
-        <p className="text-sm text-slate-400 mb-4">
+        <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Federal Sales Analytics</h2>
+        <p className="text-sm text-(--mp-muted) mb-4">
           Toggle between trend, agency drilldown, and treemap. Use the period selector to focus the time window.
         </p>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+        <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
           <ContractorAnalytics
             yearly={yearly.map((y) => ({
               fiscal_year: Number(y.fiscal_year),
@@ -417,10 +417,10 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* Top Agencies + Top NAICS */}
       <section className="mx-auto max-w-6xl px-6 pb-10 grid gap-6 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-bold mb-4">Top Federal Agencies</h2>
+        <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
+          <h2 className="text-xl font-bold mb-4 font-(family-name:--mp-font-serif)">Top Federal Agencies</h2>
           {topAgencies.length === 0 ? (
-            <p className="text-slate-400 text-sm">No agency data.</p>
+            <p className="text-(--mp-muted) text-sm">No agency data.</p>
           ) : (
             <ul className="space-y-3">
               {topAgencies.map((a) => (
@@ -435,26 +435,26 @@ export default async function ContractorPage({ params }: PageProps) {
                     {LINKABLE_AGENCIES.has(agencySlug(a.awarding_agency)) ? (
                       <Link
                         href={`/agencies/${agencySlug(a.awarding_agency)}`}
-                        className="truncate block text-slate-100 font-medium hover:text-purple-300 hover:underline"
+                        className="truncate block text-(--mp-ink) font-medium hover:text-(--mp-navy-hover) hover:underline"
                       >
                         {a.awarding_agency}
                       </Link>
                     ) : (
-                      <p className="truncate text-slate-100 font-medium">{a.awarding_agency}</p>
+                      <p className="truncate text-(--mp-ink) font-medium">{a.awarding_agency}</p>
                     )}
-                    <p className="text-xs text-slate-500">{(Number(a.pct_of_total) * 100).toFixed(1)}% of total obligations</p>
+                    <p className="text-xs text-(--mp-muted)">{(Number(a.pct_of_total) * 100).toFixed(1)}% of total obligations</p>
                   </div>
-                  <span className="shrink-0 font-mono text-purple-400 font-semibold">{fmtMoney(Number(a.total_amount))}</span>
+                  <span className="shrink-0 font-(family-name:--mp-font-mono) text-(--mp-navy) font-semibold">{fmtMoney(Number(a.total_amount))}</span>
                 </li>
               ))}
             </ul>
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-bold mb-4">Top NAICS Activity</h2>
+        <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
+          <h2 className="text-xl font-bold mb-4 font-(family-name:--mp-font-serif)">Top NAICS Activity</h2>
           {topNaics.length === 0 ? (
-            <p className="text-slate-400 text-sm">No NAICS data.</p>
+            <p className="text-(--mp-muted) text-sm">No NAICS data.</p>
           ) : (
             <ul className="space-y-3">
               {topNaics.map((n) => (
@@ -462,14 +462,14 @@ export default async function ContractorPage({ params }: PageProps) {
                   <div className="min-w-0">
                     <Link
                       href={`/naics/${n.naics_code}`}
-                      className="font-mono text-slate-100 hover:text-purple-300 hover:underline"
+                      className="font-(family-name:--mp-font-mono) text-(--mp-ink) hover:text-(--mp-navy-hover) hover:underline"
                     >
                       {n.naics_code}
                     </Link>
-                    <p className="truncate text-xs text-slate-400">{n.naics_description}</p>
-                    <p className="text-xs text-slate-500 mt-1">{n.award_count} awards</p>
+                    <p className="truncate text-xs text-(--mp-muted)">{n.naics_description}</p>
+                    <p className="text-xs text-(--mp-muted) mt-1">{n.award_count} awards</p>
                   </div>
-                  <span className="shrink-0 font-mono text-purple-400 font-semibold">{fmtMoney(Number(n.total_amount))}</span>
+                  <span className="shrink-0 font-(family-name:--mp-font-mono) text-(--mp-navy) font-semibold">{fmtMoney(Number(n.total_amount))}</span>
                 </li>
               ))}
             </ul>
@@ -479,13 +479,13 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* Recent Awards Table */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-4">Recent Federal Awards</h2>
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+        <h2 className="text-2xl font-bold mb-4 font-(family-name:--mp-font-serif)">Recent Federal Awards</h2>
+        <div className="overflow-x-auto rounded-lg border border-(--mp-line) bg-(--mp-surface)">
           {recentAwards.length === 0 ? (
-            <p className="p-6 text-slate-400">No recent award data available.</p>
+            <p className="p-6 text-(--mp-muted)">No recent award data available.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+              <thead className="bg-(--mp-wash) text-xs uppercase tracking-wider text-(--mp-muted)">
                 <tr>
                   <th className="text-left px-4 py-3">Date</th>
                   <th className="text-left px-4 py-3">Agency</th>
@@ -494,22 +494,22 @@ export default async function ContractorPage({ params }: PageProps) {
                   <th className="text-right px-4 py-3">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-(--mp-line)">
                 {recentAwards.map((a) => (
-                  <tr key={a.award_id} className="hover:bg-slate-800/40">
-                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{fmtDate(a.action_date)}</td>
-                    <td className="px-4 py-3 text-slate-300 max-w-[14rem]">
+                  <tr key={a.award_id} className="hover:bg-(--mp-wash)">
+                    <td className="px-4 py-3 text-(--mp-body) whitespace-nowrap">{fmtDate(a.action_date)}</td>
+                    <td className="px-4 py-3 text-(--mp-body) max-w-[14rem]">
                       <span className="truncate block">{a.awarding_agency || '—'}</span>
-                      {a.awarding_office && <span className="text-xs text-slate-500 truncate block">{a.awarding_office}</span>}
+                      {a.awarding_office && <span className="text-xs text-(--mp-muted) truncate block">{a.awarding_office}</span>}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.naics_code || '—'}</td>
-                    <td className="px-4 py-3 text-slate-300 max-w-[20rem]">
+                    <td className="px-4 py-3 font-(family-name:--mp-font-mono) text-xs text-(--mp-muted)">{a.naics_code || '—'}</td>
+                    <td className="px-4 py-3 text-(--mp-body) max-w-[20rem]">
                       <span className="line-clamp-2">{a.description || '—'}</span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                    <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) font-semibold text-(--mp-navy) whitespace-nowrap">
                       {/* link the row to its award detail page (was a dead-end before) */}
                       {a.award_id ? (
-                        <Link href={`/awards/${encodeURIComponent(a.award_id)}`} className="hover:text-purple-300 hover:underline">
+                        <Link href={`/awards/${encodeURIComponent(a.award_id)}`} className="hover:text-(--mp-navy-hover) hover:underline">
                           {fmtMoney(Number(a.obligation_amount))} →
                         </Link>
                       ) : (
@@ -527,20 +527,20 @@ export default async function ContractorPage({ params }: PageProps) {
       {/* Executives (FFATA disclosures) */}
       {executives.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 pb-10">
-          <h2 className="text-2xl font-bold mb-1">Top Compensated Officers</h2>
-          <p className="text-sm text-slate-400 mb-4">
+          <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Top Compensated Officers</h2>
+          <p className="text-sm text-(--mp-muted) mb-4">
             From FFATA executive compensation disclosures. Reported when federal contract activity exceeds the
             statutory threshold.
           </p>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
             <ul className="space-y-3">
               {executives.map((e) => (
                 <li key={e.exec_rank} className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-slate-100 font-medium">{e.exec_name}</p>
-                    <p className="text-xs text-slate-500">Rank {e.exec_rank} · Reported {fmtDate(e.reported_at)}</p>
+                    <p className="text-(--mp-ink) font-medium">{e.exec_name}</p>
+                    <p className="text-xs text-(--mp-muted)">Rank {e.exec_rank} · Reported {fmtDate(e.reported_at)}</p>
                   </div>
-                  <span className="font-mono text-purple-400 font-semibold">{fmtMoney(Number(e.exec_amount))}</span>
+                  <span className="font-(family-name:--mp-font-mono) text-(--mp-navy) font-semibold">{fmtMoney(Number(e.exec_amount))}</span>
                 </li>
               ))}
             </ul>
@@ -551,33 +551,33 @@ export default async function ContractorPage({ params }: PageProps) {
       {/* Subawards Paid Out (this contractor as prime) */}
       {subPaidOutSummary && topSubawardees.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 pb-10">
-          <h2 className="text-2xl font-bold mb-1">Subawards Paid Out</h2>
-          <p className="text-sm text-slate-400 mb-4">
+          <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Subawards Paid Out</h2>
+          <p className="text-sm text-(--mp-muted) mb-4">
             {displayName} acts as a prime contractor and pays subcontractors on federal awards. Aggregated from
             USAspending sub-award reporting (FY2016-FY2026).
           </p>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
             <div className="grid gap-4 md:grid-cols-3 mb-6">
               <Stat label="Total Paid to Subs" value={fmtMoney(subPaidOutSummary.total_amount)} highlight />
               <Stat label="Sub Awards" value={subPaidOutSummary.count.toLocaleString()} />
               <Stat label="Distinct Subawardees" value={subPaidOutSummary.partner_count.toLocaleString()} />
             </div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-(--mp-muted) mb-3">
               Top {topSubawardees.length} Subawardees
             </h3>
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-(--mp-line)">
               {topSubawardees.map((s) => (
                 <li key={s.partner_uei} className="flex items-center justify-between gap-4 py-2.5">
                   <div className="min-w-0">
                     <Link
                       href={`/contractors/${recipientSlug(s.partner_name)}`}
-                      className="text-slate-200 hover:text-purple-400 font-medium"
+                      className="text-(--mp-ink) hover:text-(--mp-navy-hover) font-medium"
                     >
                       {fmtCompanyName(s.partner_name)}
                     </Link>
-                    <p className="text-xs text-slate-500">{Number(s.count).toLocaleString()} subawards</p>
+                    <p className="text-xs text-(--mp-muted)">{Number(s.count).toLocaleString()} subawards</p>
                   </div>
-                  <span className="font-mono text-purple-400 font-semibold shrink-0">{fmtMoney(Number(s.total_amount))}</span>
+                  <span className="font-(family-name:--mp-font-mono) text-(--mp-navy) font-semibold shrink-0">{fmtMoney(Number(s.total_amount))}</span>
                 </li>
               ))}
             </ul>
@@ -588,33 +588,33 @@ export default async function ContractorPage({ params }: PageProps) {
       {/* Subawards Received (this contractor as sub) */}
       {subReceivedSummary && topPrimes.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 pb-10">
-          <h2 className="text-2xl font-bold mb-1">Subawards Received</h2>
-          <p className="text-sm text-slate-400 mb-4">
+          <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Subawards Received</h2>
+          <p className="text-sm text-(--mp-muted) mb-4">
             {displayName} also receives subaward dollars from other prime contractors. Aggregated from USAspending
             sub-award reporting (FY2016-FY2026).
           </p>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
             <div className="grid gap-4 md:grid-cols-3 mb-6">
               <Stat label="Total Received" value={fmtMoney(subReceivedSummary.total_amount)} highlight />
               <Stat label="Sub Awards" value={subReceivedSummary.count.toLocaleString()} />
               <Stat label="Distinct Primes" value={subReceivedSummary.partner_count.toLocaleString()} />
             </div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-(--mp-muted) mb-3">
               Top {topPrimes.length} Primes Paying {displayName}
             </h3>
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-(--mp-line)">
               {topPrimes.map((p) => (
                 <li key={p.partner_uei} className="flex items-center justify-between gap-4 py-2.5">
                   <div className="min-w-0">
                     <Link
                       href={`/contractors/${recipientSlug(p.partner_name)}`}
-                      className="text-slate-200 hover:text-purple-400 font-medium"
+                      className="text-(--mp-ink) hover:text-(--mp-navy-hover) font-medium"
                     >
                       {fmtCompanyName(p.partner_name)}
                     </Link>
-                    <p className="text-xs text-slate-500">{Number(p.count).toLocaleString()} subawards</p>
+                    <p className="text-xs text-(--mp-muted)">{Number(p.count).toLocaleString()} subawards</p>
                   </div>
-                  <span className="font-mono text-purple-400 font-semibold shrink-0">{fmtMoney(Number(p.total_amount))}</span>
+                  <span className="font-(family-name:--mp-font-mono) text-(--mp-navy) font-semibold shrink-0">{fmtMoney(Number(p.total_amount))}</span>
                 </li>
               ))}
             </ul>
@@ -625,8 +625,8 @@ export default async function ContractorPage({ params }: PageProps) {
       {/* Related Contractors */}
       {related.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 pb-10">
-          <h2 className="text-2xl font-bold mb-1">Related Contractors</h2>
-          <p className="text-sm text-slate-400 mb-4">
+          <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Related Contractors</h2>
+          <p className="text-sm text-(--mp-muted) mb-4">
             Other companies active in NAICS {topNaicsCode} — {topNaics[0]?.naics_description}.
           </p>
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
@@ -634,10 +634,10 @@ export default async function ContractorPage({ params }: PageProps) {
               <Link
                 key={r.recipient_uei}
                 href={`/contractors/${recipientSlug(r.recipient_name)}`}
-                className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+                className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors"
               >
-                <p className="text-sm font-medium text-slate-100 line-clamp-2">{fmtCompanyName(r.recipient_name)}</p>
-                <p className="mt-2 font-mono text-xs text-purple-400">{fmtMoney(Number(r.total_obligated))}</p>
+                <p className="text-sm font-medium text-(--mp-ink) line-clamp-2">{fmtCompanyName(r.recipient_name)}</p>
+                <p className="mt-2 font-(family-name:--mp-font-mono) text-xs text-(--mp-navy)">{fmtMoney(Number(r.total_obligated))}</p>
               </Link>
             ))}
           </div>
@@ -646,16 +646,16 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* CTA */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-2xl font-bold">Want to win work like {displayName}?</h2>
-          <p className="mt-3 mb-6 max-w-2xl mx-auto text-slate-300">
+        <div className="rounded-lg border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">Want to win work like {displayName}?</h2>
+          <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
             Their contracts will eventually end — and when they do, the government has to award that
             work again. Mindy tells you up to a year early, so you can be ready to compete for it.
           </p>
-          <MemberAwareCta memberHref="/app" memberLabel="Track this company in Mindy →">
+          <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Track this company in Mindy →">
             <Link
               href="/signup"
-              className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+              className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
             >
               Track this company free →
             </Link>
@@ -668,9 +668,9 @@ export default async function ContractorPage({ params }: PageProps) {
 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border p-5 ${highlight ? 'border-purple-500/40 bg-purple-900/20' : 'border-slate-800 bg-slate-900'}`}>
-      <div className={`text-3xl font-bold ${highlight ? 'text-purple-300' : 'text-white'}`}>{value}</div>
-      <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">{label}</div>
+    <div className={`rounded-lg border p-5 ${highlight ? 'border-(--mp-line) bg-(--mp-navy-wash)' : 'border-(--mp-line) bg-(--mp-surface)'}`}>
+      <div className={`text-3xl font-bold ${highlight ? 'text-(--mp-navy)' : 'text-(--mp-ink)'}`}>{value}</div>
+      <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">{label}</div>
     </div>
   );
 }
@@ -678,8 +678,8 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
-      <p className={`mt-1 text-slate-200 ${mono ? 'font-mono text-sm' : ''}`}>{value}</p>
+      <p className="text-xs uppercase tracking-wider text-(--mp-muted)">{label}</p>
+      <p className={`mt-1 text-(--mp-ink) ${mono ? 'font-(family-name:--mp-font-mono) text-sm' : ''}`}>{value}</p>
     </div>
   );
 }

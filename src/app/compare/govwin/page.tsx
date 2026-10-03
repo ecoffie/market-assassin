@@ -227,102 +227,102 @@ export default function GovWinComparePage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               GovWin Alternative
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             The GovWin Alternative<br />
-            <span className="text-purple-400">Built for Small Business.</span>
+            <span className="text-(--mp-navy)">Built for Small Business.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
-            GovWin charges <span className="text-white font-semibold">$15,000–$50,000 a year</span>.
-            Mindy delivers the same opportunity intelligence for <span className="text-purple-400 font-semibold">$149 a month</span>.
+          <p className="text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
+            GovWin charges <span className="text-(--mp-ink) font-semibold">$15,000–$50,000 a year</span>.
+            Mindy delivers the same opportunity intelligence for <span className="text-(--mp-navy) font-semibold">$149 a month</span>.
             No sales calls. No annual contracts. Just a daily briefing in your inbox.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-10">
-            <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 border border-purple-500/40 rounded-2xl p-6">
-              <div className="text-sm font-semibold text-purple-300 mb-1">Mindy Pro</div>
-              <div className="text-4xl font-black text-white">
-                $149<span className="text-lg text-slate-400">/mo</span>
+            <div className="border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
+              <div className="text-sm font-semibold text-(--mp-navy) mb-1">Mindy Pro</div>
+              <div className="text-4xl font-bold text-(--mp-ink)">
+                $149<span className="text-lg text-(--mp-muted)">/mo</span>
               </div>
-              <div className="text-sm text-slate-400 mt-1">Month-to-month. Cancel anytime.</div>
+              <div className="text-sm text-(--mp-muted) mt-1">Month-to-month. Cancel anytime.</div>
             </div>
-            <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-6">
-              <div className="text-sm font-semibold text-slate-400 mb-1">Deltek GovWin</div>
-              <div className="text-4xl font-black text-white">
-                $15K–$50K<span className="text-lg text-slate-400">/yr</span>
+            <div className="bg-(--mp-wash) border border-(--mp-line) rounded-lg p-6">
+              <div className="text-sm font-semibold text-(--mp-muted) mb-1">Deltek GovWin</div>
+              <div className="text-4xl font-bold text-(--mp-ink)">
+                $15K–$50K<span className="text-lg text-(--mp-muted)">/yr</span>
               </div>
-              <div className="text-sm text-slate-400 mt-1">Annual contract + onboarding fees.</div>
+              <div className="text-sm text-(--mp-muted) mt-1">Annual contract + onboarding fees.</div>
             </div>
           </div>
 
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Start Free — No Credit Card
           </Link>
-          <p className="text-slate-500 text-sm mt-4">First briefing lands tomorrow morning.</p>
+          <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
       </section>
 
       {/* Why small businesses can't use GovWin */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             Why Small Businesses Can&apos;t Actually Use GovWin
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             GovWin is a great product. It&apos;s also priced, packaged, and sold for a customer
             you&apos;re probably not.
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">💸</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">The Pricing Wall</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">The Pricing Wall</h3>
+              <p className="text-(--mp-muted) text-sm">
                 GovWin starts in the $15K range for a single seat and climbs fast for teams and
                 add-ons. For a 1–10 person federal services company, that&apos;s a meaningful
                 percentage of your annual BD budget — on a tool, before you&apos;ve won anything.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">📞</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">The Sales Gauntlet</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">The Sales Gauntlet</h3>
+              <p className="text-(--mp-muted) text-sm">
                 You can&apos;t self-serve. Demo request, qualifying call, technical demo, pricing
                 conversation, procurement review, contract negotiation. Multi-week cycle just
                 to see if the product fits.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">📚</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">Enterprise UI Overwhelm</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">Enterprise UI Overwhelm</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Dashboards built for capture analysts with 40 hours a week to spend in the tool.
                 If you&apos;re a founder running BD between proposals and delivery, you don&apos;t
                 have time to learn an enterprise platform.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">📅</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">Annual Lock-In</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">Annual Lock-In</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Standard contract is 12-month minimum with auto-renewal. Trying it for a quarter
                 to see if it moves the needle isn&apos;t an option. You commit before you know.
               </p>
@@ -332,51 +332,51 @@ export default function GovWinComparePage() {
       </section>
 
       {/* Comparison table */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-(--mp-wash) py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             Feature-by-Feature: Mindy vs GovWin
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             Honest comparison. GovWin wins on a few things — we&apos;ll tell you which.
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-(--mp-line)">
             <table className="w-full text-sm">
-              <thead className="bg-slate-900">
-                <tr className="border-b border-slate-800">
-                  <th className="text-left py-4 px-5 text-slate-400 font-semibold">Feature</th>
-                  <th className="text-left py-4 px-5 bg-purple-500/5">
-                    <span className="text-purple-300 font-bold">Mindy</span>
+              <thead className="bg-(--mp-surface)">
+                <tr className="border-b border-(--mp-line)">
+                  <th className="text-left py-4 px-5 text-(--mp-muted) font-semibold">Feature</th>
+                  <th className="text-left py-4 px-5 bg-(--mp-navy-wash)">
+                    <span className="text-(--mp-navy) font-bold">Mindy</span>
                   </th>
                   <th className="text-left py-4 px-5">
-                    <span className="text-slate-300 font-bold">GovWin</span>
+                    <span className="text-(--mp-body) font-bold">GovWin</span>
                   </th>
-                  <th className="text-center py-4 px-5 text-slate-400 font-semibold">Winner</th>
+                  <th className="text-center py-4 px-5 text-(--mp-muted) font-semibold">Winner</th>
                 </tr>
               </thead>
               <tbody>
                 {comparisonRows.map((row, i) => (
                   <tr
                     key={row.feature}
-                    className={`border-b border-slate-800/50 ${i % 2 === 0 ? 'bg-slate-900/30' : ''}`}
+                    className={`border-b border-(--mp-hair) ${i % 2 === 0 ? 'bg-(--mp-wash)' : ''}`}
                   >
-                    <td className="py-4 px-5 text-white font-medium">{row.feature}</td>
-                    <td className="py-4 px-5 text-slate-300 bg-purple-500/5">{row.mindy}</td>
-                    <td className="py-4 px-5 text-slate-400">{row.govwin}</td>
+                    <td className="py-4 px-5 text-(--mp-ink) font-medium">{row.feature}</td>
+                    <td className="py-4 px-5 text-(--mp-body) bg-(--mp-navy-wash)">{row.mindy}</td>
+                    <td className="py-4 px-5 text-(--mp-muted)">{row.govwin}</td>
                     <td className="py-4 px-5 text-center">
                       {row.winner === 'mindy' && (
-                        <span className="inline-block px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs font-semibold">
+                        <span className="inline-block px-2 py-1 bg-(--mp-navy-wash) text-(--mp-navy) rounded text-xs font-semibold">
                           Mindy
                         </span>
                       )}
                       {row.winner === 'govwin' && (
-                        <span className="inline-block px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs font-semibold">
+                        <span className="inline-block px-2 py-1 bg-(--mp-wash) text-(--mp-body) rounded text-xs font-semibold">
                           GovWin
                         </span>
                       )}
                       {row.winner === 'tie' && (
-                        <span className="inline-block px-2 py-1 bg-slate-800 text-slate-500 rounded text-xs font-semibold">
+                        <span className="inline-block px-2 py-1 bg-(--mp-wash) text-(--mp-muted) rounded text-xs font-semibold">
                           Tie
                         </span>
                       )}
@@ -392,56 +392,56 @@ export default function GovWinComparePage() {
       {/* When to choose GovWin */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             When You Should Actually Pick GovWin
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             We&apos;d rather you buy the right tool than buy the wrong one from us.
           </p>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-            <p className="text-slate-300 mb-6">
+          <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-8">
+            <p className="text-(--mp-body) mb-6">
               GovWin is the better choice if you check most of these boxes:
             </p>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
-                <span className="text-purple-400 mt-1">→</span>
-                <span className="text-slate-300">
-                  <strong className="text-white">You have a $1M+ annual BD budget</strong> and a
+                <span className="text-(--mp-navy) mt-1">→</span>
+                <span className="text-(--mp-body)">
+                  <strong className="text-(--mp-ink)">You have a $1M+ annual BD budget</strong> and a
                   dedicated capture team. The cost is a rounding error and the depth pays for itself.
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-purple-400 mt-1">→</span>
-                <span className="text-slate-300">
-                  <strong className="text-white">You need advanced forecasting analytics</strong> —
+                <span className="text-(--mp-navy) mt-1">→</span>
+                <span className="text-(--mp-body)">
+                  <strong className="text-(--mp-ink)">You need advanced forecasting analytics</strong> —
                   predictive models, pipeline scoring across hundreds of pursuits, capture
                   probability scoring.
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-purple-400 mt-1">→</span>
-                <span className="text-slate-300">
-                  <strong className="text-white">You use Deltek Costpoint or other Deltek tools</strong> and
+                <span className="text-(--mp-navy) mt-1">→</span>
+                <span className="text-(--mp-body)">
+                  <strong className="text-(--mp-ink)">You use Deltek Costpoint or other Deltek tools</strong> and
                   need a native integration into the same data model.
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-purple-400 mt-1">→</span>
-                <span className="text-slate-300">
-                  <strong className="text-white">You want analyst-written market briefs</strong> on
+                <span className="text-(--mp-navy) mt-1">→</span>
+                <span className="text-(--mp-body)">
+                  <strong className="text-(--mp-ink)">You want analyst-written market briefs</strong> on
                   specific agencies and programs delivered by humans, not AI.
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-purple-400 mt-1">→</span>
-                <span className="text-slate-300">
-                  <strong className="text-white">Compliance / procurement requires</strong> an
+                <span className="text-(--mp-navy) mt-1">→</span>
+                <span className="text-(--mp-body)">
+                  <strong className="text-(--mp-ink)">Compliance / procurement requires</strong> an
                   established enterprise vendor with a long track record.
                 </span>
               </li>
             </ul>
-            <p className="text-slate-400 mt-8 text-sm italic">
+            <p className="text-(--mp-muted) mt-8 text-sm italic">
               If most of those don&apos;t describe you, Mindy is the right call.
             </p>
           </div>
@@ -449,12 +449,12 @@ export default function GovWinComparePage() {
       </section>
 
       {/* What Mindy delivers */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-(--mp-wash) py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             What Mindy Actually Does for You
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             Everything a $150K capture manager does. For less than your coffee budget.
           </p>
 
@@ -487,13 +487,13 @@ export default function GovWinComparePage() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="bg-slate-900 border border-slate-800 rounded-xl p-5"
+                className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5"
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-purple-400 text-lg">✓</span>
+                  <span className="text-(--mp-navy) text-lg">✓</span>
                   <div>
-                    <h3 className="text-white font-semibold mb-1">{f.title}</h3>
-                    <p className="text-slate-400 text-sm">{f.detail}</p>
+                    <h3 className="text-(--mp-ink) font-semibold mb-1">{f.title}</h3>
+                    <p className="text-(--mp-muted) text-sm">{f.detail}</p>
                   </div>
                 </div>
               </div>
@@ -503,7 +503,7 @@ export default function GovWinComparePage() {
           <div className="mt-10 text-center">
             <Link
               href="/market-intelligence"
-              className="text-purple-400 hover:text-purple-300 font-semibold"
+              className="text-(--mp-navy) hover:text-(--mp-navy-hover) font-semibold"
             >
               See everything Mindy includes →
             </Link>
@@ -514,22 +514,22 @@ export default function GovWinComparePage() {
       {/* FAQ */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-12 font-(family-name:--mp-font-serif)">
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
             {faqs.map((f) => (
               <details
                 key={f.q}
-                className="group bg-slate-900 border border-slate-800 rounded-xl p-6"
+                className="group bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6"
               >
-                <summary className="text-white font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
+                <summary className="text-(--mp-ink) font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
                   <span>{f.q}</span>
-                  <span className="text-purple-400 text-xl group-open:rotate-45 transition-transform">
+                  <span className="text-(--mp-navy) text-xl group-open:rotate-45 transition-transform">
                     +
                   </span>
                 </summary>
-                <p className="text-slate-400 mt-4 leading-relaxed">{f.a}</p>
+                <p className="text-(--mp-muted) mt-4 leading-relaxed">{f.a}</p>
               </details>
             ))}
           </div>
@@ -537,25 +537,25 @@ export default function GovWinComparePage() {
       </section>
 
       {/* Related comparisons */}
-      <section className="px-4 py-12 border-t border-slate-800">
+      <section className="px-4 py-12 border-t border-(--mp-line)">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-lg font-semibold text-white mb-4">Other Comparisons</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink) mb-4">Other Comparisons</h3>
           <div className="flex flex-wrap gap-6 justify-center">
             <Link
               href="/compare/sam-gov"
-              className="text-slate-400 hover:text-purple-300 transition"
+              className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition"
             >
               Mindy vs SAM.gov →
             </Link>
             <Link
               href="/recompete"
-              className="text-slate-400 hover:text-purple-300 transition"
+              className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition"
             >
               See contracts up for recompete →
             </Link>
             <Link
               href="/forecasts"
-              className="text-slate-400 hover:text-purple-300 transition"
+              className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition"
             >
               Browse agency forecasts →
             </Link>
@@ -564,23 +564,23 @@ export default function GovWinComparePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             The big contractors have armies.<br />
-            <span className="text-purple-400">You have Mindy.</span>
+            <span className="text-(--mp-navy)">You have Mindy.</span>
           </h2>
-          <p className="text-xl text-slate-300 mb-8">
+          <p className="text-xl text-(--mp-body) mb-8">
             Stop overpaying for enterprise intelligence you don&apos;t use. Start free, see your
             first briefing tomorrow morning.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+            className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
             Get Started Free
           </Link>
-          <p className="text-slate-400 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. No sales call. Cancel anytime.
           </p>
         </div>

@@ -18,11 +18,13 @@ export default function MemberAwareCta({
   memberHref = '/app',
   memberLabel = 'Open in Mindy →',
   memberHint,
+  appearance = 'legacy',
 }: {
   children: React.ReactNode;   // the anonymous-visitor CTA
   memberHref?: string;
   memberLabel?: string;
   memberHint?: string;         // optional line shown above the member button
+  appearance?: 'legacy' | 'public'; // 'public' = Mindy public design system (inside PublicShell)
 }) {
   const [member, setMember] = useState<boolean | null>(null);
   useEffect(() => {
@@ -41,10 +43,12 @@ export default function MemberAwareCta({
   if (member) {
     return (
       <div className="text-center">
-        {memberHint && <p className="mb-3 text-sm text-slate-400">{memberHint}</p>}
+        {memberHint && <p className={`mb-3 text-sm ${appearance === 'public' ? 'text-(--mp-muted)' : 'text-slate-400'}`}>{memberHint}</p>}
         <Link
           href={memberHref}
-          className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+          className={appearance === 'public'
+            ? 'inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)'
+            : 'inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20'}
         >
           {memberLabel}
         </Link>

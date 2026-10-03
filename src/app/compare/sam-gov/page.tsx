@@ -212,36 +212,36 @@ export default function SamGovComparePage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               SAM.gov Alternative
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             You still need SAM.gov.<br />
-            <span className="text-purple-400">You just don&apos;t need to scroll it.</span>
+            <span className="text-(--mp-navy)">You just don&apos;t need to scroll it.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             SAM.gov is the official federal procurement system — required, free, and not
             going anywhere. But its alerts are noisy, its search is painful, and it
             doesn&apos;t tell you who the incumbent is or when their contract expires.
-            <span className="text-white font-semibold"> Mindy does.</span>
+            <span className="text-(--mp-ink) font-semibold"> Mindy does.</span>
           </p>
 
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 max-w-2xl mx-auto mb-8 text-left">
-            <p className="text-slate-300">
-              <strong className="text-white">Important:</strong> Mindy doesn&apos;t replace
+          <div className="bg-(--mp-wash) border border-(--mp-line) rounded-lg p-6 max-w-2xl mx-auto mb-8 text-left">
+            <p className="text-(--mp-body)">
+              <strong className="text-(--mp-ink)">Important:</strong> Mindy doesn&apos;t replace
               SAM.gov. We read it for you — and add the intelligence layer it lacks
               (incumbent data, recompete timing, AI fit scoring, personalized briefings).
               You&apos;ll still submit proposals through SAM.gov.
@@ -250,57 +250,57 @@ export default function SamGovComparePage() {
 
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Start Free — No Credit Card
           </Link>
-          <p className="text-slate-500 text-sm mt-4">First briefing lands tomorrow morning.</p>
+          <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
       </section>
 
       {/* Why SAM.gov alerts fail */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             Why SAM.gov Alerts Fail You
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             SAM.gov publishes the data. It doesn&apos;t curate it, score it, or know your
             business. That&apos;s where the wheels come off.
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">📧</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">Keyword Spam</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">Keyword Spam</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Search &ldquo;cybersecurity&rdquo; on SAM.gov alerts and you&apos;ll get every
                 solicitation that mentions the word — including janitorial services at a
                 cyber tenant&apos;s building. Zero context. Zero fit scoring.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">🕳️</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">No Incumbent Data</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">No Incumbent Data</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Solicitation drops — but who has the work today? When does it expire? Is this
                 a real recompete or a sole-source dressed up as competition? SAM.gov
                 won&apos;t tell you. You&apos;re left guessing.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">⏰</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">Missed Opportunities</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">Missed Opportunities</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Contracts posted on a Tuesday get buried by Friday. By the time you find them
                 you have 5 days to respond. The incumbent saw it the morning it dropped and
                 has been positioning for 18 months.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="text-3xl mb-3">🎯</div>
-              <h3 className="text-white font-semibold mb-2 text-lg">No Fit Scoring</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">No Fit Scoring</h3>
+              <p className="text-(--mp-muted) text-sm">
                 SAM.gov doesn&apos;t know your NAICS codes, your set-aside status, your past
                 performance, or whether a $50M IDIQ is realistic for your 5-person company.
                 Every alert looks the same. None of them tell you whether you can actually win it.
@@ -311,25 +311,25 @@ export default function SamGovComparePage() {
       </section>
 
       {/* Comparison table */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-(--mp-wash) py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             Side-by-Side: SAM.gov vs Mindy
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             Not a competitor — a complement. Here&apos;s how each one fits in your workflow.
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-(--mp-line)">
             <table className="w-full text-sm">
-              <thead className="bg-slate-900">
-                <tr className="border-b border-slate-800">
-                  <th className="text-left py-4 px-5 text-slate-400 font-semibold">Feature</th>
+              <thead className="bg-(--mp-surface)">
+                <tr className="border-b border-(--mp-line)">
+                  <th className="text-left py-4 px-5 text-(--mp-muted) font-semibold">Feature</th>
                   <th className="text-left py-4 px-5">
-                    <span className="text-slate-300 font-bold">SAM.gov</span>
+                    <span className="text-(--mp-body) font-bold">SAM.gov</span>
                   </th>
-                  <th className="text-left py-4 px-5 bg-purple-500/5">
-                    <span className="text-purple-300 font-bold">Mindy</span>
+                  <th className="text-left py-4 px-5 bg-(--mp-navy-wash)">
+                    <span className="text-(--mp-navy) font-bold">Mindy</span>
                   </th>
                 </tr>
               </thead>
@@ -337,11 +337,11 @@ export default function SamGovComparePage() {
                 {comparisonRows.map((row, i) => (
                   <tr
                     key={row.feature}
-                    className={`border-b border-slate-800/50 ${i % 2 === 0 ? 'bg-slate-900/30' : ''}`}
+                    className={`border-b border-(--mp-hair) ${i % 2 === 0 ? 'bg-(--mp-wash)' : ''}`}
                   >
-                    <td className="py-4 px-5 text-white font-medium">{row.feature}</td>
-                    <td className="py-4 px-5 text-slate-400">{row.samGov}</td>
-                    <td className="py-4 px-5 text-slate-300 bg-purple-500/5">{row.mindy}</td>
+                    <td className="py-4 px-5 text-(--mp-ink) font-medium">{row.feature}</td>
+                    <td className="py-4 px-5 text-(--mp-muted)">{row.samGov}</td>
+                    <td className="py-4 px-5 text-(--mp-body) bg-(--mp-navy-wash)">{row.mindy}</td>
                   </tr>
                 ))}
               </tbody>
@@ -353,20 +353,20 @@ export default function SamGovComparePage() {
       {/* Workflow split */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             Use SAM.gov For This. Use Mindy For That.
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             The two tools do different jobs. Here&apos;s the honest workflow.
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center">
-                  <span className="text-white font-bold">S</span>
+                <div className="w-10 h-10 rounded-lg bg-(--mp-wash) flex items-center justify-center">
+                  <span className="text-(--mp-ink) font-bold">S</span>
                 </div>
-                <h3 className="text-xl font-bold text-white">Use SAM.gov for</h3>
+                <h3 className="text-xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Use SAM.gov for</h3>
               </div>
               <ul className="space-y-3">
                 {[
@@ -376,20 +376,20 @@ export default function SamGovComparePage() {
                   'Reading and downloading contracting officer documents',
                   'Verifying the authoritative version of any opportunity',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-slate-300 text-sm">
-                    <span className="text-slate-500 mt-0.5">→</span>
+                  <li key={item} className="flex items-start gap-2 text-(--mp-body) text-sm">
+                    <span className="text-(--mp-muted) mt-0.5">→</span>
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-2xl p-6">
+            <div className="border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center">
-                  <span className="text-white font-bold">M</span>
+                <div className="w-10 h-10 rounded-lg bg-(--mp-navy) flex items-center justify-center">
+                  <span className="text-(--mp-surface) font-bold">M</span>
                 </div>
-                <h3 className="text-xl font-bold text-white">Use Mindy for</h3>
+                <h3 className="text-xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Use Mindy for</h3>
               </div>
               <ul className="space-y-3">
                 {[
@@ -400,8 +400,8 @@ export default function SamGovComparePage() {
                   'Forecast intelligence — what\'s coming before it posts',
                   'Weekly market analysis on spending in your NAICS codes',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-slate-300 text-sm">
-                    <span className="text-purple-400 mt-0.5">→</span>
+                  <li key={item} className="flex items-start gap-2 text-(--mp-body) text-sm">
+                    <span className="text-(--mp-navy) mt-0.5">→</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -409,9 +409,9 @@ export default function SamGovComparePage() {
             </div>
           </div>
 
-          <div className="mt-8 bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
-            <p className="text-slate-300">
-              <strong className="text-white">Most pros use both.</strong> Mindy is the daily inbox
+          <div className="mt-8 bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6 text-center">
+            <p className="text-(--mp-body)">
+              <strong className="text-(--mp-ink)">Most pros use both.</strong> Mindy is the daily inbox
               that surfaces what&apos;s worth your attention. SAM.gov is where you go to act on it.
             </p>
           </div>
@@ -419,37 +419,37 @@ export default function SamGovComparePage() {
       </section>
 
       {/* Time math */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-(--mp-wash) py-20 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-12 font-(family-name:--mp-font-serif)">
             The Time Math Most Contractors Ignore
           </h2>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-              <div className="text-sm font-semibold text-slate-500 mb-2">SAM.gov Workflow</div>
-              <div className="text-5xl font-black text-white mb-4">
-                10–20<span className="text-2xl text-slate-400">hrs/week</span>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-8">
+              <div className="text-sm font-semibold text-(--mp-muted) mb-2">SAM.gov Workflow</div>
+              <div className="text-5xl font-bold text-(--mp-ink) mb-4">
+                10–20<span className="text-2xl text-(--mp-muted)">hrs/week</span>
               </div>
-              <p className="text-slate-400 text-sm">
+              <p className="text-(--mp-muted) text-sm">
                 Logging in, running searches, filtering noise, opening tabs, copying notice IDs,
                 Googling incumbents, building a tracking spreadsheet. Repeat every morning.
               </p>
-              <p className="text-slate-500 text-xs mt-4 italic">
+              <p className="text-(--mp-muted) text-xs mt-4 italic">
                 At $50/hr for your time, that&apos;s $2,000–$4,000/mo.
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-2xl p-8">
-              <div className="text-sm font-semibold text-purple-300 mb-2">Mindy Workflow</div>
-              <div className="text-5xl font-black text-white mb-4">
-                ~15<span className="text-2xl text-slate-400">min/day</span>
+            <div className="border border-(--mp-line) rounded-lg p-8 bg-(--mp-wash)">
+              <div className="text-sm font-semibold text-(--mp-navy) mb-2">Mindy Workflow</div>
+              <div className="text-5xl font-bold text-(--mp-ink) mb-4">
+                ~15<span className="text-2xl text-(--mp-muted)">min/day</span>
               </div>
-              <p className="text-slate-300 text-sm">
+              <p className="text-(--mp-body) text-sm">
                 Open one email at 7 AM. Skim the briefing. Click through to the 2–3 opportunities
                 worth pursuing. Mindy did the searching, scoring, and incumbent research overnight.
               </p>
-              <p className="text-purple-300 text-xs mt-4 italic">
+              <p className="text-(--mp-navy) text-xs mt-4 italic">
                 Pro is $149/mo. The time you save pays for it 10x over.
               </p>
             </div>
@@ -460,22 +460,22 @@ export default function SamGovComparePage() {
       {/* FAQ */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-12 font-(family-name:--mp-font-serif)">
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
             {faqs.map((f) => (
               <details
                 key={f.q}
-                className="group bg-slate-900 border border-slate-800 rounded-xl p-6"
+                className="group bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6"
               >
-                <summary className="text-white font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
+                <summary className="text-(--mp-ink) font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
                   <span>{f.q}</span>
-                  <span className="text-purple-400 text-xl group-open:rotate-45 transition-transform">
+                  <span className="text-(--mp-navy) text-xl group-open:rotate-45 transition-transform">
                     +
                   </span>
                 </summary>
-                <p className="text-slate-400 mt-4 leading-relaxed">{f.a}</p>
+                <p className="text-(--mp-muted) mt-4 leading-relaxed">{f.a}</p>
               </details>
             ))}
           </div>
@@ -483,25 +483,25 @@ export default function SamGovComparePage() {
       </section>
 
       {/* Related comparisons */}
-      <section className="px-4 py-12 border-t border-slate-800">
+      <section className="px-4 py-12 border-t border-(--mp-line)">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-lg font-semibold text-white mb-4">Other Comparisons</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink) mb-4">Other Comparisons</h3>
           <div className="flex flex-wrap gap-6 justify-center">
             <Link
               href="/compare/govwin"
-              className="text-slate-400 hover:text-purple-300 transition"
+              className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition"
             >
               Mindy vs GovWin →
             </Link>
             <Link
               href="/recompete"
-              className="text-slate-400 hover:text-purple-300 transition"
+              className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition"
             >
               See contracts up for recompete →
             </Link>
             <Link
               href="/forecasts"
-              className="text-slate-400 hover:text-purple-300 transition"
+              className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition"
             >
               Browse agency forecasts →
             </Link>
@@ -510,23 +510,23 @@ export default function SamGovComparePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Stop scrolling SAM.gov.<br />
-            <span className="text-purple-400">Let Mindy do it.</span>
+            <span className="text-(--mp-navy)">Let Mindy do it.</span>
           </h2>
-          <p className="text-xl text-slate-300 mb-8">
+          <p className="text-xl text-(--mp-body) mb-8">
             Your first personalized briefing lands tomorrow morning. No credit card. No sales
             call. Cancel anytime.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+            className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
             Get Your First Briefing Free
           </Link>
-          <p className="text-slate-400 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             You&apos;ll still use SAM.gov. You just won&apos;t live there anymore.
           </p>
         </div>

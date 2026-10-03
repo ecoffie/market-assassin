@@ -128,39 +128,39 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
         activeTab="agencies"
       >
         <header className="mb-6">
-          <h2 className="text-2xl font-bold">Federal Agency Customers</h2>
+          <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">Federal Agency Customers</h2>
           {decision.headlineCount !== null && (
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-(--mp-muted)">
               {decision.headlineCount} federal {decision.headlineCount === 1 ? 'agency has' : 'agencies have'} awarded contracts to {displayName}, sorted by total dollars.
             </p>
           )}
         </header>
 
         {decision.showTable && (
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+          <div className="overflow-x-auto rounded-lg border border-(--mp-line) bg-(--mp-surface)">
             <table className="w-full text-sm">
-              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+              <thead className="bg-(--mp-wash) text-xs uppercase tracking-wider text-(--mp-muted)">
                 <tr>
                   <th className="text-left px-4 py-3">Agency</th>
                   <th className="text-right px-4 py-3">% of Total</th>
                   <th className="text-right px-4 py-3">Total Obligated</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-(--mp-line)">
                 {agencies.map((a) => (
-                  <tr key={a.awarding_agency} className="hover:bg-slate-800/40">
-                    <td className="px-4 py-3 text-slate-200">
+                  <tr key={a.awarding_agency} className="hover:bg-(--mp-wash)">
+                    <td className="px-4 py-3 text-(--mp-ink)">
                       <Link
                         href={`/agencies/${agencySlug(a.awarding_agency)}`}
-                        className="hover:text-purple-400"
+                        className="hover:text-(--mp-navy-hover)"
                       >
                         {a.awarding_agency}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">
+                    <td className="px-4 py-3 text-right text-(--mp-muted) whitespace-nowrap">
                       {(Number(a.pct_of_total) * 100).toFixed(1)}%
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                    <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) font-semibold text-(--mp-navy) whitespace-nowrap">
                       {fmtMoney(Number(a.total_amount))}
                     </td>
                   </tr>
@@ -171,10 +171,10 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
         )}
 
         {decision.notice === 'unavailable' && (
-          <div data-subpage-state="unavailable" className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-300">
+          <div data-subpage-state="unavailable" className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6 text-sm text-(--mp-body)">
             <p>The agency-by-agency breakdown for {displayName} is being refreshed and isn&apos;t available right now.</p>
             <p className="mt-2">
-              <Link href={`/contractors/${slugForLinks}`} className="text-purple-400 hover:text-purple-300">
+              <Link href={`/contractors/${slugForLinks}`} className="text-(--mp-navy) hover:text-(--mp-navy-hover)">
                 See {displayName}&apos;s contractor profile
               </Link>{' '}
               for its federal award totals and top agency customers.
@@ -182,20 +182,20 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
           </div>
         )}
         {decision.notice === 'none' && (
-          <p data-subpage-state="none" className="text-slate-400 text-sm">
+          <p data-subpage-state="none" className="text-(--mp-muted) text-sm">
             No agency-attributed federal awards are recorded for {displayName} in this dataset.
           </p>
         )}
 
         {/* CTA */}
-        <section className="mt-12 rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-xl font-bold">Track {displayName}&apos;s Agency Relationships</h2>
-          <p className="mt-2 max-w-2xl mx-auto text-slate-300 text-sm">
+        <section className="mt-12 rounded-lg border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-xl font-bold font-(family-name:--mp-font-serif)">Track {displayName}&apos;s Agency Relationships</h2>
+          <p className="mt-2 max-w-2xl mx-auto text-(--mp-body) text-sm">
             Mindy watches agency spending patterns and surfaces opportunities matching {displayName}&apos;s active customers.
           </p>
           <Link
             href="/signup"
-            className="mt-5 inline-flex rounded-xl bg-purple-600 px-5 py-2.5 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+            className="mt-5 inline-flex rounded-lg bg-(--mp-navy) px-5 py-2.5 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
             Start Free
           </Link>

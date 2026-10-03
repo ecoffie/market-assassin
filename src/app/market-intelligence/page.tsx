@@ -178,20 +178,20 @@ function MarketIntelligenceContent() {
   // Show loading state when verifying invite token
   if (verifyingInvite || (searchParams.get('invite') && !error)) {
     return (
-      <div className="min-h-screen bg-ground-deep flex items-center justify-center">
+      <div className="min-h-screen bg-(--mp-paper) flex items-center justify-center">
         <div className="text-center">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
-            <span className="text-white font-bold text-2xl">MI</span>
+          <div className="w-14 h-14 rounded-lg flex items-center justify-center mx-auto mb-4 bg-(--mp-navy)">
+            <span className="text-(--mp-surface) font-bold text-2xl">MI</span>
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <h2 className="text-xl font-semibold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">
             {redirecting ? 'Access Granted!' : 'Verifying Your Invitation...'}
           </h2>
-          <p className="text-muted">
+          <p className="text-(--mp-muted)">
             {redirecting ? 'Redirecting to your dashboard...' : 'Just a moment while we verify your access.'}
           </p>
           {!redirecting && (
             <div className="mt-4 flex justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-(--mp-navy) border-t-transparent"></div>
             </div>
           )}
         </div>
@@ -200,7 +200,7 @@ function MarketIntelligenceContent() {
   }
 
   return (
-    <div className="min-h-screen bg-ground-deep">
+    <div className="min-h-screen bg-(--mp-paper)">
       {/* Hero section removed May 22, 2026 per user: "do we need
           a hero section". Right call — users hitting this page
           from the in-app upgrade CTA already know what Mindy AI
@@ -208,12 +208,12 @@ function MarketIntelligenceContent() {
           on something they're already convinced of, costing them
           the ability to see the price + CTA without scrolling.
           A slim brand bar replaces it. */}
-      <div className="bg-gradient-to-r from-purple-900/40 to-slate-900 border-b border-purple-500/20 px-4 py-3">
+      <div className="border-b border-(--mp-line) px-4 py-3 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto flex items-center justify-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow shadow-purple-500/30">
-            <span className="text-white font-bold text-sm">M</span>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shadow bg-(--mp-navy)">
+            <span className="text-(--mp-surface) font-bold text-sm">M</span>
           </div>
-          <span className="text-white font-semibold text-lg">Mindy AI</span>
+          <span className="text-(--mp-ink) font-semibold text-lg">Mindy AI</span>
         </div>
       </div>
 
@@ -233,10 +233,10 @@ function MarketIntelligenceContent() {
           (Stripe / Linear / Notion pattern) rather than two
           side-by-side cards. */}
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-6">
-        <h2 className="text-2xl font-bold text-white text-center mb-1">
+        <h2 className="text-2xl font-bold text-(--mp-ink) text-center mb-1 font-(family-name:--mp-font-serif)">
           {tier === 'pro' ? 'Upgrade to Pro' : 'Upgrade to Team'}
         </h2>
-        <p className="text-muted text-center text-sm mb-4">
+        <p className="text-(--mp-muted) text-center text-sm mb-4">
           {tier === 'pro'
             ? 'Full Mindy AI workspace + AI briefings + FHC training.'
             : '5 seats · shared pipeline · team admin dashboard · priority support.'}
@@ -247,14 +247,14 @@ function MarketIntelligenceContent() {
             is the larger purchase population. Team upgrades for
             small BD departments who need 5 seats. */}
         <div className="flex justify-center mb-3">
-          <div className="inline-flex bg-ground border border-hairline rounded-full p-1">
+          <div className="inline-flex bg-(--mp-paper) border border-(--mp-line) rounded-full p-1">
             <button
               type="button"
               onClick={() => setTier('pro')}
-              className={`px-5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              className={`px-5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 tier === 'pro'
-                  ? 'bg-input text-white shadow-sm'
-                  : 'text-muted hover:text-slate-200'
+                  ? 'bg-(--mp-wash) text-(--mp-ink) shadow-sm'
+                  : 'text-(--mp-muted) hover:text-(--mp-ink)'
               }`}
             >
               Solo
@@ -262,15 +262,15 @@ function MarketIntelligenceContent() {
             <button
               type="button"
               onClick={() => setTier('team')}
-              className={`px-5 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
+              className={`px-5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
                 tier === 'team'
-                  ? 'bg-input text-white shadow-sm'
-                  : 'text-muted hover:text-slate-200'
+                  ? 'bg-(--mp-wash) text-(--mp-ink) shadow-sm'
+                  : 'text-(--mp-muted) hover:text-(--mp-ink)'
               }`}
             >
               Team
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                tier === 'team' ? 'bg-blue-500 text-white' : 'bg-blue-500/20 text-blue-300'
+                tier === 'team' ? 'bg-(--mp-navy) text-white' : 'bg-(--mp-navy-wash) text-(--mp-navy)'
               }`}>5 SEATS</span>
             </button>
           </div>
@@ -280,14 +280,14 @@ function MarketIntelligenceContent() {
             it's the cheaper-per-month option + we want to nudge
             toward longer commitment. */}
         <div className="flex justify-center mb-5">
-          <div className="inline-flex bg-surface border border-hairline rounded-full p-1">
+          <div className="inline-flex bg-(--mp-surface) border border-(--mp-line) rounded-full p-1">
             <button
               type="button"
               onClick={() => setBillingPeriod('monthly')}
-              className={`px-6 py-2 rounded-full text-sm font-semibold transition-colors ${
+              className={`px-6 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 billingPeriod === 'monthly'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-muted hover:text-slate-200'
+                  ? 'bg-(--mp-navy) text-white shadow-md'
+                  : 'text-(--mp-muted) hover:text-(--mp-ink)'
               }`}
             >
               Monthly
@@ -295,15 +295,15 @@ function MarketIntelligenceContent() {
             <button
               type="button"
               onClick={() => setBillingPeriod('annual')}
-              className={`px-6 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${
+              className={`px-6 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${
                 billingPeriod === 'annual'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-muted hover:text-slate-200'
+                  ? 'bg-(--mp-navy) text-white shadow-md'
+                  : 'text-(--mp-muted) hover:text-(--mp-ink)'
               }`}
             >
               Annual
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                billingPeriod === 'annual' ? 'bg-emerald-500 text-white' : 'bg-emerald-500/20 text-emerald-300'
+                billingPeriod === 'annual' ? 'bg-(--mp-navy) text-white' : 'bg-(--mp-ok-bg) text-(--mp-ok)'
               }`}>SAVE 17%</span>
             </button>
           </div>
@@ -315,10 +315,10 @@ function MarketIntelligenceContent() {
             Team) per Eric's spec, with "billed annually as $X" as
             the secondary line. Team card uses a blue accent ring
             instead of purple to differentiate visually. */}
-        <div className={`bg-gradient-to-br ${
-          tier === 'pro' ? 'from-purple-900/40 to-slate-800 border-purple-500' : 'from-blue-900/40 to-slate-800 border-blue-500'
-        } border-2 rounded-2xl p-5 shadow-2xl ${
-          tier === 'pro' ? 'shadow-purple-500/10' : 'shadow-blue-500/10'
+        <div className={`bg-(--mp-wash) ${
+          tier === 'pro' ? 'border-(--mp-navy)' : 'border-(--mp-navy)'
+        } border-2 rounded-lg p-5 ${
+          tier === 'pro' ? '' : ''
         }`}>
           <div className="text-center mb-4">
             {(() => {
@@ -334,10 +334,10 @@ function MarketIntelligenceContent() {
               return (
                 <>
                   <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-bold text-white">{p.headline}</span>
-                    <span className="text-muted">/mo</span>
+                    <span className="text-4xl font-bold text-(--mp-ink)">{p.headline}</span>
+                    <span className="text-(--mp-muted)">/mo</span>
                   </div>
-                  <p className={`text-xs mt-1 ${billingPeriod === 'annual' ? 'text-emerald-400 font-medium' : 'text-faint'}`}>
+                  <p className={`text-xs mt-1 ${billingPeriod === 'annual' ? 'text-(--mp-ok) font-medium' : 'text-(--mp-muted)'}`}>
                     {p.sub}
                   </p>
                 </>
@@ -351,46 +351,46 @@ function MarketIntelligenceContent() {
               the seat-related features. */}
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-5">
             {tier === 'team' && (
-              <li className="flex items-center gap-1.5 text-blue-300 text-xs font-medium sm:col-span-2">
-                <span className="text-blue-400">★</span> 5 user seats included
+              <li className="flex items-center gap-1.5 text-(--mp-navy) text-xs font-medium sm:col-span-2">
+                <span className="text-(--mp-navy)">★</span> 5 user seats included
               </li>
             )}
-            <li className="flex items-center gap-1.5 text-ink-soft text-xs">
-              <span className="text-green-500">✓</span> Daily market briefs
+            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
+              <span className="text-(--mp-ok)">✓</span> Daily market briefs
             </li>
-            <li className="flex items-center gap-1.5 text-ink-soft text-xs">
-              <span className="text-green-500">✓</span> Weekly deep dives
+            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
+              <span className="text-(--mp-ok)">✓</span> Weekly deep dives
             </li>
-            <li className="flex items-center gap-1.5 text-ink-soft text-xs">
-              <span className="text-green-500">✓</span> Pursuit briefs
+            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
+              <span className="text-(--mp-ok)">✓</span> Pursuit briefs
             </li>
-            <li className="flex items-center gap-1.5 text-ink-soft text-xs">
-              <span className="text-green-500">✓</span> {tier === 'team' ? 'Shared pipeline + CRM' : 'Saved target list + outreach log'}
+            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
+              <span className="text-(--mp-ok)">✓</span> {tier === 'team' ? 'Shared pipeline + CRM' : 'Saved target list + outreach log'}
             </li>
-            <li className="flex items-center gap-1.5 text-ink-soft text-xs">
-              <span className="text-green-500">✓</span> Mindy Says AI narrative
+            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
+              <span className="text-(--mp-ok)">✓</span> Mindy Says AI narrative
             </li>
-            <li className="flex items-center gap-1.5 text-ink-soft text-xs">
-              <span className="text-green-500">✓</span> {tier === 'team' ? 'Team admin dashboard' : 'FHC live training'}
+            <li className="flex items-center gap-1.5 text-(--mp-body) text-xs">
+              <span className="text-(--mp-ok)">✓</span> {tier === 'team' ? 'Team admin dashboard' : 'FHC live training'}
             </li>
             {tier === 'team' && (
-              <li className="flex items-center gap-1.5 text-blue-300 text-xs font-medium">
-                <span className="text-blue-400">★</span> Priority support
+              <li className="flex items-center gap-1.5 text-(--mp-navy) text-xs font-medium">
+                <span className="text-(--mp-navy)">★</span> Priority support
               </li>
             )}
             {tier === 'pro' && billingPeriod === 'annual' && (
               <>
-                <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
-                  <span className="text-emerald-400">★</span> Priority support
+                <li className="flex items-center gap-1.5 text-(--mp-ok) text-xs font-medium">
+                  <span className="text-(--mp-ok)">★</span> Priority support
                 </li>
-                <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
-                  <span className="text-emerald-400">★</span> Locked-in pricing
+                <li className="flex items-center gap-1.5 text-(--mp-ok) text-xs font-medium">
+                  <span className="text-(--mp-ok)">★</span> Locked-in pricing
                 </li>
               </>
             )}
             {tier === 'team' && billingPeriod === 'annual' && (
-              <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
-                <span className="text-emerald-400">★</span> Locked-in pricing
+              <li className="flex items-center gap-1.5 text-(--mp-ok) text-xs font-medium">
+                <span className="text-(--mp-ok)">★</span> Locked-in pricing
               </li>
             )}
           </ul>
@@ -403,29 +403,29 @@ function MarketIntelligenceContent() {
             }
             className={`block w-full py-3 ${
               tier === 'pro'
-                ? 'bg-purple-600 hover:bg-purple-500'
-                : 'bg-blue-600 hover:bg-blue-500'
-            } text-white font-bold text-base rounded-xl text-center transition-colors shadow-lg`}
+                ? 'bg-(--mp-navy) hover:bg-(--mp-navy-hover)'
+                : 'bg-(--mp-navy) hover:bg-(--mp-navy-hover)'
+            } text-(--mp-surface) font-bold text-base rounded-lg text-center transition-colors`}
           >
             {tier === 'pro'
               ? (billingPeriod === 'monthly' ? 'Upgrade to Pro — Monthly →' : 'Upgrade to Pro — Annual →')
               : (billingPeriod === 'monthly' ? 'Start Team — Monthly →' : 'Start Team — Annual →')}
           </a>
-          <p className="text-center text-xs text-faint mt-2">
+          <p className="text-center text-xs text-(--mp-muted) mt-2">
             Secure checkout via Stripe · Cancel anytime
           </p>
         </div>
 
         {/* Ultimate Bundle callout — keeps the existing copy
             but moves it under the new pricing card. */}
-        <div className="mt-6 bg-surface/50 border border-hairline rounded-xl p-4 text-center">
-          <p className="text-muted text-xs mb-1">Planning to go all-in?</p>
-          <p className="text-white text-sm mb-2">
-            The <span className="text-purple-400 font-medium">Ultimate Bundle ($1,497)</span> includes lifetime Mindy AI access.
+        <div className="mt-6 bg-(--mp-wash) border border-(--mp-line) rounded-lg p-4 text-center">
+          <p className="text-(--mp-muted) text-xs mb-1">Planning to go all-in?</p>
+          <p className="text-(--mp-ink) text-sm mb-2">
+            The <span className="text-(--mp-navy) font-medium">Ultimate Bundle ($1,497)</span> includes lifetime Mindy AI access.
           </p>
           <Link
             href="/bundles/ultimate"
-            className="text-purple-400 hover:text-purple-300 text-xs font-medium"
+            className="text-(--mp-navy) hover:text-(--mp-navy-hover) text-xs font-medium"
           >
             Compare with Ultimate →
           </Link>
@@ -442,8 +442,8 @@ function MarketIntelligenceContent() {
 
       {/* Tier Comparison Table */}
       <div className="max-w-6xl mx-auto px-4 pb-16">
-        <h2 className="text-2xl font-bold text-white text-center mb-4">Compare Plans</h2>
-        <p className="text-muted text-center mb-10 max-w-2xl mx-auto">
+        <h2 className="text-2xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">Compare Plans</h2>
+        <p className="text-(--mp-muted) text-center mb-10 max-w-2xl mx-auto">
           Pick the tier that fits your team. Save $700+/month vs. Deltek GovWin at every tier.
         </p>
 
@@ -451,130 +451,130 @@ function MarketIntelligenceContent() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="text-left py-3 px-3 text-muted font-medium border-b border-hairline">Feature</th>
-                <th className="py-3 px-3 text-center border-b border-hairline bg-purple-900/20">
-                  <div className="text-white font-bold">Pro</div>
-                  <div className="text-purple-400 text-xs">$149/mo</div>
+                <th className="text-left py-3 px-3 text-(--mp-muted) font-medium border-b border-(--mp-line)">Feature</th>
+                <th className="py-3 px-3 text-center border-b border-(--mp-line) bg-(--mp-navy-wash)">
+                  <div className="text-(--mp-ink) font-bold">Pro</div>
+                  <div className="text-(--mp-navy) text-xs">$149/mo</div>
                 </th>
-                <th className="py-3 px-3 text-center border-b border-hairline bg-blue-900/20">
-                  <div className="text-white font-bold">Team</div>
-                  <div className="text-blue-400 text-xs">$499/mo</div>
+                <th className="py-3 px-3 text-center border-b border-(--mp-line) bg-(--mp-navy-wash)">
+                  <div className="text-(--mp-ink) font-bold">Team</div>
+                  <div className="text-(--mp-navy) text-xs">$499/mo</div>
                 </th>
-                <th className="py-3 px-3 text-center border-b border-hairline bg-amber-900/20">
-                  <div className="text-white font-bold">Enterprise</div>
-                  <div className="text-amber-400 text-xs">Custom</div>
+                <th className="py-3 px-3 text-center border-b border-(--mp-line) bg-(--mp-wash)">
+                  <div className="text-(--mp-ink) font-bold">Enterprise</div>
+                  <div className="text-(--mp-body) text-xs">Custom</div>
                 </th>
               </tr>
             </thead>
             <tbody className="text-xs">
               {/* User Seats */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">User Seats</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">1</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">5</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">Unlimited</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">User Seats</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">1</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">5</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">Unlimited</td>
               </tr>
               {/* Market Research */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Market Research Reports</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">10 • Unlimited</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">10 • Unlimited</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">10 • Unlimited</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Market Research Reports</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">10 • Unlimited</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">10 • Unlimited</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">10 • Unlimited</td>
               </tr>
               {/* Daily Alerts */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Daily Alerts</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓ + AI</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ + AI</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ + AI</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Daily Alerts</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓ + AI</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓ + AI</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓ + AI</td>
               </tr>
               {/* AI Briefings */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">AI Briefings</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">AI Briefings</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
               </tr>
               {/* Forecasts + SBIR + Grants */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Forecasts, SBIR, Grants</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Forecasts, SBIR, Grants</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
               </tr>
               {/* Pipeline & CRM */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Pipeline + CRM</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ Shared</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ Shared</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Pipeline + CRM</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓ Shared</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓ Shared</td>
               </tr>
               {/* Content Reaper */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Content Reaper</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Content Reaper</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
               </tr>
               {/* FHC Training */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">FHC Training</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ All seats</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ All seats</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">FHC Training</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓ All seats</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓ All seats</td>
               </tr>
               {/* Team Admin */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Team Admin Dashboard</td>
-                <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Team Admin Dashboard</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-muted) bg-(--mp-navy-wash)">—</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
               </tr>
               {/* SSO */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">SSO / SAML</td>
-                <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
-                <td className="py-2.5 px-3 text-center text-slate-600 bg-blue-900/10">—</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">SSO / SAML</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-muted) bg-(--mp-navy-wash)">—</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-muted) bg-(--mp-navy-wash)">—</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
               </tr>
               {/* Custom Integrations */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Custom Integrations</td>
-                <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
-                <td className="py-2.5 px-3 text-center text-slate-600 bg-blue-900/10">—</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Custom Integrations</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-muted) bg-(--mp-navy-wash)">—</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-muted) bg-(--mp-navy-wash)">—</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
               </tr>
               {/* Support */}
-              <tr className="border-b border-surface hover:bg-surface/30">
-                <td className="py-2.5 px-3 text-ink-soft">Support</td>
-                <td className="py-2.5 px-3 text-center text-ink-soft bg-purple-900/10">Email</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">Priority</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">Dedicated</td>
+              <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
+                <td className="py-2.5 px-3 text-(--mp-body)">Support</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-body) bg-(--mp-navy-wash)">Email</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">Priority</td>
+                <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">Dedicated</td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
                 <td className="py-4 px-3"></td>
-                <td className="py-4 px-3 text-center bg-purple-900/10">
+                <td className="py-4 px-3 text-center bg-(--mp-navy-wash)">
                   <a
                     href={CHECKOUT_MONTHLY}
-                    className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors text-xs"
+                    className="inline-block px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Get Pro →
                   </a>
                 </td>
-                <td className="py-4 px-3 text-center bg-blue-900/10">
+                <td className="py-4 px-3 text-center bg-(--mp-navy-wash)">
                   <a
                     href={CHECKOUT_TEAM_MONTHLY}
-                    className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors text-xs"
+                    className="inline-block px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Start Team →
                   </a>
                 </td>
-                <td className="py-4 px-3 text-center bg-amber-900/10">
+                <td className="py-4 px-3 text-center bg-(--mp-wash)">
                   <a
                     href="mailto:hello@getmindy.ai?subject=MI%20Enterprise%20Inquiry"
-                    className="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-xs"
+                    className="inline-block px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Contact Sales
                   </a>
@@ -585,23 +585,23 @@ function MarketIntelligenceContent() {
         </div>
 
         {/* Competitor Comparison */}
-        <div className="mt-10 bg-surface/30 border border-hairline rounded-xl p-6">
+        <div className="mt-10 bg-(--mp-wash) border border-(--mp-line) rounded-lg p-6">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-2xl">💡</span>
-            <h3 className="text-lg font-bold text-white">Why Mindy Pro vs. Deltek GovWin?</h3>
+            <h3 className="text-lg font-bold text-(--mp-ink)">Why Mindy Pro vs. Deltek GovWin?</h3>
           </div>
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div>
-              <p className="text-purple-400 font-semibold mb-1">Mindy Pro: $149/mo</p>
-              <p className="text-muted">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring. Includes FHC training access.</p>
+              <p className="text-(--mp-navy) font-semibold mb-1">Mindy Pro: $149/mo</p>
+              <p className="text-(--mp-muted)">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring. Includes FHC training access.</p>
             </div>
             <div>
-              <p className="text-faint font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>
-              <p className="text-faint">Enterprise platform with extensive data. Overkill for small businesses. Requires training.</p>
+              <p className="text-(--mp-muted) font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>
+              <p className="text-(--mp-muted)">Enterprise platform with extensive data. Overkill for small businesses. Requires training.</p>
             </div>
             <div>
-              <p className="text-emerald-400 font-semibold mb-1">Your Savings: 85%+</p>
-              <p className="text-muted">Get the intelligence you need at a fraction of the cost. Built for small GovCon firms, not enterprise.</p>
+              <p className="text-(--mp-ok) font-semibold mb-1">Your Savings: 85%+</p>
+              <p className="text-(--mp-muted)">Get the intelligence you need at a fraction of the cost. Built for small GovCon firms, not enterprise.</p>
             </div>
           </div>
         </div>
@@ -617,10 +617,10 @@ function MarketIntelligenceContent() {
           who land here from a search engine or old email link
           still need a path to sign in; this puts that path at
           the bottom so it doesn't dilute the upgrade pitch. */}
-      <div className="border-t border-surface bg-ground/30">
+      <div className="border-t border-(--mp-line) bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto px-4 py-10">
-          <div className="bg-surface/50 border border-hairline rounded-xl p-5">
-            <p className="text-ink-soft text-center text-sm mb-3">
+          <div className="bg-(--mp-wash) border border-(--mp-line) rounded-lg p-5">
+            <p className="text-(--mp-body) text-center text-sm mb-3">
               Already a Mindy Pro customer? Enter your purchase email to access your account.
             </p>
             <form onSubmit={handleVerifyAccess} className="flex gap-2 max-w-md mx-auto">
@@ -628,12 +628,12 @@ function MarketIntelligenceContent() {
                 ref={emailRef}
                 type="email"
                 placeholder="you@example.com"
-                className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-slate-200 placeholder-faint text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                className="flex-1 px-3 py-2 bg-(--mp-paper) border border-(--mp-line) rounded-lg text-(--mp-ink) placeholder:text-(--mp-subtle) text-sm focus:ring-1 focus:ring-(--mp-navy) focus:border-(--mp-navy)"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-input hover:bg-slate-600 text-white rounded-lg font-semibold disabled:opacity-50 text-sm transition-colors"
+                className="px-4 py-2 bg-(--mp-wash) hover:bg-(--mp-line) text-(--mp-ink) rounded-lg font-semibold disabled:opacity-50 text-sm transition-colors"
               >
                 {loading ? '...' : 'Access'}
               </button>
@@ -643,35 +643,35 @@ function MarketIntelligenceContent() {
                 type="button"
                 onClick={handleSendSecureLink}
                 disabled={sendingLink}
-                className="text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
+                className="text-xs text-(--mp-navy) hover:text-(--mp-navy-hover) disabled:opacity-50"
               >
                 {sendingLink ? 'Sending secure link...' : 'Email me a secure access link instead'}
               </button>
             </div>
-            {error && <p className="text-red-400 text-xs mt-2 text-center">{error}</p>}
-            {success && <p className="text-green-400 text-xs mt-2 text-center">{success}</p>}
-            {redirecting && <p className="text-green-400 text-xs mt-2 text-center">Access verified! Redirecting...</p>}
+            {error && <p className="text-(--mp-crit) text-xs mt-2 text-center">{error}</p>}
+            {success && <p className="text-(--mp-ok) text-xs mt-2 text-center">{success}</p>}
+            {redirecting && <p className="text-(--mp-ok) text-xs mt-2 text-center">Access verified! Redirecting...</p>}
           </div>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="border-t border-surface py-8">
+      <div className="border-t border-(--mp-line) py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <p className="text-faint text-sm">
-            <Link href="/" className="text-muted hover:text-white">
+          <p className="text-(--mp-muted) text-sm">
+            <Link href="/" className="text-(--mp-muted) hover:text-(--mp-ink)">
               ← Back to Tools
             </Link>
             <span className="mx-4">•</span>
-            <Link href="/briefings" className="text-muted hover:text-white">
+            <Link href="/briefings" className="text-(--mp-muted) hover:text-(--mp-ink)">
               View Dashboard
             </Link>
             <span className="mx-4">•</span>
-            <a href="mailto:hello@getmindy.ai" className="text-muted hover:text-white">
+            <a href="mailto:hello@getmindy.ai" className="text-(--mp-muted) hover:text-(--mp-ink)">
               Support
             </a>
           </p>
-          <p className="text-slate-600 text-xs mt-4">
+          <p className="text-(--mp-muted) text-xs mt-4">
             © {new Date().getFullYear()} GovCon Giants • getmindy.ai
           </p>
         </div>
@@ -683,8 +683,8 @@ function MarketIntelligenceContent() {
 export default function MarketIntelligencePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 flex items-center justify-center">
-        <div className="text-muted">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-(--mp-wash)">
+        <div className="text-(--mp-muted)">Loading...</div>
       </div>
     }>
       <MarketIntelligenceContent />

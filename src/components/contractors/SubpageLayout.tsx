@@ -50,32 +50,32 @@ export function SubpageLayout({
   ];
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <BackToAppHeader slug={slug} company={displayName} />
       {/* Breadcrumb */}
-      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
-        <Link href="/" className="hover:text-purple-400">Home</Link>
+      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <Link href="/contractors" className="hover:text-purple-400">Contractors</Link>
+        <Link href="/contractors" className="hover:text-(--mp-navy-hover)">Contractors</Link>
         <span className="mx-2">/</span>
-        <Link href={`/contractors/${slug}`} className="hover:text-purple-400">{displayName}</Link>
+        <Link href={`/contractors/${slug}`} className="hover:text-(--mp-navy-hover)">{displayName}</Link>
         {activeTab !== 'overview' && (
           <>
             <span className="mx-2">/</span>
-            <span className="text-slate-300 capitalize">{activeTab}</span>
+            <span className="text-(--mp-body) capitalize">{activeTab}</span>
           </>
         )}
       </div>
 
       {/* Compact identity strip */}
       <section className="mx-auto max-w-6xl px-6 pt-6 pb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-navy)">
           Federal Contractor Profile
         </p>
-        <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">{displayName}</h1>
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-400">
+        <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight font-(family-name:--mp-font-serif)">{displayName}</h1>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-(--mp-muted)">
           <span>
-            <span className="font-mono text-purple-300 font-semibold">{totalObligated}</span> obligated
+            <span className="font-(family-name:--mp-font-mono) text-(--mp-navy) font-semibold">{totalObligated}</span> obligated
           </span>
           <span>·</span>
           <span>{awardCount.toLocaleString()} awards</span>
@@ -88,15 +88,15 @@ export function SubpageLayout({
 
       {/* Tabs */}
       <div className="mx-auto max-w-6xl px-6">
-        <div className="flex gap-1 border-b border-slate-800 overflow-x-auto">
+        <div className="flex gap-1 border-b border-(--mp-line) overflow-x-auto">
           {tabs.map((tab) => (
             <Link
               key={tab.href}
               href={tab.href}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 tab.active
-                  ? 'border-purple-500 text-white'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  ? 'border-(--mp-navy) text-(--mp-ink)'
+                  : 'border-transparent text-(--mp-muted) hover:text-(--mp-ink) hover:border-(--mp-line)'
               }`}
             >
               {tab.label}

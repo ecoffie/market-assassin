@@ -25,10 +25,10 @@ export default function CompareHub() {
     ...COMPETITORS.map((c) => ({ slug: c.slug, name: c.name })),
   ];
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <div className="max-w-3xl mx-auto px-4 py-16">
-        <h1 className="text-3xl md:text-4xl font-extrabold">How Mindy compares</h1>
-        <p className="text-slate-300 mt-4 text-lg">
+        <h1 className="text-3xl md:text-4xl font-bold font-(family-name:--mp-font-serif)">How Mindy compares</h1>
+        <p className="text-(--mp-body) mt-4 text-lg">
           Honest comparisons of Mindy vs. the other federal market-intelligence tools — including the
           tradeoffs. Free daily alerts, $149/mo Pro, no enterprise sales call.
         </p>
@@ -37,15 +37,15 @@ export default function CompareHub() {
             <Link
               key={x.slug}
               href={`/compare/${x.slug}`}
-              className="block border border-slate-800 rounded-xl p-5 hover:border-purple-500 hover:bg-slate-900 transition-colors"
+              className="block border border-(--mp-line) rounded-lg p-5 hover:border-(--mp-navy) hover:bg-(--mp-surface) transition-colors"
             >
-              <div className="font-semibold text-white">Mindy vs {x.name}</div>
-              <div className="text-sm text-purple-400 mt-1">See the comparison →</div>
+              <div className="font-semibold text-(--mp-ink)">Mindy vs {x.name}</div>
+              <div className="text-sm text-(--mp-navy) mt-1">See the comparison →</div>
             </Link>
           ))}
         </div>
         <div className="mt-10 text-center">
-          <Link href="/app" className="inline-block bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg px-7 py-3">Start free →</Link>
+          <Link href="/app" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start free →</Link>
         </div>
       </div>
     </main>

@@ -74,17 +74,17 @@ export default async function ForecastsPage() {
 
   if (!s.available) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-200">
+      <main className="bg-(--mp-paper) text-(--mp-ink)">
         <div className="mx-auto max-w-4xl px-6 py-20">
-          <h1 className="text-3xl font-bold text-white">Federal Contract Forecasts</h1>
-          <p className="mt-4 text-slate-400">
+          <h1 className="text-3xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Federal Contract Forecasts</h1>
+          <p className="mt-4 text-(--mp-muted)">
             Forecast data is temporarily unavailable. Rather than show you a zero we cannot prove,
             we are showing you nothing. Try{' '}
-            <Link href="/agencies" className="text-purple-300 hover:underline">
+            <Link href="/agencies" className="text-(--mp-navy) hover:underline">
               the agency directory
             </Link>{' '}
             or{' '}
-            <Link href="/opportunity-hunter" className="text-purple-300 hover:underline">
+            <Link href="/opportunity-hunter" className="text-(--mp-navy) hover:underline">
               open opportunities
             </Link>{' '}
             in the meantime.
@@ -118,26 +118,26 @@ export default async function ForecastsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-200">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <div className="mx-auto max-w-5xl px-6 py-14">
-        <nav className="text-sm text-slate-400">
-          <Link href="/" className="hover:text-purple-400">Home</Link>
+        <nav className="text-sm text-(--mp-muted)">
+          <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
           <span className="mx-2">/</span>
-          <span className="text-slate-300">Forecasts</span>
+          <span className="text-(--mp-body)">Forecasts</span>
         </nav>
 
-        <h1 className="mt-6 text-3xl md:text-4xl font-bold text-white">
+        <h1 className="mt-6 text-3xl md:text-4xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">
           Federal Contract Forecasts — What Agencies Plan to Buy Next
         </h1>
-        <p className="mt-5 text-lg text-slate-300 max-w-3xl">
+        <p className="mt-5 text-lg text-(--mp-body) max-w-3xl">
           Federal agencies publish what they intend to buy before they buy it. Mindy has{' '}
-          <strong className="text-white">{s.total.toLocaleString()}</strong> of those forecasted
+          <strong className="text-(--mp-ink)">{s.total.toLocaleString()}</strong> of those forecasted
           requirements normalized into one place — the earliest legal signal you can act on, often
           months before a solicitation appears on SAM.gov.
         </p>
-        <p className="mt-4 text-slate-400 max-w-3xl">
+        <p className="mt-4 text-(--mp-muted) max-w-3xl">
           A forecast is a plan, not a promise: dates move, scopes change, and some entries never
           become contracts. That is exactly why they are useful. The window between a published
           forecast and a posted solicitation is the only period in which a small business can
@@ -145,56 +145,56 @@ export default async function ForecastsPage() {
         </p>
 
         {/* Provenance — a forecast is a claim about the future; say where it came from. */}
-        <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm">
-          <p className="text-slate-300">
-            <strong className="text-white">Sources:</strong>{' '}
+        <div className="mt-8 rounded-lg border border-(--mp-line) bg-(--mp-surface) p-5 text-sm">
+          <p className="text-(--mp-body)">
+            <strong className="text-(--mp-ink)">Sources:</strong>{' '}
             {s.sources.map((x) => x.label).join(', ')}.
           </p>
           {synced && (
-            <p className="mt-2 text-slate-400">
-              <strong className="text-slate-200">Last updated:</strong> {synced}.
+            <p className="mt-2 text-(--mp-muted)">
+              <strong className="text-(--mp-ink)">Last updated:</strong> {synced}.
             </p>
           )}
-          <p className="mt-2 text-slate-500">
+          <p className="mt-2 text-(--mp-muted)">
             Counts are taken from the {s.total.toLocaleString()} records actually held. Nothing on
             this page is estimated.
           </p>
         </div>
 
         {/* Agencies */}
-        <h2 className="mt-12 text-2xl font-bold text-white">Agencies with published forecasts</h2>
-        <p className="mt-2 text-slate-400">Forecasted requirements by buying organization.</p>
+        <h2 className="mt-12 text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Agencies with published forecasts</h2>
+        <p className="mt-2 text-(--mp-muted)">Forecasted requirements by buying organization.</p>
         <ul className="mt-5 grid gap-2 sm:grid-cols-2">
           {s.agencies.map((a) => {
             const slug = agencySlug(a.label);
             return (
-              <li key={a.key} className="flex items-baseline justify-between gap-3 border-b border-slate-800/70 py-2">
+              <li key={a.key} className="flex items-baseline justify-between gap-3 border-b border-(--mp-hair) py-2">
                 {LINKABLE_AGENCIES.has(slug) ? (
-                  <Link href={`/agencies/${slug}`} className="text-purple-300 hover:underline">
+                  <Link href={`/agencies/${slug}`} className="text-(--mp-navy) hover:underline">
                     {a.label}
                   </Link>
                 ) : (
-                  <span className="text-slate-200">{a.label}</span>
+                  <span className="text-(--mp-ink)">{a.label}</span>
                 )}
-                <span className="shrink-0 font-mono text-slate-400">{a.count.toLocaleString()}</span>
+                <span className="shrink-0 font-(family-name:--mp-font-mono) text-(--mp-muted)">{a.count.toLocaleString()}</span>
               </li>
             );
           })}
         </ul>
 
         {/* NAICS */}
-        <h2 className="mt-12 text-2xl font-bold text-white">Most forecasted industries (NAICS)</h2>
-        <p className="mt-2 text-slate-400">
+        <h2 className="mt-12 text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Most forecasted industries (NAICS)</h2>
+        <p className="mt-2 text-(--mp-muted)">
           If your NAICS code is here, agencies have already said they intend to buy your work.
         </p>
         <ul className="mt-5 grid gap-2 sm:grid-cols-2">
           {s.naics.map((n) => (
-            <li key={n.key} className="flex items-baseline justify-between gap-3 border-b border-slate-800/70 py-2">
-              <Link href={`/naics/${n.key}`} className="text-purple-300 hover:underline">
-                <span className="font-mono">{n.key}</span>
-                {n.label !== n.key && <span className="text-slate-400"> — {n.label}</span>}
+            <li key={n.key} className="flex items-baseline justify-between gap-3 border-b border-(--mp-hair) py-2">
+              <Link href={`/naics/${n.key}`} className="text-(--mp-navy) hover:underline">
+                <span className="font-(family-name:--mp-font-mono)">{n.key}</span>
+                {n.label !== n.key && <span className="text-(--mp-muted)"> — {n.label}</span>}
               </Link>
-              <span className="shrink-0 font-mono text-slate-400">{n.count.toLocaleString()}</span>
+              <span className="shrink-0 font-(family-name:--mp-font-mono) text-(--mp-muted)">{n.count.toLocaleString()}</span>
             </li>
           ))}
         </ul>
@@ -202,56 +202,56 @@ export default async function ForecastsPage() {
         {/* Set-asides + fiscal years */}
         <div className="mt-12 grid gap-8 md:grid-cols-2">
           <div>
-            <h2 className="text-2xl font-bold text-white">Set-aside intentions</h2>
-            <p className="mt-2 text-slate-400">
+            <h2 className="text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Set-aside intentions</h2>
+            <p className="mt-2 text-(--mp-muted)">
               Where the agency has already signalled a small-business preference.
             </p>
             <ul className="mt-4 space-y-2">
               {s.setAsides.map((x) => (
-                <li key={x.key} className="flex items-baseline justify-between gap-3 border-b border-slate-800/70 py-2">
-                  <span className="text-slate-200">{x.label}</span>
-                  <span className="shrink-0 font-mono text-slate-400">{x.count.toLocaleString()}</span>
+                <li key={x.key} className="flex items-baseline justify-between gap-3 border-b border-(--mp-hair) py-2">
+                  <span className="text-(--mp-ink)">{x.label}</span>
+                  <span className="shrink-0 font-(family-name:--mp-font-mono) text-(--mp-muted)">{x.count.toLocaleString()}</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm text-slate-500">
+            <p className="mt-3 text-sm text-(--mp-muted)">
               Certified?{' '}
-              <Link href="/set-asides" className="text-purple-300 hover:underline">
+              <Link href="/set-asides" className="text-(--mp-navy) hover:underline">
                 See the 8(a), HUBZone, SDVOSB and WOSB programs
               </Link>
               .
             </p>
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">By fiscal year</h2>
-            <p className="mt-2 text-slate-400">When the requirement is expected to land.</p>
+            <h2 className="text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">By fiscal year</h2>
+            <p className="mt-2 text-(--mp-muted)">When the requirement is expected to land.</p>
             <ul className="mt-4 space-y-2">
               {s.fiscalYears.map((x) => (
-                <li key={x.key} className="flex items-baseline justify-between gap-3 border-b border-slate-800/70 py-2">
-                  <span className="text-slate-200">{x.label}</span>
-                  <span className="shrink-0 font-mono text-slate-400">{x.count.toLocaleString()}</span>
+                <li key={x.key} className="flex items-baseline justify-between gap-3 border-b border-(--mp-hair) py-2">
+                  <span className="text-(--mp-ink)">{x.label}</span>
+                  <span className="shrink-0 font-(family-name:--mp-font-mono) text-(--mp-muted)">{x.count.toLocaleString()}</span>
                 </li>
               ))}
             </ul>
           </div>
         </div>
 
-        <h2 className="mt-12 text-2xl font-bold text-white">Where to go next</h2>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2 text-slate-400">
+        <h2 className="mt-12 text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Where to go next</h2>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2 text-(--mp-muted)">
           <li>
-            <Link href="/agencies" className="text-purple-300 hover:underline">Agency directory</Link>
+            <Link href="/agencies" className="text-(--mp-navy) hover:underline">Agency directory</Link>
             {' '}— what each buyer purchases and where they post it.
           </li>
           <li>
-            <Link href="/recompete" className="text-purple-300 hover:underline">Contract recompetes</Link>
+            <Link href="/recompete" className="text-(--mp-navy) hover:underline">Contract recompetes</Link>
             {' '}— work already under contract that comes up again.
           </li>
           <li>
-            <Link href="/opportunity-hunter" className="text-purple-300 hover:underline">Open opportunities</Link>
+            <Link href="/opportunity-hunter" className="text-(--mp-navy) hover:underline">Open opportunities</Link>
             {' '}— what is solicitable right now.
           </li>
           <li>
-            <Link href="/contractors" className="text-purple-300 hover:underline">Contractor database</Link>
+            <Link href="/contractors" className="text-(--mp-navy) hover:underline">Contractor database</Link>
             {' '}— who holds the work today.
           </li>
         </ul>

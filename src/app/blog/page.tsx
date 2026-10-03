@@ -58,7 +58,7 @@ export default function BlogIndexPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -68,36 +68,36 @@ export default function BlogIndexPage() {
           consistent crumb chain everywhere. */}
       <nav
         aria-label="Breadcrumb"
-        className="max-w-4xl mx-auto px-4 pt-8 text-sm text-slate-400"
+        className="max-w-4xl mx-auto px-4 pt-8 text-sm text-(--mp-muted)"
       >
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/" className="hover:text-purple-300 transition">
+            <Link href="/" className="hover:text-(--mp-navy-hover) transition">
               Home
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li className="text-slate-500" aria-current="page">
+          <li className="text-(--mp-muted)" aria-current="page">
             Blog
           </li>
         </ol>
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900/30 via-slate-950 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <span className="text-white font-bold text-xl">M</span>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-(--mp-navy)">
+              <span className="text-(--mp-surface) font-bold text-xl">M</span>
             </div>
-            <span className="text-purple-300 font-semibold tracking-wide uppercase text-sm">
+            <span className="text-(--mp-navy) font-semibold tracking-wide uppercase text-sm">
               The Mindy Blog
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Federal Contracting Intelligence, Demystified.
           </h1>
-          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto">
+          <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto">
             Tactics, frameworks, and plain-English explainers for small
             businesses pursuing federal contracts.
           </p>
@@ -121,26 +121,26 @@ export default function BlogIndexPage() {
               <li key={post.slug}>
                 <Link
                   href={`/blog/${post.slug}`}
-                  className="group block rounded-2xl border border-slate-800 hover:border-purple-500/50 bg-slate-900/40 hover:bg-slate-900 p-6 md:p-8 transition-all"
+                  className="group block rounded-lg border border-(--mp-line) hover:border-(--mp-navy) bg-(--mp-wash) hover:bg-(--mp-surface) p-6 md:p-8 transition-colors"
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     {post.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="text-xs font-medium uppercase tracking-wide text-purple-300 bg-purple-500/10 border border-purple-500/30 rounded-full px-3 py-1"
+                        className="text-xs font-medium uppercase tracking-wide text-(--mp-navy) bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg px-3 py-1"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-white group-hover:text-purple-200 transition-colors mb-3 leading-tight">
+                  <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) group-hover:text-(--mp-navy-hover) transition-colors mb-3 leading-tight font-(family-name:--mp-font-serif)">
                     {post.title}
                   </h2>
-                  <p className="text-slate-300 mb-4 leading-relaxed">
+                  <p className="text-(--mp-body) mb-4 leading-relaxed">
                     {post.summary}
                   </p>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
-                    <span className="text-slate-300">{post.author}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-(--mp-muted)">
+                    <span className="text-(--mp-body)">{post.author}</span>
                     <span aria-hidden="true">·</span>
                     <time dateTime={post.publishedAt}>{publishedLabel}</time>
                     <span aria-hidden="true">·</span>
@@ -156,17 +156,17 @@ export default function BlogIndexPage() {
       {/* CTA strip — soft pitch for the email digest, since blog readers
           are a high-intent surface. */}
       <section className="max-w-4xl mx-auto px-4 pb-20">
-        <div className="rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 p-8 md:p-10 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+        <div className="rounded-lg border border-(--mp-line) p-8 md:p-10 text-center bg-(--mp-wash)">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-3 font-(family-name:--mp-font-serif)">
             Want this kind of intel in your inbox?
           </h2>
-          <p className="text-slate-300 max-w-xl mx-auto mb-6">
+          <p className="text-(--mp-body) max-w-xl mx-auto mb-6">
             Mindy sends a daily briefing of federal opportunities matched to
             your NAICS codes — plus tactical playbooks like the ones above.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-3 bg-white hover:bg-slate-100 text-purple-700 font-bold rounded-xl shadow-lg transition-all hover:scale-105"
+            className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
             Start Free — No Credit Card
           </Link>
@@ -174,31 +174,31 @@ export default function BlogIndexPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800 py-8">
+      <footer className="border-t border-(--mp-line) py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
+            <div className="w-8 h-8 rounded-lg bg-(--mp-navy) flex items-center justify-center">
+              <span className="text-(--mp-surface) font-bold text-sm">M</span>
             </div>
-            <span className="text-white font-semibold">Mindy</span>
+            <span className="text-(--mp-ink) font-semibold">Mindy</span>
           </div>
-          <p className="text-slate-500 text-sm mb-2">
-            <Link href="/blog" className="text-slate-400 hover:text-white transition">
+          <p className="text-(--mp-muted) text-sm mb-2">
+            <Link href="/blog" className="text-(--mp-muted) hover:text-(--mp-ink) transition">
               Blog
             </Link>
             <span className="mx-3">·</span>
-            <Link href="/" className="text-slate-400 hover:text-white transition">
+            <Link href="/" className="text-(--mp-muted) hover:text-(--mp-ink) transition">
               Home
             </Link>
             <span className="mx-3">·</span>
             <a
               href="mailto:hello@getmindy.ai"
-              className="text-slate-400 hover:text-white transition"
+              className="text-(--mp-muted) hover:text-(--mp-ink) transition"
             >
               hello@getmindy.ai
             </a>
           </p>
-          <p className="text-slate-700 text-xs mt-2 italic">
+          <p className="text-(--mp-body) text-xs mt-2 italic">
             &quot;The big contractors have armies. You have Mindy.&quot;
           </p>
         </div>

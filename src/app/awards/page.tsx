@@ -89,50 +89,50 @@ export default async function AwardsLanding() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <MeetMindyStrip variant="banner" />
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
+      <MeetMindyStrip variant="banner" appearance="public" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
-        <Link href="/" className="hover:text-purple-400">Home</Link>
+      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">Awards</span>
+        <span className="text-(--mp-body)">Awards</span>
       </div>
 
       <section className="mx-auto max-w-6xl px-6 pt-6 pb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-navy)">
           Federal Contract Awards Database
         </p>
-        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight font-(family-name:--mp-font-serif)">
           63 Million Federal Contract Awards
         </h1>
-        <p className="mt-4 max-w-3xl text-lg text-slate-300">
+        <p className="mt-4 max-w-3xl text-lg text-(--mp-body)">
           Every federal contract award from USAspending.gov, FY2016–FY2026. Browse the latest activity, the
           largest single awards, and drill into the full detail for any individual contract.
         </p>
         <div className="mt-6 grid gap-3 sm:grid-cols-3 max-w-3xl">
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <div className="text-2xl font-bold text-purple-300">63M+</div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">Awards Indexed</div>
+          <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4">
+            <div className="text-2xl font-bold text-(--mp-navy)">63M+</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">Awards Indexed</div>
           </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <div className="text-2xl font-bold text-white">FY16–FY26</div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">10-Year Coverage</div>
+          <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4">
+            <div className="text-2xl font-bold text-(--mp-ink)">FY16–FY26</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">10-Year Coverage</div>
           </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <div className="text-2xl font-bold text-white">$10T+</div>
-            <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">Total Obligated</div>
+          <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4">
+            <div className="text-2xl font-bold text-(--mp-ink)">$10T+</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-(--mp-muted)">Total Obligated</div>
           </div>
         </div>
       </section>
 
       {/* Largest Awards (most ranking value) */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-1">Largest Federal Contract Awards</h2>
-        <p className="text-sm text-slate-400 mb-4">
+        <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Largest Federal Contract Awards</h2>
+        <p className="text-sm text-(--mp-muted) mb-4">
           Top 50 federal contract awards of all time by single-action obligation amount.
         </p>
         <AwardsTable rows={largest} />
@@ -140,8 +140,8 @@ export default async function AwardsLanding() {
 
       {/* Latest Awards */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-1">Latest Federal Contract Awards</h2>
-        <p className="text-sm text-slate-400 mb-4">
+        <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Latest Federal Contract Awards</h2>
+        <p className="text-sm text-(--mp-muted) mb-4">
           The 50 most recent dollar-bearing federal contract actions from USAspending.gov.
         </p>
         <AwardsTable rows={latest} />
@@ -149,37 +149,37 @@ export default async function AwardsLanding() {
 
       {/* Cross-link to other ways to slice the data */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-4">Other Ways to Browse</h2>
+        <h2 className="text-2xl font-bold mb-4 font-(family-name:--mp-font-serif)">Other Ways to Browse</h2>
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-          <Link href="/contractors" className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors">
-            <p className="text-sm font-medium text-slate-100">By Contractor</p>
-            <p className="mt-1 text-xs text-slate-500">290K+ contractor profiles</p>
+          <Link href="/contractors" className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors">
+            <p className="text-sm font-medium text-(--mp-ink)">By Contractor</p>
+            <p className="mt-1 text-xs text-(--mp-muted)">290K+ contractor profiles</p>
           </Link>
-          <Link href="/agencies" className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors">
-            <p className="text-sm font-medium text-slate-100">By Agency</p>
-            <p className="mt-1 text-xs text-slate-500">49 federal agencies</p>
+          <Link href="/agencies" className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors">
+            <p className="text-sm font-medium text-(--mp-ink)">By Agency</p>
+            <p className="mt-1 text-xs text-(--mp-muted)">49 federal agencies</p>
           </Link>
-          <Link href="/naics" className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors">
-            <p className="text-sm font-medium text-slate-100">By Industry (NAICS)</p>
-            <p className="mt-1 text-xs text-slate-500">Top 100 NAICS codes</p>
+          <Link href="/naics" className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors">
+            <p className="text-sm font-medium text-(--mp-ink)">By Industry (NAICS)</p>
+            <p className="mt-1 text-xs text-(--mp-muted)">Top 100 NAICS codes</p>
           </Link>
-          <Link href="/top" className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors">
-            <p className="text-sm font-medium text-slate-100">Top Contractor Lists</p>
-            <p className="mt-1 text-xs text-slate-500">Ranked lists by cohort</p>
+          <Link href="/top" className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-4 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors">
+            <p className="text-sm font-medium text-(--mp-ink)">Top Contractor Lists</p>
+            <p className="mt-1 text-xs text-(--mp-muted)">Ranked lists by cohort</p>
           </Link>
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-2xl font-bold">Get Alerts on New Awards Matching Your Profile</h2>
-          <p className="mt-3 max-w-2xl mx-auto text-slate-300">
+        <div className="rounded-lg border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">Get Alerts on New Awards Matching Your Profile</h2>
+          <p className="mt-3 max-w-2xl mx-auto text-(--mp-body)">
             Mindy scans every new federal contract award daily and surfaces the ones matching your NAICS codes,
             agencies, and capabilities. Zero scrolling SAM.gov.
           </p>
           <Link
             href="/signup"
-            className="mt-6 inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+            className="mt-6 inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
             Start Free
           </Link>
@@ -191,9 +191,9 @@ export default async function AwardsLanding() {
   // Shared table renderer (inline so it can access the page-local helpers)
   function AwardsTable({ rows }: { rows: typeof latest }) {
     return (
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+      <div className="overflow-x-auto rounded-lg border border-(--mp-line) bg-(--mp-surface)">
         <table className="w-full text-sm">
-          <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+          <thead className="bg-(--mp-wash) text-xs uppercase tracking-wider text-(--mp-muted)">
             <tr>
               <th className="text-left px-4 py-3">Date</th>
               <th className="text-left px-4 py-3">Recipient</th>
@@ -202,14 +202,14 @@ export default async function AwardsLanding() {
               <th className="text-right px-4 py-3">Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody className="divide-y divide-(--mp-line)">
             {rows.map((a) => (
-              <tr key={a.award_id} className="hover:bg-slate-800/40">
-                <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{fmtDate(a.action_date)}</td>
+              <tr key={a.award_id} className="hover:bg-(--mp-wash)">
+                <td className="px-4 py-3 text-(--mp-body) whitespace-nowrap">{fmtDate(a.action_date)}</td>
                 <td className="px-4 py-3 max-w-[16rem]">
                   <Link
                     href={`/contractors/${recipientSlug(a.recipient_name)}`}
-                    className="text-slate-200 hover:text-purple-400 truncate block"
+                    className="text-(--mp-ink) hover:text-(--mp-navy-hover) truncate block"
                   >
                     {fmtCompanyName(a.recipient_name)}
                   </Link>
@@ -219,16 +219,16 @@ export default async function AwardsLanding() {
                         ? `/contracts/${encodeURIComponent(a.piid)}`
                         : `/awards/${encodeURIComponent(a.award_id)}`
                     }
-                    className="text-xs text-slate-500 hover:text-purple-400"
+                    className="text-xs text-(--mp-muted) hover:text-(--mp-navy-hover)"
                   >
                     {a.piid || a.award_id.slice(0, 40)}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-slate-300 max-w-[12rem]">
+                <td className="px-4 py-3 text-(--mp-body) max-w-[12rem]">
                   <span className="truncate block">{a.awarding_agency || '—'}</span>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-400 hidden md:table-cell">{a.naics_code || '—'}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                <td className="px-4 py-3 font-(family-name:--mp-font-mono) text-xs text-(--mp-muted) hidden md:table-cell">{a.naics_code || '—'}</td>
+                <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) font-semibold text-(--mp-navy) whitespace-nowrap">
                   {fmtMoney(Number(a.obligation_amount))}
                 </td>
               </tr>
