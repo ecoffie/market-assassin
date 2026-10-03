@@ -5,30 +5,82 @@ production `/chatgpt/mcp` endpoint across all 15 tools (routing, latency, timeou
 commerce). **Measure only.** No tool-set changes, no latency optimisation, no reviewer account, no
 domain verification, no Plugin submission. Do not change routing on one result.
 
-## Setup (once)
+## Setup (once) — the real OAuth flow, no pre-seeded session
 
 - **Account:** `chatgpt-devmode-acceptance@getmindy.ai` — synthetic, no customer owns it, funded by
   `admin_grant` (does NOT reset the ChatGPT auto-recharge window; no card on file, so no payment is
   possible). Never use a real customer or `credit-integrity-acceptance@` (its live test drains it).
-- **Sign in as it (incognito window, so your own Mindy session is untouched):**
-  1. Open `https://getmindy.ai` in an incognito window, open DevTools → Console, paste the
-     localStorage snippet Claude puts in your clipboard (it holds a session token: treat as secret).
-  2. In the same incognito window, sign in to ChatGPT → Settings → Apps & Connectors → Advanced →
-     Developer mode ON → Create connector: URL `https://mcp.getmindy.ai/chatgpt/mcp`, auth OAuth.
-  3. The consent page must show the **ChatGPT** copy with **no free-credit promise**. Click Allow.
-  4. Confirm the connector lists **15** tools. Note the time (UTC): that is `--since`.
-- **Per prompt:** new chat, developer mode ON, Mindy connector enabled, web search left at default
-  (we want to see whether ChatGPT picks web or Mindy). Start a stopwatch at Send, stop when the answer
-  finishes streaming. Expand the tool-call panel to read the tool name + arguments.
+- **Login:** a password login was attached 2026-10-03 (Supabase auth user
+  `92e46b92-9834-44db-805e-19866bca9933`, email confirmed, `email` provider). The password was placed
+  in Eric's clipboard only — it is not in this repo, any doc, or any log. If it is lost, reset it with
+  the admin API; do not create a second account. Verified before/after: the only state change was the
+  auth identity plus the `user_profiles` row the `on_auth_user_created` trigger always inserts
+  (`tier='free'`, every paid `access_*` flag false; `access_daily_briefings=true` is the column
+  default, the free daily alerts — 2,871/2,876 free profiles carry it). Credit balance stayed 1,000,
+  the ledger still holds only the one `admin_grant` row, and no KV entitlement key exists. It is a
+  FREE account, so password sign-in mints a session with no email OTP (`MFA_ENFORCED_PAID` applies
+  to paid accounts only).
+- **Connect (incognito window, so your own Mindy session is untouched). Do NOT paste a session token
+  into DevTools — the point is to test the flow a real user gets:**
+  1. Sign in to chatgpt.com (a Plus/Pro/Business account) → Settings → **Security and login** →
+     Developer mode ON. Then open **ChatGPT Plugins** → **+** → create a developer-mode app:
+     URL `https://mcp.getmindy.ai/chatgpt/mcp`, authentication OAuth. (Path per OpenAI's
+     developer-mode guide, developers.openai.com/api/docs/guides/developer-mode, as of 2026-10-03;
+     the older "Apps & Connectors → Advanced" path is gone.)
+  2. ChatGPT opens Mindy's `/oauth/authorize`. Signed out, it shows "Sign in or create an account"
+     with **no free-credit promise** (ChatGPT resource). Open the sign-in link, sign in with the
+     synthetic email + the clipboard password. The consent tab picks up the session by itself.
+  3. The consent page must show the **ChatGPT** copy with **no free-credit promise**. Click **Allow**.
+     ChatGPT should show the connector as connected.
+  4. Confirm the connector lists **exactly 15** tools.
+- **Per prompt:** new chat, Mindy app enabled via the composer's **Developer mode** tool, web search left at default
+  (we want to see whether ChatGPT picks web or Mindy). **Never say "use Mindy"** unless a row says so.
+  Start a stopwatch at Send, stop when the answer finishes streaming. Expand the tool-call panel to
+  read the tool name + arguments.
 
-## What to record (one row per prompt)
+## ⏱ Record the UTC start — immediately before the first prompt
 
-| # | prompt | Mindy selected? | first tool | arguments | web before? | web after? | answer s (stopwatch) | result (from report) | accurate? | commerce wording? | finished before timeout? | notes |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+Run `date -u +%Y-%m-%dT%H:%M:%SZ` right before sending the first prompt (after connecting, not before)
+and write it here: `SINCE = ____________`. It is the `--since` for the server report, which isolates
+this session's calls by `mcp_call_log.channel='chatgpt'` + the synthetic email.
 
-"Tool execution latency" and grounded/degraded/refused/error come from the server report (below),
-matched by tool + time. "Accurate?" = does the answer state only what the tool returned (counts,
-names, dollars, dates) and keep its caveats; any invented figure = HOST_MISREPRESENTATION.
+## 🚦 Smoke gate — run FIRST, before spending the full budget (~50 credits)
+
+| # | check | prompt / action | pass condition |
+|---|---|---|---|
+| S0 | tool count | connector tool list | exactly 15 tools |
+| S1 | discovery without being told (A13) | What is the current status of the FY2027 NDAA? | ChatGPT selects `get_legislation_status` (record if web ran instead/also) |
+| S2 | latency risk (D1, verbatim) | We're a veteran-owned firm that provides cybersecurity assessments and FedRAMP readiness consulting. | `capability_market_match` completes before the ChatGPT host timeout |
+| S3 | incumbent (A4) | Who currently holds the contract that solicitation W5168W26RA015 (Fort Benning base operations) is replacing? | `get_solicitation_incumbent` |
+| S4 | FIND (A1) | Find open federal contracting opportunities for a commercial HVAC contractor in Arizona. | `find_opportunities` |
+| S5 | boundary (B4) | Who are my likely competitors for VA chiller replacement work (NAICS 238220)? | `find_capable_contractors` |
+| S6 | boundary (B5) | Tell me about Amentum's federal contracting footprint. | `get_contractor_profile` |
+
+**STOP — do not run the full worksheet — if either:**
+- `capability_market_match` hits the ChatGPT host timeout (spinner then "took too long", retry, or
+  ChatGPT gives up / falls back to web), **or**
+- ChatGPT repeatedly/systematically fails to discover Mindy (e.g. S1, S4 and S5/S6 all go to web or
+  no tool). One miss is a data point, not a stop.
+
+On a stop: run the server report (below) with the recorded `SINCE`, fill the results table for the
+smoke rows only, and report. Do not change routing or latency on these results.
+
+**If the smoke gate passes:** continue through the complete worksheet (A → B → C → D; skip rows the
+smoke gate already ran and reuse their results), then run the server report with the same `SINCE`.
+
+## Primary result table (one row per prompt — this IS the deliverable)
+
+| # | prompt | first host choice (Mindy / web / none / other) | Mindy tool | arguments | web before? | web after? | tool latency (server report) | outcome (server report) | answer fidelity | classification |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+- **tool latency / outcome** come from the server report (grounded / degraded / refused / error),
+  matched by tool + time. Also note the stopwatch end-to-end seconds and whether the answer finished
+  before the host timeout in **answer fidelity** or a notes line.
+- **answer fidelity** = does the answer state only what the tool returned (counts, names, dollars,
+  dates) and keep its caveats? Any invented figure or dropped material caveat → `HOST_MISREPRESENTATION`.
+  Note any commerce wording (prices, upgrade, buy credits) here too.
+- **classification** = `PASS` | `ROUTING_FAIL` | `TIMEOUT` | `TOOL_ERROR` | `HOST_MISREPRESENTATION`
+  (definitions in the Classification section).
 
 ## A. Direct test — one per tool (15)
 
@@ -114,8 +166,8 @@ with 1,000. Re-fund only by `admin_grant`.
 
 After the session (read-only):
 
-    npx tsx scripts/chatgpt-devmode-report.ts --email chatgpt-devmode-acceptance@getmindy.ai --since <connect time UTC>
-    npx tsx scripts/chatgpt-devmode-report.ts --email chatgpt-devmode-acceptance@getmindy.ai --since <…> --json > devmode-report.json
+    npx tsx scripts/chatgpt-devmode-report.ts --email chatgpt-devmode-acceptance@getmindy.ai --since <SINCE>
+    npx tsx scripts/chatgpt-devmode-report.ts --email chatgpt-devmode-acceptance@getmindy.ai --since <SINCE> --json > devmode-report.json
 
 It prints per-tool n / p50 / p90 / max server latency, >45 s / >60 s counts, outcomes, the ledger
 split (ChatGPT vs other debits), and the commerce invariants (paywall attempts, signup grants,
