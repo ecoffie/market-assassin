@@ -101,7 +101,6 @@ async function generateReminderEmail(email: string): Promise<{ subject: string; 
       <ul style="color: #15803d; margin: 0; padding-left: 20px;">
         <li><strong>Daily Opportunity Alerts</strong> - Live SAM.gov opportunities in YOUR NAICS codes</li>
         <li><strong>Daily Market Intelligence</strong> - Recompete analysis, competitor wins, teaming leads</li>
-        <li><strong>Weekly Pursuit Brief</strong> - Full capture strategy for your TOP opportunity</li>
         <li><strong>Weekly Deep Dive</strong> - Comprehensive market analysis report</li>
       </ul>
     </div>
@@ -149,7 +148,6 @@ You're enrolled in our FREE Daily Alerts and Market Intelligence system, but you
 WHAT YOU'LL GET (FREE):
 - Daily Opportunity Alerts - Live SAM.gov opportunities in YOUR NAICS codes
 - Daily Market Intelligence - Recompete analysis, competitor wins, teaming leads
-- Weekly Pursuit Brief - Full capture strategy for your TOP opportunity
 - Weekly Deep Dive - Comprehensive market analysis report
 
 SET YOUR NAICS CODES NOW:

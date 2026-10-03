@@ -39,7 +39,8 @@ const ROWS: Array<{ job_name: string; route: string; cron_expr: string; timeout_
   { job_name: 'manage-briefing-rollout', route: '/api/cron/manage-briefing-rollout', cron_expr: '0 12 * * *', timeout_ms: 60000, notes: 'Daily briefing rollout cohort management. Migrated 2026-06-19.' },
   { job_name: 'precompute-briefings', route: '/api/cron/precompute-briefings', cron_expr: '0 2 * * *', timeout_ms: 120000, notes: 'Daily briefing precompute (was 02:00-04:00 window; resumable via templatesRemaining). Migrated 2026-06-19.' },
   { job_name: 'precompute-weekly-briefings', route: '/api/cron/precompute-weekly-briefings', cron_expr: '0 20 * * 4', timeout_ms: 120000, notes: 'Thu weekly precompute (was 20:00-22:00 window; resumable). Migrated 2026-06-19.' },
-  { job_name: 'precompute-pursuit-briefs', route: '/api/cron/precompute-pursuit-briefs', cron_expr: '0 20 * * 5', timeout_ms: 120000, notes: 'Fri pursuit precompute (was 20:00-22:00 window; resumable). Migrated 2026-06-19.' },
+  // 2026-09-28: 'precompute-pursuit-briefs' entry REMOVED — Pursuit Brief was retired
+  // (product decision) and the route deleted. Re-running this one-off must not recreate it.
   { job_name: 'refresh-contracts', route: '/api/cron/refresh-contracts', cron_expr: '0 23 * * 0', timeout_ms: 120000, notes: 'Sun contracts refresh. Migrated 2026-06-19.' },
   { job_name: 'sam-sync-watchdog', route: '/api/cron/sam-sync-watchdog', cron_expr: '0 15 * * *', timeout_ms: 60000, notes: 'Daily SAM sync watchdog. Migrated 2026-06-19.' },
   { job_name: 'snapshot-multisite-darpa', route: '/api/cron/snapshot-multisite?source=darpa_baa', cron_expr: '0 5 * * *', timeout_ms: 120000, notes: 'DARPA BAA multisite snapshot. Migrated 2026-06-19.' },

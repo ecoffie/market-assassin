@@ -32,11 +32,4 @@ export type {
   WeeklyCalendarItem,
 } from './weekly-briefing-generator';
 
-// Pursuit Brief: 1-page deep dive on single opportunity
-export { generatePursuitBrief } from './pursuit-brief-generator';
-export type {
-  PursuitBrief,
-  PursuitOutreachTarget,
-  PursuitActionItem,
-  PursuitRisk,
-} from './pursuit-brief-generator';
+// Pursuit Brief generator removed 2026-09-28 (product retired, no replacement).

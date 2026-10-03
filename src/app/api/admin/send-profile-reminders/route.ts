@@ -373,7 +373,6 @@ function generateProfileReminderEmail(email: string, setupUrl: string): string {
                 <ul style="margin: 0; padding: 0 0 0 20px; color: #4b5563; font-size: 14px; line-height: 1.8;">
                   <li>Daily opportunities matched to your NAICS codes</li>
                   <li>Weekly deep dive analysis on expiring contracts</li>
-                  <li>Pursuit briefs for high-value targets</li>
                   <li>Win probability scoring on every opportunity</li>
                 </ul>
               </div>

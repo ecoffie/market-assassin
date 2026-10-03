@@ -49,9 +49,10 @@ export const MINDY_PREFERENCES_URL = `${MINDY_SITE_URL}/alerts/preferences`;
  *
  * Every sibling link already did this correctly — preferencesUrl, unsubscribeUrl and
  * the add-to-pipeline actions all carry ?email=. Only the dashboard CTA did not, in
- * SIX separate senders (daily-alerts, weekly-alerts, send-weekly-fast,
- * send-pursuit-fast, pursuit-brief, weekly-deep-dive). Fixing it here rather than at
- * each call site is what stops the seventh sender reintroducing it.
+ * SIX separate senders (daily-alerts, weekly-alerts, send-weekly-fast, weekly-deep-dive,
+ * plus two pursuit-brief senders deleted 2026-09-28 when Pursuit Brief was retired).
+ * Fixing it here rather than at each call site is what stops the next sender
+ * reintroducing it.
  *
  * The destination reads ?email= to identify the recipient without a login round-trip.
  *
