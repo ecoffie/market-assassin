@@ -64,4 +64,11 @@ describe('raw-HTML public shell', () => {
     expect(head).not.toMatch(/googleapis|gstatic/);
     expect(head).toContain('rel="preload"');
   });
+
+  it('drops the shared chrome when printed, on React and raw-HTML pages alike', () => {
+    const rule = '@media print{.mp-site [data-mp-chrome]{display:none!important}';
+    expect(MP_COMPONENTS_CSS).toContain(rule);
+    expect(MP_SITE_CSS).toContain(rule);
+    expect(MP_RAW_SITE_CSS).toContain(rule);
+  });
 });

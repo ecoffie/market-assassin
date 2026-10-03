@@ -192,6 +192,11 @@ export const MP_COMPONENTS_CSS = [
   '.mp-code code{font:inherit}',
   '.mp-code{font:400 13px/1.6 var(--mp-font-mono);background:var(--mp-wash);border:1px solid var(--mp-hair);color:var(--mp-ink);padding:16px 18px;overflow-x:auto;margin:0}',
   ':not(pre)>code.mp-code-inline{font:400 .9em var(--mp-font-mono);background:var(--mp-wash);border:1px solid var(--mp-hair);border-radius:var(--mp-radius-chip);padding:1px 5px}',
+
+  // Print: a printed public page is the document, not the site. Everything marked as shared
+  // chrome (skip link, header, footer) is dropped, and the sticky header cannot repeat on every
+  // page. Family stylesheets (papers, the Observatory report) add their own print rules on top.
+  '@media print{.mp-site [data-mp-chrome]{display:none!important}.mp-site{min-height:0}}',
 ].join('');
 
 /** Everything a React public page needs, scoped to `.mp-site`. Font faces exclude Inter (see fonts.ts). */
