@@ -1307,6 +1307,8 @@ the instance:** a populated stale source beside a live one always wins.
 **Purpose:** Personalized GovCon intel emails with win probability scoring
 **Features:** Smart profiles, engagement tracking, shared cohort rollout across all 3 briefing types
 
+> ⛔ **Pursuit Brief RETIRED 2026-09-28** (product decision, no replacement, no remediation). Sales copy + the save-path auto-request were removed (#1791); the generator, `precompute-pursuit-briefs` / `send-pursuit-fast` / `cron/pursuit-brief` crons, the orphan `api/opportunities/pursuit-brief` endpoint and the watchdog's pursuit checks were deleted in the follow-up dead-code PR. Historical pursuit briefs in `briefing_log` still DISPLAY (briefings page, DashboardPanel, `api/briefings/latest`). Pursuit references below are history — do not rebuild them.
+
 **Enterprise Pre-computation Architecture (April 9, 2026):**
 Instead of generating 928 individual briefings per type, we pre-compute 49 templates (one per unique NAICS profile) for ALL 3 briefing types.
 

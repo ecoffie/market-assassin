@@ -4,8 +4,8 @@
  * Tests the complete Market Intel flow:
  * 1. Daily Alerts - SAM.gov opportunities
  * 2. Daily Briefs - Recompete/Market intel
- * 3. Weekly Pursuit Brief - Capture strategy
- * 4. Weekly Deep Dive - Comprehensive analysis
+ * 3. Weekly Deep Dive - Comprehensive analysis
+ * (Weekly Pursuit Brief was retired 2026-09-28 — removed from this check.)
  *
  * Usage:
  * GET ?password=xxx - Full pipeline status report
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       usage: {
         status: 'GET ?password=xxx - Full pipeline report',
         testUser: 'GET ?password=xxx&email=xxx - Test specific user',
-        sendTest: 'POST ?password=xxx&email=xxx&component=alerts|briefs|pursuit|deepdive',
+        sendTest: 'POST ?password=xxx&email=xxx&component=alerts|briefs|deepdive',
       }
     }, { status: 401 });
   }
@@ -73,11 +73,7 @@ export async function GET(request: NextRequest) {
   const briefsStatus = await checkBriefsStatus(supabase);
   pipeline.push(briefsStatus);
 
-  // 3. Pursuit Brief Status
-  const pursuitStatus = await checkPursuitStatus(supabase);
-  pipeline.push(pursuitStatus);
-
-  // 4. Weekly Deep Dive Status
+  // 3. Weekly Deep Dive Status
   const deepDiveStatus = await checkDeepDiveStatus(supabase);
   pipeline.push(deepDiveStatus);
 
@@ -212,34 +208,6 @@ async function checkBriefsStatus(supabase: ReturnType<typeof getSupabase>): Prom
   };
 }
 
-async function checkPursuitStatus(supabase: ReturnType<typeof getSupabase>): Promise<PipelineStatus> {
-  const { count: eligibleCount } = await supabase
-    .from('user_notification_settings')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
-    .eq('briefings_enabled', true);
-
-  // Check recent pursuit briefs (weekly - last 7 days)
-  // Pursuit briefs are now stored in briefing_log with briefing_type='pursuit'
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-
-  const { count: recentCount } = await supabase
-    .from('briefing_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('briefing_type', 'pursuit')
-    .gte('created_at', weekAgo.toISOString());
-
-  return {
-    component: 'Weekly Pursuit Brief',
-    status: 'healthy', // Weekly, so harder to check
-    usersEligible: eligibleCount || 0,
-    usersWithNaics: 0, // Not tracked separately
-    usersWithFallback: 0,
-    recentDeliveries: recentCount || 0,
-  };
-}
-
 async function checkDeepDiveStatus(supabase: ReturnType<typeof getSupabase>): Promise<PipelineStatus> {
   const { count: eligibleCount } = await supabase
     .from('user_notification_settings')
@@ -294,9 +262,6 @@ async function testUserEligibility(supabase: ReturnType<typeof getSupabase>, ema
       eligible: notifSettings?.is_active && notifSettings?.briefings_enabled,
       hasNaics: Array.isArray(notifSettings?.naics_codes) && notifSettings.naics_codes.length > 0,
       willUseFallback: !(notifSettings?.naics_codes?.length > 0),
-    },
-    pursuitBrief: {
-      eligible: notifSettings?.is_active && notifSettings?.briefings_enabled,
     },
     weeklyDeepDive: {
       eligible: notifSettings?.is_active && notifSettings?.briefings_enabled,
@@ -358,9 +323,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'email parameter required' }, { status: 400 });
   }
 
-  if (!component || !['alerts', 'briefs', 'pursuit', 'deepdive'].includes(component)) {
+  if (!component || !['alerts', 'briefs', 'deepdive'].includes(component)) {
     return NextResponse.json({
-      error: 'component must be one of: alerts, briefs, pursuit, deepdive'
+      error: 'component must be one of: alerts, briefs, deepdive'
     }, { status: 400 });
   }
 
@@ -374,9 +339,6 @@ export async function POST(request: NextRequest) {
       break;
     case 'briefs':
       testUrl = `${baseUrl}/api/cron/send-briefings?email=${email}&test=true`;
-      break;
-    case 'pursuit':
-      testUrl = `${baseUrl}/api/admin/test-pursuit-brief?password=${ADMIN_PASSWORD}&email=${email}`;
       break;
     case 'deepdive':
       testUrl = `${baseUrl}/api/cron/weekly-deep-dive?email=${email}&test=true`;

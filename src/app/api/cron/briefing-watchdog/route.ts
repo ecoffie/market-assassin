@@ -13,7 +13,11 @@ import { sendOpsAlert } from '@/lib/ops-alert';
  * 5. Alert on critical failures
  *
  * Schedule: 9 AM, 9:30 AM daily (after send windows)
- *           Plus Friday checks after weekly and Saturday checks after pursuit
+ *           Plus Friday checks after weekly
+ *
+ * Pursuit Brief was retired 2026-09-28 (product decision, no replacement); its
+ * precompute/send crons were deleted, so 'pursuit' is no longer checked, healed
+ * or retried here.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,7 +85,6 @@ export async function GET(request: NextRequest) {
     // Determine which briefing types to check based on day
     const briefingTypes: string[] = ['daily'];
     if (dayOfWeek === 5) briefingTypes.push('weekly');  // Friday
-    if (dayOfWeek === 6) briefingTypes.push('pursuit'); // Saturday
 
     // 1. Process retry queue FIRST. The per-briefing-type health checks below
     // are DB-heavy and can eat the whole function budget; when they did, this
@@ -282,13 +285,6 @@ function getTemplateDateForBriefingType(briefingType: string, date: string): str
   const base = new Date(`${date}T00:00:00Z`);
   const dayOfWeek = base.getUTCDay();
 
-  if (briefingType === 'pursuit') {
-    const saturday = new Date(base);
-    const daysToSaturday = dayOfWeek === 6 ? 0 : (6 - dayOfWeek + 7) % 7;
-    saturday.setUTCDate(saturday.getUTCDate() + daysToSaturday);
-    return saturday.toISOString().split('T')[0];
-  }
-
   const monday = new Date(base);
   const daysToMonday = dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   monday.setUTCDate(monday.getUTCDate() + daysToMonday);
@@ -339,6 +335,17 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
     return false;
   }
 
+  // Pursuit Brief was retired 2026-09-28 and its send route deleted. Any
+  // 'pursuit' dead-letter row older than MAX_RETRY_AGE_DAYS is retired by the
+  // stale branch above (all 27 existing rows were already 'exhausted'); a fresh
+  // one cannot be created because nothing sends pursuit briefs any more. If one
+  // somehow appears, leave the row untouched (no extra DB write) and never call
+  // a route that no longer exists.
+  if (retry.briefing_type === 'pursuit') {
+    console.log(`[Watchdog] Skipping retired pursuit retry for ${retry.user_email}`);
+    return false;
+  }
+
   console.log(`[Watchdog] Retrying ${retry.briefing_type} for ${retry.user_email} (attempt ${retry.retry_count + 1})`);
 
   // Mark as retrying
@@ -351,9 +358,7 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
     // Call the appropriate send endpoint with single user
     const endpoint = retry.briefing_type === 'weekly'
       ? 'send-weekly-fast'
-      : retry.briefing_type === 'pursuit'
-        ? 'send-pursuit-fast'
-        : 'send-briefings-fast';
+      : 'send-briefings-fast';
 
     const response = await fetch(
       `${BASE_URL}/api/cron/${endpoint}?test=true&email=${encodeURIComponent(retry.user_email)}&force=true`,
@@ -412,9 +417,7 @@ async function selfHealPrecompute(briefingType: string): Promise<boolean> {
   try {
     const endpoint = briefingType === 'weekly'
       ? 'precompute-weekly-briefings'
-      : briefingType === 'pursuit'
-        ? 'precompute-pursuit-briefs'
-        : 'precompute-briefings';
+      : 'precompute-briefings';
 
     const response = await fetch(`${BASE_URL}/api/cron/${endpoint}?test=true`, {
       method: 'GET',
