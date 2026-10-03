@@ -22,15 +22,18 @@ domain verification, no Plugin submission. Do not change routing on one result.
   to paid accounts only).
 - **Connect (incognito window, so your own Mindy session is untouched). Do NOT paste a session token
   into DevTools — the point is to test the flow a real user gets:**
-  1. Sign in to ChatGPT → Settings → Apps & Connectors → Advanced → Developer mode ON → Create
-     connector: URL `https://mcp.getmindy.ai/chatgpt/mcp`, auth OAuth.
+  1. Sign in to chatgpt.com (a Plus/Pro/Business account) → Settings → **Security and login** →
+     Developer mode ON. Then open **ChatGPT Plugins** → **+** → create a developer-mode app:
+     URL `https://mcp.getmindy.ai/chatgpt/mcp`, authentication OAuth. (Path per OpenAI's
+     developer-mode guide, developers.openai.com/api/docs/guides/developer-mode, as of 2026-10-03;
+     the older "Apps & Connectors → Advanced" path is gone.)
   2. ChatGPT opens Mindy's `/oauth/authorize`. Signed out, it shows "Sign in or create an account"
      with **no free-credit promise** (ChatGPT resource). Open the sign-in link, sign in with the
      synthetic email + the clipboard password. The consent tab picks up the session by itself.
   3. The consent page must show the **ChatGPT** copy with **no free-credit promise**. Click **Allow**.
      ChatGPT should show the connector as connected.
   4. Confirm the connector lists **exactly 15** tools.
-- **Per prompt:** new chat, developer mode ON, Mindy connector enabled, web search left at default
+- **Per prompt:** new chat, Mindy app enabled via the composer's **Developer mode** tool, web search left at default
   (we want to see whether ChatGPT picks web or Mindy). **Never say "use Mindy"** unless a row says so.
   Start a stopwatch at Send, stop when the answer finishes streaming. Expand the tool-call panel to
   read the tool name + arguments.
