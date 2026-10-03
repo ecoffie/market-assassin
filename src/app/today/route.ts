@@ -42,6 +42,8 @@ import { estMoneyServer } from '@/lib/opportunities/map-data';
 import { getMarketTiles } from '@/lib/today/markets';
 import type { MarketTile } from '@/lib/today/markets';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../opportunity-map/account-menu';
+import { MP_ACCOUNT_OVERRIDES_CSS, MP_ROOT_PAINT_CSS, mpA11yCss, mpTokenDeclarations } from '@/lib/public-site/css';
+import { mpFontFaceCss, mpFontPreloadLinksHtml } from '@/lib/public-site/fonts';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -186,6 +188,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
 <meta name="twitter:title" content="Today's Intel — what changed in federal contracting today">
 <meta name="twitter:description" content="What was posted today, which contracts are entering recompete, and which markets are moving.">
 <meta name="twitter:image" content="https://getmindy.ai/opengraph-image">
+${mpFontPreloadLinksHtml({ includeInter: true })}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://getmindy.ai/today","url":"https://getmindy.ai/today","name":"Today's Intel — what changed in federal contracting today","description":"The daily front page of public procurement: new opportunities posted today, contracts entering recompete, upcoming industry events, and which markets are moving.","isPartOf":{"@type":"WebSite","@id":"https://getmindy.ai/#website","name":"Mindy","url":"https://getmindy.ai"},"publisher":{"@id":"https://getmindy.ai/#organization"},"dateModified":"${new Date().toISOString()}"}</script>
 <style>
   /* THREE VOICES, each with a job (the editorial pass, Eric 2026-08-15):
@@ -196,19 +199,23 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
        Inter — chrome and labels ONLY.
        IBM Plex Mono, tabular — every dollar figure. These are LEDGER numbers; Bloomberg sets
          prices fixed-width so columns align. */
-  @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  ${mpFontFaceCss({ includeInter: true })}
   /* Palette from the SUBJECT's own materials — government bond paper, seal blue (GSA/DoD, not a
      SaaS blue), oxblood for urgency (a date-stamp red). Neutrals biased warm so nothing reads as
-     default grey. Kept --jan/--line/--wash etc. as aliases so the shared chrome CSS still resolves. */
-  :root{--ink:#12100E;--sub:#7A7266;--faint:#9a9384;--line:#DCD8CF;--hair:#EDEAE3;--wash:#F3F0E9;
-        --paper:#FBFAF7;--body:#3A352E;--seal:#1B3A6B;--stamp:#8C2F1E;
-        --blue:#1B3A6B;--jan:#1B3A6B;--green:#22a06b;--red:#8C2F1E}
+     default grey. The values are the public-site tokens (src/lib/public-site/tokens.ts); the
+     short names are aliases so this page and the shared account chrome still resolve.
+     --sub and --faint take the AA-corrected secondary and tertiary text colours. */
+  :root{${mpTokenDeclarations()};
+        --ink:var(--mp-ink);--sub:var(--mp-muted);--faint:var(--mp-subtle);--line:var(--mp-line);
+        --hair:var(--mp-hair);--wash:var(--mp-wash);--paper:var(--mp-paper);--body:var(--mp-body);
+        --seal:var(--mp-navy);--stamp:var(--mp-accent);--jan:var(--mp-navy)}
+  ${MP_ROOT_PAINT_CSS}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
   /* ── App chrome: top nav + left rail. VERBATIM from opportunity-map ZHEAD/ZRAIL so a visitor
        crossing between /today and the map cannot perceive a boundary. ── */
-  .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:40}
+  .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:var(--mp-surface);z-index:40}
   .zh-left,.zh-right{display:flex;align-items:center;gap:22px}
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
@@ -234,9 +241,9 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
 
   @media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}
   .zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);
-    background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
+    background:var(--mp-surface);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
   .zrail a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}
-  .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}
+  .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:var(--mp-navy-wash)}
   /* ⚠️ EVERY chrome SVG needs an explicit size. Without it they expand to fill the flex parent —
      measured 445x445 black shapes over the hero. The map's own stylesheet has this rule; /today's
      copy had dropped it. */
@@ -254,7 +261,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
     .zrail{position:fixed;left:0;right:0;top:auto;bottom:0;width:100%;height:auto;
       flex-direction:row;justify-content:space-around;align-items:center;gap:0;
       padding:6px 4px calc(6px + env(safe-area-inset-bottom));
-      border-right:0;border-top:1px solid var(--line);background:#fff;z-index:60}
+      border-right:0;border-top:1px solid var(--line);background:var(--mp-surface);z-index:60}
     .zrail a{width:auto;flex:1 1 0;min-height:44px;padding:4px 2px;font-size:10px}
     .zrail a span{font-size:10px}
   }
@@ -306,11 +313,11 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   /* Search lives INSIDE the map, once you've decided to explore — never in the headline block. */
   .tsearch{display:none}
   /* Sits ABOVE the map's zoom controls + attribution strip (see the .mcount note). */
-  .tcta{position:absolute;right:28px;bottom:74px;background:var(--seal);color:#fff;text-decoration:none;
+  .tcta{position:absolute;right:28px;bottom:74px;background:var(--seal);color:var(--mp-surface);text-decoration:none;
     padding:14px 26px;font:600 14px Inter,system-ui,sans-serif;box-shadow:0 8px 26px rgba(18,16,14,.30)}
-  .tcta:hover{background:#12294D}
+  .tcta:hover{background:var(--mp-navy-hover)}
   /* LIVE badge + activity count — the map states what it is showing, so it can't read as empty. */
-  .mlive{position:absolute;left:24px;top:20px;display:inline-flex;align-items:center;gap:7px;background:#fff;
+  .mlive{position:absolute;left:24px;top:20px;display:inline-flex;align-items:center;gap:7px;background:var(--mp-surface);
     border:1px solid var(--line);padding:7px 13px;font:700 9px Inter,system-ui,sans-serif;letter-spacing:.16em;
     text-transform:uppercase;color:var(--stamp);box-shadow:0 2px 10px rgba(18,16,14,.10)}
   .mlive::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--stamp);animation:pulse 2.6s ease-in-out infinite}
@@ -323,7 +330,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
      so the map could not be zoomed from the front page. Caught by screenshot; nothing in the
      DOM can detect it, because the collision is with content inside a cross-origin iframe.
      The count moves up beside the LIVE badge; the CTA lifts clear of the controls. */
-  .mcount{position:absolute;left:24px;top:20px;transform:translateX(80px);background:#fff;
+  .mcount{position:absolute;left:24px;top:20px;transform:translateX(80px);background:var(--mp-surface);
     border:1px solid var(--line);padding:7px 13px;
     font:400 12px Inter,system-ui,sans-serif;color:var(--body);box-shadow:0 2px 10px rgba(18,16,14,.10)}
   .mcount b{font:600 12px "IBM Plex Mono",monospace;color:var(--ink);font-variant-numeric:tabular-nums}
@@ -337,7 +344,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   /* ── CHAPTER 2 — the cards. ── */
   .tcards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
   @media(max-width:900px){.tcards{grid-template-columns:1fr}}
-  .tcard{display:block;border:0;padding:30px 28px 26px;text-decoration:none;color:inherit;background:#fff;transition:background .15s}
+  .tcard{display:block;border:0;padding:30px 28px 26px;text-decoration:none;color:inherit;background:var(--mp-surface);transition:background .15s}
   .tcard:hover{background:var(--wash)}
   .tc-val{font:600 3.1rem/.95 "IBM Plex Mono",monospace;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
   .tc-range{font:500 .82rem/1 Inter,system-ui,sans-serif;color:var(--faint);margin-left:9px;letter-spacing:0}
@@ -346,13 +353,13 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .tc-title{font:700 1.08rem/1.36 "Libre Baskerville",Georgia,serif;margin-top:8px;color:var(--ink)}
   .tc-meta{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
   .tc-days{font:600 12px Inter,system-ui,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
-  .tc-days.soon{color:#b54708;background:#fffaeb;border-color:#fedf89}
+  .tc-days.soon{color:var(--mp-warn);background:var(--mp-warn-bg);border-color:var(--mp-warn-line)}
   .tc-place{display:inline-flex;align-items:center;gap:5px;font:400 12px Inter,system-ui,sans-serif;color:var(--sub)}
   .tc-place svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2}
   .tc-chips{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   .tc-dna{font:600 11px Inter,system-ui,sans-serif;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub);border:1px solid var(--line)}
-  .tc-dna.good{background:#ecfdf3;color:#027a48;border-color:#abefc6}
-  .tc-dna.warn{background:#fffaeb;color:#b54708;border-color:#fedf89}
+  .tc-dna.good{background:var(--mp-ok-bg);color:var(--mp-ok);border-color:var(--mp-ok-line)}
+  .tc-dna.warn{background:var(--mp-warn-bg);color:var(--mp-warn);border-color:var(--mp-warn-line)}
   /* ── CHAPTER 3 — the market. BORDERLESS: outlined KPI boxes are dashboard UI, not editorial. ── */
   .tlenshint{display:block;margin-top:10px;font:500 13px/1.4 var(--sans);color:var(--muted)}
   .tstats{display:grid;grid-template-columns:repeat(4,1fr)}
@@ -372,12 +379,12 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
      number is still the headline; the delta is the pulse. Colour carries direction, but
      the sign (+/-) carries it too, so it never depends on colour alone. */
   .tstat-d{font:600 .82rem/1 "IBM Plex Mono",monospace;letter-spacing:-.01em;margin-left:.5rem;vertical-align:.55em}
-  .tstat-d-up{color:#15803d}
-  .tstat-d-down{color:#b91c1c}
+  .tstat-d-up{color:var(--mp-up)}
+  .tstat-d-down{color:var(--mp-crit)}
   .tstat-d-flat{color:var(--muted)}
   .tstat-l{font:400 13px/1.4 Inter,system-ui,sans-serif;color:var(--sub);margin-top:9px}
   .tfoot{border-top:1px solid var(--line);margin-top:72px;padding:26px 0;text-align:center;font:400 12px Inter,system-ui,sans-serif;color:var(--faint)}
-  .tfoot .warn{display:block;margin-top:5px;color:#b54708}
+  .tfoot .warn{display:block;margin-top:5px;color:var(--mp-warn)}
 
   /* ── SITE FOOTER — the crawl entry point into the public content surface. ─────────────
      Added 2026-09-21. When the homepage cut over from /mindy-landing to /today (#1315) the
@@ -406,7 +413,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .mkts{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
   @media(max-width:900px){.mkts{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:560px){.mkts{grid-template-columns:1fr}}
-  .mkt{display:flex;flex-direction:column;justify-content:space-between;gap:16px;background:#fff;padding:26px 24px;
+  .mkt{display:flex;flex-direction:column;justify-content:space-between;gap:16px;background:var(--mp-surface);padding:26px 24px;
     text-decoration:none;color:inherit;transition:background .15s}
   .mkt:hover{background:var(--wash)}
   .mkt-n{font:700 1.05rem/1.3 "Libre Baskerville",Georgia,serif;color:var(--ink)}
@@ -417,7 +424,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .mkt-go{font:600 12px Inter,system-ui,sans-serif;color:var(--jan)}
 
   /* Momentum rows — work, not cards. The next action dominates; the title is context. */
-  .ymrow{display:flex;align-items:baseline;gap:16px;padding:15px 0;border-bottom:1px solid var(--hair,#eceff3);
+  .ymrow{display:flex;align-items:baseline;gap:16px;padding:15px 0;border-bottom:1px solid var(--hair);
     text-decoration:none;color:inherit}
   .ymrow:last-child{border-bottom:0}
   .ymrow:hover .ymt{color:var(--seal)}
@@ -429,7 +436,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .ymwhen{font:500 12px Inter,system-ui,sans-serif;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
   .ymdue{font:600 12px Inter,system-ui,sans-serif;white-space:nowrap;border-radius:6px;padding:3px 8px;
     background:var(--wash);border:1px solid var(--line);color:var(--sub)}
-  .ymdue.soon{color:#b54708;background:#fffaeb;border-color:#fedf89}
+  .ymdue.soon{color:var(--mp-warn);background:var(--mp-warn-bg);border-color:var(--mp-warn-line)}
   .ymdue.past{color:var(--faint);background:transparent;border-color:transparent}
   .ymcols{display:grid;grid-template-columns:1fr 1fr;gap:0 48px}
   @media(max-width:860px){.ymcols{grid-template-columns:1fr;gap:0}}
@@ -443,10 +450,12 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
     align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
   .rec-t{font:700 1.15rem/1.4 "Libre Baskerville",Georgia,serif;color:var(--ink)}
   .rec-s{font:400 .92rem/1.5 Inter,system-ui,sans-serif;color:var(--sub);margin-top:6px;max-width:52ch}
-  .rec-b{background:var(--seal);color:#fff;text-decoration:none;padding:12px 22px;
+  .rec-b{background:var(--seal);color:var(--mp-surface);text-decoration:none;padding:12px 22px;
     font:600 13px Inter,system-ui,sans-serif;white-space:nowrap}
-  .rec-b:hover{background:#12294D}
+  .rec-b:hover{background:var(--mp-navy-hover)}
   ${ACCOUNT_MENU_CSS}
+  ${MP_ACCOUNT_OVERRIDES_CSS}
+  ${mpA11yCss('')}
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
