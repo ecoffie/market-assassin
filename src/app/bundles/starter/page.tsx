@@ -6,9 +6,6 @@ export default function StarterBundlePage() {
       title="GovCon Starter Bundle"
       tagline="Everything you need to start winning federal contracts"
       description="The perfect foundation for new government contractors. Get the essential tools to find opportunities, track expiring contracts, and connect with prime contractors—all at one unbeatable price."
-      primaryColor="#10b981"
-      gradientFrom="#10b981"
-      gradientTo="#14b8a6"
       price={697}
       originalPrice={943}
       checkoutUrl="/pricing"

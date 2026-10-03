@@ -41,19 +41,19 @@ export default function TopHubPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
-        <Link href="/" className="hover:text-purple-400">Home</Link>
+      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">Top Lists</span>
+        <span className="text-(--mp-body)">Top Lists</span>
       </div>
 
       <section className="mx-auto max-w-6xl px-6 pt-6 pb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">Rankings</p>
-        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">Top Federal Contractor Lists</h1>
-        <p className="mt-4 max-w-3xl text-lg text-slate-300">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-accent)">Rankings</p>
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight font-(family-name:--mp-font-serif)">Top Federal Contractor Lists</h1>
+        <p className="mt-4 max-w-3xl text-lg text-(--mp-body)">
           The largest federal contractors ranked by total obligated dollars, sliced by agency, NAICS, and SBA
           set-aside cohort. All lists pull live from USAspending.gov (FY2016–FY2026).
         </p>
@@ -61,17 +61,17 @@ export default function TopHubPage() {
 
       {/* Featured rankings (agency / NAICS / set-aside / branch) */}
       <section className="mx-auto max-w-6xl px-6 pb-12">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">By Sector</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-muted) mb-4">By Sector</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {LISTICLES.filter((l) => l.kind !== 'state').map((l) => (
             <Link
               key={l.slug}
               href={`/top/${l.slug}`}
-              className="block rounded-xl border border-slate-800 bg-slate-900 p-6 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+              className="block rounded-none border border-(--mp-line) bg-(--mp-surface) p-6 hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors"
             >
-              <h3 className="text-lg font-bold text-white">{l.title}</h3>
-              <p className="mt-2 text-sm text-slate-400">{l.description}</p>
-              <p className="mt-3 text-xs uppercase tracking-wider text-purple-300">
+              <h3 className="text-lg font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">{l.title}</h3>
+              <p className="mt-2 text-sm text-(--mp-muted)">{l.description}</p>
+              <p className="mt-3 text-xs uppercase tracking-wider text-(--mp-navy)">
                 View ranking →
               </p>
             </Link>
@@ -81,8 +81,8 @@ export default function TopHubPage() {
 
       {/* State rankings — 51 entries, dense grid */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">By State</h2>
-        <p className="text-sm text-slate-400 mb-4">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-muted) mb-4">By State</h2>
+        <p className="text-sm text-(--mp-muted) mb-4">
           The 50 largest federal contractors headquartered in each U.S. state plus DC.
         </p>
         <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -90,7 +90,7 @@ export default function TopHubPage() {
             <Link
               key={l.slug}
               href={`/top/${l.slug}`}
-              className="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+              className="block rounded-none border border-(--mp-line) bg-(--mp-surface) px-3 py-2.5 text-sm text-(--mp-ink) hover:border-(--mp-navy) hover:bg-(--mp-wash) transition-colors"
             >
               {l.shortTitle.replace('Top Contractors in ', '')}
             </Link>

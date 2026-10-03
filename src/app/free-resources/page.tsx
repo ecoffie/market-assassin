@@ -242,21 +242,21 @@ export default function FreeResourcesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-(--mp-wash)">
       {/* Header */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-20">
+      <nav className="bg-(--mp-surface) border-b border-(--mp-hair)">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-blue-700">GovCon</span>
-              <span className="text-xl font-bold text-amber-500">Giants</span>
+              <span className="text-xl font-bold text-(--mp-navy)">GovCon</span>
+              <span className="text-xl font-bold text-(--mp-accent)">Giants</span>
             </Link>
             {userEmail && (
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 hidden sm:inline">{userEmail}</span>
+                <span className="text-sm text-(--mp-muted) hidden sm:inline">{userEmail}</span>
                 <button
                   onClick={handleSignOut}
-                  className="text-sm text-gray-500 hover:text-gray-700"
+                  className="text-sm text-(--mp-muted) hover:text-(--mp-body)"
                 >
                   Sign Out
                 </button>
@@ -268,18 +268,18 @@ export default function FreeResourcesPage() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Hero */}
-        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-2xl p-8 text-white mb-12">
+        <div className="rounded-none p-8 text-(--mp-ink) mb-12 bg-(--mp-surface) border border-(--mp-line)">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-4xl">🎁</span>
-            <h1 className="text-3xl font-bold">Free GovCon Resources</h1>
+            <h1 className="text-3xl font-bold font-(family-name:--mp-font-serif)">Free GovCon Resources</h1>
           </div>
-          <p className="text-lg opacity-95">
+          <p className="text-lg text-(--mp-body)">
             Download free templates, checklists, and guides to accelerate your government contracting journey.
             Just enter your email to access.
           </p>
           {userEmail && (
-            <div className="mt-4 flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2 w-fit">
-              <span className="text-green-100">Signed in as:</span>
+            <div className="mt-4 flex items-center gap-2 bg-(--mp-wash) border border-(--mp-line) rounded-[6px] px-4 py-2 w-fit">
+              <span className="text-(--mp-muted)">Signed in as:</span>
               <span className="font-medium">{userEmail}</span>
             </div>
           )}
@@ -288,7 +288,7 @@ export default function FreeResourcesPage() {
         {/* Loading State */}
         {isCheckingAccess ? (
           <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500">Loading resources...</div>
+            <div className="text-(--mp-muted)">Loading resources...</div>
           </div>
         ) : (
           /* Resources Grid */
@@ -299,25 +299,25 @@ export default function FreeResourcesPage() {
               return (
                 <div
                   key={resource.id}
-                  className="bg-white rounded-xl shadow-lg p-6 border-2 border-slate-200 hover:border-green-400 hover:shadow-xl transition-all cursor-pointer"
+                  className="bg-(--mp-surface) rounded-none p-6 border border-(--mp-line) hover:border-(--mp-ink) transition-colors cursor-pointer"
                   onClick={() => handleResourceClick(resource)}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">{resource.icon}</span>
-                      <h3 className="text-lg font-bold text-gray-900">{resource.name}</h3>
+                      <h3 className="font-(family-name:--mp-font-serif) text-lg font-bold text-(--mp-ink)">{resource.name}</h3>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm text-gray-400 line-through">{resource.price}</span>
-                      <span className="block text-green-600 font-bold">FREE</span>
+                      <span className="text-sm text-(--mp-muted) line-through">{resource.price}</span>
+                      <span className="block text-(--mp-accent) font-bold">FREE</span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-4">{resource.description}</p>
+                  <p className="text-sm text-(--mp-muted) mb-4">{resource.description}</p>
                   <button
-                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                    className={`w-full px-4 py-2 rounded-none font-medium transition-colors ${
                       hasAccess
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-green-500 text-white hover:bg-green-600'
+                        ? 'bg-(--mp-ok-bg) text-(--mp-ok) border border-(--mp-ok-line)'
+                        : 'bg-(--mp-navy) text-white hover:bg-(--mp-navy-hover)'
                     }`}
                   >
                     {hasAccess ? '✓ Download Again' : 'Get Free Access'}
@@ -329,17 +329,17 @@ export default function FreeResourcesPage() {
         )}
 
         {/* Upgrade CTA */}
-        <div className="mt-12 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-xl p-8 text-white">
+        <div className="mt-12 rounded-none p-8 text-(--mp-ink) bg-(--mp-wash)">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-2">Want More?</h2>
+              <h2 className="text-2xl font-bold mb-2 font-(family-name:--mp-font-serif)">Want More?</h2>
               <p className="opacity-90">
                 Upgrade to our premium tools for advanced market intelligence, contractor databases, and AI-powered content generation.
               </p>
             </div>
             <Link
               href="/store"
-              className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors whitespace-nowrap"
+              className="px-8 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-bold rounded-none transition-colors whitespace-nowrap"
             >
               View Premium Tools
             </Link>
@@ -349,16 +349,16 @@ export default function FreeResourcesPage() {
 
       {/* Email Capture Modal */}
       {selectedResource && !showSuccess && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-(--mp-ink)/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{selectedResource.icon}</span>
-                <h3 className="text-lg font-bold text-gray-900">{selectedResource.name}</h3>
+                <h3 className="font-(family-name:--mp-font-serif) text-lg font-bold text-(--mp-ink)">{selectedResource.name}</h3>
               </div>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-(--mp-muted) hover:text-(--mp-muted)"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -366,13 +366,13 @@ export default function FreeResourcesPage() {
               </button>
             </div>
 
-            <p className="text-gray-600 mb-6">
+            <p className="text-(--mp-muted) mb-6">
               Enter your email to get instant access to this resource.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-(--mp-body) mb-1">
                   Email Address *
                 </label>
                 <input
@@ -381,12 +381,12 @@ export default function FreeResourcesPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-2 border border-(--mp-line) rounded-[8px] focus:border-(--mp-navy) text-(--mp-ink)"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-(--mp-body) mb-1">
                   Name (optional)
                 </label>
                 <input
@@ -394,12 +394,12 @@ export default function FreeResourcesPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-2 border border-(--mp-line) rounded-[8px] focus:border-(--mp-navy) text-(--mp-ink)"
                 />
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                <div className="bg-(--mp-warn-bg) border border-(--mp-warn-line) text-(--mp-crit) px-4 py-2 rounded-[6px] text-sm">
                   {error}
                 </div>
               )}
@@ -407,12 +407,12 @@ export default function FreeResourcesPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                className="w-full px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-bold rounded-none transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? 'Processing...' : 'Get Free Access'}
               </button>
 
-              <p className="text-xs text-gray-500 text-center">
+              <p className="text-xs text-(--mp-muted) text-center">
                 By submitting, you agree to receive occasional emails from GovCon Giants.
                 Unsubscribe anytime.
               </p>
@@ -423,11 +423,11 @@ export default function FreeResourcesPage() {
 
       {/* Download Success Modal */}
       {selectedResource && showSuccess && downloadUrl && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
+        <div className="fixed inset-0 bg-(--mp-ink)/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-(--mp-surface) border border-(--mp-line) rounded-none max-w-md w-full p-6 text-center">
             <div className="text-5xl mb-4">🎉</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Access Granted!</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-xl font-bold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">Access Granted!</h3>
+            <p className="text-(--mp-muted) mb-6">
               Your download for <strong>{selectedResource.name}</strong> is ready.
             </p>
 
@@ -436,14 +436,14 @@ export default function FreeResourcesPage() {
               target="_blank"
               rel="noopener noreferrer"
               {...(downloadUrl.endsWith('.csv') ? { download: true } : {})}
-              className="block w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors mb-4"
+              className="block w-full px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-bold rounded-none transition-colors mb-4"
             >
               {downloadUrl.endsWith('.csv') ? 'Download Now' : 'Open Resource'}
             </a>
 
             <button
               onClick={closeModal}
-              className="text-gray-500 hover:text-gray-700 text-sm"
+              className="text-(--mp-muted) hover:text-(--mp-body) text-sm"
             >
               Close
             </button>
@@ -452,7 +452,7 @@ export default function FreeResourcesPage() {
       )}
 
       {/* Footer */}
-      <footer className="mt-12 py-8 text-center text-gray-600">
+      <footer className="mt-12 py-8 text-center text-(--mp-muted)">
         <p className="text-sm">
           &copy; {new Date().getFullYear()} GovCon Giants. All rights reserved.
         </p>
