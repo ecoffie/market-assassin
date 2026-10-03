@@ -194,6 +194,7 @@ export default async function GlossaryTermPage({
             </div>
 
             {/* "How Mindy uses this" callout — the soft conversion */}
+            {term.mindyUse && (
             <aside className="border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-(--mp-navy)">
@@ -218,6 +219,7 @@ export default async function GlossaryTermPage({
                 </div>
               </div>
             </aside>
+            )}
 
             {/* Inline CTA so we don't depend on the rail for conversion */}
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">

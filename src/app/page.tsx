@@ -213,11 +213,11 @@ export default function Home() {
                 Market Intelligence
               </h3>
               <p className="text-slate-400 text-sm mb-5 leading-relaxed">
-                Access your personalized intelligence workspace with daily briefs, weekly deep dives, and pursuit briefs tailored to your market.
+                Access your personalized intelligence workspace with daily briefs and weekly deep dives tailored to your market.
               </p>
               <ul className="text-slate-400 text-sm space-y-2 mb-6">
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Daily, weekly, and pursuit briefings
+                  <span className="text-green-500">✓</span> Daily and weekly briefings
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-500">✓</span> Verify access with your purchase email

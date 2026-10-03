@@ -1264,10 +1264,6 @@ function BriefingsDashboardContent() {
               <span className="w-6 h-6 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-400 text-sm">✓</span>
               <span>Weekly Deep Dive — strategic analysis</span>
             </div>
-            <div className="flex items-center gap-3 text-gray-300">
-              <span className="w-6 h-6 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-400 text-sm">✓</span>
-              <span>Pursuit Brief — capture guidance</span>
-            </div>
           </div>
 
           {/* Login form */}
@@ -1343,7 +1339,7 @@ function BriefingsDashboardContent() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">No Access Found</h1>
           <p className="text-gray-400 mb-6">
-            Mindy AI includes daily briefs, weekly deep dives, and pursuit briefs.
+            Mindy AI includes daily briefs and weekly deep dives.
             Purchase access to unlock your personalized GovCon intelligence.
           </p>
           <Link

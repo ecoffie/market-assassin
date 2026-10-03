@@ -1,16 +1,18 @@
 /**
  * POST /api/opportunities/save
  *
- * Save/favorite an opportunity and trigger Pursuit Brief generation.
+ * Save/favorite an opportunity.
  *
  * Body:
  * - email: user email
  * - noticeId: SAM.gov notice ID
  * - opportunityData: full opportunity object (optional, will fetch if not provided)
  * - source: 'daily_alert' | 'daily_brief' | 'manual' | 'opportunity_hunter'
- * - requestPursuitBrief: boolean (default true)
+ * - requestPursuitBrief: IGNORED. Pursuit Briefs were retired by product decision
+ *   (2026-09-28); saving never requests or emails a brief. The field is still
+ *   accepted so older callers (email links, the Opportunity Map) keep working.
  *
- * Returns saved opportunity and optionally triggers pursuit brief generation.
+ * Returns the saved opportunity.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -35,7 +37,6 @@ export async function POST(request: NextRequest) {
       noticeId,
       opportunityData,
       source = 'manual',
-      requestPursuitBrief = true,
     } = body;
 
     if (!email || !noticeId) {
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
         posted_date: oppData.postedDate || oppData.posted_date,
         estimated_value: oppData.estimatedValue || oppData.estimated_value,
         source,
-        pursuit_brief_requested: requestPursuitBrief,
+        pursuit_brief_requested: false,
         status: 'watching',
       }, {
         onConflict: 'user_email,notice_id',
@@ -111,31 +112,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If pursuit brief requested, trigger async generation
-    if (requestPursuitBrief) {
-      // Fire and forget - call the pursuit brief endpoint
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
-      fetch(`${baseUrl}/api/opportunities/pursuit-brief`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.toLowerCase(),
-          savedOpportunityId: savedOpp.id,
-          noticeId,
-          opportunityData: oppData,
-        }),
-      }).catch(err => {
-        console.error('[Save Opportunity] Failed to trigger pursuit brief:', err);
-      });
-    }
-
     return NextResponse.json({
       success: true,
       savedOpportunity: savedOpp,
-      pursuitBriefRequested: requestPursuitBrief,
-      message: requestPursuitBrief
-        ? 'Opportunity saved! Your Pursuit Brief will be emailed shortly.'
-        : 'Opportunity saved to your watchlist.',
+      pursuitBriefRequested: false,
+      message: 'Opportunity saved to your watchlist.',
     });
 
   } catch (error) {

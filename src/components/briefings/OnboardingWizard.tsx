@@ -720,9 +720,6 @@ export default function OnboardingWizard({
                   <li className="flex items-center gap-2">
                     <span className="text-purple-400">✓</span> Weekly Deep Dive — strategic analysis and teaming
                   </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-purple-400">✓</span> Pursuit Briefs — capture guidance for targets
-                  </li>
                 </ul>
               </div>
             </div>

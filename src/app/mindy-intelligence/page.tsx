@@ -396,7 +396,7 @@ export default function MindyIntelligencePage() {
               },
               {
                 t: 'Cross-tool intelligence',
-                b: 'Same retrieval infrastructure will plug into Cap Statement Builder, Content Reaper, pursuit briefings, recompete intelligence — every output sharpened by Vault + corpus.',
+                b: 'Same retrieval infrastructure will plug into Cap Statement Builder, Content Reaper, recompete intelligence — every output sharpened by Vault + corpus.',
               },
             ].map((row) => (
               <div key={row.t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">

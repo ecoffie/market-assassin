@@ -21,7 +21,8 @@ export interface GlossaryTerm {
   term: string;
   slug: string;
   definition: string;
-  mindyUse: string;
+  /** Optional — omit rather than promise a feature Mindy doesn't have. */
+  mindyUse?: string;
   related?: string[];
   productLink?: {
     label: string;
@@ -72,7 +73,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition:
       'Commercial and Government Entity code — a unique five-character alphanumeric identifier assigned by the Defense Logistics Agency (DLA) to entities doing business with the federal government. Obtained automatically through SAM.gov registration.',
     mindyUse:
-      'Mindy stores your CAGE code on your profile so contractor lookups, capability statement exports, and pursuit briefs are pre-filled.',
+      'Mindy stores your CAGE code on your profile so contractor lookups and capability statement exports are pre-filled.',
     related: ['sam-gov', 'uei', 'ncage-code'],
   },
   {
@@ -116,8 +117,6 @@ export const glossaryTerms: GlossaryTerm[] = [
     slug: 'cpars',
     definition:
       "Contractor Performance Assessment Reporting System — the government's database for recording contractor performance evaluations. Past performance ratings in CPARS directly affect your ability to win future contracts.",
-    mindyUse:
-      "Mindy's pursuit briefs include incumbent CPARS context where available so you know whether the incumbent is vulnerable or entrenched.",
     related: ['past-performance', 'ppq', 'debriefing'],
   },
   {
@@ -282,8 +281,6 @@ export const glossaryTerms: GlossaryTerm[] = [
     slug: 'ppq',
     definition:
       'A form sent to your references during proposal evaluation asking them to rate your performance on previous contracts. The government uses PPQ responses to assess the risk of awarding you a new contract.',
-    mindyUse:
-      "Mindy's pursuit briefs flag when an RFP requires PPQs so you can warn references early — chasing signatures the day before submission is how good proposals die.",
     related: ['past-performance', 'cpars', 'rfp'],
   },
   {

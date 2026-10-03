@@ -996,7 +996,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
                     <span className="text-white font-medium">Market Intelligence Briefings</span>
-                    <p className="text-xs text-gray-500">Daily, weekly, and pursuit briefs</p>
+                    <p className="text-xs text-gray-500">Daily and weekly briefs</p>
                   </div>
                   <div className="relative">
                     <input

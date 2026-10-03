@@ -480,10 +480,6 @@ export default function GovWinComparePage() {
                 title: 'Weekly market deep dives',
                 detail: 'Spending trends, set-aside patterns, and where the money is moving in your space.',
               },
-              {
-                title: 'Pursuit briefs',
-                detail: 'Deep research on specific opportunities — incumbent, history, decision-makers.',
-              },
             ].map((f) => (
               <div
                 key={f.title}

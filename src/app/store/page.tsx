@@ -155,12 +155,11 @@ export default function Home() {
                 <span className="inline-block bg-violet-600 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">NEW</span>
                 <h3 className="text-xl font-bold mb-2 text-gray-900">Market Intelligence</h3>
                 <p className="text-gray-500 text-sm mb-4">
-                  Get the full three-part briefing experience: daily brief, weekly deep dive, and pursuit brief with actionable capture guidance.
+                  Get the briefing experience: a daily brief and a weekly deep dive.
                 </p>
                 <ul className="text-sm mb-5 space-y-1">
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Daily opportunity prioritization</li>
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Weekly market and teaming analysis</li>
-                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Pursuit-specific action briefs</li>
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Monthly or annual billing</li>
                 </ul>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">

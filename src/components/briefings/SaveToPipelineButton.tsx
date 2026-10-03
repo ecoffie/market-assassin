@@ -250,11 +250,6 @@ function NextActionPrompt({
       options: { stage: 'pursuing' as const },
     },
     {
-      label: 'Pursuit brief',
-      value: 'request_pursuit_brief',
-      options: { stage: 'pursuing' as const },
-    },
-    {
       label: 'Move to capture',
       value: 'move_to_capture',
       options: { stage: 'pursuing' as const },
