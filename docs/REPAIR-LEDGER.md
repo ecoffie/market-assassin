@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-03 — N-1: an agency acronym never becomes a state
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-03 | Profile from text (onboarding + coach seeding) | The shared text-to-profile engine counted any capitalized two-letter state code as a place, so "VA medical centers" (Veterans Affairs) seeded location_states VA (Virginia); IN, OR, OK, ME, PA, HI, DE, LA are words and acronyms too. A state code now counts only inside an explicit place phrase: an address ("Norfolk, VA 23511", the word before the comma must be a Capitalized place word, not an all-caps acronym or an organisation word such as Affairs), a list of two or more codes ("DC, MD, VA", "DC/MD/VA") or "based/located/headquartered in" plus the code. Full state names are unchanged. No backfill of existing profiles. | `function detectStateCodes(text: string)` → `src/lib/market/profile-from-text.ts` | `profile-from-text-states.unit.test.ts` 16 cases: 7 red on origin/main, all green after; market + mindy suites 486/486 | Draft PR, not merged |
+
 ## 2026-10-03 — SEC-5d: partner trials only for a verified identity, once per account
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

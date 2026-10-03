@@ -77,7 +77,37 @@ const REGION_TO_STATES: Record<string, string[]> = {
   caribbean: ['PR', 'VI'],
 };
 
-function detectStates(text: string): string[] {
+// N-1 (2026-09-27): a bare two-letter token is NOT a place. "VA medical centers" is the
+// Department of Veterans Affairs, and IN / OR / ME / OK / HI / DE / PA / LA are ordinary
+// words or acronyms too. A state CODE counts only inside an explicit place phrase:
+//   1. an address  — "Norfolk, VA", "Norfolk, VA 23511", "Tampa, FL." (a Capitalized,
+//      not all-caps, word — so "GSA, VA," is not an address — a comma, the code, then a ZIP / punctuation / end / "and|or|&"); the word
+//      before the comma must not be an organisation word ("Veterans Affairs, VA and DoD");
+//   2. a list of ≥2 codes — "MD, VA, DC", "DC/MD/VA", "VA and MD";
+//   3. "based in|located in|headquartered in" + the code.
+// Full state NAMES are unchanged (they are explicit place phrases already).
+const ORG_WORDS = /^(affairs|administration|agency|agencies|department|departments|service|services|command|center|centers|centre|office|offices|bureau|division|directorate|program|programs|system|systems|health|hospital|hospitals|clinics?)$/i;
+const CODE_ALT = ALL_STATE_CODES.join('|');
+
+function detectStateCodes(text: string): string[] {
+  const found = new Set<string>();
+  // 1. Address: "City, ST" followed by ZIP / punctuation / end / a conjunction.
+  const addr = new RegExp(`\\b([A-Z][a-z][A-Za-z.'-]*),\\s+(${CODE_ALT})(?=\\s+\\d{5}\\b|\\s*[.,;:)\\]\\n]|\\s*$|\\s+(?:and|or|&)\\b)`, 'g');
+  for (const m of text.matchAll(addr)) {
+    if (!ORG_WORDS.test(m[1])) found.add(m[2]);
+  }
+  // 2. A list of two or more codes joined by , / & and or.
+  const list = new RegExp(`\\b(?:${CODE_ALT})(?:\\s*(?:,|/|&|\\band\\b|\\bor\\b|,\\s*and\\b)\\s*(?:${CODE_ALT})\\b)+`, 'g');
+  for (const m of text.matchAll(list)) {
+    for (const c of m[0].match(new RegExp(`\\b(?:${CODE_ALT})\\b`, 'g')) || []) found.add(c);
+  }
+  // 3. "based in VA", "located in TX", "headquartered in MD".
+  const based = new RegExp(`\\b(?:based|located|headquartered)\\s+in\\s+(${CODE_ALT})\\b`, 'g');
+  for (const m of text.matchAll(based)) found.add(m[1]);
+  return Array.from(found);
+}
+
+export function detectStates(text: string): string[] {
   const found = new Set<string>();
   const lower = text.toLowerCase();
   // Word-boundary match so "Florida." / "Puerto Rico," (with punctuation) still
@@ -86,9 +116,7 @@ function detectStates(text: string): string[] {
   for (const [name, code] of Object.entries(STATE_NAME_TO_CODE)) {
     if (new RegExp(`\\b${name.replace(/[.]/g, '\\.')}\\b`).test(lower)) found.add(code);
   }
-  for (const code of ALL_STATE_CODES) {
-    if (new RegExp(`\\b${code}\\b`).test(text)) found.add(code);
-  }
+  for (const code of detectStateCodes(text)) found.add(code);
   for (const [region, codes] of Object.entries(REGION_TO_STATES)) {
     if (new RegExp(`\\b${region}\\b`).test(lower)) codes.forEach((c) => found.add(c));
   }
