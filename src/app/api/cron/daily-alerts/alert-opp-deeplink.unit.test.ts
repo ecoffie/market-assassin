@@ -114,13 +114,15 @@ describe('the delayed __applySavedSearch path cannot touch an ?opp= link', () =>
   });
 
   it('the exact-opportunity handler is the one that owns ?opp=', () => {
-    const at = MAP.indexOf('window.openOppDrawer(nid)');
-    expect(at).toBeGreaterThan(-1);
-    const handler = MAP.slice(at - 280, at + 200);
-    expect(handler).toContain('match(/[?&]opp=([^&]+)/)');
+    // ONE owner since 2026-10-03 (two handlers opened the drawer twice): SHARED-LINK OPEN.
+    const start = MAP.indexOf('SHARED-LINK OPEN (?opp=');
+    expect(start).toBeGreaterThan(-1);
+    const handler = MAP.slice(start, MAP.indexOf('window.openOppDrawer=function', start));
+    expect(handler).toContain("_sp.get('opp')");
+    expect(handler).toContain('window.openOppDrawer(_id,true)');
     // Retries until the drawer JS defines openOppDrawer — without it a cold load silently
     // no-ops, which reads as "the deep link is broken, but only sometimes".
-    expect(handler).toMatch(/tries\+\+|setTimeout/);
+    expect(handler).toContain('setInterval');
   });
 });
 
