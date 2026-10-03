@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 import { getBalance } from '@/lib/mcp/credits';
-import { listMcpTools } from '@/lib/mcp/tool-registry';
+import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
@@ -69,7 +69,9 @@ export async function GET(request: NextRequest) {
     .map(([date, v]) => ({ date, calls: v.calls, credits: v.credits }))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 
-  const tools = listMcpTools().map((t) => {
+  // PUBLIC catalog only. Usage rows above still include any hidden tool a user called
+  // before it was hidden — history is never rewritten.
+  const tools = listPublicMcpTools().map((t) => {
     const fn = t.function as { name: string; description?: string };
     return { name: fn.name, description: fn.description ?? '', credits: (t._credits as number) ?? 0 };
   });

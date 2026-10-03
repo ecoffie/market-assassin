@@ -97,21 +97,21 @@ const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 1000, usd: 119, label: 'Top
  * `enforceTiers`); the /mcp/tools reference reads it and labels the Pro chip accordingly.
  * Do not restate a gating claim in copy — read the flag.
  */
-const MOAT_LIST = 'The winning playbook (Pro) · Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The full proposal pipeline (matrix → draft → referee → .docx)';
+const MOAT_LIST = 'The winning playbook (Pro) · Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The proposal pipeline (matrix → draft → referee)';
 
 /** Plan-finder activities — each a real BD workflow, priced per opportunity from the live catalog. */
 const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[] = [
   { id: 'find', label: 'Find & filter opportunities', note: 'live SAM search across your NAICS + keywords', tools: ['search_sam_opportunities'] },
-  { id: 'incumbent', label: 'Vet the incumbent', note: 'SEC financials + full contractor profile', tools: ['get_incumbent_financials', 'get_contractor_profile'] },
-  { id: 'price', label: 'Price the bid', note: 'GSA labor rates + regulatory demand signal', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
+  { id: 'incumbent', label: 'Vet the incumbent', note: 'who holds it now + full contractor profile', tools: ['get_solicitation_incumbent', 'get_contractor_profile'] },
+  { id: 'price', label: 'Price the bid', note: 'GSA labor rates (p25 / p50 / p75)', tools: ['get_pricing_intel'] },
   { id: 'playbook', label: 'Draft a win strategy', note: 'proprietary winning playbook — Mindy Pro', tools: ['get_winning_playbook'] },
   { id: 'teaming', label: 'Build a teaming shortlist', note: 'who-can-win scan + deep-profile top partners', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile'] },
 ];
 
 const FAQ: { q: string; a: string }[] = [
-  { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are debited only when a call succeeds; a failed or empty call costs nothing, and repeat/cached reads are free.' },
+  { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are charged when Mindy does the research. A search that is measured and honestly finds nothing is still a paid answer. You are not charged when a call does no work: a refused request (missing or invalid input, or something you have not set up yet), a failure on our side, or a call stopped before it runs. Repeating a call charges it again.' },
   { q: 'Entry, Mid, Growth or Agency — which do I need?', a: `Entry ($99, ${planCredits('entry')} credits/mo) suits project or occasional use. Mid ($249, ${planCredits('mid')}/mo) is the daily driver for an agent working opportunities every day. Growth ($399, ${planCredits('growth')}/mo) is for working several markets at once. Agency ($999, ${planCredits('agency')}/mo) is for a shop running many pursuits. Every plan has the SAME tools — the tiers differ only in monthly credit allowance. Use the plan finder below to size it against your real workflow.` },
-  { q: 'What makes Mindy different from a public-data wrapper?', a: 'Beyond the public-data tools (SAM, USASpending, EDGAR, GSA, Grants, Federal Register), Mindy adds an un-copyable layer no public API has: curated SBLO + OSBP teaming/small-business contacts, agency intel and angles, podcast lessons, and a full proposal pipeline (compliance matrix → drafted sections → an independent compliance referee → a submittable .docx). You pay per successful call in credits — nothing is locked behind a tier; the plans just set how many credits you get each month.' },
+  { q: 'What makes Mindy different from a public-data wrapper?', a: 'Beyond the public-data tools (SAM, USASpending, EDGAR, GSA, Grants, Federal Register), Mindy adds an un-copyable layer no public API has: curated SBLO + OSBP teaming/small-business contacts, agency intel and angles, podcast lessons, and a proposal pipeline (compliance matrix → drafted sections → an independent compliance referee). You pay per successful call in credits — nothing is locked behind a tier; the plans just set how many credits you get each month.' },
   { q: 'I already pay for the Mindy app (Pro or Team). Do I get MCP credits?', a: `Yes — Pro ($149/mo) includes ${PRO_APP_CREDITS} MCP credits every month and Team ($499/mo) includes ${TEAM_APP_CREDITS}, at no extra cost. Connect with the same account and they’re already there. It’s a taste — if your agent runs heavier, add one of the credit plans on this page.` },
   { q: 'What is the one-time top-up for?', a: `The top-up (1,000 credits / $119) is the “ran out mid-month” valve — a one-time refill that doesn’t change your plan. It’s also the pack auto-recharge draws from if you switch that on. Top-up credits never expire and carry over when your plan renews.` },
   { q: 'Do you have an Enterprise / API option?', a: 'Yes — for primes, agencies, funds, lenders, and partners who need a data/feed license, high-volume programmatic API access, SSO/SAML, a dedicated success manager, or an SLA. Pricing is bespoke (volume-based, annual invoicing). Email hello@getmindy.ai and we’ll scope it with you.' },

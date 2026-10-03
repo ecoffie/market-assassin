@@ -1,7 +1,7 @@
 /**
  * Tool → job grouping for the /mcp/tools reference page.
  *
- * WHY THIS FILE EXISTS: `listMcpTools()` is the source of truth for WHICH tools
+ * WHY THIS FILE EXISTS: `listPublicMcpTools()` is the source of truth for WHICH tools
  * exist, their credits, and their tier — but it carries no "what job is this for"
  * grouping, and it shouldn't (the registry is a dispatch table, not IA). This map
  * adds only the editorial layer: which bucket a tool belongs in, and the one-line
@@ -45,7 +45,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'get_agency_forecasts',
       'get_expiring_contracts',
       'search_grants',
-      'search_sbir',
       'search_idv_contracts',
       'search_past_contracts',
       'match_recompete_sow',
@@ -60,7 +59,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'search_contractors',
       'get_contractor_profile',
       'get_contractor_award_history',
-      'get_incumbent_financials',
       'get_recipient_annual_obligations',
       'find_predecessor_award',
       'get_solicitation_incumbent',
@@ -74,7 +72,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
     tools: [
       'get_keyword_coverage',
       'get_pricing_intel',
-      'get_regulatory_demand',
       'derive_company_keywords',
       'get_market_vocabulary',
       'search_podcast_lessons',
@@ -89,7 +86,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
     tools: [
       'get_agency_intel',
       'understand_customer',
-      'get_agency_budget_trends',
       'get_agency_spending_detail',
       'get_sba_goaling_share',
       'get_award_detail',
@@ -118,24 +114,20 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'get_federal_event_series',
       'search_federal_contacts',
       'get_sblo_contact',
-      'add_contacts_to_crm',
     ],
   },
   {
     id: 'proposal',
     label: 'Proposal Pipeline',
-    blurb: 'Decide, extract, structure, draft, referee, export. Each step runs on what you pass it, so an agent can enter anywhere.',
+    blurb: 'Decide, extract, draft, referee. Each step runs on what you pass it, so an agent can enter anywhere.',
     tools: [
       'evaluate_bid_decision',
       'extract_compliance_matrix',
-      'extract_statement_of_work',
       'get_solicitation_documents',
-      'build_proposal_structure',
       'draft_proposal',
       'draft_proposal_section',
       'scan_proposal_compliance',
       'referee_proposal_compliance',
-      'export_proposal',
     ],
   },
   {
@@ -146,14 +138,13 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'build_pursuit_dossier',
       'capability_market_match',
       'generate_market_report',
-      'one_click_proposal',
     ],
   },
   {
     id: 'account',
-    label: 'Account & Proof',
-    blurb: 'Free utilities. Check a balance, poll a job, or independently re-verify our branded numbers against their oracle.',
-    tools: ['get_balance', 'get_proposal_job', 'verify_m_scale'],
+    label: 'Account',
+    blurb: 'Free utility. Check your credit balance.',
+    tools: ['get_balance'],
   },
 ];
 

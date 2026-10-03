@@ -13,7 +13,7 @@
  * fabrication. Billing handled by the transport (runMeteredTool).
  */
 import { getCrmConnection } from '@/lib/crm/connections';
-import { upsertContactsBatch, type CrmContactInput, type CrmUpsertRow } from '@/lib/ghl/contacts';
+import { upsertContactsBatch, CONTACT_INVALID_ERROR, type CrmContactInput, type CrmUpsertRow } from '@/lib/ghl/contacts';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 const MAX_CONTACTS = 200;
@@ -35,7 +35,19 @@ export interface AddContactsResult {
   capped: boolean;
   rows: CrmUpsertRow[];
   message?: string;
-  _meta: { grounded: boolean; degraded: boolean; connected: boolean; count: number };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    connected: boolean;
+    count: number;
+    /**
+     * Credit integrity (credit-integrity.ts). A call that wrote nothing because the
+     * account has no CRM, or because no contact was usable, did no work and is not
+     * billed. Measured 2026-10-02: every customer call to this tool had hit the
+     * not-connected branch and was charged 10 credits for it.
+     */
+    billing_outcome?: 'nonbillable_not_configured' | 'nonbillable_invalid_input';
+  };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
 }
 
@@ -54,7 +66,7 @@ export async function addContactsToCrm(input: AddContactsInput): Promise<AddCont
       capped: false,
       rows: [],
       message: 'No CRM is connected for this account. Connect your GoHighLevel (Private Integration Token + Location ID) in Mindy → MCP account settings, then retry.',
-      _meta: { grounded: false, degraded: false, connected: false, count: 0 },
+      _meta: { grounded: false, degraded: false, connected: false, count: 0, billing_outcome: 'nonbillable_not_configured' },
     };
     if (mcpFlags.aiHint) {
       result._ai_hint = {
@@ -83,6 +95,11 @@ export async function addContactsToCrm(input: AddContactsInput): Promise<AddCont
     rows: res.rows,
     _meta: { grounded, degraded: res.degraded, connected: true, count: contacts.length },
   };
+  // Nothing usable was sent to the CRM: an empty list, or every row rejected locally
+  // before any GHL request. No write was attempted, so no charge.
+  const nothingAttempted =
+    contacts.length === 0 || res.rows.every((r) => r.status === 'failed' && r.error === CONTACT_INVALID_ERROR);
+  if (nothingAttempted) result._meta.billing_outcome = 'nonbillable_invalid_input';
   if (capped) result.message = `Only the first ${MAX_CONTACTS} contacts were processed (${all.length} supplied). Call again with the rest.`;
 
   if (mcpFlags.aiHint) {

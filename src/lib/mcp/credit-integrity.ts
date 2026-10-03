@@ -23,14 +23,35 @@ export type BillingOutcome =
   | 'billable_success'
   | 'billable_no_result'
   | 'nonbillable_invalid_input'
+  | 'nonbillable_not_configured'
   | 'nonbillable_system_failure';
 
 const OUTCOMES: ReadonlySet<string> = new Set<BillingOutcome>([
   'billable_success',
   'billable_no_result',
   'nonbillable_invalid_input',
+  'nonbillable_not_configured',
   'nonbillable_system_failure',
 ]);
+
+/**
+ * Tier-1/Tier-2 tools (shared with Mindy Chat) report a refusal as
+ * `{ ok: false, error: '<code>' }` and carry no `_meta`. Until 2026-10-02 those results
+ * fell through to "billable" — `keyword_required`, `sam_unavailable`, `rate_limited`
+ * and `lookup_failed` all cost the caller credits for work that never happened.
+ *
+ * Inventory of every `ok: false` code those modules return (tier1-tools.ts,
+ * tier2-tools.ts), pinned by credit-integrity.unit.test.ts:
+ *   invalid input  → keyword_required, naics_required, company_name_required,
+ *                    naics_or_psc_required, unknown_set_aside, unknown_tool:<name>
+ *   system failure → sam_unavailable, rate_limited, lookup_failed, and anything else
+ * Unknown codes default to system failure: an unrecognised refusal is never billed.
+ */
+const INVALID_INPUT_ERROR = /(^|_)required$|^unknown_set_aside$|^unknown_tool:/;
+
+export function errorCodeBillingOutcome(code: string): BillingOutcome {
+  return INVALID_INPUT_ERROR.test(code) ? 'nonbillable_invalid_input' : 'nonbillable_system_failure';
+}
 
 export function isBillable(outcome: BillingOutcome): boolean {
   return outcome === 'billable_success' || outcome === 'billable_no_result';
@@ -43,14 +64,22 @@ export function isBillable(outcome: BillingOutcome): boolean {
  *   1. An explicit `_meta.billing_outcome` set by the tool — the tool knows whether
  *      it performed the job (e.g. market-report `measurement_failure`, which can be
  *      `grounded` on optional sections while the REQUIRED measurement failed).
- *   2. DEFECT-7 (2026-08-24), unchanged: degraded AND ungrounded → system failure.
- *   3. Otherwise billable. Zero rows is NOT an error — a valid "found nothing" is a
+ *   2. `_meta.validation_error` (pricing / incumbent-financials / regulatory-demand
+ *      return it when no usable input was given) → invalid input. The tool did no
+ *      research, so it is not a paid "found nothing".
+ *   3. A Tier-1/Tier-2 refusal `{ ok: false, error: '<code>' }` → see
+ *      errorCodeBillingOutcome().
+ *   4. DEFECT-7 (2026-08-24), unchanged: degraded AND ungrounded → system failure.
+ *   5. Otherwise billable. Zero rows is NOT an error — a valid "found nothing" is a
  *      paid research answer (billable_no_result).
  */
 export function classifyBillingOutcome(result: unknown): BillingOutcome {
-  const meta = (result as { _meta?: Record<string, unknown> } | null | undefined)?._meta;
+  const r = result as { ok?: unknown; error?: unknown; _meta?: Record<string, unknown> } | null | undefined;
+  const meta = r?._meta;
   const explicit = meta?.billing_outcome;
   if (typeof explicit === 'string' && OUTCOMES.has(explicit)) return explicit as BillingOutcome;
+  if (typeof meta?.validation_error === 'string' && meta.validation_error) return 'nonbillable_invalid_input';
+  if (r?.ok === false && typeof r.error === 'string' && r.error) return errorCodeBillingOutcome(r.error);
   if (meta?.degraded === true && meta?.grounded !== true) return 'nonbillable_system_failure';
   return meta?.grounded === false ? 'billable_no_result' : 'billable_success';
 }

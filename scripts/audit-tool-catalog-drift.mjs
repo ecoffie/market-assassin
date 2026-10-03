@@ -10,7 +10,8 @@
  * A written rule did not stop it. The rule was read, and violated, by the same
  * session that had just quoted it. So it is a gate now:
  *
- *   listMcpTools() is the SOURCE OF TRUTH (not a grep — tools register on two
+ *   listPublicMcpTools() (the PUBLIC catalog, built on listMcpTools()) is the
+ *   SOURCE OF TRUTH (not a grep — tools register on two
  *   paths, and a grep has already made live tools look missing).
  *
  * The artifact lives on claude.ai and cannot be linted from here, so its count
@@ -36,27 +37,45 @@ const PROSE_SURFACES = [
 ];
 
 function liveTools() {
-  // Run through tsx: the registry is TS with path aliases. listMcpTools() is the
-  // authority — it reflects BOTH registration paths.
+  // Run through tsx: the registry is TS with path aliases.
+  //
+  // The customer-facing surfaces (artifact, whitepaper, changelog) document the PUBLIC
+  // catalog — what an external MCP host can list and call — so that is what they are
+  // checked against: listPublicMcpTools() (src/lib/mcp/public-catalog.ts). The internal
+  // registry, listMcpTools(), also feeds Mindy Chat and can hold tools that are
+  // deliberately unlisted. Its classification is checked separately below (every
+  // registered tool must be either public or explicitly hidden).
   const out = execSync(
-    `npx tsx -e "(async()=>{const m=await import('./src/lib/mcp/tool-registry');const r=m.default??m;console.log(JSON.stringify(r.listMcpTools().map(t=>t.function?.name).filter(Boolean).sort()))})()"`,
+    `npx tsx -e "(async()=>{const m=await import('./src/lib/mcp/public-catalog');const r=m.default??m;const pub=r.listPublicMcpTools().map(t=>t.function?.name).filter(Boolean).sort();console.log(JSON.stringify({pub,audit:r.auditPublicCatalog()}))})()"`,
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], cwd: process.cwd() },
   );
-  const line = out.split('\n').find((l) => l.trim().startsWith('['));
-  if (!line) throw new Error('could not read listMcpTools() output');
+  const line = out.split('\n').find((l) => l.trim().startsWith('{'));
+  if (!line) throw new Error('could not read listPublicMcpTools() output');
   return JSON.parse(line);
 }
 
-const live = liveTools();
+const { pub: live, audit: catalogAudit } = liveTools();
 const liveCount = live.length;
 
 if (process.argv.includes('--list')) {
-  console.log(`[tool-catalog] ${liveCount} live tools:`);
+  console.log(`[tool-catalog] ${liveCount} public tools:`);
   live.forEach((n) => console.log('  ' + n));
   process.exit(0);
 }
 
 const problems = [];
+
+// ── 0. every registered tool is classified public OR hidden ─────────────────
+// Publishing is fail-closed: an unclassified tool is silently NOT public. That is safe
+// for customers but easy to miss, so it blocks here instead.
+for (const [k, label] of [
+  ['unclassified', 'registered but in neither PUBLIC_MCP_TOOLS nor HIDDEN_FROM_PUBLIC_MCP'],
+  ['both', 'in BOTH the public allowlist and the hidden map'],
+  ['unknownPublic', 'on the public allowlist but not registered'],
+  ['unknownHidden', 'in the hidden map but not registered'],
+]) {
+  if (catalogAudit[k]?.length) problems.push(`public-catalog-config.ts: ${label}: ${catalogAudit[k].join(', ')}`);
+}
 
 // ── 1. the artifact mirror ───────────────────────────────────────────────────
 let mirror = null;
@@ -81,6 +100,22 @@ if (mirror) {
   }
 }
 
+// ── 1b. the generated Tool Map (docs/mcp-tool-map.html, published to the artifact) ──────
+// Built by scripts/build-tool-map-artifact.ts. It must list exactly the public tools.
+const MAP = 'docs/mcp-tool-map.html';
+if (existsSync(MAP)) {
+  const mapNames = [...readFileSync(MAP, 'utf8').matchAll(/<code class="tname">([a-z0-9_]+)<\/code>/g)].map((m) => m[1]);
+  const mapMissing = live.filter((n) => !mapNames.includes(n));
+  const mapExtra = mapNames.filter((n) => !live.includes(n));
+  if (mapMissing.length || mapExtra.length) {
+    problems.push(
+      `${MAP} is out of sync with the public catalog — rerun: npx tsx scripts/build-tool-map-artifact.ts (then republish the artifact)` +
+        (mapMissing.length ? `\n      missing: ${mapMissing.join(', ')}` : '') +
+        (mapExtra.length ? `\n      not public: ${mapExtra.join(', ')}` : ''),
+    );
+  }
+}
+
 // ── 2. prose counts ──────────────────────────────────────────────────────────
 for (const { file, re } of PROSE_SURFACES) {
   if (!existsSync(file)) continue;
@@ -98,7 +133,7 @@ if (process.argv.includes('--update')) {
     JSON.stringify(
       {
         _comment:
-          'Mirror of the claude.ai Tool Map artifact. Update the artifact FIRST, then run: node scripts/audit-tool-catalog-drift.mjs --update. The gate fails if this disagrees with listMcpTools().',
+          'Mirror of the claude.ai Tool Map artifact. Update the artifact FIRST, then run: node scripts/audit-tool-catalog-drift.mjs --update. The gate fails if this disagrees with listPublicMcpTools() (the PUBLIC catalog).',
         artifact_url: mirror?.artifact_url ?? 'https://claude.ai/code/artifact/31ec6de1-1dcf-4a04-aa43-30289bfc6c7c',
         count: liveCount,
         tools: live,
@@ -121,7 +156,7 @@ if (!problems.length) {
   process.exit(0);
 }
 
-console.error(`\n[tool-catalog] ✗ CATALOG DRIFT — the live registry has ${liveCount} tools:\n`);
+console.error(`\n[tool-catalog] ✗ CATALOG DRIFT — the public catalog has ${liveCount} tools:\n`);
 problems.forEach((p) => console.error('    ' + p));
 console.error(
   `\n  Why this blocks: the catalog lives on FOUR surfaces (tool-registry.ts, the whitepaper,\n` +

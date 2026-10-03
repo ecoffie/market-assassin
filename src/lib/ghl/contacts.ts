@@ -47,6 +47,9 @@ function ghlHeaders(token: string): HeadersInit {
  * Upsert a batch of contacts into a GHL location. Each contact needs at least an
  * email or a phone. `extraTags` (e.g. a campaign/source tag) are merged onto every row.
  */
+/** Row error for a contact rejected BEFORE any GHL request (no email and no valid phone). */
+export const CONTACT_INVALID_ERROR = 'contact needs an email or a valid phone';
+
 export async function upsertContactsBatch(
   token: string,
   locationId: string,
@@ -59,7 +62,7 @@ export async function upsertContactsBatch(
   for (const c of contacts) {
     const phone = c.phone ? normalizePhoneNumber(c.phone) : null;
     if (!c.email && !phone) {
-      rows.push({ input: c, status: 'failed', error: 'contact needs an email or a valid phone' });
+      rows.push({ input: c, status: 'failed', error: CONTACT_INVALID_ERROR });
       continue;
     }
     const tags = Array.from(new Set([...(c.tags || []), ...extraTags].filter(Boolean)));
