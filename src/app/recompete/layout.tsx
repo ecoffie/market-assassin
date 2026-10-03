@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import PublicShell from '@/components/public-site/PublicShell';
 import Link from 'next/link';
 
 /**
@@ -60,77 +61,77 @@ export default function RecompeteLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <PublicShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
-      <section className="bg-slate-950 text-slate-200">
+      <section className="bg-(--mp-paper) text-(--mp-ink)">
         <div className="mx-auto max-w-4xl px-6 py-14">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-navy)">
             Federal contract recompetes
           </p>
-          <h1 className="mt-3 text-3xl md:text-4xl font-bold text-white">
+          <h1 className="mt-3 text-3xl md:text-4xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">
             Every federal contract ends. That is when it becomes winnable.
           </h1>
-          <p className="mt-5 text-lg text-slate-300">
+          <p className="mt-5 text-lg text-(--mp-body)">
             A recompete is what happens when an existing contract reaches the end of its period of
             performance and the agency has to buy the same work again. The incumbent is not
             guaranteed to keep it — and unlike a brand-new requirement, you can see this one coming
             years in advance, because the end date is in the public award record.
           </p>
-          <p className="mt-4 text-slate-400">
+          <p className="mt-4 text-(--mp-muted)">
             That lead time is the whole advantage. By the time a solicitation posts to SAM.gov, the
             agency has usually already talked to the vendors who introduced themselves months
             earlier. Working backward from expiration dates is how a small business gets into that
             conversation instead of reading about it afterward.
           </p>
 
-          <h2 className="mt-10 text-xl font-semibold text-white">What to look at first</h2>
-          <ul className="mt-4 space-y-3 text-slate-400">
+          <h2 className="mt-10 text-xl font-semibold text-(--mp-ink) font-(family-name:--mp-font-serif)">What to look at first</h2>
+          <ul className="mt-4 space-y-3 text-(--mp-muted)">
             <li>
-              <strong className="text-slate-200">Who holds it now.</strong> The incumbent&rsquo;s
+              <strong className="text-(--mp-ink)">Who holds it now.</strong> The incumbent&rsquo;s
               award history tells you the size of the work and whether they are a specialist or a
               generalist defending a long tail —{' '}
-              <Link href="/contractors" className="text-purple-300 hover:underline">
+              <Link href="/contractors" className="text-(--mp-navy) hover:underline">
                 look the company up
               </Link>
               .
             </li>
             <li>
-              <strong className="text-slate-200">Which agency buys it.</strong> Buying patterns,
+              <strong className="text-(--mp-ink)">Which agency buys it.</strong> Buying patterns,
               vehicles and where each office posts its work differ sharply by agency —{' '}
-              <Link href="/agencies" className="text-purple-300 hover:underline">
+              <Link href="/agencies" className="text-(--mp-navy) hover:underline">
                 browse the agency directory
               </Link>
               .
             </li>
             <li>
-              <strong className="text-slate-200">Whether it is set aside.</strong> A recompete
+              <strong className="text-(--mp-ink)">Whether it is set aside.</strong> A recompete
               reserved for 8(a), HUBZone, SDVOSB or WOSB firms is a much shorter list of
               competitors —{' '}
-              <Link href="/set-asides" className="text-purple-300 hover:underline">
+              <Link href="/set-asides" className="text-(--mp-navy) hover:underline">
                 see the programs
               </Link>
               .
             </li>
             <li>
-              <strong className="text-slate-200">What it is classified as.</strong> The NAICS code
+              <strong className="text-(--mp-ink)">What it is classified as.</strong> The NAICS code
               on the original award is the one the recompete will almost certainly carry —{' '}
-              <Link href="/naics" className="text-purple-300 hover:underline">
+              <Link href="/naics" className="text-(--mp-navy) hover:underline">
                 find yours
               </Link>
               .
             </li>
           </ul>
 
-          <p className="mt-8 text-sm text-slate-500">
+          <p className="mt-8 text-sm text-(--mp-muted)">
             New to this?{' '}
-            <Link href="/glossary" className="text-purple-300 hover:underline">
+            <Link href="/glossary" className="text-(--mp-navy) hover:underline">
               The GovCon glossary
             </Link>{' '}
             defines the terms, and{' '}
-            <Link href="/spending" className="text-purple-300 hover:underline">
+            <Link href="/spending" className="text-(--mp-navy) hover:underline">
               the latest big federal contracts
             </Link>{' '}
             shows what is being awarded right now.
@@ -138,6 +139,6 @@ export default function RecompeteLayout({
         </div>
       </section>
       {children}
-    </>
+    </PublicShell>
   );
 }

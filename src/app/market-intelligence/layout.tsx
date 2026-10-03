@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import PublicShell from '@/components/public-site/PublicShell';
 import Link from 'next/link';
 
 /**
@@ -66,26 +67,26 @@ export default function MarketIntelligenceLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <PublicShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
-      <section className="bg-slate-950 text-slate-200">
+      <section className="bg-(--mp-paper) text-(--mp-ink)">
         <div className="mx-auto max-w-4xl px-6 py-14">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--mp-navy)">
             Federal market intelligence
           </p>
-          <h1 className="mt-3 text-3xl md:text-4xl font-bold text-white">
+          <h1 className="mt-3 text-3xl md:text-4xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">
             Know who buys what you sell — before the solicitation drops.
           </h1>
-          <p className="mt-5 text-lg text-slate-300">
+          <p className="mt-5 text-lg text-(--mp-body)">
             Every federal contract award is a public record. The problem has never been secrecy;
             it is that the records are scattered across SAM.gov, USASpending and dozens of agency
             forecast files, in formats built for auditors rather than for the small business
             trying to find its next contract.
           </p>
-          <p className="mt-4 text-slate-400">
+          <p className="mt-4 text-(--mp-muted)">
             Mindy reads those records and answers the three questions that actually decide whether
             a pursuit is worth your time: which agencies already buy your work, who holds those
             contracts today, and when each one comes up for recompete. Every figure traces back to
@@ -93,73 +94,73 @@ export default function MarketIntelligenceLayout({
             answer is &ldquo;unavailable&rdquo; rather than a zero.
           </p>
 
-          <h2 className="mt-10 text-xl font-semibold text-white">Start from the public data</h2>
+          <h2 className="mt-10 text-xl font-semibold text-(--mp-ink) font-(family-name:--mp-font-serif)">Start from the public data</h2>
           <ul className="mt-4 grid gap-3 sm:grid-cols-2">
             <li>
-              <Link href="/contractors" className="text-purple-300 hover:underline">
+              <Link href="/contractors" className="text-(--mp-navy) hover:underline">
                 Federal contractor database
               </Link>
-              <span className="block text-sm text-slate-500">
+              <span className="block text-sm text-(--mp-muted)">
                 Award history, agencies and NAICS activity per company.
               </span>
             </li>
             <li>
-              <Link href="/agencies" className="text-purple-300 hover:underline">
+              <Link href="/agencies" className="text-(--mp-navy) hover:underline">
                 Federal agency directory
               </Link>
-              <span className="block text-sm text-slate-500">
+              <span className="block text-sm text-(--mp-muted)">
                 What each buyer purchases, and where they post it.
               </span>
             </li>
             <li>
-              <Link href="/naics" className="text-purple-300 hover:underline">
+              <Link href="/naics" className="text-(--mp-navy) hover:underline">
                 Contracts by NAICS code
               </Link>
-              <span className="block text-sm text-slate-500">
+              <span className="block text-sm text-(--mp-muted)">
                 Your industry code, and the federal demand under it.
               </span>
             </li>
             <li>
-              <Link href="/spending" className="text-purple-300 hover:underline">
+              <Link href="/spending" className="text-(--mp-navy) hover:underline">
                 The latest big federal contracts
               </Link>
-              <span className="block text-sm text-slate-500">
+              <span className="block text-sm text-(--mp-muted)">
                 Recent awards, with the record behind each one.
               </span>
             </li>
             <li>
-              <Link href="/set-asides" className="text-purple-300 hover:underline">
+              <Link href="/set-asides" className="text-(--mp-navy) hover:underline">
                 Set-aside programs
               </Link>
-              <span className="block text-sm text-slate-500">
+              <span className="block text-sm text-(--mp-muted)">
                 8(a), HUBZone, SDVOSB and WOSB contract paths.
               </span>
             </li>
             <li>
-              <Link href="/glossary" className="text-purple-300 hover:underline">
+              <Link href="/glossary" className="text-(--mp-navy) hover:underline">
                 GovCon glossary
               </Link>
-              <span className="block text-sm text-slate-500">
+              <span className="block text-sm text-(--mp-muted)">
                 The vocabulary, in plain English.
               </span>
             </li>
           </ul>
 
-          <p className="mt-8 text-sm text-slate-500">
+          <p className="mt-8 text-sm text-(--mp-muted)">
             Comparing tools? See how Mindy stacks up against{' '}
-            <Link href="/compare/govwin" className="text-purple-300 hover:underline">
+            <Link href="/compare/govwin" className="text-(--mp-navy) hover:underline">
               GovWin
             </Link>
             ,{' '}
-            <Link href="/compare/highergov" className="text-purple-300 hover:underline">
+            <Link href="/compare/highergov" className="text-(--mp-navy) hover:underline">
               HigherGov
             </Link>{' '}
             and{' '}
-            <Link href="/compare/sam-gov" className="text-purple-300 hover:underline">
+            <Link href="/compare/sam-gov" className="text-(--mp-navy) hover:underline">
               SAM.gov itself
             </Link>
             , or read the{' '}
-            <Link href="/pricing" className="text-purple-300 hover:underline">
+            <Link href="/pricing" className="text-(--mp-navy) hover:underline">
               pricing
             </Link>
             .
@@ -167,6 +168,6 @@ export default function MarketIntelligenceLayout({
         </div>
       </section>
       {children}
-    </>
+    </PublicShell>
   );
 }

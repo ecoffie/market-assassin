@@ -6,12 +6,19 @@
  *   - use no purple, violet, indigo or fuchsia: no Tailwind utilities in those families, and
  *     no hex/rgb colour with a purple hue;
  *   - use no gradients and no dark-slate or black backgrounds;
+ *   - use none of the authenticated app's @theme tokens (bg-ground, text-ink, bg-accent, ...),
+ *     which resolve to its dark palette;
  *   - opt out of automatic dark mode (no `dark:` variants, no prefers-color-scheme: dark);
  *   - stay at or below font weight 700;
  *   - name no font family other than Libre Baskerville, Inter and IBM Plex Mono (plus their
  *     system fallbacks), and load no fonts from a CDN;
  *   - use only hex colours from src/lib/public-site/tokens.ts;
- *   - import the shared system (route files outside the public-site directories).
+ *   - render inside the shared system: an app file must import it or sit under a family
+ *     layout.tsx that renders PublicShell. Components listed here render only inside the shell.
+ *
+ * Directories are walked, so a migrated route family stays guarded when pages are added to it.
+ * Generated social images (opengraph-image, twitter-image, icon) are metadata, not page UI, and
+ * are skipped.
  *
  * The purple Mindy logo is an image asset, not a colour, so nothing here touches it.
  *
@@ -23,7 +30,7 @@
  *       node scripts/audit-public-design.mjs --self-test
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
-import { join, relative } from 'path';
+import { dirname, join, relative } from 'path';
 
 const ROOT = process.cwd();
 const MANIFEST = 'src/lib/public-site/opt-in.json';
@@ -34,7 +41,7 @@ function walk(p, out = []) {
   if (!existsSync(p)) throw new Error(`opt-in path does not exist: ${p}`);
   if (statSync(p).isDirectory()) {
     for (const e of readdirSync(p)) walk(join(p, e), out);
-  } else if (/\.(tsx?|jsx?|mjs|css)$/.test(p) && !/\.(test|spec)\./.test(p)) {
+  } else if (/\.(tsx?|jsx?|mjs|css)$/.test(p) && !/\.(test|spec)\./.test(p) && !/\/(?:opengraph-image|twitter-image|icon|apple-icon)\.[jt]sx?$/.test(p)) {
     out.push(relative(ROOT, p));
   }
   return out;
@@ -45,6 +52,17 @@ export function stripComments(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
     .replace(/(^|[\s;{}(,])\/\/[^\n]*/g, (m, lead) => lead + ' '.repeat(m.length - lead.length));
+}
+
+/** True when a layout.tsx between the file's directory and src/app renders PublicShell. */
+function underShellLayout(file) {
+  let dir = dirname(file);
+  while (dir.startsWith('src/app')) {
+    const layout = join(ROOT, dir, 'layout.tsx');
+    if (existsSync(layout) && /<PublicShell\b/.test(readFileSync(layout, 'utf8'))) return true;
+    dir = dirname(dir);
+  }
+  return false;
 }
 
 function hexToRgb(hex) {
@@ -88,6 +106,7 @@ const RULES = [
   { id: 'dark-mode', re: /\bdark:[\w-]+|prefers-color-scheme\s*:\s*dark/g, msg: 'automatic dark mode' },
   { id: 'weight', re: /(?<![-\w])font-(?:extrabold|black)\b|font-weight\s*:\s*[89]00\b|\bfont\s*:\s*(?:italic\s+)?[89]00\b|fontWeight\s*:\s*['"]?[89]00/g, msg: 'font weight above 700' },
   { id: 'font-family', re: /\b(?:Newsreader|JetBrains|Roboto|Poppins|Montserrat|Lato|Open Sans|Playfair|Merriweather|Source Serif|Space Grotesk|DM Sans|Helvetica Neue|Arial)\b|(?<![-\w])font-(?:mono|serif)\b/g, msg: 'font outside Libre Baskerville / Inter / IBM Plex Mono' },
+  { id: 'app-theme', re: /(?<![\w(-])(?:[a-z-]+:)*(?:bg|text|border|ring|divide|placeholder|from|via|to|fill|stroke|outline)-(?:ground(?:-deep)?|surface(?:-2)?|input|hairline|ink(?:-soft)?|muted|faint|accent(?:-[a-z]+)?|navy(?:-\d{3}|-hover)?)(?![\w(-])/g, msg: 'authenticated-app theme token (dark @theme); use the --mp-* roles' },
   { id: 'font-cdn', re: /fonts\.googleapis\.com|fonts\.gstatic\.com|use\.typekit\.net/g, msg: 'font loaded from a CDN (use src/lib/public-site/fonts.ts)' },
 ];
 
@@ -111,8 +130,9 @@ export function auditSource(file, src, palette) {
     if (isPurple([+m[1], +m[2], +m[3]])) findings.push({ file, line: lineOf(m.index), rule: 'purple-rgb', msg: 'purple-hue colour', text: m[0] });
   }
   const shared = SHARED_DIRS.some((d) => file.startsWith(d));
-  if (!shared && /\.(tsx?|jsx?)$/.test(file) && !/@\/(?:lib|components)\/public-site\//.test(src)) {
-    findings.push({ file, line: 1, rule: 'shared-import', msg: 'opted-in file does not import the public design system', text: '' });
+  const appFile = file.startsWith('src/app/');
+  if (!shared && appFile && /\.(tsx?|jsx?)$/.test(file) && !/@\/(?:lib|components)\/public-site\//.test(src) && !underShellLayout(file)) {
+    findings.push({ file, line: 1, rule: 'shared-import', msg: 'opted-in route neither imports the public design system nor sits under a PublicShell layout', text: '' });
   }
   return findings;
 }
@@ -123,11 +143,12 @@ function selfTest() {
     'className="bg-purple-600"', 'background:linear-gradient(135deg,#1e3a8a,#7c3aed)', 'className="bg-slate-950"',
     'className="dark:bg-black"', 'font-weight:800', 'className="font-black"', 'color:#7c3aed', 'color:#123456',
     "font-family:'Newsreader'", 'rgba(124,58,237,.5)', '@import url(https://fonts.googleapis.com/css2)',
-    'className="font-mono text-sm"',
+    'className="font-mono text-sm"', 'className="bg-ground-deep text-ink"', 'className="hover:bg-accent-hover"', 'className="border-hairline"',
   ];
   const good = [
     'color:#1B3A6B', 'background:#fff', 'font:700 16px Inter', '/* #7c3aed in a comment */', 'href="https://x.y/z" // note',
     '&#39;', 'font:400 13px var(--mp-font-mono)', 'font:700 1rem var(--mp-font-serif)',
+    'className="bg-(--mp-surface) text-(--mp-ink) border-(--mp-line)"', 'className="text-muted-foreground-x"',
   ];
   let ok = true;
   for (const s of bad) {

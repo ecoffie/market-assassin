@@ -186,20 +186,20 @@ export default function ContractorsIndexPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-200">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <BackToAppHeader />
-      <MeetMindyStrip variant="banner" />
+      <MeetMindyStrip variant="banner" appearance="public" />
       <div className="mx-auto max-w-6xl px-6 py-12">
         {/* Hero */}
         <header className="mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
+          <h1 className="text-3xl md:text-4xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">
             Federal Contractor Database
           </h1>
-          <p className="mt-3 text-lg text-slate-400 max-w-3xl">
+          <p className="mt-3 text-lg text-(--mp-muted) max-w-3xl">
             Search the full federal contractor universe by name — every company with
             USAspending award history. This index highlights{' '}
             {totalCount.toLocaleString()} curated profiles; use search or a direct
@@ -207,17 +207,17 @@ export default function ContractorsIndexPage() {
             on record. Powered by USAspending + SAM.gov data.
           </p>
           <div className="mt-6 flex flex-wrap gap-4 text-sm">
-            <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
-              <div className="text-2xl font-bold text-emerald-400">{CANONICAL_POPULATION_LABEL}</div>
-              <div className="text-xs text-slate-500 mt-0.5">contractors searchable</div>
+            <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) px-4 py-3">
+              <div className="text-2xl font-bold text-(--mp-ok)">{CANONICAL_POPULATION_LABEL}</div>
+              <div className="text-xs text-(--mp-muted) mt-0.5">contractors searchable</div>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
-              <div className="text-2xl font-bold text-emerald-400">{totalCount.toLocaleString()}</div>
-              <div className="text-xs text-slate-500 mt-0.5">curated profiles in this index</div>
+            <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) px-4 py-3">
+              <div className="text-2xl font-bold text-(--mp-ok)">{totalCount.toLocaleString()}</div>
+              <div className="text-xs text-(--mp-muted) mt-0.5">curated profiles in this index</div>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
-              <div className="text-2xl font-bold text-emerald-400">{formatCompactCurrency(totalSpend)}</div>
-              <div className="text-xs text-slate-500 mt-0.5">combined federal spend</div>
+            <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) px-4 py-3">
+              <div className="text-2xl font-bold text-(--mp-ok)">{formatCompactCurrency(totalSpend)}</div>
+              <div className="text-xs text-(--mp-muted) mt-0.5">combined federal spend</div>
             </div>
           </div>
         </header>
@@ -232,9 +232,9 @@ export default function ContractorsIndexPage() {
               const hidden = tier.contractors.length - visible.length;
               return (
                 <section key={tier.label}>
-                  <header className="mb-4 border-b border-slate-800 pb-2">
-                    <h2 className="text-xl font-bold text-white">{tier.label}</h2>
-                    <p className="text-sm text-slate-500 mt-1">
+                  <header className="mb-4 border-b border-(--mp-line) pb-2">
+                    <h2 className="text-xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">{tier.label}</h2>
+                    <p className="text-sm text-(--mp-muted) mt-1">
                       {tier.description} ({tier.contractors.length.toLocaleString()} total)
                     </p>
                   </header>
@@ -249,12 +249,12 @@ export default function ContractorsIndexPage() {
                         <li key={slug}>
                           <Link
                             href={`/contractors/${slug}`}
-                            className="block py-1 px-2 rounded hover:bg-slate-900 transition-colors group"
+                            className="block py-1 px-2 rounded hover:bg-(--mp-surface) transition-colors group"
                           >
-                            <span className="text-slate-200 group-hover:text-white truncate block">
+                            <span className="text-(--mp-ink) group-hover:text-(--mp-ink) truncate block">
                               {c.company}
                             </span>
-                            <span className="text-[10px] text-slate-500 group-hover:text-slate-400">
+                            <span className="text-[10px] text-(--mp-muted) group-hover:text-(--mp-muted)">
                               {formatCompactCurrency(c.contract_value_num || 0)}
                               {c.contract_count && ` · ${c.contract_count} contracts`}
                             </span>
@@ -265,7 +265,7 @@ export default function ContractorsIndexPage() {
                   </ul>
 
                   {hidden > 0 && (
-                    <p className="text-xs text-slate-500 italic mt-3">
+                    <p className="text-xs text-(--mp-muted) italic mt-3">
                       +{hidden.toLocaleString()} more contractors in this tier (browse via search or sitemap).
                     </p>
                   )}
@@ -275,24 +275,24 @@ export default function ContractorsIndexPage() {
         </div>
 
         {/* CTA back to the product */}
-        <section className="mt-16 rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-900/30 to-purple-800/10 p-6 text-center">
-          <h2 className="text-xl font-bold text-white mb-2">
+        <section className="mt-16 rounded-lg border border-(--mp-line) p-6 text-center bg-(--mp-wash)">
+          <h2 className="text-xl font-bold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">
             Need full federal contracting intelligence?
           </h2>
-          <p className="text-sm text-slate-400 mb-4 max-w-2xl mx-auto">
+          <p className="text-sm text-(--mp-muted) mb-4 max-w-2xl mx-auto">
             {SITE_NAME} Market Intelligence gives you SAM.gov opportunities, recompete tracking,
             agency pain points, OSBP contacts, AI bid/no-bid analysis, and 33,000+ agency forecasts
             — all in one workspace.
           </p>
           <Link
             href="/market-intelligence"
-            className="inline-block px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold"
+            className="inline-block px-5 py-2.5 rounded-lg bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white text-sm font-semibold"
           >
             Try Market Intelligence Free →
           </Link>
         </section>
 
-        <footer className="mt-12 pt-6 border-t border-slate-800 text-xs text-slate-500 text-center">
+        <footer className="mt-12 pt-6 border-t border-(--mp-line) text-xs text-(--mp-muted) text-center">
           Data sources: USAspending.gov + SAM.gov, updated weekly.
         </footer>
       </div>

@@ -13,10 +13,10 @@ export const metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-200">
+    <main className="bg-(--mp-paper) text-(--mp-ink)">
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <h1 className="text-4xl font-bold text-white mb-4">Privacy Policy</h1>
-        <p className="text-slate-500 mb-10">Last Updated: July 17, 2026</p>
+        <h1 className="text-4xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">Privacy Policy</h1>
+        <p className="text-(--mp-muted) mb-10">Last Updated: July 17, 2026</p>
 
         <div className="space-y-6 leading-relaxed">
           <p>
@@ -26,9 +26,9 @@ export default function PrivacyPolicyPage() {
             and use our services.
           </p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">1. Information We Collect</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">1. Information We Collect</h2>
 
-          <h3 className="text-lg font-semibold text-white">Personal Information</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink)">Personal Information</h3>
           <p>We may collect personal information that you voluntarily provide to us when you:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Register for an account</li>
@@ -46,14 +46,14 @@ export default function PrivacyPolicyPage() {
             <li>Payment information (processed securely via Stripe)</li>
           </ul>
 
-          <h3 className="text-lg font-semibold text-white">Usage Information</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink)">Usage Information</h3>
           <p>
             We automatically collect certain information when you visit our website, including your IP
             address, browser type, operating system, referring URLs, and information about how you interact
             with our site.
           </p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">2. How We Use Your Information</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">2. How We Use Your Information</h2>
           <p>We use the information we collect to:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Provide, maintain, and improve our services</li>
@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
             <li>Detect, investigate, and prevent fraudulent transactions and other illegal activities</li>
           </ul>
 
-          <h2 id="sms-communications" className="text-2xl font-semibold text-white pt-6">
+          <h2 id="sms-communications" className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">
             3. SMS / Text Message Communications
           </h2>
           <p>
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
             <li>Webinar and bootcamp reminders</li>
           </ul>
 
-          <h3 className="text-lg font-semibold text-white">SMS Opt-In and Consent</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink)">SMS Opt-In and Consent</h3>
           <p>You must explicitly opt in to receive SMS messages from us. We collect your consent through:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Checking a checkbox or clicking a button indicating your consent to receive SMS messages</li>
@@ -87,15 +87,15 @@ export default function PrivacyPolicyPage() {
             <li>Providing your phone number during checkout with SMS opt-in selected</li>
           </ul>
           <p>
-            <strong className="text-white">Message frequency:</strong> Varies based on your subscription.
+            <strong className="text-(--mp-ink)">Message frequency:</strong> Varies based on your subscription.
             Daily briefing subscribers receive 1 message per day. Other notifications are sent as needed.
           </p>
           <p>
-            <strong className="text-white">Message and data rates may apply.</strong> Check with your
+            <strong className="text-(--mp-ink)">Message and data rates may apply.</strong> Check with your
             mobile carrier for details.
           </p>
 
-          <h3 className="text-lg font-semibold text-white">How to Opt Out of SMS</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink)">How to Opt Out of SMS</h3>
           <p>You can opt out of receiving SMS messages at any time by:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Replying STOP to any message you receive from us</li>
@@ -107,7 +107,7 @@ export default function PrivacyPolicyPage() {
             SMS messages from us unless you opt in again.
           </p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">4. Email Communications</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">4. Email Communications</h2>
           <p>By providing your email address, you may receive:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Daily intelligence briefings</li>
@@ -120,24 +120,24 @@ export default function PrivacyPolicyPage() {
             link at the bottom of any email.
           </p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">5. Information Sharing</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">5. Information Sharing</h2>
           <p>We do not sell your personal information. We may share your information with:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>
-              <strong className="text-white">Service Providers:</strong> Companies that help us operate
+              <strong className="text-(--mp-ink)">Service Providers:</strong> Companies that help us operate
               our business (payment processing, email delivery, SMS delivery, analytics)
             </li>
             <li>
-              <strong className="text-white">Legal Requirements:</strong> When required by law or to
+              <strong className="text-(--mp-ink)">Legal Requirements:</strong> When required by law or to
               protect our rights
             </li>
             <li>
-              <strong className="text-white">Business Transfers:</strong> In connection with a merger,
+              <strong className="text-(--mp-ink)">Business Transfers:</strong> In connection with a merger,
               acquisition, or sale of assets
             </li>
           </ul>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">6. Where Your Data Is Stored</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">6. Where Your Data Is Stored</h2>
           <p>
             Your account data, saved research, and usage records are stored in our PostgreSQL database
             hosted by Supabase in the United States (AWS US-West-2, Oregon), with a read replica in the
@@ -150,59 +150,59 @@ export default function PrivacyPolicyPage() {
             guarantee absolute security.
           </p>
 
-          <h2 id="data-retention" className="text-2xl font-semibold text-white pt-6">
+          <h2 id="data-retention" className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">
             7. Data Retention
           </h2>
           <p>We keep your information only as long as we need it for the purpose it was collected:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>
-              <strong className="text-white">Account information</strong> (name, email, company, targeting
+              <strong className="text-(--mp-ink)">Account information</strong> (name, email, company, targeting
               preferences) &mdash; for as long as your account is active.
             </li>
             <li>
-              <strong className="text-white">Saved work</strong> (research, market reports, proposal drafts,
+              <strong className="text-(--mp-ink)">Saved work</strong> (research, market reports, proposal drafts,
               pipeline, contacts) &mdash; for as long as your account is active, so you can return to it.
             </li>
             <li>
-              <strong className="text-white">Usage and billing records</strong> (tool-call logs, credit
+              <strong className="text-(--mp-ink)">Usage and billing records</strong> (tool-call logs, credit
               ledger) &mdash; retained while your account is active, because they are the audit trail behind
               your balance and invoices.
             </li>
             <li>
-              <strong className="text-white">Authentication tokens</strong> &mdash; access tokens expire
+              <strong className="text-(--mp-ink)">Authentication tokens</strong> &mdash; access tokens expire
               after 1 hour, refresh tokens after 60 days, and authorization codes after 5 minutes and are
               single-use. Revoking a connection invalidates them immediately.
             </li>
             <li>
-              <strong className="text-white">Email and SMS delivery records</strong> &mdash; kept while your
+              <strong className="text-(--mp-ink)">Email and SMS delivery records</strong> &mdash; kept while your
               account is active so we can honor unsubscribe and STOP requests and prove consent.
             </li>
           </ul>
           <p>
-            <strong className="text-white">Deletion.</strong> You can ask us to delete your account and its
+            <strong className="text-(--mp-ink)">Deletion.</strong> You can ask us to delete your account and its
             data at any time by emailing hello@getmindy.ai. We action deletion requests within 30 days.
             Deleting your account removes your saved work and activity records. We may retain a minimal
             record of a transaction where tax, accounting, or legal obligations require it, and we may keep
             anonymized, aggregated statistics that cannot identify you.
           </p>
 
-          <h2 id="ai-processing" className="text-2xl font-semibold text-white pt-6">
+          <h2 id="ai-processing" className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">
             8. AI Processing and Model Providers
           </h2>
           <p>
             Mindy is an AI product. To answer your questions, extract requirements from solicitations, and
             draft proposal content, we send the relevant text to third-party large language model providers.
-            Depending on the task, that may include <strong className="text-white">OpenAI</strong>,{' '}
-            <strong className="text-white">Anthropic</strong>, <strong className="text-white">Groq</strong>,
-            and <strong className="text-white">xAI</strong>. We use multiple providers so the service stays
+            Depending on the task, that may include <strong className="text-(--mp-ink)">OpenAI</strong>,{' '}
+            <strong className="text-(--mp-ink)">Anthropic</strong>, <strong className="text-(--mp-ink)">Groq</strong>,
+            and <strong className="text-(--mp-ink)">xAI</strong>. We use multiple providers so the service stays
             available when any one of them is rate-limited or down.
           </p>
           <p>
-            <strong className="text-white">Sensitive content is restricted to a narrower set.</strong> When
+            <strong className="text-(--mp-ink)">Sensitive content is restricted to a narrower set.</strong> When
             a request involves your own business information &mdash; your capability statements, past
             performance, personnel details, or a proposal draft grounded in them &mdash; we classify it as
             sensitive and route it only to providers we have vetted as{' '}
-            <strong className="text-white">not training on our data</strong>. Sensitive content is never
+            <strong className="text-(--mp-ink)">not training on our data</strong>. Sensitive content is never
             sent to xAI. This restriction is enforced in our code, not by policy alone: a configuration
             change cannot override it.
           </p>
@@ -212,12 +212,12 @@ export default function PrivacyPolicyPage() {
             data, not your data, and carries no such restriction.
           </p>
 
-          <h2 id="mcp-connector" className="text-2xl font-semibold text-white pt-6">
+          <h2 id="mcp-connector" className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">
             9. The Mindy Connector for AI Assistants (MCP)
           </h2>
           <p>
             Mindy can be connected to AI assistants that support the Model Context Protocol (MCP), including
-            Claude, at <span className="font-mono text-slate-300">https://mcp.getmindy.ai/mcp</span>. If you
+            Claude, at <span className="font-(family-name:--mp-font-mono) text-(--mp-body)">https://mcp.getmindy.ai/mcp</span>. If you
             connect it:
           </p>
           <ul className="list-disc pl-6 space-y-1">
@@ -243,7 +243,7 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">10. Your Rights</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">10. Your Rights</h2>
           <p>Depending on your location, you may have the right to:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Access the personal information we hold about you</li>
@@ -254,30 +254,30 @@ export default function PrivacyPolicyPage() {
           </ul>
           <p>To exercise these rights, contact us at hello@getmindy.ai.</p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">11. Children&apos;s Privacy</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">11. Children&apos;s Privacy</h2>
           <p>
             Our services are not intended for individuals under 18 years of age. We do not knowingly
             collect personal information from children.
           </p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">12. Changes to This Policy</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">12. Changes to This Policy</h2>
           <p>
             We may update this Privacy Policy from time to time. We will notify you of any changes by
             posting the new Privacy Policy on this page and updating the &quot;Last Updated&quot; date.
           </p>
 
-          <h2 className="text-2xl font-semibold text-white pt-6">13. Contact Us</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">13. Contact Us</h2>
           <p>If you have questions about this Privacy Policy, please contact us:</p>
           <ul className="list-none space-y-1">
             <li>
-              <strong className="text-white">GovConEdu LLC</strong>
+              <strong className="text-(--mp-ink)">GovConEdu LLC</strong>
             </li>
             <li>Email: hello@getmindy.ai</li>
           </ul>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-slate-800">
-          <Link href="/" className="text-purple-400 hover:text-purple-300 font-medium">
+        <div className="mt-12 pt-8 border-t border-(--mp-line)">
+          <Link href="/" className="text-(--mp-navy) hover:text-(--mp-navy-hover) font-medium">
             &larr; Back to Mindy
           </Link>
         </div>

@@ -100,8 +100,8 @@ export default function AgenciesIndexPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
-      <MeetMindyStrip variant="banner" />
+    <main className="bg-(--mp-paper)">
+      <MeetMindyStrip variant="banner" appearance="public" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -110,37 +110,37 @@ export default function AgenciesIndexPage() {
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
-        className="max-w-4xl mx-auto px-4 pt-8 text-sm text-slate-400"
+        className="max-w-4xl mx-auto px-4 pt-8 text-sm text-(--mp-muted)"
       >
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/" className="hover:text-purple-300 transition">
+            <Link href="/" className="hover:text-(--mp-navy-hover) transition">
               Home
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li className="text-slate-500" aria-current="page">
+          <li className="text-(--mp-muted)" aria-current="page">
             Agencies
           </li>
         </ol>
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900/30 via-slate-950 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <span className="text-white font-bold text-xl">M</span>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-(--mp-navy)">
+              <span className="text-(--mp-surface) font-bold text-xl">M</span>
             </div>
-            <span className="text-purple-300 font-semibold tracking-wide uppercase text-sm">
+            <span className="text-(--mp-navy) font-semibold tracking-wide uppercase text-sm">
               Agency Directory
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Federal Agencies —{' '}
-            <span className="text-purple-400">Contract Opportunities by Buyer</span>
+            <span className="text-(--mp-navy)">Contract Opportunities by Buyer</span>
           </h1>
-          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-10">
+          <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-10">
             {AGENCIES_SEO.length} federal agencies, ranked by FY26 budget.
             Click any agency to see what they buy, where they post
             opportunities, and what they actually struggle with.
@@ -169,7 +169,6 @@ export default function AgenciesIndexPage() {
           <Group
             label="Defense & Homeland"
             description="DoD, DHS, and USACE — the largest single buyer cluster in the federal market."
-            color="red"
             agencies={defense}
           />
         )}
@@ -177,7 +176,6 @@ export default function AgenciesIndexPage() {
           <Group
             label="Health"
             description="HHS and its sub-agencies — primary civilian buyer of R&D and IT services."
-            color="emerald"
             agencies={health}
           />
         )}
@@ -185,7 +183,6 @@ export default function AgenciesIndexPage() {
           <Group
             label="Cabinet — Civilian"
             description="The other 12 cabinet departments. Strong set-aside programs at VA, USDA, and DOI."
-            color="blue"
             agencies={civilian}
           />
         )}
@@ -193,7 +190,6 @@ export default function AgenciesIndexPage() {
           <Group
             label="Independent Agencies"
             description="NASA, GSA, EPA, NSF and others — often the easiest entry points for small business."
-            color="purple"
             agencies={independent}
           />
         )}
@@ -201,7 +197,6 @@ export default function AgenciesIndexPage() {
           <Group
             label="Smaller Agencies & Commissions"
             description="Lower competition, predictable repeat buyers. Often overlooked by primes."
-            color="slate"
             agencies={small}
           />
         )}
@@ -209,22 +204,22 @@ export default function AgenciesIndexPage() {
 
       {/* CTA */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto border border-(--mp-line) rounded-lg p-8 md:p-12 text-center bg-(--mp-wash)">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Stop checking 12 portals. Let Mindy do it.
           </h2>
-          <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Mindy aggregates SAM.gov, agency forecast portals, NIH RePORTER,
             SBIR/STTR, and dozens of agency-specific bid boards into one daily
             briefing — matched to your NAICS codes.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Get Free Daily Opportunity Alerts
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. First briefing lands tomorrow morning.
           </p>
         </div>
@@ -235,90 +230,63 @@ export default function AgenciesIndexPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-      <div className="text-2xl font-bold text-purple-300">{value}</div>
-      <div className="text-xs text-slate-400 mt-1">{label}</div>
+    <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-4">
+      <div className="text-2xl font-bold text-(--mp-navy)">{value}</div>
+      <div className="text-xs text-(--mp-muted) mt-1">{label}</div>
     </div>
   );
 }
 
-const COLOR_CLASSES: Record<
-  string,
-  { pill: string; hover: string; accent: string }
-> = {
-  red: {
-    pill: 'bg-red-500/15 text-red-300 border-red-500/30',
-    hover: 'hover:border-red-500/50',
-    accent: 'text-red-300',
-  },
-  emerald: {
-    pill: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    hover: 'hover:border-emerald-500/50',
-    accent: 'text-emerald-300',
-  },
-  blue: {
-    pill: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    hover: 'hover:border-blue-500/50',
-    accent: 'text-blue-300',
-  },
-  purple: {
-    pill: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-    hover: 'hover:border-purple-500/50',
-    accent: 'text-purple-300',
-  },
-  slate: {
-    pill: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
-    hover: 'hover:border-slate-500/50',
-    accent: 'text-slate-300',
-  },
+const GROUP_STYLE = {
+  pill: 'bg-(--mp-navy-wash) text-(--mp-navy) border-(--mp-line)',
+  hover: 'hover:border-(--mp-navy)',
+  accent: 'text-(--mp-navy)',
 };
 
 function Group({
   label,
   description,
-  color,
   agencies,
 }: {
   label: string;
   description: string;
-  color: string;
   agencies: AgencySeo[];
 }) {
-  const styles = COLOR_CLASSES[color] ?? COLOR_CLASSES.purple;
+  const styles = GROUP_STYLE;
   return (
     <section>
       <div className="flex items-center gap-3 mb-2">
         <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${styles.pill}`}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide border ${styles.pill}`}
         >
           {label}
         </span>
-        <span className="text-slate-500 text-sm">
+        <span className="text-(--mp-muted) text-sm">
           {agencies.length} agencies
         </span>
       </div>
-      <p className="text-slate-400 text-sm mb-6 max-w-3xl">{description}</p>
+      <p className="text-(--mp-muted) text-sm mb-6 max-w-3xl">{description}</p>
       <ul className="grid sm:grid-cols-2 gap-4">
         {agencies.map((a) => (
           <li key={a.slug}>
             <Link
               href={`/agencies/${a.slug}`}
-              className={`block bg-slate-900/60 border border-slate-800 rounded-xl p-5 transition group ${styles.hover}`}
+              className={`block bg-(--mp-wash) border border-(--mp-line) rounded-lg p-5 transition group ${styles.hover}`}
             >
               <div className="flex items-baseline justify-between gap-3 mb-1">
                 <span className={`font-bold ${styles.accent}`}>
                   {a.abbreviation || a.name}
                 </span>
                 {a.fy26BudgetB ? (
-                  <span className="text-slate-500 text-sm whitespace-nowrap">
+                  <span className="text-(--mp-muted) text-sm whitespace-nowrap">
                     ${a.fy26BudgetB.toLocaleString()}B FY26
                   </span>
                 ) : null}
               </div>
-              <h3 className="text-white font-semibold leading-snug group-hover:text-white">
+              <h3 className="text-(--mp-ink) font-semibold leading-snug group-hover:text-(--mp-ink)">
                 {a.name}
               </h3>
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-(--mp-muted) mt-2">
                 {a.painPoints.length > 0
                   ? `${a.painPoints.length} priorities tracked`
                   : 'View opportunities'}{' '}

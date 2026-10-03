@@ -105,7 +105,7 @@ function track(action: string, extra: Record<string, unknown> = {}) {
 function ShowingOf({ shown, total }: { shown: number; total?: number | null }) {
   if (typeof total !== 'number' || total <= shown) return null;
   return (
-    <span className="ml-2 font-normal normal-case text-faint">
+    <span className="ml-2 font-normal normal-case text-(--mp-muted)">
       showing {shown} of {total}
     </span>
   );
@@ -114,10 +114,10 @@ function ShowingOf({ shown, total }: { shown: number; total?: number | null }) {
 function RevealHero({ view }: { view: HiddenMarketLandingView }) {
   const reveal = view.reveal;
   if (view.outcome === 'need_followup' && view.message) {
-    return <p className="text-lg text-ink">{view.message}</p>;
+    return <p className="text-lg text-(--mp-ink)">{view.message}</p>;
   }
   if (!reveal?.explanation) return null;
-  return <p className="text-lg text-ink">{reveal.explanation}</p>;
+  return <p className="text-lg text-(--mp-ink)">{reveal.explanation}</p>;
 }
 
 export function TryLanding() {
@@ -236,22 +236,22 @@ export function TryLanding() {
     showUncovered && (reveal?.translatedTerms?.length ?? 0) > 0 && reveal?.translatedTerms;
 
   return (
-    <main className="min-h-screen bg-ground-deep px-4 py-12 text-ink">
+    <main className="bg-(--mp-paper) px-4 py-12 text-(--mp-ink)">
       <div className="mx-auto w-full max-w-2xl">
-        <p className="mb-8 text-sm text-muted">
-          <Link href="/" className="text-accent hover:underline">
+        <p className="mb-8 text-sm text-(--mp-muted)">
+          <Link href="/" className="text-(--mp-navy) hover:underline">
             Mindy
           </Link>
         </p>
-        <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight text-(--mp-ink) sm:text-4xl font-(family-name:--mp-font-serif)">
           See where the government buys what you sell
         </h1>
-        <p className="mt-3 text-lg text-ink-soft">
+        <p className="mt-3 text-lg text-(--mp-body)">
           Describe your business in plain English. No codes required.
         </p>
 
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
-          <label htmlFor="business-do" className="block text-sm font-medium text-ink-soft">
+          <label htmlFor="business-do" className="block text-sm font-medium text-(--mp-body)">
             What does your business do?
           </label>
           <textarea
@@ -262,11 +262,11 @@ export function TryLanding() {
             rows={3}
             maxLength={400}
             required
-            className="w-full rounded-xl border border-hairline bg-surface px-4 py-3 text-ink placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full rounded-lg border border-(--mp-line) bg-(--mp-surface) px-4 py-3 text-(--mp-ink) placeholder:text-(--mp-subtle) focus:outline-none focus:ring-2 focus:ring-(--mp-navy)"
           />
           {showFollowUp && (
             <div>
-              <label htmlFor="business-followup" className="block text-sm font-medium text-ink-soft">
+              <label htmlFor="business-followup" className="block text-sm font-medium text-(--mp-body)">
                 {view?.followUpPrompt || 'What do you actually do for customers?'}
               </label>
               <textarea
@@ -275,27 +275,27 @@ export function TryLanding() {
                 onChange={(e) => setFollowUp(e.target.value)}
                 rows={2}
                 maxLength={400}
-                className="mt-2 w-full rounded-xl border border-hairline bg-surface px-4 py-3 text-ink placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent"
+                className="mt-2 w-full rounded-lg border border-(--mp-line) bg-(--mp-surface) px-4 py-3 text-(--mp-ink) placeholder:text-(--mp-subtle) focus:outline-none focus:ring-2 focus:ring-(--mp-navy)"
               />
             </div>
           )}
           <button
             type="submit"
             disabled={loading || !description.trim()}
-            className="w-full rounded-xl bg-accent px-6 py-3 font-semibold text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover) disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? 'Looking…' : 'Show me where the government buys this'}
           </button>
         </form>
 
         {loading && (
-          <p className="mt-8 text-muted" role="status">
+          <p className="mt-8 text-(--mp-muted)" role="status">
             Looking for where the government buys this…
           </p>
         )}
 
         {requestError && !loading && (
-          <p className="mt-8 text-warn" role="status">
+          <p className="mt-8 text-(--mp-warn)" role="status">
             {requestError}
           </p>
         )}
@@ -308,34 +308,34 @@ export function TryLanding() {
             data-reveal-state={reveal?.revealState ?? ''}
           >
             {view.outcome !== 'need_followup' && view.outcome !== 'empty' && (
-              <div className="space-y-2 rounded-xl border border-hairline bg-surface p-5">
+              <div className="space-y-2 rounded-lg border border-(--mp-line) bg-(--mp-surface) p-5">
                 <RevealHero view={view} />
                 {showTerms && (
-                  <p className="text-sm text-ink-soft">
+                  <p className="text-sm text-(--mp-body)">
                     Government calls this work things like:{' '}
                     <strong>{showTerms.join(' · ')}</strong>
                   </p>
                 )}
                 {reveal?.stageSummary && (
-                  <p className="text-sm text-ink-soft">
+                  <p className="text-sm text-(--mp-body)">
                     Of the {reveal.directMatchCount} matching what you described:{' '}
                     <strong>{reveal.stageSummary}</strong>. Only the &ldquo;open to bid&rdquo; ones
                     are asking for a priced offer today.
                   </p>
                 )}
                 {reveal?.agencies && reveal.agencies.count >= 2 && (
-                  <p className="text-sm text-muted">
+                  <p className="text-sm text-(--mp-muted)">
                     Listings from {reveal.agencies.count} agencies.
                   </p>
                 )}
               </div>
             )}
 
-            {view.outcome === 'empty' && <p className="text-ink-soft">{view.message}</p>}
+            {view.outcome === 'empty' && <p className="text-(--mp-body)">{view.message}</p>}
 
             {view.directCards.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-(--mp-muted)">
                   {reveal?.directLabel || 'Matches what you described'}
                   <ShowingOf shown={view.directCards.length} total={reveal?.directMatchCount} />
                 </h2>
@@ -358,7 +358,7 @@ export function TryLanding() {
 
             {showUncovered && (
               <div className="space-y-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-(--mp-muted)">
                   {reveal?.expandedLabel || 'Opportunities Mindy uncovered'}
                   <ShowingOf shown={view.uncoveredCards.length} total={reveal?.expandedMatchCount} />
                 </h2>
@@ -381,10 +381,10 @@ export function TryLanding() {
 
             {view.relatedCards.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-(--mp-muted)">
                   {view.relatedLabel}
                 </h2>
-                <p className="text-sm text-muted">
+                <p className="text-sm text-(--mp-muted)">
                   Not a direct match to your words — a broader or neighbouring version of
                   the same work. Worth a look, but read the listing before you commit.
                 </p>
@@ -409,7 +409,7 @@ export function TryLanding() {
               <p className="pt-2">
                 <Link
                   href={ctaHref}
-                  className="inline-flex w-full justify-center rounded-xl bg-accent px-6 py-3 font-semibold text-white hover:bg-accent-hover sm:w-auto"
+                  className="inline-flex w-full justify-center rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover) sm:w-auto"
                   onClick={() =>
                     track('beginner_signup_clicked', {
                       revealState: reveal?.revealState ?? null,

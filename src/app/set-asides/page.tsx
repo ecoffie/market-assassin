@@ -114,34 +114,34 @@ export default function SetAsidesIndexPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumb */}
-      <nav className="max-w-4xl mx-auto px-4 pt-6 text-sm text-slate-500">
-        <Link href="/" className="hover:text-purple-300">Home</Link>
+      <nav className="max-w-4xl mx-auto px-4 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">Set-Asides</span>
+        <span className="text-(--mp-body)">Set-Asides</span>
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               SBA Set-Aside Programs
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-5xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             Find the Federal Contracts<br />
-            <span className="text-purple-400">You&apos;re Certified For.</span>
+            <span className="text-(--mp-navy)">You&apos;re Certified For.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             Set-asides are the single highest-leverage filter in federal contracting.
             Mindy reads SAM.gov, agency forecasts, and recompetes — then surfaces only
             the work your certification actually unlocks.
@@ -149,21 +149,21 @@ export default function SetAsidesIndexPage() {
 
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Get Free Set-Aside Alerts
           </Link>
-          <p className="text-slate-500 text-sm mt-4">First briefing lands tomorrow morning.</p>
+          <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
       </section>
 
       {/* Program grid */}
       <section className="py-16 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-2 text-center font-(family-name:--mp-font-serif)">
             Four Programs. Pick the One You Qualify For.
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             Each program restricts a slice of federal spending to certified small businesses.
             Click through for current opportunities, top awarding agencies, and program-specific strategy.
           </p>
@@ -173,18 +173,18 @@ export default function SetAsidesIndexPage() {
               <Link
                 key={p.slug}
                 href={p.href}
-                className="group block bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-6 transition-all"
+                className="group block bg-(--mp-surface) border border-(--mp-line) hover:border-(--mp-navy) rounded-lg p-6 transition-colors"
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
-                    <span className="text-purple-300 font-bold text-sm">{p.short}</span>
+                  <div className="w-12 h-12 rounded-lg bg-(--mp-navy-wash) border border-(--mp-line) flex items-center justify-center">
+                    <span className="text-(--mp-navy) font-bold text-sm">{p.short}</span>
                   </div>
-                  <h3 className="text-xl font-bold text-white group-hover:text-purple-300 transition">
+                  <h3 className="text-xl font-bold text-(--mp-ink) group-hover:text-(--mp-navy-hover) transition font-(family-name:--mp-font-serif)">
                     {p.name}
                   </h3>
                 </div>
-                <p className="text-slate-400 text-sm leading-relaxed mb-4">{p.eligibility}</p>
-                <span className="text-purple-400 text-sm font-semibold">
+                <p className="text-(--mp-muted) text-sm leading-relaxed mb-4">{p.eligibility}</p>
+                <span className="text-(--mp-navy) text-sm font-semibold">
                   View {p.short} opportunities →
                 </span>
               </Link>
@@ -194,65 +194,65 @@ export default function SetAsidesIndexPage() {
       </section>
 
       {/* How to choose */}
-      <section className="bg-slate-900/50 py-16 px-4">
+      <section className="bg-(--mp-wash) py-16 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 text-center font-(family-name:--mp-font-serif)">
             Not Sure Which Program Fits You?
           </h2>
-          <p className="text-slate-400 mb-8 text-center">
+          <p className="text-(--mp-muted) mb-8 text-center">
             A quick decision tree — most contractors qualify for more than one. You
             can hold multiple certifications simultaneously and stack them.
           </p>
 
           <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">
                 You&apos;re a veteran with a VA-rated service-connected disability
               </h3>
-              <p className="text-slate-400 text-sm">
-                Start with <Link href="/set-asides/sdvosb" className="text-purple-400 hover:text-purple-300">SDVOSB</Link> —
+              <p className="text-(--mp-muted) text-sm">
+                Start with <Link href="/set-asides/sdvosb" className="text-(--mp-navy) hover:text-(--mp-navy-hover)">SDVOSB</Link> —
                 it&apos;s the most powerful veteran-focused set-aside and unlocks VA
                 Veterans First priority.
               </p>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">
                 Your business is 51%+ owned by women
               </h3>
-              <p className="text-slate-400 text-sm">
-                Start with <Link href="/set-asides/wosb" className="text-purple-400 hover:text-purple-300">WOSB</Link> —
+              <p className="text-(--mp-muted) text-sm">
+                Start with <Link href="/set-asides/wosb" className="text-(--mp-navy) hover:text-(--mp-navy-hover)">WOSB</Link> —
                 if the owner also meets the economic-disadvantage threshold, the EDWOSB
                 certification expands the eligible NAICS list.
               </p>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">
                 You meet the SBA&apos;s social and economic disadvantage criteria
               </h3>
-              <p className="text-slate-400 text-sm">
-                Apply for <Link href="/set-asides/8a" className="text-purple-400 hover:text-purple-300">8(a)</Link> —
+              <p className="text-(--mp-muted) text-sm">
+                Apply for <Link href="/set-asides/8a" className="text-(--mp-navy) hover:text-(--mp-navy-hover)">8(a)</Link> —
                 it&apos;s a nine-year development program with sole-source authority that no
                 other certification matches.
               </p>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">
                 Your principal office is in (or could move to) a HUBZone
               </h3>
-              <p className="text-slate-400 text-sm">
-                Look at <Link href="/set-asides/hubzone" className="text-purple-400 hover:text-purple-300">HUBZone</Link> —
+              <p className="text-(--mp-muted) text-sm">
+                Look at <Link href="/set-asides/hubzone" className="text-(--mp-navy) hover:text-(--mp-navy-hover)">HUBZone</Link> —
                 check the SBA HUBZone map before assuming you don&apos;t qualify.
                 Designations change as the data updates.
               </p>
             </div>
           </div>
 
-          <div className="mt-8 bg-purple-900/20 border border-purple-500/30 rounded-xl p-5 text-center">
-            <p className="text-slate-300">
-              <strong className="text-white">Most successful firms stack certifications.</strong>{' '}
+          <div className="mt-8 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg p-5 text-center">
+            <p className="text-(--mp-body)">
+              <strong className="text-(--mp-ink)">Most successful firms stack certifications.</strong>{' '}
               An 8(a) firm that&apos;s also SDVOSB and HUBZone qualifies for every set-aside
               category — three times the eligible opportunity volume.
             </p>
@@ -263,36 +263,36 @@ export default function SetAsidesIndexPage() {
       {/* How Mindy helps */}
       <section className="py-16 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 text-center font-(family-name:--mp-font-serif)">
             How Mindy Surfaces Set-Aside Work
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-2">Set-aside filter on every alert</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-2">Set-aside filter on every alert</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Mindy applies your certifications to every SAM.gov opportunity so you
                 never see work you can&apos;t bid on — and never miss work reserved for
                 your program.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-2">Sole-source intelligence</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-2">Sole-source intelligence</h3>
+              <p className="text-(--mp-muted) text-sm">
                 8(a), SDVOSB, HUBZone, and WOSB firms can win sole-source awards up to
                 $4.5M (services) / $8M (manufacturing). Mindy tracks which agencies
                 actually use that authority.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-2">Recompete alerts</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-2">Recompete alerts</h3>
+              <p className="text-(--mp-muted) text-sm">
                 When a set-aside contract is 12 months from expiring, Mindy flags it —
                 including whether the incumbent shares your certification.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-2">Forecast aggregation</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-2">Forecast aggregation</h3>
+              <p className="text-(--mp-muted) text-sm">
                 33,000+ federal forecasts pulled into one feed, filtered by set-aside.
                 See what&apos;s coming 6–18 months before the solicitation hits SAM.gov.
               </p>
@@ -302,20 +302,20 @@ export default function SetAsidesIndexPage() {
       </section>
 
       {/* Related */}
-      <section className="px-4 py-12 border-t border-slate-800">
+      <section className="px-4 py-12 border-t border-(--mp-line)">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-lg font-semibold text-white mb-4">Related</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink) mb-4">Related</h3>
           <div className="flex flex-wrap gap-6 justify-center">
-            <Link href="/glossary/set-aside" className="text-slate-400 hover:text-purple-300 transition">
+            <Link href="/glossary/set-aside" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">
               What is a set-aside?
             </Link>
-            <Link href="/compare/sam-gov" className="text-slate-400 hover:text-purple-300 transition">
+            <Link href="/compare/sam-gov" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">
               Mindy vs SAM.gov alerts
             </Link>
-            <Link href="/blog/how-to-find-federal-contracts" className="text-slate-400 hover:text-purple-300 transition">
+            <Link href="/blog/how-to-find-federal-contracts" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">
               How to find federal contracts
             </Link>
-            <Link href="/recompete" className="text-slate-400 hover:text-purple-300 transition">
+            <Link href="/recompete" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">
               Expiring contracts
             </Link>
           </div>
@@ -323,18 +323,18 @@ export default function SetAsidesIndexPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Stop missing set-aside contracts.
           </h2>
-          <p className="text-lg text-slate-300 mb-8">
+          <p className="text-lg text-(--mp-body) mb-8">
             Pick your program, get a daily briefing of opportunities matched to your
             certification. Free, no credit card.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+            className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
             Get Free Alerts
           </Link>

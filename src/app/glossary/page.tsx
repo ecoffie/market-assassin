@@ -126,27 +126,27 @@ export default function GlossaryIndexPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               GovCon Glossary
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             The GovCon glossary,<br />
-            <span className="text-purple-400">demystified.</span>
+            <span className="text-(--mp-navy)">demystified.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             {glossaryTerms.length} federal contracting terms in plain English.
             NAICS, FAR, DCAA, IDIQ, set-asides — every acronym a small business
             actually needs, defined without the acquisition-speak.
@@ -154,18 +154,18 @@ export default function GlossaryIndexPage() {
 
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Get Mindy&apos;s Daily Briefing Free
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. First briefing lands tomorrow morning.
           </p>
         </div>
       </section>
 
       {/* A–Z Jump Nav */}
-      <section className="px-4 py-10 border-b border-slate-900">
+      <section className="px-4 py-10 border-b border-(--mp-hair)">
         <div className="max-w-4xl mx-auto">
           <nav
             aria-label="Jump to letter"
@@ -175,7 +175,7 @@ export default function GlossaryIndexPage() {
               <a
                 key={letter}
                 href={`#letter-${letter}`}
-                className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-lg text-purple-400 hover:bg-slate-800 hover:text-purple-300 hover:border-purple-500/40 transition text-sm font-bold"
+                className="w-10 h-10 flex items-center justify-center bg-(--mp-surface) border border-(--mp-line) rounded-lg text-(--mp-navy) hover:bg-(--mp-wash) hover:text-(--mp-navy-hover) hover:border-(--mp-navy) transition text-sm font-bold"
               >
                 {letter}
               </a>
@@ -189,29 +189,29 @@ export default function GlossaryIndexPage() {
         <div className="max-w-4xl mx-auto space-y-14">
           {sortedKeys.map((letter) => (
             <div key={letter} id={`letter-${letter}`} className="scroll-mt-24">
-              <h2 className="text-3xl font-bold text-purple-400 mb-6 border-b border-slate-800 pb-3">
+              <h2 className="text-3xl font-bold text-(--mp-navy) mb-6 border-b border-(--mp-line) pb-3 font-(family-name:--mp-font-serif)">
                 {letter}
               </h2>
               <div className="space-y-6">
                 {grouped[letter].map((term) => (
                   <article
                     key={term.slug}
-                    className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 hover:border-purple-500/40 transition"
+                    className="bg-(--mp-wash) border border-(--mp-line) rounded-lg p-6 hover:border-(--mp-navy) transition"
                   >
-                    <h3 className="text-xl font-bold text-white mb-2">
+                    <h3 className="text-xl font-bold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">
                       <Link
                         href={`/glossary/${term.slug}`}
-                        className="hover:text-purple-300 transition"
+                        className="hover:text-(--mp-navy-hover) transition"
                       >
                         {term.term}
                       </Link>
                     </h3>
-                    <p className="text-slate-300 leading-relaxed mb-3">
+                    <p className="text-(--mp-body) leading-relaxed mb-3">
                       {term.definition}
                     </p>
                     <Link
                       href={`/glossary/${term.slug}`}
-                      className="text-purple-400 hover:text-purple-300 text-sm font-semibold transition inline-flex items-center gap-1"
+                      className="text-(--mp-navy) hover:text-(--mp-navy-hover) text-sm font-semibold transition inline-flex items-center gap-1"
                     >
                       Read full definition <span aria-hidden>→</span>
                     </Link>
@@ -225,22 +225,22 @@ export default function GlossaryIndexPage() {
 
       {/* Footer CTA — the "Mindy translates this for you" close */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto border border-(--mp-line) rounded-lg p-8 md:p-12 text-center bg-(--mp-wash)">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Tired of looking up these terms manually?
           </h2>
-          <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Mindy translates acquisition-speak inside your daily briefing — set-asides,
             NAICS, incumbents, recompete timing, all in plain English. So you read
             opportunities, not a glossary.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Meet Mindy — Free Daily Briefing
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             500+ small businesses already wake up to a Mindy briefing.
           </p>
         </div>

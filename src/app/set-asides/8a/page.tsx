@@ -128,34 +128,34 @@ export default function EightAPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumb */}
-      <nav className="max-w-4xl mx-auto px-4 pt-6 text-sm text-slate-500">
-        <Link href="/" className="hover:text-purple-300">Home</Link>
+      <nav className="max-w-4xl mx-auto px-4 pt-6 text-sm text-(--mp-muted)">
+        <Link href="/" className="hover:text-(--mp-navy-hover)">Home</Link>
         <span className="mx-2">/</span>
-        <Link href="/set-asides" className="hover:text-purple-300">Set-Asides</Link>
+        <Link href="/set-asides" className="hover:text-(--mp-navy-hover)">Set-Asides</Link>
         <span className="mx-2">/</span>
-        <span className="text-slate-300">8(a)</span>
+        <span className="text-(--mp-body)">8(a)</span>
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               8(a) Business Development
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-5xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             8(a) Set-Aside<br />
-            <span className="text-purple-400">Contract Opportunities</span>
+            <span className="text-(--mp-navy)">Contract Opportunities</span>
           </h1>
-          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             The 8(a) program is the only federal set-aside with sole-source authority
             up to $4.5M for services and $8M for manufacturing — meaning a contracting
             officer can award you the contract without competition. Mindy surfaces
@@ -164,95 +164,95 @@ export default function EightAPage() {
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Get Free 8(a) Opportunity Alerts
           </Link>
-          <p className="text-slate-500 text-sm mt-4">First briefing lands tomorrow morning.</p>
+          <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
       </section>
 
       {/* Who qualifies */}
       <section className="py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Who Qualifies for 8(a)
           </h2>
-          <p className="text-slate-300 mb-4">
+          <p className="text-(--mp-body) mb-4">
             The 8(a) Business Development Program is for small businesses that are
             unconditionally owned and controlled by individuals who are both <em>socially</em>{' '}
             and <em>economically</em> disadvantaged. SBA presumes certain groups are
             socially disadvantaged; others must prove it through narrative evidence.
           </p>
-          <ul className="space-y-3 text-slate-300">
+          <ul className="space-y-3 text-(--mp-body)">
             <li className="flex gap-3">
-              <span className="text-purple-400 mt-1">→</span>
-              <span><strong className="text-white">51%+ ownership</strong> by socially and economically disadvantaged U.S. citizens.</span>
+              <span className="text-(--mp-navy) mt-1">→</span>
+              <span><strong className="text-(--mp-ink)">51%+ ownership</strong> by socially and economically disadvantaged U.S. citizens.</span>
             </li>
             <li className="flex gap-3">
-              <span className="text-purple-400 mt-1">→</span>
-              <span><strong className="text-white">Economic disadvantage thresholds:</strong> personal net worth under $850K (initial entry), adjusted gross income averaging under $400K, and total assets under $6.5M.</span>
+              <span className="text-(--mp-navy) mt-1">→</span>
+              <span><strong className="text-(--mp-ink)">Economic disadvantage thresholds:</strong> personal net worth under $850K (initial entry), adjusted gross income averaging under $400K, and total assets under $6.5M.</span>
             </li>
             <li className="flex gap-3">
-              <span className="text-purple-400 mt-1">→</span>
-              <span><strong className="text-white">Small business size standards</strong> for your primary NAICS code.</span>
+              <span className="text-(--mp-navy) mt-1">→</span>
+              <span><strong className="text-(--mp-ink)">Small business size standards</strong> for your primary NAICS code.</span>
             </li>
             <li className="flex gap-3">
-              <span className="text-purple-400 mt-1">→</span>
-              <span><strong className="text-white">Two years of operating history</strong> (a waiver is possible if you can demonstrate management experience and capital).</span>
+              <span className="text-(--mp-navy) mt-1">→</span>
+              <span><strong className="text-(--mp-ink)">Two years of operating history</strong> (a waiver is possible if you can demonstrate management experience and capital).</span>
             </li>
             <li className="flex gap-3">
-              <span className="text-purple-400 mt-1">→</span>
-              <span><strong className="text-white">Good character</strong> — SBA reviews for federal debt, criminal history, and tax compliance.</span>
+              <span className="text-(--mp-navy) mt-1">→</span>
+              <span><strong className="text-(--mp-ink)">Good character</strong> — SBA reviews for federal debt, criminal history, and tax compliance.</span>
             </li>
           </ul>
-          <p className="text-slate-400 text-sm mt-4">
-            Source: SBA, <a className="underline hover:text-purple-300" href="https://www.sba.gov/federal-contracting/contracting-assistance-programs/8a-business-development-program/8a-business-development-program-eligibility-requirements" target="_blank" rel="noopener noreferrer">8(a) Program Eligibility Requirements</a>.
+          <p className="text-(--mp-muted) text-sm mt-4">
+            Source: SBA, <a className="underline hover:text-(--mp-navy-hover)" href="https://www.sba.gov/federal-contracting/contracting-assistance-programs/8a-business-development-program/8a-business-development-program-eligibility-requirements" target="_blank" rel="noopener noreferrer">8(a) Program Eligibility Requirements</a>.
           </p>
         </div>
       </section>
 
       {/* Where opportunities post */}
-      <section className="bg-slate-900/50 py-14 px-4">
+      <section className="bg-(--mp-wash) py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Where 8(a) Opportunities Actually Live
           </h2>
-          <p className="text-slate-300 mb-6">
+          <p className="text-(--mp-body) mb-6">
             Most 8(a) work doesn&apos;t look like a normal RFP. The biggest opportunities
             are sole-source — awarded without ever being competed — which means
             scrolling SAM.gov for solicitations is the slowest way to find them.
             Here&apos;s where to look:
           </p>
           <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">SAM.gov set-aside filter</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">SAM.gov set-aside filter</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Filter opportunities by &ldquo;8(a) Competed&rdquo; and &ldquo;8(a) Sole Source.&rdquo; The
                 sole-source filter often returns award announcements rather than open
                 solicitations, but it reveals which agencies are using the authority.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Agency forecasts</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Agency forecasts</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Every federal agency publishes a forecast of upcoming procurements with
                 anticipated set-aside type. 8(a) forecasts are the earliest indicator
                 of a sole-source brewing 6–18 months out. Mindy aggregates 33,000+
                 forecasts in one feed.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">8(a) STARS III and 8(a)-only vehicles</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">8(a) STARS III and 8(a)-only vehicles</h3>
+              <p className="text-(--mp-muted) text-sm">
                 If you&apos;re on the GSA-managed 8(a) STARS III GWAC, task orders compete
                 only among holders. The vehicle itself recompetes every several years,
                 so getting on is the leverage point.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Sources Sought + RFI responses</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Sources Sought + RFI responses</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Sources Sought is the agency asking &ldquo;is there a qualified 8(a) for this?&rdquo;
                 Your response is what convinces the CO to set it aside for 8(a) at all.
                 Two strong Sources Sought responses are worth more than ten RFP submissions.
@@ -265,10 +265,10 @@ export default function EightAPage() {
       {/* Top agencies */}
       <section className="py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Top Agencies Awarding 8(a) Contracts
           </h2>
-          <p className="text-slate-300 mb-6">
+          <p className="text-(--mp-body) mb-6">
             Every federal agency has small-business goals that include an 8(a)
             component, but a handful of agencies drive the lion&apos;s share of 8(a)
             awards. These are the highest-volume targets:
@@ -281,13 +281,13 @@ export default function EightAPage() {
               { name: 'Department of Health and Human Services', why: 'NIH, CDC, and CMS are heavy 8(a) IT services buyers. CIO-SP4 is a key vehicle.' },
               { name: 'Department of the Treasury', why: 'IRS modernization work is a long-running 8(a) pipeline.' },
             ].map((a) => (
-              <div key={a.name} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-white font-semibold mb-1">{a.name}</h3>
-                <p className="text-slate-400 text-sm">{a.why}</p>
+              <div key={a.name} className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+                <h3 className="text-(--mp-ink) font-semibold mb-1">{a.name}</h3>
+                <p className="text-(--mp-muted) text-sm">{a.why}</p>
               </div>
             ))}
           </div>
-          <p className="text-slate-400 text-sm mt-6 italic">
+          <p className="text-(--mp-muted) text-sm mt-6 italic">
             Don&apos;t sleep on smaller agencies. They have 8(a) goals too and far less
             competition from established primes — often the fastest path to a first
             sole-source.
@@ -296,60 +296,60 @@ export default function EightAPage() {
       </section>
 
       {/* Strategy */}
-      <section className="bg-slate-900/50 py-14 px-4">
+      <section className="bg-(--mp-wash) py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             How to Win 8(a) Contracts: 6 Tactics That Actually Work
           </h2>
           <div className="space-y-5">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">1. Build the sole-source case before the requirement exists</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">1. Build the sole-source case before the requirement exists</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Sole-source awards happen because a CO knows you can do the work and
                 writes a J&amp;A justifying you specifically. That requires capability
                 briefings, relationship-building with OSDBU, and capture work that
                 starts 6–12 months before any solicitation. Don&apos;t wait for a posting.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">2. Pursue mentor-protege early</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">2. Pursue mentor-protege early</h3>
+              <p className="text-(--mp-muted) text-sm">
                 The SBA Mentor-Protege Program lets you joint-venture with a large
                 business and bid on 8(a) work you couldn&apos;t qualify for alone. Your
                 nine-year clock is finite — start mentor-protege conversations in
                 year 1 or 2, not year 7.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">3. Get on the right 8(a) vehicles</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">3. Get on the right 8(a) vehicles</h3>
+              <p className="text-(--mp-muted) text-sm">
                 8(a) STARS III is the obvious one for IT. But there are dozens of
                 agency-specific 8(a) IDIQs (Army ITES-3S, Navy SeaPort task orders
                 with 8(a) set-asides, etc.). Vehicle holders see task orders nobody
                 else sees.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">4. Respond to every Sources Sought in your NAICS</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">4. Respond to every Sources Sought in your NAICS</h3>
+              <p className="text-(--mp-muted) text-sm">
                 The CO uses Sources Sought responses to justify the set-aside type.
                 If two qualified 8(a)s respond, the procurement gets set aside as
                 8(a). If only large businesses respond, you lose the set-aside
                 before the RFP even drops.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">5. Track the clock — and the transition</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">5. Track the clock — and the transition</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Years 6–9 of the program require a rising share of non-8(a) revenue
                 to graduate successfully. Start chasing full-and-open, GSA Schedule,
                 and unrestricted small-business set-asides early. Mindy filters by
                 set-aside type so you can build that mix deliberately.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">6. Track recompetes where the incumbent is also 8(a)</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">6. Track recompetes where the incumbent is also 8(a)</h3>
+              <p className="text-(--mp-muted) text-sm">
                 When an 8(a) incumbent&apos;s contract is expiring, the recompete will
                 almost always be re-set aside as 8(a). Knowing 12 months in advance
                 gives you time to build a relationship before the solicitation drops.
@@ -363,34 +363,34 @@ export default function EightAPage() {
       {/* How Mindy helps */}
       <section className="py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             How Mindy Helps 8(a) Firms
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">8(a)-only filter</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">8(a)-only filter</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Daily briefings filtered to 8(a) competed and 8(a) sole-source set-asides
                 — no scrolling past full-and-open noise.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Sole-source intel</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Sole-source intel</h3>
+              <p className="text-(--mp-muted) text-sm">
                 Tracks which agencies actually use 8(a) sole-source authority and
                 surfaces the forecasts most likely to convert.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">8(a) recompete alerts</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">8(a) recompete alerts</h3>
+              <p className="text-(--mp-muted) text-sm">
                 12-month advance notice when an 8(a) incumbent contract is expiring —
                 including the incumbent&apos;s name and award value.
               </p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">Mentor-protege intel</h3>
-              <p className="text-slate-400 text-sm">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+              <h3 className="text-(--mp-ink) font-semibold mb-1">Mentor-protege intel</h3>
+              <p className="text-(--mp-muted) text-sm">
                 The Mindy contractor database surfaces large primes winning in your
                 NAICS — the shortlist for mentor outreach.
               </p>
@@ -400,19 +400,19 @@ export default function EightAPage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-slate-900/50 py-14 px-4">
+      <section className="bg-(--mp-wash) py-14 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-8 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-8 text-center font-(family-name:--mp-font-serif)">
             8(a) Frequently Asked Questions
           </h2>
           <div className="space-y-3">
             {faqs.map((f) => (
-              <details key={f.q} className="group bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <summary className="text-white font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
+              <details key={f.q} className="group bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
+                <summary className="text-(--mp-ink) font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
                   <span>{f.q}</span>
-                  <span className="text-purple-400 text-xl group-open:rotate-45 transition-transform">+</span>
+                  <span className="text-(--mp-navy) text-xl group-open:rotate-45 transition-transform">+</span>
                 </summary>
-                <p className="text-slate-400 mt-3 leading-relaxed text-sm">{f.a}</p>
+                <p className="text-(--mp-muted) mt-3 leading-relaxed text-sm">{f.a}</p>
               </details>
             ))}
           </div>
@@ -420,35 +420,35 @@ export default function EightAPage() {
       </section>
 
       {/* Related programs */}
-      <section className="px-4 py-12 border-t border-slate-800">
+      <section className="px-4 py-12 border-t border-(--mp-line)">
         <div className="max-w-4xl mx-auto text-center">
-          <h3 className="text-lg font-semibold text-white mb-4">Other Set-Aside Programs</h3>
+          <h3 className="text-lg font-semibold text-(--mp-ink) mb-4">Other Set-Aside Programs</h3>
           <div className="flex flex-wrap gap-6 justify-center mb-4">
-            <Link href="/set-asides/hubzone" className="text-slate-400 hover:text-purple-300 transition">HUBZone Opportunities →</Link>
-            <Link href="/set-asides/sdvosb" className="text-slate-400 hover:text-purple-300 transition">SDVOSB Opportunities →</Link>
-            <Link href="/set-asides/wosb" className="text-slate-400 hover:text-purple-300 transition">WOSB Opportunities →</Link>
+            <Link href="/set-asides/hubzone" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">HUBZone Opportunities →</Link>
+            <Link href="/set-asides/sdvosb" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">SDVOSB Opportunities →</Link>
+            <Link href="/set-asides/wosb" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">WOSB Opportunities →</Link>
           </div>
           <div className="flex flex-wrap gap-6 justify-center text-sm">
-            <Link href="/glossary/8a-program" className="text-slate-500 hover:text-purple-300 transition">Full 8(a) definition →</Link>
-            <Link href="/compare/sam-gov" className="text-slate-500 hover:text-purple-300 transition">Mindy vs SAM.gov →</Link>
-            <Link href="/blog/how-to-find-federal-contracts" className="text-slate-500 hover:text-purple-300 transition">How to find federal contracts →</Link>
+            <Link href="/glossary/8a-program" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">Full 8(a) definition →</Link>
+            <Link href="/compare/sam-gov" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">Mindy vs SAM.gov →</Link>
+            <Link href="/blog/how-to-find-federal-contracts" className="text-(--mp-muted) hover:text-(--mp-navy-hover) transition">How to find federal contracts →</Link>
           </div>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="py-16 px-4 bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Get 8(a) opportunity alerts in your inbox.
           </h2>
-          <p className="text-lg text-slate-300 mb-8">
+          <p className="text-lg text-(--mp-body) mb-8">
             Daily briefings filtered to 8(a) set-asides and forecasts where your next
             sole-source could come from. Free. No credit card.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+            className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
             Get Free 8(a) Alerts
           </Link>

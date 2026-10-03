@@ -252,33 +252,33 @@ export default function PricingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               Pricing
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             Pricing that makes sense<br />
-            <span className="text-purple-400">for small business.</span>
+            <span className="text-(--mp-navy)">for small business.</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
-            GovWin charges <span className="text-white font-semibold">$15,000–$50,000 a year</span> because
+          <p className="text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
+            GovWin charges <span className="text-(--mp-ink) font-semibold">$15,000–$50,000 a year</span> because
             they sell to Lockheed and Booz Allen. Mindy is{' '}
-            <span className="text-purple-400 font-semibold">$149 a month</span> because we built her for you.
+            <span className="text-(--mp-navy) font-semibold">$149 a month</span> because we built her for you.
           </p>
 
-          <p className="text-slate-400 text-sm">
+          <p className="text-(--mp-muted) text-sm">
             Start free. No credit card. Cancel anytime.
           </p>
         </div>
@@ -289,13 +289,13 @@ export default function PricingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-3 gap-6">
             {/* Free */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col">
-              <h3 className="text-xl font-bold text-white mb-2">Free</h3>
-              <p className="text-slate-400 text-sm mb-6">For contractors just getting started.</p>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-8 flex flex-col">
+              <h3 className="text-xl font-bold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">Free</h3>
+              <p className="text-(--mp-muted) text-sm mb-6">For contractors just getting started.</p>
 
               <div className="mb-6">
-                <span className="text-5xl font-black text-white">$0</span>
-                <span className="text-slate-400 ml-1">/mo</span>
+                <span className="text-5xl font-bold text-(--mp-ink)">$0</span>
+                <span className="text-(--mp-muted) ml-1">/mo</span>
               </div>
 
               <ul className="space-y-3 mb-8 flex-1">
@@ -305,7 +305,7 @@ export default function PricingPage() {
                   'Browse agency forecasts',
                   'Email support',
                 ].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-slate-300 text-sm">
+                  <li key={f} className="flex items-start gap-2 text-(--mp-body) text-sm">
                     <CheckIcon />
                     <span>{f}</span>
                   </li>
@@ -314,31 +314,31 @@ export default function PricingPage() {
 
               <Link
                 href={FREE_SIGNUP_URL}
-                className="block w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-center transition-colors"
+                className="block w-full py-3 bg-(--mp-wash) hover:bg-(--mp-wash) text-(--mp-ink) font-semibold rounded-lg text-center transition-colors"
               >
                 Start Free
               </Link>
-              <p className="text-slate-500 text-xs text-center mt-3">No credit card required.</p>
+              <p className="text-(--mp-muted) text-xs text-center mt-3">No credit card required.</p>
             </div>
 
             {/* Pro - Most Popular */}
-            <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 border-2 border-purple-500 rounded-2xl p-8 relative flex flex-col shadow-xl shadow-purple-500/10">
+            <div className="border-2 border-(--mp-navy) rounded-lg p-8 relative flex flex-col bg-(--mp-wash)">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-purple-500 text-white text-xs font-bold px-4 py-1 rounded-full">
+                <span className="bg-(--mp-navy) text-white text-xs font-bold px-4 py-1 rounded-lg">
                   MOST POPULAR
                 </span>
               </div>
 
-              <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
-              <p className="text-purple-200 text-sm mb-6">The $150K capture manager in your pocket.</p>
+              <h3 className="text-xl font-bold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">Pro</h3>
+              <p className="text-(--mp-navy) text-sm mb-6">The $150K capture manager in your pocket.</p>
 
               <div className="mb-2">
-                <span className="text-5xl font-black text-white">$149</span>
-                <span className="text-slate-400 ml-1">/mo</span>
+                <span className="text-5xl font-bold text-(--mp-ink)">$149</span>
+                <span className="text-(--mp-muted) ml-1">/mo</span>
               </div>
-              <p className="text-purple-300 text-sm mb-6">
-                or <span className="font-semibold text-white">$1,490/yr</span>{' '}
-                <span className="text-purple-400">(save $298)</span>
+              <p className="text-(--mp-navy) text-sm mb-6">
+                or <span className="font-semibold text-(--mp-ink)">$1,490/yr</span>{' '}
+                <span className="text-(--mp-navy)">(save $298)</span>
               </p>
 
               <ul className="space-y-3 mb-8 flex-1">
@@ -352,7 +352,7 @@ export default function PricingPage() {
                   'Pursuit briefs on demand',
                   'Priority email support (24hr)',
                 ].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-slate-200 text-sm">
+                  <li key={f} className="flex items-start gap-2 text-(--mp-ink) text-sm">
                     <CheckIcon highlighted />
                     <span>{f}</span>
                   </li>
@@ -361,26 +361,26 @@ export default function PricingPage() {
 
               <Link
                 href={CHECKOUT_MONTHLY}
-                className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-center transition-colors shadow-lg shadow-purple-500/25"
+                className="block w-full py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-bold rounded-lg text-center transition-colors"
               >
                 Get Mindy Pro — $149/mo
               </Link>
               <Link
                 href={CHECKOUT_ANNUAL}
-                className="block text-center text-purple-300 hover:text-purple-200 text-sm font-semibold mt-3"
+                className="block text-center text-(--mp-navy) hover:text-(--mp-navy-hover) text-sm font-semibold mt-3"
               >
                 Or get annual ($1,490/yr) →
               </Link>
             </div>
 
             {/* Teams */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col">
-              <h3 className="text-xl font-bold text-white mb-2">Teams</h3>
-              <p className="text-slate-400 text-sm mb-6">For growing contractors with a BD team.</p>
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-8 flex flex-col">
+              <h3 className="text-xl font-bold text-(--mp-ink) mb-2 font-(family-name:--mp-font-serif)">Teams</h3>
+              <p className="text-(--mp-muted) text-sm mb-6">For growing contractors with a BD team.</p>
 
               <div className="mb-6">
-                <span className="text-5xl font-black text-white">$499</span>
-                <span className="text-slate-400 ml-1">/mo</span>
+                <span className="text-5xl font-bold text-(--mp-ink)">$499</span>
+                <span className="text-(--mp-muted) ml-1">/mo</span>
               </div>
 
               <ul className="space-y-3 mb-8 flex-1">
@@ -393,7 +393,7 @@ export default function PricingPage() {
                   'Onboarding call included',
                   'Custom seat count on request',
                 ].map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-slate-300 text-sm">
+                  <li key={f} className="flex items-start gap-2 text-(--mp-body) text-sm">
                     <CheckIcon />
                     <span>{f}</span>
                   </li>
@@ -402,16 +402,16 @@ export default function PricingPage() {
 
               <Link
                 href={TEAMS_CONTACT_URL}
-                className="block w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-center transition-colors"
+                className="block w-full py-3 bg-(--mp-wash) hover:bg-(--mp-wash) text-(--mp-ink) font-semibold rounded-lg text-center transition-colors"
               >
                 Contact Sales
               </Link>
-              <p className="text-slate-500 text-xs text-center mt-3">Reply within one business day.</p>
+              <p className="text-(--mp-muted) text-xs text-center mt-3">Reply within one business day.</p>
             </div>
           </div>
 
           {/* Reassurance bar */}
-          <div className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-slate-400">
+          <div className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-(--mp-muted)">
             <span className="flex items-center gap-2">
               <CheckIcon /> Cancel anytime
             </span>
@@ -429,34 +429,34 @@ export default function PricingPage() {
       </section>
 
       {/* Feature comparison table */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-(--mp-wash) py-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">
             What&apos;s in every plan
           </h2>
-          <p className="text-slate-400 text-center mb-12 max-w-2xl mx-auto">
+          <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
             Full feature matrix. No fine print, no &quot;contact us for pricing&quot; mystery boxes.
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-(--mp-line)">
             <table className="w-full text-sm">
-              <thead className="bg-slate-900">
+              <thead className="bg-(--mp-surface)">
                 <tr>
-                  <th className="text-left py-4 px-5 text-slate-400 font-semibold w-2/5">Feature</th>
-                  <th className="text-center py-4 px-5 text-slate-300 font-bold">Free</th>
-                  <th className="text-center py-4 px-5 bg-purple-500/5">
-                    <span className="text-purple-300 font-bold">Pro</span>
+                  <th className="text-left py-4 px-5 text-(--mp-muted) font-semibold w-2/5">Feature</th>
+                  <th className="text-center py-4 px-5 text-(--mp-body) font-bold">Free</th>
+                  <th className="text-center py-4 px-5 bg-(--mp-navy-wash)">
+                    <span className="text-(--mp-navy) font-bold">Pro</span>
                   </th>
-                  <th className="text-center py-4 px-5 text-slate-300 font-bold">Teams</th>
+                  <th className="text-center py-4 px-5 text-(--mp-body) font-bold">Teams</th>
                 </tr>
               </thead>
               <tbody>
                 {featureMatrix.map((section) => (
                   <>
-                    <tr key={`${section.category}-header`} className="bg-slate-900/80 border-t border-slate-800">
+                    <tr key={`${section.category}-header`} className="bg-(--mp-wash) border-t border-(--mp-line)">
                       <td
                         colSpan={4}
-                        className="py-3 px-5 text-purple-300 font-bold uppercase tracking-wide text-xs"
+                        className="py-3 px-5 text-(--mp-navy) font-bold uppercase tracking-wide text-xs"
                       >
                         {section.category}
                       </td>
@@ -464,13 +464,13 @@ export default function PricingPage() {
                     {section.rows.map((row, i) => (
                       <tr
                         key={`${section.category}-${row.feature}`}
-                        className={`border-t border-slate-800/50 ${i % 2 === 0 ? 'bg-slate-900/30' : ''}`}
+                        className={`border-t border-(--mp-hair) ${i % 2 === 0 ? 'bg-(--mp-wash)' : ''}`}
                       >
-                        <td className="py-3 px-5 text-white">{row.feature}</td>
+                        <td className="py-3 px-5 text-(--mp-ink)">{row.feature}</td>
                         <td className="py-3 px-5 text-center">
                           <CellValue value={row.free} />
                         </td>
-                        <td className="py-3 px-5 text-center bg-purple-500/5">
+                        <td className="py-3 px-5 text-center bg-(--mp-navy-wash)">
                           <CellValue value={row.pro} highlighted />
                         </td>
                         <td className="py-3 px-5 text-center">
@@ -492,15 +492,15 @@ export default function PricingPage() {
             same constants the matrix uses, never retyped.
           */}
           <div className="mt-6 flex justify-center">
-            <div className="max-w-2xl rounded-xl border border-purple-400/25 bg-purple-400/[0.05] px-5 py-4 text-center text-sm text-slate-300">
+            <div className="max-w-2xl rounded-lg border border-(--mp-line) bg-(--mp-navy-wash) px-5 py-4 text-center text-sm text-(--mp-body)">
               Need more than{' '}
-              <b className="font-semibold text-white">{TEAM_MONTHLY_CREDITS.toLocaleString()} credits</b>{' '}
+              <b className="font-semibold text-(--mp-ink)">{TEAM_MONTHLY_CREDITS.toLocaleString()} credits</b>{' '}
               a month? Credit-only plans start at{' '}
-              <b className="font-semibold text-white">$99 for 500/mo</b> — no app subscription
+              <b className="font-semibold text-(--mp-ink)">$99 for 500/mo</b> — no app subscription
               required, and they work on the same account.{' '}
               <Link
                 href="/mcp/pricing"
-                className="font-semibold text-purple-300 underline underline-offset-2 hover:text-purple-200"
+                className="font-semibold text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)"
               >
                 See credit plans →
               </Link>
@@ -512,11 +512,11 @@ export default function PricingPage() {
       {/* How we got to this price */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-12 font-(family-name:--mp-font-serif)">
             How we got to this price
           </h2>
 
-          <div className="space-y-6 text-slate-300 text-lg leading-relaxed">
+          <div className="space-y-6 text-(--mp-body) text-lg leading-relaxed">
             <p>
               GovWin charges $15,000 to $50,000 a year because they sell to enterprise primes —
               Lockheed, Booz Allen, Leidos. Those customers have dedicated procurement teams,
@@ -540,7 +540,7 @@ export default function PricingPage() {
           <div className="mt-10 text-center">
             <Link
               href="/compare/govwin"
-              className="inline-block text-purple-400 hover:text-purple-300 font-semibold"
+              className="inline-block text-(--mp-navy) hover:text-(--mp-navy-hover) font-semibold"
             >
               See the full GovWin comparison →
             </Link>
@@ -549,24 +549,24 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-(--mp-wash) py-20 px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) text-center mb-12 font-(family-name:--mp-font-serif)">
             Pricing questions, answered
           </h2>
           <div className="space-y-4">
             {faqs.map((f) => (
               <details
                 key={f.q}
-                className="group bg-slate-900 border border-slate-800 rounded-xl p-6"
+                className="group bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6"
               >
-                <summary className="text-white font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
+                <summary className="text-(--mp-ink) font-semibold cursor-pointer list-none flex items-center justify-between gap-4">
                   <span>{f.q}</span>
-                  <span className="text-purple-400 text-xl group-open:rotate-45 transition-transform">
+                  <span className="text-(--mp-navy) text-xl group-open:rotate-45 transition-transform">
                     +
                   </span>
                 </summary>
-                <p className="text-slate-400 mt-4 leading-relaxed">{f.a}</p>
+                <p className="text-(--mp-muted) mt-4 leading-relaxed">{f.a}</p>
               </details>
             ))}
           </div>
@@ -574,27 +574,27 @@ export default function PricingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+          <h2 className="text-3xl md:text-4xl font-bold text-(--mp-ink) mb-6 font-(family-name:--mp-font-serif)">
             Start free. See your first briefing tomorrow.
           </h2>
-          <p className="text-xl text-slate-300 mb-8">
+          <p className="text-xl text-(--mp-body) mb-8">
             Three NAICS codes, a daily opportunity digest, and zero commitment. Upgrade to Pro
             when you&apos;re ready for the full intelligence layer.
           </p>
           <Link
             href={FREE_SIGNUP_URL}
-            className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+            className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
             Get Started Free
           </Link>
-          <p className="text-slate-400 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. No sales call. Cancel anytime.
           </p>
 
-          <div className="mt-12 pt-8 border-t border-slate-800/50">
-            <p className="text-slate-500 text-sm italic">
+          <div className="mt-12 pt-8 border-t border-(--mp-hair)">
+            <p className="text-(--mp-muted) text-sm italic">
               &quot;The big contractors have armies. You have Mindy.&quot;
             </p>
           </div>
@@ -609,7 +609,7 @@ export default function PricingPage() {
 function CheckIcon({ highlighted = false }: { highlighted?: boolean }) {
   return (
     <svg
-      className={`w-4 h-4 mt-0.5 shrink-0 ${highlighted ? 'text-purple-400' : 'text-emerald-400'}`}
+      className={`w-4 h-4 mt-0.5 shrink-0 ${highlighted ? 'text-(--mp-navy)' : 'text-(--mp-ok)'}`}
       viewBox="0 0 20 20"
       fill="currentColor"
       aria-hidden="true"
@@ -632,10 +632,10 @@ function CellValue({ value, highlighted = false }: { value: string | boolean; hi
     );
   }
   if (value === false) {
-    return <span className="text-slate-600">—</span>;
+    return <span className="text-(--mp-muted)">—</span>;
   }
   return (
-    <span className={highlighted ? 'text-purple-200 font-semibold' : 'text-slate-300'}>
+    <span className={highlighted ? 'text-(--mp-navy) font-semibold' : 'text-(--mp-body)'}>
       {value}
     </span>
   );

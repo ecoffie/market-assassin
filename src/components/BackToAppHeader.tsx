@@ -64,16 +64,16 @@ export default function BackToAppHeader({
   }
 
   return (
-    <div className="sticky top-0 z-40 border-b border-purple-500/30 bg-slate-950/95 backdrop-blur-sm">
+    <div className="sticky top-(--mp-header-height) z-30 border-b border-(--mp-line) bg-(--mp-wash)">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-2.5 text-sm">
         <Link
           href={href}
-          className="inline-flex items-center gap-2 text-purple-300 transition-colors hover:text-white"
+          className="inline-flex items-center gap-2 text-(--mp-navy) transition-colors hover:text-(--mp-ink)"
         >
           <span aria-hidden="true">←</span>
           <span className="font-medium">{label}</span>
         </Link>
-        <span className="hidden text-xs text-slate-500 sm:inline">
+        <span className="hidden text-xs text-(--mp-muted) sm:inline">
           You&rsquo;re viewing the public profile · signed in to Mindy
         </span>
       </div>

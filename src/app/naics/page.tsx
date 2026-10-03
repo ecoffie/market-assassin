@@ -124,27 +124,27 @@ export default function NaicsIndexPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      <section className="py-20 px-4 bg-(--mp-wash)">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full mb-6">
-            <span className="text-purple-300 text-sm font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-6">
+            <span className="text-(--mp-navy) text-sm font-semibold uppercase tracking-wide">
               NAICS Code Directory
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-bold text-(--mp-ink) mb-6 leading-tight font-(family-name:--mp-font-serif)">
             Federal Contracts by{' '}
-            <span className="text-purple-400">NAICS Code</span>
+            <span className="text-(--mp-navy)">NAICS Code</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             The top {entries.length} NAICS codes by federal contract spend.
             Pick your industry to see who&apos;s buying, who&apos;s already
             winning, and how to get daily opportunity alerts.
@@ -152,20 +152,20 @@ export default function NaicsIndexPage() {
 
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Get Mindy&apos;s Daily Briefing Free
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. First briefing lands tomorrow morning.
           </p>
         </div>
       </section>
 
       {/* Intro — what NAICS is + why this list matters */}
-      <section className="px-4 py-12 border-b border-slate-900">
+      <section className="px-4 py-12 border-b border-(--mp-hair)">
         <div className="max-w-4xl mx-auto prose prose-invert prose-slate max-w-none">
-          <p className="text-lg text-slate-300 leading-relaxed">
+          <p className="text-lg text-(--mp-body) leading-relaxed">
             NAICS — the North American Industry Classification System — is
             how the federal government categorizes every contractor and every
             procurement. When a contracting officer publishes a solicitation
@@ -174,7 +174,7 @@ export default function NaicsIndexPage() {
             under. NAICS is the discovery mechanism: get the codes wrong and
             you&apos;ll never show up in agency searches.
           </p>
-          <p className="text-lg text-slate-300 leading-relaxed mt-4">
+          <p className="text-lg text-(--mp-body) leading-relaxed mt-4">
             The {entries.length} codes below represent{' '}
             <strong>{formatCurrency(totalSpend)}</strong> in tracked federal
             contract value — the industries where federal spend actually
@@ -190,10 +190,10 @@ export default function NaicsIndexPage() {
       <section className="px-4 py-12">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-baseline justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">
               Top {entries.length} NAICS by federal spend
             </h2>
-            <span className="text-slate-500 text-sm">Sorted by spend ↓</span>
+            <span className="text-(--mp-muted) text-sm">Sorted by spend ↓</span>
           </div>
 
           <ol className="space-y-3">
@@ -201,25 +201,25 @@ export default function NaicsIndexPage() {
               <li key={entry.code}>
                 <Link
                   href={`/naics/${entry.code}`}
-                  className="block bg-slate-900/60 border border-slate-800 hover:border-purple-500/40 rounded-xl p-5 transition group"
+                  className="block bg-(--mp-wash) border border-(--mp-line) hover:border-(--mp-navy) rounded-lg p-5 transition group"
                 >
                   <div className="flex items-start gap-4">
                     {/* Rank chip */}
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 text-xs font-bold mt-0.5">
+                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-(--mp-navy-wash) border border-(--mp-line) flex items-center justify-center text-(--mp-navy) text-xs font-bold mt-0.5">
                       {i + 1}
                     </span>
 
                     {/* Code + title + meta */}
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-purple-400 font-mono font-bold text-lg">
+                        <span className="text-(--mp-navy) font-(family-name:--mp-font-mono) font-bold text-lg">
                           {entry.code}
                         </span>
-                        <h3 className="text-white font-semibold group-hover:text-purple-200 transition leading-tight">
+                        <h3 className="text-(--mp-ink) font-semibold group-hover:text-(--mp-navy-hover) transition leading-tight">
                           {entry.title}
                         </h3>
                       </div>
-                      <p className="text-slate-400 text-sm mt-2">
+                      <p className="text-(--mp-muted) text-sm mt-2">
                         {formatCurrency(entry.totalValue)} tracked federal
                         contract value ·{' '}
                         {entry.contractorCount.toLocaleString()} contractors
@@ -229,7 +229,7 @@ export default function NaicsIndexPage() {
                     {/* View arrow */}
                     <span
                       aria-hidden
-                      className="flex-shrink-0 text-purple-400 group-hover:text-purple-300 group-hover:translate-x-0.5 transition text-sm font-semibold mt-1"
+                      className="flex-shrink-0 text-(--mp-navy) group-hover:text-(--mp-navy-hover) group-hover:translate-x-0.5 transition text-sm font-semibold mt-1"
                     >
                       View →
                     </span>
@@ -243,11 +243,11 @@ export default function NaicsIndexPage() {
 
       {/* Footer CTA */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto border border-(--mp-line) rounded-lg p-8 md:p-12 text-center bg-(--mp-wash)">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Pick your NAICS. Get the opportunities.
           </h2>
-          <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Tell Mindy which NAICS codes you target and she&apos;ll scan
             SAM.gov, Grants.gov, USASpending, and agency forecasts every day
             — emailing the matches every morning. So you read opportunities,
@@ -255,11 +255,11 @@ export default function NaicsIndexPage() {
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Meet Mindy — Free Daily Briefing
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. Cancel anytime.
           </p>
         </div>

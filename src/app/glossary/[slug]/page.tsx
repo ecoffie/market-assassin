@@ -136,44 +136,44 @@ export default async function GlossaryTermPage({
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="bg-(--mp-paper)">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumbs */}
-      <div className="bg-slate-950 border-b border-slate-900">
+      <div className="bg-(--mp-paper) border-b border-(--mp-hair)">
         <div className="max-w-5xl mx-auto px-4 py-4">
           <nav
             aria-label="Breadcrumb"
-            className="text-sm text-slate-400 flex flex-wrap items-center gap-2"
+            className="text-sm text-(--mp-muted) flex flex-wrap items-center gap-2"
           >
-            <Link href="/" className="hover:text-purple-300 transition">
+            <Link href="/" className="hover:text-(--mp-navy-hover) transition">
               Home
             </Link>
-            <span aria-hidden className="text-slate-600">/</span>
+            <span aria-hidden className="text-(--mp-muted)">/</span>
             <Link
               href="/glossary"
-              className="hover:text-purple-300 transition"
+              className="hover:text-(--mp-navy-hover) transition"
             >
               Glossary
             </Link>
-            <span aria-hidden className="text-slate-600">/</span>
-            <span className="text-slate-300">{term.term}</span>
+            <span aria-hidden className="text-(--mp-muted)">/</span>
+            <span className="text-(--mp-body)">{term.term}</span>
           </nav>
         </div>
       </div>
 
       {/* Header */}
-      <section className="bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 py-12 px-4">
+      <section className="py-12 px-4 bg-(--mp-wash)">
         <div className="max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/30 rounded-full mb-4">
-            <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg mb-4">
+            <span className="text-(--mp-navy) text-xs font-semibold uppercase tracking-wide">
               GovCon Glossary
             </span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold text-(--mp-ink) mb-4 leading-tight font-(family-name:--mp-font-serif)">
             {term.term}
           </h1>
         </div>
@@ -185,31 +185,31 @@ export default async function GlossaryTermPage({
           {/* Main definition */}
           <article className="md:col-span-2 space-y-6">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-(--mp-navy) mb-3">
                 Definition
               </h2>
-              <p className="text-lg text-slate-200 leading-relaxed">
+              <p className="text-lg text-(--mp-ink) leading-relaxed">
                 {term.definition}
               </p>
             </div>
 
             {/* "How Mindy uses this" callout — the soft conversion */}
-            <aside className="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-xl p-6">
+            <aside className="border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                  <span className="text-white font-bold text-lg">M</span>
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-(--mp-navy)">
+                  <span className="text-(--mp-surface) font-bold text-lg">M</span>
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-300 mb-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-(--mp-navy) mb-2">
                     How Mindy uses this
                   </h2>
-                  <p className="text-slate-200 leading-relaxed">
+                  <p className="text-(--mp-ink) leading-relaxed">
                     {term.mindyUse}
                   </p>
                   {term.productLink && (
                     <Link
                       href={term.productLink.href}
-                      className="inline-flex items-center gap-1 mt-4 text-purple-300 hover:text-purple-200 font-semibold transition text-sm"
+                      className="inline-flex items-center gap-1 mt-4 text-(--mp-navy) hover:text-(--mp-navy-hover) font-semibold transition text-sm"
                     >
                       {term.productLink.label}{' '}
                       <span aria-hidden>→</span>
@@ -220,15 +220,15 @@ export default async function GlossaryTermPage({
             </aside>
 
             {/* Inline CTA so we don't depend on the rail for conversion */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <p className="text-slate-300 mb-4">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
+              <p className="text-(--mp-body) mb-4">
                 Mindy translates {term.term} (and every other piece of
                 acquisition-speak) inside your daily briefing — so you read
                 opportunities, not jargon.
               </p>
               <Link
                 href="/signup"
-                className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition"
+                className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition"
               >
                 Get Mindy&apos;s daily briefing free
               </Link>
@@ -237,8 +237,8 @@ export default async function GlossaryTermPage({
 
           {/* Sidebar — related terms + back link */}
           <aside className="md:col-span-1 space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-4">
+            <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-(--mp-navy) mb-4">
                 Related terms
               </h2>
               <ul className="space-y-3">
@@ -248,10 +248,10 @@ export default async function GlossaryTermPage({
                       href={`/glossary/${r.slug}`}
                       className="block group"
                     >
-                      <div className="text-white font-semibold group-hover:text-purple-300 transition">
+                      <div className="text-(--mp-ink) font-semibold group-hover:text-(--mp-navy-hover) transition">
                         {r.term}
                       </div>
-                      <div className="text-slate-400 text-sm line-clamp-2 mt-1">
+                      <div className="text-(--mp-muted) text-sm line-clamp-2 mt-1">
                         {r.definition}
                       </div>
                     </Link>
@@ -262,12 +262,12 @@ export default async function GlossaryTermPage({
 
             <Link
               href="/glossary"
-              className="block bg-slate-900 border border-slate-800 hover:border-purple-500/40 rounded-xl p-6 transition group"
+              className="block bg-(--mp-surface) border border-(--mp-line) hover:border-(--mp-navy) rounded-lg p-6 transition group"
             >
-              <div className="text-purple-400 text-sm font-semibold mb-1">
+              <div className="text-(--mp-navy) text-sm font-semibold mb-1">
                 ← Back to glossary
               </div>
-              <div className="text-slate-300 text-sm">
+              <div className="text-(--mp-body) text-sm">
                 Browse all {glossaryTerms.length} federal contracting terms.
               </div>
             </Link>
@@ -277,22 +277,22 @@ export default async function GlossaryTermPage({
 
       {/* Footer CTA */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto border border-(--mp-line) rounded-lg p-8 md:p-12 text-center bg-(--mp-wash)">
+          <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
             Stop looking up terms. Start winning contracts.
           </h2>
-          <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Mindy delivers personalized federal opportunities every morning —
             with the acquisition-speak already translated. 500+ small businesses
             wake up to a Mindy briefing.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
             Meet Mindy — Free Daily Briefing
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-(--mp-muted) text-sm mt-4">
             No credit card. Cancel anytime. First briefing lands tomorrow morning.
           </p>
         </div>

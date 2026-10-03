@@ -190,52 +190,52 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         activeTab="contracts"
       >
         <header className="mb-6">
-          <h2 className="text-2xl font-bold">Federal Contracts</h2>
+          <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">Federal Contracts</h2>
           {available ? (
             <>
               {/* Every measure is named. Two technically-defensible calculations
                   must never present themselves as one fact — see generateMetadata. */}
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-(--mp-muted)">
                 Showing award actions {start.toLocaleString()}–{end.toLocaleString()} of{' '}
                 {total.toLocaleString()} funded award actions, most recent first.
               </p>
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Contracts with positive obligations</dt>
-                  <dd className="text-lg font-semibold text-slate-100">
+                  <dt className="text-xs uppercase tracking-wide text-(--mp-muted)">Contracts with positive obligations</dt>
+                  <dd className="text-lg font-semibold text-(--mp-ink)">
                     {recipient.award_count?.toLocaleString() ?? '—'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Funded award actions shown</dt>
-                  <dd className="text-lg font-semibold text-slate-100">{total.toLocaleString()}</dd>
+                  <dt className="text-xs uppercase tracking-wide text-(--mp-muted)">Funded award actions shown</dt>
+                  <dd className="text-lg font-semibold text-(--mp-ink)">{total.toLocaleString()}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Obligations shown</dt>
-                  <dd className="text-lg font-semibold text-slate-100">
+                  <dt className="text-xs uppercase tracking-wide text-(--mp-muted)">Obligations shown</dt>
+                  <dd className="text-lg font-semibold text-(--mp-ink)">
                     {fmtMoney(recipient.total_obligated)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Awarding agencies</dt>
-                  <dd className="text-lg font-semibold text-slate-100">
+                  <dt className="text-xs uppercase tracking-wide text-(--mp-muted)">Awarding agencies</dt>
+                  <dd className="text-lg font-semibold text-(--mp-ink)">
                     {recipient.distinct_agency_count?.toLocaleString() ?? '—'}
                   </dd>
                 </div>
               </dl>
-              <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              <p className="mt-3 text-xs leading-relaxed text-(--mp-muted)">
                 This table shows award actions with a positive obligation. Zero-dollar and
                 negative-dollar actions, such as administrative changes and deobligations, are
                 not displayed. Multiple award actions may belong to the same contract.
               </p>
               {sourceAsOf && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-(--mp-muted)">
                   Award data as of {sourceAsOf}. Source: USAspending federal award records.
                 </p>
               )}
             </>
           ) : (
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-(--mp-muted)">
               Award-level detail for {displayName} is being refreshed and isn&apos;t
               available right now. This is a temporary data state, not a contractor with
               no contracts.
@@ -244,23 +244,23 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         </header>
 
         {!available && (
-          <div className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/5 p-5">
-            <p className="text-sm text-slate-300">
+          <div className="mb-8 rounded-lg border border-(--mp-warn-line) bg-(--mp-warn-bg) p-5">
+            <p className="text-sm text-(--mp-body)">
               We&apos;d rather show you nothing than show you a wrong number. The
               contractor profile has agency mix, NAICS activity and totals available now.
             </p>
             <a
               href={`/contractors/${slugForLinks}`}
-              className="mt-3 inline-block text-sm font-semibold text-violet-300 hover:text-violet-200"
+              className="mt-3 inline-block text-sm font-semibold text-(--mp-navy) hover:text-(--mp-navy-hover)"
             >
               View the {displayName} profile →
             </a>
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+        <div className="overflow-x-auto rounded-lg border border-(--mp-line) bg-(--mp-surface)">
           <table className="w-full text-sm">
-            <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+            <thead className="bg-(--mp-wash) text-xs uppercase tracking-wider text-(--mp-muted)">
               <tr>
                 <th className="text-left px-4 py-3">Date</th>
                 <th className="text-left px-4 py-3">Agency</th>
@@ -270,31 +270,31 @@ export default async function ContractorContractsPage({ params }: PageProps) {
                 <th className="text-right px-4 py-3">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-(--mp-line)">
               {awards.map((a) => (
-                <tr key={a.award_id} className="hover:bg-slate-800/40">
-                  <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{fmtDate(a.action_date)}</td>
-                  <td className="px-4 py-3 text-slate-300 max-w-[14rem]">
+                <tr key={a.award_id} className="hover:bg-(--mp-wash)">
+                  <td className="px-4 py-3 text-(--mp-body) whitespace-nowrap">{fmtDate(a.action_date)}</td>
+                  <td className="px-4 py-3 text-(--mp-body) max-w-[14rem]">
                     <span className="truncate block">{a.awarding_agency || '—'}</span>
-                    {a.awarding_office && <span className="text-xs text-slate-500 truncate block">{a.awarding_office}</span>}
+                    {a.awarding_office && <span className="text-xs text-(--mp-muted) truncate block">{a.awarding_office}</span>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">
+                  <td className="px-4 py-3 font-(family-name:--mp-font-mono) text-xs">
                     {a.piid ? (
                       <Link
                         href={`/contracts/${encodeURIComponent(a.piid)}`}
-                        className="text-slate-400 hover:text-purple-400"
+                        className="text-(--mp-muted) hover:text-(--mp-navy-hover)"
                       >
                         {a.piid}
                       </Link>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-(--mp-muted)">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.naics_code || '—'}</td>
-                  <td className="px-4 py-3 text-slate-300 max-w-[24rem]">
+                  <td className="px-4 py-3 font-(family-name:--mp-font-mono) text-xs text-(--mp-muted)">{a.naics_code || '—'}</td>
+                  <td className="px-4 py-3 text-(--mp-body) max-w-[24rem]">
                     <span className="line-clamp-2">{a.description || '—'}</span>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                  <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) font-semibold text-(--mp-navy) whitespace-nowrap">
                     {fmtMoney(Number(a.obligation_amount))}
                   </td>
                 </tr>
@@ -306,14 +306,14 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         {/* Pagination */}
         {totalPages > 1 && (
           <nav className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <p className="text-slate-400">
+            <p className="text-(--mp-muted)">
               Page {pageNum} of {totalPages}
             </p>
             <div className="flex flex-wrap gap-2">
               {pageNum > 1 && (
                 <Link
                   href={pageNum === 2 ? `/contractors/${slugForLinks}/contracts` : `/contractors/${slugForLinks}/contracts/${pageNum - 1}`}
-                  className="px-3 py-1.5 rounded-md border border-slate-700 hover:border-purple-500 text-slate-300 hover:text-white"
+                  className="px-3 py-1.5 rounded-md border border-(--mp-line) hover:border-(--mp-navy) text-(--mp-body) hover:text-(--mp-ink)"
                 >
                   ← Prev
                 </Link>
@@ -321,7 +321,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
               {pageNum < totalPages && (
                 <Link
                   href={`/contractors/${slugForLinks}/contracts/${pageNum + 1}`}
-                  className="px-3 py-1.5 rounded-md border border-slate-700 hover:border-purple-500 text-slate-300 hover:text-white"
+                  className="px-3 py-1.5 rounded-md border border-(--mp-line) hover:border-(--mp-navy) text-(--mp-body) hover:text-(--mp-ink)"
                 >
                   Next →
                 </Link>
@@ -331,14 +331,14 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         )}
 
         {/* CTA */}
-        <section className="mt-12 rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-xl font-bold">Get Alerted Before {displayName}&apos;s Next Recompete</h2>
-          <p className="mt-2 max-w-2xl mx-auto text-slate-300 text-sm">
+        <section className="mt-12 rounded-lg border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
+          <h2 className="text-xl font-bold font-(family-name:--mp-font-serif)">Get Alerted Before {displayName}&apos;s Next Recompete</h2>
+          <p className="mt-2 max-w-2xl mx-auto text-(--mp-body) text-sm">
             Mindy monitors active contracts and flags recompetes 12 months out so you can position to compete.
           </p>
           <Link
             href="/signup"
-            className="mt-5 inline-flex rounded-xl bg-purple-600 px-5 py-2.5 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+            className="mt-5 inline-flex rounded-lg bg-(--mp-navy) px-5 py-2.5 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
             Start Free
           </Link>

@@ -12,7 +12,44 @@ import Link from 'next/link';
  *
  * Drop into any public page. Links to the getmindy.ai signup.
  */
-export default function MeetMindyStrip({ variant = 'banner' }: { variant?: 'banner' | 'card' }) {
+const CLASSES = {
+  legacy: {
+    card: 'rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 to-slate-900 p-5',
+    cardMark: 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-emerald-500 text-lg font-bold text-white',
+    title: 'text-sm font-semibold text-white',
+    body: 'mt-0.5 text-sm text-slate-400',
+    cardCta: 'mt-3 inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500',
+    banner: 'flex items-center justify-center gap-3 border-b border-purple-500/20 bg-gradient-to-r from-purple-950/40 to-emerald-950/30 px-4 py-2.5 text-sm',
+    bannerMark: 'flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-purple-600 to-emerald-500 text-xs font-bold text-white',
+    bannerText: 'text-slate-300',
+    bannerName: 'font-semibold text-white',
+    bannerCta: 'rounded-md bg-emerald-600 px-3 py-1 font-medium text-white transition-colors hover:bg-emerald-500',
+    dismiss: 'ml-1 text-slate-500 hover:text-slate-300',
+  },
+  public: {
+    card: 'rounded-lg border border-(--mp-line) bg-(--mp-wash) p-5',
+    cardMark: 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-(--mp-navy) text-lg font-bold text-white',
+    title: 'text-sm font-semibold text-(--mp-ink)',
+    body: 'mt-0.5 text-sm text-(--mp-muted)',
+    cardCta: 'mt-3 inline-flex items-center gap-1 rounded-lg bg-(--mp-navy) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--mp-navy-hover)',
+    banner: 'flex items-center justify-center gap-3 border-b border-(--mp-line) bg-(--mp-wash) px-4 py-2.5 text-sm',
+    bannerMark: 'flex h-6 w-6 items-center justify-center rounded bg-(--mp-navy) text-xs font-bold text-white',
+    bannerText: 'text-(--mp-body)',
+    bannerName: 'font-semibold text-(--mp-ink)',
+    bannerCta: 'rounded-md bg-(--mp-navy) px-3 py-1 font-medium text-white transition-colors hover:bg-(--mp-navy-hover)',
+    dismiss: 'ml-1 text-(--mp-muted) hover:text-(--mp-body)',
+  },
+} as const;
+
+export default function MeetMindyStrip({
+  variant = 'banner',
+  appearance = 'legacy',
+}: {
+  variant?: 'banner' | 'card';
+  /** 'public' = Mindy public design system (inside PublicShell). */
+  appearance?: 'legacy' | 'public';
+}) {
+  const c = CLASSES[appearance];
   const [dismissed, setDismissed] = useState(false);
   // Suppress for signed-in Mindy users. Start hidden until we've checked, so a
   // member never sees a flash of the "Try free" acquisition CTA.
@@ -30,17 +67,17 @@ export default function MeetMindyStrip({ variant = 'banner' }: { variant?: 'bann
 
   if (variant === 'card') {
     return (
-      <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 to-slate-900 p-5">
+      <div className={c.card}>
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-emerald-500 text-lg font-bold text-white">M</div>
+          <div className={c.cardMark}>M</div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white">New here? Meet Mindy.</p>
-            <p className="mt-0.5 text-sm text-slate-400">
+            <p className={c.title}>New here? Meet Mindy.</p>
+            <p className={c.body}>
               Mindy is your 24/7 federal market intelligence analyst — it scans 24,000+ opportunities daily, scores your fit, and tells you what to bid on.
             </p>
             <Link
               href="https://getmindy.ai"
-              className="mt-3 inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+              className={c.cardCta}
             >
               Try Mindy free →
             </Link>
@@ -52,15 +89,15 @@ export default function MeetMindyStrip({ variant = 'banner' }: { variant?: 'bann
 
   // banner (default) — a slim top strip.
   return (
-    <div className="flex items-center justify-center gap-3 border-b border-purple-500/20 bg-gradient-to-r from-purple-950/40 to-emerald-950/30 px-4 py-2.5 text-sm">
-      <span className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-purple-600 to-emerald-500 text-xs font-bold text-white">M</span>
-      <span className="text-slate-300">
-        <span className="font-semibold text-white">Mindy</span> finds federal opportunities that fit you, daily.
+    <div className={c.banner}>
+      <span className={c.bannerMark}>M</span>
+      <span className={c.bannerText}>
+        <span className={c.bannerName}>Mindy</span> finds federal opportunities that fit you, daily.
       </span>
-      <Link href="https://getmindy.ai" className="rounded-md bg-emerald-600 px-3 py-1 font-medium text-white transition-colors hover:bg-emerald-500">
+      <Link href="https://getmindy.ai" className={c.bannerCta}>
         Try free →
       </Link>
-      <button onClick={() => setDismissed(true)} className="ml-1 text-slate-500 hover:text-slate-300" aria-label="Dismiss">✕</button>
+      <button onClick={() => setDismissed(true)} className={c.dismiss} aria-label="Dismiss">✕</button>
     </div>
   );
 }

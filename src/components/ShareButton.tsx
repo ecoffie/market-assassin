@@ -15,9 +15,27 @@ interface ShareButtonProps {
   url: string;
   /** Human title used in the tweet / share text. */
   title: string;
+  /** 'public' = Mindy public design system (inside PublicShell). */
+  appearance?: 'legacy' | 'public';
 }
 
-export default function ShareButton({ url, title }: ShareButtonProps) {
+const CLASSES = {
+  legacy: {
+    share: 'inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-500/10 px-4 py-2 text-sm font-semibold text-purple-200 hover:bg-purple-500/20 transition-colors',
+    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:border-purple-500/50 hover:text-white transition-colors',
+    menu: 'absolute left-0 top-11 z-10 w-56 rounded-xl border border-slate-700 bg-slate-900 p-2 shadow-xl',
+    item: 'block rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800',
+  },
+  public: {
+    share: 'inline-flex items-center gap-2 rounded-lg border border-(--mp-line) bg-(--mp-surface) px-4 py-2 text-sm font-semibold text-(--mp-navy) hover:border-(--mp-navy) hover:bg-(--mp-navy-wash) transition-colors',
+    icon: 'inline-flex h-9 w-9 items-center justify-center rounded-full border border-(--mp-line) bg-(--mp-surface) text-(--mp-body) hover:border-(--mp-navy) hover:text-(--mp-ink) transition-colors',
+    menu: 'absolute left-0 top-11 z-10 w-56 rounded-lg border border-(--mp-line) bg-(--mp-surface) p-2',
+    item: 'block rounded-lg px-3 py-2 text-sm text-(--mp-ink) hover:bg-(--mp-wash)',
+  },
+} as const;
+
+export default function ShareButton({ url, title, appearance = 'legacy' }: ShareButtonProps) {
+  const c = CLASSES[appearance];
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -56,7 +74,7 @@ export default function ShareButton({ url, title }: ShareButtonProps) {
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-500/10 px-4 py-2 text-sm font-semibold text-purple-200 hover:bg-purple-500/20 transition-colors"
+          className={c.share}
           aria-label="Share this ranking"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -69,23 +87,23 @@ export default function ShareButton({ url, title }: ShareButtonProps) {
           href={x}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:border-purple-500/50 hover:text-white transition-colors"
+          className={c.icon}
           aria-label="Share on X"
         >𝕏</a>
         <a
           href={li}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:border-purple-500/50 hover:text-white transition-colors"
+          className={c.icon}
           aria-label="Share on LinkedIn"
         >in</a>
       </div>
 
       {open && (
-        <div className="absolute left-0 top-11 z-10 w-56 rounded-xl border border-slate-700 bg-slate-900 p-2 shadow-xl">
-          <a href={x} target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Share on X</a>
-          <a href={li} target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Share on LinkedIn</a>
-          <a href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`} className="block rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Share by email</a>
+        <div className={c.menu}>
+          <a href={x} target="_blank" rel="noopener noreferrer" className={c.item}>Share on X</a>
+          <a href={li} target="_blank" rel="noopener noreferrer" className={c.item}>Share on LinkedIn</a>
+          <a href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`} className={c.item}>Share by email</a>
         </div>
       )}
     </div>
