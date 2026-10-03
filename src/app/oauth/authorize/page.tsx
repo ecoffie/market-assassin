@@ -27,6 +27,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { getSupabase } from '@/lib/supabase/client';
+import { isChatgptResource } from '@/lib/mcp/oauth/resources';
 
 /**
  * Who am I, per the server. Returns the email the MI token's signature PROVES,
@@ -204,10 +205,15 @@ export default function AuthorizePage() {
                 The number comes from /api/mcp/catalog (public, no auth), which reads
                 SIGNUP_CREDITS server-side — so the promise can never drift from the
                 grant. Same pattern /mcp and /mcp/pricing already use. */}
-            <p className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[13px] text-emerald-200">
-              New here? Creating an account is <strong className="font-semibold">free</strong> — you get{' '}
-              <strong className="font-semibold">{signupCredits} credits</strong> to try it, no card required.
-            </p>
+            {/* NOT shown for a ChatGPT connect: the ChatGPT profile grants no signup credits
+                (tasks/chatgpt-plugin-path-a.md, owner decision 3), so the promise would be
+                false there. Every other client sees exactly what it saw before. */}
+            {!isChatgptResource(params?.resource) && (
+              <p className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[13px] text-emerald-200">
+                New here? Creating an account is <strong className="font-semibold">free</strong> — you get{' '}
+                <strong className="font-semibold">{signupCredits} credits</strong> to try it, no card required.
+              </p>
+            )}
             <a
               href="/app?signup=1"
               target="_blank"
@@ -241,10 +247,17 @@ export default function AuthorizePage() {
         {stage === 'consent' && (
           <>
             <h1 className="text-xl font-semibold">Connect to Mindy?</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              Allow this app to connect to your Mindy account? It can search SAM, pull playbooks, financials &amp; pricing, and{' '}
-              <strong className="text-slate-300">spend your credits</strong> on your behalf.
-            </p>
+            {isChatgptResource(params?.resource) ? (
+              <p className="mt-2 text-sm text-slate-400">
+                Allow ChatGPT to connect to your Mindy account? It can search federal opportunities, awards, contractors,
+                grants, agencies and events, and <strong className="text-slate-300">use your existing credits</strong> on your behalf.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-slate-400">
+                Allow this app to connect to your Mindy account? It can search SAM, pull playbooks, financials &amp; pricing, and{' '}
+                <strong className="text-slate-300">spend your credits</strong> on your behalf.
+              </p>
+            )}
             <p className="mt-3 text-[12px] text-slate-500">Signed in as <span className="text-slate-300">{email}</span></p>
             <button
               type="button"

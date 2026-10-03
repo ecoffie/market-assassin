@@ -13,6 +13,7 @@ import { issueAccessToken, verifyPkceS256, MCP_SCOPE } from '@/lib/mcp/oauth/tok
 import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { oauthGate } from '@/lib/mcp/oauth/guard';
+import { isChatgptAudience, resolveTokenAudience } from '@/lib/mcp/oauth/resources';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,18 +64,37 @@ export async function POST(request: NextRequest) {
     if (redirect_uri && record.redirect_uri !== redirect_uri) return err('invalid_grant', 'redirect_uri mismatch');
     if (!verifyPkceS256(code_verifier, record.code_challenge)) return err('invalid_grant', 'PKCE verification failed');
 
-    const scope = record.scope || MCP_SCOPE;
-    const access = issueAccessToken(record.user_email, client_id, scope);
-    const refresh = await saveRefreshToken({ clientId: client_id, userEmail: record.user_email, scope, resource: record.resource ?? undefined });
+    // RFC 8707 audience: bound to the resource recorded at authorize time, optionally
+    // confirmed by a `resource` on this request. Absent/unknown → the default (full MCP)
+    // resource, i.e. exactly what every Claude token was minted with before.
+    const aud = resolveTokenAudience(record.resource, body.resource);
+    if (!aud.ok) return err(aud.error, aud.description);
+    const chatgpt = isChatgptAudience(aud.audience);
 
-    // Welcome grant on first connect (idempotent; no-op if they already have a balance row).
-    try {
-      await grantSignupCreditsIfFirst(record.user_email);
-    } catch {
-      /* never block token issuance on the grant */
+    const scope = record.scope || MCP_SCOPE;
+    const access = issueAccessToken(record.user_email, client_id, scope, aud.audience);
+    const refresh = await saveRefreshToken({
+      clientId: client_id,
+      userEmail: record.user_email,
+      scope,
+      // ChatGPT grants persist the RESOLVED audience so refresh rotation can never drift
+      // back to the default; every other grant stores exactly what it stored before.
+      resource: chatgpt ? aud.audience : (record.resource ?? undefined),
+    });
+
+    // No new-user credit acquisition through the ChatGPT profile (owner decision 3,
+    // tasks/chatgpt-plugin-path-a.md): no welcome grant, no referral grant. A ChatGPT
+    // connect may SPEND an existing balance; it never creates one.
+    if (!chatgpt) {
+      // Welcome grant on first connect (idempotent; no-op if they already have a balance row).
+      try {
+        await grantSignupCreditsIfFirst(record.user_email);
+      } catch {
+        /* never block token issuance on the grant */
+      }
+      // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
+      void qualifyReferralFromRequest(request, record.user_email);
     }
-    // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
-    void qualifyReferralFromRequest(request, record.user_email);
 
     return NextResponse.json(
       { access_token: access.token, token_type: 'Bearer', expires_in: access.expiresIn, refresh_token: refresh, scope },
@@ -93,8 +113,12 @@ export async function POST(request: NextRequest) {
     if (!row) return err('invalid_grant', 'Refresh token is invalid, expired, or revoked');
     if (row.client_id !== client_id) return err('invalid_grant', 'client_id mismatch');
 
+    // Rotation PRESERVES the audience: the stored row's resource is the binding.
+    const aud = resolveTokenAudience(row.resource, body.resource);
+    if (!aud.ok) return err(aud.error, aud.description);
+
     const scope = row.scope || MCP_SCOPE;
-    const access = issueAccessToken(row.user_email, client_id, scope);
+    const access = issueAccessToken(row.user_email, client_id, scope, aud.audience);
     const newRefresh = await saveRefreshToken({
       clientId: client_id,
       userEmail: row.user_email,

@@ -2741,8 +2741,8 @@ All of Phase 1 is merged to `main` + every migration run & verified live (PRs #1
 through **`runMeteredTool`**, NOT raw `runMcpTool`. Raw dispatch = tools run for free.
 Any new transport/entry point bills only if it goes through `runMeteredTool`.
 
-**⚠️ ChatGPT-attributed auto-recharge (PR #1778, migration `20261003_mcp_autorecharge_chatgpt_attribution.sql`
-NOT applied yet):** an automatic card payment is permitted only if the account would still qualify
+**⚠️ ChatGPT-attributed auto-recharge (PR #1778 LIVE, merged `9c24b306`; migration
+`20261003_mcp_autorecharge_chatgpt_attribution.sql` applied 2026-10-03 via the runner, prod-accepted):** an automatic card payment is permitted only if the account would still qualify
 after removing all ChatGPT-originated consumption in the current ATTRIBUTION WINDOW — the window
 opened by the most recent INDEPENDENT FUNDING EVENT. `mcp_credit_balance.chatgpt_spend_since_recharge`
 (S) grows only on a PERSONAL debit with `p_channel='chatgpt'` (same UPDATE as the debit); normal and
@@ -2756,7 +2756,8 @@ reason — admin, signup/promo, referral, corrections, pool, sponsor, and ANY NE
 scans every `applyCreditOnce`/`grantCredits`/`topUpToCeiling` call and fails on an unclassified one.
 Any new surface that debits a personal balance on ChatGPT's behalf MUST pass `channel: 'chatgpt'`
 through `runMeteredTool` → `debitResolvedPayer` → `debitCredits`, or its spend can charge a card.
-Rollout: migration applied + this code live BEFORE `/chatgpt/mcp` (#1776) reaches prod.
+The `/chatgpt/mcp` route (#1776) passes `channel: 'chatgpt'`; proven route→RPC by
+`src/app/chatgpt/mcp/__tests__/route.billing-chain.unit.test.ts`.
 Open items: `tasks/autorecharge-followups-2026-10-03.md`.
 
 **Corpus extraction guard (Layers A+B, `src/lib/mcp/extraction-guard.ts`):** protects ONLY
@@ -2913,6 +2914,39 @@ needs `MI_AUTH_TOKEN`).
 **Parked:** PR #135 (GitHub OAuth for app sign-in — Apple already merged); add
 `mcp.getmindy.ai` to the token `aud` allowlist once the subdomain is claimed; provision a
 dedicated `MCP_OAUTH_SIGNING_SECRET`.
+
+---
+
+## Mindy MCP Server — `/chatgpt/mcp` profile (ChatGPT plugin Path A, 2026-10-02)
+
+A SECOND MCP handler at `https://mcp.getmindy.ai/chatgpt/mcp` (`src/app/chatgpt/mcp/route.ts`),
+beside — not replacing — the full edge. Plan + owner decisions + open items:
+**`tasks/chatgpt-plugin-path-a.md`** (read it before touching either endpoint).
+
+- **Allowlist lives in `src/lib/mcp/chatgpt-profile.ts`** (`CHATGPT_TOOL_ALLOWLIST`, exactly 15 — owner-final
+  2026-10-03; every one must be in the PUBLIC catalog `listPublicMcpTools()`, or registration throws),
+  with ChatGPT-only titles/descriptions/annotations, server instructions, the result projection
+  (`_meta` ALLOWLIST, `_next` credits stripped, find_opportunities ranking internals dropped) and the
+  neutral-refusal mapping (`chatgpt-refusals.ts`). Input schemas are reused from
+  `mcpRegistrationList()` (= the public catalog since #1777) — never redefine them there; only
+  parameter DESCRIPTION text may be overridden (`CHATGPT_PARAM_COPY`).
+- **Billing seam still holds:** calls go through `runMeteredTool(..., { channel: 'chatgpt' })`, so an
+  existing balance is pre-checked and debited exactly like Claude. The channel only suppresses
+  commerce side effects (`recordPaywallAttempt`, paywall copy, continue_url); every row still writes
+  #1777's `outcome` telemetry, refusals included. No footer, no
+  `_meta.credits`, no `grantSignupCreditsIfFirst`, no in-request `maybeAutoRecharge`.
+- **OAuth:** one authorization server, two resources (`src/lib/mcp/oauth/resources.ts`). The token
+  endpoint mints `aud` = the ChatGPT resource only for a ChatGPT grant (no signup/referral credits);
+  each handler accepts only its own audience. Metadata: `/.well-known/oauth-protected-resource/chatgpt/mcp`.
+- **⚠️ The Claude/general endpoint must stay EXACTLY as main has it** (main's public catalog — 53 of
+  64 on 2026-10-03, asserted against main's list, not a hardcoded count — copy, footer, paywall).
+  Guarded by `src/app/mcp/[transport]/__tests__/route.claude-unchanged.unit.test.ts`. Never "clean up"
+  commerce on the full endpoint as a side effect of ChatGPT work.
+- **Auto-recharge:** never in-request on this route; the hourly `/api/cron/mcp-autorecharge`
+  backstop excludes ChatGPT-attributed spend via #1778 (`rechargeGate` / `mcp_recharge_gate`, LIVE).
+  Personal ChatGPT debits carry `p_channel='chatgpt'`; pooled ChatGPT debits go to the pool only.
+  Proven route→RPC in `src/app/chatgpt/mcp/__tests__/route.billing-chain.unit.test.ts`.
+  Not submitted to OpenAI.
 
 ---
 

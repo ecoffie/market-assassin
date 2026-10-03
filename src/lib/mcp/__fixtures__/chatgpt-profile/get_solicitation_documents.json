@@ -1,0 +1,116 @@
+{
+  "notice_id": "458091d7d5514488b53dedd069aab913",
+  "title": "J--HVAC REPLACEMENT FOR COLORADO RIVER AGENCY DETENTION FACILITY",
+  "solicitation_number": "140A1126Q0048",
+  "agency": "INTERIOR, DEPARTMENT OF THE",
+  "description": "Sources Sought Notice Indian Small Business Economic Enterprise (ISBEE) Set Aside \n\nHVAC Replacement - Colorado River Detention Facility\nThis is a Sources Sought Notice issued in accordance with FAR 5.205 and the Buy Indian Act. The purpose of this notice is to identify Indian Small Business Economic Enterprises (ISBEEs) capable of performing the requirements described herein. This notice is not a [fixture: truncated]",
+  "description_truncated": false,
+  "sow_text": "SCOPE OF WORK\nHVAC REPLACEMENT\nColorado River Detention Facility\nColorado River Indian Reservation, La Paz County\n26600 Mohave Road, Parker, AZ 85344\nPrepared for: Bureau of Indian Affairs\nOffice of Facilities Management and Construction (OFMC)\nWestern Regional Office\nPurchase Request Title: Colorado River Detention Facility HVAC Replacement\nNAICS Code: 238220 - Plumbing, Heating, and Air-Conditio [fixture: truncated]",
+  "sow_text_truncated": true,
+  "documents": [
+    {
+      "filename": "Statement_of_Work_1.pdf",
+      "doc_kind": "sow_pws",
+      "mime_type": "application/octet-stream",
+      "page_count": 13,
+      "char_count": 44468,
+      "extracted_text": "SCOPE OF WORK\nHVAC REPLACEMENT\nColorado River Detention Facility\nColorado River Indian Reservation, La Paz County\n26600 Mohave Road, Parker, AZ 85344\nPrepared for: Bureau of Indian Affairs\nOffice of Facilities Management and Construction (OFMC)\nWestern Regional Office\nPurchase Request Title: Colorado River Detention Facility HVAC Replacement\nNAICS Code: 238220 - Plumbing, Heating, and Air-Conditio [fixture: truncated]",
+      "extracted_text_truncated": true,
+      "text_availability": "partial",
+      "text_window": {
+        "offset": 0,
+        "returned_chars": 20000,
+        "total_chars": 44468,
+        "next_offset": 20000,
+        "has_more": true,
+        "coverage_of_stored_text": 0.4498
+      },
+      "document_id": "17f7cd5168bf41b6949f2a1700a0d8a7",
+      "extraction_capped": false,
+      "extraction_quality": "ok",
+      "text_readable_ratio": 1,
+      "text_shorter_than_recorded": false,
+      "download_url": "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/17f7cd5168bf41b6949f2a1700a0d8a7/download",
+      "download_source": "sam_public",
+      "location_note": "File lives on SAM.gov, not in Mindy storage. Fetch the public URL; it is an external attachment location."
+    },
+    {
+      "filename": "IEE_Representation_Form_1.pdf",
+      "doc_kind": "attachment_other",
+      "mime_type": "application/octet-stream",
+      "page_count": 1,
+      "char_count": 1634,
+      "extracted_text": "In accordance with 25 U.S.C. 47 of the Buy Indian Act, the signature in the Offeror Section below constitutes\nself-certification that the Offeror meets the definition of an \"Indian Economic Enterprise (IEE)\" as defined in\nDepartment of the Interior Acquisition Regulation (DIAR) Part 1480 titled, \"Acquisitions Under the Buy\nIndian Act.\"\nThe enterprise must meet the requirements of (i) through (iii) [fixture: truncated]",
+      "extracted_text_truncated": false,
+      "text_availability": "complete",
+      "text_window": {
+        "offset": 0,
+        "returned_chars": 1634,
+        "total_chars": 1634,
+        "next_offset": null,
+        "has_more": false,
+        "coverage_of_stored_text": 1
+      },
+      "document_id": "20f8c396385a4d82b45b21b0f141061f",
+      "extraction_capped": false,
+      "extraction_quality": "ok",
+      "text_readable_ratio": 1,
+      "text_shorter_than_recorded": false,
+      "download_url": "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/20f8c396385a4d82b45b21b0f141061f/download",
+      "download_source": "sam_public",
+      "location_note": "File lives on SAM.gov, not in Mindy storage. Fetch the public URL; it is an external attachment location."
+    }
+  ],
+  "coverage": {
+    "documents_total": 2,
+    "documents_complete": 1,
+    "documents_with_more_text": 1,
+    "documents_unavailable": 0,
+    "documents_extraction_capped": 0,
+    "documents_not_requested": 0,
+    "scoped": false,
+    "complete": false
+  },
+  "next_page": {
+    "notice_id": "458091d7d5514488b53dedd069aab913",
+    "document_ids": [
+      "17f7cd5168bf41b6949f2a1700a0d8a7"
+    ],
+    "documents": [
+      {
+        "document_id": "17f7cd5168bf41b6949f2a1700a0d8a7",
+        "offset": 20000,
+        "limit": 20000
+      }
+    ]
+  },
+  "listed_attachments": [
+    {
+      "filename": "Statement_of_Work_1.pdf",
+      "url": "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/17f7cd5168bf41b6949f2a1700a0d8a7/download",
+      "has_extracted_text": true,
+      "location": "sam_public"
+    },
+    {
+      "filename": "IEE_Representation_Form_1.pdf",
+      "url": "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/20f8c396385a4d82b45b21b0f141061f/download",
+      "has_extracted_text": true,
+      "location": "sam_public"
+    }
+  ],
+  "_meta": {
+    "grounded": true,
+    "degraded": false,
+    "doc_count": 2,
+    "source": "cache",
+    "signed_url_ttl_seconds": 3600,
+    "returned_chars": 21634,
+    "total_chars": 46102,
+    "coverage_complete": false,
+    "attachments_listed": 2,
+    "attachments_with_text": 2,
+    "piee": false,
+    "piee_links": [],
+    "retrieval_limitation": null
+  }
+}

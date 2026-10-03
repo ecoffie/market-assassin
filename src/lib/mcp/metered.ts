@@ -24,6 +24,7 @@ import {
   buildRequiresProRefusal,
   type CommercialRefusal,
 } from './commercial-refusal';
+import { neutralInsufficientCreditsMessage, NEUTRAL_REQUIRES_PRO_MESSAGE } from './chatgpt-refusals';
 
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
@@ -83,19 +84,24 @@ export async function runMeteredTool(
     const pro = await isProForMcp(ctx.userEmail);
     if (!pro) {
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('requires_pro') });
-      const gatedAttemptId = await recordPaywallAttempt({
-        userEmail: ctx.userEmail,
-        toolName: name,
-        args,
-        reason: 'requires_pro',
-      });
+      // ChatGPT channel: no saved purchase retry, no purchase copy.
+      const gatedAttemptId = ctx.channel === 'chatgpt'
+        ? null
+        : await recordPaywallAttempt({
+          userEmail: ctx.userEmail,
+          toolName: name,
+          args,
+          reason: 'requires_pro',
+        });
       const continueUrl = gatedAttemptId ? `${RESUME_BASE}?attempt=${gatedAttemptId}` : null;
-      const message = paywallMessage({
-        toolName: name,
-        reason: 'requires_pro',
-        attemptId: gatedAttemptId,
-        userEmail: ctx.userEmail,
-      });
+      const message = ctx.channel === 'chatgpt'
+        ? NEUTRAL_REQUIRES_PRO_MESSAGE
+        : paywallMessage({
+          toolName: name,
+          reason: 'requires_pro',
+          attemptId: gatedAttemptId,
+          userEmail: ctx.userEmail,
+        });
       return {
         ok: false,
         error: {
@@ -196,16 +202,19 @@ export async function runMeteredTool(
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId, outcome: blockedOutcome('insufficient_credits') });
       // Save the request so it can be run verbatim after they upgrade, and so
       // "wanted another report but did not buy" is countable rather than inferred.
-      const attemptId = await recordPaywallAttempt({
-        userEmail: ctx.userEmail,
-        toolName: name,
-        args,
-        reason: 'insufficient_credits',
-        creditsRequired: cost,
-        balanceAtAttempt: balance,
-      });
+      // ChatGPT channel: no saved purchase retry, no purchase copy (owner decision 2).
+      const attemptId = ctx.channel === 'chatgpt'
+        ? null
+        : await recordPaywallAttempt({
+          userEmail: ctx.userEmail,
+          toolName: name,
+          args,
+          reason: 'insufficient_credits',
+          creditsRequired: cost,
+          balanceAtAttempt: balance,
+        });
       const continueUrl = attemptId ? `${RESUME_BASE}?attempt=${attemptId}` : null;
-      const message = paywallMessage({
+      const message = ctx.channel === 'chatgpt' ? neutralInsufficientCreditsMessage(cost, balance) : paywallMessage({
         toolName: name,
         reason: 'insufficient_credits',
         creditsRequired: cost,

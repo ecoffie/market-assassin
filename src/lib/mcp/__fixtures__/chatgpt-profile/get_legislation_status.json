@@ -1,0 +1,298 @@
+{
+  "query": "FY2026 NDAA",
+  "resolution": {
+    "kind": "fy_vehicle",
+    "matched": "FY2026 NDAA",
+    "outcome": "FOUND",
+    "note": null
+  },
+  "subject": {
+    "label": "FY2026 NDAA",
+    "fiscal_year": 2026,
+    "congress": 119
+  },
+  "overall_status": {
+    "enacted": true,
+    "law_number": "119-60",
+    "enacted_by": {
+      "bill": "S. 1071",
+      "law_number": "119-60",
+      "source_url": "https://www.congress.gov/119/plaws/publ60/PLAW-119publ60.htm",
+      "source_date": "2025-12-19"
+    },
+    "by_chamber": {
+      "house": {
+        "bill": "H.R. 3838",
+        "stage": "HOUSE_PASSED",
+        "display": "Passed the House",
+        "latest_stored_action": {
+          "date": "2025-09-30",
+          "text": "Received in the Senate."
+        }
+      },
+      "senate": {
+        "bill": "S. 1071",
+        "stage": "PUBLIC_LAW",
+        "display": "Public Law — the enacted authority",
+        "latest_stored_action": {
+          "date": "2025-12-18",
+          "text": "Became Public Law No: 119-60."
+        }
+      }
+    }
+  },
+  "documents": [
+    {
+      "bill": "H.R. 3838",
+      "congress": 119,
+      "chamber_of_origin": "House",
+      "title": "Streamlining Procurement for Effective Execution and Delivery and National Defense Authorization Act for Fiscal Year 2026",
+      "role": "authorization_vehicle",
+      "fiscal_year": 2026,
+      "amends_fiscal_year": null,
+      "current_stage": "HOUSE_PASSED",
+      "current_stage_display": "Passed the House",
+      "progress": {
+        "house": "HOUSE_PASSED",
+        "senate": null,
+        "enrolled": false,
+        "enacted": false
+      },
+      "law_number": null,
+      "latest_stored_action": {
+        "date": "2025-09-30",
+        "text": "Received in the Senate."
+      },
+      "versions": [
+        {
+          "document_number": "119-HR3838-IH",
+          "version_code": "IH",
+          "version": "Introduced in House",
+          "stage": "INTRODUCED",
+          "display": "Introduced in the House",
+          "law_status": "not_enacted",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-06-09",
+          "source_url": "https://www.congress.gov/119/bills/hr3838/BILLS-119hr3838ih.htm"
+        },
+        {
+          "document_number": "119-HR3838-RH",
+          "version_code": "RH",
+          "version": "Reported in House",
+          "stage": "REPORTED_IN_HOUSE",
+          "display": "Reported by House committee (not passed)",
+          "law_status": "not_enacted",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-08-19",
+          "source_url": "https://www.congress.gov/119/bills/hr3838/BILLS-119hr3838rh.htm"
+        },
+        {
+          "document_number": "119-HR3838-EH",
+          "version_code": "EH",
+          "version": "Engrossed in House",
+          "stage": "HOUSE_PASSED",
+          "display": "Passed the House",
+          "law_status": "not_enacted",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-09-10",
+          "source_url": "https://www.congress.gov/119/bills/hr3838/BILLS-119hr3838eh.htm"
+        }
+      ],
+      "committee_reports": [
+        {
+          "document_number": "119-HRPT-231",
+          "citation": "H. Rept. 119-231",
+          "document_kind": "committee_report",
+          "is_errata": false,
+          "is_conference_report": false,
+          "law_status": "not_applicable",
+          "source_date": "2025-08-19",
+          "source_url": "https://www.congress.gov/congressional-report/119th-congress/house-report/231"
+        }
+      ]
+    },
+    {
+      "bill": "S. 1071",
+      "congress": 119,
+      "chamber_of_origin": "Senate",
+      "title": "National Defense Authorization Act for Fiscal Year 2026",
+      "role": "authorization_vehicle",
+      "fiscal_year": 2026,
+      "amends_fiscal_year": null,
+      "current_stage": "PUBLIC_LAW",
+      "current_stage_display": "Public Law — the enacted authority",
+      "progress": {
+        "house": "HOUSE_PASSED_WITH_AMENDMENT",
+        "senate": "SENATE_PASSED",
+        "enrolled": true,
+        "enacted": true
+      },
+      "law_number": "119-60",
+      "latest_stored_action": {
+        "date": "2025-12-18",
+        "text": "Became Public Law No: 119-60."
+      },
+      "versions": [
+        {
+          "document_number": "119-S1071-IS",
+          "version_code": "IS",
+          "version": "Introduced in Senate",
+          "stage": "INTRODUCED",
+          "display": "Introduced in the Senate",
+          "law_status": "superseded_by_enactment",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-03-14",
+          "source_url": "https://www.congress.gov/119/bills/s1071/BILLS-119s1071is.htm"
+        },
+        {
+          "document_number": "119-S1071-ES",
+          "version_code": "ES",
+          "version": "Engrossed in Senate",
+          "stage": "SENATE_PASSED",
+          "display": "Passed the Senate",
+          "law_status": "superseded_by_enactment",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-08-01",
+          "source_url": "https://www.congress.gov/119/bills/s1071/BILLS-119s1071es.htm"
+        },
+        {
+          "document_number": "119-S1071-EAH",
+          "version_code": "EAH",
+          "version": "Engrossed Amendment House",
+          "stage": "HOUSE_PASSED_WITH_AMENDMENT",
+          "display": "House passed this Senate bill with an amendment (chambers not yet agreed)",
+          "law_status": "superseded_by_enactment",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-12-10",
+          "source_url": "https://www.congress.gov/119/bills/s1071/BILLS-119s1071eah.htm"
+        },
+        {
+          "document_number": "119-S1071-PUBLIC-LAW",
+          "version_code": "PUBLIC-LAW",
+          "version": "Public Law",
+          "stage": "PUBLIC_LAW",
+          "display": "Public Law — the enacted authority",
+          "law_status": "enacted",
+          "evidence_class": "ENACTED_LAW",
+          "source_date": "2025-12-19",
+          "source_url": "https://www.congress.gov/119/plaws/publ60/PLAW-119publ60.htm"
+        },
+        {
+          "document_number": "119-S1071-ENR",
+          "version_code": "ENR",
+          "version": "Enrolled Bill",
+          "stage": "ENROLLED",
+          "display": "Enrolled — passed both chambers in identical form",
+          "law_status": "enacted",
+          "evidence_class": "ENACTED_LAW",
+          "source_date": null,
+          "source_url": "https://www.congress.gov/119/bills/s1071/BILLS-119s1071enr.htm"
+        }
+      ],
+      "committee_reports": []
+    },
+    {
+      "bill": "S. 2296",
+      "congress": 119,
+      "chamber_of_origin": "Senate",
+      "title": "National Defense Authorization Act for Fiscal Year 2026",
+      "role": "authorization_vehicle",
+      "fiscal_year": 2026,
+      "amends_fiscal_year": null,
+      "current_stage": "SENATE_PASSED",
+      "current_stage_display": "Passed the Senate",
+      "progress": {
+        "house": null,
+        "senate": "SENATE_PASSED",
+        "enrolled": false,
+        "enacted": false
+      },
+      "law_number": null,
+      "latest_stored_action": {
+        "date": "2025-11-12",
+        "text": "Held at the desk."
+      },
+      "versions": [
+        {
+          "document_number": "119-S2296-RS",
+          "version_code": "RS",
+          "version": "Reported to Senate",
+          "stage": "REPORTED_IN_SENATE",
+          "display": "Reported by Senate committee (not passed)",
+          "law_status": "not_enacted",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-07-15",
+          "source_url": "https://www.congress.gov/119/bills/s2296/BILLS-119s2296rs.htm"
+        },
+        {
+          "document_number": "119-S2296-ES",
+          "version_code": "ES",
+          "version": "Engrossed in Senate",
+          "stage": "SENATE_PASSED",
+          "display": "Passed the Senate",
+          "law_status": "not_enacted",
+          "evidence_class": "LEGISLATIVE_ACTIVITY_NOT_LAW",
+          "source_date": "2025-10-09",
+          "source_url": "https://www.congress.gov/119/bills/s2296/BILLS-119s2296es.htm"
+        }
+      ],
+      "committee_reports": [
+        {
+          "document_number": "119-SRPT-39",
+          "citation": "S. Rept. 119-39",
+          "document_kind": "committee_report",
+          "is_errata": false,
+          "is_conference_report": false,
+          "law_status": "not_applicable",
+          "source_date": "2025-07-15",
+          "source_url": "https://www.congress.gov/congressional-report/119th-congress/senate-report/39"
+        },
+        {
+          "document_number": "119-SRPT-39-ERRATA",
+          "citation": "S. Rept. 119-39,Errata",
+          "document_kind": "committee_report",
+          "is_errata": true,
+          "is_conference_report": false,
+          "law_status": "not_applicable",
+          "source_date": null,
+          "source_url": "https://www.congress.gov/congressional-report/119th-congress/senate-report/39"
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "status": "complete",
+    "scope": "Measures titled \"National Defense Authorization Act\" in the 119th Congress",
+    "congress": 119,
+    "last_complete_discovery_at": "2026-09-27T13:40:28Z",
+    "last_poll": "2026-09-27T13:40:28.218+00:00",
+    "last_source_advance": "2026-07-30",
+    "freshness": "upstream_quiet",
+    "held_rows_truncated": false
+  },
+  "limitations": [
+    "bill_text_not_held",
+    "action_history_not_held",
+    "ndaa_titled_measures_only"
+  ],
+  "content_request": null,
+  "content_status": "NOT_REQUESTED",
+  "host_rules": [
+    "Answer covered status questions from these stored records and give their as-of date (_meta.as_of).",
+    "Keep the House and Senate bills separate — never describe them as one merged bill.",
+    "REPORTED is not passed. Say \"reported by committee\", not \"passed\".",
+    "Passing one chamber — or both in differing forms — is not law. Only overall_status.enacted=true, backed by a PUBLIC_LAW record, is law.",
+    "A committee report is report language, not law; errata are corrections to a report, not bills.",
+    "Say \"latest stored action as of <date>\" — never \"complete legislative history\". Mindy stores one latest action per bill, not votes or action history.",
+    "When content_status is NOT_HELD: say Mindy holds this bill's status but not its text, then stop. Do not describe provisions from memory, pain points or report titles; label any outside source as not Mindy evidence.",
+    "When resolution.outcome is NOT_ESTABLISHED or NOT_FOUND_IN_COVERED_CORPUS, never say the bill does not exist — state the scope that was covered.",
+    "Do not predict passage or timing, and do not add political commentary."
+  ],
+  "_meta": {
+    "grounded": true,
+    "degraded": false,
+    "source_count": 13,
+    "as_of": "2026-09-27T13:40:28.218+00:00",
+    "resolution_kind": "fy_vehicle"
+  }
+}

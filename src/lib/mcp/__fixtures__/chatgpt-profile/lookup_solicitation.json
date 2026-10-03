@@ -1,0 +1,162 @@
+{
+  "intent": "HISTORICAL",
+  "query": "Navy manufacturing bid at Indian Head",
+  "items": [
+    {
+      "kind": "MATCHED_CANDIDATE",
+      "title": "BPA - Bolt, Nut, Screw, Rivet & Washer Manufacturing  PSC 5305,5306,5307,5310,5315,5320,5325,5330,5331,5335,5340,5342,5345,5350,5355,5360,5365",
+      "identifiers": [
+        "N0017424SN0020",
+        "da7fe71fa65f4c64b4cafa16c974d555"
+      ],
+      "status": "open",
+      "award_status": "AWARD_NOT_ESTABLISHED",
+      "latest_amendment": null,
+      "response_deadline": "2028-11-11T05:00:00+00:00",
+      "posted_date": "2026-09-22T00:00:00+00:00",
+      "archive_date": "2028-11-26T00:00:00+00:00",
+      "buyer": "NSWC INDIAN HEAD DIVISION",
+      "office_dodaac": "N00174",
+      "naics": "332722",
+      "psc": "5306",
+      "contact": {
+        "name": "Contracting Officer (redacted in fixture)",
+        "email": "co@example.mil",
+        "phone": "000-000-0000"
+      },
+      "notice_id": "da7fe71fa65f4c64b4cafa16c974d555",
+      "why_matched": [
+        "buyer_capability_date"
+      ],
+      "provenance": "sam_opportunities",
+      "not_biddable": false,
+      "version_count": 1,
+      "deadline_conflict": false,
+      "deadline_conflict_reasons": [],
+      "lot_deadlines": []
+    },
+    {
+      "kind": "MATCHED_CANDIDATE",
+      "title": "BPA - Semiconductor & Related Device Manufacturing PSC 3670",
+      "identifiers": [
+        "N0017424SN0015",
+        "53ef430e083c49f9a45039f75a58a059"
+      ],
+      "status": "open",
+      "award_status": "AWARD_NOT_ESTABLISHED",
+      "latest_amendment": null,
+      "response_deadline": "2028-11-11T05:00:00+00:00",
+      "posted_date": "2026-09-22T00:00:00+00:00",
+      "archive_date": "2028-11-26T00:00:00+00:00",
+      "buyer": "NSWC INDIAN HEAD DIVISION",
+      "office_dodaac": "N00174",
+      "naics": "334413",
+      "psc": "3670",
+      "contact": {
+        "name": "Contracting Officer (redacted in fixture)",
+        "email": "co@example.mil",
+        "phone": "000-000-0000"
+      },
+      "notice_id": "53ef430e083c49f9a45039f75a58a059",
+      "why_matched": [
+        "buyer_capability_date"
+      ],
+      "provenance": "sam_opportunities",
+      "not_biddable": false,
+      "version_count": 1,
+      "deadline_conflict": false,
+      "deadline_conflict_reasons": [],
+      "lot_deadlines": []
+    },
+    {
+      "kind": "MATCHED_CANDIDATE",
+      "title": "Manufacturing & Services Acquisition (MASA) Manufacturing Support",
+      "identifiers": [
+        "N0017425RFPREQIHDMDept0002",
+        "f1aa309fa39040a4929d90a7d88fd091",
+        "N0017426R1003"
+      ],
+      "status": "archived",
+      "award_status": "AWARD_NOT_ESTABLISHED",
+      "latest_amendment": "Amendment 0003",
+      "response_deadline": "2026-08-27T19:00:00+00:00",
+      "posted_date": "2026-07-29T00:00:00+00:00",
+      "archive_date": "2026-09-11T00:00:00+00:00",
+      "buyer": "NSWC INDIAN HEAD DIVISION",
+      "office_dodaac": "N00174",
+      "naics": "332710",
+      "psc": "1377",
+      "contact": {
+        "name": "Contracting Officer (redacted in fixture)",
+        "email": "co@example.mil",
+        "phone": "000-000-0000"
+      },
+      "notice_id": "f1aa309fa39040a4929d90a7d88fd091",
+      "why_matched": [
+        "buyer_capability_date"
+      ],
+      "provenance": "sam_opportunities",
+      "not_biddable": true,
+      "version_count": 4,
+      "deadline_conflict": true,
+      "deadline_conflict_reasons": [
+        "sibling_notices"
+      ],
+      "lot_deadlines": []
+    },
+    {
+      "kind": "MATCHED_CANDIDATE",
+      "title": "Special Industrial Manufacturing Equipment and Parts (Vacuum, Mixing, and Grinding)",
+      "identifiers": [
+        "N0017426SN0033",
+        "cb47e02872074b2b9dfc9070818c5252"
+      ],
+      "status": "closed",
+      "award_status": "AWARD_NOT_ESTABLISHED",
+      "latest_amendment": null,
+      "response_deadline": "2028-11-11T17:15:00+00:00",
+      "posted_date": "2026-07-15T00:00:00+00:00",
+      "archive_date": "2028-11-26T00:00:00+00:00",
+      "buyer": "NSWC INDIAN HEAD DIVISION",
+      "office_dodaac": "N00174",
+      "naics": "333248",
+      "psc": "4310",
+      "contact": {
+        "name": "Contracting Officer (redacted in fixture)",
+        "email": "co@example.mil",
+        "phone": "000-000-0000"
+      },
+      "notice_id": "cb47e02872074b2b9dfc9070818c5252",
+      "why_matched": [
+        "buyer_capability_date"
+      ],
+      "provenance": "sam_opportunities",
+      "not_biddable": true,
+      "version_count": 1,
+      "deadline_conflict": false,
+      "deadline_conflict_reasons": [],
+      "lot_deadlines": []
+    }
+  ],
+  "next_prompt": "Which of these is the one you mean?",
+  "host_rules": [
+    "This is lookup_solicitation \u2014 not find_opportunities. Do not call FIND.",
+    "MATCHED_CANDIDATE is not identity. Never silently merge or pick the top hit as \"the\" solicitation.",
+    "Same solicitation_number may collapse amendments; different numbers stay separate candidates.",
+    "Closed/archived means not_biddable=true. Closed is not awarded. award_status is independent.",
+    "After the user confirms (\"yes, that's the one\"), call lookup_solicitation with confirm_notice_id.",
+    "Offer at most ONE next_prompt. Wait. Do not invent awards, debrief timing, or a post-award checklist. Do not auto-call paid tools.",
+    "No web search for facts already returned."
+  ],
+  "_meta": {
+    "grounded": true,
+    "candidate_count": 4,
+    "collapsed_count": 4,
+    "history_matches": 0,
+    "corpus_matches": 7,
+    "rows_before_collapse": 7,
+    "db_ms": 2796,
+    "sow_text_used": false,
+    "external_api": false
+  }
+}
