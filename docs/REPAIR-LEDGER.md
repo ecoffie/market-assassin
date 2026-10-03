@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-03 — R1 migration: legacy /briefings authenticates from a verified session
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-03 | Security / legacy /briefings identity | R0 measured paying customers reading briefings on the plaintext ma_access_email cookie (5 by readout #7, growing). The page loaded ANY remembered, typed or ?email= address, wrote that cookie itself, and /api/briefings/latest accepted it: a forged cookie, another customer's cookie or a claimed staff address returned that customer's briefings. Now /api/briefings/latest requires strong auth (Mindy session, Supabase session or signed link). The page sends the Mindy session on every briefing/profile call and treats a remembered/typed/URL address as a HINT that pre-fills a one-time secure sign-in link. Consuming that link (emailed to the mailbox, 15 minutes, now consumed atomically with GETDEL) mints the signed session for the LINK's email and returns to /briefings (returnTo allowlist). No entitlement, pricing or briefing capability changed; the cookie may still be written for legacy navigation but authorizes no briefing. | `verifyUserOwnsEmail(request, email, { requireStrongAuth: true })` → `src/app/api/briefings/latest/route.ts` | `verified-session.unit.test.ts` drives the real handler + real tokens, 13 cases (5 red on origin/main: forged cookie, other customer's cookie, staff claim, legacy link chain, returnTo/preferences); `legacy-session.unit.test.ts` 5; page contract test 7; tsc clean | Draft PR, not merged |
+
 ## 2026-10-03 — SEC-5d: partner trials only for a verified identity, once per account
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

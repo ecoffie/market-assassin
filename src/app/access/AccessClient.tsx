@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { persistAccessEmail } from '@/lib/access-cookie';
+import { storeVerifiedSession } from '@/lib/briefings/legacy-session';
 
 export default function AccessClient() {
   const searchParams = useSearchParams();
@@ -31,10 +32,11 @@ export default function AccessClient() {
         }
 
         if (data.destination === 'briefings') {
-          // Sets both localStorage AND the ma_access_email cookie so the
-          // /briefings page can authenticate downstream API calls. Without
-          // the cookie, /api/alerts/preferences returns 401 and users get
-          // bounced to onboarding.
+          // R1 migration: the consumed link is the verified identity, and the server minted a
+          // signed Mindy session for the LINK's email. Store it — /briefings authenticates from
+          // the session, never from the plaintext cookie. The cookie is still written for legacy
+          // navigation only (it now always equals a verified address).
+          if (data.sessionToken) storeVerifiedSession(data.sessionToken, data.email);
           persistAccessEmail(data.email);
         } else {
           localStorage.setItem('preferences_access_email', data.email);

@@ -14,11 +14,12 @@ import GrantsPanel from '@/components/briefings/GrantsPanel';
 import ShareButton from '@/components/briefings/ShareButton';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import GettingStartedPanel from '@/components/app/panels/GettingStartedPanel';
-import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { getMIApiHeaders, storedMIEmail } from '@/components/app/authHeaders';
+import { briefingsEntry } from '@/lib/briefings/legacy-session';
 import { sendAppEngagement } from '@/components/app/track';
 import PipelineBoard from '@/components/bd-assist/PipelineBoard';
 import ContactsPanel from '@/components/bd-assist/ContactsPanel';
-import { persistAccessEmail, reconcileAccessEmail, clearAccessEmail } from '@/lib/access-cookie';
+import { persistAccessEmail, readStoredAccessEmail, readAccessCookie, clearAccessEmail } from '@/lib/access-cookie';
 
 // Client-specific types for briefing display
 // Note: These are intentionally separate from server-side types in @/lib/briefings/delivery/types.ts
@@ -626,6 +627,8 @@ function BriefingsDashboardContent() {
   const [error, setError] = useState('');
   const [linkSending, setLinkSending] = useState(false);
   const [linkMessage, setLinkMessage] = useState('');
+  // R1 migration: true when we know who the reader claims to be but have no verified session yet.
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [pendingSetupOpen, setPendingSetupOpen] = useState(false); // Track if we should open settings after auth/onboarding
   const [profileStatsRefreshKey, setProfileStatsRefreshKey] = useState(0);
@@ -812,27 +815,21 @@ function BriefingsDashboardContent() {
   // in that case (it would wipe a real saved profile).
   const checkProfileSetupState = useCallback(async (userEmail: string): Promise<ProfileSetupState & { authFailed?: boolean }> => {
     const fetchOnce = async () => {
-      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`);
+      // Authenticated by the signed Mindy session, never by the plaintext ma_access_email cookie.
+      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`, { headers: getMIApiHeaders(userEmail) });
       return { status: res.status, body: await res.json().catch(() => null) };
     };
 
     const empty: ProfileSetupState = { hasNaics: false, hasCustomNaics: false, hasBusinessDescription: false, businessDescription: '' };
 
     try {
-      let result = await fetchOnce();
-
-      // If unauthorized, defensively re-persist the cookie and retry once.
-      // This fixes the class of bug where localStorage has the email but the
-      // ma_access_email cookie was missing (incognito, expired, browser cleared).
-      if (result.status === 401) {
-        persistAccessEmail(userEmail);
-        result = await fetchOnce();
-      }
+      const result = await fetchOnce();
 
       if (result.status === 401) {
-        // Still unauthorized after the cookie restore — surface the failure so
-        // the caller can leave the user on the gate instead of pushing them
-        // through onboarding and overwriting their saved profile.
+        // No valid session (expired, invalid, or a different account) — surface the failure so
+        // the caller sends the user to a secure sign-in link instead of pushing them through
+        // onboarding and overwriting their saved profile. Re-writing the plaintext cookie used
+        // to "fix" this; that cookie is no longer evidence of identity.
         return { ...empty, authFailed: true };
       }
 
@@ -858,7 +855,15 @@ function BriefingsDashboardContent() {
   }, []);
 
   const fetchBriefings = useCallback(async (userEmail: string) => {
-    const res = await fetch(`/api/briefings/latest?email=${encodeURIComponent(userEmail)}&days=30`);
+    const res = await fetch(`/api/briefings/latest?email=${encodeURIComponent(userEmail)}&days=30`, { headers: getMIApiHeaders(userEmail) });
+    if (res.status === 401) {
+      // The briefing API accepts only a verified session. Ask for a secure sign-in link.
+      setInputEmail(userEmail);
+      setNeedsVerification(true);
+      setError('Please confirm it’s you — we’ll email a secure sign-in link.');
+      setStatus('gate');
+      return;
+    }
     if (res.status === 403) {
       clearAccessEmail();
       setStatus('denied');
@@ -910,7 +915,7 @@ function BriefingsDashboardContent() {
       // First check access
       const response = await fetch('/api/briefings/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(userEmail, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email: userEmail }),
       });
       const data = await response.json();
@@ -934,7 +939,9 @@ function BriefingsDashboardContent() {
       // the gate with an error message rather than wiping their saved profile
       // by forcing them through onboarding.
       if (profileSetup.authFailed) {
-        setError('We could not verify your saved profile. Please try the secure access link below.');
+        setInputEmail(userEmail);
+        setNeedsVerification(true);
+        setError('Please confirm it’s you — we’ll email a secure sign-in link.');
         setStatus('gate');
         return;
       }
@@ -961,10 +968,15 @@ function BriefingsDashboardContent() {
       return;
     }
 
+    // A link's ?email= is a hint, not identity: load only when the signed session is that account.
+    const entry = briefingsEntry({ sessionEmail: storedMIEmail(), urlEmail: emailParam });
+    if (entry.kind === 'session') {
+      void verifyAndLoadUser(entry.email);
+      return;
+    }
     setInputEmail(emailParam);
-    setEmail(emailParam);
-    persistAccessEmail(emailParam);
-    void verifyAndLoadUser(emailParam);
+    setNeedsVerification(true);
+    setStatus('gate');
   }, [searchParams, verifyAndLoadUser]);
 
   // On mount, check localStorage. If no saved email and no URL param, redirect to signup —
@@ -975,13 +987,18 @@ function BriefingsDashboardContent() {
       return;
     }
 
-    // Reconcile localStorage + cookie before doing anything else. If a returning
-    // user has the email in localStorage but their cookie expired or was cleared,
-    // this restores the cookie so the very first API call this page makes will
-    // succeed instead of returning 401 and dumping the user into onboarding.
-    const saved = reconcileAccessEmail();
-    if (saved) {
-      void verifyAndLoadUser(saved);
+    // R1 migration: the signed Mindy session is the only identity. A remembered plaintext
+    // email (localStorage / ma_access_email cookie) is the LEGACY identification: it pre-fills
+    // the secure sign-in link request, and never loads anyone's briefings by itself.
+    const entry = briefingsEntry({ sessionEmail: storedMIEmail(), legacyEmail: readStoredAccessEmail() || readAccessCookie() });
+    if (entry.kind === 'session') {
+      void verifyAndLoadUser(entry.email);
+      return;
+    }
+    if (entry.kind === 'needs_verification') {
+      setInputEmail(entry.hintEmail);
+      setNeedsVerification(true);
+      setStatus('gate');
       return;
     }
 
@@ -1079,7 +1096,13 @@ function BriefingsDashboardContent() {
     const trimmed = inputEmail.toLowerCase().trim();
     if (!trimmed) return;
     setError('');
-    await verifyAndLoadUser(trimmed);
+    // A typed address is not identity. If it is the signed-in account, load; otherwise send the
+    // one-time sign-in link to that mailbox.
+    if (trimmed === storedMIEmail()) {
+      await verifyAndLoadUser(trimmed);
+      return;
+    }
+    await handleSendSecureLink();
   };
 
   const handleSendSecureLink = async () => {
@@ -1097,7 +1120,7 @@ function BriefingsDashboardContent() {
       const response = await fetch('/api/access-links/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmed, destination: 'briefings' }),
+        body: JSON.stringify({ email: trimmed, destination: 'briefings', returnTo: '/briefings' }),
       });
       const data = await response.json();
 
@@ -1106,7 +1129,7 @@ function BriefingsDashboardContent() {
         return;
       }
 
-      setLinkMessage('Secure link sent. Check your email to open your briefings.');
+      setLinkMessage('Secure link sent. Open it from your email on this device to sign in to your briefings.');
     } catch {
       setError('Could not send secure link. Please try again.');
     } finally {
@@ -1122,7 +1145,7 @@ function BriefingsDashboardContent() {
 
     // Check if user has briefings access (MI Pro) or just alerts (MI Free)
     try {
-      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) });
       const data = await res.json();
 
       if (data.success && data.data) {
@@ -1164,7 +1187,7 @@ function BriefingsDashboardContent() {
       // Create user with free tier (alerts only, not briefings)
       const response = await fetch('/api/alerts/save-profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(trimmed, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email: trimmed,
           naicsCodes: [], // Will be set in onboarding
@@ -1269,6 +1292,11 @@ function BriefingsDashboardContent() {
           {/* Login form */}
           <div className="p-6 bg-gray-900 border border-gray-800 rounded-2xl">
             <form onSubmit={handleSubmit}>
+              {needsVerification ? (
+                <p className="text-sm text-gray-300 mb-3">
+                  For your security, we now confirm it’s you before showing your briefings. We’ll email a one-time sign-in link to this address.
+                </p>
+              ) : null}
               <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Enter your email
               </label>
@@ -1284,20 +1312,15 @@ function BriefingsDashboardContent() {
               {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
               <button
                 type="submit"
-                className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors"
+                disabled={linkSending}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
               >
-                View My Briefings
+                {linkSending ? 'Sending secure link...' : 'Email me a secure sign-in link'}
               </button>
             </form>
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={handleSendSecureLink}
-                disabled={linkSending}
-                className="text-sm text-purple-400 hover:text-purple-300 disabled:opacity-50"
-              >
-                {linkSending ? 'Sending secure link...' : 'Email me a secure access link'}
-              </button>
+            <div className="mt-4 text-center text-sm text-gray-400">
+              Already use Mindy?{' '}
+              <Link href="/app" className="text-purple-400 hover:text-purple-300">Sign in</Link>
             </div>
             {linkMessage ? <p className="text-green-400 text-sm mt-3 text-center">{linkMessage}</p> : null}
           </div>
