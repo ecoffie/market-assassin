@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-03 — SEC-5b: briefings_enabled no longer defaults to true
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-03 | Notification settings / briefings_enabled default | The column DEFAULT was TRUE (live information_schema, 2026-10-03), so every row created by a writer that omits it started with briefings on although it grants nothing (delivery also needs an entitled customer_classifications row). Measured: 44 of 239 TRUE rows have no entitlement, 35 of them created in the last 30 days, all with the bare-default fingerprint (treatment_type alerts, no source). Three marketing crons read TRUE as Pro: upgrade-drip and bootcamp-lifetime-offer skip those Free users, setup-invite-batch counts them entitled. Migration sets the default to FALSE (existing rows untouched). The one paid path that relied on the TRUE default, the grantBriefingAccess seed upsert, now writes TRUE explicitly. | `briefings_enabled: true,` → `src/lib/access-codes.ts` | `briefings-default-writers.unit.test.ts` 8 cases (2 red on origin/main): every paid writer writes TRUE explicitly, the migration changes only the default, the free helper stays FALSE | Draft PR; migration NOT applied |
+
 ## 2026-10-03 — SEC-5d: partner trials only for a verified identity, once per account
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
