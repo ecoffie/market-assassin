@@ -157,6 +157,7 @@ export async function listApiKeys(userEmail: string): Promise<McpApiKeyRow[]> {
 export async function revokeApiKey(userEmail: string, keyId: string): Promise<boolean> {
   const { data, error } = await getWriteClient()
     .from('mcp_api_keys')
+    // truncation-ok: keyed on the primary key `id`, so at most one row can match.
     .update({ revoked_at: new Date().toISOString() })
     .eq('id', keyId)
     .eq('user_email', userEmail.toLowerCase())
