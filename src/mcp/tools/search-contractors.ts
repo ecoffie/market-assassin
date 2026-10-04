@@ -15,6 +15,7 @@
  */
 import { searchRecipients, type RecipientSearchRow } from '@/lib/bigquery/recipients';
 import { mcpFlags } from '@/lib/mcp/flags';
+import type { PlayersStatus, PlayersCoverage } from '@/lib/players/truth';
 
 export interface SearchContractorsInput {
   /** Free-text company-name match, e.g. "Booz" or "cyber". */
@@ -33,7 +34,16 @@ export interface SearchContractorsResult {
   queried: { keyword?: string; naics?: string; state?: string; sort_by: string };
   contractors: RecipientSearchRow[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; count: number };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    count: number;
+    /** success_nonzero | success_zero | unavailable | coverage_incomplete — only success_zero is a real zero. */
+    status: PlayersStatus;
+    /** Matching firms in the queried population (null = unknown). A FLOOR when status is coverage_incomplete. */
+    total: number | null;
+    coverage: PlayersCoverage;
+  };
 }
 
 export async function searchContractors(input: SearchContractorsInput): Promise<SearchContractorsResult> {
@@ -48,6 +58,9 @@ export async function searchContractors(input: SearchContractorsInput): Promise<
 
   let contractors: RecipientSearchRow[] = [];
   let degraded = false;
+  let status: PlayersStatus = 'unavailable';
+  let total: number | null = null;
+  let coverage: PlayersCoverage = { source: naics ? 'top50_rollup' : 'recipients' };
 
   try {
     const res = await searchRecipients({
@@ -61,6 +74,12 @@ export async function searchContractors(input: SearchContractorsInput): Promise<
       liveBq: true,
     });
     contractors = res.rows || [];
+    status = res.status;
+    total = res.status === 'unavailable' ? null : res.total;
+    coverage = res.coverage;
+    // A swallowed BigQuery failure (quota/cold cache) returns [] WITHOUT throwing — the status is
+    // the only thing that tells it apart from a real empty market.
+    degraded = res.status === 'unavailable';
   } catch (err) {
     degraded = true;
     console.error('[mcp:search_contractors] search failed:', err);
@@ -75,7 +94,7 @@ export async function searchContractors(input: SearchContractorsInput): Promise<
       sort_by: sortBy,
     },
     contractors,
-    _meta: { grounded, degraded, count: contractors.length },
+    _meta: { grounded, degraded, count: contractors.length, status, total, coverage },
   };
 
   if (mcpFlags.aiHint) {
@@ -83,6 +102,8 @@ export async function searchContractors(input: SearchContractorsInput): Promise<
     result._ai_hint = {
       summary: degraded
         ? 'Contractor search backend (BigQuery) errored — retry; do NOT state the market is empty.'
+        : status === 'coverage_incomplete'
+        ? `PARTIAL population: ${coverage.incompleteReason || 'the source is incomplete'} ${contractors.length} shown; this is NOT the full count of firms${contractors.length === 0 ? ' and NOT evidence that none exist' : ''}.`
         : grounded
         ? `${contractors.length} contractor${contractors.length === 1 ? '' : 's'} match. Top by ${sortBy}: ${top.recipient_name} ($${Math.round(top.total_obligated).toLocaleString()} obligated, ${top.award_count} awards, ${top.distinct_agency_count} agencies).`
         : `No rows returned for ${keyword || naics || state || 'that query'}. This can mean a genuinely thin market OR a temporary data-source limit — try a broader NAICS prefix / drop the state, and if it stays empty, retry later. Do NOT assert "no such contractors exist."`,
