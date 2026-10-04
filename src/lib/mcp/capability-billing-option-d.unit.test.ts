@@ -104,3 +104,26 @@ describe('runMeteredTool charges by result tier', () => {
     expect(m(payer.debitResolvedPayer)).not.toHaveBeenCalled();
   });
 });
+
+describe('the two billing contracts coexist in runMeteredTool (#1809 + #1810)', () => {
+  it('a verified document continuation stays free; a capability candidate still bills 10', async () => {
+    process.env.MCP_OAUTH_SIGNING_SECRET = 'test-secret-coexist';
+    const { issueContinuation } = await import('./doc-continuation');
+    const W = [{ document_id: 'doc-a', offset: 20_000, limit: 20_000 }];
+    m(registry.runMcpTool).mockResolvedValueOnce({ result: { _meta: { grounded: true, degraded: false } }, credits: 50 });
+    const cont = await runMeteredTool('get_solicitation_documents', { notice_id: 'n', document_ids: ['doc-a'], documents: W, continuation: issueContinuation('u@x.com', W, 1)! }, { userEmail: 'u@x.com', channel: 'chatgpt' });
+    expect(cont.creditsCharged).toBe(0);
+    expect(m(payer.debitResolvedPayer)).not.toHaveBeenCalled();
+
+    m(registry.runMcpTool).mockResolvedValueOnce({ result: result('candidate', 'billable_candidate'), credits: 50 });
+    const cand = await runMeteredTool('capability_market_match', { description: 'roofing' }, { userEmail: 'u@x.com', channel: 'chatgpt' });
+    expect(cand.creditsCharged).toBe(10);
+  });
+
+  it('the 50-credit starting balance is still required for capability_market_match (pre-check at full price)', async () => {
+    m(credits.getBalance).mockResolvedValueOnce(30);
+    const out = await runMeteredTool('capability_market_match', { description: 'roofing' }, { userEmail: 'u@x.com' });
+    expect(out.ok).toBe(false);
+    expect(m(registry.runMcpTool)).not.toHaveBeenCalled();
+  });
+});
