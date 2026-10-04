@@ -179,6 +179,7 @@ describe('signed in — the exact email link', () => {
     expect(h.applied[0].opts).toEqual({ savedSearch: true });   // saved-search semantics, not a scope link
     expect(h.dom.state()).toBe('applied');
     expect(h.dom.pill()!.text).toContain('Atlantic Craft Partners JV');
+    expect(h.dom.pill()!.text).toContain('nationwide');            // bbox:null is NOT "this view"
     expect(h.win.__ssPending).toBe(false);
     expect(h.events).toContainEqual(['tool_use', 'saved_search_link', expect.objectContaining({ outcome: 'applied', src: 'saved_search_alert' })]);
   });
@@ -294,7 +295,9 @@ describe('missing, foreign and failed lookups never present the default as the s
     await settle(8100);
     expect(h.win.__ssPending).toBe(false);
     expect(h.refetches).toEqual([{ system: true }]);            // the deferred boot round finally runs
-    expect(h.dom.state()).toBe('loading');                     // ...under a pill that still says so
+    expect(h.dom.state()).toBe('slow');                        // ...under a pill that says it is NOT filtered
+    expect(h.dom.pill()!.text).toMatch(/isn.t filtered yet/);
+    expect(h.dom.pill()!.text).not.toContain('Atlantic');      // never the saved search's name
     await settle(7000);
     expect(h.dom.state()).toBe('error');
   });

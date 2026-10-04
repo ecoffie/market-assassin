@@ -5371,7 +5371,7 @@ const SAVE_JS = `<script>
   // The map session, readable from ANY <script> block. tok()/email() are private to this IIFE, and
   // VIEWPORT_JS's _uemail is private to ITS IIFE — the ?ss= handler (BOOT_VIEW_JS) guarded on
   // "typeof _uemail==='function'", which is never true from another block, so every saved-search
-  // link spun 40 retries and silently opened the unfiltered map (2026-08-13 → 2026-10-04).
+  // link spun 40 retries and returned without requesting the search (2026-08-13 → 2026-10-04).
   // Returns {t,em} for a live session, {expired:true,em} for a token past its exp, or null.
   // The exp check is advisory; the server still verifies the signature and the account.
   window.__mapSession=function(){
@@ -9434,8 +9434,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // ⚠️ IT NEVER RAN (2026-08-13 → 2026-10-04). This handler guarded on "typeof _uemail ===
   // 'function'", but _uemail is private to the VIEWPORT_JS IIFE — a different <script> block — so
   // the guard was false forever: 40 retries, then a silent return, for signed-in and signed-out
-  // visitors alike. No saved search was ever requested; every alert email that promised "your
-  // filters are restored exactly as you saved them" opened the unfiltered map. Identity now comes
+  // visitors alike. No saved search was ever requested, so no link applied one: the page stayed on
+  // its default market (what a reader then did — e.g. re-picking the search in the in-map picker,
+  // which calls the restorer directly — is a separate question the telemetry answers). Identity now comes
   // from window.__mapSession (SAVE_JS), and EVERY outcome is visible: a saved-search link either
   // shows the saved market or says, on the map, why it can't — never a silent default.
   //
@@ -9476,7 +9477,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
     }
     var SIGN_IN={id:'signin',label:'Sign in',fn:signIn};
-    var FULL={id:'dismiss',label:'Show the full map',fn:dismiss};
+    // "Show the full map" is a CANCEL, not just a close: it ends this restore (seq), so a lookup
+    // that answers later cannot reach over the reader's choice and re-filter the map.
+    function cancel(){ seq++; clearTimeout(ceiling); dismiss(); track('cancelled'); release(); }
+    var FULL={id:'dismiss',label:'Show the full map',fn:cancel};
+    function intentSig(){ try{ return window.__mapIntentSig?window.__mapIntentSig():null; }catch(e){ return null; } }
     // Delayed authentication: a sign-in in ANOTHER tab writes the token here too.
     var listening=false;
     function waitForAuth(){ if(listening)return; listening=true;
@@ -9484,10 +9489,14 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     function fail(kind,text,actions,extra){ clearTimeout(ceiling); pill(kind,text,actions); track(kind,extra); release(); }
     function start(){
       var my=++seq; window.__ssPending=true; window.__ssOwnsView=true;
-      pill('loading','Restoring your saved search\\u2026',[]);
-      // Never hold the map hostage: past 8 s the default map loads UNDER the still-showing
-      // "Restoring" pill, and the saved search still applies (newest action wins) if it arrives.
-      clearTimeout(ceiling); ceiling=setTimeout(function(){ if(my!==seq)return; release(); },8000);
+      pill('loading','Restoring your saved search\\u2026',[FULL]);
+      // Never hold the map hostage: past 8 s the default map loads — under a pill that says, in so
+      // many words, that it is NOT filtered (never the saved search's name). If the lookup answers
+      // later it still applies (its fetch is a user-action round, so newest-action-wins drops the
+      // default round still in flight) — unless the reader has changed the map since (sig0 below).
+      clearTimeout(ceiling); ceiling=setTimeout(function(){ if(my!==seq)return;
+        pill('slow','Still loading your saved search \\u2014 the map below isn\\u2019t filtered yet.',[FULL]);
+        track('slow'); release(); },8000);
       var tries=0; (function ready(){
         if(my!==seq)return;
         if(typeof window.__applySavedSearch!=='function'||typeof window.__mapSession!=='function'){
@@ -9498,6 +9507,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         if(!sess){ waitForAuth(); return fail('signin','Sign in to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
         if(sess.expired){ waitForAuth(); return fail('expired','Your session expired. Sign in again to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
         var done=false;
+        // The market as it stands when we ask. If it differs when the answer lands, the reader has
+        // moved on (picked another saved search, changed a filter, toggled a horizon) — applying now
+        // would overwrite their current selection with a stale one. Pans do not count (no bbox).
+        var sig0=intentSig();
         var giveUp=setTimeout(function(){ if(done||my!==seq)return; done=true;
           fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'timeout'}); },15000);
         fetch('/api/app/saved-searches?email='+encodeURIComponent(sess.em)+'&id='+encodeURIComponent(wantId),
@@ -9516,24 +9529,43 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
               return fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'http_'+res.status});
             }
             clearTimeout(ceiling);
-            var out=window.__applySavedSearch(ss,{savedSearch:true})||{};
-            // Round 1 already carries the saved market: either fetchView above ran (boot released),
-            // or boot has not released yet and its release round reads the restored FILT.
-            window.__ssPending=false; window.__ssDeferredRound=false;
-            var miss=(out.unsupported||[]);
-            pill('applied','Saved search: '+String(ss.name||'Untitled').slice(0,80)+(miss.length?(' \\u00b7 not on the map: '+miss.join(', ')):''),[{id:'dismiss',label:'\\u2715',fn:dismiss}]);
-            track('applied',{mode:String(ss.mode||''),unsupported:miss.join(',').slice(0,80)});
-            // The pill names THIS market; the first round showing a different one removes it
-            // (same provenance rule as the return-continuity pill, whose slot ?ss= leaves free).
-            var sig=null; try{ if(window.__mapIntentSig)sig=window.__mapIntentSig(); }catch(e){}
-            if(sig){ window.__checkResumeProvenance=function(){ try{
-              if(!document.getElementById('ssPill')){ window.__checkResumeProvenance=null; return; }
-              var now=window.__mapIntentSig?window.__mapIntentSig():null;
-              if(now==null||now===sig)return; dismiss(); window.__checkResumeProvenance=null; }catch(e){} }; }
+            var sigNow=intentSig();
+            if(sig0!=null&&sigNow!=null&&sigNow!==sig0){
+              release();   // their own (deferred) round runs; the saved search waits for consent
+              pill('superseded','Your saved search \\u201c'+String(ss.name||'Untitled').slice(0,60)+'\\u201d loaded after you changed the map.',
+                [{id:'apply',label:'Apply it',fn:function(){ applyNow(ss); }},{id:'dismiss',label:'Keep my changes',fn:cancel}]);
+              track('superseded'); return;
+            }
+            applyNow(ss);
           })
           .catch(function(){ if(done||my!==seq)return; done=true; clearTimeout(giveUp);
             fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'network'}); });
       })();
+    }
+    function applyNow(ss){
+      seq++; clearTimeout(ceiling);
+      var out=window.__applySavedSearch(ss,{savedSearch:true})||{};
+      // Round 1 already carries the saved market: either fetchView above ran (boot released),
+      // or boot has not released yet and its release round reads the restored FILT.
+      window.__ssPending=false; window.__ssDeferredRound=false;
+      var miss=(out.unsupported||[]);
+      // Say WHERE the search covers. A search with no saved area is NATIONWIDE (incl. AK/HI,
+      // territories, overseas); the frame it opens in is only a starting view — at the pin zoom
+      // floor (5) not even CONUS fits a desktop window. The map-count pill beside it carries the
+      // live "N of M opportunities · K not shown on map" split; this pill must not imply the view
+      // is the market.
+      var b=ss.bbox, hasArea=!!(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null);
+      pill('applied','Saved search: '+String(ss.name||'Untitled').slice(0,80)
+        +(hasArea?' \\u00b7 its saved area':' \\u00b7 nationwide \\u2014 pan to see matches outside this view')
+        +(miss.length?(' \\u00b7 not on the map: '+miss.join(', ')):''),[{id:'dismiss',label:'\\u2715',fn:dismiss}]);
+      track('applied',{mode:String(ss.mode||''),unsupported:miss.join(',').slice(0,80)});
+      // The pill names THIS market; the first round showing a different one removes it
+      // (same provenance rule as the return-continuity pill, whose slot ?ss= leaves free).
+      var sig=null; try{ if(window.__mapIntentSig)sig=window.__mapIntentSig(); }catch(e){}
+      if(sig){ window.__checkResumeProvenance=function(){ try{
+        if(!document.getElementById('ssPill')){ window.__checkResumeProvenance=null; return; }
+        var now=window.__mapIntentSig?window.__mapIntentSig():null;
+        if(now==null||now===sig)return; dismiss(); window.__checkResumeProvenance=null; }catch(e){} }; }
     }
     start();
   }catch(e){ window.__ssPending=false; window.__ssOwnsView=false; } })();
