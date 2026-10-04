@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { geocodeCity, stableSeed } from './city-geocode';
 
 describe('geocodeCity', () => {
-  it('resolves a real city to its exact GeoNames coordinate (city precision)', () => {
+  it('resolves a real city to its Census place coordinate (city precision)', () => {
     const r = geocodeCity('Louisville', 'KY');
     expect(r).not.toBeNull();
     expect(r!.precision).toBe('city');
-    // Real Louisville KY, NOT Kentucky's state centroid (37.5, -85.3).
-    expect(r!.lat).toBeCloseTo(38.189, 1);
-    expect(r!.lng).toBeCloseTo(-85.6768, 1);
+    // Real Louisville KY, NOT Kentucky's state centroid (37.5, -85.3). Census internal point since
+    // 2026-10-04; the old value (38.189, -85.6768) was a single-ZIP centroid outside the city.
+    expect(r!.lat).toBeCloseTo(38.2247, 3);
+    expect(r!.lng).toBeCloseTo(-85.7406, 3);
   });
 
   it('is case-insensitive on the city name', () => {

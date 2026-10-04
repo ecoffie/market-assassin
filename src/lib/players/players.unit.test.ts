@@ -115,9 +115,10 @@ describe('viewport geography with an explicit state — FILTER, then RANK (Richm
     expect(va.includeUngeocodedCities).toBe(false); // the VA centroid is not in a Richmond view
   });
   it("a city whose point sits just outside the box still counts if its pins can draw inside it", () => {
-    // RICHMOND|VA is at 37.4373 — 0.003° south of the box's 37.4405 edge.
-    expect(CITY_COORDS['RICHMOND|VA'][0]).toBeLessThan(RICHMOND[1]);
-    expect(stateGeoScope('VA', RICHMOND).cities).toContain('RICHMOND');
+    // MECHANICSVILLE|VA sits 0.011° east of a box whose east edge is moved inside it.
+    const [lat, lng] = CITY_COORDS['MECHANICSVILLE|VA'];
+    const box: [number, number, number, number] = [lng - 0.2, lat - 0.1, lng - 0.011, lat + 0.1];
+    expect(stateGeoScope('VA', box).cities).toContain('MECHANICSVILLE');
   });
   it('the pad is exactly the placement jitter: no city pin draws farther than CITY_JITTER_MAX_DEG', () => {
     for (const key of ['RICHMOND|VA', 'AUSTIN|TX', 'NORFOLK|VA']) {
