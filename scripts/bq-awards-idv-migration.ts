@@ -44,6 +44,7 @@ import {
   type LiveAwardsColumn,
 } from '../src/lib/awards-ingest/awards-schema';
 import { resolveIdvIdentityColumnsMode } from '../src/lib/awards-ingest/merge-sql';
+import { cleanupScript, selectionSql, verifySelection, type SelectedRow } from '../src/lib/awards-ingest/a1b-cleanup';
 import {
   buildCohortMonthlyCountsSql,
   classifyCohortCompleteness,
@@ -191,6 +192,27 @@ async function main(): Promise<void> {
       const ok = post.ok && after.awardsRows === before.awardsRows && oblAfter === oblBefore;
       log(`ddl verify: ${describeSchema(post.state)} (expected ${AWARDS_COLUMNS.length}, ${IDV_IDENTITY_COLUMNS.length} IDV typed) rows ${before.awardsRows}->${after.awardsRows} obligation ${oblBefore}->${oblAfter}`);
       if (!ok) throw new Error('STOP: unexpected change after DDL — see 99-rollback.sql §A');
+      return;
+    }
+    case 'a1b_cleanup': {
+      // A1b (2026-10-04): remove ONLY the pinned double-count populations. Read-only selection first;
+      // refuse unless it reproduces the pinned identities exactly; then one transaction with ASSERTs.
+      if (!ddlPostCheck(await awardsColumns(bq)).ok) throw new Error('refused: identity columns absent — A1b runs only after A1');
+      const { rows: selected } = await query<SelectedRow>(bq, selectionSql(AWARDS), { label: 'a1b_select' });
+      const pre = verifySelection(selected);
+      log(`a1b selection matches pinned populations: F3 ${pre.f3} rows / $${pre.f3Sum} · F1 ${pre.f1} rows / $${pre.f1Sum} · F1b ${pre.f1b} rows · ambiguous untouched 2`);
+      const oblBefore = await obligationTotal(bq, AWARDS);
+      await query(bq, cleanupScript(AWARDS), { label: 'a1b_cleanup' });
+      const after = await tableState(bq);
+      const oblAfter = await obligationTotal(bq, AWARDS);
+      const { rows: post } = await query<SelectedRow>(bq, selectionSql(AWARDS), { label: 'a1b_select_after' });
+      const left = (p: string) => post.filter((r) => r.pop === p).length;
+      log(`a1b cleanup committed: awards rows ${before.awardsRows}->${after.awardsRows} (removed ${before.awardsRows - after.awardsRows}) obligation ${oblBefore}->${oblAfter}`);
+      log(`a1b remaining: F3 ${left('f3')} · F1 ${left('f1')} · F1b ${left('f1b')} · short-code remainder ${left('short_remaining')} (expected 0/0/0/2)`);
+      if (left('f3') || left('f1') || left('f1b') || left('short_remaining') !== 2) {
+        throw new Error('STOP: post-cleanup selection is not 0/0/0/2 — investigate before acceptance');
+      }
+      await probes(bq);
       return;
     }
     case 'repull_window':

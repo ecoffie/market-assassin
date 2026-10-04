@@ -1,0 +1,4487 @@
+{
+ "measured": "2026-10-04 (after A1 steps 1-10; source lookups against api.usaspending.gov)",
+ "preRepairClone": "awards_clone_pre_idv_20261004_1406",
+ "f3StaleCopies": [
+  {
+   "txn_id": "12K3_12K3_12639522F0493_P00001_12639522D0006_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-01-06",
+   "code": "012",
+   "obligation": "-2500"
+  },
+  {
+   "txn_id": "1501_-NONE-_15JA6924P00000046_P00002_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-03-12",
+   "code": "015",
+   "obligation": "-47635.7900000000008731149137020111083984375"
+  },
+  {
+   "txn_id": "1501_1501_15JA3426F00000001_P00001_15JA0522A00000241_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-10-27",
+   "code": "015",
+   "obligation": "2500"
+  },
+  {
+   "txn_id": "1549_-NONE-_15F06725P0000744_P00001_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-03-18",
+   "code": "015",
+   "obligation": "82379.880000000004656612873077392578125"
+  },
+  {
+   "txn_id": "1549_8000_15F06726F0000201_0_NNG15SC83B_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-03-04",
+   "code": "015",
+   "obligation": "591122.959999999962747097015380859375"
+  },
+  {
+   "txn_id": "1900_-NONE-_19AQMM21C0178_P00014_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-10",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19AQMM24C0094_P00002_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-02-07",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19AQMM24C0095_P00003_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-02-07",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19AQMM24C0096_P00004_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-02-07",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19AQMM25P0501_P00001_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-29",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19AQMM25P0612_P00001_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-30",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19GE5022D0022_P00005_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2025-01-20",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_-NONE-_19GE5023C0029_P00001_-NONE-_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-09-20",
+   "code": "019",
+   "obligation": "-8834"
+  },
+  {
+   "txn_id": "1900_-NONE-_SAQMMA14C0124_P00049_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-02-11",
+   "code": "019",
+   "obligation": "-12836.4300000000002910383045673370361328125"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM19F0235_P00012_SAQMMA13D0078_0",
+   "fiscal_year": 2022,
+   "action_date": "2022-01-26",
+   "code": "019",
+   "obligation": "171730"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM20F7182_P00002_19AQMM19A0146_0",
+   "fiscal_year": 2020,
+   "action_date": "2020-03-09",
+   "code": "019",
+   "obligation": "-130.34999999999999431565811391919851303101"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM21F2684_P00004_19AQMM18D0089_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-04",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM21F3476_P00009_19AQMM18D0105_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-03-18",
+   "code": "019",
+   "obligation": "-985.69000000000005456968210637569427490234"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM21F7282_P00001_19AQMM18A0216_0",
+   "fiscal_year": 2021,
+   "action_date": "2021-06-02",
+   "code": "019",
+   "obligation": "-520.6200000000000045474735088646411895752"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM22F1880_P00024_19AQMM22D0043_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-15",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM22F7536_P00001_19AQMM18A0216_0",
+   "fiscal_year": 2022,
+   "action_date": "2022-09-15",
+   "code": "019",
+   "obligation": "-234.83000000000001250555214937776327133179"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM23F1722_P00004_19AQMM23D0037_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-09-12",
+   "code": "019",
+   "obligation": "-5000"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM24F0054_P00005_19AQMM21D0129_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-01-28",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM24F0414_P00012_19AQMM22D0021_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-03-05",
+   "code": "019",
+   "obligation": "58792.080000000001746229827404022216796875"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM24F1116_P00013_19AQMM24D0014_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-24",
+   "code": "019",
+   "obligation": "164948.58999999999650754034519195556640625"
+  },
+  {
+   "txn_id": "1900_1900_19AQMM24F7291_P00009_19AQMM24A0203_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-25",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_1900_19GE5024F0680_P00001_19GE5024D0031_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-09-25",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_4732_19AQMM18F0910_P00011_GS36FGA002_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-25",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_4732_19AQMM23F1509_P00020_47QTCB22D0675_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-02-04",
+   "code": "019",
+   "obligation": "68500"
+  },
+  {
+   "txn_id": "1900_4732_19AQMM24F0073_P00019_47QTCB22D0256_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-04",
+   "code": "019",
+   "obligation": "23176.65999999999985448084771633148193359375"
+  },
+  {
+   "txn_id": "1900_8000_19AQMM23F0386_P00001_NNG15SC28B_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-02-29",
+   "code": "019",
+   "obligation": "-859.67999999999994997779140248894691467285"
+  },
+  {
+   "txn_id": "1900_8000_19AQMM25F1591_P00001_NNG15SC03B_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-26",
+   "code": "019",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "1900_8000_19AQMM26F0342_0_NNG15SD04B_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-03-13",
+   "code": "019",
+   "obligation": "116920.64999999999417923390865325927734375"
+  },
+  {
+   "txn_id": "2036_2036_20340624F00018_P00002_20340620A00001_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-15",
+   "code": "020",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "3300_-NONE-_33312724P00506731_P00001_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-22",
+   "code": "3300",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "6920_-NONE-_693KA826D00002_0_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-02",
+   "code": "069",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "6920_-NONE-_693KA826D00002_P00001_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-19",
+   "code": "069",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "6920_-NONE-_697DCK25C00294_P00001_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-30",
+   "code": "069",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "7003_7001_70SBUR22F00000119_P00007_HSHQDC16DP2024_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-03-18",
+   "code": "070",
+   "obligation": "-68425"
+  },
+  {
+   "txn_id": "7008_-NONE-_70Z08126PELIZ0003_P00002_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-11-20",
+   "code": "070",
+   "obligation": "3059.92000000000007275957614183425903320313"
+  },
+  {
+   "txn_id": "7008_-NONE-_70Z08126PELIZ0057_P00001_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-27",
+   "code": "070",
+   "obligation": "3607.80000000000018189894035458564758300781"
+  },
+  {
+   "txn_id": "7012_7001_70CTD024FR0000007_P00006_70RDAD23D00000008_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-02-25",
+   "code": "070",
+   "obligation": "1054343.1499999999068677425384521484375"
+  },
+  {
+   "txn_id": "8000_-NONE-_80KSC022DA102_P00006_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-18",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_-NONE-_80KSC022DA103_P00006_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2024-10-30",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_-NONE-_80KSC022DA105_P00006_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2024-12-05",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_-NONE-_80KSC022DA112_P00006_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-24",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_-NONE-_80KSC024DA087_P00002_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2025-03-18",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_-NONE-_80KSC024DA089_P00001_-NONE-_-NONE-",
+   "fiscal_year": 2024,
+   "action_date": "2024-08-22",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_-NONE-_80MSFC22CA004_P00021_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-16",
+   "code": "080",
+   "obligation": "898511.3100000000558793544769287109375"
+  },
+  {
+   "txn_id": "8000_-NONE-_NNA16BD26C_216_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-21",
+   "code": "080",
+   "obligation": "-51231.08999999999650754034519195556640625"
+  },
+  {
+   "txn_id": "8000_-NONE-_NND17AL01C_P00147_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-18",
+   "code": "080",
+   "obligation": "141790.10000000000582076609134674072265625"
+  },
+  {
+   "txn_id": "8000_8000_80AFRC21F0031_P00058_80AFRC21D0002_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-13",
+   "code": "080",
+   "obligation": "1700000"
+  },
+  {
+   "txn_id": "8000_8000_80ARC025FA022_P00010_80ARC024DA007_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-04-23",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8000_8000_80MSFC22FA012_P00032_80MSFC22DA006_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-11-21",
+   "code": "080",
+   "obligation": "90500"
+  },
+  {
+   "txn_id": "8000_8000_80MSFC22FA012_P00033_80MSFC22DA006_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-11-21",
+   "code": "080",
+   "obligation": "96500"
+  },
+  {
+   "txn_id": "8000_8000_80MSFC22FA012_P00034_80MSFC22DA006_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-11-21",
+   "code": "080",
+   "obligation": "123842"
+  },
+  {
+   "txn_id": "8000_8000_NNM14AA89D_157_NNM13AA35C_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-03-19",
+   "code": "080",
+   "obligation": "724342"
+  },
+  {
+   "txn_id": "8000_9700_80AFRC23FA070_P00025_HTC71123DC023_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-02-19",
+   "code": "080",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "8600_-NONE-_86615124C00002_P00001_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-11",
+   "code": "086",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9543_-NONE-_95332420C0019_P00006_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-17",
+   "code": "524",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA301624P0055_P00002_-NONE-_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-03-19",
+   "code": "097",
+   "obligation": "2754.05000000000018189894035458564758300781"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA700025C0005_P00005_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-26",
+   "code": "097",
+   "obligation": "671183.4799999999813735485076904296875"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA700026P0007_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-15",
+   "code": "097",
+   "obligation": "924988"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA812526P0012_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-29",
+   "code": "097",
+   "obligation": "178123.7999999999883584678173065185546875"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA812526P0019_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-07",
+   "code": "097",
+   "obligation": "14388.59000000000014551915228366851806640625"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA812526P0020_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-06",
+   "code": "097",
+   "obligation": "48415"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA862113C6256_P00055_-NONE-_14",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-29",
+   "code": "097",
+   "obligation": "-0.46999999999999997335464740899624302983"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA880619C0004_P00121_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-03-11",
+   "code": "097",
+   "obligation": "-1852087.84000000008381903171539306640625"
+  },
+  {
+   "txn_id": "9700_-NONE-_HDTRA115C0002_A00004_-NONE-_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-08-14",
+   "code": "097",
+   "obligation": "-1415.91000000000008185452315956354141235352"
+  },
+  {
+   "txn_id": "9700_-NONE-_HR001121C0054_P00036_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-01-30",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_HR001126CE010_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-12",
+   "code": "097",
+   "obligation": "350000"
+  },
+  {
+   "txn_id": "9700_-NONE-_M2900025P1014_P00003_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-09",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0001420C1003_ARZ994_-NONE-_0",
+   "fiscal_year": 2020,
+   "action_date": "2020-08-27",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0002409C2303_ARZ995_-NONE-_0",
+   "fiscal_year": 2023,
+   "action_date": "2022-10-11",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0010421PXB58_P00001_-NONE-_0",
+   "fiscal_year": 2022,
+   "action_date": "2022-04-02",
+   "code": "097",
+   "obligation": "-100"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0010423PQA10_P00002_-NONE-_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-07-02",
+   "code": "097",
+   "obligation": "-39060.2399999999979627318680286407470703125"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0017814D8026_ARZ994_-NONE-_-NONE-",
+   "fiscal_year": 2020,
+   "action_date": "2020-03-11",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0038320PF086_A00001_-NONE-_0",
+   "fiscal_year": 2021,
+   "action_date": "2021-07-15",
+   "code": "097",
+   "obligation": "-100"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0038322PB140_P00003_-NONE-_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-09-25",
+   "code": "097",
+   "obligation": "-34541"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0038324PA002_P00002_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-11-17",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0038325P021M_P00002_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-04-29",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_N0038325PC288_P00002_-NONE-_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-05-14",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SP470623D0002_P00005_-NONE-_-NONE-",
+   "fiscal_year": 2025,
+   "action_date": "2025-03-11",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPE60526D9501_P00002_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2025-10-13",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ10C0003_A00003_-NONE-_2",
+   "fiscal_year": 2018,
+   "action_date": "2018-02-02",
+   "code": "097",
+   "obligation": "-1594.55999999999994543031789362430572509766"
+  },
+  {
+   "txn_id": "9700_4730_FA700026F0031_0_GS21F0033V_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-14",
+   "code": "097",
+   "obligation": "29575"
+  },
+  {
+   "txn_id": "9700_4730_HR001115F0002_A00001_GS06F0626Z_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-09-08",
+   "code": "097",
+   "obligation": "-367215.71999999997206032276153564453125"
+  },
+  {
+   "txn_id": "9700_4732_FA862223F2302_P00024_GS00Q14OADU723_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-03-16",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_4732_FA942219F5003_P00030_GS00Q14OADS328_4",
+   "fiscal_year": 2025,
+   "action_date": "2024-11-12",
+   "code": "097",
+   "obligation": "-502811.76000000000931322574615478515625"
+  },
+  {
+   "txn_id": "9700_4732_HR001122F0015_P00015_47QTCA19D00F5_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-16",
+   "code": "097",
+   "obligation": "282795"
+  },
+  {
+   "txn_id": "9700_4732_HR001122F0015_P00016_47QTCA19D00F5_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-16",
+   "code": "097",
+   "obligation": "-93232.25"
+  },
+  {
+   "txn_id": "9700_4732_S5121A21F0013_P00006_47QTCA19D00LL_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-02-13",
+   "code": "097",
+   "obligation": "151800"
+  },
+  {
+   "txn_id": "9700_4732_SP470425F0073_P00003_GS00F031DA_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-15",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_4740_S5121A21F0006_P00005_47PA0419D0008_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-04-24",
+   "code": "097",
+   "obligation": "250000"
+  },
+  {
+   "txn_id": "9700_9700_0002_78_FA807516D0003_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-06",
+   "code": "097",
+   "obligation": "-162503.14999999999417923390865325927734375"
+  },
+  {
+   "txn_id": "9700_9700_FA807523F0027_P00041_FA807518D0015_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-08-09",
+   "code": "097",
+   "obligation": "35688"
+  },
+  {
+   "txn_id": "9700_9700_FA807524F0046_P00045_FA807518D0015_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-08-14",
+   "code": "097",
+   "obligation": "49627"
+  },
+  {
+   "txn_id": "9700_9700_FA807524F0060_P00055_FA807518D0006_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-09-26",
+   "code": "097",
+   "obligation": "920959.069999999948777258396148681640625"
+  },
+  {
+   "txn_id": "9700_9700_FA810823F0011_P00018_FA810817D0001_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-03-20",
+   "code": "097",
+   "obligation": "1490634.33000000007450580596923828125"
+  },
+  {
+   "txn_id": "9700_9700_FA820420F0075_P00004_FA821415D0001_0",
+   "fiscal_year": 2020,
+   "action_date": "2020-01-22",
+   "code": "097",
+   "obligation": "-70765.89999999999417923390865325927734375"
+  },
+  {
+   "txn_id": "9700_9700_FA823218F0099_A00001_FA823217D0012_0",
+   "fiscal_year": 2019,
+   "action_date": "2019-01-08",
+   "code": "097",
+   "obligation": "-20316"
+  },
+  {
+   "txn_id": "9700_9700_FA823225FB047_P00003_FA823222D0006_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-30",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_FA823226FB063_0_FA823224D0002_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-11",
+   "code": "097",
+   "obligation": "125188.800000000002910383045673370361328125"
+  },
+  {
+   "txn_id": "9700_9700_FA850423F0012_A00011_FA850418D0007_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-04-08",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_FA862118F6260_P00113_FA862115D6267_6",
+   "fiscal_year": 2024,
+   "action_date": "2024-03-17",
+   "code": "097",
+   "obligation": "599413.9399999999441206455230712890625"
+  },
+  {
+   "txn_id": "9700_9700_M2900025F1006_P00004_N0002325D0019_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-06",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0002421F8059_A00001_N0002413D6400_0",
+   "fiscal_year": 2021,
+   "action_date": "2021-02-24",
+   "code": "097",
+   "obligation": "-24015.43999999999869032762944698333740234375"
+  },
+  {
+   "txn_id": "9700_9700_N0010425FVV0E_P00001_N0010421GVV01_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-12",
+   "code": "097",
+   "obligation": "285600"
+  },
+  {
+   "txn_id": "9700_9700_N0038323FDK01_P00001_N0038323DDK01_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-10-27",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038323FSL04_P00002_N0038322DSL01_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-02-15",
+   "code": "097",
+   "obligation": "-54640"
+  },
+  {
+   "txn_id": "9700_9700_N0038323FTP0D_P00004_N0038322GTP01_0",
+   "fiscal_year": 2025,
+   "action_date": "2024-12-04",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038323FV617_P00002_N0038320GV601_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-02-06",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038324FDK08_P00001_N0038323DDK01_0",
+   "fiscal_year": 2024,
+   "action_date": "2023-10-18",
+   "code": "097",
+   "obligation": "-9623.79999999999927240423858165740966796875"
+  },
+  {
+   "txn_id": "9700_9700_N0038324FSQ02_P00004_N0038322GSQ01_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-04-22",
+   "code": "097",
+   "obligation": "-26460"
+  },
+  {
+   "txn_id": "9700_9700_N0038324FTP01_P00003_N0038322GTP01_0",
+   "fiscal_year": 2024,
+   "action_date": "2024-02-06",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038325FAQ04_P00004_N0038325GAQ01_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-31",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038325FS809_P00003_N0038322GS801_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-29",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038325FSG00_P00001_N0038322DSG01_0",
+   "fiscal_year": 2026,
+   "action_date": "2025-12-15",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_N0038325FSL00_P00005_N0038322DSL01_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-03-11",
+   "code": "097",
+   "obligation": "-40524"
+  },
+  {
+   "txn_id": "9700_9700_SP470625F0028_P00004_SP470623D0002_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-11",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SP470925F0043_P00006_SP470924D0054_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-08-28",
+   "code": "097",
+   "obligation": "8398640.24000000022351741790771484375"
+  },
+  {
+   "txn_id": "9700_9700_SP470925F0090_P00003_SP470924D0025_0",
+   "fiscal_year": 2025,
+   "action_date": "2025-09-26",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRPA119FLT1P_A00001_SPRPA115G001Z_0",
+   "fiscal_year": 2023,
+   "action_date": "2023-02-13",
+   "code": "097",
+   "obligation": "-225109"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0144_P00014_W31P4Q24D0019_1",
+   "fiscal_year": 2025,
+   "action_date": "2025-04-08",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV24F0181_P00014_W56HZV23D0007_2",
+   "fiscal_year": 2025,
+   "action_date": "2025-07-22",
+   "code": "097",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912LQ26FA013_0_W912LQ24D0001_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-01-07",
+   "code": "097",
+   "obligation": "27764.40999999999985448084771633148193359375"
+  }
+ ],
+ "f1ShortCodeTwins": [
+  {
+   "txn_id": "9700_-NONE-_N6339423C0004_P00052_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "6349506"
+  },
+  {
+   "txn_id": "9700_-NONE-_N6339423C0004_P00052_-NONE-_4",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "8596553"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL124C0077_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL125C0040_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126C0012_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126C0098_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "175517.880000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126P0002_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "67250"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126P0092_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "118713"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126P0093_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "98341.259999999994761310517787933349609375"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126P0099_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "103072.199999999997089616954326629638671875"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126P0100_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "324798.2999999999883584678173065185546875"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRDL126P0104_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "59326.449999999997089616954326629638671875"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRRA125C0023_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRRA125C0023_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRRA126C0013_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRRA226C0006_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_SPRRA226P0014_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15P7T26C0001_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15P7T26C0006_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN24C0031_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN24C0045_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN24C0063_P00008_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "1899990"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN24C0063_P00009_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN25C0011_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "1046131.5200000000186264514923095703125"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN26C0001_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN26C0001_0_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "3225227.2200000002048909664154052734375"
+  },
+  {
+   "txn_id": "9700_-NONE-_W15QKN26C0003_P00001_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-9111.40999999999985448084771633148193359375"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q22C0060_P00010_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q23C0035_P00057_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q23C0036_P00026_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "441600000"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q23C0049_P00004_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q24C0006_P00011_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q24C0007_P00051_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q24C0018_P00008_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q24C0035_P00005_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "194321.60000000000582076609134674072265625"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q25C0001_P00008_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q25C0003_P00011_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q25C0014_P00008_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "500000"
+  },
+  {
+   "txn_id": "9700_-NONE-_W31P4Q26P0011_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "69795"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC24C0004_P00072_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-204904.48000000001047737896442413330078125"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC24C0005_P00011_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1116053"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC24C0022_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "4804393.790000000037252902984619140625"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC25C0027_P00005_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC25C0031_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "1330378.959999999962747097015380859375"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC25C0032_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W519TC26C0013_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "522622.880000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_-NONE-_W52P1J17C0025_P00048_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W52P1J20C0005_P00074_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "42282081.060000002384185791015625"
+  },
+  {
+   "txn_id": "9700_-NONE-_W52P1J21C0024_P00043_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "49506.610000000000582076609134674072265625"
+  },
+  {
+   "txn_id": "9700_-NONE-_W52P1J21C0025_P00073_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "174464.01999999998952262103557586669921875"
+  },
+  {
+   "txn_id": "9700_-NONE-_W52P1J22C0023_P00020_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W52P1J22C0049_P00023_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56HZV18C0133_P00184_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56HZV20C0009_P00004_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56HZV23C0025_P00034_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "1195453"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56HZV23C0047_P00008_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56HZV23C0078_P00017_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56HZV24C0032_P00011_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56JSR22C0002_P00069_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-13942"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56KGU22C0050_P00008_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56KGU24C0023_P00008_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "723324"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56KGU25C0017_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "150000"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56KGU26C0006_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "85000"
+  },
+  {
+   "txn_id": "9700_-NONE-_W56KGY21C0010_P00017_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58P0525C0007_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "6149463.09999999962747097015380859375"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ15C0067_P00064_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "5185.19999999999981810105964541435241699219"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ17C0058_A00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ20C0032_P00017_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "-1547560.78000000002793967723846435546875"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ22C0010_P00084_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-178940"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ22C0063_P00022_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ22C0063_P00023_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "2000000"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ23C0019_P00015_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ24C0019_P00005_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "56814"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ24C0039_P00004_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ24C0046_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ25C0003_P00093_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "4810420.58000000007450580596923828125"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ26C0015_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-25",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ26C0015_0_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-25",
+   "code": "97",
+   "obligation": "4622867.49000000022351741790771484375"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ26C0017_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W58RGZ26C0017_0_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "57674366.14000000059604644775390625"
+  },
+  {
+   "txn_id": "9700_-NONE-_W909MY22C0023_P00018_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "20195591"
+  },
+  {
+   "txn_id": "9700_-NONE-_W909MY23C0002_P00010_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W909MY26C0001_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "3031912"
+  },
+  {
+   "txn_id": "9700_-NONE-_W9128Z26P0001_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "1696266"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH24C0001_P00007_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH25C0004_P00010_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH25C0048_P00003_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "101280.630000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH25C0070_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH25C0081_P00002_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-78110.699999999997089616954326629638671875"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH25C0085_PZ0001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "1591308.05000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH25P0041_P00001_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH26C0008_P00001_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH26C0014_P00004_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "2158039"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH26C0018_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "322850"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH26C0039_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "436886"
+  },
+  {
+   "txn_id": "9700_-NONE-_W912CH26C0052_0_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "969000"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB21C5007_P00016_-NONE-_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB21C5012_P00009_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "126795.229999999995925463736057281494140625"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB25C5001_P00002_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB26C5003_0_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "3473785"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB26C5017_P00002_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB26C5044_0_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "753085.079999999958090484142303466796875"
+  },
+  {
+   "txn_id": "9700_-NONE-_W91CRB26C5045_0_-NONE-_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "344549.23999999999068677425384521484375"
+  },
+  {
+   "txn_id": "9700_4732_W56JSR23F0062_P00099_47QTCK18D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "574999.910000000032596290111541748046875"
+  },
+  {
+   "txn_id": "9700_4732_W58RGZ24F0309_P00004_47QREA23D000C_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "19200"
+  },
+  {
+   "txn_id": "9700_4732_W912CH26F0197_0_47QRCA25DSB01_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRBL125F0091_P00004_SPRBL123D0007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRBL125F0151_P00002_SPRBL123D0007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRBL126F0012_P00002_SPRBL123D0011_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-8091.85999999999967258190736174583435058594"
+  },
+  {
+   "txn_id": "9700_9700_SPRBL126F0086_P00002_SPRBL123D0006_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-1948.75999999999999090505298227071762084961"
+  },
+  {
+   "txn_id": "9700_9700_SPRBL126F0106_0_SPRBL120D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "2130990"
+  },
+  {
+   "txn_id": "9700_9700_SPRBL126F0106_P00001_SPRBL120D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL121F0075_P00005_SPRDL121D0030_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL126F0076_P00001_SPRDL126D0017_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL126F0096_0_SPRDL126D0009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "196235"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL126F0110_0_SPRDL125D0056_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "54460.5599999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL126F0111_0_SPRDL125D0032_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "28350"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL126F0112_0_SPRDL126D0014_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "580070"
+  },
+  {
+   "txn_id": "9700_9700_SPRDL126F0114_0_SPRDL126D0031_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "291899.5800000000162981450557708740234375"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA124F0137_P00001_SPE4A119G0013_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA125F0083_P00001_SPRRA121D0027_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0024_P00001_SPRRA126D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-1631.54999999999995452526491135358810424805"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0034_0_SPRRA126D0006_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "6680660"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0037_0_SPRRA126D0009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "313823.75"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0038_0_SPRPA124D003E_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "1584308.80000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0041_0_SPRRA121D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "167095.98000000001047737896442413330078125"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0042_0_SPRRA121D0008_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "286960"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0043_0_SPRRA121D0019_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "84689.919999999998253770172595977783203125"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0045_0_SPRRA122D0015_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "590568.30000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0048_0_SPRRA121D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "12111"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA126F0050_0_SPRRA121D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "101881.5"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA224F0007_P00003_SPRBL115D0017_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA224F0093_P00006_SPRRA220D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA224F0219_P00008_SPRBL115D0017_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA225F0169_P00002_SPRRA225D0010_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA225F0208_P00004_SPRBL115D0017_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA225F0208_P00005_SPRBL115D0017_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA226F0036_P00002_SPRRA223D0011_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA226F0077_0_SPRRA225D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "11880775"
+  },
+  {
+   "txn_id": "9700_9700_SPRRA226F0082_0_SPRRA223D0015_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "160000"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T20F0286_A00001_W15P7T10DC007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-78699.52999999999883584678173065185546875"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T21F0002_A00001_W15P7T10DC007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-5201.19999999999981810105964541435241699219"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T22F0011_A00001_W15P7T10DC007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-1613873.07000000006519258022308349609375"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T22F0102_P00033_W15P7T20D0021_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "-5072.68999999999959982233121991157531738281"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T23F0088_P00028_W15P7T19D0203_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "352115.849999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T24F0033_P00009_W15P7T18D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T24F0040_P00012_W15P7T19D0152_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "2055000"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T24F0049_P00017_W15P7T19D0207_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "714000"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T24F0109_P00004_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T24F0109_P00005_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T25F0038_P00022_W15P7T17D0148_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "824831.839999999967403709888458251953125"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T25F0160_P00001_W15P7T25D0005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "184434.33999999999650754034519195556640625"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T25F0160_P00002_W15P7T25D0005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0006_P00012_W15P7T25D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "6125969.7699999995529651641845703125"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0008_P00002_W15P7T17D0146_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0009_P00002_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0042_P00002_FA873023DB003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0068_P00001_W15P7T20D0021_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0075_P00001_N0024424D0005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0097_0_W15P7T24D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "792636"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0107_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "3396936"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0108_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "55692"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0109_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "701946.400000000023283064365386962890625"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0110_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "6831030"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0112_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "48213"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0114_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "526415"
+  },
+  {
+   "txn_id": "9700_9700_W15P7T26F0115_0_W15P7T23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "46761"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN22F0344_P00012_W15QKN18D0122_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "11120511.56000000052154064178466796875"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN23F0034_P00005_W15QKN18D0034_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-2800"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN23F0168_P00004_W15QKN22D0033_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN23F0404_P00012_W15QKN19D0051_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "6909167"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN23F0461_P00023_W52P1J18DA088_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "828000"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN23F0614_P00008_W15QKN21D0005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN23F0685_P00004_W15QKN18D0083_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0229_P00003_W15QKN18D0126_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1971245.379999999888241291046142578125"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0261_P00004_W15QKN23D0046_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0344_P00005_W15QKN19D0051_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "2165827.75999999977648258209228515625"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0351_P00004_W15QKN24D0035_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0377_P00005_W15QKN23D0021_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0393_P00005_W15QKN19D0055_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "330329.4400000000023283064365386962890625"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0404_P00006_W15QKN19D0050_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN24F0458_P00003_W15QKN21D0038_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "172066.1799999999930150806903839111328125"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0038_P00002_W15QKN21D0038_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0053_P00004_W15QKN24D0035_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0095_P00010_W15QKN19D0042_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "4635700"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0183_P00002_W15QKN21D0038_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0286_P00002_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-2357.40000000000009094947017729282379150391"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0359_P00007_W15QKN19D0051_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0362_P00002_W15QKN24D0041_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN25F0412_P00002_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-392.89999999999997726263245567679405212402"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0025_P00002_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-2907.46000000000003637978807091712951660156"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0078_P00003_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-157.1599999999999965893948683515191078186"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0089_P00001_W15QKN19D0051_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0093_P00002_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "-9914.0400000000008731149137020111083984375"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0104_P00002_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "-4135.23999999999978172127157449722290039063"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0116_0_W15QKN19D0074_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "1466150"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0116_0_W15QKN19D0074_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "127800"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0118_P00002_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "-8084.8199999999997089616954326629638671875"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0120_0_W15QKN22D0009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "7715946.299999999813735485076904296875"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0120_0_W15QKN22D0009_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "177512"
+  },
+  {
+   "txn_id": "9700_9700_W15QKN26F0146_0_W15QKN22D0008_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "59531125"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q21F0295_P00025_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "583317.130000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q21F0295_P00026_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "350000"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q22F0021_P00015_W31P4Q21D0026_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q22F0098_P00054_W31P4Q21D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q22F0228_P00010_W31P4Q22D0020_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q23F0024_P00031_W31P4Q23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q23F0220_P00002_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-5182.60000000000036379788070917129516601563"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q23F0235_P00004_W31P4Q20D0039_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q23F0341_P00007_W31P4Q23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0041_P00027_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-567000"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0085_PT0006_W31P4Q22D0022_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0165_P00019_W31P4Q23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1914063.69999999995343387126922607421875"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0165_PZ0018_W31P4Q23D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "23430697"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0165_PZ0018_W31P4Q23D0003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "65439674.490000002086162567138671875"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0193_P00001_W31P4Q21D0013_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q24F0200_A00002_W31P4Q20D0032_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q25F0021_P00003_W31P4Q25D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q25F0074_P00005_W31P4Q25D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q25F0083_P00004_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "235656"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q25F0125_P00002_W31P4Q22D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-96951.1900000000023283064365386962890625"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q25F0137_P00004_W31P4Q22D0024_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "2000000"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q25F0156_P00001_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "5490496.2300000004470348358154296875"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q26F0012_P00002_W31P4Q18D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "25967000"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q26F0015_P00001_W31P4Q22D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q26F0026_P00002_W31P4Q20D0032_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "5901076.309999999590218067169189453125"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q26F0036_0_W31P4Q24D0019_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "58323854"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q26F0036_0_W31P4Q24D0019_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W31P4Q26F0079_PZ0001_W31P4Q25D0010_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "74392444"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0033_P00009_W52P1J19D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "23726964.0300000011920928955078125"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0096_P00004_W52P1J19D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "22818344.5"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0132_P00028_W52P1J22D0040_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "-522622.880000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0229_P00012_W52P1J18D0092_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0243_P00005_W52P1J19D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0334_P00004_W519TC23D0028_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-628632.4799999999813735485076904296875"
+  },
+  {
+   "txn_id": "9700_9700_W519TC23F0503_P00001_W52P1J19D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0043_P00032_W52P1J21D0036_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-3404.65999999999985448084771633148193359375"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0179_P00005_W52P1J18D0059_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0190_P00006_W519TC24D0007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "5304690.179999999701976776123046875"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0190_P00006_W519TC24D0007_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "19056001.8000000007450580596923828125"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0190_P00007_W519TC24D0007_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0212_P00020_W52P1J19D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "6740038.309999999590218067169189453125"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0303_P00012_W519TC24D0018_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1225000"
+  },
+  {
+   "txn_id": "9700_9700_W519TC24F0451_P00004_W519TC24D0019_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC25F0043_P00004_N0024424D0009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "4314"
+  },
+  {
+   "txn_id": "9700_9700_W519TC25F0083_P00003_W52P1J21D0024_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "634.79999999999995452526491135358810424805"
+  },
+  {
+   "txn_id": "9700_9700_W519TC25F0135_P00001_W519TC24D0019_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC25F0138_P00002_W52P1J22D0021_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC25F0146_P00002_W52P1J20D0061_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC25F0230_P00007_W52P1J21D0015_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "3215855.0299999997951090335845947265625"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0006_P00003_W519TC23D0005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0019_P00003_W52P1J21D0018_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "400000"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0072_0_W52P1J19D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "1300002.94999999995343387126922607421875"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0087_P00001_W52P1J21D0026_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0094_0_W52P1J19D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "96900000"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0100_0_W52P1J21D0024_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "9193500"
+  },
+  {
+   "txn_id": "9700_9700_W519TC26F0107_0_W52P1J21D0037_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "543320"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J19F0371_P00074_W52P1J19D0045_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "34905231.759999997913837432861328125"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J19F0398_P00095_W52P1J19D0045_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "33302530.5100000016391277313232421875"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J19F0402_P00084_W52P1J19D0045_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "-56150.110000000000582076609134674072265625"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J19F0403_P00140_W52P1J19D0046_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "1767883.75"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J19F0403_P00141_W52P1J19D0046_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "31418121.789999999105930328369140625"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J19F0404_P00086_W52P1J19D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "484893.7899999999790452420711517333984375"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J20F0539_P00011_W52P1J19D0044_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J20F0539_P00012_W52P1J19D0044_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J20F0539_PZ0010_W52P1J19D0044_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J21F0128_P00036_W52P1J21D0018_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J21F0251_P00006_W52P1J18D0074_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W52P1J22F0271_P00001_W52P1J19D0054_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "-2400"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV19F0209_P00103_W56HZV19D0040_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-26656.15999999999985448084771633148193359375"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV19F0304_P00003_W56HZV18D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV19F0329_P00053_W56HZV19D0040_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV20F0367_P00023_W56HZV20D0084_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV21F0011_P00005_W56HZV18D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV21F0142_P00004_W56HZV19D0051_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "-1840.48000000000001818989403545856475830078"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV22F0095_P00009_W56HZV22D0001_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV22F0264_P00002_W56HZV18D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV22F0283_P00005_W56HZV15D0037_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "102174.5599999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV23F0331_P00010_W56HZV18D0010_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "668904.48999999999068677425384521484375"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV23F0335_P00031_W56HZV22DER04_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "410454.4799999999813735485076904296875"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV23F0346_P00013_W56HZV22D0092_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV24F0056_P00005_W56HZV22D0013_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV24F0105_P00019_W56HZV24D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV24F0217_P00027_W56HZV24D0020_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "292784"
+  },
+  {
+   "txn_id": "9700_9700_W56HZV24F0227_P00023_W56HZV24D0020_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56JSR24F0002_P00024_W56JSR23D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "297000"
+  },
+  {
+   "txn_id": "9700_9700_W56JSR25F0004_P00012_W56JSR22D0005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56JSR26F0003_0_W519TC26DA005_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "3854142.75999999977648258209228515625"
+  },
+  {
+   "txn_id": "9700_9700_W56JSR26F0004_0_W519TC26DA009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "2490131.2200000002048909664154052734375"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU20F0007_P00079_W15P7T17D0142_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-12800"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU20F0012_P00160_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "-662653.46999999997206032276153564453125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU20F0012_P00161_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-121192.490000000005238689482212066650390625"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU21F0008_P00140_W56KGU18D0004_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-2875.21000000000003637978807091712951660156"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU21F0013_P00090_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-230950.01000000000931322574615478515625"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU22F0005_P00053_W15P7T19D0196_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-19817.22000000000116415321826934814453125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU22F0017_P00130_W56KGU18D0004_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "-5980.47999999999956344254314899444580078125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU22F0021_P00073_W15P7T19D0181_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "4954033.809999999590218067169189453125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU23F0004_P00043_W15P7T19D0181_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "915000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU23F0007_P00007_W52P1J18DA038_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU23F0011_P00064_W56KGU19D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU23F0014_P00061_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "3596828.799999999813735485076904296875"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU24F0002_P00068_W56KGU19D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "13400"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0012_P00008_W909MY23D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "180736.47000000000116415321826934814453125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0014_P00013_W15P7T19D0181_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "1189467.55000000004656612873077392578125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0014_P00014_W15P7T19D0181_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-402809"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0015_P00060_W56KGU18D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "18210713"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0015_P00061_W56KGU18D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "-98100"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0015_P00062_W56KGU18D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "10992720"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0015_P00063_W56KGU18D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "2725350.1800000001676380634307861328125"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0015_P00063_W56KGU18D0004_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "2385000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0020_P00010_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "513600"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0021_P00010_W15P7T19D0010_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "517000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGU25F0022_P00014_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "2519537.0600000000558793544769287109375"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY20F0026_P00070_W15P7T17D0113_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "-33187.52999999999883584678173065185546875"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY20F0026_P00071_W15P7T17D0113_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "149.91999999999998749444785062223672866821"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY21F0025_P00043_W15P7T19D0131_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "1610316.73999999999068677425384521484375"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY21F0025_P00044_W15P7T19D0131_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY22F0001_P00027_W56KGY22D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "8603000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY22F0037_P00023_W56KGY20D0013_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "185625.119999999995343387126922607421875"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY22F0057_P00099_W15P7T17D0100_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "1530448"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY23F0001_P00026_W56KGY22D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY23F0001_P00027_W56KGY22D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY23F0033_P00040_W15P7T17D0118_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "237500"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY24F0019_P00031_W15P7T17D0147_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "1500000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY24F0019_P00032_W15P7T17D0147_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY24F0040_P00013_W56KGY23D0002_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "39199.3099999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY24F0054_P00034_W15P7T19D0157_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "100000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY24F0063_P00004_W56KGY24D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "-125000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY25F0011_P00003_W56KGY22D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-256560.66000000000349245965480804443359375"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY25F0021_P00002_W56KGY24D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY25F0022_P00012_W56JSR23D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY25F0029_P00020_W15P7T19D0077_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY25F0122_P00013_W56KGY24D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0003_P00001_W56KGY22D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "10920710"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0012_P00004_W56KGY26D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0017_P00005_W519TC25D0039_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "258012"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0022_P00007_W56KGY24D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0031_P00001_W519TC25D0039_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "5000000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0031_P00002_W519TC25D0039_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "5000000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0036_P00001_W56JSR23D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0036_P00002_W56JSR23D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "3757133"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0048_0_W56KGY26D0006_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "200000"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0049_0_W56KGY26D0008_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "199119.3099999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_W56KGY26F0050_0_W56KGY26D0009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "199761.76000000000931322574615478515625"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ19F0488_P00005_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-3859.36000000000012732925824820995330810547"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ21F0122_P00008_W58RGZ18D0034_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ21F0122_P00008_W58RGZ18D0034_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "11093020"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ22F0093_P00006_W58RGZ17D0087_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "212080"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ22F0140_P00027_W58RGZ21D0077_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ22F0476_P00015_W58RGZ21D0031_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ22F0477_P00019_W58RGZ19D0101_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "-981213.890000000013969838619232177734375"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ23F0149_P00011_W58RGZ23D0011_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ23F0155_P00005_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "170355"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ23F0313_P00016_W58RGZ19D0014_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-2387"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ23F0510_P00007_W58RGZ19D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0070_P00005_W58RGZ24D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "900"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0180_P00004_W58RGZ22D0061_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0206_P00006_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "229800"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0225_P00008_W58RGZ18D0001_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "559542"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0248_P00003_W58RGZ20D0011_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-97969.919999999998253770172595977783203125"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0281_P00001_W58RGZ19D0028_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "151548"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0327_P00007_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0425_P00006_W58RGZ20D0098_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ24F0427_P00002_W58RGZ24D0071_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ25F0038_P00003_W58RGZ21D0023_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ25F0254_P00001_W58RGZ23D0011_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "195730"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ25F0280_P00002_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "413656"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ25F0353_P00002_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ25F0439_P00001_W58RGZ19D0070_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0027_P00001_W58RGZ21D0028_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0080_P00001_W58RGZ25D0022_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "850000"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0137_P00001_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "99999"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0139_P00003_W58RGZ26D0001_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0150_P00001_W58RGZ26D0035_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0159_0_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "755818"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0183_P00001_W58RGZ21D0048_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0188_P00001_W58RGZ24D0048_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0189_0_W58RGZ24D0008_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "1350965"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0194_0_W58RGZ21D0010_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "5192558"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0196_0_W58RGZ26D0039_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "14399300"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0197_P00001_W58RGZ26D0040_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0212_0_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "851890"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0222_P00001_W58RGZ26D0001_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "4457.88000000000010913936421275138854980469"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0233_0_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "474290"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0253_0_W58RGZ24D0049_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "1326000"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0257_0_W58RGZ22D0023_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "1297950"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0263_0_W58RGZ22D0043_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "464212.599999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0264_0_W58RGZ22D0010_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "649944"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0268_0_W58RGZ18D0001_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "1500638"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0272_0_W58RGZ24D0071_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "278026.2000000000116415321826934814453125"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0275_0_W58RGZ22D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "589228.5"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0282_0_W58RGZ24D0053_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "1269598"
+  },
+  {
+   "txn_id": "9700_9700_W58RGZ26F0283_0_W58RGZ25D0003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "8984"
+  },
+  {
+   "txn_id": "9700_9700_W909MY19F0047_P00019_W911QY16D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "670492.25"
+  },
+  {
+   "txn_id": "9700_9700_W909MY19F0047_P00020_W911QY16D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W909MY20F0015_P00006_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-121.0199999999999960209606797434389591217"
+  },
+  {
+   "txn_id": "9700_9700_W909MY20F0070_P00015_W911QY16D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-263275.3400000000256113708019256591796875"
+  },
+  {
+   "txn_id": "9700_9700_W909MY21F0008_P00003_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-148.1299999999999954525264911353588104248"
+  },
+  {
+   "txn_id": "9700_9700_W909MY21F0034_P00002_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-1122.43000000000006366462912410497665405273"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0018_P00042_W15P7T19D0038_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "58980"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0027_P00002_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-0.01000000000000000020816681711721685133"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0028_P00004_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-10.84999999999999964472863211994990706444"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0032_P00010_W911QY16D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-29279.97000000000116415321826934814453125"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0068_P00009_W911QY16D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "61550.58999999999650754034519195556640625"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0072_P00008_W911QY16D0025_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "594713.21999999997206032276153564453125"
+  },
+  {
+   "txn_id": "9700_9700_W909MY22F0083_P00003_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-5927.0699999999997089616954326629638671875"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0010_P00003_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-107.59999999999999431565811391919851303101"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0020_P00002_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-9071.30999999999949068296700716018676757813"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0039_P00003_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-165.72999999999998976818460505455732345581"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0044_P00004_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-6271.27999999999974534148350358009338378906"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0053_P00004_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-87.3599999999999994315658113919198513031"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0054_P00003_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-164.75"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0055_P00052_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "322650"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0055_P00053_W15P7T19D0157_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "2133073"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0057_P00003_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "-12348.82999999999992724042385816574096679688"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0060_P00004_W911QY15D0047_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-9.07000000000000028421709430404007434845"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0071_P00033_W15P7T17D0125_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0073_P00041_W15P7T19D0135_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "441000"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0077_P00027_W15P7T17D0102_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "984000"
+  },
+  {
+   "txn_id": "9700_9700_W909MY23F0084_P00032_W15P7T19D0181_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "450000"
+  },
+  {
+   "txn_id": "9700_9700_W909MY24F0007_P00022_W15P7T17D0102_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1125000"
+  },
+  {
+   "txn_id": "9700_9700_W909MY24F0007_P00023_W15P7T17D0102_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W909MY25F0059_P00001_W909MY25D0003_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W909MY25F0061_P00002_W909MY19D0015_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W909MY25F0061_P00002_W909MY19D0015_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "250201.7999999999883584678173065185546875"
+  },
+  {
+   "txn_id": "9700_9700_W909MY26F0021_0_W909MY17D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "503171.2700000000186264514923095703125"
+  },
+  {
+   "txn_id": "9700_9700_W9128Z26F0007_0_W52P1J20D0046_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "11635052.91999999992549419403076171875"
+  },
+  {
+   "txn_id": "9700_9700_W912CH24F0007_P00026_W56HZV24D0012_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "6802"
+  },
+  {
+   "txn_id": "9700_9700_W912CH24F0288_P00002_W56HZV23D0064_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "-22727.139999999999417923390865325927734375"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0040_P00006_W56HZV22D0082_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0040_P00007_W56HZV22D0082_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0070_P00003_W56HZV20D0066_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0174_P00002_W56HZV24D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "3680107"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0174_P00003_W56HZV24D0016_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0205_P00001_W56HZV23D0048_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0206_P00002_W56HZV23D0048_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0263_P00001_W56HZV22D0056_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "-362357.900000000023283064365386962890625"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0342_P00006_W56HZV23D0064_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH25F0343_P00002_W56HZV20D0084_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0027_P00001_W56HZV23D0008_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0044_P00001_W56HZV18D0010_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "-0.05999999999999999777955395074968691915"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0075_P00003_W56HZV22D0082_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "2684756.950000000186264514923095703125"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0089_0_W56HZV22D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "4737393.7300000004470348358154296875"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0100_P00003_W56HZV20D0075_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "510110"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0102_P00001_W56HZV20D0075_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1062356"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0117_P00001_W56HZV23D0008_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "9181812.06000000052154064178466796875"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0117_P00002_W56HZV23D0008_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0122_P00002_W56HZV23D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0176_P00001_W56HZV22D0046_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0183_0_W912CH25D0049_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "32439105.179999999701976776123046875"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0187_0_W912CH25D0049_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "36780338.2199999988079071044921875"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0192_0_W56HZV23D0004_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "659502.19999999995343387126922607421875"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0198_0_W56HZV23D0048_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "30803560"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0214_P00001_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0216_P00001_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0231_0_W56HZV23D0046_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "1102.06999999999993633537087589502334594727"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0245_0_W912CH24D0009_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "3475833.75"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0252_0_W912CH26D0002_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "2531731"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0253_0_W56HZV24D0031_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "10923554"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0267_0_W912CH25D0081_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "1107786.23999999999068677425384521484375"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0268_0_W56HZV24D0031_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "97",
+   "obligation": "4793621"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0273_0_W912CH26D0006_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "25300"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0274_0_W56HZV24D0015_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "160267.39999999999417923390865325927734375"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0279_0_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "97497.08999999999650754034519195556640625"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0280_0_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "72667.039999999993597157299518585205078125"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0281_0_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "43266.9000000000014551915228366851806640625"
+  },
+  {
+   "txn_id": "9700_9700_W912CH26F0285_0_W15QKN23D0029_1",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "97",
+   "obligation": "38618.0199999999967985786497592926025390625"
+  },
+  {
+   "txn_id": "9700_9700_W91CRB24F5011_P00004_W56JSR19D0014_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "0"
+  },
+  {
+   "txn_id": "9700_9700_W91CRB26F5047_0_W91CRB21D5003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "97",
+   "obligation": "326667.0599999999976716935634613037109375"
+  },
+  {
+   "txn_id": "9700_9700_W91CRB26F5049_0_W91CRB21D5003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "6938531.530000000260770320892333984375"
+  },
+  {
+   "txn_id": "9700_9700_W91CRB26F5050_0_W91CRB21D5003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "4404116.299999999813735485076904296875"
+  },
+  {
+   "txn_id": "9700_9700_W91CRB26F5051_0_W91CRB21D5003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "97",
+   "obligation": "4195432.290000000037252902984619140625"
+  },
+  {
+   "txn_id": "9700_9700_W91CRB26F5053_0_W91CRB21D5003_2",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "97",
+   "obligation": "583760.01000000000931322574615478515625"
+  }
+ ],
+ "f1bResolvedShortCode": [
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0261_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "8903.84",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0262_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "6747.42",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0263_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "4424",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0264_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "4479",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0265_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "4479",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0266_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "6488",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0267_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "12",
+   "obligation": "6479",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "12K2_-NONE-_121NTF26C0274_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "12",
+   "obligation": "6764.65",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "1341_1341_1333ND25FNB190188_P26001_1333ND24ANB190020_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "13",
+   "obligation": "0",
+   "disposition": "mod_absent_at_source"
+  },
+  {
+   "txn_id": "1406_2036_140D0426F0411_0_20343125A00002_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-23",
+   "code": "14",
+   "obligation": "155626.84",
+   "disposition": "superseded"
+  },
+  {
+   "txn_id": "1560_1560_15A00022FAQA00176_P00003_15A00020DAQA00416_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "15",
+   "obligation": "-54569",
+   "disposition": "mod_absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343122D00002_P00009_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343123D00002_P00009_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343123D00003_P00010_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343123D00004_P00010_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343124D00002_P00008_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343124D00003_P00006_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343125D00002_P00006_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343125D00004_P00005_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343125D00005_P00005_-NONE-_-NONE-",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20343223C00003_P00007_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_-NONE-_20356425P00003_P00003_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-27",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_2036_20342824F00008_P00005_20342823A00001_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-24",
+   "code": "20",
+   "obligation": "-2082.65",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_4732_20343222F00004_P00013_47QTCA20D00B5_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_4732_20343222F00007_P00008_GS00Q17NSD3009_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-01",
+   "code": "20",
+   "obligation": "1502.92",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "2036_4732_20356425F00005_P00001_47QREA23D0016_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-28",
+   "code": "20",
+   "obligation": "0",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "7527_4732_75H70426F80007_0_47QRAA26D001B_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "75",
+   "obligation": "561671.64",
+   "disposition": "superseded"
+  },
+  {
+   "txn_id": "9700_-NONE-_FA462026P0021_0_-NONE-_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "9166.35",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "9700_4732_FA700026F0092_0_47QSMA23D08NJ_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "41964.51",
+   "disposition": "superseded"
+  },
+  {
+   "txn_id": "9700_4732_N6133126FG074_0_GS35F051CA_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-05-02",
+   "code": "97",
+   "obligation": "709.13",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "9700_4732_N6133126FG075_0_47QSEA20D007B_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-29",
+   "code": "97",
+   "obligation": "119.44",
+   "disposition": "absent_at_source"
+  },
+  {
+   "txn_id": "9700_9700_FA527026FA019_0_FA805522A3006_0",
+   "fiscal_year": 2026,
+   "action_date": "2026-04-30",
+   "code": "97",
+   "obligation": "249202.8",
+   "disposition": "superseded"
+  }
+ ],
+ "ambiguousUntouched": [
+  {
+   "txn_id": "1900_-NONE-_19N06026P0281_P00001_-NONE-_0",
+   "action_date": "2026-04-26",
+   "code": "19",
+   "obligation": "0",
+   "reason": "source re-dated to 2026-06-22 with no valid warehouse copy yet"
+  },
+  {
+   "txn_id": "7008_-NONE-_70Z0G826PBNCR0005_0_-NONE-_0",
+   "action_date": "2026-05-01",
+   "code": "70",
+   "obligation": "15000",
+   "reason": "source award detail returned HTTP 500 — a failed lookup is not absence"
+  }
+ ],
+ "f2SourceRedated": [
+  {
+   "txn_id": "4500_4732_45310026F0052_0_47QTCA18D008L_0",
+   "cloneActionDate": "2026-05-06",
+   "obligation": "181827.5"
+  },
+  {
+   "txn_id": "6920_-NONE-_693KA726C00059_P00001_-NONE-_0",
+   "cloneActionDate": "2026-05-06",
+   "obligation": "13000000"
+  }
+ ]
+}

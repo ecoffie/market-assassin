@@ -16,11 +16,11 @@ import {
   type LiveAwardsColumn,
 } from './awards-schema';
 
-export const IDV_MIGRATION_STEPS = ['preflight', 'snapshot', 'ddl', 'verify', 'repull_window', 'idv_fy_backfill'] as const;
+export const IDV_MIGRATION_STEPS = ['preflight', 'snapshot', 'ddl', 'verify', 'repull_window', 'idv_fy_backfill', 'a1b_cleanup'] as const;
 export type IdvMigrationStep = (typeof IDV_MIGRATION_STEPS)[number];
 
 /** Steps that write to production `awards` (need the fresh-clone gate). */
-export const IDV_MIGRATION_WRITE_STEPS: readonly IdvMigrationStep[] = ['ddl', 'repull_window', 'idv_fy_backfill'];
+export const IDV_MIGRATION_WRITE_STEPS: readonly IdvMigrationStep[] = ['ddl', 'repull_window', 'idv_fy_backfill', 'a1b_cleanup'];
 
 export const IDV_MIGRATION_CLONE_PREFIX = 'awards_clone_pre_idv_' as const;
 export const IDV_MIGRATION_CLONE_MAX_AGE_HOURS = 24;

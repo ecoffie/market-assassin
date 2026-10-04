@@ -162,7 +162,7 @@ describe('fresh-clone write gate', () => {
   });
 
   it('the runner applies the gate to every write step BEFORE any write', () => {
-    expect([...IDV_MIGRATION_WRITE_STEPS].sort()).toEqual(['ddl', 'idv_fy_backfill', 'repull_window']);
+    expect([...IDV_MIGRATION_WRITE_STEPS].sort()).toEqual(['a1b_cleanup', 'ddl', 'idv_fy_backfill', 'repull_window']);
     const gateAt = runner.indexOf('assertFreshCloneGate({');
     const switchAt = runner.indexOf('switch (dispatch.step)');
     expect(gateAt).toBeGreaterThan(-1);
@@ -235,6 +235,7 @@ describe('ddl post-check — typed, against the canonical schema (awards-schema.
   it('the runner reads names AND types through #1670\'s awardsColumnsQuery and uses the post-check for ddl + re-acquisition', () => {
     expect(runner).toContain('awardsColumnsQuery(PROJECT, DATASET)');
     expect(runner).not.toMatch(/SELECT column_name FROM/);
-    expect(runner.match(/ddlPostCheck\(await awardsColumns\(bq\)\)/g)?.length).toBe(2);
+    // ddl post-verify + re-acquisition steps + a1b_cleanup precondition (A1b, 2026-10-04)
+    expect(runner.match(/ddlPostCheck\(await awardsColumns\(bq\)\)/g)?.length).toBe(3);
   });
 });
