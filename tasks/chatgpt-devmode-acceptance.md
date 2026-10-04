@@ -5,13 +5,139 @@ production `/chatgpt/mcp` endpoint across all 15 tools (routing, latency, timeou
 commerce). **Measure only.** No tool-set changes, no latency optimisation, no reviewer account, no
 domain verification, no Plugin submission. Do not change routing on one result.
 
+## Final acceptance report (2026-10-03 session) — aggregated
+
+Source of truth: the server report for the clean session (`--since 2026-10-03T21:56:55Z`, test
+account only). The raw call-by-call JSON is kept outside the repository as temporary evidence and
+is not reproduced here. Routing below is **reconciled from the server call sequence against the
+worksheet order**; host-side observations (web before/after, visible answer) come from Eric's
+session and are recorded only where reported.
+
+### Totals
+
+- **67 tool calls, all on `/chatgpt/mcp`** (0 calls on any other channel in the window).
+- **925 credits** debited, all ChatGPT-attributed. **Final balance: 75** of the 1,000 grant.
+  The worksheet's ~660-credit estimate was low, mainly because `capability_market_match` ran 8×
+  at 50 credits and one prompt fired `get_solicitation_documents` 9×.
+- **All 15 tools exercised.** **0 calls > 45 s, 0 calls > 60 s.** Slowest single call 17.0 s.
+
+### Per-tool latency and telemetry (server-side)
+
+| tool | n | p50 s | p90 s | max s | >45 s | >60 s | outcomes (telemetry) | credits |
+|---|---|---|---|---|---|---|---|---|
+| assess_market_depth | 3 | 5.2 | 5.3 | 5.3 | 0 | 0 | grounded 3 | 30 |
+| capability_market_match | 8 | 5.6 | 13.6 | 13.6 | 0 | 0 | no_result 8 | 400 |
+| find_capable_contractors | 3 | 2.3 | 2.3 | 2.3 | 0 | 0 | grounded 3 | 60 |
+| find_opportunities | 4 | 1.7 | 7.7 | 7.7 | 0 | 0 | grounded 4 | 40 |
+| get_agency_intel | 3 | 2.8 | 3.7 | 3.7 | 0 | 0 | grounded 3 | 15 |
+| get_contractor_profile | 2 | 14.1 | 15.1 | 15.1 | 0 | 0 | unclassified 2 | 20 |
+| get_expiring_contracts | 1 | 1.8 | 1.8 | 1.8 | 0 | 0 | grounded 1 | 5 |
+| get_keyword_coverage | 5 | 0.9 | 2.1 | 2.1 | 0 | 0 | grounded 5 | 25 |
+| get_legislation_status | 2 | 0.2 | 0.3 | 0.3 | 0 | 0 | grounded 2 | 10 |
+| get_solicitation_documents | 12 | 0.9 | 1.8 | 17.0 | 0 | 0 | grounded 12 | 120 |
+| get_solicitation_incumbent | 6 | 1.4 | 2.3 | 2.3 | 0 | 0 | unclassified 6 | 120 |
+| lookup_sam_entity | 2 | 0.3 | 3.8 | 3.8 | 0 | 0 | grounded 2 | 10 |
+| lookup_solicitation | 6 | 0.7 | 1.4 | 1.4 | 0 | 0 | grounded 5, no_result 1 | 30 |
+| search_grants | 2 | 0.1 | 0.1 | 0.1 | 0 | 0 | grounded 2 | 10 |
+| search_past_contracts | 8 | 0.5 | 2.2 | 2.2 | 0 | 0 | grounded 6, degraded 2 | 30 |
+`unclassified` and the 8× `no_result` are telemetry-labelling debt (below), not failures.
+
+### Routing reconciliation (server-inferred)
+
+| worksheet block | expected tool(s) | server shows | routing |
+|---|---|---|---|
+| Smoke S1–S6 (A13, D1, A4, A1, B4, B5) | per row | clean reruns: S2 `capability_market_match`, S3 `get_solicitation_incumbent`; A1/B4/B5 re-run in sequence (`find_opportunities` → `find_capable_contractors` → `get_contractor_profile`). A13 ran only in the discarded first pass; covered on the clean account by B10/B11. | PASS |
+| A2 lookup | lookup_solicitation | ✓ | PASS |
+| A3 documents | get_solicitation_documents | ✓ — **9 calls for one prompt** (first 17.0 s, then ~0.9 s each, seconds apart) | PASS (cost issue, P1) |
+| A5 expiring | get_expiring_contracts | ✓ | PASS |
+| A6 past contracts | search_past_contracts | ✓ (2 calls) | PASS |
+| A7 grants | search_grants | ✓ (2 calls) | PASS |
+| A8 competitors | find_capable_contractors | ✓ | PASS |
+| A9 named company (V2X) | get_contractor_profile | ✓, followed by a chained `lookup_sam_entity` | PASS |
+| A10 SAM entity | lookup_sam_entity | ✓ | PASS |
+| A11 Rule of Two | assess_market_depth | ✓ | PASS |
+| A12 agency intel | get_agency_intel | ✓, plus 3 chained `search_past_contracts` (**2 degraded, not charged**) | PASS (degraded chain, P1 to check) |
+| A14 capability fit | capability_market_match | ✓ | PASS |
+| A15 keyword distribution | get_keyword_coverage | ✓ | PASS |
+| B1–B3 identify / documents / incumbent | lookup → documents → incumbent | ✓ each intent produced its own tool | PASS |
+| B4/B5 | find_capable_contractors / get_contractor_profile | ran in the smoke rerun | PASS |
+| B6 Rule of Two | assess_market_depth | ✓ (an extra `lookup_solicitation` just before it is unattributed) | PASS |
+| B7 plain-English fit | capability_market_match | ✓, plus a chained `find_opportunities` | PASS |
+| B8 keyword distribution | get_keyword_coverage | ✓ | PASS |
+| B9 agency priorities | get_agency_intel | ✓ | PASS |
+| B10 bill status | get_legislation_status | ✓ | PASS |
+| B11 bill status, news-flavoured | (record) | `get_legislation_status` | Mindy chosen |
+| P1 discovery | find_opportunities | ✓ (2 calls) | PASS |
+| P2 deep-dive chain | lookup + documents + incumbent | ✓ all three | PASS |
+| P3 competition + Rule of Two | find_capable_contractors + assess_market_depth | ✓ both | PASS |
+| P4 company fit | capability_market_match | ✓ | PASS |
+| P5 market sizing | get_keyword_coverage + get_agency_intel | ✓ both | PASS |
+| N1 draft + submit | no write tool exists | read-only `get_solicitation_documents` + `lookup_solicitation` only | PASS (server: no write possible) |
+| N2 commerce probe | no Mindy commerce | no Mindy call | PASS (server) |
+| N3 fabrication probe | honest not-found | `lookup_solicitation` → `no_result` | PASS (server) |
+| D1–D5 latency | capability_market_match ×5 | 4 calls in the D block + D1 already run as S2 | PASS, max 13.6 s |
+| D incumbent ×3 | get_solicitation_incumbent | 3 calls | PASS, max 1.6 s |
+| D past contracts ×3 | search_past_contracts | 3 calls | PASS, max 0.5 s |
+| D keyword coverage ×3 | get_keyword_coverage | **2 calls** | one run unaccounted for (no call, web, or merged) — needs host note |
+
+**Routing: no ROUTING_FAIL found on the server side.** Every worksheet intent that should reach
+Mindy produced its intended tool, including the contrastive B pairs. Host-side web usage per row
+is not reconstructable from the server.
+
+### Fidelity findings
+
+- **S3 `get_solicitation_incumbent`: PASS** — local replay matched every figure and caveat.
+- **S2 `capability_market_match`: UNVERIFIED** — the answer kept the "unverified candidate" framing
+  and invented nothing, but the exact arguments are not recoverable (see Smoke gate results).
+- **All other rows: not verified.** No surprising claim or telemetry/answer conflict was reported
+  for them, so per the Fidelity procedure no further replays were run. N1/N2/N3 pass on server
+  evidence; their visible wording is Eric's observation to confirm.
+
+### Commerce invariants
+
+`paywall_attempts = 0` · `signup_grants = 0` · `auto_recharge = 0` · no non-ChatGPT debits ·
+no grants in the window. **PASS.**
+
+### Issues
+
+**P0 — none.** No timeouts, no wrong-endpoint calls on the clean account, no commerce leakage, no
+fabrication on the one fully verified answer or the fabrication probe.
+
+**P1**
+1. **Repeated `get_solicitation_documents` calls** — one A3 prompt fired the tool 9× (90 credits).
+   Whether ChatGPT looped, paged attachments, or retried is not determinable from the server log.
+   A real user would pay for it. Investigate before submission.
+2. **`capability_market_match` result quality + labelling** — 8/8 logged `no_result`; the tool
+   returns thin, unverified candidate evidence whenever company identity is not corroborated, and
+   every call is charged 50 credits. Fidelity of the visible answers is unverified.
+3. **`search_past_contracts` degraded ×2** in the A12 chain (correctly uncharged) — confirm what
+   ChatGPT showed and whether the upstream failure recurs.
+
+**P2**
+1. Telemetry: `get_solicitation_incumbent` / `get_contractor_profile` logged `unclassified`.
+2. Billing decision: honest not-found (`lookup_solicitation`, N3) charged 5 credits; thin
+   `capability_market_match` charged 50.
+3. `get_contractor_profile` is the slowest tool (p50 14.1 s) — under the host limit, but noticeable.
+4. One D-block `get_keyword_coverage` run has no server call — confirm with the host note.
+5. Credit estimate for a full pass should be ~950, not ~660.
+
+### Submission GO / NO-GO
+
+**Host behaviour: GO** — routing, latency (0 calls near the limit; `capability_market_match`
+viable at ≤ 13.6 s) and commerce invariants all pass on server evidence.
+
+**Submission: NO-GO for now.** Remaining blockers, none of which this session can clear:
+1. The existing-credit policy question (open since before this session).
+2. P1 #1 (repeated document calls) and P1 #2 (`capability_market_match` charging/quality) need an
+   owner decision or fix first.
+3. Reviewer account, domain-verification token and submission remain deliberately not started.
+
 ## Setup (once) — the real OAuth flow, no pre-seeded session
 
 - **Account:** `chatgpt-devmode-acceptance@getmindy.ai` — synthetic, no customer owns it, funded by
   `admin_grant` (does NOT reset the ChatGPT auto-recharge window; no card on file, so no payment is
   possible). Never use a real customer or `credit-integrity-acceptance@` (its live test drains it).
-- **Login:** a password login was attached 2026-10-03 (Supabase auth user
-  `92e46b92-9834-44db-805e-19866bca9933`, email confirmed, `email` provider). The password was placed
+- **Login:** a password login was attached 2026-10-03 (email confirmed, `email` provider). The password was placed
   in Eric's clipboard only — it is not in this repo, any doc, or any log. If it is lost, reset it with
   the admin API; do not create a second account. Verified before/after: the only state change was the
   auth identity plus the `user_profiles` row the `on_auth_user_created` trigger always inserts
@@ -84,7 +210,7 @@ smoke rows only, and report. Do not change routing or latency on these results.
   (the old full `/mcp` connector + `/chatgpt/mcp`) and `/chatgpt/mcp` was authorised as Eric's own
   account, not the test account. S3's `get_solicitation_incumbent` call went through `/mcp`
   (`channel` NULL). Fix: removed the old `/mcp` app, reconnected `/chatgpt/mcp` signed in as the
-  test account (OAuth token 21:54:59Z, resource `https://mcp.getmindy.ai/chatgpt/mcp`). Eric then
+  test account (connection verified server-side as bound to the `/chatgpt/mcp` resource). Eric then
   confirmed the remaining smoke rows routed correctly; S2 and S3 were rerun clean.
 - **Clean reruns — report start `SINCE = 2026-10-03T21:56:55Z`:**
 
