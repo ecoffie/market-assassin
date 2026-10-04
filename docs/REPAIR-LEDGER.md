@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — A1 acceptance gate is executable BEFORE the repair
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | BQ awards / A1 DoD-gap repair | The A1 acceptance criteria existed only as prose. `scripts/bq-awards-a1-acceptance.ts` (read-only: every query asserted SELECT, dry-run first, bytes capped) now decides ACCEPTED / ACCEPTED_PENDING_DERIVATIVES / REJECTED / UNMEASURED against the pre-repair clone and live USASpending. Checks: DoD Jan–May within ±0.5% of source counts; Feb/Mar/Apr not near zero; malformed agency codes in the MERGE's reach = 0; cohort completeness; Mech-Elec II 31 orders / ±0.5% of $17,001,286; Lockheed XFJMYSYFJEK4 vs source; **content preservation per fiscal year** (row count + BIGNUMERIC obligations + SUM of a 51-column row fingerprint; equal counts are not treated as equal content); no lost txn_ids; duplicates not increased; recipients rebuilt + reconciled; rollups reported STALE until step D. Found while measuring: valid agency codes are 3 OR 4 digits (Labor 1601, Smithsonian 3300…) and a `LENGTH = 3` rule would have flagged ~10K legitimate rows a year and undercounted the civilian control. | `export function preservationSignatureSql(` → `src/lib/awards-ingest/a1-acceptance.ts` | 24 unit tests (read-only SQL guard, content-vs-count preservation, verdict/exit codes, 3–4-digit rule); every SQL builder dry-run against live BigQuery (full run ≈ 84 GiB, dominated by the two 41.7 GiB signatures); cheap checks run on today's state and correctly fail (DoD Feb/Mar/Apr 71/74/50; 191,761 malformed codes in window; Mech-Elec 27 / $8.86M). Not run as acceptance (A1 not executed). | 🟡 PR open, not merged |
+
 ## 2026-10-04 — X1: the IDV-migration gate dropped the re-pull window
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
