@@ -2762,6 +2762,14 @@ The `/chatgpt/mcp` route (#1776) passes `channel: 'chatgpt'`; proven route→RPC
 `src/app/chatgpt/mcp/__tests__/route.billing-chain.unit.test.ts`.
 Open items: `tasks/autorecharge-followups-2026-10-03.md`.
 
+**Document paging is billed once per retrieval (ChatGPT blocker #2, 2026-10-04).** A
+`get_solicitation_documents` call that continues a paid read with the `next_page.continuation`
+token is priced 0 in `runMeteredTool` before the balance check (`isFreeDocumentContinuation`,
+`src/lib/mcp/doc-continuation.ts`). The token is HMAC-bound to the caller, the exact next windows,
+a 6h TTL and `MAX_FREE_CONTINUATIONS` (50); anything else bills as a new retrieval — never refused.
+Paging copy is question-driven ("page only when the question needs more"); never restore the
+unconditional "call again until next_page is empty" — it cost 90 credits on one prompt.
+
 **Corpus extraction guard (Layers A+B, `src/lib/mcp/extraction-guard.ts`):** protects ONLY
 the proprietary tools (`PROPRIETARY_TOOLS` in `tool-registry.ts`: winning-playbook, podcast-
 lessons, sblo-contact, federal-osbp) from bulk export — the public-data wrappers stay ungated.
