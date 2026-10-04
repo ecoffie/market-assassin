@@ -387,6 +387,18 @@ describe('projection — shape fixtures for the other tools', () => {
     expect(p._meta).toEqual({ grounded: true, degraded: false, count: 1, total: 1, state_scope: 'pop', field_status: { naics: 'ok' } });
   });
 
+  it('get_solicitation_documents: the continuation token and scope_document reach ChatGPT unchanged (blocker #2)', () => {
+    const raw = load('get_solicitation_documents');
+    const withToken = {
+      ...raw,
+      next_page: { ...(raw.next_page as Record<string, unknown>), continuation: 'tok.sig' },
+      scope_document: { status: 'not_found', files: [], note: 'No statement of work, PWS or SOO was found.' },
+    };
+    const p = projectChatgptResult('get_solicitation_documents', withToken);
+    expect((p.next_page as { continuation?: string }).continuation).toBe('tok.sig');
+    expect(p.scope_document).toEqual(withToken.scope_document);
+  });
+
   it('get_solicitation_documents (real capture): keeps the paging contract + completeness, drops the cache-path label', () => {
     const raw = load('get_solicitation_documents');
     const p = projectChatgptResult('get_solicitation_documents', raw);

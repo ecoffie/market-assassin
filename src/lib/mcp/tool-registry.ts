@@ -1301,9 +1301,12 @@ const SOLICITATION_DOCUMENTS_TOOL_DEF = {
       'Get the FULL text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, the notice ' +
       'body, and every attachment. Returns notice metadata + inline body/SOW text + a documents[] list, each with ' +
       'a WINDOW of extracted_text per document PLUS a short-lived signed download_url (~1h) to the full raw ' +
-      'PDF/DOCX. PAGING: a response returns text_limit chars per document; while next_page is non-null, re-call with ' +
-      'next_page (pass its document_ids AND documents verbatim) — STOP when next_page is null. A clause absent from a ' +
-      'PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never convert it to pages. Cold notices ' +
+      'PDF/DOCX. PAGING: a response returns text_limit chars per document. Page only when the question needs more of ' +
+      'a specific document — re-call with next_page (pass its document_ids, documents AND continuation verbatim); ' +
+      'next_page=null is the end. For a summary, read the first window of each file and say which still have unread ' +
+      'text instead of paging through everything. scope_document.status says whether a statement of work / PWS is in ' +
+      'the package (found | not_found | unknown) — on not_found, say so rather than paging to look for it. A clause ' +
+      'absent from a PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never convert it to pages. Cold notices ' +
       'are downloaded + extracted ON DEMAND. grounded=false when the notice has no text or attachments — verify the ' +
       'notice_id. SAM attachments are public federal data.',
     parameters: {
@@ -1340,6 +1343,10 @@ const SOLICITATION_DOCUMENTS_TOOL_DEF = {
           type: 'array',
           description: 'Only return these document_ids — page one long document without re-sending the rest.',
           items: { type: 'string' },
+        },
+        continuation: {
+          type: 'string',
+          description: 'Opaque token from the previous response\'s next_page. Pass it back unchanged with next_page.documents to read the next window of the same documents.',
         },
       },
       required: ['notice_id'],
@@ -2561,6 +2568,9 @@ export async function runMcpTool(
         ? (args.documents as Array<{ document_id?: string; offset?: number; limit?: number }>)
         : undefined,
       document_ids: Array.isArray(args.document_ids) ? (args.document_ids as string[]) : undefined,
+      continuation: typeof args.continuation === 'string' ? args.continuation : undefined,
+      // The VERIFIED caller from the transport — never an argument — binds continuation tokens.
+      userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

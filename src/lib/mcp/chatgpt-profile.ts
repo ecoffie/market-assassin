@@ -88,7 +88,7 @@ export const CHATGPT_TOOL_COPY: Readonly<Record<ChatgptToolName, ChatgptToolCopy
   get_solicitation_documents: {
     title: 'Solicitation Documents',
     description:
-      'Read the full text and attachments of one federal solicitation: the notice body, the statement of work and every attached file, each with a download link. Give a SAM.gov notice ID or solicitation number. Long documents arrive in windows: while next_page is present, call again with its document_ids and documents unchanged, and stop when it is empty. Text not yet read is unknown, not absent. Files hosted outside SAM.gov are named but not read, and the result says so. To identify the solicitation first, use lookup_solicitation.',
+      'Read the full text and attachments of one federal solicitation: notice body, statement of work and every file, with download links. Give a notice ID or solicitation number. Long files arrive in windows: page only when the question needs more of a file, calling again with next_page unchanged. For a summary, read each first window and say what is unread. If scope_document is not_found, say the statement of work is not in these files instead of paging to find it. Unread text is unknown, not absent. Files outside SAM.gov are named, not read. To identify a solicitation, use lookup_solicitation.',
     openWorldHint: true,
   },
   get_solicitation_incumbent: {

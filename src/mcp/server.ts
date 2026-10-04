@@ -1078,8 +1078,10 @@ server.registerTool(
     description:
       'Full text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, notice body, and every ' +
       'attachment. Returns a WINDOW of extracted_text per document + a short-lived signed download_url (~1h) to the ' +
-      'full raw PDF/DOCX. PAGING: while next_page is non-null, re-call with next_page (its document_ids AND ' +
-      'documents) — STOP when next_page is null. A clause absent from a PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never ' +
+      'full raw PDF/DOCX. PAGING: page only when the question needs more of a specific document — re-call with ' +
+      'next_page (its document_ids, documents AND continuation); next_page=null is the end. For a summary, read the ' +
+      'first window of each file instead of paging through everything. scope_document.status (found | not_found | ' +
+      'unknown) says whether a statement of work is present. A clause absent from a PARTIAL window is UNKNOWN, not missing. Coverage is in CHARACTERS — never ' +
       'convert it to pages. Cold notices are downloaded + extracted on demand. grounded=false when the notice has ' +
       'no text/attachments.',
     inputSchema: {
@@ -1103,10 +1105,12 @@ server.registerTool(
         .optional()
         .describe('Per-document windows — pass next_page.documents verbatim to continue.'),
       document_ids: z.array(z.string()).optional().describe('Only return these document_ids.'),
+      continuation: z.string().optional().describe("Opaque token from the previous response's next_page — pass it back unchanged to read the next window."),
     },
   },
-  async ({ notice_id, text_limit, text_offset, documents, document_ids }) => {
+  async ({ notice_id, text_limit, text_offset, documents, document_ids, continuation }) => {
     const result = await solicitationDocuments({
+      continuation,
       notice_id,
       text_limit,
       text_offset,

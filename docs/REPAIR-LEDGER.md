@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — get_solicitation_documents: bounded free continuation, question-driven paging, scope signal
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | MCP billing / document paging (ChatGPT blocker #2) | In ChatGPT dev mode one "summarize the scope" prompt called `get_solicitation_documents` 9× (90 credits): the tool told every host to "call again while next_page is present", every window cost the full 10 credits, and W5168W26RA015's latest amendment holds a 725-page reference guide and NO statement of work (reading it to the end = 50 calls / 500 credits). Now: (1) continuing a paid retrieval is free — the response's `next_page` carries an HMAC token bound to the caller, the exact next windows, a 6h TTL and a 50-page cap; `runMeteredTool` prices a verified continuation at 0 BEFORE the balance pre-check; anything that does not verify bills as a new retrieval (never refused); (2) paging copy is question-driven on the registry, ChatGPT profile, stdio server and hint ("page only when the question needs more of a file; for a summary read the first window of each"); (3) `scope_document` = found / not_found / unknown, with not_found only when every file was read and classified; (4) the hint looked for doc_kind `sow`/`pws` and never matched the classifier's `sow_pws` — fixed. Earlier-amendment document coverage stays a separate P2. | `export function isFreeDocumentContinuation(` → `src/lib/mcp/doc-continuation.ts` | doc-continuation (14), solicitation-documents-continuation (12), metered.doc-continuation (4), chatgpt-profile (+1, 73) unit tests; MCP/ChatGPT/tools suites 89 files / 929 tests green; tsc clean; catalog drift OK (53). Local real-data run on W5168W26RA015: page 1 `scope_document=not_found` + token; page 2 priced 0, offset 20,000, page 1; page 3 free for the same user, paid for another. | 🟡 PR open — not deployed |
+
 ## 2026-10-03 — R1 migration: legacy /briefings authenticates from a verified session
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
