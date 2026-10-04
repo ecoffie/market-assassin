@@ -65,22 +65,34 @@ export interface MIAuthResult {
 }
 
 /**
- * Extract user email from cookie or request body.
- * Checks `ma_access_email` cookie first, then `userEmail` in body.
+ * The email a request CLAIMS (body `userEmail`, else `x-user-email`). A claim, never identity:
+ * pass it to verifiedClaimedEmail() before using it for access. R1 (2026-10-04): this used to
+ * read the plaintext `ma_access_email` cookie first, which made the cookie an access key for
+ * /api/reports/generate-all.
  */
 export function getEmailFromRequest(
   request: NextRequest,
   body?: Record<string, unknown>
 ): string | null {
-  // Check cookie first
-  const cookieEmail = request.cookies.get('ma_access_email')?.value;
-  if (cookieEmail) return cookieEmail.toLowerCase();
-
-  // Fall back to request body
   const bodyEmail = body?.userEmail as string | undefined;
   if (bodyEmail) return bodyEmail.toLowerCase();
+  const headerEmail = request.headers.get('x-user-email');
+  return headerEmail ? headerEmail.toLowerCase().trim() : null;
+}
 
-  return null;
+/**
+ * R1: the claimed email, ONLY if the request proves it (Supabase session, signed link or signed
+ * Mindy session — the strong path). Returns null for no claim, no credential, or a credential for
+ * a different address. Pro routes derive tier from THIS, never from the claim.
+ */
+export async function verifiedClaimedEmail(
+  request: NextRequest,
+  claimedEmail: string | null | undefined
+): Promise<string | null> {
+  const claimed = (claimedEmail || '').toLowerCase().trim();
+  if (!claimed) return null;
+  const auth = await verifyUserOwnsEmail(request, claimed, { requireStrongAuth: true });
+  return auth.authenticated && auth.email ? auth.email.toLowerCase() : null;
 }
 
 /**
@@ -504,28 +516,20 @@ async function verifyUserOwnsEmailCore(
     }
   }
 
-  // Methods 3 & 4 below are WEAK (a spoofable plaintext cookie; a token-less
-  // staff-email claim). Strong-auth callers (the vault) stop here — for the
-  // most sensitive PII, only a real session/token/2FA is acceptable.
+  // R1 (2026-10-04): the two former WEAK methods are REMOVED from authorization.
+  //   Method 3: a plaintext `ma_access_email` cookie equal to the claimed email — anyone can set
+  //             a cookie to anyone's address.
+  //   Method 4: any claimed staff-domain email, with no proof at all.
+  // Only a Supabase session, a signed email-action link or the signed Mindy session identify a
+  // user. R0 (#1722, 7 days) showed their only legitimate dependency was legacy /briefings,
+  // migrated to a verified session by #1801. `requireStrongAuth` is now the behaviour for every
+  // caller; the option stays so existing call sites keep compiling and keep their own message.
   if (options.requireStrongAuth) {
     return {
       authenticated: false,
       email: null,
       error: 'Strong authentication required — please sign in',
     };
-  }
-
-  // Method 3: Check cookie (legacy, weak auth)
-  const cookieEmail = request.cookies.get('ma_access_email')?.value?.toLowerCase();
-  if (cookieEmail && cookieEmail === normalized) {
-    return { authenticated: true, email: normalized, method: 'cookie' };
-  }
-
-  // Method 4: Trust internal staff members (no cookie required)
-  // Staff members are trusted if the claimed email matches a known staff email
-  const staffRole = getStaffRole(normalized);
-  if (staffRole !== 'none') {
-    return { authenticated: true, email: normalized, method: 'cookie' };
   }
 
   return { authenticated: false, email: null, error: 'Unauthorized - please sign in' };

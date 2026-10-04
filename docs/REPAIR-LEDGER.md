@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — R1: weak authentication removed (cookie + claimed staff email), Pro gates on verified identity
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | Security / identity (R1, re-scoped) | verifyUserOwnsEmail no longer accepts the plaintext ma_access_email cookie (Method 3) or a claimed staff-domain email with no proof (Method 4). The 8 Pro routes that took a client-supplied email (competitor-awards, market-dossier, market-narrative, pricing-intel, target-market-research, market-overview, generate-all, teaming/suggest) derive the tier from the verified identity: gated routes answer 401, aggregate routes serve the Free view, generate-all treats an unverified claim exactly like no email (unchanged anonymous 403). getEmailFromRequest no longer reads the cookie. teaming/suggest (Contractor-DB contacts) now requires identity and caps limit at 50. The dead server-to-server save-profile call in generate-all is removed. Re-scoped from old #1750 (not merged); classification in tasks/auth-r1-rescope-2026-10-04.md. No entitlement change. | `export async function verifiedClaimedEmail(` → `src/lib/api-auth.ts` | `auth-r1-weak-methods.unit.test.ts` 21 cases (15 red on origin/main); R0 observability pins updated; full suite 9,191 passed; tsc clean | PR open, not merged |
+
 ## 2026-10-03 — R1 migration: legacy /briefings authenticates from a verified session
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

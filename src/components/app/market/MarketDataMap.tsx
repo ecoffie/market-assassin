@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import { hasPaidProductTier } from '@/lib/access/tier-rank';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface Tile {
   key: string;
@@ -68,7 +69,8 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
     if (naics) qs.set('naics', naics);
     if (state) qs.set('state', state);
     if (email) qs.set('email', email);
-    fetch(`/api/market-overview?${qs.toString()}`)
+    // R1: the viewer tier comes from the verified session — send it.
+    fetch(`/api/market-overview?${qs.toString()}`, { headers: getMIApiHeaders(email) })
       .then((r) => r.json())
       .then((d) => { if (!cancelled) { if (d?.success) setData(d); else setError(true); setLoading(false); } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });

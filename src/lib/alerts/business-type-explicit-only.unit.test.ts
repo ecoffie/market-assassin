@@ -180,9 +180,12 @@ describe('client payloads never carry a defaulted business type', () => {
 
   const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
-  it('generate-all builds the save-profile body with the builder', () => {
+  it('generate-all no longer writes the alert profile at all (R1, 2026-10-04)', () => {
+    // The server-to-server save-profile call authenticated only through the removed staff claim
+    // (refused since #1747) and replaced the user's alert NAICS on the strength of a claim.
     const src = read('src/app/api/reports/generate-all/route.ts');
-    expect(src).toContain('buildReportAlertProfileBody(email, inputs)');
+    expect(src).not.toMatch(/\/api\/alerts\/save-profile`/);
+    expect(src).not.toContain('saveAlertProfile(');
     expect(src).not.toMatch(/businessType:\s*inputs\.businessType\s*\|\|\s*null/);
   });
 

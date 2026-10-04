@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import contractorData from '@/data/contractors.json';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { verifiedClaimedEmail } from '@/lib/api-auth';
 
 // Actual structure from contractors.json
 interface ContractorRaw {
@@ -31,13 +32,19 @@ interface ContractorRaw {
 }
 
 export async function GET(request: NextRequest) {
-  // R0 observability (behaviour-neutral): this route is unauthenticated today; record who calls it.
-  observeProGateIdentity(request, request.nextUrl.searchParams.get('email') || request.headers.get('x-user-email'));
+  const claimedEmail = request.nextUrl.searchParams.get('email') || request.headers.get('x-user-email');
+  // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
+  observeProGateIdentity(request, claimedEmail);
+  // R1: this returns Contractor-DB SBLO names, emails and phones. It was unauthenticated; it now
+  // requires a verified identity, and the page size is capped (it was unbounded).
+  if (!(await verifiedClaimedEmail(request, claimedEmail))) {
+    return NextResponse.json({ error: 'Sign in required', auth_required: true }, { status: 401 });
+  }
   const naics = request.nextUrl.searchParams.get('naics');
   const setAside = request.nextUrl.searchParams.get('setAside');
   const agency = request.nextUrl.searchParams.get('agency');
   const state = request.nextUrl.searchParams.get('state');
-  const limit = parseInt(request.nextUrl.searchParams.get('limit') || '10');
+  const limit = Math.min(Math.max(parseInt(request.nextUrl.searchParams.get('limit') || '10', 10) || 10, 1), 50);
 
   if (!naics) {
     return NextResponse.json(

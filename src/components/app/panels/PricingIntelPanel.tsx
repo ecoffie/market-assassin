@@ -119,8 +119,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
     try {
       const param = isRole ? `keyword=${encodeURIComponent(value)}` : `naics=${encodeURIComponent(value)}`;
-      const res = await fetch(
-        `/api/app/pricing-intel?email=${encodeURIComponent(email)}&${param}`
+      // R1: the route derives identity from the Mindy session — send it.
+      const res = await authedFetch(
+        `/api/app/pricing-intel?email=${encodeURIComponent(email)}&${param}`,
+        email,
       );
       const payload = await res.json().catch(() => null);
 

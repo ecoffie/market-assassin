@@ -19,7 +19,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifiedClaimedEmail } from '@/lib/api-auth';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
@@ -229,14 +229,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const email = body.email || '';
+  const claimedEmail = body.email || '';
   // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
-  observeProGateIdentity(request, email);
+  observeProGateIdentity(request, claimedEmail);
   const naics = body.naics || body.naicsCode || '';
   const businessType = body.businessType || '';
 
-  if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+  if (!claimedEmail) return NextResponse.json({ error: 'email required' }, { status: 400 });
   if (!naics) return NextResponse.json({ error: 'naics required' }, { status: 400 });
+
+  // R1: this route WRITES a per-user cache row and returns Pro content — the identity must be
+  // verified, never the body email alone.
+  const email = await verifiedClaimedEmail(request, claimedEmail);
+  if (!email) return NextResponse.json({ error: 'Sign in required', auth_required: true }, { status: 401 });
 
   // Pro gate. Free users get a 402 — UI renders an upgrade teaser.
   const access = await verifyMIAccess(email);
