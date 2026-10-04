@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — R1 (A): identity comes only from a verified session
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | Security / identity | `verifyUserOwnsEmail` no longer accepts the legacy plaintext `ma_access_email` cookie or a claimed staff-domain address as identity; only a Mindy session, a Supabase session or a signed email-action link authenticate. One canonical helper, `getVerifiedIdentity` / `verifyClaimedIdentity` / `identityFailureResponse` (`src/lib/api-auth.ts`), where a query/body email is at most a claim that must match the session. Credential and OAuth issuance (`/api/mcp/keys`, `/api/oauth/authorize/approve`) and `/api/app/me` now use it directly. R0's 7-day observation (closed 2026-10-04T04:07Z) found no customer depending on the removed methods outside routes already migrated by #1801. | `export async function verifyClaimedIdentity(` → `src/lib/api-auth.ts` | `r1-verified-identity.unit.test.ts` drives the real handlers: 30 cases, 15 red on origin/main; `auth-observability.unit.test.ts` re-pinned (R0's byte pin replaced by the R1 invariant); full unit suite 796 files / 9,286 tests green; tsc clean | SHIPPING |
+
 ## 2026-10-04 — capability_market_match: plain-English matching + Option D billing (ChatGPT blocker #3)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
