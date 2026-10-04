@@ -12,17 +12,19 @@ export async function GET() {
     version: '1.0.0',
     description: 'Unified intelligence API for Lindy AI integration. Provides daily briefings, recompete alerts, contractor activity, and recommended actions.',
 
+    authentication: {
+      required: true,
+      how: 'Authorization: Bearer <Mindy connection key>',
+      get_a_key: 'https://getmindy.ai/briefings/lindy-setup — create a connection key (scope: briefings:read). It reads only your own briefings and can be revoked any time from https://getmindy.ai/mcp/account.',
+      note: 'An email address is never accepted as authentication.',
+    },
+
     endpoints: {
       intelligence: {
         url: '/api/lindy/intelligence',
         method: 'GET',
-        description: 'Get unified intelligence for a user',
+        description: 'Get unified intelligence for the authenticated user',
         params: {
-          email: {
-            required: true,
-            type: 'string',
-            description: 'User email (must have briefing access)',
-          },
           days: {
             required: false,
             type: 'number',
@@ -38,13 +40,13 @@ export async function GET() {
             options: ['briefing', 'recompetes', 'contractors', 'actions'],
           },
         },
-        example: '/api/lindy/intelligence?email=user@example.com&days=1',
+        example: 'GET /api/lindy/intelligence?days=1  (header: Authorization: Bearer <key>)',
       },
     },
 
     response_schema: {
       as_of: 'ISO 8601 timestamp of when intelligence was generated',
-      user_email: 'User email address',
+      user_email: 'The authenticated user',
       profile_summary: {
         naics_codes: 'Array of NAICS codes user tracks',
         agencies: 'Array of agencies user tracks',
@@ -100,32 +102,32 @@ export async function GET() {
       {
         name: 'Daily Briefing Summary',
         description: 'Get top intelligence items for morning review',
-        query: '?email=X&include=briefing',
+        query: '?include=briefing',
       },
       {
         name: 'Urgent Deadline Alerts',
         description: 'Get critical recompetes needing immediate action',
-        query: '?email=X&include=recompetes',
+        query: '?include=recompetes',
       },
       {
         name: 'Competitor Monitoring',
         description: 'Track watched company activity',
-        query: '?email=X&include=contractors',
+        query: '?include=contractors',
       },
       {
         name: 'Action Item Generation',
         description: 'Get AI-recommended actions for the day',
-        query: '?email=X&include=actions',
+        query: '?include=actions',
       },
       {
         name: 'Full Intelligence Feed',
         description: 'Get everything for comprehensive analysis',
-        query: '?email=X&days=7',
+        query: '?days=7',
       },
     ],
 
     lindy_integration: {
-      setup: 'Configure Lindy scheduled trigger to poll /api/lindy/intelligence daily',
+      setup: 'Configure a Lindy scheduled trigger to GET /api/lindy/intelligence daily with your connection key in the Authorization header',
       knowledge_base: 'Route response to Lindy Knowledge Base for conversational Q&A',
       actions: 'Use recommended_actions array to trigger Lindy automations',
       calendar: 'Use deadline actions to create calendar reminders',

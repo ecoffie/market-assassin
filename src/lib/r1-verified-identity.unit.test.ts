@@ -24,8 +24,9 @@ vi.mock('@supabase/supabase-js', () => ({
 const issueApiKey = vi.fn();
 const listApiKeys = vi.fn();
 const revokeApiKey = vi.fn();
-vi.mock('@/lib/mcp/api-keys', () => ({ issueApiKey, listApiKeys, revokeApiKey }));
-vi.mock('@/lib/mcp/credits', () => ({ grantSignupCreditsIfFirst: async () => 0 }));
+vi.mock('@/lib/mcp/api-keys', () => ({ issueApiKey, listApiKeys, revokeApiKey, BRIEFINGS_READ_SCOPE: 'briefings:read' }));
+const grantSignupCreditsIfFirst = vi.fn(async () => 0);
+vi.mock('@/lib/mcp/credits', () => ({ grantSignupCreditsIfFirst }));
 vi.mock('@/lib/mcp/referrals', () => ({ qualifyReferralFromRequest: async () => {} }));
 
 const saveAuthCode = vi.fn();
@@ -62,6 +63,7 @@ beforeEach(() => {
   revokeApiKey.mockResolvedValue(true);
   saveAuthCode.mockReset();
   saveAuthCode.mockResolvedValue('code123');
+  grantSignupCreditsIfFirst.mockClear();
 });
 
 type Who = { label: string; claim: string; headers?: Record<string, string>; cookie?: string };
@@ -112,6 +114,31 @@ describe('POST /api/mcp/keys — mints a key only for the verified session', () 
   });
   it('a claim in the body cannot redirect the key to someone else', async () => {
     const res = await keys.POST(req('https://getmindy.ai/api/mcp/keys', OWNER, { method: 'POST', body: { email: B } }));
+    expect(res.status).toBe(401);
+    expect(issueApiKey).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/mcp/keys purpose: 'briefings' — a narrow connection key", () => {
+  it('issues a briefings:read key for the verified owner, with no MCP credits', async () => {
+    const res = await keys.POST(req(`https://getmindy.ai/api/mcp/keys?email=${A}`, OWNER, { method: 'POST', body: { purpose: 'briefings' } }));
+    expect(res.status).toBe(200);
+    expect(issueApiKey).toHaveBeenCalledWith(A, expect.objectContaining({ scopes: ['briefings:read'] }));
+    expect(grantSignupCreditsIfFirst).not.toHaveBeenCalled();
+    expect((await res.json()).signupCredits).toBe(0);
+  });
+  it('an MCP key still gets the one-time signup grant path', async () => {
+    await keys.POST(req(`https://getmindy.ai/api/mcp/keys?email=${A}`, OWNER, { method: 'POST', body: {} }));
+    expect(issueApiKey.mock.calls[0][1]?.scopes).toBeUndefined();
+    expect(grantSignupCreditsIfFirst).toHaveBeenCalledWith(A);
+  });
+  it('an unknown purpose is refused, nothing minted', async () => {
+    const res = await keys.POST(req(`https://getmindy.ai/api/mcp/keys?email=${A}`, OWNER, { method: 'POST', body: { purpose: 'admin' } }));
+    expect(res.status).toBe(400);
+    expect(issueApiKey).not.toHaveBeenCalled();
+  });
+  it('a briefings key cannot be minted for someone else', async () => {
+    const res = await keys.POST(req(`https://getmindy.ai/api/mcp/keys?email=${B}`, ATTACKS[3], { method: 'POST', body: { purpose: 'briefings' } }));
     expect(res.status).toBe(401);
     expect(issueApiKey).not.toHaveBeenCalled();
   });
