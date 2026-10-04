@@ -18,7 +18,7 @@
  * never 500s.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import {
   recipientSlug,
   getRollupBySlug,
@@ -38,8 +38,11 @@ export async function GET(request: NextRequest) {
   const name = (request.nextUrl.searchParams.get('name') || '').trim();
   if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
+  // R1: the tier comes from the VERIFIED identity; the email is only a claim that must match it.
+  const identity = await verifyClaimedIdentity(request, email);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
 
-  const access = await verifyMIAccess(email);
+  const access = await verifyMIAccess(identity.email);
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       { upgrade_required: true, message: 'Competitor award history is included with Mindy Pro' },

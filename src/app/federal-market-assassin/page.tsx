@@ -47,6 +47,7 @@ import ReportsDisplay from '@/components/federal-market-assassin/reports/Reports
 import KittLoader from '@/components/federal-market-assassin/ui/KittLoader';
 import { MarketAssassinTier } from '@/lib/access-codes';
 import { captureMarketAssassinSearch } from '@/lib/briefings/capture-search';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 export default function FederalMarketAssassinPage() {
   return (
@@ -109,7 +110,7 @@ function FederalMarketAssassinContent() {
   // Fetch usage info
   const fetchUsageInfo = async (email: string) => {
     try {
-      const response = await fetch(`/api/ma-usage?email=${encodeURIComponent(email)}`);
+      const response = await fetch(`/api/ma-usage?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders() });
       const data = await response.json();
       if (data.success) {
         setUsageInfo({
@@ -284,10 +285,13 @@ function FederalMarketAssassinContent() {
     try {
       // Check usage limit for standard tier users
       if (tier === 'standard' && userEmail) {
-        const usageCheck = await fetch(`/api/ma-usage?email=${encodeURIComponent(userEmail)}`);
-        const usageData = await usageCheck.json();
+        const usageCheck = await fetch(`/api/ma-usage?email=${encodeURIComponent(userEmail)}`, { headers: getMIApiHeaders() });
+        const usageData = await usageCheck.json().catch(() => ({}));
 
-        if (!usageData.allowed) {
+        // Only a real answer can block. Without a Mindy session the usage route answers 401
+        // (an access cookie is not identity), and the report route then serves the Free set,
+        // so there is no paid quota to enforce here.
+        if (usageCheck.ok && usageData.allowed === false) {
           setError(`You've reached your monthly limit of ${usageData.limit} reports. Upgrade to Premium for unlimited reports.`);
           setLoading(false);
           return;
@@ -301,7 +305,9 @@ function FederalMarketAssassinContent() {
 
       const response = await fetch('/api/reports/generate-all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The Mindy session (when this browser has one) is what identifies the buyer; an access
+        // cookie no longer does. No email is named, so a session for another account is never purged.
+        headers: getMIApiHeaders(undefined, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           inputs: coreInputs,
           selectedAgencies,
@@ -322,7 +328,7 @@ function FederalMarketAssassinContent() {
       if (tier === 'standard' && userEmail) {
         await fetch('/api/ma-usage', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getMIApiHeaders(undefined, { 'Content-Type': 'application/json' }),
           body: JSON.stringify({ email: userEmail }),
         });
         // Refresh usage info
