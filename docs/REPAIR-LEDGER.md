@@ -24,6 +24,15 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 `Date` · `Area` · `Fix` · `Proof anchor` (string → file) · `Verified` (how proven) · `Status`
 
+
+---
+
+## 2026-10-04 — A1b: bounded cleanup of A1's double counting
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | BQ awards / DoD incident | A1 restored ~1.14M DoD transactions, but #1815 acceptance REJECTED it. The MERGE's `T.action_date >= start − 2d` bound left 126 re-dated pre-A1 rows as stale second copies ($17,228,795.29). 473 early-August short-agency-code rows (different txn_id from the source's current key) now sat beside their A1-loaded twins ($1,641,861,025.78). New protected step `a1b_cleanup` deletes ONLY the pinned populations (`a1b-populations.json`, row-by-row identities). It first runs a read-only selection that must reproduce the pins exactly, then executes ONE transaction whose three DELETEs are each bounded by predicate AND explicit txn_id list, and each `ASSERT @@row_count` (126 / 473 / 32). The 32 F1b rows were resolved individually against api.usaspending.gov: 26 absent (award 404 AND PIID search empty), 2 mods absent from the complete transaction list, 4 superseded by a valid warehouse copy. 2 ambiguous rows are left untouched. Acceptance gains opt-in `--allowances=a1b`: exact identities only (126 stale + 2 F2 re-dates for preservation, 505 removed txn_ids for lost-check, 2 allowed short codes). No tolerance. | `ASSERT @@row_count = ${A1B_EXPECTED.f3.rows}` → `src/lib/awards-ingest/a1b-cleanup.ts` | 23 unit tests: populations pinned and disjoint; the script is exactly BEGIN/3×(DELETE+ASSERT)/COMMIT, each DELETE bounded by its exact pinned list; drift (extra/missing/changed row, wrong remainder) is refused; unsafe ids refused. awards-ingest 211/211. Live: read-only selection reproduces the pins exactly; script dry-run valid (36.48 GiB, not executed). | 🟡 PR open |
+
 ---
 
 ## 2026-10-04 — X4: the clone gate detects writes that keep the row count

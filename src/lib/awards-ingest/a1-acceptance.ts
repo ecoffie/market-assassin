@@ -87,10 +87,12 @@ export function monthlyCountsSql(table: string): string {
 }
 
 /** Malformed agency codes (NULL or not 3–4 digits) inside the MERGE's reach vs outside it (FY2026). */
-export function malformedCodeSql(table: string): string {
+export function malformedCodeSql(table: string, allow?: AcceptanceAllowances): string {
+  const allowed = allow?.allowedShortCode.length ? inList(allow.allowedShortCode) : `''`;
   return `
     SELECT
-      COUNTIF(action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}') AS in_window,
+      COUNTIF(action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}' AND txn_id NOT IN (${allowed})) AS in_window,
+      COUNTIF(action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}' AND txn_id IN (${allowed})) AS allowed_in_window,
       COUNTIF(action_date NOT BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}') AS outside_window
     FROM ${table}
     WHERE fiscal_year = 2026 AND (awarding_agency_code IS NULL OR NOT ${VALID_AGENCY_CODE_SQL()})`;
@@ -105,23 +107,44 @@ function legacyRowFingerprint(alias: string): string {
  * Per-fiscal-year content signature over the rows A1 cannot touch: everything except FY2026 rows
  * whose action_date falls inside the MERGE's reach. Same SQL for the live table and the clone.
  */
-export function preservationSignatureSql(table: string): string {
+/**
+ * Exact-identity allowances (A1b). Each is a pinned list — never a tolerance or a row-count margin.
+ * `preservationExcluded` = `txn_id|action_date` rows intentionally removed or source-re-dated;
+ * `removedInWindow` = clone txn_ids A1b deleted on purpose; `allowedShortCode` = unresolved rows left as-is.
+ */
+export interface AcceptanceAllowances {
+  preservationExcluded: readonly string[];
+  removedInWindow: readonly string[];
+  allowedShortCode: readonly string[];
+}
+
+const IDENT = /^[A-Za-z0-9_.|-]{6,140}$/;
+function inList(values: readonly string[]): string {
+  for (const v of values) if (!IDENT.test(v)) throw new Error(`refused: unsafe identity ${JSON.stringify(v)}`);
+  return values.map((v) => `'${v}'`).join(', ');
+}
+
+export function preservationSignatureSql(table: string, allow?: AcceptanceAllowances): string {
+  const excl = allow?.preservationExcluded.length
+    ? `\n      AND CONCAT(t.txn_id, '|', CAST(t.action_date AS STRING)) NOT IN (${inList(allow.preservationExcluded)})`
+    : '';
   return `
     SELECT t.fiscal_year AS fiscal_year,
       COUNT(*) AS row_count,
       CAST(SUM(CAST(t.obligation_amount AS BIGNUMERIC)) AS STRING) AS obligation_total,
       CAST(SUM(CAST(${legacyRowFingerprint('t')} AS BIGNUMERIC)) AS STRING) AS content_sum
     FROM ${table} t
-    WHERE NOT (t.fiscal_year = 2026 AND t.action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}')
+    WHERE NOT (t.fiscal_year = 2026 AND t.action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}')${excl}
     GROUP BY fiscal_year`;
 }
 
 /** Clone rows inside the repaired range whose txn_id is gone from live (the MERGE never deletes). */
-export function lostTxnSql(live: string, clone: string): string {
+export function lostTxnSql(live: string, clone: string, allow?: AcceptanceAllowances): string {
+  const excl = allow?.removedInWindow.length ? ` AND txn_id NOT IN (${inList(allow.removedInWindow)})` : '';
   return `
     SELECT COUNT(*) AS lost
     FROM (SELECT DISTINCT txn_id FROM ${clone}
-          WHERE fiscal_year = 2026 AND action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}') c
+          WHERE fiscal_year = 2026 AND action_date BETWEEN '${A1_MERGE_REACH_FROM}' AND '${A1_REPAIR_TO}'${excl}) c
     LEFT JOIN (SELECT DISTINCT txn_id FROM ${live} WHERE fiscal_year = 2026) l USING (txn_id)
     WHERE l.txn_id IS NULL`;
 }

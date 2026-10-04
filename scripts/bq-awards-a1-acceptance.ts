@@ -47,6 +47,8 @@ import {
   type FySignature,
   type MonthPair,
 } from '../src/lib/awards-ingest/a1-acceptance';
+import { allowedRemainingShortCode, intentionallyRemovedInWindow, preservationExclusions } from '../src/lib/awards-ingest/a1b-cleanup';
+import type { AcceptanceAllowances } from '../src/lib/awards-ingest/a1-acceptance';
 import {
   buildCohortMonthlyCountsSql,
   classifyCohortCompleteness,
@@ -64,6 +66,12 @@ const args = process.argv.slice(2);
 const arg = (k: string) => args.find((a) => a.startsWith(`--${k}=`))?.split('=')[1];
 const DRY = args.includes('--dry-run');
 const JSON_OUT = args.includes('--json');
+// --allowances=a1b applies the pinned A1b identities (exact rows, never a tolerance). Without it, none.
+const ALLOW_MODE = arg('allowances') ?? 'none';
+if (!['none', 'a1b'].includes(ALLOW_MODE)) throw new Error(`refused: --allowances must be none or a1b`);
+const ALLOW: AcceptanceAllowances | undefined = ALLOW_MODE === 'a1b'
+  ? { preservationExcluded: preservationExclusions(), removedInWindow: intentionallyRemovedInWindow(), allowedShortCode: allowedRemainingShortCode() }
+  : undefined;
 
 function client(): BigQuery {
   const raw = (process.env.GCP_SA_JSON || '').trim();
@@ -165,9 +173,9 @@ async function main(): Promise<void> {
 
   // 3. Malformed agency codes inside the repaired range.
   await safe('malformed_agency_code_in_window', async () => {
-    const [m] = await q<{ in_window: number; outside_window: number }>(bq, 'malformed_codes', malformedCodeSql(AWARDS));
+    const [m] = await q<{ in_window: number; allowed_in_window: number; outside_window: number }>(bq, 'malformed_codes', malformedCodeSql(AWARDS, ALLOW));
     const r = checkZero('malformed_agency_code_in_window', m ? Number(m.in_window) : null, 'NULL or non-3/4-digit awarding_agency_code in 2026-01-18..2026-05-03');
-    return { ...r, detail: `${r.detail} (outside the window, reported only: ${m?.outside_window ?? '?'})` };
+    return { ...r, detail: `${r.detail} (explicitly allowed unresolved rows: ${m?.allowed_in_window ?? '?'} of ${ALLOW?.allowedShortCode.length ?? 0}; outside the window, reported only: ${m?.outside_window ?? '?'})` };
   });
 
   // 4. Cohort completeness (the existing oracle's classifier).
@@ -195,15 +203,15 @@ async function main(): Promise<void> {
   // 7. Content preservation outside the MERGE's reach (counts alone cannot prove this).
   await safe('preserved_outside_repair', async () => {
     const [c, l] = await Promise.all([
-      q<FySignature>(bq, 'signature_clone', preservationSignatureSql(CLONE)),
-      q<FySignature>(bq, 'signature_live', preservationSignatureSql(AWARDS)),
+      q<FySignature>(bq, 'signature_clone', preservationSignatureSql(CLONE, ALLOW)),
+      q<FySignature>(bq, 'signature_live', preservationSignatureSql(AWARDS, ALLOW)),
     ]);
     return DRY ? { id: 'preserved_outside_repair', status: 'unmeasured', detail: 'dry-run' } : checkPreservation(c, l);
   });
 
   // 8. No transaction inside the repaired range disappeared.
   await safe('no_lost_txns_in_window', async () => {
-    const [r] = await q<{ lost: number }>(bq, 'lost_txns', lostTxnSql(AWARDS, CLONE));
+    const [r] = await q<{ lost: number }>(bq, 'lost_txns', lostTxnSql(AWARDS, CLONE, ALLOW));
     return checkZero('no_lost_txns_in_window', r ? Number(r.lost) : null, 'clone txn_ids in the repaired range missing from live');
   });
 
@@ -237,6 +245,7 @@ async function main(): Promise<void> {
   };
   if (JSON_OUT) console.log(JSON.stringify(summary, null, 2));
   else {
+    console.log(`[a1-acceptance] allowances=${ALLOW_MODE}${ALLOW ? ` (preservation ${ALLOW.preservationExcluded.length} identities · removed-in-window ${ALLOW.removedInWindow.length} · allowed short-code ${ALLOW.allowedShortCode.length})` : ''}`);
     console.log(`[a1-acceptance] pre-repair clone ${cloneId} (created ${summary.cloneCreated}); awards last modified ${summary.awardsLastModified}`);
     for (const r of results) console.log(`[a1-acceptance] ${r.status.toUpperCase().padEnd(10)} ${r.id}: ${r.detail}`);
     console.log(`[a1-acceptance] planned scan ${summary.plannedGiB} GiB — VERDICT ${verdict}`);
