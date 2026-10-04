@@ -44,6 +44,52 @@ describe('contacts-map Players — geography before rank', () => {
   });
 });
 
+describe('contacts-map Players — explicit state + city viewport (Richmond P1, 2026-10-04)', () => {
+  // The mock answers like the canonical table: a query scoped to Richmond-area cities returns the
+  // Richmond firms; a state-wide VA query ranked by $ returns 300 Northern-Virginia primes and none
+  // of them are in Richmond. Before the fix the route sent only the state-wide query and drew 0.
+  const RICH = 'bbox=-77.6112,37.4405,-77.3290,37.6395&type=companies&naics=541512&state=VA';
+  const richmondFirms = ['RICHMOND', 'HENRICO', 'MECHANICSVILLE', 'RICHMOND'].map((c, i) => row(`R${i}`, c, 'VA'));
+  const novaPrimes = Array.from({ length: 300 }, (_, i) => row(`N${i}`, 'RESTON', 'VA'));
+  beforeEach(() => {
+    searchRecipients.mockImplementation(async (a: { geo?: { cities: string[] }; limit: number }) => {
+      if (a.geo?.cities?.includes('RICHMOND')) {
+        return { rows: richmondFirms, total: 17, status: 'success_nonzero', coverage: { source: 'players_canonical' } };
+      }
+      return { rows: novaPrimes.slice(0, a.limit), total: 2343, status: 'success_nonzero', coverage: { source: 'players_canonical' } };
+    });
+  });
+
+  it('pins come from VA ∩ the visible cities, filtered BEFORE ranking', async () => {
+    const { body } = await call(RICH);
+    const pinQuery = searchRecipients.mock.calls.map((c) => c[0]).find((a) => a.geo);
+    expect(pinQuery.state).toBe('VA');
+    expect(pinQuery.naics).toBe('541512');
+    expect(pinQuery.geo.cities).toContain('RICHMOND');
+    expect(body.totalInView).toBeGreaterThan(0);
+    expect(body.pins.every((p: { city: string }) => p.city !== 'RESTON')).toBe(true);
+    expect(body.geo.level).toBe('city');
+  });
+  it('the header count stays the state-wide market truth (filters, no bbox)', async () => {
+    const { body } = await call(RICH);
+    const market = searchRecipients.mock.calls.map((c) => c[0]).find((a) => !a.geo);
+    expect(market).toMatchObject({ state: 'VA', naics: '541512', limit: 1 });
+    expect(body.totalForFilters).toBe(2343);
+    expect(body.status).toBe('success_nonzero');
+  });
+  it('a viewport with nothing to draw shows 0 in view, never 0 in the market', async () => {
+    const { body } = await call('bbox=-72.0,35.0,-71.5,35.5&type=companies&naics=541512&state=VA');
+    expect(body.totalInView).toBe(0);
+    expect(body.totalForFilters).toBe(2343);
+    expect(body.status).toBe('success_nonzero');
+  });
+  it('a whole-state view still makes ONE state-wide query (no extra count query)', async () => {
+    await call('bbox=-84.0,36.4,-75.0,39.6&type=companies&naics=541512&state=VA');
+    expect(searchRecipients).toHaveBeenCalledTimes(1);
+    expect(searchRecipients.mock.calls[0][0].geo).toBeUndefined();
+  });
+});
+
 describe('contacts-map Players — truth states', () => {
   it('a swallowed BigQuery failure is unavailable with a NULL count, not 0', async () => {
     searchRecipients.mockResolvedValue({ rows: [], total: 0, status: 'unavailable', coverage: { source: 'players_canonical' } });

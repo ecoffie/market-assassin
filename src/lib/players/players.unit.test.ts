@@ -3,6 +3,7 @@ import { classifyPlayersResult, combinePlayersStatuses, mayRenderZero } from './
 import { buildPlayersQuery, cityScopeSql } from './query';
 import { buildPlayersDatasetSql, buildPlayersTruthSql } from './dataset';
 import { resolvePlayersGeoScope, stateGeoScope } from './geography';
+import { CITY_COORDS, CITY_JITTER_MAX_DEG, geocodeCity } from '@/lib/geo/city-geocode';
 import { reconciles, selectSampleCells, evaluateCells, datasetMismatchRate, PLAYERS_REGRESSION_FIXTURES } from './reconcile';
 import { decidePlayersRebuild, encodePlayersBuildRecord, decodePlayersBuildRecord, type PlayersBuildRecord } from './rebuild';
 import { playersHeaderText } from './copy';
@@ -75,7 +76,7 @@ describe('dataset — full population, independent truth', () => {
 });
 
 describe('geography resolves BEFORE the query', () => {
-  it('explicit state is state-wide', () => {
+  it('an explicit state whose whole area is in view needs no city filter', () => {
     expect(resolvePlayersGeoScope([-125, 24, -66, 50], 'TX')).toEqual({ states: [{ state: 'TX' }], droppedStates: [] });
   });
   it('a part-of-state viewport restricts to the visible cities', () => {
@@ -91,6 +92,75 @@ describe('geography resolves BEFORE the query', () => {
     const g = resolvePlayersGeoScope([-125, 24, -66, 50]);
     expect(g.states.length).toBe(6);
     expect(g.droppedStates.length).toBeGreaterThan(0);
+  });
+});
+
+// P1 2026-10-04 (browser acceptance check 5): Richmond 541512/VA showed 0 Players while 17 canonical
+// firms are HQ'd there. The request carries state=VA AND the viewport, and an explicit state was
+// applied state-wide — VA's top 300 by $ ranked first, the box cropped afterwards, 1 of 17 survived
+// the rank and 0 were drawn. FILTER (state ∩ viewport cities) → RANK, for every viewport below.
+const RICHMOND: [number, number, number, number] = [-77.6112, 37.4405, -77.3290, 37.6395];
+const NORFOLK: [number, number, number, number] = [-76.35, 36.80, -76.05, 36.98];
+const ATLANTIC: [number, number, number, number] = [-72.0, 35.0, -71.5, 35.5]; // open ocean
+const WHOLE_VA: [number, number, number, number] = [-84.0, 36.4, -75.0, 39.6];
+const VA_NC_LINE: [number, number, number, number] = [-79.9, 36.35, -79.2, 36.8]; // Danville VA ↔ Eden NC
+
+describe('viewport geography with an explicit state — FILTER, then RANK (Richmond P1)', () => {
+  it('Richmond regression: state=VA + the Richmond box ranks only cities that can draw in the box', () => {
+    const [va] = resolvePlayersGeoScope(RICHMOND, 'VA').states;
+    expect(va.state).toBe('VA');
+    expect(va.cities).toBeDefined(); // NOT state-wide
+    for (const c of ['RICHMOND', 'HENRICO', 'MECHANICSVILLE']) expect(va.cities).toContain(c);
+    for (const c of ['NORFOLK', 'VIRGINIA BEACH', 'ROANOKE', 'ARLINGTON']) expect(va.cities).not.toContain(c);
+    expect(va.includeUngeocodedCities).toBe(false); // the VA centroid is not in a Richmond view
+  });
+  it("a city whose point sits just outside the box still counts if its pins can draw inside it", () => {
+    // RICHMOND|VA is at 37.4373 — 0.003° south of the box's 37.4405 edge.
+    expect(CITY_COORDS['RICHMOND|VA'][0]).toBeLessThan(RICHMOND[1]);
+    expect(stateGeoScope('VA', RICHMOND).cities).toContain('RICHMOND');
+  });
+  it('the pad is exactly the placement jitter: no city pin draws farther than CITY_JITTER_MAX_DEG', () => {
+    for (const key of ['RICHMOND|VA', 'AUSTIN|TX', 'NORFOLK|VA']) {
+      const [city, st] = key.split('|');
+      const [lat, lng] = CITY_COORDS[key];
+      for (let seed = 0; seed < 24; seed++) {
+        const g = geocodeCity(city, st, seed)!;
+        expect(Math.abs(g.lat - lat)).toBeLessThanOrEqual(CITY_JITTER_MAX_DEG + 1e-9);
+        expect(Math.abs(g.lng - lng)).toBeLessThanOrEqual(CITY_JITTER_MAX_DEG + 1e-9);
+      }
+    }
+  });
+  it('another populated city viewport (Austin, state=TX) is city-scoped too', () => {
+    const [tx] = resolvePlayersGeoScope([-98.0, 30.1, -97.5, 30.5], 'TX').states;
+    expect(tx.cities).toContain('AUSTIN');
+    expect(tx.cities).not.toContain('HOUSTON');
+  });
+  it('a genuinely empty viewport is a measured empty scope, not the whole state', () => {
+    const [va] = resolvePlayersGeoScope(ATLANTIC, 'VA').states;
+    expect(va.cities).toEqual([]);
+    expect(va.includeUngeocodedCities).toBe(false);
+  });
+  it('zooming out from city to the whole state drops the city filter', () => {
+    expect(resolvePlayersGeoScope(RICHMOND, 'VA').states[0].cities).toBeDefined();
+    expect(resolvePlayersGeoScope(WHOLE_VA, 'VA').states[0].cities).toBeUndefined();
+  });
+  it('panning Richmond → Norfolk swaps the city set', () => {
+    const rich = resolvePlayersGeoScope(RICHMOND, 'VA').states[0].cities!;
+    const nor = resolvePlayersGeoScope(NORFOLK, 'VA').states[0].cities!;
+    expect(nor).toContain('NORFOLK');
+    expect(nor).not.toContain('RICHMOND');
+    expect(rich).not.toContain('NORFOLK');
+  });
+  it('a viewport crossing the VA/NC line keeps both states without a state filter, only VA with one', () => {
+    const open = resolvePlayersGeoScope(VA_NC_LINE);
+    const va = open.states.find((g) => g.state === 'VA');
+    const nc = open.states.find((g) => g.state === 'NC');
+    expect(va?.cities).toContain('DANVILLE');
+    expect(nc?.cities).toContain('EDEN');
+    const filtered = resolvePlayersGeoScope(VA_NC_LINE, 'VA');
+    expect(filtered.states.map((g) => g.state)).toEqual(['VA']);
+    expect(filtered.states[0].cities).toContain('DANVILLE');
+    expect(filtered.states[0].cities).not.toContain('EDEN');
   });
 });
 
