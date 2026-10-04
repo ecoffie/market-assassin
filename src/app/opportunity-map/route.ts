@@ -2191,7 +2191,9 @@ const VIEWPORT_JS = `<script>
   //   otherwise                              → the zoom-5 window holding the MOST of them (it may be
   //                                             overseas — a federal market is not US-only).
   // Unlocated matches are never moved INTO a view; the map count keeps saying "K not shown on map".
-  // done({ok, reason?, located, inFrame, all}) — reason: unavailable|failed|none_located|user_moved|intent_changed.
+  // done({ok, reason?, located, inFrame, all}) — reason: unavailable|failed|none_located|user_moved|intent_changed|timeout.
+  // opts.deadline (ms epoch): an answer after it is DISCARDED, never applied late — the caller has
+  // already shown the map, and a frame landing after that would move a map the reader is reading.
   var WORLD_BOX='-180.0000,-85.0000,180.0000,85.0000';
   function _frameFor(pts){
     var Z=PIN_DOT_ZOOM, sz=map.getSize(), hw=Math.max(40,sz.x*0.44), hh=Math.max(40,sz.y*0.44);
@@ -2211,10 +2213,13 @@ const VIEWPORT_JS = `<script>
     var c0=map.getCenter(), z0=map.getZoom(), sig0=window.__mapIntentSig?window.__mapIntentSig():null;
     Promise.all(hz.map(function(h){ return fetch(_buildOppUrl(h,WORLD_BOX)).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }))
       .then(function(rs){
+        if(opts.deadline&&Date.now()>opts.deadline)return done({ok:false,reason:'timeout'});
         if(opts.unlessMoved){
           // A reader who has moved the map or changed the market since we asked keeps what they chose.
-          var c=map.getCenter();
-          if(map.getZoom()!==z0||Math.abs(c.lat-c0.lat)>1e-6||Math.abs(c.lng-c0.lng)>1e-6)return done({ok:false,reason:'user_moved'});
+          // Measured in PIXELS, not degrees: a layout change (a notice row appearing) re-measures the
+          // map and can nudge the centre by a fraction of a pixel — that is not the reader panning.
+          var p0=map.project(c0,z0), p1=map.project(map.getCenter(),z0);
+          if(map.getZoom()!==z0||Math.abs(p1.x-p0.x)>2||Math.abs(p1.y-p0.y)>2)return done({ok:false,reason:'user_moved'});
           var s1=window.__mapIntentSig?window.__mapIntentSig():null; if(s1!==sig0)return done({ok:false,reason:'intent_changed'});
         }
         var pts=[], failed=0;
@@ -2978,8 +2983,10 @@ const VIEWPORT_JS = `<script>
     // For the list's empty state: "no matches in THIS VIEW" vs "no matches at all" (template drawFeed).
     // total = located matches for the filters (bbox-independent), inView = in this viewport,
     // unmapped = matches with no map location (null = unknown, never 0), settled = every horizon answered.
+    // totalKnown=false when a part that answered carried no numeric total — an unknown is never a zero.
     window.__mapMatchTotals={ total:TOTAL, inView:INVIEW, unmapped:window.__unmappedForFilters, capped:!!CAPPED,
-      settled:!loading.length, anyFailed:parts.some(function(p){ return p&&p.failed; }) };
+      settled:!loading.length, anyFailed:parts.some(function(p){ return p&&p.failed; }),
+      totalKnown:parts.every(function(p){ return !p||p.failed||typeof p.total==='number'; }) };
     if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     render();
     if(!round.painted){ round.painted=true; round.perf.firstPaint=Math.round(_nowMs()-round.perf.action); }
@@ -5356,7 +5363,7 @@ const VIEWPORT_JS = `<script>
         window.__frameHold=true;
         var _fh=function(){ if(!window.__frameHold)return; window.__frameHold=false; fetchView(); };
         var _fhT=setTimeout(_fh,4000);
-        window.__showMatchingLocations({unlessMoved:true,done:function(r){ clearTimeout(_fhT); window.__lastSavedFrame=r; _fh(); }});
+        window.__showMatchingLocations({unlessMoved:true,deadline:Date.now()+4000,done:function(r){ clearTimeout(_fhT); window.__lastSavedFrame=r; _fh(); }});
       } }
     fetchView();
     return {unsupported:_unsupported};

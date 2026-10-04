@@ -38,6 +38,27 @@ function emptyFeed(totals: unknown, opts: { helper?: boolean } = {}) {
 }
 
 describe('the list distinguishes "none in this view" from "none at all"', () => {
+  const T = (o: Record<string, unknown>) => ({ total: 0, inView: 0, unmapped: 0, capped: false, settled: true, anyFailed: false, totalKnown: true, ...o });
+  it('a source that FAILED while the rest answered 0 is not "no matches" and never suggests clearing filters', () => {
+    const h = emptyFeed(T({ anyFailed: true }));
+    expect(h).toContain('Some results couldn’t load');
+    expect(h).toContain('this isn’t a count of zero');
+    expect(h).toContain('Try again');
+    expect(h).not.toMatch(/No opportunities match|Clear all filters/);
+  });
+  it('a round still loading is not "no matches"', () => {
+    const h = emptyFeed(T({ settled: false }));
+    expect(h).toContain('Still loading results');
+    expect(h).not.toMatch(/No opportunities match|Clear all filters/);
+  });
+  it('a count that never arrived (totalKnown=false) is unknown, not zero', () => {
+    const h = emptyFeed(T({ totalKnown: false }));
+    expect(h).not.toMatch(/No opportunities match|Clear all filters/);
+  });
+  it('a genuine, settled, fully-answered zero still reaches the original state', () => {
+    expect(emptyFeed(T({}))).toContain('Clear all filters');
+  });
+
   it('matches elsewhere → "No matches in this map view" + Show matching locations, never "clear filters"', () => {
     const h = emptyFeed({ total: 56, inView: 0, unmapped: 8, capped: false, settled: true, anyFailed: false });
     expect(h).toContain('No matches in this map view');
@@ -126,7 +147,7 @@ const NAVY: Array<[number, number]> = [
   [38.9714, -76.9837], [39.9513, -75.1741],
 ];
 
-function run(opts: { size: { x: number; y: number }; pins: Array<[number, number]> | null; moveDuring?: boolean; changeDuring?: boolean; unlessMoved?: boolean }) {
+function run(opts: { size: { x: number; y: number }; pins: Array<[number, number]> | null; moveDuring?: boolean; changeDuring?: boolean; unlessMoved?: boolean; jitterDuring?: boolean; deadline?: number }) {
   const lf = leaflet(opts.size, { lat: 38, lng: -96, z: 5 });
   const urls: string[] = [];
   let sig = 'S0'; let result: unknown = null;
@@ -141,6 +162,7 @@ function run(opts: { size: { x: number; y: number }; pins: Array<[number, number
     fetch: (u: string) => {
       urls.push(u);
       if (opts.moveDuring) lf.view.lng += 3;          // the reader pans while we ask
+      if (opts.jitterDuring) lf.view.lng += 0.0005;   // a layout re-measure: well under a pixel at zoom 5
       if (opts.changeDuring) sig = 'S1';              // ...or changes a filter
       return Promise.resolve({ ok: opts.pins !== null, json: async () => ({ success: true, pins: (opts.pins || []).map(([lat, lng]) => ({ lat, lng })) }) });
     },
@@ -149,7 +171,7 @@ function run(opts: { size: { x: number; y: number }; pins: Array<[number, number
   vm.createContext(ctx);
   vm.runInContext(`${BUILDER}\n${HELPER}\nthis.__go=window.__showMatchingLocations;`, ctx);
   const go = ctx.__go as (o: unknown) => void;
-  const done = new Promise((r) => go({ unlessMoved: opts.unlessMoved, done: (x: unknown) => { result = x; r(x); } }));
+  const done = new Promise((r) => go({ unlessMoved: opts.unlessMoved, deadline: opts.deadline, done: (x: unknown) => { result = x; r(x); } }));
   return { done, urls, moves: lf.moves, view: lf.view, project: lf.project, size: opts.size, result: () => result as Record<string, unknown> };
 }
 const PHONE = { x: 390, y: 600 };
@@ -233,5 +255,34 @@ describe('the automatic frame (saved search, no bounds) never overrides the read
     const calls = ROUTE.match(/window\.__showMatchingLocations\(/g) || [];
     expect(calls.length).toBe(1);                       // the restorer; the button calls it from template.html
     expect(TMPL.match(/window\.__showMatchingLocations\(/g) || []).toHaveLength(1);
+  });
+});
+
+describe('slow framing never overrides anything newer', () => {
+  it('an answer after the deadline is discarded — no late move', async () => {
+    const h = run({ size: PHONE, pins: NAVY, unlessMoved: true, deadline: Date.now() - 1 });
+    await h.done;
+    expect(h.moves).toEqual([]);
+    expect(h.result()).toMatchObject({ ok: false, reason: 'timeout' });
+  });
+
+  it('a sub-pixel layout nudge (notice row resizing) is NOT a pan — the frame still applies', async () => {
+    const h = run({ size: PHONE, pins: NAVY, unlessMoved: true, jitterDuring: true, deadline: Date.now() + 60_000 });
+    await h.done;
+    expect(h.result()).toMatchObject({ ok: true });
+  });
+
+  it('a newer search started while an older frame is in flight: the older one yields', async () => {
+    // Two restores in a row (e.g. the reader picks another saved search from the in-map picker).
+    // The first answer arrives after the market changed → intent_changed, no move; the newer one frames.
+    const older = run({ size: PHONE, pins: NAVY, unlessMoved: true, changeDuring: true });
+    await older.done;
+    expect(older.moves).toEqual([]);
+    expect(older.result()).toMatchObject({ ok: false, reason: 'intent_changed' });
+  });
+
+  it('the automatic frame passes a deadline equal to the hold (4 s), so it can never land after release', () => {
+    expect(ROUTE).toContain("window.__showMatchingLocations({unlessMoved:true,deadline:Date.now()+4000,");
+    expect(ROUTE).toContain('var _fhT=setTimeout(_fh,4000);');
   });
 });

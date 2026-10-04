@@ -1632,6 +1632,16 @@ function drawFeed(){
       <p>${_mt.unmapped.toLocaleString()} ${_mt.unmapped===1?'opportunity matches':'opportunities match'} your filters, but ${_mt.unmapped===1?'it has':'none has'} a map location yet, so ${_mt.unmapped===1?'it can’t':'they can’t'} be shown here. Your filters are unchanged.</p></div>`;
     return;
   }
+  // NOT A ZERO: a round still loading, a source that failed, or a count that never arrived. None of
+  // these may say "No opportunities match" or suggest clearing filters (an unknown is never a zero).
+  if(!rows.length && _mt && (!_mt.settled || _mt.anyFailed || _mt.totalKnown===false)){
+    var _ld=!_mt.settled&&!_mt.anyFailed;
+    feed.innerHTML=_ld
+      ? `<div class="empty" id="viewEmpty"><h4>Still loading results\u2026</h4><p>Nothing in this view yet \u2014 the rest is still loading. Your filters are unchanged.</p></div>`
+      : `<div class="empty" id="viewEmpty"><h4>Some results couldn\u2019t load</h4><p>At least one source didn\u2019t answer, so this isn\u2019t a count of zero. Your filters are unchanged.</p>
+         <button type="button" data-act="retry-round" onclick="if(window.__mapRefetch)window.__mapRefetch()">Try again</button></div>`;
+    return;
+  }
   if(!rows.length){
     feed.innerHTML=`<div class="empty"><h4>No opportunities match</h4>
       <p>Try removing a filter or widening your service lines.</p>
