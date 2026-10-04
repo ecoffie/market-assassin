@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ConnectionKeyCard from './ConnectionKeyCard';
 
 export const metadata: Metadata = {
   title: 'Connect Briefings to Lindy AI | GovCon Giants',
@@ -13,36 +14,41 @@ export default function LindySetupPage() {
           Connect Your Briefings to Lindy AI
         </h1>
         <p className="text-gray-400 mb-10">
-          Your daily GovCon briefings are available as structured JSON via API.
-          Connect them to Lindy, Zapier, Make, n8n, or any automation platform.
+          Your daily GovCon briefings are available as structured JSON. Connect them to Lindy, Zapier, Make,
+          n8n, or any automation platform with a connection key that only reads your own briefings.
         </p>
+
+        {/* Step 1: connection key */}
+        <section className="mb-10">
+          <h2 className="text-xl font-semibold mb-3">Step 1: Create a connection key</h2>
+          <ConnectionKeyCard />
+        </section>
 
         {/* API Endpoint */}
         <section className="mb-10">
           <h2 className="text-xl font-semibold mb-3">Your Briefing API</h2>
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-            <p className="text-green-400 mb-2"># Latest briefing</p>
+            <p className="text-green-400 mb-2"># Today&apos;s intelligence</p>
+            <p className="text-gray-300">GET https://getmindy.ai/api/lindy/intelligence</p>
             <p className="text-gray-300">
-              GET https://getmindy.ai/api/briefings/latest?email=<span className="text-amber-400">YOUR_EMAIL</span>
+              Authorization: Bearer <span className="text-amber-400">YOUR_CONNECTION_KEY</span>
             </p>
             <p className="text-green-400 mt-4 mb-2"># Last 7 days</p>
-            <p className="text-gray-300">
-              GET https://getmindy.ai/api/briefings/latest?email=<span className="text-amber-400">YOUR_EMAIL</span>&days=7
-            </p>
+            <p className="text-gray-300">GET https://getmindy.ai/api/lindy/intelligence?days=7</p>
           </div>
           <p className="text-gray-500 text-sm mt-2">
-            Access is gated to your subscriber email. Max 30 days of history.
+            The key always returns your own data. An email address in the URL is never accepted as a login.
           </p>
         </section>
 
         {/* Option A */}
         <section className="mb-10">
-          <h2 className="text-xl font-semibold mb-1">Option A: Email Forwarding (Easiest)</h2>
-          <p className="text-gray-400 text-sm mb-3">Best for conversational Q&A with your briefings</p>
+          <h2 className="text-xl font-semibold mb-1">Option A: Email Forwarding (Easiest, no key needed)</h2>
+          <p className="text-gray-400 text-sm mb-3">Best for conversational Q&amp;A with your briefings</p>
           <ol className="list-decimal list-inside space-y-2 text-gray-300">
             <li>In Lindy, create a new agent with an <strong className="text-white">&quot;Email Received&quot;</strong> trigger</li>
-            <li>Set it to watch for emails from <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded">hello@getmindy.ai</code></li>
-            <li>Lindy automatically reads your briefing email and adds it to your knowledge base</li>
+            <li>Set it to watch for emails from <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded">alerts@mail.getmindy.ai</code></li>
+            <li>Lindy reads each briefing email and adds it to your knowledge base</li>
             <li>Ask your Lindy agent questions about your briefings anytime</li>
           </ol>
         </section>
@@ -52,10 +58,10 @@ export default function LindySetupPage() {
           <h2 className="text-xl font-semibold mb-1">Option B: API Polling (Structured Data)</h2>
           <p className="text-gray-400 text-sm mb-3">Best for automations that need structured fields (agencies, amounts, deadlines)</p>
           <ol className="list-decimal list-inside space-y-2 text-gray-300">
+            <li>Create a connection key (Step 1) and keep it somewhere safe</li>
             <li>In Lindy, create an agent with a <strong className="text-white">&quot;Scheduled&quot;</strong> trigger (daily, after 9 AM UTC)</li>
-            <li>Add an <strong className="text-white">&quot;HTTP Request&quot;</strong> action: GET the API URL above</li>
+            <li>Add an <strong className="text-white">&quot;HTTP Request&quot;</strong> action: GET the API URL above, with the header <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded">Authorization: Bearer YOUR_CONNECTION_KEY</code></li>
             <li>Connect the response to a <strong className="text-white">Knowledge Base</strong> action</li>
-            <li>Now Lindy has your structured briefing data — agencies, amounts, deadlines, relevance scores</li>
           </ol>
         </section>
 
@@ -64,7 +70,8 @@ export default function LindySetupPage() {
           <h2 className="text-xl font-semibold mb-1">Option C: Works with Any Tool</h2>
           <p className="text-gray-400 text-sm mb-3">Zapier, Make, n8n, or custom scripts</p>
           <p className="text-gray-300">
-            The same API works with any automation platform. Poll daily, get JSON, route to wherever you want.
+            Same API, same header. Poll daily, get JSON, and route it wherever you want. If a key is ever exposed,
+            revoke it in your account and create a new one.
           </p>
         </section>
 
@@ -100,21 +107,20 @@ export default function LindySetupPage() {
           <h2 className="text-xl font-semibold mb-3">API Response Shape</h2>
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
             <pre className="text-gray-300">{`{
-  "success": true,
-  "briefing_date": "2026-03-10",
-  "generated_at": "2026-03-10T09:00:00Z",
+  "as_of": "2026-10-04T09:30:00Z",
+  "user_email": "you@yourcompany.com",
+  "has_full_access": true,
+  "profile_summary": { "naics_codes": [...], "agencies": [...], "watched_companies": [...] },
   "briefing": {
-    "summary": {
-      "headline": "3 High-Priority Recompetes This Week",
-      "subheadline": "...",
-      "quickStats": [...],
-      "urgentAlerts": 2
-    },
-    "topItems": [...],
-    "categorizedItems": { ... },
-    "totalItems": 15,
-    "sourcesIncluded": ["fpds", "sam_gov", "web_intel"]
-  }
+    "date": "2026-10-04",
+    "headline": "3 High-Priority Recompetes This Week",
+    "urgent_alerts": 2,
+    "top_items": [...]
+  },
+  "recompetes": { "critical": [...], "high": [...], "upcoming": [...], "total_count": 14 },
+  "contractor_activity": { ... },
+  "recommended_actions": [...],
+  "meta": { "data_freshness": { ... }, "next_briefing_at": "...", "api_version": "..." }
 }`}</pre>
           </div>
         </section>
