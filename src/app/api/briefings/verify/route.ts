@@ -1,23 +1,33 @@
 /**
  * Lightweight briefing access check
  * POST /api/briefings/verify
- * Body: { email: string }
+ * Body: { email?: string }
  * Returns: { hasAccess: boolean }
+ *
+ * R1: answers only for the VERIFIED caller (Mindy or Supabase session). The body email is a
+ * claim that must match it. An anonymous caller gets 401 `auth_required`, never a yes/no about
+ * someone else's address, so this cannot be used to check who is a paying customer.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { hasProAccess } from '@/lib/access/resolve-access';
+import { verifyClaimedIdentity } from '@/lib/api-auth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const claimed = typeof body?.email === 'string' ? body.email : null;
 
-    if (!email) {
-      return NextResponse.json({ hasAccess: false }, { status: 400 });
+    const identity = await verifyClaimedIdentity(request, claimed);
+    if (identity.status !== 'verified') {
+      return NextResponse.json(
+        { hasAccess: false, auth_required: true, error: identity.status === 'mismatch' ? 'Email mismatch with session' : 'Sign in required' },
+        { status: 401 },
+      );
     }
 
     // Pro access = paid OR active trial (MINDY_TRIAL_OPEN).
-    const hasAccess = await hasProAccess(email);
+    const hasAccess = await hasProAccess(identity.email);
     return NextResponse.json({ hasAccess });
   } catch {
     return NextResponse.json({ hasAccess: false }, { status: 500 });

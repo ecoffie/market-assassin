@@ -40,6 +40,21 @@ export interface VerifiedApiKey {
   scopes: string[];
 }
 
+/**
+ * Key purposes. Every key issued before scopes existed has `scopes = []`, which means
+ * "MCP" — so existing keys keep working on the MCP edge and enterprise routes.
+ * A `briefings:read` key is a narrow machine credential for reading the owner's own
+ * briefings (Lindy / Zapier / n8n): it is refused everywhere else, and an MCP key is
+ * refused on the briefings routes (least privilege in both directions).
+ */
+export const BRIEFINGS_READ_SCOPE = 'briefings:read';
+export type ApiKeyPurpose = 'mcp' | typeof BRIEFINGS_READ_SCOPE;
+
+export function keyAllows(scopes: string[], purpose: ApiKeyPurpose): boolean {
+  if (purpose === BRIEFINGS_READ_SCOPE) return scopes.includes(BRIEFINGS_READ_SCOPE);
+  return scopes.length === 0 || scopes.includes('mcp');
+}
+
 /** sha256 hex of a raw key string. The only form we ever persist/compare. */
 export function hashApiKey(rawKey: string): string {
   return createHash('sha256').update(rawKey, 'utf8').digest('hex');
@@ -89,12 +104,16 @@ export async function issueApiKey(
 
 /**
  * Verify a presented key (the raw Bearer/X-Mindy-API-Key value). Returns the
- * resolved identity, or null if the key is unknown or revoked. Best-effort stamps
+ * resolved identity, or null if the key is unknown, revoked, or not issued for
+ * `purpose` (default: the MCP edge). Best-effort stamps
  * last_used_at (never blocks/fails the call on the stamp).
  *
  * This is the primitive the Slice 2 HTTP transport calls on every request.
  */
-export async function verifyApiKey(rawKey: string | null | undefined): Promise<VerifiedApiKey | null> {
+export async function verifyApiKey(
+  rawKey: string | null | undefined,
+  purpose: ApiKeyPurpose = 'mcp',
+): Promise<VerifiedApiKey | null> {
   const key = (rawKey || '').trim();
   if (!key.startsWith(KEY_PREFIX)) return null; // fast reject malformed/foreign tokens
 
@@ -106,6 +125,7 @@ export async function verifyApiKey(rawKey: string | null | undefined): Promise<V
     .maybeSingle();
 
   if (error || !data) return null;
+  if (!keyAllows(data.scopes || [], purpose)) return null; // valid key, wrong purpose
 
   // Fire-and-forget usage stamp — must not affect the verify result.
   getWriteClient()
@@ -137,6 +157,7 @@ export async function listApiKeys(userEmail: string): Promise<McpApiKeyRow[]> {
 export async function revokeApiKey(userEmail: string, keyId: string): Promise<boolean> {
   const { data, error } = await getWriteClient()
     .from('mcp_api_keys')
+    // truncation-ok: keyed on the primary key `id`, so at most one row can match.
     .update({ revoked_at: new Date().toISOString() })
     .eq('id', keyId)
     .eq('user_email', userEmail.toLowerCase())

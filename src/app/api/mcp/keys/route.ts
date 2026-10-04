@@ -1,7 +1,9 @@
 /**
  * /api/mcp/keys — self-serve MCP API-key management for the getmindy.ai/mcp dashboard.
  *
- *   POST   → mint a new key (returns the plaintext key ONCE)
+ *   POST   → mint a new key (returns the plaintext key ONCE). Body `purpose: 'briefings'`
+ *            mints a `briefings:read` connection key (Lindy / automations) instead of
+ *            an MCP key; it reads only the owner's briefings and earns no MCP credits.
  *   GET    → list the caller's keys (metadata only, never the secret)
  *   DELETE → revoke one of the caller's keys (?id=<keyId>)
  *
@@ -12,7 +14,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyClaimedIdentity, identityFailureResponse, type ClaimedIdentity } from '@/lib/api-auth';
-import { issueApiKey, listApiKeys, revokeApiKey } from '@/lib/mcp/api-keys';
+import { issueApiKey, listApiKeys, revokeApiKey, BRIEFINGS_READ_SCOPE } from '@/lib/mcp/api-keys';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 
@@ -28,9 +30,11 @@ async function keyOwner(request: NextRequest, bodyEmail?: unknown): Promise<Clai
 export async function POST(request: NextRequest) {
   let label: string | undefined;
   let bodyEmail: unknown;
+  let purpose: unknown;
   try {
     const body = await request.json();
     bodyEmail = body?.email;
+    purpose = body?.purpose;
     if (typeof body?.label === 'string' && body.label.trim()) label = body.label.trim().slice(0, 80);
   } catch {
     // no/invalid body → unlabeled key is fine
@@ -40,7 +44,16 @@ export async function POST(request: NextRequest) {
   if (identity.status !== 'verified') return identityFailureResponse(identity);
   const auth = { email: identity.email };
 
+  if (purpose !== undefined && purpose !== 'mcp' && purpose !== 'briefings') {
+    return NextResponse.json({ error: "purpose must be 'mcp' or 'briefings'" }, { status: 400 });
+  }
+  const briefingsKey = purpose === 'briefings';
+
   try {
+    if (briefingsKey) {
+      const { key, row } = await issueApiKey(auth.email, { label: label || 'Briefings connection', scopes: [BRIEFINGS_READ_SCOPE] });
+      return NextResponse.json({ success: true, key, keyInfo: row, signupCredits: 0 });
+    }
     const { key, row } = await issueApiKey(auth.email, { label });
     // Grant one-time free credits on the user's FIRST key (no balance row yet).
     const signupCredits = await grantSignupCreditsIfFirst(auth.email).catch(() => 0);

@@ -4,20 +4,24 @@
  * Unified endpoint that provides all GovCon intelligence for Lindy consumption.
  * Returns briefings, recompetes, contractor activity, and recommended actions.
  *
- * GET /api/lindy/intelligence?email=user@example.com
+ * GET /api/lindy/intelligence
+ *
+ * Authentication (required): a signed-in Mindy session, or a Mindy connection key
+ * issued with the `briefings:read` scope (Authorization: Bearer <key>). The data is
+ * always the authenticated identity's own — see src/lib/lindy/identity.ts.
  *
  * Query params:
- * - email (required): User email for personalized intelligence
+ * - email (optional): if sent, must equal the authenticated identity
  * - days (optional): Number of days of history (default: 1, max: 7)
  * - include (optional): Comma-separated sections to include (default: all)
  *   Options: briefing, recompetes, contractors, actions
  *
- * Authentication: Uses same email-gated access as briefings (Vercel KV)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hasProAccess } from '@/lib/access/resolve-access';
+import { resolveLindyIdentity } from '@/lib/lindy/identity';
 
 interface RecompeteContract {
   contractNumber: string;
@@ -104,19 +108,14 @@ interface LindyIntelligence {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const email = searchParams.get('email')?.toLowerCase().trim();
+  const identity = await resolveLindyIdentity(request, searchParams.get('email'));
+  if (!identity.ok) return identity.response;
+  const email = identity.email;
   const days = Math.min(parseInt(searchParams.get('days') || '1'), 7);
   const includeParam = searchParams.get('include');
   const includeSections = includeParam
     ? includeParam.split(',').map(s => s.trim())
     : ['briefing', 'recompetes', 'contractors', 'actions'];
-
-  if (!email) {
-    return NextResponse.json({
-      error: 'Email required',
-      usage: 'GET /api/lindy/intelligence?email=user@example.com',
-    }, { status: 400 });
-  }
 
   // Pro access = paid OR active trial (but don't block - just note it)
   const hasAccess = await hasProAccess(email);

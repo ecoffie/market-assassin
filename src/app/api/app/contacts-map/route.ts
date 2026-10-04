@@ -30,10 +30,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { statesOverlappingBbox } from '@/lib/geo/state-centroids';
 import { geocodeCity, stableSeed, resolveBuyerLocation } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
-import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
+import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL, type RecipientSearchRow, type RecipientSearchResult } from '@/lib/bigquery/recipients';
+import { resolvePlayersGeoScope } from '@/lib/players/geography';
+import { combinePlayersStatuses, type PlayersStatus, type PlayersCoverage } from '@/lib/players/truth';
+import { recordPlayersResult } from '@/lib/players/telemetry';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
@@ -145,11 +147,11 @@ async function companiesPins(params: {
   // recipient, ranked by $) when this is set — the plain NAICS rollup has no agency column.
   // Threaded into the SAME searchRecipients call as state/naics (never ranked-then-filtered).
 }) {
-  // Explicit state filter wins; otherwise infer the state(s) actually visible in
-  // the current viewport from their centroids (cheap, no polygon data needed —
-  // see statesOverlappingBbox). Capped at 6 states so a zoomed-out view can't
-  // fan out into a dozen parallel BQ calls.
-  const states = params.state ? [params.state] : statesOverlappingBbox(params.bbox, 3, 6);
+  // GEOGRAPHY BEFORE RANK (Players repair, 2026-10-04). The viewport resolves to HQ states — and,
+  // when only part of a state is visible, to the geocodable cities in view — and that scope goes
+  // INTO the query, so ranking happens inside the visible geography. Explicit ?state= wins and is
+  // state-wide. See src/lib/players/geography.ts and tasks/players-naics-coverage-audit-2026-10-04.md.
+  const geoScope = resolvePlayersGeoScope(params.bbox, params.state || undefined);
 
   const sortBy = SORT_TO_RECIPIENT_SORT[params.sort] || 'total_obligated';
   // Over-fetch per state (300-500 pre-bbox-filter, per task spec) so small
@@ -158,43 +160,52 @@ async function companiesPins(params: {
   const PER_STATE_LIMIT = 300;
 
   let total = 0;
-  const byUei = new Map<string, { r: Awaited<ReturnType<typeof searchRecipients>>['rows'][number] }>();
-  if (states.length === 0) {
-    // No state resolvable from the viewport (e.g. zoomed out to the whole US,
-    // or OCONUS) — fall back to the prior global-top behavior rather than
-    // returning nothing; this only affects the "zoomed way out" case, where
-    // showing the biggest national names is a reasonable default view.
-    const { rows, total: t } = await searchRecipients({
+  const parts: Array<{ status: PlayersStatus; rowCount: number }> = [];
+  let coverage: PlayersCoverage | null = null;
+  const byUei = new Map<string, { r: RecipientSearchRow }>();
+  const absorb = (res: RecipientSearchResult) => {
+    total += res.total;
+    parts.push({ status: res.status, rowCount: res.rows.length });
+    if (!coverage || (res.coverage.incompleteReason && !coverage.incompleteReason)) coverage = res.coverage;
+    for (const r of res.rows) {
+      const key = r.recipient_uei || r.recipient_name;
+      if (!byUei.has(key)) byUei.set(key, { r });
+    }
+  };
+  if (geoScope.states.length === 0) {
+    // No state resolvable from the viewport (zoomed out to the whole US, or OCONUS) — the
+    // national ranking IS the requested geography here, so this is not rank-then-filter.
+    absorb(await searchRecipients({
       search: params.search || undefined,
       naics: params.naics || undefined,
       agency: params.agency || undefined,
       sortBy,
       limit: 100,
       liveBq: true,
-    });
-    total = t;
-    for (const r of rows) byUei.set(r.recipient_uei || r.recipient_name, { r });
+    }));
   } else {
     const results = await Promise.all(
-      states.map((st) =>
-        searchRecipients({
+      geoScope.states.map((g) => {
+        // Part of a state in view but none of its geocodable cities, and its centroid is out of
+        // view → nothing of that state can be drawn. A measured zero, no query.
+        if (g.cities && g.cities.length === 0 && !g.includeUngeocodedCities) {
+          return Promise.resolve<RecipientSearchResult>({
+            rows: [], total: 0, status: 'success_zero', coverage: { source: 'players_canonical' },
+          });
+        }
+        return searchRecipients({
           search: params.search || undefined,
           naics: params.naics || undefined,
           agency: params.agency || undefined,
-          state: st,
+          state: g.state,
+          geo: g.cities ? { cities: g.cities, includeUngeocodedCities: g.includeUngeocodedCities, knownCities: g.knownCities } : undefined,
           sortBy,
           limit: PER_STATE_LIMIT,
           liveBq: true, // authed in-app request — must hit live BQ, else 0 on a cold cache.
-        }),
-      ),
+        });
+      }),
     );
-    for (const { rows, total: t } of results) {
-      total += t;
-      for (const r of rows) {
-        const key = r.recipient_uei || r.recipient_name;
-        if (!byUei.has(key)) byUei.set(key, { r });
-      }
-    }
+    for (const res of results) absorb(res);
   }
 
   // Re-rank the merged, deduped set the same way the caller asked (per-state
@@ -295,10 +306,37 @@ async function companiesPins(params: {
   // "tavares" → 26 firms match in-state but 0 land in the visible NE box). Returning BOTH lets the
   // UI show the honest "N in view" instead of claiming 26 while the map is empty (the count/pins
   // mismatch bug). See [[rank_then_filter_starves_local]] — same family, count-vs-pins honesty.
+  // TRUTH STATE. A set-aside filter runs over a bounded candidate pool (SBA certs live in Supabase,
+  // not in the award dataset), and dropped viewport states were never queried — both make any count
+  // a FLOOR. An unavailable part never becomes 0.
+  const postCapFilter = wantBuckets.size > 0;
+  const combined = combinePlayersStatuses(parts);
+  const status: PlayersStatus = combined === 'unavailable' ? 'unavailable'
+    : (postCapFilter || geoScope.droppedStates.length > 0) ? 'coverage_incomplete'
+    : combined;
+  const reasons: string[] = [];
+  const cov = coverage as PlayersCoverage | null;
+  if (cov?.incompleteReason) reasons.push(cov.incompleteReason);
+  if (postCapFilter) reasons.push(`Set-aside filter applied to the top ${CANDIDATE_CAP} firms in view, not every firm.`);
+  if (geoScope.droppedStates.length) reasons.push(`Only the ${geoScope.states.length} states nearest the map center were searched (${geoScope.droppedStates.length} more in view).`);
+  if (combined === 'coverage_incomplete' && parts.some((p) => p.status === 'unavailable')) reasons.push('Some states could not be loaded.');
   return {
     pins,
     totalInView: pins.length,
-    totalForFilters: wantBuckets.size ? placed.length : (total || pins.length),
+    // null = UNKNOWN. Never a 0 that stands in for a failure.
+    totalForFilters: status === 'unavailable' ? null : (wantBuckets.size ? placed.length : (total || pins.length)),
+    status,
+    totalIsFloor: status === 'coverage_incomplete',
+    coverage: {
+      source: cov?.source ?? 'players_canonical',
+      sourceActionMax: cov?.sourceActionMax ?? null,
+      incompleteReason: reasons.length ? reasons.join(' ') : undefined,
+    },
+    geo: {
+      level: geoScope.states.length === 0 ? 'national' : geoScope.states.some((g) => g.cities) ? 'city' : 'state',
+      states: geoScope.states.map((g) => g.state),
+      droppedStates: geoScope.droppedStates.length,
+    },
   };
 }
 
@@ -511,18 +549,32 @@ export async function GET(request: NextRequest) {
   const officeApplied = isValidDodaac(office);
   if (officeApplied && type === 'companies') {
     return NextResponse.json({
-      success: true, mode: 'contacts', type, pins: [], totalInView: 0, totalForFilters: 0,
+      success: true, mode: 'contacts', type, pins: [], totalInView: 0, totalForFilters: 0, status: 'success_zero',
       notApplicable: `Office ${office} is a government buying office — it applies to Government Buyers, not companies.`,
     });
   }
 
+  const t0 = Date.now();
   try {
-    const out = type === 'buyers'
-      ? await buyersPins({ bbox, state, search, agency, office })
-      : await companiesPins({ bbox, state, search: searchCompanies, sort, setAside, naics, agency });
+    if (type === 'buyers') {
+      const out = await buyersPins({ bbox, state, search, agency, office });
+      return NextResponse.json({
+        success: true, mode: 'contacts', type, ...out,
+        status: out.pins.length > 0 ? 'success_nonzero' : 'success_zero',
+      });
+    }
+    const out = await companiesPins({ bbox, state, search: searchCompanies, sort, setAside, naics, agency });
+    await recordPlayersResult({
+      type: 'companies', naics, geoLevel: out.geo.level as 'national' | 'state' | 'city',
+      states: out.geo.states, droppedStates: out.geo.droppedStates, explicitState: !!state,
+      hasSearch: !!searchCompanies, searchLen: searchCompanies.length, setAside, hasAgency: !!agency,
+      total: out.totalForFilters, shown: out.totalInView, status: out.status,
+      source: out.coverage.source, sourceActionMax: out.coverage.sourceActionMax, ms: Date.now() - t0,
+    });
     return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
   } catch (e) {
     console.error('[contacts-map] error:', (e as Error).message);
-    return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
+    // An error is UNAVAILABLE — the client must never render it as 0 Players or as sales copy.
+    return NextResponse.json({ success: false, status: 'unavailable', error: (e as Error).message }, { status: 500 });
   }
 }

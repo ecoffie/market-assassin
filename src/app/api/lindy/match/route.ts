@@ -6,9 +6,13 @@
  * Takes user's knowledge base (capabilities, past performance, certs) and matches
  * against agency pain points, priorities, and current opportunities.
  *
+ * Authentication (required): a signed-in Mindy session, or a Mindy connection key
+ * issued with the `briefings:read` scope (Authorization: Bearer <key>). Matches are
+ * built from the authenticated identity's own briefing — see src/lib/lindy/identity.ts.
+ *
  * Request body:
  * {
- *   email: string,
+ *   email?: string,                     // optional; must equal the authenticated identity
  *   user_kb: {
  *     capabilities: string[],           // "cybersecurity", "cloud migration", "data analytics"
  *     past_performance: string[],       // "DHS USCIS contract", "VA modernization"
@@ -28,6 +32,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import agencyPainPoints from '@/data/agency-pain-points.json';
+import { resolveLindyIdentity } from '@/lib/lindy/identity';
 import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 
 interface UserKB {
@@ -83,16 +88,16 @@ interface AgencyMatch {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, user_kb, query } = body as {
+    const body = await request.json().catch(() => ({}));
+    const { email: claimedEmail, user_kb, query } = body as {
       email?: string;
       user_kb?: UserKB;
       query?: string;
     };
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email required' }, { status: 400 });
-    }
+    const identity = await resolveLindyIdentity(request, claimedEmail);
+    if (!identity.ok) return identity.response;
+    const email = identity.email;
 
     if (!user_kb || Object.keys(user_kb).length === 0) {
       return NextResponse.json({
@@ -533,8 +538,9 @@ export async function GET(request: NextRequest) {
     endpoint: '/api/lindy/match',
     method: 'POST',
     description: 'Match user knowledge base against opportunities and agency pain points',
+    authentication: 'Signed-in Mindy session, or Authorization: Bearer <Mindy connection key with briefings:read scope>',
     usage: {
-      email: 'user@example.com (required)',
+      email: 'optional — must equal the authenticated identity',
       user_kb: {
         capabilities: ['cybersecurity', 'cloud migration', 'data analytics'],
         past_performance: ['DHS USCIS contract', 'VA modernization'],

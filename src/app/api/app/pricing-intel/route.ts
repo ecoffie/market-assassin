@@ -11,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchPricingIntel, fetchPricingIntelByKeywords } from '@/lib/utils/calc-rates';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 
 export async function GET(request: NextRequest) {
@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
   // Pro gate. verifyMIAccess returns { tier, email, isStaff, ... } —
   // free users see a 402 upgrade teaser matching the Mindy Analyst
   // pattern (c9004f4). Staff bypass the tier check.
-  const access = await verifyMIAccess(email);
+  // R1: the tier comes from the VERIFIED identity; the email is only a claim that must match it.
+  const identity = await verifyClaimedIdentity(request, email);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
+  const access = await verifyMIAccess(identity.email);
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

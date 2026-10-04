@@ -40,7 +40,7 @@ on:
         required: false
         default: ''
       window_to:
-        description: repull_window only — YYYY-MM-DD (blank = today); span <= 62 days
+        description: repull_window only — YYYY-MM-DD, required, <= today; span <= 62 days
         type: string
         required: false
         default: ''

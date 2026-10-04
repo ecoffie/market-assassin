@@ -19,7 +19,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
@@ -237,9 +237,12 @@ export async function POST(request: NextRequest) {
 
   if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
   if (!naics) return NextResponse.json({ error: 'naics required' }, { status: 400 });
+  // R1: the tier comes from the VERIFIED identity; the email is only a claim that must match it.
+  const identity = await verifyClaimedIdentity(request, email);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
 
   // Pro gate. Free users get a 402 — UI renders an upgrade teaser.
-  const access = await verifyMIAccess(email);
+  const access = await verifyMIAccess(identity.email);
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

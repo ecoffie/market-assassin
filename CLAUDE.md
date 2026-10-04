@@ -260,6 +260,35 @@ can claim them.
 
 ---
 
+## 👥 Proven Players — FILTER, then RANK (2026-10-04)
+
+**Proven Player** = a unique UEI with actual federal award history under the selected NAICS.
+Canonical order: **awards → UEI → NAICS → HQ geography → FILTER → RANK.** Never national rank →
+geography filter. Audit: `tasks/players-naics-coverage-audit-2026-10-04.md`.
+
+- ⛔ **`top_contractors_by_dimension` is a top-50 LISTICLE, not a population.** It powers `/top/*`
+  only. Reading it as "the firms in NAICS X" then filtering by state is what made 541512/TX show
+  **0 Players vs 327** real awardees and 45.9% of NAICS×state cells a false zero.
+- Canonical dataset `players_naics_recipients` (`src/lib/players/dataset.ts`), query
+  `src/lib/players/query.ts` (every scope is a WHERE before GROUP BY/ORDER BY/LIMIT), viewport
+  geography `src/lib/players/geography.ts` (visible cities applied before ranking).
+- **Four truth states** (`src/lib/players/truth.ts`): `success_nonzero` · `success_zero` ·
+  `unavailable` · `coverage_incomplete`. Only `success_zero` may render 0. An error is never 0 and
+  never the Players sales copy (that copy is for a 401/403 only). The legacy rollup answer is always
+  `coverage_incomplete`. Copy: `src/lib/players/copy.ts` ("Top N shown", never "N companies exist").
+- ⚠️ **HELD:** `PLAYERS_SOURCE=canonical` is OFF and the production table is NOT built. Required
+  order: **BQ awards repair → awards reconciliation → `npm run players:rebuild -- --go` →
+  `npm run players:rebuild -- --reconcile --go`** → then set the flag. The rebuild REFUSES while
+  awards cohort completeness ≠ complete (no override). `PLAYERS_REBUILD_AFTER_INGEST=on` chains it
+  after each ingest — turn on only after acceptance.
+- Oracle: `npm run verify:oracles -- --only players` (fails on legacy by design);
+  `--players-preview` proves the code in an ephemeral BQ session table (not acceptance).
+- Registered Players (SAM registration NAICS) are a separate future population — never mix them in.
+- **Merged dormant (#1812).** Activation runbook + open P1 follow-ups (Contractors panel null→0,
+  set-aside after cap): `tasks/players-followups-2026-10-04.md`. Canonical identity is the **UEI**, never the name.
+
+---
+
 ## 🔤 A MATCH IS A CLAIM — READ before touching /try, the match engine, or SEO page generation
 
 **`docs/engineering/try-relevance-regression.md`** is the record; the frozen set is
@@ -1007,8 +1036,10 @@ curl -s -X POST https://getmindy.ai/api/app/target-market-research \
   -H 'Content-Type: application/json' \
   -d '{"naicsCode":"236220","email":"eric@govcongiants.com","businessType":"","veteranStatus":"Not Applicable"}'
 ```
-`eric@govcongiants.com` is staff → append `"refresh":true` to **bypass the cache** for a
-fresh compute. The cache key also splits on `business_type` + `veteran_status` + states,
+Since R1 (2026-10-04) the tier comes only from a verified session, so this unsigned curl
+gets the **Free** view. To see the Pro rows or force a fresh compute, add a staff session
+header (`-H "x-mi-auth-token: <token minted for the staff email>"`) and `"refresh":true`.
+A claimed email alone no longer counts as staff. The cache key also splits on `business_type` + `veteran_status` + states,
 so the form default `veteranStatus:'Not Applicable'` is a **different key** than an
 omitted one. Response: `agencies[]` (each with `metric_top_total`), `relevant_spending`,
 `cached`.

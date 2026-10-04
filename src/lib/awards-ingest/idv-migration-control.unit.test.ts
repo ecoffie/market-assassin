@@ -107,13 +107,9 @@ describe('dispatch gate', () => {
     const c = 'IDV-MIGRATION-repull_window';
     expect(validateIdvMigrationDispatch({ ...ok, step: 'repull_window', confirmation: c, windowFrom: '2026-01-20', windowTo: '2026-03-20' }).window)
       .toEqual({ from: '2026-01-20', to: '2026-03-20' });
-    expect(validateIdvMigrationDispatch({ ...ok, step: 'repull_window', confirmation: c, windowFrom: '2026-08-01' }).window)
-      .toEqual({ from: '2026-08-01', to: null });
     for (const [windowFrom, windowTo] of [['2026-01-01', '2026-02-01'], ['2026-01-20', '2026-06-01'], ['2026-03-01', '2026-02-01'], ['2026-09-01', '2026-10-01'], ['bad', '']]) {
       expect(() => validateIdvMigrationDispatch({ ...ok, step: 'repull_window', confirmation: c, windowFrom, windowTo })).toThrow(/refused/);
     }
-    // a blank window_to means "to today": from 2026-01-20 would be 246 days — refused.
-    expect(() => validateIdvMigrationDispatch({ ...ok, step: 'repull_window', confirmation: c, windowFrom: '2026-01-20' })).toThrow(/split it/);
   });
 });
 
@@ -182,8 +178,6 @@ describe('ingest arguments', () => {
   it('maps the two re-acquisition steps to the reviewed ingest flags', () => {
     expect(ingestArgsForStep({ step: 'repull_window', fiscalYear: null, window: { from: '2026-01-20', to: '2026-03-20' } }))
       .toEqual(['--from=2026-01-20', '--to=2026-03-20', '--apply']);
-    expect(ingestArgsForStep({ step: 'repull_window', fiscalYear: null, window: { from: '2026-08-01', to: null } }))
-      .toEqual(['--from=2026-08-01', '--apply']);
     expect(ingestArgsForStep({ step: 'idv_fy_backfill', fiscalYear: 2024, window: null }))
       .toEqual(['--idv-only', '--from=2023-10-01', '--to=2024-09-30', '--apply']);
     expect(() => ingestArgsForStep({ step: 'ddl', fiscalYear: null, window: null })).toThrow();

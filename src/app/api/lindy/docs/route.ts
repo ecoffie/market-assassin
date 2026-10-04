@@ -13,18 +13,19 @@ export async function GET() {
     api_name: 'GovCon Giants Lindy Integration API',
     version: '1.0.0',
     base_url: 'https://getmindy.ai/api/lindy',
+    authentication: {
+      required: true,
+      how: 'Authorization: Bearer <Mindy connection key>',
+      get_a_key: 'https://getmindy.ai/briefings/lindy-setup (scope: briefings:read; revoke any time at https://getmindy.ai/mcp/account)',
+      note: 'Every endpoint returns only the key owner\'s data. An email address is never accepted as authentication.',
+    },
 
     endpoints: [
       {
         path: '/intelligence',
         method: 'GET',
-        description: 'Get personalized GovCon intelligence for a user',
+        description: 'Get personalized GovCon intelligence for the authenticated user',
         parameters: {
-          email: {
-            type: 'string',
-            required: true,
-            description: 'User email address',
-          },
           days: {
             type: 'number',
             required: false,
@@ -39,7 +40,7 @@ export async function GET() {
             description: 'Comma-separated sections to include',
           },
         },
-        example_request: 'GET /api/lindy/intelligence?email=user@example.com',
+        example_request: 'GET /api/lindy/intelligence  (header: Authorization: Bearer <key>)',
         returns: {
           briefing: 'Latest briefing with opportunities, teaming plays, market intel',
           recompetes: 'Expiring contracts by risk level (critical, high, upcoming)',
@@ -52,11 +53,6 @@ export async function GET() {
         method: 'POST',
         description: 'Match user knowledge base against opportunities and agency pain points',
         parameters: {
-          email: {
-            type: 'string',
-            required: true,
-            description: 'User email address',
-          },
           user_kb: {
             type: 'object',
             required: true,
@@ -81,8 +77,8 @@ export async function GET() {
         example_request: {
           method: 'POST',
           url: '/api/lindy/match',
+          headers: { Authorization: 'Bearer <key>' },
           body: {
-            email: 'user@example.com',
             user_kb: {
               capabilities: ['cybersecurity', 'cloud migration', 'zero trust'],
               set_asides: ['SDVOSB'],
@@ -138,7 +134,7 @@ export async function GET() {
     ],
 
     lindy_prompts: {
-      intelligence_pull: 'When user asks about opportunities, market news, or "what\'s happening", call GET /api/lindy/intelligence?email={user_email} first to get current data.',
+      intelligence_pull: 'When user asks about opportunities, market news, or "what\'s happening", call GET /api/lindy/intelligence (with the connection key) first to get current data.',
       match_analysis: 'When user asks about fit, capabilities match, or agency targeting, call POST /api/lindy/match with their knowledge base.',
       combine_for_strategy: 'For strategic questions, combine intelligence data with match analysis to provide actionable recommendations.',
     },
