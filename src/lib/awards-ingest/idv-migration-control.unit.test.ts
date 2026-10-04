@@ -15,6 +15,8 @@ import {
   idvMigrationCloneTableId,
   ingestArgsForStep,
   validateIdvMigrationDispatch,
+  RECIPIENTS_REBUILD_FILE,
+  assertRecipientsRebuildOnly,
 } from './idv-migration-control';
 
 const root = process.cwd();
@@ -239,3 +241,27 @@ describe('ddl post-check — typed, against the canonical schema (awards-schema.
     expect(runner.match(/ddlPostCheck\(await awardsColumns\(bq\)\)/g)?.length).toBe(3);
   });
 });
+
+describe('rebuild_recipients (A1b follow-up, 2026-10-04)', () => {
+  it('is a dispatchable step that is not an awards write (no clone gate needed: awards is untouched)', () => {
+    expect(IDV_MIGRATION_STEPS).toContain('rebuild_recipients');
+    expect(IDV_MIGRATION_WRITE_STEPS).not.toContain('rebuild_recipients');
+    expect(workflow).toMatch(/- rebuild_recipients/);
+  });
+  it('runs exactly the ingest rebuild file, which only recreates the three recipients tables', () => {
+    const sql = readFileSync(join(root, RECIPIENTS_REBUILD_FILE), 'utf8');
+    expect(() => assertRecipientsRebuildOnly(sql)).not.toThrow();
+    expect(runner).toContain('assertRecipientsRebuildOnly(sql)');
+    const ingest = readFileSync(join(root, 'scripts/ingest-usaspending-awards.ts'), 'utf8');
+    expect(ingest).toContain("'scripts/usaspending-ingest/rebuild-recipients-from-awards.sql'");
+  });
+  it('the guard refuses anything that could touch awards or another table', () => {
+    for (const bad of [
+      'DELETE FROM `market-assasin.usaspending.awards` WHERE TRUE;',
+      'CREATE OR REPLACE TABLE `market-assasin.usaspending.awards` AS SELECT 1;',
+      'CREATE OR REPLACE TABLE `market-assasin.usaspending.recipients` AS SELECT 1;',
+      'UPDATE x SET y = 1;',
+    ]) expect(() => assertRecipientsRebuildOnly(bad)).toThrow(/refused/);
+  });
+});
+

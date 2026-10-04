@@ -29,6 +29,8 @@ import {
   IDV_MIGRATION_CLONE_EXPIRATION_DAYS,
   IDV_MIGRATION_CLONE_PREFIX,
   IDV_MIGRATION_WRITE_STEPS,
+  RECIPIENTS_REBUILD_FILE,
+  assertRecipientsRebuildOnly,
   idvMigrationCloneTableId,
   idvMigrationDispatchFromEnv,
   ingestArgsForStep,
@@ -192,6 +194,24 @@ async function main(): Promise<void> {
       const ok = post.ok && after.awardsRows === before.awardsRows && oblAfter === oblBefore;
       log(`ddl verify: ${describeSchema(post.state)} (expected ${AWARDS_COLUMNS.length}, ${IDV_IDENTITY_COLUMNS.length} IDV typed) rows ${before.awardsRows}->${after.awardsRows} obligation ${oblBefore}->${oblAfter}`);
       if (!ok) throw new Error('STOP: unexpected change after DDL — see 99-rollback.sql §A');
+      return;
+    }
+    case 'rebuild_recipients': {
+      // Re-derive recipients* from awards with the SAME SQL the weekly ingest runs after every MERGE.
+      // Needed after a1b_cleanup (which deletes awards rows but does not rebuild). Writes only the three
+      // recipients tables — asserted on the statement text before it is sent.
+      const sql = readFileSync(RECIPIENTS_REBUILD_FILE, 'utf8');
+      assertRecipientsRebuildOnly(sql);
+      await query(bq, sql, { label: 'rebuild_recipients' });
+      const { rows } = await query<{ table_id: string; row_count: number; last_modified_time: number }>(bq,
+        `SELECT table_id, row_count, last_modified_time FROM \`${PROJECT}.${DATASET}.__TABLES__\`
+         WHERE table_id IN ('awards', 'recipients', 'recipients_rollup', 'recipients_rollup_merged')`, { label: 'rebuild_state' });
+      const awardsMs = Number(rows.find((r) => r.table_id === 'awards')?.last_modified_time);
+      for (const r of rows.filter((x) => x.table_id !== 'awards')) {
+        const fresh = Number(r.last_modified_time) >= awardsMs;
+        log(`${r.table_id}: ${Number(r.row_count)} rows, rebuilt ${new Date(Number(r.last_modified_time)).toISOString()} ${fresh ? '(after the last awards write)' : '(STALE)'}`);
+        if (!fresh) throw new Error(`STOP: ${r.table_id} is older than the last awards write`);
+      }
       return;
     }
     case 'a1b_cleanup': {
