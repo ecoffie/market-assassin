@@ -25,6 +25,15 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 `Date` · `Area` · `Fix` · `Proof anchor` (string → file) · `Verified` (how proven) · `Status`
 
 
+
+---
+
+## 2026-10-04 — A1b follow-up: recipients rebuilt after the cleanup
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | BQ awards / DoD incident | `a1b_cleanup` deleted 631 `awards` rows but, unlike the ingest's re-pull path, did not rebuild `recipients*`. #1815 acceptance then failed only `recipients_rebuilt_and_reconciled` (recipients older than the last awards write). New protected step `rebuild_recipients` runs exactly `scripts/usaspending-ingest/rebuild-recipients-from-awards.sql`, the same file the weekly ingest runs after every MERGE. A guard on the statement text refuses anything other than CREATE OR REPLACE of the three recipients tables. It does not touch `awards`, so no clone gate is needed. The step confirms each table is newer than the last awards write. | `export function assertRecipientsRebuildOnly(` → `src/lib/awards-ingest/idv-migration-control.ts` | 3 tests (step wired, runs exactly the ingest's file, the guard refuses awards/other-table/DML); awards-ingest 214/214; tsc clean. | 🟡 PR open |
+
 ---
 
 ## 2026-10-04 — A1b: bounded cleanup of A1's double counting

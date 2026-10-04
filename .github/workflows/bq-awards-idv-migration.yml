@@ -26,6 +26,7 @@ on:
           - repull_window
           - idv_fy_backfill
           - a1b_cleanup
+          - rebuild_recipients
       confirmation:
         description: Type exactly IDV-MIGRATION-<step>
         type: string

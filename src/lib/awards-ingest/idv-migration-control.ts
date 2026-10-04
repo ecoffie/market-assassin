@@ -16,7 +16,25 @@ import {
   type LiveAwardsColumn,
 } from './awards-schema';
 
-export const IDV_MIGRATION_STEPS = ['preflight', 'snapshot', 'ddl', 'verify', 'repull_window', 'idv_fy_backfill', 'a1b_cleanup'] as const;
+export const IDV_MIGRATION_STEPS = ['preflight', 'snapshot', 'ddl', 'verify', 'repull_window', 'idv_fy_backfill', 'a1b_cleanup', 'rebuild_recipients'] as const;
+
+/** The SQL the weekly ingest runs after every MERGE; `rebuild_recipients` runs exactly this file. */
+export const RECIPIENTS_REBUILD_FILE = 'scripts/usaspending-ingest/rebuild-recipients-from-awards.sql' as const;
+const RECIPIENT_TABLES = ['recipients', 'recipients_rollup', 'recipients_rollup_merged'];
+
+/**
+ * The rebuild may only (re)create the three recipients tables — never touch `awards` or anything else.
+ * Checked on the statement text before it is sent. Comment lines are ignored.
+ */
+export function assertRecipientsRebuildOnly(sql: string): void {
+  const code = sql.split('\n').filter((l) => !/^\s*--/.test(l)).join('\n');
+  if (/\b(DELETE|UPDATE|MERGE|INSERT|DROP|ALTER|TRUNCATE)\b/i.test(code)) throw new Error('refused: recipients rebuild contains a DML/DDL other than CREATE OR REPLACE');
+  const targets = [...code.matchAll(/CREATE\s+OR\s+REPLACE\s+TABLE\s+`market-assasin\.usaspending\.([a-z_]+)`/gi)].map((m) => m[1]);
+  const creates = (code.match(/\bCREATE\b/gi) ?? []).length;
+  if (creates !== targets.length || targets.length !== RECIPIENT_TABLES.length || targets.some((t) => !RECIPIENT_TABLES.includes(t))) {
+    throw new Error(`refused: recipients rebuild must CREATE OR REPLACE exactly ${RECIPIENT_TABLES.join(', ')} (found ${targets.join(', ') || 'none'})`);
+  }
+}
 export type IdvMigrationStep = (typeof IDV_MIGRATION_STEPS)[number];
 
 /** Steps that write to production `awards` (need the fresh-clone gate). */
