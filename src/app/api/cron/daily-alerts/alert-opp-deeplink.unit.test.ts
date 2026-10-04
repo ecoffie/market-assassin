@@ -139,14 +139,16 @@ describe('both ends of the contract agree', () => {
 
   it('?opp= is honored with NO auth — logged-out and authenticated both work', () => {
     // The handler reads location.search and calls openOppDrawer directly; there is no token
-    // gate on this path (unlike ?ss=, which requires an email + token and bails signed-out).
+    // gate on this path (unlike ?ss=, which requires a signed-in session and asks a signed-out reader to sign in).
     const at = MAP.indexOf('window.openOppDrawer(nid)');
     const handler = MAP.slice(at - 280, at + 200);
     expect(handler).not.toContain('mi_beta_auth_token');
     expect(handler).not.toContain('_uemail');
-    // The contrasting ?ss= handler DOES gate — proving the distinction is real, not assumed.
-    const ssAt = MAP.indexOf("var m=(location.search||'').match(/[?&]ss=([^&]+)/)");
-    expect(MAP.slice(ssAt, ssAt + 700)).toContain('mi_beta_auth_token');
+    // The contrasting ?ss= handler DOES gate (on the shared map session) — proving the
+    // distinction is real, not assumed. A saved search is an account's record; a listing is public.
+    const ssAt = MAP.indexOf("var m=(location.search||'').match(/[?&]ss=([^&]+)/);");
+    expect(ssAt).toBeGreaterThan(0);
+    expect(MAP.slice(ssAt, ssAt + 6000)).toContain('window.__mapSession()');
   });
 
   it('a notice with no id still avoids the bare 136K-pin map, without the reader state', () => {

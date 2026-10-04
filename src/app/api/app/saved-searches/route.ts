@@ -10,6 +10,7 @@ import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filter
 import {
   createSavedSearch,
   deleteSavedSearch,
+  getSavedSearch,
   listSavedSearches,
   updateSavedSearch,
   LAST_SEEN_NOTICE_IDS_CAP,
@@ -60,6 +61,21 @@ export async function GET(request: NextRequest) {
       perSearch.push({ id: sf.id, count: n });
     }
     return NextResponse.json({ success: true, count: fresh.size, perSearch });
+  }
+
+  // ?id=<uuid> — ONE saved search, for the Map's ?ss= deep link. Owner-scoped: a deleted id and
+  // another account's id both answer 404 with the same body, so an id never confirms that a
+  // search exists for someone else. 401 (above) means the session itself is missing/expired.
+  const id = request.nextUrl.searchParams.get('id');
+  if (id != null) {
+    const one = await getSavedSearch(email, id);
+    if (!one.ok) {
+      if (one.code === 'not_found') {
+        return NextResponse.json({ success: false, code: 'not_found', error: one.message }, { status: 404 });
+      }
+      return NextResponse.json({ success: false, code: one.code, error: one.message }, { status: 503 });
+    }
+    return NextResponse.json({ success: true, search: one.data.search });
   }
 
   const listed = await listSavedSearches(email);

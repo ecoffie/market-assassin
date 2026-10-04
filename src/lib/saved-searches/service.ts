@@ -237,6 +237,43 @@ export async function listSavedSearches(
   };
 }
 
+const SAVED_SEARCH_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * One saved search, read AS ITS OWNER — the Map's `?ss=<id>` deep link.
+ *
+ * The id is only a pointer, never a credential: the row is selected by id AND the verified
+ * actor's email, so another account's id comes back exactly like a deleted one (`not_found`).
+ * A malformed id is answered the same way without a query — Postgres would reject the uuid
+ * cast with a 500, which would let a caller tell "bad shape" from "not yours".
+ */
+export async function getSavedSearch(
+  userEmail: string,
+  id: string,
+): Promise<SavedSearchServiceResult<{ search: SavedSearchRow }>> {
+  const actorErr = requireActorEmail(userEmail);
+  if (actorErr) return actorErr;
+
+  const wanted = (id || '').trim();
+  const notFound = { ok: false as const, code: 'not_found' as const, message: 'Saved search not found for this account' };
+  if (!SAVED_SEARCH_ID.test(wanted)) return notFound;
+
+  const supabase = getAppSupabase();
+  const { data, error } = await supabase
+    .from('saved_searches')
+    .select('*')
+    .eq('id', wanted)
+    .eq('user_email', normalizeEmail(userEmail))
+    .maybeSingle();
+
+  if (error) {
+    if (tableMissing(error)) return notFound;
+    return { ok: false, code: 'scheduler_unavailable', message: error.message };
+  }
+  if (!data) return notFound;
+  return { ok: true, data: { search: rowFromDb(data as Record<string, unknown>) } };
+}
+
 export async function updateSavedSearch(
   input: UpdateSavedSearchInput,
 ): Promise<SavedSearchServiceResult<{ search: SavedSearchRow; noop: boolean }>> {
