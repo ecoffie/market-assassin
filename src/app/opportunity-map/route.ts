@@ -1584,9 +1584,11 @@ const MOBILE_JS = '<script>(function(){'
 // The header is promoted to a dynamic "N of TOTAL" hero (reacts to filters + viewport, the
 // Zillow/Airbnb convention); SDVOSB/closing is demoted to a small secondary line. select() is
 // wrapped so clicking a card whose pin is inside a cluster zooms to reveal it first.
+// Proven Players copy — the SAME plain-JS source unit-tested in src/lib/players/copy.ts. Its own
+// <script>, loaded before VIEWPORT_JS (which calls it), so no template interpolation sits inside
+// the statically syntax-checked viewport script.
+const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_TEXT_JS + ';</script>';
 const VIEWPORT_JS = `<script>
-// Proven Players copy — the SAME function unit-tested in src/lib/players/copy.ts.
-window.__playersHeaderText=${PLAYERS_HEADER_TEXT_JS};
 (function(){
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
   // Company set-aside chip colors — reuses the map's existing legend palette exactly (see
@@ -10732,7 +10734,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

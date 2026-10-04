@@ -85,6 +85,7 @@ describe('Maps client — errors never render as 0 or sales copy', () => {
     expect(map).toMatch(/_st\.status==='unavailable'\)\|\|T\[t\]==null \? '\?'/);
   });
   it('the header copy is the unit-tested playersHeaderText, injected verbatim', () => {
-    expect(map).toContain('window.__playersHeaderText=${PLAYERS_HEADER_TEXT_JS}');
+    expect(map).toContain("const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_TEXT_JS + ';</script>';");
+    expect(map).toContain('PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS');
   });
 });
