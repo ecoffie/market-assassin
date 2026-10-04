@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { persistAccessEmail } from '@/lib/access-cookie';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 // Public pricing — anchor prices for the upgrade page.
 //
@@ -121,13 +122,17 @@ function MarketIntelligenceContent() {
     try {
       const response = await fetch('/api/briefings/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The session (if any) proves who is asking; naming the TYPED address here would make
+        // getMIApiHeaders purge a session that belongs to a different account.
+        headers: getMIApiHeaders(undefined, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (data.hasAccess) {
+      // Not signed in as this address: the typed email is only a hint. /briefings sends the
+      // one-time secure sign-in link to that mailbox, and access is decided after sign-in.
+      if (response.status === 401 || data.hasAccess) {
         persistAccessEmail(email);
         setRedirecting(true);
         await new Promise((resolve) => setTimeout(resolve, 120));
