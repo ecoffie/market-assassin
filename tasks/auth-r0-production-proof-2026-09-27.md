@@ -386,7 +386,15 @@ R0 classifies a **refused** call as `none`. It does not record which cookie was 
 
 **Final R0 report:** due when the window closes, 2026-10-04T04:07Z. Append it here as the **before-baseline of record**.
 
+**R0 CLOSED 2026-10-04T04:07Z.** The window confirmed the transition-first decision:
+- The only customer reliance on legacy identity was on the `/briefings` path that #1801 had already migrated.
+- No other customer surface depended on it.
+
+R1 then removed legacy identity (#1811 / #1813 / #1816, production-proven). The public summary is `tasks/auth-r1-closeout-2026-10-04.md`. Detailed per-route readouts are kept private.
+
 ## R1 — next steps (after R0 closeout; do NOT merge old #1750)
+
+**Status 2026-10-04: DONE.** R1 shipped as #1811 / #1813 / #1816. #1750 closed as superseded. See `tasks/auth-r1-closeout-2026-10-04.md`.
 
 1. Diff R1's intended invariants against current main.
 2. Identify what later security PRs already implemented: SEC-3 #1738, SEC-4 #1748, SEC-5 #1747, SEC-5d #1787, #1801.
