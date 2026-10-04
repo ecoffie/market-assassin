@@ -286,3 +286,33 @@ describe('slow framing never overrides anything newer', () => {
     expect(ROUTE).toContain('var _fhT=setTimeout(_fh,4000);');
   });
 });
+
+// ── 3. The header never prints "0 results" for a count that did not arrive ─────────────────
+function header(counts: Record<string, { state: string; total: number | null }>, note = '') {
+  const a = ROUTE.indexOf('  function updateHeader(');
+  let d = 0, j = ROUTE.indexOf('{', a);
+  for (; j < ROUTE.length; j++) { if (ROUTE[j] === '{') d++; else if (ROUTE[j] === '}') { d--; if (d === 0) break; } }
+  const fn = unT(ROUTE.slice(a, j + 1));
+  const els: Record<string, { innerHTML: string; hidden: boolean }> = { rescount: { innerHTML: '', hidden: false }, mapCount: { innerHTML: '', hidden: false } };
+  const ctx: Record<string, unknown> = {
+    MODE: 'open', TOTAL: 0, rows: [], OPPS: [], isContactMode: () => false, esc: (s: string) => s,
+    window: { __horizonCounts: counts, __horizons: { open: true, recompete: true, forecast: false }, __coverageNote: note },
+    document: { querySelector: () => null, getElementById: (id: string) => els[id] || null },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fn + '\nupdateHeader();', ctx);
+  return els.rescount.innerHTML.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+describe('the header count', () => {
+  it('a FAILED horizon with the others at 0 → "?", never "0 results" (measured: "0 results · Recompetes couldn’t load")', () => {
+    const h = header({ open: { state: 'ok', total: 0 }, recompete: { state: 'failed', total: null } }, 'Recompetes couldn’t load');
+    expect(h).toMatch(/^\? results/);
+    expect(h).not.toMatch(/^0 results/);
+  });
+  it('an UNKNOWN horizon → "?"', () => {
+    expect(header({ open: { state: 'ok', total: 0 }, recompete: { state: 'unknown', total: null } })).toMatch(/^\? results/);
+  });
+  it('every horizon measured at zero → a real "0 results"', () => {
+    expect(header({ open: { state: 'ok', total: 0 }, recompete: { state: 'ok', total: 0 } })).toMatch(/^0 results/);
+  });
+});

@@ -2069,7 +2069,9 @@ const VIEWPORT_JS = `<script>
         return;
       }
       if(_reported){
-        var _unknown=_en.some(function(h){ return _hc[h].state==='unknown'; });
+        // 'failed' is as unknown as 'unknown': a horizon that did not answer contributed no count, so
+        // the sum of the ones that did is not "0 results" (measured: "0 results · Recompetes couldn't load").
+        var _unknown=_en.some(function(h){ return _hc[h].state==='unknown'||_hc[h].state==='failed'; });
         var _rc0=document.getElementById('rescount');
         var _shown0=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
         if(_rc0)_rc0.innerHTML=_unknown
