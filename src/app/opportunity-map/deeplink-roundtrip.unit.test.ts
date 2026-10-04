@@ -73,7 +73,7 @@ describe('the ?ss= receiver is the single normalization point', () => {
   it('a signed-out reader is asked to sign in — the unfiltered map is never presented silently', () => {
     // Before 2026-10-04 this returned silently (and, worse, so did the signed-in path). Executed
     // behaviour lives in saved-search-link-restore.unit.test.ts.
-    expect(MAP).toContain("fail('signin','Sign in to open your saved search");
+    expect(MAP).toContain("fail({kind:'signin',icon:'info',title:'Sign in to open this saved search'");
   });
 });
 

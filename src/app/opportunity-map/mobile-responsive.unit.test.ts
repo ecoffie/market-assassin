@@ -24,8 +24,9 @@ const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 describe('opportunity-map mobile responsive invariants', () => {
   it('has a phone breakpoint that collapses the grid to one column', () => {
     expect(routeSrc.includes('@media(max-width:640px)'), 'the ≤640px mobile media query must exist').toBe(true);
-    // The single-column grid override (zhead / ztop / zcards stacked).
-    expect(routeSrc.includes('"zhead" "ztop" "zcards"'), 'mobile grid must stack to a single column').toBe(true);
+    // The single-column grid override (zhead / ztop / znote / zcards stacked; znote = the saved-search
+    // notice row, 0 px when absent).
+    expect(routeSrc.includes('"zhead" "ztop" "znote" "zcards"'), 'mobile grid must stack to a single column').toBe(true);
     // The fixed rail is hidden on phones (moves into the drawer).
     expect(/\.zrail\{display:none!important\}/.test(routeSrc), '.zrail must be display:none on mobile').toBe(true);
   });

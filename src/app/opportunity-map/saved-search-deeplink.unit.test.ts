@@ -70,7 +70,7 @@ describe('the map applies ?ss= through the existing restorer', () => {
     const block = map.slice(map.indexOf("var m=(location.search||'').match(/[?&]ss=([^&]+)/)"), map.indexOf('// "Today\'s Lens" pill names the lens'));
     // Never silent any more (2026-10-04): signed out / expired / missing / failed each SAY so on
     // the map. Behaviour is pinned by saved-search-link-restore.unit.test.ts (executed, not grepped).
-    expect(block).toContain("fail('signin'");
+    expect(block).toContain("fail({kind:'signin'");
     expect(block).toContain('res.status===404');
     expect(block).toContain('String(ss.id)!==wantId');   // a body that is not THE requested search is not applied
   });
