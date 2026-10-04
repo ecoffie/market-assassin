@@ -100,11 +100,35 @@ isolated headless Chrome, synthetic accounts, all rows deleted (re-counted 0).
 Wall-clock (~34–36 s per scenario) is dominated by Rosetta-translated Chrome under load and is not a performance
 measurement; the request count is the regression guard.
 
-**New finding (pre-existing, NOT caused by #1740/#1751, not fixed):** a typed `?opp=<notice_id>` link opens the
-drawer **twice** — two independent handlers each call `openOppDrawer` (the typed-address `go` loop and the
-shared-link `setInterval` opener) — so it records **2 `listing_open`** and fetches `opportunity-detail` twice.
-Needs its own narrow PR (one owner per typed address, as `?recompete=` already has) before M4 relies on Open-Now
-opens from deep links.
+**Finding (pre-existing, NOT caused by #1740/#1751) — ✅ CLOSED: fixed by #1803 (`1a33f289`), production-proven
+2026-10-03 (26/26):** a typed `?opp=<notice_id>` link opened the drawer **twice** — two independent handlers each called
+`openOppDrawer` (the boot `go` loop and the shared-link `setInterval` opener). The boot handler was removed; the
+SHARED-LINK handler (`force=true`, `fc-`/`?forecast=` routing) is the single owner. Invariant: one navigation
+intent → one drawer invocation → one base `opportunity-detail?id=` request → one `listing_open` (the `?intel=1`
+enrichment fetch is separate by design). Regression `opp-deeplink-single-owner.unit.test.ts` executes every `?opp=`
+handler in the route: 4/6 red on main → 6/6.
+
+| Check (synthetic accounts, all rows cleaned) | Baseline `37c93f53` | After `1a33f289` |
+|---|---|---|
+| Typed `?opp=` → `listing_open` | 2 | **1** |
+| Typed `?opp=` → base `opportunity-detail?id=` requests | 2 | **1** |
+| Share-format `?opp=&src=share&sh=` → events / base requests | 2 / 2 | **1 / 1** |
+| Close → reopen the same listing | +1 (+1 base request) | +1 (+1) |
+| Click a different Open Now listing | +1 | +1 |
+| `?recompete=` · `?forecast=` | 1 · 1 | 1 · 1 |
+| Buyer drawer `listing_open` / `office_viewed` | 0 / `dodaac:FA9948` | 0 / same |
+| Drawer kind / visible (opp, share, recompete, forecast, buyer) | open·open·recompete·forecast·buyer, shown | identical |
+| Open Now identity (event id = detail id = typed notice) | — | ✅ |
+| Maps discovery requests (opp/share/rc/fc/buyer) | 1/1/1/1/0 | 1/1/1/1/0 |
+| `?intel=1` enrichment requests (opp/share) | 2/2 | 1/1 (the duplicate open also duplicated it) |
+
+Also removed: the legacy handler fired the SAM drawer for old `?opp=fc-…` forecast links. Learn completion is
+still NOT wired.
+
+**⛔ Maps instrumentation prerequisite lane — CLOSED 2026-10-03 (Eric).** P0-G/PR 2b (#1726, #1740), the recompete
+retry count (#1751) and the `?opp=` single owner (#1803) are all production-proven. No further speculative Maps
+instrumentation audits; any future Maps work needs a **concrete observed defect**. Learn completion is wired
+separately (not in this lane).
 
 ### P0-I — company/profile storage (read-only POTETO, prod 2026-09-27) — DECIDED: option B, shipped #1749
 
