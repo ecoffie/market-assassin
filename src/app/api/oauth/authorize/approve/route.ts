@@ -2,14 +2,15 @@
  * Authorize approval — POST /api/oauth/authorize/approve.
  *
  * The consent page (/oauth/authorize) calls this AFTER the user clicks Allow.
- * Identity comes from the user's existing Mindy session (the MI 2FA token, via
- * requireUserAuth) — this is how we stay keyless without a second identity system.
+ * Identity comes ONLY from the user's verified session (the signed Mindy session or a
+ * Supabase session). The body's `email` is a claim that must match it; it never decides
+ * who is granting access. This is how we stay keyless without a second identity system.
  * We re-validate the client + redirect_uri server-side (never trust the page),
  * mint a single-use PKCE-bound authorization code, and hand back the redirect
  * the browser should follow to the client with ?code=…&state=….
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserAuth } from '@/lib/api-auth';
+import { verifyClaimedIdentity } from '@/lib/api-auth';
 import { getClient, saveAuthCode } from '@/lib/mcp/oauth/store';
 import { MCP_SCOPE } from '@/lib/mcp/oauth/tokens';
 import { oauthGate } from '@/lib/mcp/oauth/guard';
@@ -21,17 +22,24 @@ export async function POST(request: NextRequest) {
   const gated = oauthGate();
   if (gated) return gated;
 
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: 'unauthorized', error_description: auth.error || 'Sign in required' }, { status: 401 });
-  }
-
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
+
+  const identity = await verifyClaimedIdentity(
+    request,
+    typeof body.email === 'string' ? body.email : request.nextUrl.searchParams.get('email'),
+  );
+  if (identity.status !== 'verified') {
+    return NextResponse.json(
+      { error: 'unauthorized', error_description: identity.status === 'mismatch' ? 'Email mismatch with session' : 'Sign in required' },
+      { status: 401 },
+    );
+  }
+  const auth = { email: identity.email };
 
   const clientId = String(body.client_id || '');
   const redirectUri = String(body.redirect_uri || '');

@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server';
  * tasks/mindy-entitlement-audit-2026-09-26.md §14 R0.
  *
  * Four things are pinned here:
- *   1. verifyUserOwnsEmail's decision logic is byte-identical to its pre-R0 text (hash pin).
+ *   1. verifyUserOwnsEmail no longer has the weak methods (R1 replaced R0's byte-for-byte pin).
  *   2. For every authentication method, the wrapper returns the SAME object the core returns.
  *   3. The logger never throws and never blocks, even when the database write fails.
  *   4. Aggregation keys and the email-recording rule are exactly what the R1 readout assumes.
@@ -56,18 +56,17 @@ function signedLink(email: string) {
 
 // ─── 1. the decision logic did not change ──────────────────────────────────
 
-describe('R0 changed no return value in verifyUserOwnsEmail', () => {
-  it('the core body is byte-identical to the pre-R0 function (origin/main c36ed7df)', () => {
+describe('verifyUserOwnsEmail decision logic (R1: strong methods only)', () => {
+  it('the core no longer reads the plaintext cookie or trusts a claimed staff address', () => {
     const src = readFileSync(join(__dirname, 'api-auth.ts'), 'utf8');
     const start = src.indexOf('async function verifyUserOwnsEmailCore(');
     expect(start).toBeGreaterThan(-1);
-    const end = src.indexOf('\n}\n', start);
-    const body = src.slice(start, end + 3)
-      .replace('async function verifyUserOwnsEmailCore(', 'export async function verifyUserOwnsEmail(');
-    const sha = createHash('sha256').update(body).digest('hex');
-    // Pre-R0 `export async function verifyUserOwnsEmail(...) {...}` from origin/main.
-    // If this fails, an auth DECISION changed — that is R1's job, not R0's.
-    expect(sha).toBe('349ae3b6150b5a55238c9f3effc7dd26df00f2d780cd05a90e5166b6361211f3');
+    const body = src.slice(start, src.indexOf('\n}\n', start) + 3)
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''); // code only, not the comments explaining it
+    // R0 pinned this body byte-for-byte; R1 is the deliberate decision change it was waiting for.
+    expect(body).not.toMatch(/ma_access_email/);
+    expect(body).not.toMatch(/getStaffRole/);
+    expect(body).not.toMatch(/method: 'cookie'/);
   });
 
   it('the exported wrapper returns the core result object itself and only observes', () => {
@@ -127,18 +126,18 @@ describe('verifyUserOwnsEmail: identical results for every method, correctly cla
       observed: { method: 'mi_session', verified: 'yes', matches: 'yes', email: null },
     },
     {
-      name: 'plaintext cookie (Method 3)',
+      name: 'plaintext cookie is refused (R1)',
       claim: U,
       build: () => req('/api/pipeline/stats', { cookie: `ma_access_email=${U}` }),
-      expectAuth: true, expectMethod: 'cookie',
-      observed: { method: 'cookie', verified: 'no', matches: 'n/a', email: U },
+      expectAuth: false, expectMethod: undefined, expectError: 'Unauthorized - please sign in',
+      observed: { method: 'none', verified: 'no', matches: 'n/a', email: null },
     },
     {
-      name: 'claimed staff email, no proof (Method 4)',
+      name: 'claimed staff email with no proof is refused (R1)',
       claim: STAFF,
       build: () => req('/api/team/upgrade'),
-      expectAuth: true, expectMethod: 'cookie',
-      observed: { method: 'staff_claim', verified: 'no', matches: 'n/a', email: STAFF },
+      expectAuth: false, expectMethod: undefined, expectError: 'Unauthorized - please sign in',
+      observed: { method: 'none', verified: 'no', matches: 'n/a', email: null },
     },
     {
       name: 'nothing at all',
@@ -186,8 +185,8 @@ describe('verifyUserOwnsEmail: identical results for every method, correctly cla
   it('AUTH_OBSERVE=off writes nothing and still returns the same result', async () => {
     process.env.AUTH_OBSERVE = 'off';
     try {
-      const r = await verifyUserOwnsEmail(req('/api/x', { cookie: `ma_access_email=${U}` }), U);
-      expect(r).toEqual({ authenticated: true, email: U, method: 'cookie' });
+      const r = await verifyUserOwnsEmail(req('/api/x', { headers: { 'x-mi-auth-token': createMIAuthSessionToken(U) } }), U);
+      expect(r).toEqual({ authenticated: true, email: U, method: 'session' });
       await flush();
       expect(written).toHaveLength(0);
     } finally {
@@ -202,8 +201,8 @@ describe('logger failure is invisible to the caller', () => {
   it('a rejecting writer (DB down) does not throw or change the result', async () => {
     obs.__setObservationWriterForTests(async () => { throw new Error('connect ECONNREFUSED'); });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const r = await verifyUserOwnsEmail(req('/api/x', { cookie: 'ma_access_email=a@b.com' }), 'a@b.com');
-    expect(r).toEqual({ authenticated: true, email: 'a@b.com', method: 'cookie' });
+    const r = await verifyUserOwnsEmail(req('/api/x', { headers: { 'x-mi-auth-token': createMIAuthSessionToken('a@b.com') } }), 'a@b.com');
+    expect(r).toEqual({ authenticated: true, email: 'a@b.com', method: 'session' });
     await flush();
     warn.mockRestore();
   });

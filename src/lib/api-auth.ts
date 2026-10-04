@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac } from 'crypto';
 import { observeVerifyResult } from '@/lib/auth-observability';
@@ -415,19 +415,16 @@ export function generateEmailToken(email: string): { token: string; ts: number }
  * Tries multiple auth methods:
  * 1. Supabase session (from Authorization header)
  * 2. Signed email token (from URL params - for email action links)
- * 3. ma_access_email cookie (legacy, treat as weak auth)
+ * 3. Mindy session token (x-mi-auth-token / x-mi-2fa-token)
  *
- * The claimedEmail MUST match the authenticated email.
+ * The claimedEmail MUST match the authenticated email. Since R1 there is no weaker
+ * fallback: a cookie or a claimed staff address never authenticates.
  */
 export interface VerifyOptions {
   /**
-   * When true, ONLY cryptographically-strong methods are accepted: Supabase
-   * session, signed email token, or the Mindy 2FA session token. The legacy
-   * plaintext `ma_access_email` cookie and the token-less staff-domain bypass
-   * are REFUSED. Use this for the highest-sensitivity data (the vault), where a
-   * spoofable cookie or an unauthenticated staff-email claim is not acceptable
-   * (Data Trust Phase 1.4). Default false = existing behavior for all other
-   * routes, unchanged.
+   * Since R1 every caller gets strong-only verification; this flag now only changes
+   * the error text. Kept so existing call sites (the vault, save-profile, …) compile
+   * unchanged and keep stating their intent.
    */
   requireStrongAuth?: boolean;
 }
@@ -504,9 +501,9 @@ async function verifyUserOwnsEmailCore(
     }
   }
 
-  // Methods 3 & 4 below are WEAK (a spoofable plaintext cookie; a token-less
-  // staff-email claim). Strong-auth callers (the vault) stop here — for the
-  // most sensitive PII, only a real session/token/2FA is acceptable.
+  // R1: nothing else identifies a caller. The plaintext `ma_access_email` cookie and a
+  // claimed staff-domain address used to authenticate here; both are user-settable, so
+  // neither is evidence of who is calling. Staff sign in like everyone else.
   if (options.requireStrongAuth) {
     return {
       authenticated: false,
@@ -515,20 +512,82 @@ async function verifyUserOwnsEmailCore(
     };
   }
 
-  // Method 3: Check cookie (legacy, weak auth)
-  const cookieEmail = request.cookies.get('ma_access_email')?.value?.toLowerCase();
-  if (cookieEmail && cookieEmail === normalized) {
-    return { authenticated: true, email: normalized, method: 'cookie' };
-  }
-
-  // Method 4: Trust internal staff members (no cookie required)
-  // Staff members are trusted if the claimed email matches a known staff email
-  const staffRole = getStaffRole(normalized);
-  if (staffRole !== 'none') {
-    return { authenticated: true, email: normalized, method: 'cookie' };
-  }
-
   return { authenticated: false, email: null, error: 'Unauthorized - please sign in' };
+}
+
+/**
+ * The identity a request can PROVE, independent of any email it claims.
+ *
+ * Accepted: the signed Mindy session (x-mi-auth-token / x-mi-2fa-token / Bearer), a
+ * Supabase session (Bearer JWT), or a signed email-action link (?token=&ts=), which only
+ * proves the email it was signed for. Never a cookie, never a claimed staff address, never
+ * a body or query email on its own.
+ */
+export interface VerifiedIdentity {
+  email: string;
+  method: 'mi_session' | 'supabase' | 'signed_link';
+}
+
+export async function getVerifiedIdentity(
+  request: NextRequest,
+  claimedEmail?: string | null
+): Promise<VerifiedIdentity | null> {
+  try {
+    const { getTwoFactorTokenFromRequest, verifyTwoFactorSessionToken } = await import('@/lib/two-factor-session');
+    const miToken = getTwoFactorTokenFromRequest(request);
+    if (miToken) {
+      const r = verifyTwoFactorSessionToken(miToken);
+      if (r.valid && r.email) return { email: r.email.toLowerCase(), method: 'mi_session' };
+    }
+  } catch {
+    // fall through to the next method
+  }
+
+  if (request.headers.get('authorization')?.startsWith('Bearer ')) {
+    const session = await verifyUserSession(request);
+    if (session.authenticated && session.email) return { email: session.email.toLowerCase(), method: 'supabase' };
+  }
+
+  const claimed = claimedEmail?.toLowerCase().trim();
+  const token = request.nextUrl.searchParams.get('token');
+  const ts = request.nextUrl.searchParams.get('ts');
+  if (claimed && token && ts) {
+    const link = verifyEmailToken(claimed, token, ts);
+    if (link.authenticated && link.email) return { email: link.email, method: 'signed_link' };
+  }
+  return null;
+}
+
+/**
+ * Reconcile a claimed email with the proven identity.
+ *   verified  — an identity was proven and the claim (if any) matches it. Use `email`.
+ *   anonymous — nothing was proven. Callers answer 401 or serve the public/Free result.
+ *   mismatch  — an identity was proven for a DIFFERENT address than claimed. Always 401.
+ */
+export type ClaimedIdentity =
+  | { status: 'verified'; email: string; method: VerifiedIdentity['method'] }
+  | { status: 'anonymous' }
+  | { status: 'mismatch' };
+
+export async function verifyClaimedIdentity(
+  request: NextRequest,
+  claimedEmail?: string | null
+): Promise<ClaimedIdentity> {
+  const claimed = claimedEmail?.toLowerCase().trim() || null;
+  const identity = await getVerifiedIdentity(request, claimed);
+  if (!identity) return { status: 'anonymous' };
+  if (claimed && claimed !== identity.email) return { status: 'mismatch' };
+  return { status: 'verified', email: identity.email, method: identity.method };
+}
+
+/** The standard 401 for an anonymous or mismatched identity on a protected route. */
+export function identityFailureResponse(identity: Exclude<ClaimedIdentity, { status: 'verified' }>) {
+  return NextResponse.json(
+    identity.status === 'mismatch'
+      ? { error: 'Email mismatch with session', auth_required: true }
+      : { error: 'Sign in required', auth_required: true },
+    { status: 401 }
+  );
 }
 
 /**
