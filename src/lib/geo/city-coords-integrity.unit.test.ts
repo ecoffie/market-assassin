@@ -14,6 +14,8 @@ import { CITY_COORDS, geocodeCity } from './city-geocode';
 const manifest = JSON.parse(readFileSync(join(process.cwd(), 'data/geo/us-city-coords-corrections-2026-10-04.json'), 'utf8')) as {
   applied: Array<{ key: string; from: [number, number]; to: [number, number]; move_km: number; geoid: string }>;
   held: Array<{ key: string; from: [number, number]; to: [number, number]; move_km: number }>;
+  held_review: Array<{ key: string; cls: string; from: [number, number]; to: [number, number]; move_km: number }>;
+  held_resolved: Array<{ key: string; from: [number, number]; to: [number, number]; move_km: number; evidence: string }>;
 };
 const km = (a: [number, number], b: [number, number]) => {
   const r = Math.PI / 180;
@@ -47,10 +49,23 @@ describe('shared city coordinates — Census place truth', () => {
     for (const r of manifest.applied) expect(CITY_COORDS[r.key]).toEqual(r.to);
     for (const r of manifest.held) expect(CITY_COORDS[r.key]).toEqual(r.from);
   });
-  it('no applied move exceeds 25 km — larger moves are homonym risks and are held', () => {
+  it('no automatic move exceeds 25 km — larger moves are homonym risks and are held', () => {
     expect(Math.max(...manifest.applied.map((r) => r.move_km))).toBeLessThanOrEqual(25);
     expect(manifest.held.every((r) => r.move_km > 25)).toBe(true);
     expect(manifest.held.map((r) => r.key)).toContain('VOORHEES|NJ');
+  });
+  it('every held move was reviewed individually; only PROVEN SAME PLACE changed the table', () => {
+    expect(manifest.held_review).toHaveLength(79);
+    const proven = manifest.held_review.filter((r) => r.cls === 'PROVEN SAME PLACE').map((r) => r.key).sort();
+    expect(proven).toEqual(['COLUMBIA|SC', 'KINGMAN|AZ', 'KODIAK|AK', 'LANSING|MI', 'ORLANDO|FL', 'RIO RANCHO|NM', 'ROSWELL|NM']);
+    expect(manifest.held_resolved.map((r) => r.key).sort()).toEqual(proven);
+    for (const r of manifest.held_resolved) { expect(CITY_COORDS[r.key]).toEqual(r.to); expect(r.evidence.length).toBeGreaterThan(10); }
+    expect(manifest.held.map((r) => r.key)).not.toContain('ORLANDO|FL');
+    expect(manifest.held).toHaveLength(72);
+  });
+  it('Orlando, FL is the city — not the Kennedy Space Center ZIP that carries the postal name', () => {
+    expect(km(CITY_COORDS['ORLANDO|FL'], [28.4087, -81.2548])).toBeLessThan(0.1);
+    expect(km(CITY_COORDS['ORLANDO|FL'], [28.3067, -80.6862])).toBeGreaterThan(50);
   });
   it('the table keeps its identity: same keys, every value a finite [lat, lng] in US range', () => {
     expect(Object.keys(CITY_COORDS).length).toBe(29542);
