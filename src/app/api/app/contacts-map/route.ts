@@ -149,8 +149,10 @@ async function companiesPins(params: {
 }) {
   // GEOGRAPHY BEFORE RANK (Players repair, 2026-10-04). The viewport resolves to HQ states — and,
   // when only part of a state is visible, to the geocodable cities in view — and that scope goes
-  // INTO the query, so ranking happens inside the visible geography. Explicit ?state= wins and is
-  // state-wide. See src/lib/players/geography.ts and tasks/players-naics-coverage-audit-2026-10-04.md.
+  // INTO the query, so ranking happens inside the visible geography. An explicit ?state= is a
+  // filter, so the pins come from that state ∩ the visible cities too (it used to rank the whole
+  // state and crop afterwards: Richmond 541512/VA showed 0). See src/lib/players/geography.ts and
+  // tasks/players-naics-coverage-audit-2026-10-04.md.
   const geoScope = resolvePlayersGeoScope(params.bbox, params.state || undefined);
 
   const sortBy = SORT_TO_RECIPIENT_SORT[params.sort] || 'total_obligated';
@@ -158,6 +160,23 @@ async function companiesPins(params: {
   // firms actually in view surface instead of being crowded out by a couple
   // of dominant primes within that same state.
   const PER_STATE_LIMIT = 300;
+
+  // MARKET TRUTH for an explicit state is the whole state, not the slice in view — the same
+  // split every other map horizon makes (totalForFilters ignores the bbox; totalInView does not).
+  // Only needed when the pins query is narrower than the state; LIMIT 1 because only the
+  // window count (total_rows) is read.
+  const explicitStateScope = params.state && geoScope.states[0]?.cities ? params.state : null;
+  const marketP: Promise<RecipientSearchResult> | null = explicitStateScope
+    ? searchRecipients({
+        search: params.search || undefined,
+        naics: params.naics || undefined,
+        agency: params.agency || undefined,
+        state: explicitStateScope,
+        sortBy,
+        limit: 1,
+        liveBq: true,
+      })
+    : null;
 
   let total = 0;
   const parts: Array<{ status: PlayersStatus; rowCount: number }> = [];
@@ -206,6 +225,11 @@ async function companiesPins(params: {
       }),
     );
     for (const res of results) absorb(res);
+  }
+  if (marketP) {
+    const market = await marketP;
+    total = market.total;
+    parts.push({ status: market.status, rowCount: market.total > 0 ? 1 : 0 });
   }
 
   // Re-rank the merged, deduped set the same way the caller asked (per-state

@@ -34,9 +34,14 @@ export type GeocodeResult = {
 
 /** Small deterministic offset (~1km per step) so rows sharing one exact city coordinate
  *  don't perfectly overlap into a single dot. Bounded, not a ring — stays within the city. */
+const CITY_JITTER_STEP_DEG = 0.011;
+/** The farthest (per axis, in degrees) a city-precision pin can be drawn from its city's point.
+ *  Viewport filters that decide by city must pad by this, or a pin drawn inside the box is
+ *  excluded because its city's point sits just outside it. */
+export const CITY_JITTER_MAX_DEG = 6 * CITY_JITTER_STEP_DEG;
 function cityJitter([lat, lng]: [number, number], seed: number): [number, number] {
   const s = seed % 12;
-  return [lat + (s - 6) * 0.011, lng + (((s * 5) % 12) - 6) * 0.011];
+  return [lat + (s - 6) * CITY_JITTER_STEP_DEG, lng + (((s * 5) % 12) - 6) * CITY_JITTER_STEP_DEG];
 }
 
 /**

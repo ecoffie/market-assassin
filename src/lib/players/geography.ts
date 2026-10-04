@@ -12,7 +12,7 @@
  * Firms whose HQ city is not in the geocode table are placed at the state centroid; they are kept
  * only when that centroid is in view, which is exactly when the map would draw them.
  */
-import { CITY_COORDS } from '@/lib/geo/city-geocode';
+import { CITY_COORDS, CITY_JITTER_MAX_DEG } from '@/lib/geo/city-geocode';
 import { STATE_CENTROIDS, statesOverlappingBbox } from '@/lib/geo/state-centroids';
 
 export type Bbox = [number, number, number, number]; // west, south, east, north
@@ -53,10 +53,19 @@ function citiesByState() {
   return m;
 }
 
+/** A city counts as visible when ANY of its pins could be drawn inside the box: its point, padded by
+ *  the placement jitter. Testing the bare point dropped every Richmond firm from a Richmond view
+ *  (the city's point sits 0.003° south of that box while its pins draw inside it). The route's
+ *  final in-box check on the drawn position still decides what is shown. */
+function padded(b: Bbox, d: number): Bbox {
+  return [b[0] - d, b[1] - d, b[2] + d, b[3] + d];
+}
+
 export function stateGeoScope(state: string, bbox: Bbox): StateGeoScope {
   const all = citiesByState().get(state) || [];
   if (all.length === 0) return { state };
-  const visible = all.filter((c) => inBox(c.lat, c.lng, bbox)).map((c) => c.city);
+  const near = padded(bbox, CITY_JITTER_MAX_DEG);
+  const visible = all.filter((c) => inBox(c.lat, c.lng, near)).map((c) => c.city);
   if (visible.length === all.length) return { state }; // whole state in view
   const centroid = STATE_CENTROIDS[state];
   const centroidInView = !!centroid && inBox(centroid[0], centroid[1], bbox);
@@ -69,11 +78,14 @@ export function stateGeoScope(state: string, bbox: Bbox): StateGeoScope {
 }
 
 /**
- * An explicit `?state=` wins and is applied state-wide (the user named the geography). Otherwise
- * the viewport decides, down to the visible cities.
+ * An explicit `?state=` is a FILTER and the viewport is the VIEW: the pins come from the state ∩ the
+ * visible cities, filtered before ranking. It used to be applied state-wide, so a Richmond view of
+ * 541512/VA ranked Virginia's top 300 and then cropped to the box — 0 shown, 17 real firms there
+ * (P1, 2026-10-04). The route keeps the state-wide count as a separate market-truth query.
+ * Without an explicit state the viewport decides which states, down to the visible cities.
  */
 export function resolvePlayersGeoScope(bbox: Bbox, explicitState?: string): PlayersGeoScope {
-  if (explicitState) return { states: [{ state: explicitState }], droppedStates: [] };
+  if (explicitState) return { states: [stateGeoScope(explicitState, bbox)], droppedStates: [] };
   const overlapping = statesOverlappingBbox(bbox, 3, 99);
   const kept = overlapping.slice(0, PLAYERS_MAX_STATES);
   return {
