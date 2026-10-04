@@ -12,11 +12,9 @@ import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget
 import { MICRO_PURCHASE_THRESHOLD, SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 import { fetchPricingIntel } from '@/lib/utils/calc-rates';
 import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
-import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
+import { getEmailFromRequest, verifyMIAccess, verifiedClaimedEmail, type MIAccessTier } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
-import { getMarketAssassinTier } from '@/lib/access-codes';
-import { buildReportAlertProfileBody } from '@/lib/alerts/report-alert-profile-body';
 import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 
@@ -127,9 +125,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting: email-based if available, stricter IP-based for unauthenticated
-    const email = getEmailFromRequest(request, body);
+    const claimedEmail = getEmailFromRequest(request, body);
     // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
-    observeProGateIdentity(request, email);
+    observeProGateIdentity(request, claimedEmail);
+    // R1: the identity is the VERIFIED session, never the ma_access_email cookie or the body's
+    // userEmail on their own. An unverified claim is treated exactly like no email (unchanged
+    // anonymous behaviour) — it never reads the claimed customer's entitlement.
+    const email = await verifiedClaimedEmail(request, claimedEmail);
     if (email) {
       const rl = await checkReportRateLimit(email);
       if (!rl.allowed) return rateLimitResponse(rl);
@@ -981,16 +983,10 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Save alert profile for ALL MA users (non-blocking)
-    // This updates their alert preferences with the NAICS/PSC codes they actually use
-    if (email) {
-      const userTier = await getMarketAssassinTier(email);
-      if (userTier) {
-        saveAlertProfile(email, inputs).catch(err => {
-          console.error('[Alerts] Failed to save profile:', err);
-        });
-      }
-    }
+    // R1: the post-report call to /api/alerts/save-profile was REMOVED. It was a server-to-server
+    // fetch carrying only an email, so since #1747 (save-profile requires a verified identity) every
+    // call was refused, and before that it would REPLACE the user's alert NAICS on the strength of
+    // a claim. Re-adding it needs a signed call and a product ruling.
 
     // Filter reports based on access tier
     // Free tier only gets: governmentBuyers, budgetCheckup, simplifiedAcquisition
@@ -1059,34 +1055,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Save alert profile for MA Premium users
- * Called after report generation to enable weekly alerts
- *
- * Supports:
- * - NAICS code input (single or comma-separated prefixes like "236, 238")
- * - PSC code input (will be expanded to related NAICS codes)
- */
-async function saveAlertProfile(
-  email: string,
-  inputs: CoreInputs,
-): Promise<void> {
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai'}/api/alerts/save-profile`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildReportAlertProfileBody(email, inputs)),
-      }
-    );
-
-    if (response.ok) {
-      const result = await response.json();
-      console.log(`[Alerts] Saved alert profile for ${email}: ${result.data?.naicsCount || 0} NAICS codes`);
-    }
-  } catch (error) {
-    // Non-blocking, just log
-    console.error('[Alerts] Error saving profile:', error);
-  }
-}

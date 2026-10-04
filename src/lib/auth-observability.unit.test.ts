@@ -56,8 +56,8 @@ function signedLink(email: string) {
 
 // ─── 1. the decision logic did not change ──────────────────────────────────
 
-describe('R0 changed no return value in verifyUserOwnsEmail', () => {
-  it('the core body is byte-identical to the pre-R0 function (origin/main c36ed7df)', () => {
+describe('verifyUserOwnsEmail decision logic is pinned', () => {
+  it('the core body is byte-identical to the R1 function (weak methods removed, 2026-10-04)', () => {
     const src = readFileSync(join(__dirname, 'api-auth.ts'), 'utf8');
     const start = src.indexOf('async function verifyUserOwnsEmailCore(');
     expect(start).toBeGreaterThan(-1);
@@ -65,9 +65,10 @@ describe('R0 changed no return value in verifyUserOwnsEmail', () => {
     const body = src.slice(start, end + 3)
       .replace('async function verifyUserOwnsEmailCore(', 'export async function verifyUserOwnsEmail(');
     const sha = createHash('sha256').update(body).digest('hex');
-    // Pre-R0 `export async function verifyUserOwnsEmail(...) {...}` from origin/main.
-    // If this fails, an auth DECISION changed — that is R1's job, not R0's.
-    expect(sha).toBe('349ae3b6150b5a55238c9f3effc7dd26df00f2d780cd05a90e5166b6361211f3');
+    // R0 pinned the pre-R0 body (349ae3b6…). R1 deliberately removed Method 3 (plaintext cookie) and
+    // Method 4 (claimed staff email); this pins the R1 body. If this fails, an auth DECISION changed —
+    // review it as a security change, then re-pin.
+    expect(sha).toBe('4e02fa6be5b36f0293b514885dfdc4634489418872d73d39fa02e1f01dcba526');
   });
 
   it('the exported wrapper returns the core result object itself and only observes', () => {
@@ -127,18 +128,18 @@ describe('verifyUserOwnsEmail: identical results for every method, correctly cla
       observed: { method: 'mi_session', verified: 'yes', matches: 'yes', email: null },
     },
     {
-      name: 'plaintext cookie (Method 3)',
+      name: 'plaintext cookie (Method 3) — REFUSED since R1',
       claim: U,
       build: () => req('/api/pipeline/stats', { cookie: `ma_access_email=${U}` }),
-      expectAuth: true, expectMethod: 'cookie',
-      observed: { method: 'cookie', verified: 'no', matches: 'n/a', email: U },
+      expectAuth: false, expectMethod: undefined, expectError: 'Unauthorized - please sign in',
+      observed: { method: 'none', verified: 'no', matches: 'n/a', email: null },
     },
     {
-      name: 'claimed staff email, no proof (Method 4)',
+      name: 'claimed staff email, no proof (Method 4) — REFUSED since R1',
       claim: STAFF,
       build: () => req('/api/team/upgrade'),
-      expectAuth: true, expectMethod: 'cookie',
-      observed: { method: 'staff_claim', verified: 'no', matches: 'n/a', email: STAFF },
+      expectAuth: false, expectMethod: undefined, expectError: 'Unauthorized - please sign in',
+      observed: { method: 'none', verified: 'no', matches: 'n/a', email: null },
     },
     {
       name: 'nothing at all',
@@ -186,8 +187,8 @@ describe('verifyUserOwnsEmail: identical results for every method, correctly cla
   it('AUTH_OBSERVE=off writes nothing and still returns the same result', async () => {
     process.env.AUTH_OBSERVE = 'off';
     try {
-      const r = await verifyUserOwnsEmail(req('/api/x', { cookie: `ma_access_email=${U}` }), U);
-      expect(r).toEqual({ authenticated: true, email: U, method: 'cookie' });
+      const r = await verifyUserOwnsEmail(req('/api/x', { headers: { 'x-mi-auth-token': createMIAuthSessionToken(U) } }), U);
+      expect(r).toEqual({ authenticated: true, email: U, method: 'session' });
       await flush();
       expect(written).toHaveLength(0);
     } finally {
@@ -202,8 +203,8 @@ describe('logger failure is invisible to the caller', () => {
   it('a rejecting writer (DB down) does not throw or change the result', async () => {
     obs.__setObservationWriterForTests(async () => { throw new Error('connect ECONNREFUSED'); });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const r = await verifyUserOwnsEmail(req('/api/x', { cookie: 'ma_access_email=a@b.com' }), 'a@b.com');
-    expect(r).toEqual({ authenticated: true, email: 'a@b.com', method: 'cookie' });
+    const r = await verifyUserOwnsEmail(req('/api/x', { headers: { 'x-mi-auth-token': createMIAuthSessionToken('a@b.com') } }), 'a@b.com');
+    expect(r).toEqual({ authenticated: true, email: 'a@b.com', method: 'session' });
     await flush();
     warn.mockRestore();
   });

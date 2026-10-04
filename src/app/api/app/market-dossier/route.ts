@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifiedClaimedEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 import { hasPaidProductTier } from '@/lib/access/tier-rank';
@@ -64,10 +64,13 @@ function realSetAside(s: unknown): string | null {
 }
 
 export async function GET(request: NextRequest) {
-  const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
+  const claimedEmail = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
-  observeProGateIdentity(request, email);
-  if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
+  observeProGateIdentity(request, claimedEmail);
+  if (!claimedEmail) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
+  // R1: every read below (profile, workspace, tier) is keyed by the VERIFIED identity, never the claim.
+  const email = await verifiedClaimedEmail(request, claimedEmail);
+  if (!email) return NextResponse.json({ success: false, error: 'Sign in required', auth_required: true }, { status: 401 });
   if (!supabaseUrl || !supabaseKey) return NextResponse.json({ success: false, error: 'not configured' }, { status: 500 });
 
   const supabase = createClient(supabaseUrl, supabaseKey);

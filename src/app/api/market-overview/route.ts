@@ -23,7 +23,7 @@ import { createClient } from '@supabase/supabase-js';
 import { queryKeywordCoverage } from '@/lib/market/keyword-coverage';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifiedClaimedEmail } from '@/lib/api-auth';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import primeDb from '@/data/prime-contractors-database.json';
 import { observeProGateIdentity } from '@/lib/auth-observability';
@@ -400,10 +400,14 @@ export async function GET(request: NextRequest) {
   //    whether to render the locked-chip CTA (Pro/Team see the real detail).
   type ViewerTier = 'free' | 'pro' | 'team' | 'enterprise' | 'none';
   let tier: ViewerTier = 'free';
+  // R1: only a VERIFIED identity can raise the tier; a bare ?email= is the Free view.
   if (email) {
     try {
-      const access = await verifyMIAccess(email);
-      tier = (access?.tier as ViewerTier) || 'free';
+      const verifiedEmail = await verifiedClaimedEmail(request, email);
+      if (verifiedEmail) {
+        const access = await verifyMIAccess(verifiedEmail);
+        tier = (access?.tier as ViewerTier) || 'free';
+      }
     } catch { /* default free */ }
   }
   const isPaid = hasPaidProductTier(tier);

@@ -47,6 +47,7 @@ import ReportsDisplay from '@/components/federal-market-assassin/reports/Reports
 import KittLoader from '@/components/federal-market-assassin/ui/KittLoader';
 import { MarketAssassinTier } from '@/lib/access-codes';
 import { captureMarketAssassinSearch } from '@/lib/briefings/capture-search';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 export default function FederalMarketAssassinPage() {
   return (
@@ -301,7 +302,8 @@ function FederalMarketAssassinContent() {
 
       const response = await fetch('/api/reports/generate-all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // R1: send the Mindy session when this browser has one (a bare cookie no longer identifies).
+        headers: getMIApiHeaders(userEmail, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           inputs: coreInputs,
           selectedAgencies,
