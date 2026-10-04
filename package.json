@@ -54,6 +54,7 @@
     "verify:beginner": "npx tsx scripts/verify-beginner-translation.ts",
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
+    "verify:capability-match": "caffeinate -i tsx scripts/verify-capability-match.ts",
     "verify:beginner-try": "npx tsx --tsconfig tsconfig.json scripts/verify-beginner-try.mjs",
     "verify:task-order-scope": "tsx scripts/verify-task-order-scope.ts",
     "vehicles:verify": "tsx scripts/verify-vehicle-parents.ts",

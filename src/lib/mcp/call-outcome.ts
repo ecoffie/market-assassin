@@ -25,6 +25,8 @@ export type CallOutcome =
   | 'grounded'
   /** A valid query that honestly found nothing. A paid research answer, not a failure. */
   | 'no_result'
+  /** Useful but UNVERIFIED evidence (e.g. a candidate market without company identity). */
+  | 'candidate'
   /** Mindy's upstream/dependency failed and nothing usable came back. */
   | 'degraded'
   /** The tool ran but declined: invalid/missing input, or the account is not set up. */
@@ -77,6 +79,12 @@ export function classifyCallOutcome(result: unknown): OutcomeTelemetry {
     outcome = 'refused';
   } else if (billingOutcome === 'nonbillable_system_failure') {
     outcome = 'degraded';
+  } else if (billingOutcome === 'billable_candidate') {
+    // grounded=false here means "not corroborated", not "nothing came back" — the measured
+    // ChatGPT dev-mode run logged 8/8 capability matches as no_result for this reason.
+    outcome = 'candidate';
+  } else if (billingOutcome === 'nonbillable_no_market') {
+    outcome = 'no_result';
   } else if (grounded === true) {
     outcome = 'grounded';
   } else if (grounded === false) {

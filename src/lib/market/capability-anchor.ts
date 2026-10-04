@@ -86,6 +86,9 @@ export interface RankedAnchorCandidate {
   phrase: string;
   score: number;
   rejectReason?: string;
+  kind?: AnchorCandidateKind;
+  /** 'extracted' = the sentence-aware extractor (tier 1); 'derived' = keywords + decomposition. */
+  origin?: 'extracted' | 'derived';
 }
 
 export interface BrandStripContext {
@@ -235,9 +238,10 @@ export function scoreAnchorPhrase(phrase: string, brand: Set<string>): { score: 
   if (/\bregulatory affairs\b/.test(p) || (words.length === 1 && p === 'affairs')) {
     return { score: -800, rejectReason: 'generic_abstraction' };
   }
-  if (/\b(asphalt|roofing|shingle)\b/.test(p) && !/\b(concrete|reinforcement|construction|drywall|forming|metal stud)\b/.test(p)) {
-    return { score: -600, rejectReason: 'wrong_trade_interpretation' };
-  }
+  // (A global `roofing|asphalt|shingle` ban used to live here, written for one concrete
+  // contractor (Morehouse "Morris Builders") whose text never says roofing. It rejected every
+  // genuine roofing contractor. The real guard is SOURCE GROUNDING in rankAnchorCandidates:
+  // an anchor's words must come from the company's own text.)
   if (/\bexpert solutions\b/.test(p)) {
     return { score: -500, rejectReason: 'generic_abstraction' };
   }
@@ -277,6 +281,179 @@ export function scoreAnchorPhrase(phrase: string, brand: Set<string>): { score: 
   return { score };
 }
 
+/**
+ * PLAIN-ENGLISH CANDIDATES (ChatGPT blocker #3, 2026-10-04).
+ *
+ * Beginners describe WHO they are before WHAT they do — "Small engineering firm doing
+ * environmental remediation", "We're a 20-person firm that does building automation and energy
+ * audits". The ranker used to anchor on "small engineering" and "automation and energy" — a
+ * size descriptor and a phrase spanning two activities — and keywordCoverage (exact phrase on
+ * USASpending) found nothing, so the tool returned NO market for 8 of 22 ordinary businesses.
+ * These helpers only REARRANGE the company's own words; they never add a word.
+ */
+const LEAD_FILLER = new Set([
+  'we', 'our', 'i', 'my', 'us', 'do', 'does', 'doing', 'make', 'makes', 'making', 'build', 'builds',
+  'provide', 'provides', 'providing', 'offer', 'offers', 'offering', 'perform', 'performs',
+  'licensed', 'certified', 'experienced', 'professional', 'that', 'who', 'manufacture',
+  'manufactures', 'design', 'designs', 'custom', 'help', 'helps', 'achieve', 'deliver', 'delivers',
+  'placing', 'serve', 'serves', 'serving', 'supporting', 'specialize', 'specializes', 'specializing',
+]);
+const DESCRIPTOR_TOKENS = new Set([
+  'small', 'firm', 'company', 'business', 'agency', 'contractor', 'contractors', 'family-owned',
+  'family-operated', 'veteran-owned', 'woman-owned', 'women-owned', 'minority-owned', 'owned',
+  'operated', 'based', 'local', 'leading', 'trusted', 'full-service',
+]);
+const PERSON_COUNT_RE = /^\d+[- ]?(person|people|employee|employees|man|staff)$/;
+/** Words after these describe the CUSTOMER, EQUIPMENT or PLACE — never the work itself
+ *  ("photogrammetry FOR infrastructure inspection", "haul freight WITH a fleet of trailers",
+ *  "roofing contractor IN Florida", "training software FOR clinicians"). */
+const OBJECT_INTRO_RE = /\s(?:for|to|with|serving|across|throughout|in|near|at|through|by|via)\s/i;
+const CONJUNCTION_SPLIT_RE = /\s*(?:,|;|\s&\s|\band\b|\bor\b|\bplus\b)\s*/i;
+
+function normalizeForGrounding(text: string): string {
+  return ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+}
+
+/** Strip filler/descriptors and hyphen-joins from one phrase. Null when nothing is left. */
+export function cleanAnchorCandidate(phrase: string): string | null {
+  const words = phrase
+    .toLowerCase()
+    .replace(/[’']s\b/g, '')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    // "drone-based" / "cloud-based" qualify the work; they are not the work.
+    .filter((w) => !/-based$/.test(w))
+    .flatMap((w) => (DESCRIPTOR_TOKENS.has(w) || SOCIOECONOMIC_FRAGMENT_RE.test(w) || PERSON_COUNT_RE.test(w) ? [] : w.split('-')))
+    .filter((w) => w && !DESCRIPTOR_TOKENS.has(w));
+  while (words.length && LEAD_FILLER.has(words[0])) words.shift();
+  while (words.length && (LEAD_FILLER.has(words[words.length - 1]) || BARE_CONJUNCTIONS.has(words[words.length - 1]))) words.pop();
+  const out = words.join(' ').trim();
+  return out.length >= 3 ? out : null;
+}
+
+/** How a candidate was derived — candidates are probed phrases first, single words last. */
+export type AnchorCandidateKind = 'phrase' | 'bigram' | 'head' | 'modifier';
+const KIND_ORDER: Record<AnchorCandidateKind, number> = { phrase: 0, bigram: 1, head: 2, modifier: 3 };
+
+/** Trailing nouns that name a deliverable type, not the trade ("NEPA compliance STUDIES",
+ *  "marketing MATERIALS", "metal PARTS"). Never a head on their own. */
+const GENERIC_HEAD_NOUNS = new Set([
+  'studies', 'study', 'projects', 'project', 'work', 'works', 'jobs', 'tasks', 'materials',
+  'products', 'items', 'parts', 'equipment', 'supplies', 'goods', 'consulting', 'professionals',
+]);
+
+/** Evaluative adjectives describe how well, never what — they cannot name a market. */
+const EVALUATIVE_ADJECTIVES = new Set([
+  'better', 'best', 'greater', 'improved', 'efficient', 'effective', 'reliable', 'innovative',
+  'strategic', 'superior', 'excellent', 'dependable', 'affordable', 'premier', 'proven',
+]);
+
+function distinctiveWord(w: string): boolean {
+  if (ALLOWED_SHORT_UNIGRAMS.has(w)) return true;
+  return (
+    w.length >= 5 &&
+    !GENERIC_ANCHOR_UNIGRAMS.has(w) &&
+    !GENERIC_ABSTRACTIONS.has(w) &&
+    !OK_AS_TRAILING.has(w) &&
+    !LEAD_FILLER.has(w) &&
+    !EVALUATIVE_ADJECTIVES.has(w) &&
+    !GENERIC_HEAD_NOUNS.has(w)
+  );
+}
+
+/**
+ * The individual activities inside a phrase. Only the ACTIVITY side is used (everything before
+ * for/to/with/in…); it is split at and/or/commas, and each part yields itself, its contiguous
+ * word pairs (3–5 word parts), its head noun and — for two-word parts — its modifier.
+ */
+export function decomposeAnchorPhraseWithKinds(phrase: string): { phrase: string; kind: AnchorCandidateKind }[] {
+  const out = new Map<string, AnchorCandidateKind>();
+  const put = (p: string | null, kind: AnchorCandidateKind) => {
+    if (!p) return;
+    const prev = out.get(p);
+    if (prev === undefined || KIND_ORDER[kind] < KIND_ORDER[prev]) out.set(p, kind);
+  };
+  const activitySide = ` ${phrase} `.split(OBJECT_INTRO_RE)[0];
+  for (const rawPart of activitySide.split(CONJUNCTION_SPLIT_RE)) {
+    const part = cleanAnchorCandidate(rawPart);
+    if (!part) continue;
+    const words = part.split(' ');
+    // A single word is never a 'phrase': it ranks with the other single words, and only if it
+    // could name a market at all.
+    if (words.length === 1) {
+      if (distinctiveWord(part)) put(part, 'head');
+      continue;
+    }
+    put(part, 'phrase');
+    if (words.length >= 3 && words.length <= 5) {
+      for (let i = 0; i + 1 < words.length; i++) put(`${words[i]} ${words[i + 1]}`, 'bigram');
+    }
+    if (words.length >= 2) {
+      // Head: the last DISTINCTIVE word, skipping trailing service-line / deliverable nouns
+      // ("translation services" → translation, "environmental consulting" → environmental).
+      const head = [...words].reverse().find((w) => distinctiveWord(w));
+      if (head) put(head, 'head');
+      if (words.length === 2 && distinctiveWord(words[0]) && words[0] !== head) put(words[0], 'modifier');
+    }
+  }
+  return [...out.entries()].map(([p, kind]) => ({ phrase: p, kind }));
+}
+
+export function decomposeAnchorPhrase(phrase: string): string[] {
+  return decomposeAnchorPhraseWithKinds(phrase).map((c) => c.phrase);
+}
+
+/**
+ * The ACTIVITY side of the company's own text: each clause up to its first for/to/with/in…
+ * Words that only ever appear after those (the customer, equipment or place) never anchor —
+ * even when the keyword extractor hands them over as a separate fragment ("tractor-trailers"
+ * from "haul freight with a fleet of tractor-trailers", "infrastructure" from "… for
+ * infrastructure inspection").
+ */
+export function activitySideText(sourceText: string): string {
+  return sourceText
+    .split(/[.;:!?\n]+/)
+    .map((clause) => ` ${clause} `.split(OBJECT_INTRO_RE)[0])
+    .join(' ');
+}
+
+/**
+ * Phrases that name the TYPE OF FIRM — the one or two words before firm/company/agency/
+ * contractor/provider ("small ENGINEERING firm", "a FACILITIES MANAGEMENT company", "an IT and
+ * ENERGY SOLUTIONS provider"). They describe the company, not the specific work, so they are
+ * tried last — never preferred over an activity the text also names. Agency/contractor are
+ * excluded: there the firm type IS the trade.
+ */
+export function firmTypePhrases(sourceText: string | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!sourceText) return out;
+  // Not agency/contractor: there the firm type IS the trade ("staffing agency", "roofing contractor").
+  const re = /\b([a-z][a-z-]*(?:\s+[a-z][a-z-]*)?)\s+(?:firm|company|provider|business)\b/gi;
+  for (const m of sourceText.matchAll(re)) {
+    const words = (cleanAnchorCandidate(m[1]) ?? '').split(' ').filter(Boolean);
+    if (!words.length) continue;
+    out.add(words.join(' '));
+    out.add(words[words.length - 1]);
+  }
+  return out;
+}
+
+/** Every word of the candidate appears in the company's own text — by default on its ACTIVITY side. */
+export function isGroundedInSource(
+  phrase: string,
+  sourceText: string | undefined,
+  opts: { activitySideOnly?: boolean } = {},
+): boolean {
+  if (!sourceText) return true;
+  const src = normalizeForGrounding(opts.activitySideOnly === false ? sourceText : activitySideText(sourceText));
+  return phrase
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .every((w) => src.includes(` ${w} `) || src.includes(` ${w}s `) || (w.endsWith('s') && src.includes(` ${w.slice(0, -1)} `)));
+}
+
 /** Rank candidates; never pick merely because a phrase appeared first. */
 export function rankAnchorCandidates(
   keywords: string[],
@@ -284,27 +461,66 @@ export function rankAnchorCandidates(
 ): RankedAnchorCandidate[] {
   const brand = buildBrandTokenSet(ctx);
   const seen = new Set<string>();
-  const ranked: RankedAnchorCandidate[] = [];
-
   const bonus = new Map<string, number>();
-  const candidates: string[] = [];
-  for (const extracted of ctx.sourceText ? extractCapabilityPhrases(ctx.sourceText) : []) {
-    bonus.set(extracted.phrase, extracted.bonus);
-    candidates.push(extracted.phrase);
+  // TIER 1 — phrases from the sentence-aware extractor keep their previous order exactly (that
+  // ordering is what the Morehouse Ascend exact cases pin). TIER 2 — the keyword fragments
+  // (cleaned of filler/descriptors) and their decomposition (plain-English, 2026-10-04),
+  // ordered whole phrases → word pairs → single words. The probe ladder tries tier 1 first.
+  const extracted: string[] = [];
+  const fromExtractor = new Set<string>();
+  for (const e of ctx.sourceText ? extractCapabilityPhrases(ctx.sourceText) : []) {
+    bonus.set(e.phrase, e.bonus);
+    extracted.push(e.phrase);
+    fromExtractor.add(e.phrase.trim().toLowerCase());
   }
-  candidates.push(...keywords);
 
-  for (const kw of candidates) {
+  // GROUNDING by provenance. The extractor reads whole sentences and NORMALIZES ("maintaining
+  // elevators" → "elevator maintenance"), so its phrases are trusted as-is. Everything else must
+  // come from the ACTIVITY side of the text — the words before for/with/in… — so a fragment like
+  // "tractor-trailers" (from "… with a fleet of tractor-trailers") cannot anchor.
+  const scoreOne = (kw: string): RankedAnchorCandidate => {
     const key = kw.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+    const grounded = fromExtractor.has(key) || isGroundedInSource(key, ctx.sourceText);
+    if (!grounded) {
+      return { phrase: kw.trim(), score: -1000, rejectReason: 'not_in_source' };
+    }
     const { score, rejectReason } = scoreAnchorPhrase(kw, brand);
     // Provenance never rescues a rejected phrase — it only orders survivors.
     const adjusted = score < 0 ? score : score + (bonus.get(key) ?? 0);
-    ranked.push({ phrase: kw.trim(), score: adjusted, ...(rejectReason ? { rejectReason } : {}) });
+    return { phrase: kw.trim(), score: adjusted, ...(rejectReason ? { rejectReason } : {}) };
+  };
+
+  const tier1: RankedAnchorCandidate[] = [];
+  for (const kw of extracted) {
+    const key = kw.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    tier1.push({ ...scoreOne(kw), kind: 'phrase', origin: 'extracted' });
   }
 
-  return ranked.sort((a, b) => b.score - a.score);
+  const tier2: RankedAnchorCandidate[] = [];
+  for (const kw of [...extracted, ...keywords]) {
+    for (const { phrase: c, kind } of decomposeAnchorPhraseWithKinds(kw)) {
+      if (seen.has(c)) continue;
+      seen.add(c);
+      tier2.push({ ...scoreOne(c), kind, origin: 'derived' });
+    }
+  }
+
+  const firmType = firmTypePhrases(ctx.sourceText);
+  const isFirmType = (r: RankedAnchorCandidate) => firmType.has(r.phrase.trim().toLowerCase());
+  const survivors = (list: RankedAnchorCandidate[]) => list.filter((r) => r.score >= 0 && !isFirmType(r));
+  const rejected = [...tier1, ...tier2].filter((r) => r.score < 0);
+  return [
+    ...survivors(tier1).sort((a, b) => b.score - a.score),
+    ...survivors(tier2).sort((a, b) => {
+      const k = KIND_ORDER[a.kind ?? 'phrase'] - KIND_ORDER[b.kind ?? 'phrase'];
+      return k !== 0 ? k : b.score - a.score;
+    }),
+    // Firm-type phrases last among survivors (see firmTypePhrases), tier 1 before tier 2.
+    ...[...tier1, ...tier2].filter((r) => r.score >= 0 && isFirmType(r)),
+    ...rejected.sort((a, b) => b.score - a.score),
+  ];
 }
 
 export function normalizeSelectedAnchor(phrase: string): string {

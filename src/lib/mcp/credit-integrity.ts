@@ -22,17 +22,40 @@
 export type BillingOutcome =
   | 'billable_success'
   | 'billable_no_result'
+  /** A useful but UNVERIFIED answer, charged the tool's reduced price (CANDIDATE_CREDITS). */
+  | 'billable_candidate'
   | 'nonbillable_invalid_input'
   | 'nonbillable_not_configured'
-  | 'nonbillable_system_failure';
+  | 'nonbillable_system_failure'
+  /** The tool ran and established that nothing defensible matched — not a sold answer. */
+  | 'nonbillable_no_market';
 
 const OUTCOMES: ReadonlySet<string> = new Set<BillingOutcome>([
   'billable_success',
   'billable_no_result',
+  'billable_candidate',
   'nonbillable_invalid_input',
   'nonbillable_not_configured',
   'nonbillable_system_failure',
+  'nonbillable_no_market',
 ]);
+
+/**
+ * Reduced price for a `billable_candidate` outcome, per tool. Owner decision 2026-10-04
+ * (ChatGPT blocker #3, Option D, r = 10): capability_market_match charges 50 for a grounded
+ * (company-corroborated) market, 10 for a useful candidate market, 0 for an empty or failed one.
+ * A tool absent here is never charged a reduced price — its candidate outcome bills in full.
+ */
+export const CANDIDATE_CREDITS: Readonly<Record<string, number>> = {
+  capability_market_match: 10,
+};
+
+/** The credits a completed, billable call is charged. Never more than the tool's base price. */
+export function creditsForOutcome(tool: string, outcome: BillingOutcome, baseCredits: number): number {
+  if (!isBillable(outcome)) return 0;
+  if (outcome === 'billable_candidate') return Math.min(baseCredits, CANDIDATE_CREDITS[tool] ?? baseCredits);
+  return baseCredits;
+}
 
 /**
  * Tier-1/Tier-2 tools (shared with Mindy Chat) report a refusal as
@@ -54,7 +77,7 @@ export function errorCodeBillingOutcome(code: string): BillingOutcome {
 }
 
 export function isBillable(outcome: BillingOutcome): boolean {
-  return outcome === 'billable_success' || outcome === 'billable_no_result';
+  return outcome === 'billable_success' || outcome === 'billable_no_result' || outcome === 'billable_candidate';
 }
 
 /**

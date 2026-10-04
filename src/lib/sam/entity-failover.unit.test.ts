@@ -113,7 +113,9 @@ describe('billing — a degraded, empty paid call is not charged', () => {
 
   it('metered.ts skips the debit when degraded && !grounded', () => {
     expect(rule()).toMatch(/meta\?\.degraded === true && meta\?\.grounded !== true\) return 'nonbillable_system_failure'/);
-    expect(metered()).toMatch(/if \(!isBillable\(classifyBillingOutcome\(result\)\)\) \{[\s\S]{0,80}status: 'uncharged'/);
+    // The outcome is computed once (billingOutcome) so the charge can follow it (Option D,
+    // 2026-10-04); the guard is the same: a non-billable result is logged uncharged, never debited.
+    expect(metered()).toMatch(/const billingOutcome = classifyBillingOutcome\(result\);\s*if \(!isBillable\(billingOutcome\)\) \{[\s\S]{0,80}status: 'uncharged'/);
   });
 
   it('a GENUINE no-match still bills (that is a real answer)', () => {

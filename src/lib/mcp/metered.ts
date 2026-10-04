@@ -17,7 +17,7 @@ import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
-import { classifyBillingOutcome, isBillable, preflightPaidInput } from './credit-integrity';
+import { classifyBillingOutcome, creditsForOutcome, isBillable, preflightPaidInput } from './credit-integrity';
 import { blockedOutcome, classifyCallOutcome, errorOutcome } from './call-outcome';
 import { recordPaywallAttempt, paywallMessage, RESUME_BASE } from './paywall';
 import {
@@ -295,7 +295,8 @@ export async function runMeteredTool(
   // `_meta.billing_outcome` (e.g. market-report `measurement_failure`, which can be
   // grounded on optional sections while the REQUIRED measurement failed). Nothing has
   // been debited yet, so a non-billable outcome is simply never charged — no refund.
-  if (!isBillable(classifyBillingOutcome(result))) {
+  const billingOutcome = classifyBillingOutcome(result);
+  if (!isBillable(billingOutcome)) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: telemetry });
     // Report the balance of the payer that WOULD have paid — a pooled member's personal
     // balance is not the number that governs their calls.
@@ -304,9 +305,12 @@ export async function runMeteredTool(
   }
 
   // 3) Priced tool → debit the RESOLVED payer on success (atomic).
-  // With zero pools this is byte-for-byte the previous `debitCredits` call.
+  // With zero pools this is byte-for-byte the previous `debitCredits` call. `charge` equals
+  // `cost` except for a `billable_candidate` outcome, which bills the tool's reduced price
+  // (CANDIDATE_CREDITS — e.g. capability_market_match 10 instead of 50).
+  const charge = creditsForOutcome(name, billingOutcome, cost);
   const debit = await debitResolvedPayer(
-    ctx.userEmail, cost,
+    ctx.userEmail, charge,
     // ChatGPT-originated personal debits are ATTRIBUTED (p_channel) so auto-recharge can
     // exclude them: a balance ChatGPT drained must never charge the user's card. Only the
     // 'chatgpt' channel adds the key — the Claude path's meta is unchanged.
@@ -322,8 +326,8 @@ export async function runMeteredTool(
   // would charge an individual's card for their employer's shared allowance.
   const recharge = (bal: number) => debit.payer === 'personal' && bal < AUTORECHARGE_SIGNAL_FLOOR;
   if (debit.ok) {
-    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: telemetry });
-    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance), funding: poolFunding(payer) };
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: charge, latencyMs, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: telemetry });
+    return { ok: true, result, creditsCharged: charge, balance: debit.newBalance, needsRecharge: recharge(debit.newBalance), funding: poolFunding(payer) };
   }
 
   // Edge race: balance dropped below cost between pre-check and debit (concurrent

@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — capability_market_match: plain-English matching + Option D billing (ChatGPT blocker #3)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | MCP / capability_market_match quality + billing | In ChatGPT dev mode 6 of 8 ordinary descriptions returned NO market (50 credits each). Cause: ONE anchor phrase was checked against USASpending (exact-phrase keyword search), and the ranker picked beginner-prose junk ("small engineering", "automation and energy", "does building automation"); a global `roofing` ban (written for one concrete contractor whose text never says roofing) rejected every real roofer. Now: (1) candidates are cleaned of filler/descriptors and split into individual activities; words after for/to/with/in (customer, equipment, place) never anchor; loose keyword fragments must be grounded on the activity side of the text (the extractor's curated phrases stay trusted and keep their order — Morehouse pins it); firm-type phrases ("engineering firm") are tried last; (2) the top 4 extractor + 6 derived candidates are probed IN PARALLEL with a 15s per-probe limit, and chosen by a ladder — first usable market (>= $5M, not too broad) in rank order, else a thin one (>= $500K), else an honest empty; a stalled probe takes the existing deadline path; (3) Option D r=10: grounded 50 · candidate 10 · empty 0 · degraded 0 (`billable_candidate` / `nonbillable_no_market`, `CANDIDATE_CREDITS`), telemetry outcome `candidate` split from `no_result`. | `export function selectAnchorFromProbes(` → `src/mcp/tools/capability-market-match.ts` | New 25-case plain-English fixture set. **Live (unbilled) baseline 16/25 → 24/25** (8 no-market + 1 wrong-market → 1 documented judgement miss: sign printing anchors on "marketing"/541810). Hermetic recorded replay (27), anchor rules (16), Option D billing/telemetry (10); all 32 Morehouse Ascend cases + the deadline contract still pass; MCP/market/ChatGPT suites 109 files / 1,203 tests green; tsc clean. | 🟡 PR open — not deployed |
 ## 2026-10-04 — get_solicitation_documents: bounded free continuation, question-driven paging, scope signal
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

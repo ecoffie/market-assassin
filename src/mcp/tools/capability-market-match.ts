@@ -26,11 +26,16 @@ import { topRecipientsByPsc } from '@/lib/usaspending/psc-recipients';
 import type { RecipientSearchRow as RecipientRow } from '@/lib/bigquery/recipients';
 import {
   pickBestAnchor,
+  rankAnchorCandidates,
+  normalizeSelectedAnchor,
+  evaluateTamBounds,
+  TAM_TOO_NARROW_USD,
   pickLeadKeyword,
   validateMarketAnchor,
   resolveLeadNaicsWithEvidence,
   type AnchorConfidence,
   type EntityIdentityStatus,
+  type RankedAnchorCandidate,
 } from '@/lib/market/capability-anchor';
 import { loadAnchorEvidence } from '@/lib/market/capability-anchor-evidence';
 import {
@@ -107,6 +112,10 @@ export interface CapabilityMarketMatchResult {
     >;
     elapsed_ms: number;
     note?: string;
+    anchor_probes?: { phrase: string; total_market: number | null; failed: boolean }[];
+    result_tier?: 'grounded' | 'candidate' | 'empty' | 'degraded';
+    billing_outcome?: 'billable_success' | 'billable_candidate' | 'nonbillable_no_market' | 'nonbillable_system_failure';
+    anchor_market_tier?: 'usable' | 'thin' | null;
   };
 }
 
@@ -116,6 +125,66 @@ export interface CapabilityMarketMatchResult {
  * deadline_exceeded on the representative drones capability. 55s leaves ~5s
  * for transport under maxDuration 60. */
 export const CAPABILITY_MARKET_MATCH_BUDGET_MS = 55_000;
+
+/**
+ * Plain-English anchor probing (ChatGPT blocker #3, 2026-10-04). The tool used to check
+ * federal spending for ONE anchor phrase; USASpending keyword search is an exact phrase, so a
+ * phrase nobody writes in a contract ("automation and energy", "small engineering") returned
+ * nothing and the tool gave up. Now the top candidates are probed in parallel and chosen by a
+ * ladder — rank order first, coverage only as the admission test.
+ */
+export const MAX_ORIGINAL_PROBES = 4;
+export const MAX_DERIVED_PROBES = 6;
+/** A candidate is a USABLE market at this size (one fiscal year, keyword coverage). */
+export const MIN_USABLE_MARKET_USD = 5_000_000;
+/** One probe may not hold the result: a stalled upstream request counts as failed after this. */
+export const ANCHOR_PROBE_TIMEOUT_MS = 15_000;
+
+export interface AnchorProbe {
+  phrase: string;
+  coverage: KeywordCoverage | null;
+  failed: boolean;
+  /** The probe hit ANCHOR_PROBE_TIMEOUT_MS (a stalled upstream), as opposed to erroring. */
+  timedOut?: boolean;
+}
+
+/**
+ * Pick the anchor from probes that are ALREADY in rank order. A ladder, not a score:
+ *   1. the first candidate whose market is usable (>= MIN_USABLE_MARKET_USD, not implausibly broad);
+ *   2. else the first with a thin but real market (>= TAM_TOO_NARROW_USD);
+ *   3. else nothing — an honest empty. Dollars never reorder candidates; they only admit them.
+ */
+export function selectAnchorFromProbes(probes: AnchorProbe[]): { probe: AnchorProbe; tier: 'usable' | 'thin' } | null {
+  const real = probes.filter((p) => p.coverage && p.coverage.totalMarket > 0);
+  const usable = real.find(
+    (p) => p.coverage!.totalMarket >= MIN_USABLE_MARKET_USD && evaluateTamBounds(p.coverage!.totalMarket) !== 'too_broad',
+  );
+  if (usable) return { probe: usable, tier: 'usable' };
+  const thin = real.find((p) => p.coverage!.totalMarket >= TAM_TOO_NARROW_USD);
+  return thin ? { probe: thin, tier: 'thin' } : null;
+}
+
+/**
+ * Which ranked candidates to probe: the best ORIGINAL candidates and the best DERIVED
+ * fallbacks, in rank order (originals first). Without reserved derived slots a long keyword
+ * list fills every probe and the plain-English fallbacks are never tried.
+ */
+export function chooseProbePhrases(ranked: RankedAnchorCandidate[]): string[] {
+  const out: string[] = [];
+  let originalsTaken = 0;
+  let derivedTaken = 0;
+  for (const r of ranked) {
+    if (r.score < 0) continue;
+    const isDerived = r.origin !== 'extracted';
+    if (isDerived ? derivedTaken >= MAX_DERIVED_PROBES : originalsTaken >= MAX_ORIGINAL_PROBES) continue;
+    const p = normalizeSelectedAnchor(r.phrase);
+    if (out.includes(p)) continue;
+    out.push(p);
+    if (isDerived) derivedTaken++;
+    else originalsTaken++;
+  }
+  return out;
+}
 
 /** Minimum remaining budget before we even start an optional enrichment section. */
 const MIN_SECTION_MS = 500;
@@ -181,6 +250,10 @@ function miss(note: string, started: number, partial?: Partial<CapabilityMarketM
     _meta: {
       grounded: false,
       degraded: false,
+      // Nothing defensible matched: an honest empty is not a sold answer (owner decision
+      // 2026-10-04, Option D — empty = 0 credits).
+      result_tier: 'empty',
+      billing_outcome: 'nonbillable_no_market',
       anchor_verified: false,
       anchor_confidence: 'unverified',
       lead_keyword: null,
@@ -219,6 +292,8 @@ function deadlineMiss(started: number, partial?: Partial<CapabilityMarketMatchRe
       degraded: true,
       degraded_reason: 'deadline_exceeded',
       grounded: false,
+      result_tier: 'degraded',
+      billing_outcome: 'nonbillable_system_failure',
     },
   };
 }
@@ -284,37 +359,55 @@ async function capabilityMarketMatchInner(
     );
   }
 
-  const bestAnchor = pickBestAnchor(keywords, brandCtx);
-  if (!bestAnchor) {
+  // Rank every candidate the company's own words support, then PROBE the best few.
+  const probePhrases = chooseProbePhrases(rankAnchorCandidates(keywords, brandCtx));
+  if (!probePhrases.length) {
     return miss(
       'No defensible capability anchor from the supplied text — add a clearer capability statement or past performance.',
       started,
       { subject: input.client_name || 'your company', keywords },
     );
   }
-  const lead = bestAnchor.phrase;
 
   if (signal.aborted || remainingMs() < 1_500) {
     return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
   }
 
-  // Propagate remaining deadline into keywordCoverage — every USASpending fetch aborts.
-  // Also race the await: if a fetch ignores AbortSignal, we still stop waiting.
-  let coverage: KeywordCoverage | null = null;
-  let covFailed = false;
+  // Probe in parallel under the remaining deadline. Every USASpending fetch aborts on the
+  // signal; the race also stops waiting if a fetch ignores it.
+  let probes: AnchorProbe[];
   try {
     const covBudget = remainingMs();
     let covTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      coverage = await Promise.race([
-        keywordCoverage(lead, 0.9, { signal }),
+      probes = await Promise.race([
+        Promise.all(
+          probePhrases.map(async (phrase): Promise<AnchorProbe> => {
+            let probeTimer: ReturnType<typeof setTimeout> | undefined;
+            try {
+              const coverage = await Promise.race([
+                keywordCoverage(phrase, 0.9, { signal }),
+                new Promise<'timeout'>((resolve) => {
+                  probeTimer = setTimeout(() => resolve('timeout'), Math.min(ANCHOR_PROBE_TIMEOUT_MS, remainingMs()));
+                }),
+              ]);
+              if (coverage === 'timeout') {
+                console.error('[capability_market_match] probe timed out:', phrase);
+                return { phrase, coverage: null, failed: true, timedOut: true };
+              }
+              return { phrase, coverage, failed: false };
+            } catch (err) {
+              if (err instanceof CoverageDeadlineError || signal.aborted) throw err;
+              console.error('[capability_market_match] keywordCoverage failed for', phrase, err);
+              return { phrase, coverage: null, failed: true };
+            } finally {
+              if (probeTimer) clearTimeout(probeTimer);
+            }
+          }),
+        ),
         new Promise<never>((_, reject) => {
           covTimer = setTimeout(() => reject(new CoverageDeadlineError()), covBudget);
-          signal.addEventListener(
-            'abort',
-            () => reject(new CoverageDeadlineError()),
-            { once: true },
-          );
+          signal.addEventListener('abort', () => reject(new CoverageDeadlineError()), { once: true });
         }),
       ]);
     } finally {
@@ -324,10 +417,34 @@ async function capabilityMarketMatchInner(
     if (err instanceof CoverageDeadlineError || signal.aborted) {
       return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
     }
-    console.error('[capability_market_match] keywordCoverage failed:', err);
-    covFailed = true;
-    coverage = null;
+    throw err;
   }
+
+  const picked = selectAnchorFromProbes(probes);
+  // No market chosen and a probe STALLED → the coverage deadline contract (deadline_exceeded,
+  // no market, uncharged) — exactly what one stalled single-anchor lookup returned before.
+  if (!picked && probes.some((p) => p.timedOut)) {
+    return deadlineMiss(started, { subject: input.client_name || 'your company', keywords });
+  }
+  // Every probe ERRORED → the market is unknown (degraded, uncharged), not empty.
+  // Every probe ERRORED or timed out → unknown (degraded, uncharged). If SOME failed and none of
+  // the rest found a market, absence is not established either — also unknown, never "empty".
+  const covFailed = !picked && probes.some((p) => p.failed);
+  if (!picked && !covFailed) {
+    return miss(
+      `No federal contract spending matched the activities in this description (searched: ${probes.map((p) => `"${p.phrase}"`).join(', ')}). ` +
+        'Name the work the way a contract would (for example "roofing", "translation services"), or add past performance.',
+      started,
+      { subject: input.client_name || 'your company', keywords },
+    );
+  }
+  const lead = picked?.probe.phrase ?? probePhrases[0];
+  const coverage: KeywordCoverage | null = picked?.probe.coverage ?? null;
+  const anchorProbesMeta = probes.map((p) => ({
+    phrase: p.phrase,
+    total_market: p.coverage?.totalMarket ?? null,
+    failed: p.failed,
+  }));
 
   const isPscPinned = Boolean(coverage?.pinnedPscCodes?.length);
   const pinnedPsc = coverage?.pinnedPscCodes?.[0];
@@ -476,6 +593,23 @@ async function capabilityMarketMatchInner(
   const recompeteRows = recompetesOmitted ? [] : (expiringValue?.contracts ?? []);
   const shownAvail = (shown: number, available: number) => ({ shown: Math.min(shown, available), available });
 
+  const marketCodes = allNaics.length + allPsc.length;
+  const resultTier: 'grounded' | 'candidate' | 'empty' | 'degraded' = coreDegraded
+    ? 'degraded'
+    : validation.grounded
+      ? 'grounded'
+      : coverage && marketCodes > 0
+        ? 'candidate'
+        : 'empty';
+  const billingOutcome =
+    resultTier === 'grounded'
+      ? ('billable_success' as const)
+      : resultTier === 'candidate'
+        ? ('billable_candidate' as const)
+        : resultTier === 'degraded'
+          ? ('nonbillable_system_failure' as const)
+          : ('nonbillable_no_market' as const);
+
   return {
     subject: input.client_name || 'your company',
     keywords,
@@ -497,6 +631,9 @@ async function capabilityMarketMatchInner(
     recompete_opportunities: recompeteRows.slice(0, LIST_CAP),
     _meta: {
       grounded: validation.grounded,
+      // Option D (2026-10-04): grounded 50 · useful candidate 10 · empty 0 · degraded 0.
+      result_tier: resultTier,
+      billing_outcome: billingOutcome,
       // Only core coverage failure — NOT enrichment omission (Eric charging decision 2026-09-15).
       degraded: coreDegraded,
       ...(coreDegraded ? { degraded_reason: 'section_failed' as const } : {}),
@@ -506,6 +643,9 @@ async function capabilityMarketMatchInner(
       anchor_confidence: validation.anchor_confidence,
       anchor_note: validation.anchor_note,
       selected_anchor: lead,
+      // Every candidate probed, in rank order, with the market it found (null = none).
+      anchor_probes: anchorProbesMeta,
+      anchor_market_tier: picked?.tier ?? null,
       lead_keyword: lead,
       lead_naics: marketVerified ? (leadNaics ?? null) : null,
       tam_verified: tamVerified,

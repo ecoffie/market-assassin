@@ -2762,6 +2762,15 @@ The `/chatgpt/mcp` route (#1776) passes `channel: 'chatgpt'`; proven route→RPC
 `src/app/chatgpt/mcp/__tests__/route.billing-chain.unit.test.ts`.
 Open items: `tasks/autorecharge-followups-2026-10-03.md`.
 
+**`capability_market_match` bills by result tier (Option D, owner decision 2026-10-04):**
+grounded (company-corroborated) 50 · useful candidate 10 (`billable_candidate`, `CANDIDATE_CREDITS`
+in `credit-integrity.ts`) · empty / no defensible market 0 (`nonbillable_no_market`) · degraded 0.
+The pre-check still requires the full 50. Matching probes several cleaned candidates in parallel
+and picks by a ladder (`selectAnchorFromProbes`); fixture gate =
+`src/lib/market/capability-plain-english.unit.test.ts` + live `scripts/verify-capability-match.ts`
+(run under `caffeinate -i` — a sleeping Mac turns probe timeouts into false "degraded").
+⚠️ Never re-add a word ban (the old global `roofing` reject deleted every real roofer); anchors
+must come from the company's own activity words instead.
 **Document paging is billed once per retrieval (ChatGPT blocker #2, 2026-10-04).** A
 `get_solicitation_documents` call that continues a paid read with the `next_page.continuation`
 token is priced 0 in `runMeteredTool` before the balance check (`isFreeDocumentContinuation`,
