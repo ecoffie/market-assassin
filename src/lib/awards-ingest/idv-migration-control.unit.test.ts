@@ -117,23 +117,48 @@ describe('fresh-clone write gate', () => {
   const clone = (tableId: string, ageH: number, rowCount: number) => ({ tableId, createdAtMs: NOW - ageH * H, rowCount });
 
   it('ddl cannot run without a clone', () => {
-    expect(() => assertFreshCloneGate({ clones: [], liveRowCount: 65_030_126, nowMs: NOW })).toThrow(/no awards_clone_pre_idv_/);
+    expect(() => assertFreshCloneGate({ clones: [], liveRowCount: 65_030_126, awardsLastModifiedMs: NOW - 48 * H, nowMs: NOW })).toThrow(/no awards_clone_pre_idv_/);
   });
 
   it('refuses a clone >= 24h old', () => {
-    expect(() => assertFreshCloneGate({ clones: [clone('awards_clone_pre_idv_20260922_1100', 25, 65_030_126)], liveRowCount: 65_030_126, nowMs: NOW })).toThrow(/old/);
+    expect(() => assertFreshCloneGate({ clones: [clone('awards_clone_pre_idv_20260922_1100', 25, 65_030_126)], liveRowCount: 65_030_126, awardsLastModifiedMs: NOW - 48 * H, nowMs: NOW })).toThrow(/old/);
   });
 
   it('refuses a clone whose row count differs from live awards (awards changed since)', () => {
-    expect(() => assertFreshCloneGate({ clones: [clone('awards_clone_pre_idv_20260923_1100', 1, 65_000_000)], liveRowCount: 65_030_126, nowMs: NOW })).toThrow(/changed since the clone/);
+    expect(() => assertFreshCloneGate({ clones: [clone('awards_clone_pre_idv_20260923_1100', 1, 65_000_000)], liveRowCount: 65_030_126, awardsLastModifiedMs: NOW - 48 * H, nowMs: NOW })).toThrow(/changed since the clone/);
   });
 
   it('ignores tables without the clone prefix and uses the newest clone', () => {
     const got = assertFreshCloneGate({
       clones: [clone('awards_snap_other', 1, 65_030_126), clone('awards_clone_pre_idv_20260923_0900', 3, 1), clone('awards_clone_pre_idv_20260923_1100', 1, 65_030_126)],
-      liveRowCount: 65_030_126, nowMs: NOW,
+      liveRowCount: 65_030_126, awardsLastModifiedMs: NOW - 48 * H, nowMs: NOW,
     });
     expect(got.tableId).toBe('awards_clone_pre_idv_20260923_1100');
+  });
+
+  it('X4: a clone that matches on row count is REFUSED if awards was modified after it (an UPDATE keeps the count)', () => {
+    const c = clone('awards_clone_pre_idv_20260923_1100', 1, 65_030_126); // created NOW - 1h
+    // the weekly ingest's correction window updated rows 30 min ago; the count is unchanged
+    expect(() => assertFreshCloneGate({ clones: [c], liveRowCount: 65_030_126, awardsLastModifiedMs: NOW - 0.5 * H, nowMs: NOW }))
+      .toThrow(/awards was modified at .* after clone awards_clone_pre_idv_20260923_1100 was created/);
+  });
+
+  it('X4: a clone created after the last write to awards passes (equal timestamps pass)', () => {
+    const c = clone('awards_clone_pre_idv_20260923_1100', 1, 65_030_126);
+    expect(assertFreshCloneGate({ clones: [c], liveRowCount: 65_030_126, awardsLastModifiedMs: NOW - 2 * H, nowMs: NOW }).tableId).toBe(c.tableId);
+    expect(assertFreshCloneGate({ clones: [c], liveRowCount: 65_030_126, awardsLastModifiedMs: c.createdAtMs, nowMs: NOW }).tableId).toBe(c.tableId);
+  });
+
+  it('X4: an unreadable last-modified time is refused, never assumed fresh', () => {
+    const c = clone('awards_clone_pre_idv_20260923_1100', 1, 65_030_126);
+    for (const bad of [Number.NaN, 0, -1, Number.POSITIVE_INFINITY]) {
+      expect(() => assertFreshCloneGate({ clones: [c], liveRowCount: 65_030_126, awardsLastModifiedMs: bad, nowMs: NOW })).toThrow(/unreadable|modified/);
+    }
+  });
+
+  it('X4: the runner reads awards.last_modified_time from __TABLES__ and passes it to the gate', () => {
+    expect(runner).toMatch(/SELECT table_id, row_count, creation_time, last_modified_time FROM/);
+    expect(runner).toContain('awardsLastModifiedMs: before.awardsLastModifiedMs');
   });
 
   it('the runner applies the gate to every write step BEFORE any write', () => {

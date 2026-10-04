@@ -80,14 +80,15 @@ async function query<T>(bq: BigQuery, sql: string, opts: { defaultDataset?: bool
   return { rows: rows as T[], jobId: job.id, bytes };
 }
 
-async function tableState(bq: BigQuery): Promise<{ awardsRows: number; clones: CloneCandidate[] }> {
-  const { rows } = await query<{ table_id: string; row_count: number; creation_time: number }>(bq,
-    `SELECT table_id, row_count, creation_time FROM \`${PROJECT}.${DATASET}.__TABLES__\`
+async function tableState(bq: BigQuery): Promise<{ awardsRows: number; awardsLastModifiedMs: number; clones: CloneCandidate[] }> {
+  const { rows } = await query<{ table_id: string; row_count: number; creation_time: number; last_modified_time: number }>(bq,
+    `SELECT table_id, row_count, creation_time, last_modified_time FROM \`${PROJECT}.${DATASET}.__TABLES__\`
      WHERE table_id = 'awards' OR STARTS_WITH(table_id, '${IDV_MIGRATION_CLONE_PREFIX}')`, { label: 'table_state' });
   const awards = rows.find((r) => r.table_id === 'awards');
   if (!awards) throw new Error('awards table not found');
   return {
     awardsRows: Number(awards.row_count),
+    awardsLastModifiedMs: Number(awards.last_modified_time),
     clones: rows.filter((r) => r.table_id !== 'awards').map((r) => ({
       tableId: r.table_id, rowCount: Number(r.row_count), createdAtMs: Number(r.creation_time),
     })),
@@ -147,10 +148,10 @@ async function main(): Promise<void> {
   log(`step=${dispatch.step}`);
   const bq = client();
   const before = await tableState(bq);
-  log(`awards rows=${before.awardsRows} clones=${before.clones.map((c) => `${c.tableId}(${c.rowCount})`).join(', ') || 'none'}`);
+  log(`awards rows=${before.awardsRows} last_modified=${new Date(before.awardsLastModifiedMs).toISOString()} clones=${before.clones.map((c) => `${c.tableId}(${c.rowCount})`).join(', ') || 'none'}`);
 
   if (IDV_MIGRATION_WRITE_STEPS.includes(dispatch.step)) {
-    const clone = assertFreshCloneGate({ clones: before.clones, liveRowCount: before.awardsRows, nowMs: Date.now() });
+    const clone = assertFreshCloneGate({ clones: before.clones, liveRowCount: before.awardsRows, awardsLastModifiedMs: before.awardsLastModifiedMs, nowMs: Date.now() });
     log(`clone gate passed: ${clone.tableId} (${clone.rowCount} rows, ${((Date.now() - clone.createdAtMs) / 3_600_000).toFixed(1)}h old)`);
   }
 

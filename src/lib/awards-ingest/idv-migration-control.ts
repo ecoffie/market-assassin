@@ -170,11 +170,20 @@ export interface CloneCandidate {
 
 /**
  * The write gate. Returns the clone that makes the write reversible, or throws.
- * Freshest matching clone wins; it must be < 24h old and row-count-identical to live `awards`.
+ * Freshest matching clone wins. It must be < 24h old, row-count-identical to live `awards`, AND
+ * `awards` must not have been modified since the clone was created.
+ *
+ * X4 (2026-10-04): row-count equality alone does not prove the clone is a rollback point for the
+ * CURRENT state — an UPDATE-only MERGE (e.g. the weekly ingest's correction window) keeps the count.
+ * `awards.last_modified_time` (from `__TABLES__`) moves on every DML, DDL and load, so
+ * `awardsLastModifiedMs <= clone.createdAtMs` proves nothing wrote to `awards` after the clone.
+ * An unreadable last-modified time is refused (fail closed), never assumed fresh.
  */
 export function assertFreshCloneGate(input: {
   clones: CloneCandidate[];
   liveRowCount: number;
+  /** `__TABLES__.last_modified_time` of `awards`, epoch ms. */
+  awardsLastModifiedMs: number;
   nowMs: number;
   maxAgeHours?: number;
 }): CloneCandidate {
@@ -190,6 +199,12 @@ export function assertFreshCloneGate(input: {
   }
   if (!(Number.isFinite(input.liveRowCount) && latest.rowCount === input.liveRowCount)) {
     throw new Error(`refused: clone ${latest.tableId} has ${latest.rowCount} rows but awards has ${input.liveRowCount} — awards changed since the clone; take a new snapshot`);
+  }
+  if (!Number.isFinite(input.awardsLastModifiedMs) || input.awardsLastModifiedMs <= 0) {
+    throw new Error('refused: awards last_modified_time is unreadable — cannot prove the clone is current; take a new snapshot');
+  }
+  if (input.awardsLastModifiedMs > latest.createdAtMs) {
+    throw new Error(`refused: awards was modified at ${new Date(input.awardsLastModifiedMs).toISOString()}, after clone ${latest.tableId} was created at ${new Date(latest.createdAtMs).toISOString()} — awards changed since the clone (row count alone cannot show an update); take a new snapshot`);
   }
   return latest;
 }

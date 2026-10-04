@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — X4: the clone gate detects writes that keep the row count
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | BQ awards / protected migration workflow | The write gate (`assertFreshCloneGate`) accepted a clone that was < 24h old and row-count-identical to `awards`. An UPDATE-only write between a `snapshot` dispatch and the write dispatch (e.g. the weekly ingest's 100-day correction window) keeps the count, so the clone would pass while no longer being a rollback point for the current state. Now the gate also requires `awards.last_modified_time` (from `__TABLES__`, moved by every DML/DDL/load) to be at or before the clone's creation time, and refuses an unreadable value (fail closed). This makes "a fresh snapshot before each write" enforced, not procedural. | `awardsLastModifiedMs > latest.createdAtMs` → `src/lib/awards-ingest/idv-migration-control.ts` | 4 X4 tests; 2 of them red against the pre-X4 gate (an update-only write after the clone, and an unreadable timestamp, were both accepted); awards-ingest suite 168/168; tsc clean. Not dispatched. Assumption, recorded: creating a clone does not bump the SOURCE table's last_modified_time — if it did, every write would be refused (fail closed) and the first snapshot→ddl dispatch would show it. | 🟡 PR open, not merged |
+
 ## 2026-10-04 — X1: the IDV-migration gate dropped the re-pull window
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
