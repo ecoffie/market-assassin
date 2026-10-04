@@ -73,11 +73,44 @@ export interface IdvMigrationDispatch {
 export interface IdvMigrationDispatchResult {
   step: IdvMigrationStep;
   fiscalYear: number | null;
-  /** repull_window only. `to` null = up to today (a full refresh that stamps the freshness clocks). */
-  window: { from: string; to: string | null } | null;
+  /**
+   * repull_window only. BOTH ends are explicit: a re-pull is a bounded repair of a reviewed window,
+   * never an open-ended "up to today" refresh (that is the weekly ingest's job, and a run with
+   * `--to` never stamps the freshness clocks).
+   */
+  window: { from: string; to: string } | null;
+}
+
+/**
+ * The ONE mapping from workflow env → dispatch input, shared by the pre-auth gate
+ * (scripts/validate-bq-awards-idv-migration-dispatch.ts) and the runner
+ * (scripts/bq-awards-idv-migration.ts). The gate used to hand-map its own subset and silently
+ * omitted window_from / window_to, so every repull_window dispatch was refused before auth even
+ * with a valid window (found 2026-10-04, tasks/bq-awards-a1-preflight-2026-10-04.md X1).
+ * `hasGcpSaJson` is passed in because the gate only sees a boolean flag, never the secret.
+ */
+export function idvMigrationDispatchFromEnv(
+  env: Record<string, string | undefined>,
+  hasGcpSaJson: boolean,
+): IdvMigrationDispatch {
+  return {
+    eventName: env.GITHUB_EVENT_NAME ?? '',
+    step: env.IDV_MIGRATION_STEP ?? '',
+    confirmation: env.IDV_MIGRATION_CONFIRMATION,
+    fiscalYear: env.IDV_MIGRATION_FISCAL_YEAR,
+    windowFrom: env.IDV_MIGRATION_WINDOW_FROM,
+    windowTo: env.IDV_MIGRATION_WINDOW_TO,
+    hasGcpSaJson,
+  };
 }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** YYYY-MM-DD AND a real calendar day (2026-02-30 is refused, not rolled over to March). */
+function isIsoDay(d: string): boolean {
+  if (!ISO_DAY.test(d)) return false;
+  const ms = Date.parse(`${d}T00:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === d;
+}
 function dayMs(d: string): number {
   return Date.parse(`${d}T00:00:00Z`);
 }
@@ -95,17 +128,20 @@ export function validateIdvMigrationDispatch(input: IdvMigrationDispatch): IdvMi
   let window: IdvMigrationDispatchResult['window'] = null;
   if (input.step === 'repull_window') {
     const today = input.today ?? new Date().toISOString().slice(0, 10);
-    const from = (input.windowFrom ?? '').trim();
-    const to = blank(input.windowTo) ? null : (input.windowTo as string).trim();
-    if (!ISO_DAY.test(from) || (to !== null && !ISO_DAY.test(to))) {
-      throw new Error('refused: repull_window needs window_from (and optional window_to) as YYYY-MM-DD');
+    if (blank(input.windowFrom) || blank(input.windowTo)) {
+      throw new Error('refused: repull_window needs BOTH window_from and window_to (YYYY-MM-DD)');
+    }
+    const from = (input.windowFrom as string).trim();
+    const to = (input.windowTo as string).trim();
+    if (!isIsoDay(from) || !isIsoDay(to)) {
+      throw new Error('refused: window_from and window_to must be real calendar dates as YYYY-MM-DD');
     }
     if (from < IDV_MIGRATION_REPULL_FROM) {
       throw new Error(`refused: window_from must be >= ${IDV_MIGRATION_REPULL_FROM} (the reviewed DoD-gap start)`);
     }
-    const end = to ?? today;
-    if (end > today || end < from) throw new Error('refused: window must satisfy window_from <= window_to <= today');
-    const span = (dayMs(end) - dayMs(from)) / 86_400_000;
+    if (to < from) throw new Error('refused: window_to is before window_from');
+    if (to > today) throw new Error('refused: window_to is after today');
+    const span = (dayMs(to) - dayMs(from)) / 86_400_000;
     if (span > IDV_MIGRATION_REPULL_MAX_SPAN_DAYS) {
       throw new Error(`refused: window spans ${span} days (max ${IDV_MIGRATION_REPULL_MAX_SPAN_DAYS}) — split it`);
     }
@@ -169,7 +205,7 @@ export function ingestArgsForStep(result: IdvMigrationDispatchResult): string[] 
   const { step, fiscalYear, window } = result;
   if (step === 'repull_window') {
     if (!window) throw new Error('repull_window needs a validated window');
-    return [`--from=${window.from}`, ...(window.to ? [`--to=${window.to}`] : []), '--apply'];
+    return [`--from=${window.from}`, `--to=${window.to}`, '--apply'];
   }
   if (step === 'idv_fy_backfill') {
     if (fiscalYear === null) throw new Error('idv_fy_backfill needs a fiscal year');

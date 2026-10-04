@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-04 — X1: the IDV-migration gate dropped the re-pull window
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-04 | BQ awards / protected migration workflow | `scripts/validate-bq-awards-idv-migration-dispatch.ts` hand-mapped its env and never passed `window_from` / `window_to` to `validateIdvMigrationDispatch`, so EVERY `repull_window` dispatch was refused before GCP auth, including the two reviewed A1 DoD-gap windows (2026-01-20→03-21, 03-22→05-03). Fail-closed, nothing written, but it blocked the incident repair (A1 preflight finding X1). Now ONE env→input mapping (`idvMigrationDispatchFromEnv`) feeds both the gate and the runner. `repull_window` requires BOTH ends explicitly: the old "blank window_to = today" path is removed, and a missing end refuses. Dates must be real calendar days (2026-02-30 refused). Separate reversed / after-today / span>62 errors. No change to `bq-production`, triggers, concurrency, clone gate or any other step. | `export function idvMigrationDispatchFromEnv(` → `src/lib/awards-ingest/idv-migration-control.ts` | `idv-migration-gate-window.unit.test.ts` (15) runs the REAL gate script as a subprocess + pins the workflow protection; **4 red against origin/main's gate script** (approved windows refused), all green after; awards-ingest suite 6 files / 164 tests; tsc clean. Not dispatched. | 🟡 PR open, not merged |
+
 ## 2026-10-04 — R1 (C): Pro gates read entitlement only for the verified identity
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

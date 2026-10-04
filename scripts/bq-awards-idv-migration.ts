@@ -30,6 +30,7 @@ import {
   IDV_MIGRATION_CLONE_PREFIX,
   IDV_MIGRATION_WRITE_STEPS,
   idvMigrationCloneTableId,
+  idvMigrationDispatchFromEnv,
   ingestArgsForStep,
   validateIdvMigrationDispatch,
   type CloneCandidate,
@@ -140,15 +141,9 @@ async function probes(bq: BigQuery): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const dispatch = validateIdvMigrationDispatch({
-    eventName: process.env.GITHUB_EVENT_NAME ?? '',
-    step: process.env.IDV_MIGRATION_STEP ?? '',
-    confirmation: process.env.IDV_MIGRATION_CONFIRMATION,
-    fiscalYear: process.env.IDV_MIGRATION_FISCAL_YEAR,
-    windowFrom: process.env.IDV_MIGRATION_WINDOW_FROM,
-    windowTo: process.env.IDV_MIGRATION_WINDOW_TO,
-    hasGcpSaJson: Boolean(process.env.GCP_SA_JSON),
-  });
+  const dispatch = validateIdvMigrationDispatch(
+    idvMigrationDispatchFromEnv(process.env, Boolean(process.env.GCP_SA_JSON)),
+  );
   log(`step=${dispatch.step}`);
   const bq = client();
   const before = await tableState(bq);
