@@ -54,6 +54,7 @@ export { savedSearchFingerprint, savedSearchesMatchFingerprint } from './fingerp
 export {
   createSavedSearch,
   deleteSavedSearch,
+  getSavedSearch,
   listSavedSearches,
   updateSavedSearch,
   savedSearchFiltersDigest,

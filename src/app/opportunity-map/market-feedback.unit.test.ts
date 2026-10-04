@@ -264,7 +264,8 @@ describe('wiring in route.ts', () => {
     expect(src).toContain("if(!(opts&&(opts.pan||opts.system)))_actionNow();");
     expect(src).toContain("function _actionNow(){ _fetchGen++; if(window.__mf)window.__mf.ack(); }");
     // boot/failsafe refetches are the SYSTEM, never acknowledged as the user's action
-    expect(src).toContain("function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }");
+    // (a ?ss= link defers round 1 to the saved-search restore; it is still a {system:true} round)
+    expect(src).toContain("function finishBoot(){ releaseFit(); if(window.__ssPending){ window.__ssDeferredRound=true; return; } if(window.__mapRefetch)window.__mapRefetch({system:true}); }");
     expect(src).toContain("if(window.__mapRefetch)window.__mapRefetch({system:true});   // a failsafe, not a user action");
     expect(src).toContain("requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); });");
     expect(src).toContain("t=setTimeout(function(){ fetchView({pan:true}); },450);");

@@ -61,17 +61,19 @@ describe('the ?ss= receiver is the single normalization point', () => {
 
   it('routes through __applySavedSearch — the same path the Saved panel uses', () => {
     // This is what makes ?ss= drift-proof: one function defines what a saved filter MEANS.
-    expect(MAP).toContain('window.__applySavedSearch(ss)');
+    expect(MAP).toContain('window.__applySavedSearch(ss,{savedSearch:true})');
   });
 
   it('never fabricates a filter for a deleted or foreign id', () => {
-    expect(MAP).toMatch(/if\(!ss\)return;/);
+    // The server answers both with the same 404; the map says so instead of applying anything.
+    expect(MAP).toContain('res.status===404');
+    expect(MAP).toContain('String(ss.id)!==wantId');
   });
 
-  it('leaves the map on its default when signed out', () => {
-    // A signed-out visitor cannot resolve the id, and a silently-unfiltered map claiming to be
-    // filtered is the failure this whole PR is about.
-    expect(MAP).toMatch(/if\(!em\|\|!tk\)return;/);
+  it('a signed-out reader is asked to sign in — the unfiltered map is never presented silently', () => {
+    // Before 2026-10-04 this returned silently (and, worse, so did the signed-in path). Executed
+    // behaviour lives in saved-search-link-restore.unit.test.ts.
+    expect(MAP).toContain("fail('signin','Sign in to open your saved search");
   });
 });
 

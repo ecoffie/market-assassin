@@ -61,15 +61,18 @@ describe('the watchlist links by id, not by flattened filters', () => {
 describe('the map applies ?ss= through the existing restorer', () => {
   it('reads ?ss and hands it to __applySavedSearch', () => {
     expect(map).toContain("(location.search||'').match(/[?&]ss=([^&]+)/)");
-    expect(map).toContain('window.__applySavedSearch(ss);');
+    expect(map).toContain('window.__applySavedSearch(ss,{savedSearch:true})');
     // Reuse, not a second implementation — one code path for both entry points.
     expect(map.match(/window\.__applySavedSearch=function/g)?.length).toBe(1);
   });
 
   it('never fabricates a filter it could not load', () => {
     const block = map.slice(map.indexOf("var m=(location.search||'').match(/[?&]ss=([^&]+)/)"), map.indexOf('// "Today\'s Lens" pill names the lens'));
-    expect(block).toContain('if(!em||!tk)return;');   // signed out -> default map, no pretend filter
-    expect(block).toContain('if(!ss)return;');        // deleted / foreign id -> default map
+    // Never silent any more (2026-10-04): signed out / expired / missing / failed each SAY so on
+    // the map. Behaviour is pinned by saved-search-link-restore.unit.test.ts (executed, not grepped).
+    expect(block).toContain("fail('signin'");
+    expect(block).toContain('res.status===404');
+    expect(block).toContain('String(ss.id)!==wantId');   // a body that is not THE requested search is not applied
   });
 });
 
@@ -79,7 +82,7 @@ describe('a saved search restores its horizons', () => {
   it('applies the saved horizons object', () => {
     // This is why an "Open only" search came back full of Forecast rows: the restorer handled every
     // FILT key but never looked at f.horizons, and the map defaults all three ON.
-    expect(restorer).toContain("if(f.horizons&&typeof f.horizons==='object')");
+    expect(restorer).toContain("var _hz=(f.horizons&&typeof f.horizons==='object')?f.horizons:null;");
     expect(restorer).toContain("['open','recompete','forecast'].forEach");
     expect(restorer).toContain('window.toggleHorizon(h)');
   });

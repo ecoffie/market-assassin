@@ -2579,6 +2579,8 @@ const VIEWPORT_JS = `<script>
     // Every round re-evaluates the scope banner for the CURRENT map mode — including the Players branch
     // below, which returns before any Awarded round could update it (#1692 review).
     if(typeof window.__renderVehicleScope==='function')window.__renderVehicleScope();
+    // ?ss= owns round 1 — boot release AND the first moveend; deferred, run on the handler's release.
+    if(window.__ssPending){ window.__ssDeferredRound=true; return; }
     _trackMapView();
     // RETURN CONTINUITY — remember this market (debounced, local only). Placed here
     // rather than on each control because every filter, search, sort, horizon and
@@ -5149,8 +5151,22 @@ const VIEWPORT_JS = `<script>
   // Apply a SAVED SEARCH to the map in-place (the reverse of Save search): take its stored
   // mode + filters (+ bbox) and drive the same FILT state / controls / viewport the live
   // filters use, then refetch. Exposed for the search-bar dropdown (SEARCH_PANEL_JS).
-  window.__applySavedSearch=function(ss){
+  //
+  // opts.savedSearch — the caller is restoring a STORED saved_searches row (the ?ss= link and the
+  // in-map picker), not a URL scope or the return-continuity memory. Only then:
+  //   · no filters.horizons  → the horizons the alert cron uses for that row (open mode = Open only;
+  //     see wantsForecasts() in cron/saved-search-alerts). Searches saved before horizons were
+  //     captured, and every MCP-created search, have no horizons key — leaving the map's default
+  //     (all three on) mixed Awarded + Forecast rows into a search whose alerts are Open-only.
+  //   · no bbox              → the national view. No bounds means nationwide; inheriting this
+  //     browser's remembered viewport would show one region of a national market (measured for the
+  //     2026-10-03 report: 23 pins in the remembered view vs 49 across CONUS for the same filters).
+  //   · filters.strategy     → the Opportunity DNA boxes (an allowed saved-search key FILT lacks).
+  // Scope links and return continuity omit opts on purpose: they keep the viewport and horizons.
+  // Returns {unsupported:[keys]} — saved keys this map cannot represent, so callers can say so.
+  window.__applySavedSearch=function(ss,opts){
     if(!ss||typeof ss!=='object')return;
+    var _asSaved=!!(opts&&opts.savedSearch);
     var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
     // Switch dataset first (open|recompete|companies|buyers). setMapMode resets Q + FILT-driving controls.
     var wantMode=(ss.mode==='recompete')?'recompete':((ss.mode==='companies'||ss.mode==='buyers')?ss.mode:'open');
@@ -5160,7 +5176,7 @@ const VIEWPORT_JS = `<script>
         var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
         var live=tk&&!(typeof window.__tokenExpired==='function'&&window.__tokenExpired(tk));
         if(!live&&typeof window.__playersGate==='function'){
-          window.__playersGate(wantMode, function(){ window.__applySavedSearch(ss); });
+          window.__playersGate(wantMode, function(){ window.__applySavedSearch(ss,opts); });
           return;
         }
         setMapMode(wantMode);
@@ -5175,6 +5191,23 @@ const VIEWPORT_JS = `<script>
       subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'',
       vehicle:'', parent:'', work:'' };
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
+    // Saved keys this map has no control for. 'status:active' is what the open map always sends.
+    var _unsupported=[];
+    for(var uk in f){
+      if(uk in FILT||uk==='q'||uk==='horizons'||uk==='fsc')continue;
+      if(uk==='strategy'&&_asSaved)continue;
+      if(uk==='status'&&String(f[uk]).toLowerCase()==='active')continue;
+      if(f[uk]==null||f[uk]===''||f[uk]===false)continue;
+      _unsupported.push(uk);
+    }
+    // Opportunity DNA strands (saved as an array or a comma list). FILT.strategy is an ARRAY —
+    // the URL builder joins it — and the boxes are the control readDeep reads back on Apply.
+    if(_asSaved){
+      var _strat=Array.isArray(f.strategy)?f.strategy:String(f.strategy||'').split(',');
+      _strat=_strat.map(function(x){return String(x).trim();}).filter(Boolean);
+      var _known={}; document.querySelectorAll('.mf-strategy').forEach(function(c){ _known[c.value]=1; c.checked=_strat.indexOf(c.value)>=0; });
+      FILT.strategy=_strat.filter(function(x){ return _known[x]; });
+    }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
     // Set-aside is Filters-panel only now → restore the .mf-set checkboxes (the top-bar pill is gone).
@@ -5235,11 +5268,16 @@ const VIEWPORT_JS = `<script>
     // back full of Forecast rows (Eric 2026-08-13). Go through toggleHorizon rather than writing
     // window.__horizons directly: it owns the chip sync for BOTH surfaces (.hzc + .hznrow) and the
     // "never turn the last one off" guard, so the UI cannot end up disagreeing with the fetch.
-    if(f.horizons&&typeof f.horizons==='object'){
+    var _hz=(f.horizons&&typeof f.horizons==='object')?f.horizons:null;
+    if(!_hz&&_asSaved&&wantMode==='open'){
+      _hz=(ss.mode==='forecast')?{open:false,recompete:false,forecast:true}:{open:true,recompete:false,forecast:false};
+    }
+    if(_hz){
+      var f_h=_hz;
       window.__hzSystem=true;   // a restore is not the user toggling (horizon_toggled)
       try{
         ['open','recompete','forecast'].forEach(function(h){
-          var want=(f.horizons[h]!==false);
+          var want=(f_h[h]!==false);
           var have=(window.__horizons&&window.__horizons[h]!==false);
           if(want!==have&&typeof window.toggleHorizon==='function')window.toggleHorizon(h);
         });
@@ -5248,7 +5286,10 @@ const VIEWPORT_JS = `<script>
     // Restore the saved viewport (bbox) so results frame where the search was made.
     var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
       try{ map.fitBounds([[b.s,b.w],[b.n,b.e]]); _didAutoFit=true; }catch(e){} }
+    else if(_asSaved&&typeof window.__mapNationalView==='function'){
+      try{ window.__mapNationalView(); _didAutoFit=true; }catch(e){} }
     fetchView();
+    return {unsupported:_unsupported};
   };
 
   // Clear all: reset the server filters + their controls, then refetch. (Runs in
@@ -5327,6 +5368,18 @@ const SAVE_JS = `<script>
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function decodeEmail(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); return (j.email||'').toLowerCase().trim(); }catch(e){return '';} }
   function email(t){ var e=decodeEmail(t); if(e)return e; try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
+  // The map session, readable from ANY <script> block. tok()/email() are private to this IIFE, and
+  // VIEWPORT_JS's _uemail is private to ITS IIFE — the ?ss= handler (BOOT_VIEW_JS) guarded on
+  // "typeof _uemail==='function'", which is never true from another block, so every saved-search
+  // link spun 40 retries and silently opened the unfiltered map (2026-08-13 → 2026-10-04).
+  // Returns {t,em} for a live session, {expired:true,em} for a token past its exp, or null.
+  // The exp check is advisory; the server still verifies the signature and the account.
+  window.__mapSession=function(){
+    var t=tok(); if(!t)return null;
+    var em=email(t); if(!em)return null;
+    if(typeof window.__tokenExpired==='function'&&window.__tokenExpired(t))return {expired:true,em:em};
+    return {t:t,em:em};
+  };
   // THE flywheel gate (read free, respond gated). One shared helper for every
   // respond/draft/save action: returns {t,em} when signed in; otherwise fires a
   // friendly "Sign in to <action>?" confirm → /app?next=<this page> (so they land
@@ -9145,6 +9198,14 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // the global-outlier markers. Cleared once we've placed the home-state / CONUS view.
   window.__suppressFitView=true;
   window.__suppressFetchView=true; // don't fetch until a United States view is placed
+  // A ?ss=<saved search> link OWNS this page load's first data round and its viewport until the
+  // saved search resolves (the handler further down releases both). Set HERE, before
+  // __mapBootView runs, because boot can release synchronously (remembered view / anonymous) and
+  // map-home / geolocation move the map asynchronously — either would otherwise paint the
+  // unfiltered default, or shrink a nationwide search to the visitor's home state, after the
+  // restore landed. Bounded: the handler always releases (success, failure, or an 8 s ceiling).
+  window.__ssPending=/[?&]ss=[^&]/.test(location.search||'');
+  window.__ssOwnsView=window.__ssPending;
   // Boot zoom 5, NOT 4.5. PIN_DOT_ZOOM suppresses pins below 5, so a 4.5 default sat HALF A LEVEL
   // BELOW the map's own pin threshold: measured on prod 2026-08-16, every visitor arrived at zero
   // markers and "Zoom in to see opportunities" — on the page whose job is showing the market is
@@ -9169,6 +9230,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   function decodeEmail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=(t.split('.')[1]||'').replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   function setStateView(st){ var m=M(); var c=window.__STATE_CENTROIDS&&window.__STATE_CENTROIDS[st]; if(m&&c){ try{ m.setView(c,6,{animate:false}); return true; }catch(e){} } return false; }
   function conus(){ var m=M(); if(m){ try{ m.setView(CONUS[0],CONUS[1],{animate:false}); return true; }catch(e){} } return false; }
+  // The national frame, for a saved search with no bounds (__applySavedSearch opts.savedSearch).
+  window.__mapNationalView=function(){ conus(); ensureUS(); };
   // LAST VIEW (Eric 2026-08-12, "start zoomed in to a single state, preferably the user's location
   // or last login location"). The map remembers where you left off and reopens there — the single
   // strongest signal of the region you care about, and it costs no network round-trip.
@@ -9233,7 +9296,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Desktop is unaffected (body.m-map is a no-op there — the mobile chrome is display:none).
   // Scoped to ?src=alert ONLY: a normal mobile visit keeps its existing list-first default,
   // which is a deliberate small-screen choice, not a bug.
-  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch({system:true}); }
+  function finishBoot(){ releaseFit(); if(window.__ssPending){ window.__ssDeferredRound=true; return; } if(window.__mapRefetch)window.__mapRefetch({system:true}); }
   // #1696: resolve the layout BEFORE the first round. The container settles early, but the Leaflet map kept
   // an older size until the template's next resize() tick — AFTER release — so round 1 read a stale bbox and
   // the catch-up resize fired a second full round. Sync first (the resulting moveend is a layout move before
@@ -9250,6 +9313,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(!c||!inUS(c.lat,c.lng)||(m.getZoom&&m.getZoom()<4)) conus();
     }
     releaseFit();
+    if(window.__ssPending){ window.__ssDeferredRound=true; return; }   // the saved search owns round 1
     if(window.__mapRefetch)window.__mapRefetch({system:true});   // a failsafe, not a user action
   },4000);
   var _done=false, _bootSrc='';
@@ -9262,7 +9326,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var em=decodeEmail();
     if(!em){
       finishBoot();
-      if(_bootSrc==='conus') geoState(function(st){ if(st)setStateView(st); ensureUS(); });
+      if(_bootSrc==='conus') geoState(function(st){ if(st&&!window.__ssOwnsView)setStateView(st); ensureUS(); });
       return;
     }
     // ONE BOOT ROUND (Maps P0, 2026-09-24). A signed-in visitor with no remembered view used to get
@@ -9280,7 +9344,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       .then(function(r){return r.json();}).then(function(d){
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
         if(st){ window.__homeState=st; }
-        if(st&&_bootSrc!=='last'){ setStateView(st); ensureUS(); }
+        if(st&&_bootSrc!=='last'&&!window.__ssOwnsView){ setStateView(st); ensureUS(); }
         releaseBoot();
       }).catch(function(){ releaseBoot(); });
     // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
@@ -9366,28 +9430,113 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Rather than re-parse filters here, pass the ID and reuse __applySavedSearch — the SAME restorer
   // the in-map picker uses, which already handles mode, every FILT key, the visible controls and
   // the saved viewport. One code path, so the two entry points cannot drift.
+  //
+  // ⚠️ IT NEVER RAN (2026-08-13 → 2026-10-04). This handler guarded on "typeof _uemail ===
+  // 'function'", but _uemail is private to the VIEWPORT_JS IIFE — a different <script> block — so
+  // the guard was false forever: 40 retries, then a silent return, for signed-in and signed-out
+  // visitors alike. No saved search was ever requested; every alert email that promised "your
+  // filters are restored exactly as you saved them" opened the unfiltered map. Identity now comes
+  // from window.__mapSession (SAVE_JS), and EVERY outcome is visible: a saved-search link either
+  // shows the saved market or says, on the map, why it can't — never a silent default.
+  //
+  // Ownership is the server's: GET /api/app/saved-searches?id= selects by id AND the verified
+  // session's account, so a deleted id and another account's id are the same 404.
   (function(){ try{
-    var m=(location.search||'').match(/[?&]ss=([^&]+)/); if(!m)return;
-    var wantId=decodeURIComponent(m[1]); if(!wantId)return;
-    var tries=0; (function go(){
-      if(typeof window.__applySavedSearch!=='function'||typeof _uemail!=='function'){
-        if(++tries<40)return setTimeout(go,150); return;
-      }
-      var em=''; try{ em=_uemail(); }catch(e){}
-      var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-      // Signed out → leave the map on its default rather than pretending a filter applied.
-      if(!em||!tk)return;
-      var h={'x-mi-auth-token':tk,'x-user-email':em};
-      fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:h})
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          var list=(d&&(d.searches||d.results||d.data))||[];
-          var ss=null; for(var i=0;i<list.length;i++){ if(String(list[i].id)===wantId){ ss=list[i]; break; } }
-          if(!ss)return;                      // deleted/foreign id → default map, never a fake filter
-          window.__applySavedSearch(ss);
-        }).catch(function(){});
-    })();
-  }catch(e){} })();
+    var m=(location.search||'').match(/[?&]ss=([^&]+)/);
+    function release(){ window.__ssPending=false; window.__ssOwnsView=false; if(window.__ssDeferredRound){ window.__ssDeferredRound=false; if(window.__mapRefetch)window.__mapRefetch({system:true}); } }
+    if(!m){ release(); return; }
+    var wantId=''; try{ wantId=decodeURIComponent(m[1]).trim(); }catch(e){}
+    if(!wantId){ release(); return; }
+    var src=((location.search||'').match(/[?&]src=([^&]+)/)||[])[1]||'';
+    var seq=0, ceiling=0, tracked={};
+    function track(outcome,extra){ if(tracked[outcome])return; tracked[outcome]=1;
+      try{ if(window.__track){ var md={outcome:outcome,src:String(src).slice(0,40)}; if(extra)for(var k in extra)md[k]=extra[k]; window.__track('tool_use','saved_search_link',md); } }catch(e){} }
+    // One status pill (same look + slot as "Picked up where you left off", which stands down on ?ss=).
+    function pill(kind,text,actions){
+      var go2=function(){
+        var host=document.querySelector('.mapwrap')||document.body; if(!host)return;
+        var el=document.getElementById('ssPill');
+        if(!el){ el=document.createElement('div'); el.id='ssPill'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); host.appendChild(el); }
+        el.setAttribute('data-state',kind);
+        var warn=(kind!=='loading'&&kind!=='applied');
+        el.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:650;max-width:min(92vw,600px);display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;background:'+(warn?'#fff8eb':'#fff')+';color:#0b1220;border:1px solid '+(warn?'#f0b44c':'#d7dee8')+';font:600 13px Inter,system-ui,sans-serif;padding:8px 14px;border-radius:'+(warn?'14px':'999px')+';box-shadow:0 4px 16px rgba(0,0,0,.18)';
+        el.innerHTML='';
+        var t=document.createElement('span'); t.className='ss-msg'; t.textContent=text; t.style.cssText='flex:1 1 auto;min-width:0'; el.appendChild(t);
+        (actions||[]).forEach(function(a){ var bt=document.createElement('button'); bt.type='button'; bt.className='ss-act'; bt.setAttribute('data-act',a.id); bt.textContent=a.label;
+          bt.style.cssText='all:unset;cursor:pointer;font-weight:700;color:#006aff;white-space:nowrap'; bt.onclick=a.fn; el.appendChild(bt); });
+      };
+      if(document.body)go2(); else document.addEventListener('DOMContentLoaded',go2);
+    }
+    function dismiss(){ var el=document.getElementById('ssPill'); if(el)el.remove(); }
+    function signIn(){
+      // The modal's default resume is a reload — the URL still carries ?ss=, so the reload restores
+      // with a live session (and repaints the account chip). OAuth / MFA / setup hand off to /app
+      // with next=<this path + query>, which resolvePostSignupDestination preserves.
+      if(typeof window.openSignInModal==='function'){ window.openSignInModal('open your saved search'); return; }
+      location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
+    }
+    var SIGN_IN={id:'signin',label:'Sign in',fn:signIn};
+    var FULL={id:'dismiss',label:'Show the full map',fn:dismiss};
+    // Delayed authentication: a sign-in in ANOTHER tab writes the token here too.
+    var listening=false;
+    function waitForAuth(){ if(listening)return; listening=true;
+      window.addEventListener('storage',function(e){ if(e&&e.key==='mi_beta_auth_token'&&e.newValue){ var s2=window.__mapSession&&window.__mapSession(); if(s2&&!s2.expired)start(); } }); }
+    function fail(kind,text,actions,extra){ clearTimeout(ceiling); pill(kind,text,actions); track(kind,extra); release(); }
+    function start(){
+      var my=++seq; window.__ssPending=true; window.__ssOwnsView=true;
+      pill('loading','Restoring your saved search\\u2026',[]);
+      // Never hold the map hostage: past 8 s the default map loads UNDER the still-showing
+      // "Restoring" pill, and the saved search still applies (newest action wins) if it arrives.
+      clearTimeout(ceiling); ceiling=setTimeout(function(){ if(my!==seq)return; release(); },8000);
+      var tries=0; (function ready(){
+        if(my!==seq)return;
+        if(typeof window.__applySavedSearch!=='function'||typeof window.__mapSession!=='function'){
+          if(++tries<60)return setTimeout(ready,150);
+          return fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'not_ready'});
+        }
+        var sess=window.__mapSession();
+        if(!sess){ waitForAuth(); return fail('signin','Sign in to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
+        if(sess.expired){ waitForAuth(); return fail('expired','Your session expired. Sign in again to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
+        var done=false;
+        var giveUp=setTimeout(function(){ if(done||my!==seq)return; done=true;
+          fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'timeout'}); },15000);
+        fetch('/api/app/saved-searches?email='+encodeURIComponent(sess.em)+'&id='+encodeURIComponent(wantId),
+          {headers:{'x-mi-auth-token':sess.t,'x-user-email':sess.em}})
+          .then(function(r){ return r.json().catch(function(){ return null; }).then(function(d){ return {status:r.status,ok:r.ok,d:d}; }); })
+          .then(function(res){
+            if(done||my!==seq)return; done=true; clearTimeout(giveUp);
+            var d=res.d||{};
+            if(res.status===401){ waitForAuth(); return fail('expired','Your session expired. Sign in again to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
+            if(res.status===404){
+              return fail('not_found','This saved search isn\\u2019t available for '+sess.em+' \\u2014 it may have been deleted, or saved under a different account. Showing the full map.',
+                [{id:'saved',label:'My saved searches',fn:function(){ location.href='/opportunity-map/saved'; }},{id:'switch',label:'Use another account',fn:signIn},FULL]);
+            }
+            var ss=d.search;
+            if(!res.ok||!d.success||!ss||String(ss.id)!==wantId){
+              return fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'http_'+res.status});
+            }
+            clearTimeout(ceiling);
+            var out=window.__applySavedSearch(ss,{savedSearch:true})||{};
+            // Round 1 already carries the saved market: either fetchView above ran (boot released),
+            // or boot has not released yet and its release round reads the restored FILT.
+            window.__ssPending=false; window.__ssDeferredRound=false;
+            var miss=(out.unsupported||[]);
+            pill('applied','Saved search: '+String(ss.name||'Untitled').slice(0,80)+(miss.length?(' \\u00b7 not on the map: '+miss.join(', ')):''),[{id:'dismiss',label:'\\u2715',fn:dismiss}]);
+            track('applied',{mode:String(ss.mode||''),unsupported:miss.join(',').slice(0,80)});
+            // The pill names THIS market; the first round showing a different one removes it
+            // (same provenance rule as the return-continuity pill, whose slot ?ss= leaves free).
+            var sig=null; try{ if(window.__mapIntentSig)sig=window.__mapIntentSig(); }catch(e){}
+            if(sig){ window.__checkResumeProvenance=function(){ try{
+              if(!document.getElementById('ssPill')){ window.__checkResumeProvenance=null; return; }
+              var now=window.__mapIntentSig?window.__mapIntentSig():null;
+              if(now==null||now===sig)return; dismiss(); window.__checkResumeProvenance=null; }catch(e){} }; }
+          })
+          .catch(function(){ if(done||my!==seq)return; done=true; clearTimeout(giveUp);
+            fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'network'}); });
+      })();
+    }
+    start();
+  }catch(e){ window.__ssPending=false; window.__ssOwnsView=false; } })();
 
   // Deep-link: scope params — /opportunity-map?agency=&naics=&state=&setAside=&psc=&q=
   // Open the map ALREADY narrowed, from a link that carries the scope instead of dropping it.
@@ -10170,7 +10319,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     else if(act==='unplaced'){ location.href='/opportunity-map/forecasts?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
-      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss);
+      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss,{savedSearch:true});
         // Picking a saved search is a user action: the URL now carries ITS query (or none), never
         // the one typed before it. The restorer itself never writes the URL.
         if(typeof window.__syncQueryUrl==='function')window.__syncQueryUrl(true);
