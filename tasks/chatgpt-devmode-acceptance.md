@@ -56,7 +56,7 @@ session and are recorded only where reported.
 | A9 named company (V2X) | get_contractor_profile | ✓, followed by a chained `lookup_sam_entity` | PASS |
 | A10 SAM entity | lookup_sam_entity | ✓ | PASS |
 | A11 Rule of Two | assess_market_depth | ✓ | PASS |
-| A12 agency intel | get_agency_intel | ✓, plus 3 chained `search_past_contracts` (**2 degraded, not charged**) | PASS (degraded chain, P1 to check) |
+| A12 agency intel | get_agency_intel | ✓, plus 3 chained `search_past_contracts` (**2 degraded, not charged** — retained as measured) | PASS · host outcome: usable answer with material caveats preserved |
 | A14 capability fit | capability_market_match | ✓ | PASS |
 | A15 keyword distribution | get_keyword_coverage | ✓ | PASS |
 | B1–B3 identify / documents / incumbent | lookup → documents → incumbent | ✓ each intent produced its own tool | PASS |
@@ -78,11 +78,37 @@ session and are recorded only where reported.
 | D1–D5 latency | capability_market_match ×5 | 4 calls in the D block + D1 already run as S2 | PASS, max 13.6 s |
 | D incumbent ×3 | get_solicitation_incumbent | 3 calls | PASS, max 1.6 s |
 | D past contracts ×3 | search_past_contracts | 3 calls | PASS, max 0.5 s |
-| D keyword coverage ×3 | get_keyword_coverage | **2 calls** | one run unaccounted for (no call, web, or merged) — needs host note |
+| D keyword coverage ×3 | get_keyword_coverage | **2 calls for 3 prompts**; none after the report window; arguments are not logged, so neither call can be attributed to a specific prompt | "satellite imagery" row: **HOST_RESULT_VISIBLE / SERVER_CALL_NOT_ESTABLISHED** (reconciliation debt) |
 
 **Routing: no ROUTING_FAIL found on the server side.** Every worksheet intent that should reach
-Mindy produced its intended tool, including the contrastive B pairs. Host-side web usage per row
-is not reconstructable from the server.
+Mindy produced its intended tool, including the contrastive B pairs — except the one D-block
+keyword-coverage row whose server call is not established (below).
+
+**Web usage: `WEB_USAGE_NOT_RECORDED` for every clean-run row**, including B10/B11. The web-search
+indicator was not systematically recorded during the clean Path A run, and the transcript does not
+establish web-before/web-after per row. B10/B11 visibly answered from Mindy's stored legislation
+status, but without the host UI indicator recorded their web field stays NOT_RECORDED. "No web" is
+not inferred from an answer citing Mindy, and "web" is not inferred from ordinary links in
+ChatGPT's prose. (Web use observed in the discarded first pass does not carry over.) This is a
+documentation gap, not a product failure.
+
+### Host-side reconciliation (Eric's manual run)
+
+- **D-block "satellite imagery" (`get_keyword_coverage`)** — ChatGPT showed a detailed
+  Mindy-attributed answer ($2.82M FY2026 exact-phrase spending, 11 awards / 12 transactions,
+  NAICS 541512 leading at $2.48M / 87.9%, with coverage caveats). The server has only 2
+  keyword-coverage calls for the 3 D-block prompts and no later call, so a server call for this
+  row is **not established**. Recorded as `HOST_RESULT_VISIBLE / SERVER_CALL_NOT_ESTABLISHED`.
+  Not PASS from prose; no missing call inferred; not rerun.
+- **A12 (VA facilities & construction)** — host answer usable and kept the degraded-evidence
+  boundary: EHRM infrastructure, medical-center renovation, HVAC/central-plant modernisation,
+  energy/resiliency and construction-management themes; the $78.3B FY2025 figure stated as
+  VA-wide, not construction-only; the 16.4% small-business and 9.1% set-aside figures stated as
+  VA-wide; individual award values stated as lifetime totals, not FY2025 spending, and not to be
+  summed. No visible failure or "could not complete". **Host outcome: usable answer with material
+  caveats preserved. Server outcome: 2 × `search_past_contracts` degraded, kept exactly as
+  measured** — not relabelled grounded because the final answer was useful.
+- **Web usage** — see above: `WEB_USAGE_NOT_RECORDED`.
 
 ### Fidelity findings
 
@@ -110,20 +136,24 @@ fabrication on the one fully verified answer or the fabrication probe.
 2. **`capability_market_match` result quality + labelling** — 8/8 logged `no_result`; the tool
    returns thin, unverified candidate evidence whenever company identity is not corroborated, and
    every call is charged 50 credits. Fidelity of the visible answers is unverified.
-3. **`search_past_contracts` degraded ×2** in the A12 chain (correctly uncharged) — confirm what
-   ChatGPT showed and whether the upstream failure recurs.
+3. **`search_past_contracts` degraded ×2** in the A12 chain (correctly uncharged). Host answer was
+   usable with caveats preserved; the upstream cause of the degradation is still unknown and
+   should be checked for recurrence.
 
 **P2**
 1. Telemetry: `get_solicitation_incumbent` / `get_contractor_profile` logged `unclassified`.
 2. Billing decision: honest not-found (`lookup_solicitation`, N3) charged 5 credits; thin
    `capability_market_match` charged 50.
 3. `get_contractor_profile` is the slowest tool (p50 14.1 s) — under the host limit, but noticeable.
-4. One D-block `get_keyword_coverage` run has no server call — confirm with the host note.
+4. Reconciliation debt: the D-block "satellite imagery" row is
+   `HOST_RESULT_VISIBLE / SERVER_CALL_NOT_ESTABLISHED`; and web usage is `WEB_USAGE_NOT_RECORDED`
+   for all clean-run rows. Future runs should record the server row immediately after each prompt
+   and the host web indicator per row.
 5. Credit estimate for a full pass should be ~950, not ~660.
 
 ### Submission GO / NO-GO
 
-**Host behaviour: GO** — routing, latency (0 calls near the limit; `capability_market_match`
+**Host behaviour: GO** (with the documented reconciliation gaps) — routing, latency (0 calls near the limit; `capability_market_match`
 viable at ≤ 13.6 s) and commerce invariants all pass on server evidence.
 
 **Submission: NO-GO for now.** Remaining blockers, none of which this session can clear:
