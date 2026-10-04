@@ -24,6 +24,7 @@ Public, but part of product flows (checkout, signup, auth). Out by decision.
 | `/pursuit-brief/requested`, `/pursuit-brief/error` | request confirmation |
 | `/mindy-day/confirmed` | event confirmation |
 | `/alerts/signup` | alert signup |
+| `/opportunity/mute/success`, `/opportunity/mute/already-muted`, `/opportunity/mute/error` | email "mute this opportunity" action confirmations |
 | `/signup`, `/activate`, `/access`, `/welcome` | signup / activation |
 | `/forgot-password`, `/reset-password`, `/setup-password`, `/setup-account` | password / account setup |
 | `/auth/callback`, `/checkout/[product]` | handlers (redirects, no page) |
@@ -42,6 +43,11 @@ These keep the product's own design system. PR 1's map-chrome check guards that 
 | route | note |
 |---|---|
 | `/contracts/[piid]` | Award-detail resolver (redirects). Tracked with the award 404s in #1786, kept separate from design work. `/awards/[id]` itself sits in the migrated `/awards` family. |
+
+## Not served on getmindy.ai
+| route | note |
+|---|---|
+| `/` (`src/app/page.tsx`) | On getmindy.ai, `/` is rewritten by host to `/today` (migrated), and `mi.govcongiants.com/` 308s to getmindy.ai. This legacy page renders only on other hosts (deployment URLs, localhost) and carries the Supabase auth-recovery redirect. It is the same frozen-rollback class as `/mindy-landing`. |
 
 ## Not pages
 | route | note |
