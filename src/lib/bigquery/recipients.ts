@@ -16,6 +16,9 @@ import { bqUnavailable } from './cache';
 import { readServedPage } from '../awards-serving';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
+import { buildPlayersQuery, cityScopeSql, geoCacheToken } from '@/lib/players/query';
+import { playersSourceMode } from '@/lib/players/source';
+import { classifyPlayersResult, TOP50_INCOMPLETE_REASON, type PlayersStatus, type PlayersCoverage } from '@/lib/players/truth';
 import {
   buildCountingBases,
   dateRangeValidFlag,
@@ -1428,6 +1431,16 @@ export interface RecipientSearchRow {
   award_count: number;
   distinct_agency_count: number;
   distinct_naics_count: number;
+  /** Most recent award action (YYYY-MM-DD) — feeds the map's recency ranking. Optional: not every path has it. */
+  last_action_date?: string | null;
+}
+
+/** searchRecipients result. `status` says whether `total`/`rows` may be read as a complete count. */
+export interface RecipientSearchResult {
+  rows: RecipientSearchRow[];
+  total: number;
+  status: PlayersStatus;
+  coverage: PlayersCoverage;
 }
 
 /**
@@ -1462,7 +1475,10 @@ export async function searchRecipients(opts: {
   // returns 0 on a cold cache (the bug: panel + lookup showed no results despite
   // 317K rows in the table).
   liveBq?: boolean;
-}): Promise<{ rows: RecipientSearchRow[]; total: number }> {
+  // Sub-state viewport geography (visible cities), applied BEFORE ranking. Only the canonical
+  // Players source can honor it; see src/lib/players/geography.ts.
+  geo?: { cities?: string[]; includeUngeocodedCities?: boolean; knownCities?: string[] };
+}): Promise<RecipientSearchResult> {
   const liveBq = opts.liveBq ?? false;
   const search = (opts.search || '').trim();
   const state = (opts.state || '').trim().toUpperCase();
@@ -1531,13 +1547,16 @@ export async function searchRecipients(opts: {
     const orderCol = sortBy === 'recipient_name' ? 'recipient_name' : sortBy === 'award_count' ? 'award_count' : 'total_obligated';
     const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
     const agencyKey = agencyNeedles.join('|').toLowerCase();
+    // Sub-state geography BEFORE ranking (on the canonical recipients HQ city).
+    const agencyCityCond = cityScopeSql('r.city', opts.geo || {}, rp);
+    const agencyGeo = geoCacheToken(opts.geo);
 
     const rows = await queryCached<{
       recipient_uei: string; recipient_name: string; total_obligated: number; award_count: number;
       distinct_agency_count: number; city: string | null; state: string | null; total_rows: number;
     }>({
       cacheOnly: !liveBq,
-      cacheKey: `recipient-search-agency:${agencyKey}:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
+      cacheKey: `recipient-search-agency:${agencyKey}:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v2${agencyGeo === '-' ? '' : ':g' + agencyGeo}`,
       query: `
         WITH matched AS (
           SELECT
@@ -1556,7 +1575,8 @@ export async function searchRecipients(opts: {
           COUNT(*) OVER() AS total_rows
         FROM matched m
         LEFT JOIN ${BQ_TABLES.recipients} r USING (recipient_uei)
-        ${state ? 'WHERE r.state = @stateJoin' : ''}
+        ${[state ? 'r.state = @stateJoin' : '', agencyCityCond || ''].filter(Boolean).length
+          ? 'WHERE ' + [state ? 'r.state = @stateJoin' : '', agencyCityCond || ''].filter(Boolean).join(' AND ') : ''}
         ORDER BY ${orderCol === 'recipient_name' ? 'm.recipient_name' : orderCol === 'award_count' ? 'm.award_count' : 'm.total_obligated'} ${orderDir}
         LIMIT @limit OFFSET @offset
       `,
@@ -1570,8 +1590,11 @@ export async function searchRecipients(opts: {
       maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     });
     const total = rows.length ? Number(rows[0].total_rows) : 0;
+    const agencyKeyFull = `recipient-search-agency:${agencyKey}:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v2${agencyGeo === '-' ? '' : ':g' + agencyGeo}`;
     return {
       total,
+      status: classifyPlayersResult({ rowCount: rows.length, bqState: bqResultState(agencyKeyFull, rows.length), source: 'awards_scan' }),
+      coverage: { source: 'awards_scan' },
       rows: rows.map(r => ({
         recipient_uei: r.recipient_uei,
         recipient_name: r.recipient_name,
@@ -1585,7 +1608,40 @@ export async function searchRecipients(opts: {
     };
   }
 
-  // ── NAICS path: cheap pre-aggregated rollup (top contractors per NAICS) ──
+  // ── NAICS path, CANONICAL: full award-derived Players, FILTER (naics/state/cities/name) → RANK ──
+  // players_naics_recipients has no rank cap, so a state- or city-scoped request sees that
+  // geography's own firms. Off until PLAYERS_SOURCE=canonical (see src/lib/players/source.ts).
+  if (naicsCodes.length > 0 && playersSourceMode() === 'canonical') {
+    const { sql, params: qp, cacheKey } = buildPlayersQuery(BQ_TABLES.playersNaicsRecipients, {
+      naicsCodes, state: state || undefined, search: search || undefined,
+      cities: opts.geo?.cities, includeUngeocodedCities: opts.geo?.includeUngeocodedCities,
+      knownCities: opts.geo?.knownCities, sortBy, limit, offset,
+    });
+    const rows = await queryCached<{
+      recipient_uei: string; recipient_name: string; city: string | null; state: string | null;
+      total_obligated: number; award_count: number; distinct_agency_count: number;
+      last_action_date: string | null; source_action_max: string | null; total_rows: number;
+    }>({ cacheOnly: !liveBq, cacheKey, query: sql, params: qp });
+    return {
+      total: rows.length ? Number(rows[0].total_rows) : 0,
+      status: classifyPlayersResult({ rowCount: rows.length, bqState: bqResultState(cacheKey, rows.length), source: 'players_canonical' }),
+      coverage: { source: 'players_canonical', sourceActionMax: rows[0]?.source_action_max ?? null },
+      rows: rows.map(r => ({
+        recipient_uei: r.recipient_uei,
+        recipient_name: r.recipient_name,
+        city: r.city ?? null,
+        state: r.state ?? null,
+        total_obligated: Number(r.total_obligated || 0),
+        award_count: Number(r.award_count || 0),
+        distinct_agency_count: Number(r.distinct_agency_count || 0),
+        distinct_naics_count: 0,
+        last_action_date: r.last_action_date ?? null,
+      })),
+    };
+  }
+
+  // ── NAICS path, LEGACY: the national top-50 rollup. A TRUNCATED population — every answer
+  // from it is coverage_incomplete (a floor), never a confident count or a confident zero. ──
   if (naicsCodes.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rp: Record<string, any> = { limit, offset };
@@ -1641,8 +1697,11 @@ export async function searchRecipients(opts: {
       params: rp,
     });
     const total = rolled.length ? Number(rolled[0].total_rows) : 0;
+    const legacyKey = `recipient-search-naics:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v4`;
     return {
       total,
+      status: classifyPlayersResult({ rowCount: rolled.length, bqState: bqResultState(legacyKey, rolled.length), source: 'top50_rollup' }),
+      coverage: { source: 'top50_rollup', incompleteReason: TOP50_INCOMPLETE_REASON },
       rows: rolled.map(r => ({
         recipient_uei: r.recipient_uei,
         recipient_name: r.recipient_name,
@@ -1673,6 +1732,9 @@ export async function searchRecipients(opts: {
     params.search = `%${search.toLowerCase()}%`;
   }
   if (state) { where.push('r.state = @state'); params.state = state; }
+  const plainCityCond = cityScopeSql('r.city', opts.geo || {}, params);
+  if (plainCityCond) where.push(plainCityCond);
+  const plainGeo = geoCacheToken(opts.geo);
 
   const orderCol = sortBy === 'recipient_name' ? 'r.recipient_name'
     : sortBy === 'award_count' ? 'r.award_count'
@@ -1681,7 +1743,7 @@ export async function searchRecipients(opts: {
 
   const rows = await queryCached<RecipientSearchRow & { total_rows: number }>({
     cacheOnly: !liveBq,
-    cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
+    cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v2${plainGeo === '-' ? '' : ':g' + plainGeo}`,
     query: `
       SELECT
         r.recipient_uei, r.recipient_name, r.city, r.state,
@@ -1697,7 +1759,13 @@ export async function searchRecipients(opts: {
   });
 
   const total = rows.length ? Number(rows[0].total_rows) : 0;
-  return { rows: rows.map(({ total_rows, ...r }) => r), total };
+  const plainKey = `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v2${plainGeo === '-' ? '' : ':g' + plainGeo}`;
+  return {
+    rows: rows.map(({ total_rows, ...r }) => r),
+    total,
+    status: classifyPlayersResult({ rowCount: rows.length, bqState: bqResultState(plainKey, rows.length), source: 'recipients' }),
+    coverage: { source: 'recipients' },
+  };
 }
 
 /**

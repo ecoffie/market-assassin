@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   try {
     // liveBq: this is the in-app contractor search — hit live BigQuery, don't
     // return [] on a cold cache (the bug that made the panel + lookup show nothing).
-    const { rows, total } = await searchRecipients({ search, naics, state, sortBy, limit, offset, liveBq: true });
+    const { rows, total, status, coverage } = await searchRecipients({ search, naics, state, sortBy, limit, offset, liveBq: true });
 
     // Shape to the panel's contractor model (recipient_name → company, etc.).
     const contractors = rows.map((r) => ({
@@ -67,8 +67,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       source: 'bigquery_recipients',
-      totalCount: total,     // full DB size (317K) — for the headline stat
-      filteredCount: total,  // matches after filters
+      // null = UNKNOWN (BigQuery failed / cold cache) — never a fabricated 0. When status is
+      // coverage_incomplete the number is a FLOOR (e.g. the legacy national top-50 NAICS list).
+      totalCount: status === 'unavailable' ? null : total,
+      filteredCount: status === 'unavailable' ? null : total,
+      status,
+      coverage,
       count: contractors.length,
       // How many rows on this page resolved to a capability profile — lets the UI (and
       // /verify-panel) tell "no profiles exist" apart from "the join silently broke".

@@ -9,8 +9,8 @@
  * the balance + billing that used to sit on the landing page live here.
  *
  * Identity is server-verified via /api/mcp/session (never a client-claimed email).
- * Account/autorecharge reads use the token-only session; key management uses
- * requireUserAuth, so those calls pass the resolved email in the headers.
+ * Account/autorecharge reads use the token-only session; key management also takes
+ * its identity from the session (the email it sends is only a claim checked against it).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
