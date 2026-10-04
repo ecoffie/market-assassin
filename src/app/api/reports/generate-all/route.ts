@@ -12,7 +12,7 @@ import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget
 import { MICRO_PURCHASE_THRESHOLD, SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 import { fetchPricingIntel } from '@/lib/utils/calc-rates';
 import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
-import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
+import { getEmailFromRequest, verifyMIAccess, getVerifiedIdentity, type MIAccessTier } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
 import { getMarketAssassinTier } from '@/lib/access-codes';
@@ -127,9 +127,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting: email-based if available, stricter IP-based for unauthenticated
-    const email = getEmailFromRequest(request, body);
-    // R0 observability (behaviour-neutral): records whether this claimed email carried a verified identity.
-    observeProGateIdentity(request, email);
+    // R0 observability: records whether the claimed email carried a verified identity.
+    observeProGateIdentity(request, getEmailFromRequest(request, body));
+    // R1: the identity is the VERIFIED session, never the legacy access cookie or the body's
+    // userEmail (legacy Market Assassin metadata, not a login). No session = the Free set.
+    const verified = await getVerifiedIdentity(request);
+    const email = verified?.email ?? null;
     if (email) {
       const rl = await checkReportRateLimit(email);
       if (!rl.allowed) return rateLimitResponse(rl);
@@ -140,8 +143,10 @@ export async function POST(request: NextRequest) {
       if (!rl.allowed) return rateLimitResponse(rl);
     }
 
-    // Server-side access verification - MI tiers (free/pro/none)
-    const auth = await verifyMIAccess(email);
+    // Server-side access verification - MI tiers (free/pro/none). Anonymous = the Free set.
+    const auth = email
+      ? await verifyMIAccess(email)
+      : { tier: 'free' as MIAccessTier, email: null, error: undefined as string | undefined };
     if (auth.tier === 'none') {
       console.log('[generate-all] Access denied:', { email, authError: auth.error });
       return NextResponse.json(

@@ -45,7 +45,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assertRankingComplete } from '@/lib/integrity/postconditions';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import {
   getPainPointsForAgency,
@@ -417,7 +417,13 @@ export async function POST(request: NextRequest) {
     const marketFilter = buildMarketFilter({ coverage, pscCode: psc, keyword: keywordForCoverage });
 
     // Tier check. Free users still see data, just fewer rows.
-    const access = await verifyMIAccess(email);
+    // R1: only a VERIFIED identity can raise the tier. An anonymous caller gets the Free result
+    // (the same rows a Free account sees); a claim that contradicts the session is refused.
+    const identity = await verifyClaimedIdentity(request, email);
+    if (identity.status === 'mismatch') return identityFailureResponse(identity);
+    const access = identity.status === 'verified'
+      ? await verifyMIAccess(identity.email)
+      : { tier: 'free' as const, isStaff: false };
     const isFree = access.tier === 'free' && !access.isStaff;
 
     // Normalize the states filter so it participates in the cache key (different

@@ -1036,8 +1036,10 @@ curl -s -X POST https://getmindy.ai/api/app/target-market-research \
   -H 'Content-Type: application/json' \
   -d '{"naicsCode":"236220","email":"eric@govcongiants.com","businessType":"","veteranStatus":"Not Applicable"}'
 ```
-`eric@govcongiants.com` is staff → append `"refresh":true` to **bypass the cache** for a
-fresh compute. The cache key also splits on `business_type` + `veteran_status` + states,
+Since R1 (2026-10-04) the tier comes only from a verified session, so this unsigned curl
+gets the **Free** view. To see the Pro rows or force a fresh compute, add a staff session
+header (`-H "x-mi-auth-token: <token minted for the staff email>"`) and `"refresh":true`.
+A claimed email alone no longer counts as staff. The cache key also splits on `business_type` + `veteran_status` + states,
 so the form default `veteranStatus:'Not Applicable'` is a **different key** than an
 omitted one. Response: `agencies[]` (each with `metric_top_total`), `relevant_spending`,
 `cached`.
