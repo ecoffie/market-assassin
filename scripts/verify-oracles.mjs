@@ -32,7 +32,8 @@
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
- *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema>
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema|players>
+ *       --players-preview  (with --only players) build Players in an ephemeral BQ session — code proof, not acceptance
  */
 
 import { config } from 'dotenv';
@@ -529,6 +530,78 @@ if (want('awards-schema')) {
     // Could not observe the schema — UNMEASURED, never a pass (and never "0 columns").
     record('awards-schema: live awards schema unmeasured', false,
       'BQ probe unavailable, schema NOT proven: ' + String(e?.message || e).slice(0, 160), 'unmeasured');
+  }
+}
+
+// ── 13. PLAYERS — Players counts reconcile with unique canonical awardee UEIs per (NAICS, HQ state) ──
+// Audit 2026-10-04 (tasks/players-naics-coverage-audit-2026-10-04.md): Maps Players + MCP
+// search_contractors read the national top-50 listicle rollup as a population, so 541512/TX showed
+// 0 Players against 327 real awardees and 45.9% of NAICS×state cells were a false zero. Truth is
+// derived from awards + recipients directly (never from the Players table). Cells = the 4 regression
+// fixtures + largest/median/smallest state for 15 sector-spread NAICS. A partial or unknown answer
+// NEVER reconciles. On today's production (legacy source) this check FAILS — that is the point.
+//   --players-preview  build the canonical dataset in an EPHEMERAL BigQuery session temp table and run
+//                      the canonical query against it (code proof; NOT production acceptance).
+if (want('players')) {
+  const PREVIEW = process.argv.includes('--players-preview');
+  try {
+    const { BQ_TABLES } = await import('@/lib/bigquery/client');
+    const { queryCached } = await import('@/lib/bigquery/cache');
+    const { buildPlayersTruthSql, buildPlayersDatasetSql } = await import('@/lib/players/dataset');
+    const { PLAYERS_BROAD_NAICS, PLAYERS_REGRESSION_FIXTURES, selectSampleCells, evaluateCells, datasetMismatchRate, buildPlayersCellCountsSql } = await import('@/lib/players/reconcile');
+    const naicsList = Array.from(new Set([...PLAYERS_BROAD_NAICS, ...PLAYERS_REGRESSION_FIXTURES.map((f) => f.naics)]));
+    const truth = await queryCached({
+      cacheOnly: false, ttlSeconds: 12 * 3600,
+      cacheKey: `players-oracle-truth:${naicsList.join('_')}:v1`,
+      query: buildPlayersTruthSql({ awards: BQ_TABLES.awards, recipients: BQ_TABLES.recipients }, 'naics'),
+      params: { naics: naicsList },
+    });
+    if (!truth.length) throw new Error('truth query returned no rows (BigQuery unavailable?)');
+    const cells = selectSampleCells(truth);
+    const measured = new Map();
+    let source = 'production';
+    let datasetNote = '';
+    if (PREVIEW) {
+      source = 'preview (session temp table)';
+      const { openBqSession, asSessionTempTable, SESSION_PLAYERS_TABLE } = await import('@/lib/players/bq-session');
+      const { buildPlayersQuery } = await import('@/lib/players/query');
+      const target = BQ_TABLES.playersNaicsRecipients;
+      const sess = await openBqSession(asSessionTempTable(buildPlayersDatasetSql({ awards: BQ_TABLES.awards, recipients: BQ_TABLES.recipients, target }), target));
+      try {
+        for (const c of cells) {
+          const { sql, params } = buildPlayersQuery(SESSION_PLAYERS_TABLE, { naicsCodes: [c.naics], state: c.state, sortBy: 'total_obligated', limit: 1, offset: 0 });
+          const rows = await sess.query(sql, params);
+          const total = rows.length ? Number(rows[0].total_rows) : 0;
+          measured.set(`${c.naics}|${c.state}`, { total, status: total > 0 ? 'success_nonzero' : 'success_zero' });
+        }
+        // Dataset-level: EVERY (NAICS, state) cell in the warehouse vs truth.
+        const allTruth = await sess.query(buildPlayersTruthSql({ awards: BQ_TABLES.awards, recipients: BQ_TABLES.recipients }, 'all'));
+        const allPlayers = await sess.query(buildPlayersCellCountsSql(SESSION_PLAYERS_TABLE));
+        const d = datasetMismatchRate(allTruth.map((r) => ({ ...r, proven_players: Number(r.proven_players) })), allPlayers.map((r) => ({ ...r, proven_players: Number(r.proven_players) })));
+        datasetNote = `; dataset ${d.cells} cells, ${d.mismatched} mismatched` + (d.examples.length ? ` e.g. ${d.examples.slice(0, 3).join(', ')}` : '');
+        if (d.mismatched > 0) measured.set('__dataset__', { total: null, status: 'dataset_mismatch' });
+      } finally {
+        await sess.close();
+      }
+    } else {
+      const { searchRecipients } = await import('@/lib/bigquery/recipients');
+      const { playersSourceMode } = await import('@/lib/players/source');
+      source = `production (${playersSourceMode()})`;
+      for (const c of cells) {
+        const r = await searchRecipients({ naics: c.naics, state: c.state, sortBy: 'total_obligated', limit: 1, liveBq: true });
+        measured.set(`${c.naics}|${c.state}`, { total: r.status === 'unavailable' ? null : r.total, status: r.status });
+      }
+    }
+    const { results, failed } = evaluateCells(cells, truth, measured);
+    const datasetBad = measured.has('__dataset__');
+    const fx = results.filter((r) => PLAYERS_REGRESSION_FIXTURES.some((f) => f.naics === r.naics && f.state === r.state))
+      .map((r) => `${r.naics}/${r.state} ${r.players ?? '?'}/${r.truth}${r.ok ? '' : ` [${r.status}]`}`).join(' · ');
+    const pass = failed.length === 0 && !datasetBad;
+    record(`players: ${source} reconciles with awardee UEIs (${results.length} cells)`, pass,
+      `fixtures ${fx}; ${failed.length} cell(s) off` +
+      (failed.length ? ` e.g. ${failed.filter((f) => !PLAYERS_REGRESSION_FIXTURES.some((x) => x.naics === f.naics && x.state === f.state)).slice(0, 4).map((f) => `${f.naics}/${f.state} ${f.players ?? '?'}/${f.truth}`).join(', ')}` : '') + datasetNote);
+  } catch (e) {
+    record('players: reconciliation unmeasured', false, 'could not observe Players or truth: ' + String(e?.message || e).slice(0, 200), 'unmeasured');
   }
 }
 

@@ -409,6 +409,22 @@ async function main() {
       throw new Error(`failed_clock_stamp: ${stampError?.message || 'stamp updated no row'}`);
     }
     log(`data_sources[bq_awards] stamped successful full refresh at ${lastBuilt}`);
+
+    // Proven Players chain (src/lib/players). OFF until the awards incident is repaired and
+    // reconciled — set PLAYERS_REBUILD_AFTER_INGEST=on then. Even when on, runPlayersRebuild refuses
+    // while awards cohort completeness is not `complete`, and records the refusal. A Players failure
+    // never fails the awards ingest (the awards clocks above are already stamped).
+    if ((process.env.PLAYERS_REBUILD_AFTER_INGEST || '').trim() === 'on') {
+      try {
+        const { runPlayersRebuild } = await import('../src/lib/players/rebuild-run');
+        const rec = await runPlayersRebuild({ go: true, log: (m) => log(`players: ${m}`) });
+        log(`players rebuild: ${rec.status} — ${rec.detail}`);
+      } catch (e) {
+        log(`players rebuild errored (awards ingest unaffected): ${(e as Error).message}`);
+      }
+    } else {
+      log('players rebuild skipped (PLAYERS_REBUILD_AFTER_INGEST is not "on")');
+    }
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

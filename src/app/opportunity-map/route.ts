@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
+import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
@@ -152,7 +153,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // as the top-bar "Player type" dropdown (both drive window.__players). Players-map only.
   + '<div class="mf-sec mfv-companies mfv-buyers" data-mfsec="playertype">Show on the map <em>(player type)</em></div>'
   + '<div class="mf-checks mfv-companies mfv-buyers" data-mfsec="playertype" id="plrToggles">'
-  +   '<button class="hzc on" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')">Companies</button>'
+  +   '<button class="hzc on" title="' + PROVEN_PLAYERS_LABEL + ' — ' + PROVEN_PLAYERS_DESCRIPTION + '" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')">Companies</button>'
   +   '<button class="hzc on" data-plr="buyers" style="--hzc:#dc2626" onclick="togglePlayer(\'buyers\')">Gov Buyers</button>'
   + '</div>'
   + '<div class="mf-sec mfv-open" data-mfsec="scope">Show</div>'
@@ -373,7 +374,7 @@ const SERVER_FILTERS =
   + '<div class="hznwrap mfv-companies" id="plrWrap" style="display:none">'
   +   '<button class="fsel fsel-mode" id="plrBtn" type="button" title="Which players to show" aria-haspopup="true" aria-expanded="false">Player type</button>'
   +   '<div class="hznpop" id="plrPop" role="menu" hidden>'
-  +     '<button class="hznrow on" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')"><i></i><span class="hznlbl">Companies</span><span class="hznn" data-plrn="companies"></span></button>'
+  +     '<button class="hznrow on" title="' + PROVEN_PLAYERS_LABEL + ' — ' + PROVEN_PLAYERS_DESCRIPTION + '" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')"><i></i><span class="hznlbl">Companies</span><span class="hznn" data-plrn="companies"></span></button>'
   +     '<button class="hznrow on" data-plr="buyers" style="--hzc:#dc2626" onclick="togglePlayer(\'buyers\')"><i></i><span class="hznlbl">Gov Buyers</span><span class="hznn" data-plrn="buyers"></span></button>'
   +   '</div>'
   + '</div>'
@@ -1583,6 +1584,10 @@ const MOBILE_JS = '<script>(function(){'
 // The header is promoted to a dynamic "N of TOTAL" hero (reacts to filters + viewport, the
 // Zillow/Airbnb convention); SDVOSB/closing is demoted to a small secondary line. select() is
 // wrapped so clicking a card whose pin is inside a cluster zooms to reveal it first.
+// Proven Players copy — the SAME plain-JS source unit-tested in src/lib/players/copy.ts. Its own
+// <script>, loaded before VIEWPORT_JS (which calls it), so no template interpolation sits inside
+// the statically syntax-checked viewport script.
+const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_TEXT_JS + ';</script>';
 const VIEWPORT_JS = `<script>
 (function(){
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
@@ -2074,6 +2079,16 @@ const VIEWPORT_JS = `<script>
         var _mc0=document.getElementById('mapCount'); if(_mc0)_mc0.hidden=true;
         return;
       }
+    }
+    // PROVEN PLAYERS header — status-aware (src/lib/players/copy.ts, injected below). Runs before the
+    // !TOTAL early-return so an unavailable or partial answer repaints instead of keeping a stale count.
+    if(typeof isContactMode==='function'&&isContactMode(MODE)&&window.__playersView&&typeof window.__playersHeaderText==='function'){
+      var _pv=window.__playersView, _ph=window.__playersHeaderText(_pv);
+      var _rcP=document.getElementById('rescount');
+      if(_rcP){ _rcP.innerHTML='<span style="font-weight:700;color:var(--ink)">'+esc(_ph.count)+'</span> <span style="font-weight:400;color:var(--sub)">'+esc(_ph.detail)+'</span>'; _rcP.title=_ph.title||''; }
+      if(_pv.status==='unavailable'||_pv.status==='coverage_incomplete'){ var _mcP=document.getElementById('mapCount'); if(_mcP)_mcP.hidden=true; }
+      else setMapCount(_pv.shown, (_pv.total==null?_pv.shown:_pv.total), (_pv.total!=null&&_pv.total>_pv.shown));
+      return;
     }
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
@@ -2612,19 +2627,37 @@ const VIEWPORT_JS = `<script>
       var P=window.__players||{companies:true,buyers:true};
       var _pen=['companies','buyers'].filter(function(t){return P[t]!==false;});
       if(_pen.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
-      var _anyDenied=false;
+      // TRUTH STATES (Players repair 2026-10-04): each type reports success_nonzero | success_zero |
+      // unavailable | coverage_incomplete. ONLY an auth denial (401/403) is "denied" and may show the
+      // gate copy — a 500, a BigQuery quota failure or a network error is UNAVAILABLE: never 0 Players
+      // and never sales copy. See src/lib/players/truth.ts.
+      var _anyDenied=false, _allDenied=true;
       Promise.all(_pen.map(function(t){
-        return fetch(_buildContactUrl(t),{headers:ch}).then(function(r){return r.json();}).then(function(d){
-          if(!d||!d.success){ if(!d||d.error)_anyDenied=true; return {t:t,pins:[],total:0}; }
-          return {t:t,pins:(d.pins||[]).map(function(p){return toRow(p,t);}),total:d.totalForFilters||0};
-        }).catch(function(){return {t:t,pins:[],total:0};});
+        return fetch(_buildContactUrl(t),{headers:ch}).then(function(r){
+          var denied=(r.status===401||r.status===403);
+          return r.json().catch(function(){return null;}).then(function(d){ return {r:r,d:d,denied:denied}; });
+        }).then(function(x){
+          var d=x.d;
+          if(x.denied){ _anyDenied=true; return {t:t,pins:[],total:null,status:'denied'}; }
+          _allDenied=false;
+          if(!d||!d.success) return {t:t,pins:[],total:null,status:'unavailable'};
+          var st=d.status||((d.pins||[]).length?'success_nonzero':'success_zero');
+          return {t:t,pins:(d.pins||[]).map(function(p){return toRow(p,t);}),
+            total:(st==='unavailable'||d.totalForFilters==null)?null:Number(d.totalForFilters)||0,
+            status:st, reason:(d.coverage&&d.coverage.incompleteReason)||null};
+        }).catch(function(){ _allDenied=false; return {t:t,pins:[],total:null,status:'unavailable'}; });
       })).then(function(parts){
         if(cgen!==_fetchGen)return;   // superseded — never paints
         var merged=[],tot=0;
         window.__playerTotals=window.__playerTotals||{};
+        window.__playerStatus={};
         ['companies','buyers'].forEach(function(k){ window.__playerTotals[k]=0; });
-        parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; if(p.t)window.__playerTotals[p.t]=p.total; });
-        if(merged.length===0 && _anyDenied){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
+        parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=(p.total||0); if(p.t){ window.__playerTotals[p.t]=p.total; window.__playerStatus[p.t]={status:p.status,total:p.total,shown:p.pins.length,reason:p.reason||null}; } });
+        // The Proven Players header view: companies drives it whenever its answer is not a plain
+        // measured count, or when it is the only player type on.
+        var _cs=window.__playerStatus.companies;
+        window.__playersView=(_cs&&_cs.status!=='denied'&&(_cs.status==='unavailable'||_cs.status==='coverage_incomplete'||_pen.length===1))?_cs:null;
+        if(merged.length===0 && _anyDenied && _allDenied){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
           var fe=document.getElementById('feed'); if(fe)fe.innerHTML='<div class="empty"><h4>Meet the buyers behind the opportunities</h4><p>Buying offices, incumbents, contracting officers and supplier relationships \u2014 connected to the opportunities on your map. Your current map will be waiting when you return.</p></div>';
           // Backstop for any OTHER route into a contact mode (a stale ?mode=buyers link, a
           // restored saved search). The nav is intercepted before the switch by __playersGate;
@@ -2634,6 +2667,16 @@ const VIEWPORT_JS = `<script>
         OPPS=merged; TOTAL=tot; CAPPED=false; INVIEW=merged.length;
         if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
         render();
+        // Nothing to draw and the answer is NOT a measured zero → say what actually happened.
+        if(merged.length===0 && parts.every(function(p){ return p.status==='unavailable'||p.status==='denied'; })){
+          if(typeof _showFetchError==='function')_showFetchError();
+          try{ updateHeader(); }catch(e){}
+          return;
+        }
+        if(merged.length===0 && parts.some(function(p){ return p.status==='coverage_incomplete'; })){
+          var _fe=document.getElementById('feed');
+          if(_fe)_fe.innerHTML='<div class="empty"><h4>No companies to show from a partial list</h4><p>Mindy\u2019s Players list for this market is incomplete, so this is <b>not</b> evidence that no companies have won here.</p></div>';
+        }
         if(maybeJumpToSearch())return;
         maybeAutoFit();
       }).catch(function(){ if(cgen!==_fetchGen)return; if(typeof _showFetchError==='function')_showFetchError(); });
@@ -3056,7 +3099,12 @@ const VIEWPORT_JS = `<script>
     function fmt(n){ n=Number(n)||0; return n>=1000?(n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':Math.round(n/100)/10+'K').replace(/\.0([KM])/,'$1'):String(n); }
     ['companies','buyers'].forEach(function(t){
       var el=document.querySelector('.hznn[data-plrn="'+t+'"]'); if(!el)return;
-      el.textContent = (window.__players[t]!==false) ? fmt(T[t]) : '';
+      var _st=(window.__playerStatus||{})[t];
+      // Unknown is '?', a floor carries '+' — never a bare 0 for an answer we do not have.
+      el.textContent = (window.__players[t]!==false)
+        ? ((_st&&_st.status==='unavailable')||T[t]==null ? '?'
+          : (_st&&_st.status==='coverage_incomplete') ? fmt(T[t])+'+' : fmt(T[t]))
+        : '';
     });
     var onCount=['companies','buyers'].filter(function(k){return window.__players[k]!==false;}).length;
     var btn=document.getElementById('plrBtn');
@@ -10686,7 +10734,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

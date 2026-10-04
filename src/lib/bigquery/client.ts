@@ -169,6 +169,11 @@ export const BQ_TABLES = {
   // Unified rollup for the /top/[slug] listicle pages (top contractors by
   // agency / naics / sub_agency / state / set_aside). Same monthly build.
   topContractorsByDimension: `\`${PROJECT_ID}.${DATASET}.top_contractors_by_dimension\``,
+  // Canonical PROVEN PLAYERS (one row per 6-digit NAICS × UEI, HQ geography, NO rank cap). Maps
+  // Players + MCP search_contractors read this when PLAYERS_SOURCE=canonical. Built by
+  // scripts/players-rebuild.ts (src/lib/players/dataset.ts) — never read top_contractors_by_dimension
+  // as a population; it is the national top 50 for the /top/* listicles only.
+  playersNaicsRecipients: `\`${PROJECT_ID}.${DATASET}.players_naics_recipients\``,
   // Clustered lookups (built in build-derived.sql) that replace full-table
   // scans on /contracts/[piid] and /awards/[id]. awards is clustered on
   // (recipient_uei, recipient_name), so lookups by piid / award_id scanned
@@ -327,4 +332,12 @@ export async function bqQuery<T = Record<string, unknown>>(opts: BqQueryParams):
       ?? String(opts.bulkJob ? BULK_MAX_BYTES : RUNTIME_MAX_BYTES),
   });
   return rows as T[];
+}
+
+/**
+ * The guarded client, for callers that need BigQuery features bqQuery() does not expose
+ * (sessions — see src/lib/players/bq-session.ts). Same build/test guard as every other call.
+ */
+export function getBigQueryClient(): BigQuery {
+  return getClient();
 }
