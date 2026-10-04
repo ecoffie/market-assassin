@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { requireUserAuth } from '@/lib/api-auth';
+import { verifyUserSession } from '@/lib/api-auth';
 import { profileFromAuthUser } from '@/lib/mindy/account-avatar';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
@@ -13,10 +13,9 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
  * auth user (user_metadata + identities[].identity_data) — never stuffed
  * into the MI HMAC token.
  *
- * Auth reuses the EXISTING pattern — `requireMIAuthSession` (x-mi-auth-token
- * header, the same `mi_beta_auth_token` the map already sends) then
- * `requireUserAuth`. No new auth path. A logged-out request gets 401 and
- * the client falls back to "Log In".
+ * Auth: `requireMIAuthSession` (x-mi-auth-token header, the same
+ * `mi_beta_auth_token` the map already sends), else a Supabase session. A
+ * logged-out request gets 401 and the client falls back to "Log In".
  *
  * HMAC tokens are payload.sig (2 parts). The Maps chip used to treat them as
  * JWTs, send `?email=`, and this route 401'd with "Email required" — leaving
@@ -92,8 +91,10 @@ async function resolveCallerEmail(request: NextRequest): Promise<string | null> 
   const session = requireMIAuthSession(request);
   if (session.ok && session.session.email) return session.session.email;
 
-  const auth = await requireUserAuth(request);
-  if (auth.authenticated && auth.email) return auth.email;
+  // A Supabase session is the only other proof. Never a ?email= claim, a cookie or a
+  // staff address: an expired Mindy session gets 401 and the menu keeps what it painted.
+  const supa = await verifyUserSession(request);
+  if (supa.authenticated && supa.email) return supa.email;
   return null;
 }
 

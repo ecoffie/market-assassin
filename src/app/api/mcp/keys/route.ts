@@ -5,12 +5,13 @@
  *   GET    → list the caller's keys (metadata only, never the secret)
  *   DELETE → revoke one of the caller's keys (?id=<keyId>)
  *
- * Gated by requireUserAuth (the MI session must own the claimed email) — the same
- * guard every other /api/app route uses. This route only manages keys; verifying a
- * presented key on the MCP edge lives in src/lib/mcp/api-keys.ts (Slice 2).
+ * Identity comes ONLY from a verified session (the signed Mindy session or a Supabase
+ * session). A ?email= / body email is at most a claim that must match it — it never
+ * decides whose keys are minted, listed or revoked. This route only manages keys;
+ * verifying a presented key on the MCP edge lives in src/lib/mcp/api-keys.ts (Slice 2).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserAuth } from '@/lib/api-auth';
+import { verifyClaimedIdentity, identityFailureResponse, type ClaimedIdentity } from '@/lib/api-auth';
 import { issueApiKey, listApiKeys, revokeApiKey } from '@/lib/mcp/api-keys';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
@@ -18,19 +19,26 @@ import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
-  }
+/** The key owner: the verified session's email. A claim that contradicts it is refused. */
+async function keyOwner(request: NextRequest, bodyEmail?: unknown): Promise<ClaimedIdentity> {
+  const claimed = request.nextUrl.searchParams.get('email') || (typeof bodyEmail === 'string' ? bodyEmail : null);
+  return verifyClaimedIdentity(request, claimed);
+}
 
+export async function POST(request: NextRequest) {
   let label: string | undefined;
+  let bodyEmail: unknown;
   try {
     const body = await request.json();
+    bodyEmail = body?.email;
     if (typeof body?.label === 'string' && body.label.trim()) label = body.label.trim().slice(0, 80);
   } catch {
     // no/invalid body → unlabeled key is fine
   }
+
+  const identity = await keyOwner(request, bodyEmail);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
+  const auth = { email: identity.email };
 
   try {
     const { key, row } = await issueApiKey(auth.email, { label });
@@ -47,10 +55,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
-  }
+  const identity = await keyOwner(request);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
+  const auth = { email: identity.email };
 
   try {
     const keys = await listApiKeys(auth.email);
@@ -62,10 +69,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
-  }
+  const identity = await keyOwner(request);
+  if (identity.status !== 'verified') return identityFailureResponse(identity);
+  const auth = { email: identity.email };
 
   const keyId = request.nextUrl.searchParams.get('id');
   if (!keyId) {

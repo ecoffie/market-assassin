@@ -116,9 +116,8 @@ export default function McpAccountPage() {
     } catch { /* keep prior */ }
   }, []);
 
-  // NOTE: /api/mcp/keys is guarded by requireUserAuth, which reads the claimed email
-  // from ?email= (or the JSON body) — NOT the x-user-email header. So the email goes in
-  // the query string; getMIApiHeaders(email) still supplies the token that proves we own it.
+  // NOTE: /api/mcp/keys takes its identity from the session token getMIApiHeaders(email)
+  // supplies. The ?email= is only a claim it checks against that session.
   const refreshBilling = useCallback(async () => {
     try {
       const res = await fetch('/api/mcp/billing-history', { headers: getMIApiHeaders() });
