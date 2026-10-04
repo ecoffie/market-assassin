@@ -284,6 +284,8 @@ geography filter. Audit: `tasks/players-naics-coverage-audit-2026-10-04.md`.
 - Oracle: `npm run verify:oracles -- --only players` (fails on legacy by design);
   `--players-preview` proves the code in an ephemeral BQ session table (not acceptance).
 - Registered Players (SAM registration NAICS) are a separate future population — never mix them in.
+- **Merged dormant (#1812).** Activation runbook + open P1 follow-ups (Contractors panel null→0,
+  set-aside after cap): `tasks/players-followups-2026-10-04.md`. Canonical identity is the **UEI**, never the name.
 
 ---
 
