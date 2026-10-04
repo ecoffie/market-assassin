@@ -33,15 +33,28 @@ domain verification, no Plugin submission. Do not change routing on one result.
   3. The consent page must show the **ChatGPT** copy with **no free-credit promise**. Click **Allow**.
      ChatGPT should show the connector as connected.
   4. Confirm the connector lists **exactly 15** tools.
-- **Per prompt:** new chat, Mindy app enabled via the composer's **Developer mode** tool, web search left at default
-  (we want to see whether ChatGPT picks web or Mindy). **Never say "use Mindy"** unless a row says so.
-  Start a stopwatch at Send, stop when the answer finishes streaming. Expand the tool-call panel to
-  read the tool name + arguments.
+- **Per prompt:** new chat, web search left at default (we want to see whether ChatGPT picks web or
+  Mindy). **Never say "use Mindy"** unless a row says so. Start a stopwatch at Send, stop when the
+  answer finishes streaming. ChatGPT does NOT show the raw tool arguments/result in a panel — the
+  tool, latency, outcome and credits come from the server report (see Fidelity procedure).
+
+## ⚠ Per-chat activation — required for EVERY fresh test chat
+
+Chat Mindy being installed globally is **not sufficient**. ChatGPT only offers an app's tools to a
+chat where it was selected. For every fresh test chat:
+
+1. Click **+** in the composer → select **Chat Mindy**.
+2. Confirm the blue **Chat Mindy** label is visible in the composer **before** sending the prompt.
+
+If the label is not visible when the prompt is sent, the row is **`INVALID_SETUP`**, not
+`ROUTING_FAIL` — rerun it in a new chat with the app selected. (Measured 2026-10-03: the first clean
+S2 attempt ~21:57Z produced zero `/chatgpt/mcp` requests in the Vercel logs — not even
+initialize/tools/list — and a web-only answer; the rerun with the app selected called Mindy.)
 
 ## ⏱ Record the UTC start — immediately before the first prompt
 
 Run `date -u +%Y-%m-%dT%H:%M:%SZ` right before sending the first prompt (after connecting, not before)
-and write it here: `SINCE = ____________`. It is the `--since` for the server report, which isolates
+and write it here: `SINCE = 2026-10-03T21:56:55Z` (clean session, recorded 2026-10-03). It is the `--since` for the server report, which isolates
 this session's calls by `mcp_call_log.channel='chatgpt'` + the synthetic email.
 
 ## 🚦 Smoke gate — run FIRST, before spending the full budget (~50 credits)
@@ -65,6 +78,38 @@ this session's calls by `mcp_call_log.channel='chatgpt'` + the synthetic email.
 On a stop: run the server report (below) with the recorded `SINCE`, fill the results table for the
 smoke rows only, and report. Do not change routing or latency on these results.
 
+### Smoke gate results (2026-10-03)
+
+- **First pass (14:34–15:34Z) — DISCARDED as setup-contaminated.** Two Mindy apps were installed
+  (the old full `/mcp` connector + `/chatgpt/mcp`) and `/chatgpt/mcp` was authorised as Eric's own
+  account, not the test account. S3's `get_solicitation_incumbent` call went through `/mcp`
+  (`channel` NULL). Fix: removed the old `/mcp` app, reconnected `/chatgpt/mcp` signed in as the
+  test account (OAuth token 21:54:59Z, resource `https://mcp.getmindy.ai/chatgpt/mcp`). Eric then
+  confirmed the remaining smoke rows routed correctly; S2 and S3 were rerun clean.
+- **Clean reruns — report start `SINCE = 2026-10-03T21:56:55Z`:**
+
+| # | account | channel | tool | server ms | credits | routing | timeout | telemetry | answer fidelity |
+|---|---|---|---|---|---|---|---|---|---|
+| S2 (D1 + "Where does my company fit in the federal market?") | chatgpt-devmode-acceptance@getmindy.ai | chatgpt | capability_market_match | 13,220 | 50 | PASS | PASS | `no_result` / grounded=false | **UNVERIFIED** |
+| S3 (A4) | chatgpt-devmode-acceptance@getmindy.ai | chatgpt | get_solicitation_incumbent | 2,259 | 20 | PASS | PASS | `unclassified` (see telemetry debt) | **PASS** |
+
+- **S2 fidelity UNVERIFIED — why.** ChatGPT's answer kept the tool's framing (it could not place the
+  company in a verified market from the description alone and asked for past performance or a
+  clearer description) and invented no NAICS code, dollar figure or competitor. But the call log
+  stores no arguments or result body, ChatGPT shows neither, and the answer cites terms (NIST 800-53,
+  gap assessments) suggesting ChatGPT expanded the description before calling. A local unbilled
+  replay with the plain description returned a thin unverified candidate (NAICS 541519, PSC DJ01,
+  1 forecast, 0 competitors, total_market null, `grounded=false` because no SAM/award identity was
+  resolved). ChatGPT said no NAICS lane / forecasts could be verified: either accurate reporting of
+  an unverified candidate or dropped evidence — not decidable without the exact arguments.
+- **S3 fidelity PASS.** A local replay of `get_solicitation_incumbent` for W5168W26RA015 matched
+  every substantive figure and caveat in the answer: TIYA Services, L.L.C.; prior award W911SF19C0024;
+  NAICS 561210 / PSC S216; $333,142,007 obligated; $429,992,933 ceiling ("≈ $430.0M"); PoP
+  2019-09-01 → 2025-08-31; match confidence high; Small Business Set Aside – Total; deadline
+  2026-11-13; sibling-notice deadline-conflict caveat kept.
+- Ledger for the clean window: exactly two debits (−50, −20, both `channel=chatgpt`), balance
+  1,000 → 930. No paywall row, signup grant or auto-recharge.
+
 **If the smoke gate passes:** continue through the complete worksheet (A → B → C → D; skip rows the
 smoke gate already ran and reuse their results), then run the server report with the same `SINCE`.
 
@@ -80,6 +125,7 @@ smoke gate already ran and reuse their results), then run the server report with
   dates) and keep its caveats? Any invented figure or dropped material caveat → `HOST_MISREPRESENTATION`.
   Note any commerce wording (prices, upgrade, buy credits) here too.
 - **classification** = `PASS` | `ROUTING_FAIL` | `TIMEOUT` | `TOOL_ERROR` | `HOST_MISREPRESENTATION`
+  (or `INVALID_SETUP` if the Chat Mindy label was missing — rerun; it is not a result)
   (definitions in the Classification section).
 
 ## A. Direct test — one per tool (15)
@@ -162,6 +208,34 @@ still shows the call completing (it may finish after ChatGPT gave up). The route
 ≈ 660 credits for one full pass (A 170, B ~120, C ~150, D 340 less overlaps). The account is funded
 with 1,000. Re-fund only by `admin_grant`.
 
+## Fidelity procedure — local replay only when warranted
+
+ChatGPT does not expose raw tool arguments/results, and `mcp_call_log` stores neither. Do **not**
+replay every call locally — that turns acceptance into a much larger test. Replay a call (direct
+function call from a worktree: unbilled, unlogged) only when:
+
+- the ChatGPT answer contains a surprising or specific claim (a figure, name, date) worth checking;
+- the server telemetry conflicts with the visible answer (e.g. `no_result` but a specific answer); or
+- the scenario specifically requires fidelity verification (e.g. N3 fabrication probe).
+
+Otherwise record answer fidelity from the visible answer and mark anything uncheckable `UNVERIFIED`.
+
+## Telemetry debt found during acceptance — record only, do NOT fix during acceptance
+
+These distort the server report's `outcome` column; read those tools' outcomes by hand for now.
+
+1. **capability_market_match** — useful candidate evidence (candidate NAICS/PSC, forecasts) can be
+   labelled `no_result`: the tool sets `grounded=false` whenever company identity is not
+   corroborated (`src/lib/market/capability-anchor.ts`, grounded = coverage ∧ high confidence ∧
+   corroborated), and `classifyCallOutcome` maps `grounded=false ∧ degraded=false` → `no_result`.
+2. **get_solicitation_incumbent** — a grounded result is logged `unclassified`: it exposes
+   `_meta.grounded_notice` / `_meta.grounded_incumbent` (both true for W5168W26RA015), not plain
+   `grounded`.
+3. **get_contractor_profile** — appears to have the same `unclassified` problem (15:33:43Z call this
+   morning); not yet confirmed in code.
+4. **Billing (post-acceptance product decision, not a bug):** a thin/unverified
+   `capability_market_match` result is still charged the full 50 credits (`billable_no_result`).
+
 ## Collect the server-side evidence
 
 After the session (read-only):
@@ -175,7 +249,8 @@ auto-recharge — all must be 0).
 
 ## Classification (one per tool)
 
-`PASS` · `ROUTING_FAIL` (ChatGPT picked another tool / web / nothing for the tool's intended prompt) ·
+`INVALID_SETUP` (the Chat Mindy label was not in the composer when the prompt was sent — rerun, do
+not count) · `PASS` · `ROUTING_FAIL` (ChatGPT picked another tool / web / nothing for the tool's intended prompt) ·
 `TIMEOUT` (host gave up or the call exceeded the host limit) · `TOOL_ERROR` (server outcome error /
 degraded with no usable result) · `HOST_MISREPRESENTATION` (ChatGPT stated something the result did
 not contain, or dropped a material caveat). A tool is PASS only if its direct test and every routing
