@@ -104,6 +104,9 @@ export async function GET(request: NextRequest) {
         finalUrl: probe.finalUrl, finalStatus: probe.finalStatus,
         attempts: probe.attempts, detail: probe.detail, markersFound: probe.markersFound,
       },
+      // exhausted=true: EPA hung past the probe's deadline. Still a completed watch reporting an
+      // unavailable source; the deadline keeps it inside the dispatcher's 50s wait.
+      probeBudget: probe.probeBudget,
       sourceState, interventionState, ingestMode: inst.ingest_mode,
       preserved: {
         heldPopulation: inst.held_population,
