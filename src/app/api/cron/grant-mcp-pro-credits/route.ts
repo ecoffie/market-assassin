@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
 import { activeSponsorEntitlements, topUpToCeiling } from '@/lib/mcp/sponsor-entitlements';
+import { listActivePrepaidEntitlements, catchUpPrepaidMonths, dueMonths, monthlyGrantKey, type PrepaidEntitlement } from '@/lib/mcp/prepaid-entitlements';
 import { collectCreditHealth, claimAlertOnce } from '@/lib/mcp/credit-health';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
@@ -52,7 +53,7 @@ const INTERNAL_TEAM = Array.from(new Set(
 const ADVOCATES = Array.from(new Set(ADVOCATE_ACCOUNTS.map((a) => a.email.toLowerCase().trim())))
   .filter((e) => !INTERNAL_TEAM.includes(e));
 
-type Group = 'internal' | 'advocate' | 'pro-sub' | 'team-sub' | 'sponsored';
+type Group = 'internal' | 'advocate' | 'pro-sub' | 'team-sub' | 'sponsored' | 'prepaid';
 
 // `mode` decides HOW the amount is applied, and the two are not interchangeable:
 //   'add'    — grant the full amount on top of whatever is there (paid/comp allowances)
@@ -111,10 +112,11 @@ async function pooledOrgs(): Promise<{ bySub: Map<string, PooledOrg>; poolMode: 
 }
 
 /** Resolve final per-email targets (dedupe; keep the highest amount when an email matches twice). */
-async function buildTargets(): Promise<{
+async function buildTargets(month: string): Promise<{
   targets: Target[]; pools: PooledOrg[]; subError: string | null; sponsorError: string | null;
   poolError: string | null; poolMode: 'active' | 'legacy';
   proSuppressed: { email: string; reason: string; detail: string }[];
+  prepaid: PrepaidEntitlement[]; prepaidError: string | null;
 }> {
   const proSuppressed: { email: string; reason: string; detail: string }[] = [];
   const byEmail = new Map<string, Target>();
@@ -152,7 +154,19 @@ async function buildTargets(): Promise<{
   // sponsorship stands until its own expiry — both follow from taking the higher amount.
   const { entitlements, error: sponsorError } = await activeSponsorEntitlements();
   for (const ent of entitlements) consider(ent.userEmail, ent.monthlyAllowance, 'sponsored', 'topup');
-  return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode, proSuppressed };
+  // Prepaid (off-Stripe) Pro: same allowance semantics as a Pro subscription, dated. Only
+  // entitlements whose window covers THIS month join the audience; past months still owed
+  // are granted by catchUpPrepaidMonths() in the handler. The Team-supersedes-Pro check
+  // applies exactly as it does to a Stripe Pro subscriber.
+  const { entitlements: prepaidAll, error: prepaidError } = await listActivePrepaidEntitlements(month);
+  const prepaid: PrepaidEntitlement[] = [];
+  for (const ent of prepaidAll) {
+    const d = await proAllowanceDecision(ent.userEmail);
+    if (!d.grant) { proSuppressed.push({ email: ent.userEmail, reason: d.reason, detail: d.detail }); continue; }
+    prepaid.push(ent);
+    if (dueMonths(ent, month).includes(month)) consider(ent.userEmail, ent.monthlyCredits, 'prepaid');
+  }
+  return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError };
 }
 
 export async function GET(request: NextRequest) {
@@ -170,7 +184,7 @@ export async function GET(request: NextRequest) {
   // granted). On any other day it is the DAILY SELF-HEAL pass: idempotent by the
   // same pro:<email>:<YYYY-MM> key, so it grants only whoever upstream missed.
   const isMonthStart = now.getUTCDate() === 1;
-  const { targets, pools, subError, sponsorError, poolError, poolMode, proSuppressed } = await buildTargets();
+  const { targets, pools, subError, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError } = await buildTargets(month);
   // An account whose billing context could not be established got NO Pro grant this run.
   // That is a deferral (the daily self-heal retries), but it must be loud, never silent.
   const proDeferred = proSuppressed.filter((p) => p.reason === 'payer_unresolved');
@@ -182,6 +196,11 @@ export async function GET(request: NextRequest) {
       proSuppressed,
       pools: pools.map((p) => ({ orgId: p.orgId, name: p.name, seatLimit: p.seatLimit, monthlyCredits: p.monthlyCredits })),
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
+      prepaidError,
+      prepaid: prepaid.map((p) => ({
+        email: p.userEmail, monthlyCredits: p.monthlyCredits, firstMonth: p.firstMonth, lastMonth: p.lastMonth,
+        accessEndsOn: p.accessEndsOn, dueThrough: dueMonths(p, month),
+      })),
       targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group, mode: t.mode })),
     });
   }
@@ -197,7 +216,7 @@ export async function GET(request: NextRequest) {
     try {
       // ONE key per account per month regardless of source — the no-stacking rule
       // enforced at the write, not just in the resolver above.
-      const key = `pro:${email}:${month}`;
+      const key = monthlyGrantKey(email, month);
       // Comp allowances (internal team, advocates) are not a customer funding event, so they
       // carry their own reason and never reset the ChatGPT auto-recharge attribution window
       // (owner decision 2026-10-03). Paid Pro/Team subscribers keep `pro_monthly`.
@@ -215,12 +234,19 @@ export async function GET(request: NextRequest) {
         // something upstream missed them — the purchase webhook didn't fire, or they
         // subscribed mid-cycle before that path existed. Worth naming, not just
         // counting: this is the case that left 9 paying subs at zero in Jul 2026.
-        if (!isMonthStart && (group === 'pro-sub' || group === 'team-sub')) healed.push(email);
+        if (!isMonthStart && (group === 'pro-sub' || group === 'team-sub' || group === 'prepaid')) healed.push(email);
       } else alreadyHad++;
     } catch (err) {
       errors.push(`${email}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+
+  // ── Prepaid catch-up: months inside a prepaid window that NO path claimed (the job was
+  // down across a month boundary). Each is claimed under the same monthly key, so a month
+  // granted here can never be granted again by this job, a retry, or a Stripe sub.
+  const prepaidCatchUp = await catchUpPrepaidMonths(prepaid, month);
+  for (const g of prepaidCatchUp.granted) healed.push(`${g.email} (${g.month})`);
+  errors.push(...prepaidCatchUp.errors);
 
   // ── Pool replenishment: one top-up per pooled org per month (idempotent per month +
   // allowance; never stacked, never refilled by spending). Annual pooled plans land here
@@ -246,11 +272,13 @@ export async function GET(request: NextRequest) {
   const tooSmall = targets.length < INTERNAL_TEAM.length;
   // A failed sponsor read is an anomaly for the same reason a failed Stripe read is: it
   // silently drops a whole audience from the grant while the run still reports success.
-  const anomaly = Boolean(subError) || Boolean(sponsorError) || Boolean(poolError) || proDeferred.length > 0 || errors.length > 0 || nothingHappened || tooSmall;
+  const anomaly = Boolean(subError) || Boolean(sponsorError) || Boolean(prepaidError) || Boolean(poolError) || proDeferred.length > 0 || errors.length > 0 || nothingHappened || tooSmall;
 
   const summary = {
     month, audience: targets.length, byGroup, granted, alreadyHad, subError, sponsorError,
     sponsoredSatisfied,
+    prepaidError, prepaidEntitlements: prepaid.length,
+    prepaidCatchUp: { granted: prepaidCatchUp.granted, alreadyClaimed: prepaidCatchUp.alreadyClaimed },
     poolMode, poolError, pools: pools.length, poolsReplenished, poolsAlreadyFull, poolCreditsGranted,
     proSuppressed,
     errors: errors.slice(0, 10),
