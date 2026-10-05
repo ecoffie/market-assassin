@@ -11,12 +11,16 @@
  * peak 19–22 concurrent statements on a 2-core database, and Open crossed PostgREST's 8 s statement
  * timeout → HTTP 500 (#1696).
  *
- * Two rules, no timers:
+ * Three rules, no timers:
  *  1. Boot syncs the map to its container BEFORE releasing the first round (route.ts finishBoot), so
  *     round 1 reads the settled bbox.
  *  2. A moveend whose centre and zoom did not change — only the container size — is a LAYOUT move.
  *     It starts a discovery round only when it exposed area the last round did not ask for. A pan
  *     moves the centre and a zoom changes the zoom, so real navigation is never classified as layout.
+ *  3. (C, 2026-10-04) No move before release schedules a round — not even navigation. Measured on
+ *     production: boot's own view placement fires a 'navigate' moveend ~1 ms before release, whose
+ *     450 ms pan timer re-asked the release round's exact query. Open/Awarded/Forecast absorbed it
+ *     (joined/cache — no request), but Players has no horizon cache and re-ran contacts-map in full.
  *
  * Pure functions (no DOM, no Leaflet) so they are unit-tested by extraction — the same pattern as
  * market-feedback.ts. Injected into the page as window.__mapMoveKind / window.__layoutMoveNeedsFetch.
@@ -39,7 +43,14 @@ export const LAYOUT_MOVE_PURE_JS = String.raw`
     var inside=view[0]>=requested[0]-tol && view[1]>=requested[1]-tol && view[2]<=requested[2]+tol && view[3]<=requested[3]+tol;
     return !inside;                      // only a layout that EXPOSED new area needs pins for it
   }
+  // Does this moveend start a round? released: has boot released its first round. kind: mapMoveKind().
+  // layoutExposed: layoutMoveNeedsFetch() for a layout move. A move BEFORE release — navigate or layout —
+  // is boot placing its view; the release round reads that view, so it never schedules a second round.
+  function moveStartsRound(released,kind,layoutExposed){
+    if(!released)return false;
+    return kind==='layout'?!!layoutExposed:true;
+  }
 `;
 
 export const LAYOUT_MOVE_JS = '<script>(function(){' + LAYOUT_MOVE_PURE_JS
-  + 'window.__mapMoveKind=mapMoveKind;window.__layoutMoveNeedsFetch=layoutMoveNeedsFetch;})();</script>';
+  + 'window.__mapMoveKind=mapMoveKind;window.__layoutMoveNeedsFetch=layoutMoveNeedsFetch;window.__moveStartsRound=moveStartsRound;})();</script>';
