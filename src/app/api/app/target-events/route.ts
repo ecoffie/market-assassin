@@ -33,6 +33,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import eventsStaticData from '@/data/federal-events-sources.json';
 import agencyAliasesData from '@/data/agency-aliases.json';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 const EVENT_HORIZON_DAYS = 90;
 
@@ -188,6 +189,7 @@ export async function GET(request: NextRequest) {
 
   // Pro gate. Belt + suspenders since target-list itself is Pro.
   const access = await verifyMIAccess(email);
+  shadowEntitlement({ route: 'app/target-events GET', capability: 'target_list.manage', email: email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

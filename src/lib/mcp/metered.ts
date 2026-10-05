@@ -26,6 +26,7 @@ import {
   type CommercialRefusal,
 } from './commercial-refusal';
 import { neutralInsufficientCreditsMessage, NEUTRAL_REQUIRES_PRO_MESSAGE } from './chatgpt-refusals';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
@@ -85,6 +86,7 @@ export async function runMeteredTool(
   // The `gated` log row is the upsell queue (who hit the wall = who to convert).
   if (mcpFlags.enforceTiers && isProTool(name)) {
     const pro = await isProForMcp(ctx.userEmail);
+    shadowEntitlement({ route: `mcp/${name}`, capability: 'mcp.playbook', email: ctx.userEmail, identityVerified: true, currentAllow: pro });
     if (!pro) {
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: blockedOutcome('requires_pro') });
       // ChatGPT channel: no saved purchase retry, no purchase copy.

@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasProAccess } from '@/lib/access/resolve-access';
 import { verifyClaimedIdentity } from '@/lib/api-auth';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Pro access = paid OR active trial (MINDY_TRIAL_OPEN).
     const hasAccess = await hasProAccess(identity.email);
+    shadowEntitlement({ route: 'briefings/verify POST', capability: 'briefings.ai', email: identity.email, identityVerified: true, currentAllow: hasAccess });
     return NextResponse.json({ hasAccess });
   } catch {
     return NextResponse.json({ hasAccess: false }, { status: 500 });

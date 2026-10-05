@@ -26,6 +26,7 @@ import {
   getTopAgenciesForRecipient,
 } from '@/lib/bigquery/recipients';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
   if (identity.status !== 'verified') return identityFailureResponse(identity);
 
   const access = await verifyMIAccess(identity.email);
+  shadowEntitlement({ route: 'app/competitor-awards GET', capability: 'competitor.analyze', email: identity.email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       { upgrade_required: true, message: 'Competitor award history is included with Mindy Pro' },

@@ -27,6 +27,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
 import { searchEventsViaAI, type DiscoveredEvent } from '@/lib/events/ai-event-discovery';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 // Throttle window: one live discovery run per agency per 7 days
 // (roadmap: "Cache TTL: 7 days per (agency, week)").
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
 
   // Pro gate.
   const access = await verifyMIAccess(email);
+  shadowEntitlement({ route: 'app/discover-events POST', capability: 'target_list.manage', email: email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

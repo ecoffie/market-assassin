@@ -12,6 +12,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hasProAccess } from '@/lib/access/resolve-access';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
 
   // Pro access = paid (KV briefings: + entitlement) OR active trial (MINDY_TRIAL_OPEN).
   const hasAccess = await hasProAccess(auth.email!);
+  shadowEntitlement({ route: 'briefings/latest GET', capability: 'briefings.ai', email: auth.email, identityVerified: true, currentAllow: hasAccess });
   if (!hasAccess) {
     return NextResponse.json({ error: 'No briefing access' }, { status: 403 });
   }

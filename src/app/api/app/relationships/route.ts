@@ -7,6 +7,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace } from '@/lib/app/workspace';
 import { searchContractors } from '@/lib/contractor-database';
 import { getAllCommands, getEnhancedAgencyInfo, type SmallBusinessOffice } from '@/lib/utils/command-info';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -898,6 +899,7 @@ export async function POST(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
+    shadowEntitlement({ route: 'app/relationships POST', capability: 'relationships.manage', email: email, identityVerified: true, currentAllow: true });
     const { workspaceId } = await resolveActiveWorkspace(email, request);
 
     if (action === 'link_contact') {

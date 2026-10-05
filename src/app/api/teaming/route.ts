@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, recordAppActivity, clientNotificationEmail } from '@/lib/app/workspace';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, body.user_email);
     if (!authSession.ok) return authSession.response;
+    shadowEntitlement({ route: 'teaming POST', capability: 'teaming.manage', email: body.user_email, identityVerified: true, currentAllow: true });
 
     body.user_email = body.user_email.toLowerCase();
     // Coach Mode: file the partner under the ACTIVE CLIENT's workspace, not the

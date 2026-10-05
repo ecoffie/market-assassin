@@ -28,6 +28,7 @@ import { verifyMIAccess } from '@/lib/api-auth';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { recordSearchAxes } from '@/lib/search-history';
 import { hasPaidProductTier } from '@/lib/access/tier-rank';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
   const access = await verifyMIAccess(email);
   // Pro OR ABOVE: Team and Enterprise inherit every Pro capability.
   const isPro = hasPaidProductTier(access.tier) || access.isStaff === true;
+  shadowEntitlement({ route: 'app/market-report POST', capability: 'market_report.generate', email, identityVerified: true, currentAllow: isPro });
   if (!isPro) {
     return NextResponse.json(
       {

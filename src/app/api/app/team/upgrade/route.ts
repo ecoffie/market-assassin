@@ -19,6 +19,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserOwnsEmail, verifyMIAccess } from '@/lib/api-auth';
 import { provisionTeamWorkspace } from '@/lib/app/workspace';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
+import { tierAtLeast } from '@/lib/access/tier-rank';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
   // Stripe webhook on a successful Team purchase). This prevents a free user
   // from self-promoting to a team workspace without paying.
   const access = await verifyMIAccess(userEmail);
+  shadowEntitlement({ route: 'app/team/upgrade POST', capability: 'workspace.share', email: userEmail, identityVerified: true, currentAllow: tierAtLeast(access.tier, 'team') });
   if (access.tier !== 'team' && access.tier !== 'enterprise') {
     return NextResponse.json(
       { success: false, error: 'Team access is required first. Complete the Team checkout, then this finishes setup.' },

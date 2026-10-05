@@ -65,6 +65,7 @@ export const maxDuration = 120;
 import { dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -425,6 +426,9 @@ export async function POST(request: NextRequest) {
       ? await verifyMIAccess(identity.email)
       : { tier: 'free' as const, isStaff: false };
     const isFree = access.tier === 'free' && !access.isStaff;
+    if (identity.status === 'verified') {
+      shadowEntitlement({ route: 'app/target-market-research POST', capability: 'market_research.full', email: identity.email, identityVerified: true, currentAllow: !isFree });
+    }
 
     // Normalize the states filter so it participates in the cache key (different
     // state selections = different markets = different cache rows). No states column

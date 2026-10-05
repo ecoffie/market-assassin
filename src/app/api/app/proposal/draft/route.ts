@@ -31,6 +31,7 @@ import type { SectionType } from '@/lib/proposal/types';
 import { archiveContent } from '@/lib/archive/persist';
 import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  shadowEntitlement({ route: 'app/proposal/draft POST', capability: 'proposal.build', email: email, identityVerified: true, currentAllow: true });
 
   // Coach Mode: when drafting as a client, the vault weave (RAG retrieval) and the
   // archived output must both belong to the CLIENT — otherwise the draft is grounded

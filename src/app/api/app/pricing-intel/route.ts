@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchPricingIntel, fetchPricingIntelByKeywords } from '@/lib/utils/calc-rates';
 import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '@/lib/api-auth';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
   const identity = await verifyClaimedIdentity(request, email);
   if (identity.status !== 'verified') return identityFailureResponse(identity);
   const access = await verifyMIAccess(identity.email);
+  shadowEntitlement({ route: 'app/pricing-intel GET', capability: 'pricing_intel.view', email: identity.email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

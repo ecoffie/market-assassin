@@ -19,6 +19,7 @@ import { verifyMIAccess, verifyClaimedIdentity, identityFailureResponse } from '
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 import { hasPaidProductTier } from '@/lib/access/tier-rank';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
 
@@ -195,6 +196,7 @@ export async function GET(request: NextRequest) {
   const access = await verifyMIAccess(identity.email).catch(() => null);
   const tier = access?.tier || 'free';
   const isPaid = hasPaidProductTier(tier);
+  shadowEntitlement({ route: 'app/market-dossier GET', capability: 'market_research.full', email: identity.email, identityVerified: true, currentAllow: isPaid });
 
   const FREE_OPEN_CAP = 5;
   const FREE_RECOMPETE_CAP = 3;
