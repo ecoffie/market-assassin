@@ -1078,8 +1078,10 @@ const ZLAYOUT_CSS = '<style>'
   + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
   + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
-  + '.app{grid-template-columns:64px minmax(0,1fr) 400px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
-  + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
+  // znote = the saved-search notice row (#ssNotice) under the toolbar. It is IN THE FLOW (an auto
+  // row, 0 px when absent), so it can never cover pins, the map count or result cards.
+  + '.app{grid-template-columns:64px minmax(0,1fr) 400px!important;grid-template-rows:52px auto auto minmax(0,1fr)!important;'
+  + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail znote znote" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
   // Cards = a SINGLE wide column (real Zillow): one card per row, full-width, room to breathe.
   // flex:none on .card so flex layout can't shrink the (overflow:hidden) card to 0 height.
@@ -1131,6 +1133,43 @@ const ZLAYOUT_CSS = '<style>'
   // wrapping onto its own line. overflow stays visible so the Filters dropdown escapes.
   // z-index MUST beat Leaflet's map panes (tile 200 … popup 700) or the Filters dropdown,
   // which is a child of this bar, renders BEHIND the map and "won't display" when clicked.
+  // ── Saved-search notice (#ssNotice, ?ss= links). Inline row under the toolbar: Mindy's toolbar
+  // type (Inter), 8px radii, #006aff primary, hairline borders. Neutral surface — a status, not a
+  // warning box. Compact chip once restored; "View filters" expands what was actually applied.
+  + '.znote{grid-area:znote;display:block;padding:8px 18px;border-bottom:1px solid var(--line);background:#f7f9fb;font:500 13.5px Inter,system-ui,sans-serif;color:#111c26;min-width:0}'
+  + '.zn-row{display:flex;align-items:center;gap:10px;min-width:0;max-width:1180px}'
+  + '.zn-ic{flex:none;width:18px;height:18px;color:#6b7787;display:inline-flex}'
+  + '.zn-ic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  + '.zn-spin svg{animation:znspin 1s linear infinite}@keyframes znspin{to{transform:rotate(360deg)}}'
+  + '@media(prefers-reduced-motion:reduce){.zn-spin svg{animation:none}}'
+  + '.zn-txt{flex:1 1 auto;min-width:0;line-height:1.35}'
+  + '.zn-title{font-weight:700;color:#111c26}'
+  + '.zn-sub{color:#6b7787;font-weight:500;margin-top:1px;overflow-wrap:anywhere}.zn-sub b{color:#111c26;font-weight:700}'
+  + '.zn-acts{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}'
+  + '.zn-btn{font:700 13.5px Inter,system-ui,sans-serif;height:32px;padding:0 14px;border-radius:8px;cursor:pointer;border:1px solid #d1d5db;background:#fff;color:#2a2a33;white-space:nowrap;transition:border-color .15s,filter .15s}'
+  + '.zn-btn:hover{border-color:#9aa5b3}'
+  + '.zn-btn.primary{background:#006aff;border-color:#006aff;color:#fff}.zn-btn.primary:hover{filter:brightness(.94)}'
+  + '.zn-btn:focus-visible,.zn-link:focus-visible,.zn-x:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(0,106,255,.28)}'
+  + '.zn-link{font:700 13.5px Inter,system-ui,sans-serif;background:none;border:0;padding:4px 2px;color:#006aff;cursor:pointer;white-space:nowrap;border-radius:6px}'
+  + '.zn-x{flex:none;width:32px;height:32px;border:0;background:none;border-radius:8px;color:#6b7787;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}'
+  + '.zn-x:hover{background:#eef1f5}.zn-x svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
+  + '.znote.compact .zn-row{gap:8px}'
+  + '.zn-chip{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;font-weight:600;color:#111c26}'
+  + '.zn-chip b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
+  + '.zn-chip .zn-k{color:#6b7787;font-weight:600;white-space:nowrap}'
+  + '.zn-details{margin:8px 0 2px 28px;max-width:860px}'
+  + '.zn-dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0}'
+  + '.zn-dl dt{color:#6b7787;font-weight:600}.zn-dl dd{margin:0;color:#111c26;font-weight:600;overflow-wrap:anywhere}'
+  + '.zn-note{margin:8px 0 0;color:#6b7787;line-height:1.4}'
+  + '@media(max-width:640px){'
+  +   '.znote{padding:10px 12px}'
+  +   '.zn-row{flex-wrap:wrap;align-items:flex-start}'
+  +   '.zn-txt{flex:1 1 0;min-width:0}'
+  +   '.zn-acts{flex:1 1 100%;padding-left:28px;order:3}.zn-x{order:2}'
+  +   '.zn-btn{height:44px;padding:0 16px}.zn-link{min-height:44px;padding:0 6px}.zn-x{width:44px;height:44px;margin:-8px -8px 0 0}'
+  +   '.znote.compact .zn-row{flex-wrap:nowrap;align-items:center}.znote.compact .zn-acts{flex:none;padding-left:0}'
+  +   '.zn-details{margin-left:0}.zn-dl{grid-template-columns:1fr;gap:0}.zn-dl dd{margin-bottom:6px}'
+  + '}'
   + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:1001;min-width:0}'
   // Pills don\'t shrink (keep their label); the search absorbs the squeeze first.
   + '.ztop .fbar,.fsel,.savesearch{flex:none}'
@@ -1266,8 +1305,8 @@ const ZLAYOUT_CSS = '<style>'
   + '@media(max-width:640px){'
   // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
   //    visible. Header row stays; the ztop (search+filters) row stays full-width.
-  +   '.app{grid-template-columns:1fr!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
-  +     'grid-template-areas:"zhead" "ztop" "zcards"!important}'
+  +   '.app{grid-template-columns:1fr!important;grid-template-rows:52px auto auto minmax(0,1fr)!important;'
+  +     'grid-template-areas:"zhead" "ztop" "znote" "zcards"!important}'
   +   '.app.collapsed{grid-template-columns:1fr!important}'
   // 2) Kill the fixed left rail (moves into the hamburger drawer).
   +   '.zrail{display:none!important}'
@@ -9452,95 +9491,186 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var seq=0, ceiling=0, tracked={};
     function track(outcome,extra){ if(tracked[outcome])return; tracked[outcome]=1;
       try{ if(window.__track){ var md={outcome:outcome,src:String(src).slice(0,40)}; if(extra)for(var k in extra)md[k]=extra[k]; window.__track('tool_use','saved_search_link',md); } }catch(e){} }
-    // One status pill (same look + slot as "Picked up where you left off", which stands down on ?ss=).
-    function pill(kind,text,actions){
+    // ── THE NOTICE (#ssNotice) — one inline row under the toolbar (grid-area znote), never an
+    // overlay: it cannot cover pins, the map count or result cards. role=status + aria-live=polite
+    // announces each state change; nothing here ever moves keyboard focus.
+    // Every state that leaves the default map on screen SAYS "Showing all opportunities" — the full
+    // map is never presented as the saved search. Missing, deleted and another account's search are
+    // ONE state with ONE message: it names the reader's own account, never the owner, and never
+    // claims the search exists elsewhere.
+    var IC={
+      info:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/></svg>',
+      spin:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>',
+      mark:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>',
+      all:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg>',
+      x:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+    };
+    var NOTICE_ID='ssNotice', curKind=null;
+    function syncMapSize(){ try{ if(typeof window.__mapSyncSize==='function')window.__mapSyncSize(); }catch(e){} }
+    function mk(tag,cls,text){ var e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
+    function notice(spec){
       var go2=function(){
-        var host=document.querySelector('.mapwrap')||document.body; if(!host)return;
-        var el=document.getElementById('ssPill');
-        if(!el){ el=document.createElement('div'); el.id='ssPill'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); host.appendChild(el); }
-        el.setAttribute('data-state',kind);
-        var warn=(kind!=='loading'&&kind!=='applied');
-        el.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:650;max-width:min(92vw,600px);display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;background:'+(warn?'#fff8eb':'#fff')+';color:#0b1220;border:1px solid '+(warn?'#f0b44c':'#d7dee8')+';font:600 13px Inter,system-ui,sans-serif;padding:8px 14px;border-radius:'+(warn?'14px':'999px')+';box-shadow:0 4px 16px rgba(0,0,0,.18)';
+        var host=document.querySelector('.app')||document.body; if(!host)return;
+        var el=document.getElementById(NOTICE_ID);
+        if(!el){ el=mk('div'); el.id=NOTICE_ID; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); host.appendChild(el); }
+        curKind=spec.kind;
+        el.className='znote'+(spec.compact?' compact':'');
+        el.setAttribute('data-state',spec.kind);
         el.innerHTML='';
-        var t=document.createElement('span'); t.className='ss-msg'; t.textContent=text; t.style.cssText='flex:1 1 auto;min-width:0'; el.appendChild(t);
-        (actions||[]).forEach(function(a){ var bt=document.createElement('button'); bt.type='button'; bt.className='ss-act'; bt.setAttribute('data-act',a.id); bt.textContent=a.label;
-          bt.style.cssText='all:unset;cursor:pointer;font-weight:700;color:#006aff;white-space:nowrap'; bt.onclick=a.fn; el.appendChild(bt); });
+        var row=mk('div','zn-row'); el.appendChild(row);
+        var ic=mk('span','zn-ic'+(spec.icon==='spin'?' zn-spin':'')); ic.innerHTML=IC[spec.icon||'info']; row.appendChild(ic);
+        var tx=mk('div','zn-txt'); row.appendChild(tx);
+        if(spec.chip){
+          var ch=mk('span','zn-chip'); if(spec.chip.k)ch.appendChild(mk('span','zn-k',spec.chip.k)); if(spec.chip.v)ch.appendChild(mk('b',null,spec.chip.v)); tx.appendChild(ch);
+        } else {
+          tx.appendChild(mk('div','zn-title',spec.title));
+          if(spec.sub&&spec.sub.length){ var sb=mk('div','zn-sub'); spec.sub.forEach(function(p){ sb.appendChild(p.b?mk('b',null,p.t):document.createTextNode(p.t)); }); tx.appendChild(sb); }
+        }
+        var acts=mk('div','zn-acts'); var det=null;
+        (spec.actions||[]).forEach(function(a){
+          var bt=mk('button','ss-act '+(a.link?'zn-link':('zn-btn'+(a.primary?' primary':''))),a.label); bt.type='button'; bt.setAttribute('data-act',a.id);
+          if(a.id==='details'){ bt.setAttribute('aria-expanded','false'); bt.setAttribute('aria-controls','ssDetails'); }
+          bt.onclick=function(){
+            if(a.id==='details'&&det){ var open=bt.getAttribute('aria-expanded')!=='true';
+              bt.setAttribute('aria-expanded',open?'true':'false'); bt.textContent=open?'Hide filters':'View filters'; det.hidden=!open; syncMapSize(); return; }
+            a.fn();
+          };
+          acts.appendChild(bt);
+        });
+        row.appendChild(acts);
+        if(spec.onClose){ var x=mk('button','ss-act zn-x'); x.type='button'; x.setAttribute('data-act','close'); x.setAttribute('aria-label',spec.closeLabel||'Dismiss'); x.innerHTML=IC.x; x.onclick=spec.onClose; row.appendChild(x); }
+        if(spec.details){ det=spec.details(); det.id='ssDetails'; det.hidden=true; el.appendChild(det); }
+        syncMapSize();   // the row's height changed — keep Leaflet's size in step with the grid
       };
       if(document.body)go2(); else document.addEventListener('DOMContentLoaded',go2);
     }
-    function dismiss(){ var el=document.getElementById('ssPill'); if(el)el.remove(); }
+    function dismiss(){ var el=document.getElementById(NOTICE_ID); if(el){ el.remove(); curKind=null; syncMapSize(); } }
+    // The default market is on screen and the reader knows it: a compact label, removed by the
+    // first round that shows a different market (same provenance rule as the restored chip).
+    function showingAll(){
+      notice({kind:'all',compact:true,icon:'all',chip:{v:'Showing all opportunities'},onClose:dismiss,closeLabel:'Dismiss'});
+      watchMarket('all');
+    }
+    function watchMarket(kind){
+      var sig=null; try{ if(window.__mapIntentSig)sig=window.__mapIntentSig(); }catch(e){}
+      if(!sig){ window.__checkResumeProvenance=null; return; }
+      window.__checkResumeProvenance=function(){ try{
+        if(curKind!==kind||!document.getElementById(NOTICE_ID)){ window.__checkResumeProvenance=null; return; }
+        var now=window.__mapIntentSig?window.__mapIntentSig():null;
+        if(now==null||now===sig)return; dismiss(); window.__checkResumeProvenance=null; }catch(e){} };
+    }
     function signIn(){
       // The modal's default resume is a reload — the URL still carries ?ss=, so the reload restores
-      // with a live session (and repaints the account chip). OAuth / MFA / setup hand off to /app
-      // with next=<this path + query>, which resolvePostSignupDestination preserves.
-      if(typeof window.openSignInModal==='function'){ window.openSignInModal('open your saved search'); return; }
+      // with the new session (and repaints the account chip). OAuth / MFA / setup hand off to /app
+      // with next=<this path + query>, which resolvePostSignupDestination preserves. "Switch account"
+      // is this same flow: signing in as someone else replaces the session, then the URL resumes.
+      if(typeof window.openSignInModal==='function'){ window.openSignInModal('open this saved search'); return; }
       location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
     }
-    var SIGN_IN={id:'signin',label:'Sign in',fn:signIn};
-    // "Show the full map" is a CANCEL, not just a close: it ends this restore (seq), so a lookup
-    // that answers later cannot reach over the reader's choice and re-filter the map.
-    function cancel(){ seq++; clearTimeout(ceiling); dismiss(); track('cancelled'); release(); }
-    var FULL={id:'dismiss',label:'Show the full map',fn:cancel};
+    var ALL_SUB={t:'Showing all opportunities.'};
+    function closeToAll(){ showingAll(); }
+    // CANCEL, not just close: it ends this restore (seq), so a lookup that answers later cannot
+    // reach over the reader's choice and re-filter the map.
+    function cancel(){ seq++; clearTimeout(ceiling); track('cancelled'); release(); showingAll(); }
+    function keepMine(){ seq++; clearTimeout(ceiling); track('kept_changes'); release(); dismiss(); }
+    var CANCEL={id:'cancel',label:'Show all opportunities',fn:cancel};
     function intentSig(){ try{ return window.__mapIntentSig?window.__mapIntentSig():null; }catch(e){ return null; } }
     // Delayed authentication: a sign-in in ANOTHER tab writes the token here too.
     var listening=false;
     function waitForAuth(){ if(listening)return; listening=true;
       window.addEventListener('storage',function(e){ if(e&&e.key==='mi_beta_auth_token'&&e.newValue){ var s2=window.__mapSession&&window.__mapSession(); if(s2&&!s2.expired)start(); } }); }
-    function fail(kind,text,actions,extra){ clearTimeout(ceiling); pill(kind,text,actions); track(kind,extra); release(); }
+    function fail(spec,extra){ clearTimeout(ceiling); spec.onClose=spec.onClose||closeToAll; notice(spec); track(spec.kind,extra); release(); }
+    function failSignin(){ fail({kind:'signin',icon:'info',title:'Sign in to open this saved search',sub:[ALL_SUB],actions:[{id:'signin',label:'Sign in',primary:true,fn:signIn}]}); }
+    function failExpired(){ fail({kind:'expired',icon:'info',title:'Your session has expired',sub:[{t:'Sign in again to open this saved search. '},ALL_SUB],actions:[{id:'signin',label:'Sign in again',primary:true,fn:signIn}]}); }
+    function failError(reason){ fail({kind:'error',icon:'info',title:'Couldn\\u2019t load your saved search',sub:[ALL_SUB],actions:[{id:'retry',label:'Try again',primary:true,fn:start}]},{reason:reason}); }
     function start(){
       var my=++seq; window.__ssPending=true; window.__ssOwnsView=true;
-      pill('loading','Restoring your saved search\\u2026',[FULL]);
-      // Never hold the map hostage: past 8 s the default map loads — under a pill that says, in so
-      // many words, that it is NOT filtered (never the saved search's name). If the lookup answers
-      // later it still applies (its fetch is a user-action round, so newest-action-wins drops the
-      // default round still in flight) — unless the reader has changed the map since (sig0 below).
+      notice({kind:'loading',icon:'spin',title:'Restoring your saved search\\u2026',actions:[CANCEL]});
+      // Never hold the map hostage: past 8 s the default map loads — under a notice that says it is
+      // showing ALL opportunities (never the saved search's name). If the lookup answers later it
+      // still applies (its fetch is a user-action round, so newest-action-wins drops the default
+      // round still in flight) — unless the reader has changed the map since (sig0 below).
       clearTimeout(ceiling); ceiling=setTimeout(function(){ if(my!==seq)return;
-        pill('slow','Still loading your saved search \\u2014 the map below isn\\u2019t filtered yet.',[FULL]);
+        notice({kind:'slow',icon:'spin',title:'Still restoring your saved search\\u2026',sub:[{t:'Showing all opportunities until it\\u2019s ready.'}],actions:[{id:'cancel',label:'Stop waiting',fn:cancel}]});
         track('slow'); release(); },8000);
       var tries=0; (function ready(){
         if(my!==seq)return;
         if(typeof window.__applySavedSearch!=='function'||typeof window.__mapSession!=='function'){
           if(++tries<60)return setTimeout(ready,150);
-          return fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'not_ready'});
+          return failError('not_ready');
         }
         var sess=window.__mapSession();
-        if(!sess){ waitForAuth(); return fail('signin','Sign in to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
-        if(sess.expired){ waitForAuth(); return fail('expired','Your session expired. Sign in again to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
+        if(!sess){ waitForAuth(); return failSignin(); }
+        if(sess.expired){ waitForAuth(); return failExpired(); }
         var done=false;
         // The market as it stands when we ask. If it differs when the answer lands, the reader has
         // moved on (picked another saved search, changed a filter, toggled a horizon) — applying now
         // would overwrite their current selection with a stale one. Pans do not count (no bbox).
         var sig0=intentSig();
-        var giveUp=setTimeout(function(){ if(done||my!==seq)return; done=true;
-          fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'timeout'}); },15000);
+        var giveUp=setTimeout(function(){ if(done||my!==seq)return; done=true; failError('timeout'); },15000);
         fetch('/api/app/saved-searches?email='+encodeURIComponent(sess.em)+'&id='+encodeURIComponent(wantId),
           {headers:{'x-mi-auth-token':sess.t,'x-user-email':sess.em}})
           .then(function(r){ return r.json().catch(function(){ return null; }).then(function(d){ return {status:r.status,ok:r.ok,d:d}; }); })
           .then(function(res){
             if(done||my!==seq)return; done=true; clearTimeout(giveUp);
             var d=res.d||{};
-            if(res.status===401){ waitForAuth(); return fail('expired','Your session expired. Sign in again to open your saved search \\u2014 this map isn\\u2019t filtered yet.',[SIGN_IN,FULL]); }
+            if(res.status===401){ waitForAuth(); return failExpired(); }
             if(res.status===404){
-              return fail('not_found','This saved search isn\\u2019t available for '+sess.em+' \\u2014 it may have been deleted, or saved under a different account. Showing the full map.',
-                [{id:'saved',label:'My saved searches',fn:function(){ location.href='/opportunity-map/saved'; }},{id:'switch',label:'Use another account',fn:signIn},FULL]);
+              // Missing / deleted / not yours: indistinguishable on purpose (the server answers all
+              // three with the same 404). Name the CURRENT account only.
+              return fail({kind:'not_found',icon:'info',title:'This saved search isn\\u2019t available to your current account',
+                sub:[{t:'Signed in as '},{t:sess.em,b:true},{t:' \\u00b7 '},ALL_SUB],
+                actions:[{id:'switch',label:'Switch account',primary:true,fn:signIn},{id:'saved',label:'My saved searches',fn:function(){ location.href='/opportunity-map/saved'; }}]});
             }
             var ss=d.search;
-            if(!res.ok||!d.success||!ss||String(ss.id)!==wantId){
-              return fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'http_'+res.status});
-            }
+            if(!res.ok||!d.success||!ss||String(ss.id)!==wantId)return failError('http_'+res.status);
             clearTimeout(ceiling);
             var sigNow=intentSig();
             if(sig0!=null&&sigNow!=null&&sigNow!==sig0){
               release();   // their own (deferred) round runs; the saved search waits for consent
-              pill('superseded','Your saved search \\u201c'+String(ss.name||'Untitled').slice(0,60)+'\\u201d loaded after you changed the map.',
-                [{id:'apply',label:'Apply it',fn:function(){ applyNow(ss); }},{id:'dismiss',label:'Keep my changes',fn:cancel}]);
+              notice({kind:'superseded',icon:'info',title:'Your saved search loaded after you changed the map',
+                sub:[{t:'\\u201c'+String(ss.name||'Untitled').slice(0,80)+'\\u201d is ready. Your current filters haven\\u2019t changed.'}],
+                actions:[{id:'apply',label:'Apply it',primary:true,fn:function(){ applyNow(ss); }},{id:'keep',label:'Keep my changes',fn:keepMine}]});
               track('superseded'); return;
             }
             applyNow(ss);
           })
-          .catch(function(){ if(done||my!==seq)return; done=true; clearTimeout(giveUp);
-            fail('error','Couldn\\u2019t load your saved search \\u2014 this map isn\\u2019t filtered.',[{id:'retry',label:'Try again',fn:start},FULL],{reason:'network'}); });
+          .catch(function(){ if(done||my!==seq)return; done=true; clearTimeout(giveUp); failError('network'); });
       })();
+    }
+    // What "View filters" lists: the filters as APPLIED (read back after the restore), in the
+    // map's own words, plus where the search covers.
+    function appliedDetails(ss,miss){
+      var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
+      var rows=[];
+      var LBL={naics:'Industry (NAICS)',psc:'Product/service (PSC)',agency:'Agency',subAgency:'Sub-agency',office:'Buying office',state:'State',
+        setAside:'Set-aside',setAsideMulti:'Set-aside',noticeType:'Notice type',noticeMulti:'Notice type',q:'Keywords',postedDays:'Posted within',
+        closingDays:'Closing within',fullOpen:'Full & open',strategy:'Strategy',valueRange:'Value',country:'Country',hasDocs:'Has documents',hasContact:'Has a contact'};
+      var agencyName=function(v){ var pres=window.__AGENCY_PRESETS||[]; return String(v).split('|').map(function(n){
+        for(var i=0;i<pres.length;i++){ if(pres[i]&&pres[i].match===n)return pres[i].name; } return n; }).join(', '); };
+      for(var k in f){
+        var v=f[k]; if(k==='horizons'||k==='status'||k==='scope'||v==null||v===''||v===false)continue;
+        if(Array.isArray(v)){ if(!v.length)continue; v=v.join(', '); }
+        if(typeof v==='object')continue;
+        var s=String(v);
+        if(k==='agency')s=agencyName(v);
+        else if(k==='naics'||k==='psc')s=s.split(',').map(function(x){return x.trim();}).filter(Boolean).join(', ');
+        else if(k==='state')s=(window.__STATE_NAMES&&window.__STATE_NAMES[s])||s;
+        else if(k==='postedDays'||k==='closingDays')s=s+' days';
+        else if(v===true||s==='1'||s==='true')s='Yes';
+        rows.push([LBL[k]||k,s]);
+      }
+      var h=window.__horizons||{}, hz=[]; if(h.open!==false)hz.push('Open'); if(h.recompete)hz.push('Recompete'); if(h.forecast)hz.push('Forecast');
+      if(hz.length)rows.push(['Showing',hz.join(', ')]);
+      var b=ss.bbox, hasArea=!!(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null);
+      rows.push(['Location',hasArea?'The map area saved with this search':'No geographic restriction']);
+      if(miss&&miss.length)rows.push(['Not applied on the map',miss.join(', ')]);
+      var wrap=mk('div','zn-details'), dl=mk('dl','zn-dl'); wrap.appendChild(dl);
+      rows.forEach(function(r){ dl.appendChild(mk('dt',null,r[0])); dl.appendChild(mk('dd',null,r[1])); });
+      wrap.appendChild(mk('p','zn-note',hasArea
+        ?'The map opens on the area saved with this search. Pan or zoom to look elsewhere \\u2014 the count over the map shows how many matches are in view.'
+        :'The map opens on a starting view. Matches elsewhere \\u2014 including Alaska, Hawaii, U.S. territories and overseas \\u2014 appear as you pan or zoom. The count over the map shows how many are in view and how many have no map location.'));
+      return wrap;
     }
     function applyNow(ss){
       seq++; clearTimeout(ceiling);
@@ -9549,23 +9679,12 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // or boot has not released yet and its release round reads the restored FILT.
       window.__ssPending=false; window.__ssDeferredRound=false;
       var miss=(out.unsupported||[]);
-      // Say WHERE the search covers. A search with no saved area is NATIONWIDE (incl. AK/HI,
-      // territories, overseas); the frame it opens in is only a starting view — at the pin zoom
-      // floor (5) not even CONUS fits a desktop window. The map-count pill beside it carries the
-      // live "N of M opportunities · K not shown on map" split; this pill must not imply the view
-      // is the market.
-      var b=ss.bbox, hasArea=!!(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null);
-      pill('applied','Saved search: '+String(ss.name||'Untitled').slice(0,80)
-        +(hasArea?' \\u00b7 its saved area':' \\u00b7 nationwide \\u2014 pan to see matches outside this view')
-        +(miss.length?(' \\u00b7 not on the map: '+miss.join(', ')):''),[{id:'dismiss',label:'\\u2715',fn:dismiss}]);
+      notice({kind:'applied',compact:true,icon:'mark',chip:{k:'Saved search:',v:String(ss.name||'Untitled').slice(0,120)},
+        actions:[{id:'details',label:'View filters',link:true}],details:function(){ return appliedDetails(ss,miss); },
+        onClose:dismiss,closeLabel:'Dismiss saved search notice'});
       track('applied',{mode:String(ss.mode||''),unsupported:miss.join(',').slice(0,80)});
-      // The pill names THIS market; the first round showing a different one removes it
-      // (same provenance rule as the return-continuity pill, whose slot ?ss= leaves free).
-      var sig=null; try{ if(window.__mapIntentSig)sig=window.__mapIntentSig(); }catch(e){}
-      if(sig){ window.__checkResumeProvenance=function(){ try{
-        if(!document.getElementById('ssPill')){ window.__checkResumeProvenance=null; return; }
-        var now=window.__mapIntentSig?window.__mapIntentSig():null;
-        if(now==null||now===sig)return; dismiss(); window.__checkResumeProvenance=null; }catch(e){} }; }
+      // The chip names THIS market; the first round showing a different one removes it.
+      watchMarket('applied');
     }
     start();
   }catch(e){ window.__ssPending=false; window.__ssOwnsView=false; } })();

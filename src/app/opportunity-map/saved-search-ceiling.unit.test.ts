@@ -55,6 +55,7 @@ function harness(opts: { lookupAt: number | null; mapDelay: number }) {
   class FakeEl {
     id = ''; children: FakeEl[] = []; attrs: Record<string, string> = {}; style: Record<string, string> = {};
     textContent = ''; className = ''; type = ''; onclick: null | (() => void) = null; parent: FakeEl | null = null;
+    hidden = false;
     set innerHTML(_v: string) { this.children = []; }
     setAttribute(k: string, v: string) { this.attrs[k] = v; }
     getAttribute(k: string) { return this.attrs[k] ?? null; }
@@ -63,7 +64,8 @@ function harness(opts: { lookupAt: number | null; mapDelay: number }) {
     get text(): string { return [this.textContent, ...this.children.map((c) => c.text)].join(' ').trim(); }
   }
   const body = new FakeEl();
-  const pillEl = () => byId.ssPill || null;
+  const pillEl = () => byId.ssNotice || null;
+  const all = (e: FakeEl | null): FakeEl[] => (e ? [e, ...e.children.flatMap(all)] : []);
   const win: Record<string, unknown> = {
     __horizons: { open: true, recompete: true, forecast: true }, __mapMode: 'open',
     __track() {}, addEventListener() {},
@@ -78,8 +80,8 @@ function harness(opts: { lookupAt: number | null; mapDelay: number }) {
     location: { search: `?ss=${SS_ID}&src=saved_search_alert`, pathname: '/opportunity-map', href: '' },
     localStorage: { getItem: () => null, setItem() {} },
     document: {
-      body, createElement: () => new FakeEl(), getElementById: (id: string) => byId[id] || null,
-      querySelector: (sel: string) => (sel === '.mapwrap' ? body : null), querySelectorAll: () => [], addEventListener() {},
+      body, createElement: () => new FakeEl(), createTextNode: (t: string) => Object.assign(new FakeEl(), { textContent: t }), getElementById: (id: string) => byId[id] || null,
+      querySelector: (sel: string) => (sel === '.app' ? body : null), querySelectorAll: () => [], addEventListener() {},
     },
     FILT: { agency: '', naics: '', state: '', setAside: '', setAsideMulti: '' },
     MODES: { open: { ep: '/o' }, recompete: { ep: '/r' }, forecast: { ep: '/f' } },
@@ -126,7 +128,7 @@ function harness(opts: { lookupAt: number | null; mapDelay: number }) {
     paints, applies,
     pill: () => pillEl()?.getAttribute('data-state') ?? null,
     pillText: () => pillEl()?.text ?? '',
-    click: (act: string) => (pillEl()?.children || []).find((c) => c.getAttribute('data-act') === act)?.onclick?.(),
+    click: (act: string) => all(pillEl()).find((c) => c.getAttribute('data-act') === act)?.onclick?.(),
     userPicks: (naics: string) => (ctx.__userPicks as (n: string) => void)(naics),
   };
 }
@@ -165,7 +167,7 @@ describe('lookup succeeds AFTER the 8 s ceiling', () => {
     await at(13000);
     const unfiltered = h.paints.filter((p) => p.tags.includes('UNFILTERED'));
     expect(unfiltered.length).toBeGreaterThan(0);
-    expect(unfiltered.every((p) => p.pill === 'slow' && /isn.t filtered yet/.test(p.pillText))).toBe(true);
+    expect(unfiltered.every((p) => p.pill === 'slow' && /Showing all opportunities/.test(p.pillText))).toBe(true);
     expect(h.paints.at(-1)).toMatchObject({ tags: ['SAVED'], pill: 'applied' });
     noUnfilteredUnderSavedName(h.paints);
   });
@@ -211,7 +213,7 @@ describe('a late response after the reader switched', () => {
     expect(h.applies).toEqual([]);
     expect(h.pill()).toBe('superseded');
     expect(only(h.paints.at(-1), 'USER')).toBe(true);
-    h.click('dismiss');                                           // "Keep my changes"
+    h.click('keep');                                              // "Keep my changes"
     await at(20000);
     expect(h.applies).toEqual([]);
     expect(only(h.paints.at(-1), 'USER')).toBe(true);
@@ -220,10 +222,11 @@ describe('a late response after the reader switched', () => {
   it('"Show the full map" while loading cancels — a later answer does nothing', async () => {
     const h = harness({ lookupAt: 4000, mapDelay: 100 });
     await at(1000);
-    h.click('dismiss');
+    h.click('cancel');                                            // "Show all opportunities"
     await at(10000);
     expect(h.applies).toEqual([]);
-    expect(h.pill()).toBeNull();
+    expect(h.pill()).toBe('all');                                 // labelled as the full map, not the search
+    expect(h.pillText()).toContain('Showing all opportunities');
     expect(only(h.paints.at(-1), 'UNFILTERED')).toBe(true);       // the full map the reader chose
   });
 });

@@ -148,7 +148,7 @@ describe('both ends of the contract agree', () => {
     // distinction is real, not assumed. A saved search is an account's record; a listing is public.
     const ssAt = MAP.indexOf("var m=(location.search||'').match(/[?&]ss=([^&]+)/);");
     expect(ssAt).toBeGreaterThan(0);
-    expect(MAP.slice(ssAt, ssAt + 6000)).toContain('window.__mapSession()');
+    expect(MAP.slice(ssAt, MAP.indexOf('// Deep-link: scope params', ssAt))).toContain('window.__mapSession()');
   });
 
   it('a notice with no id still avoids the bare 136K-pin map, without the reader state', () => {

@@ -67,13 +67,16 @@ const tokenFor = (email: string, expMs: number) => `${b64u({ email, exp: expMs }
 
 type Resp = { status: number; body: unknown } | 'network' | 'hang';
 
-/** A tiny DOM: enough for the status pill (create / append / find by id / remove). */
+/** A tiny DOM: enough for the saved-search notice (create / append / find by id / remove / text nodes). */
 function makeDom() {
   const byId: Record<string, FakeEl> = {};
+  const focused: string[] = [];
   class FakeEl {
     id = ''; children: FakeEl[] = []; attrs: Record<string, string> = {}; style: Record<string, string> = {};
     textContent = ''; className = ''; type = ''; onclick: null | (() => void) = null; parent: FakeEl | null = null;
     constructor(public tag: string) {}
+    hidden = false;
+    focus() { focused.push(this.id || this.tag); }
     set innerHTML(_v: string) { this.children = []; }
     setAttribute(k: string, v: string) { this.attrs[k] = v; if (k === 'id') this.id = v; }
     getAttribute(k: string) { return this.attrs[k] ?? null; }
@@ -85,16 +88,19 @@ function makeDom() {
   const document = {
     body,
     createElement: (t: string) => new FakeEl(t),
+    createTextNode: (t: string) => Object.assign(new FakeEl('#text'), { textContent: t }),
     getElementById: (id: string) => byId[id] || null,
-    querySelector: (sel: string) => (sel === '.mapwrap' ? body : null),
+    querySelector: (sel: string) => (sel === '.app' ? body : null),
     querySelectorAll: () => [],
     addEventListener: () => {},
   };
-  const pill = () => byId.ssPill || null;
+  const pill = () => byId.ssNotice || null;
   const state = () => pill()?.getAttribute('data-state') || null;
-  const actions = () => (pill()?.children || []).filter((c) => c.className === 'ss-act').map((c) => c.getAttribute('data-act'));
-  const click = (act: string) => (pill()?.children || []).find((c) => c.getAttribute('data-act') === act)?.onclick?.();
-  return { document, pill, state, actions, click };
+  const all = (e: FakeEl | null): FakeEl[] => (e ? [e, ...e.children.flatMap(all)] : []);
+  const buttons = () => all(pill()).filter((c) => c.getAttribute('data-act'));
+  const actions = () => buttons().map((c) => c.getAttribute('data-act'));
+  const click = (act: string) => buttons().find((c) => c.getAttribute('data-act') === act)?.onclick?.();
+  return { document, pill, state, actions, click, focused };
 }
 
 interface Harness {
@@ -179,7 +185,8 @@ describe('signed in — the exact email link', () => {
     expect(h.applied[0].opts).toEqual({ savedSearch: true });   // saved-search semantics, not a scope link
     expect(h.dom.state()).toBe('applied');
     expect(h.dom.pill()!.text).toContain('Atlantic Craft Partners JV');
-    expect(h.dom.pill()!.text).toContain('nationwide');            // bbox:null is NOT "this view"
+    expect(h.dom.pill()!.text).toContain('No geographic restriction');   // bbox:null is not "this view"
+    expect(h.dom.pill()!.text).not.toContain('nationwide');             // matches can be overseas
     expect(h.win.__ssPending).toBe(false);
     expect(h.events).toContainEqual(['tool_use', 'saved_search_link', expect.objectContaining({ outcome: 'applied', src: 'saved_search_alert' })]);
   });
@@ -215,11 +222,11 @@ describe('signed out, then signed in', () => {
     expect(h.fetches).toHaveLength(0);
     expect(h.applied).toHaveLength(0);
     expect(h.dom.state()).toBe('signin');
-    expect(h.dom.pill()!.text).toMatch(/isn.t filtered yet/);
-    expect(h.dom.actions()).toEqual(['signin', 'dismiss']);
+    expect(h.dom.pill()!.text).toContain('Showing all opportunities');
+    expect(h.dom.actions()).toEqual(['signin', 'close']);
     expect(h.win.__ssPending).toBe(false);                        // the default map is allowed to load...
     h.dom.click('signin');
-    expect(h.modal).toEqual(['open your saved search']);          // ...and the reader can recover
+    expect(h.modal).toEqual(['open this saved search']);          // ...and the reader can recover
   });
 
   it('resumes when authentication arrives later (another tab writes the token)', async () => {
@@ -239,7 +246,7 @@ describe('signed out, then signed in', () => {
     h.run(); await settle(200);
     h.dom.click('signin');
     // openSignInModal(phrase) with no resume → the modal's default resume is location.reload()
-    expect(h.modal).toEqual(['open your saved search']);
+    expect(h.modal).toEqual(['open this saved search']);
   });
 });
 
@@ -266,8 +273,11 @@ describe('missing, foreign and failed lookups never present the default as the s
     h.run(); await settle(200);
     expect(h.applied).toHaveLength(0);
     expect(h.dom.state()).toBe('not_found');
-    expect(h.dom.pill()!.text).toContain('reader@example.test');   // which account looked
-    expect(h.dom.actions()).toEqual(['saved', 'switch', 'dismiss']);
+    expect(h.dom.pill()!.text).toContain('This saved search isn’t available to your current account');
+    expect(h.dom.pill()!.text).toContain('Signed in as reader@example.test');   // the CURRENT account only
+    expect(h.dom.pill()!.text).toContain('Showing all opportunities');
+    expect(h.dom.pill()!.text).not.toMatch(/deleted|different account|belongs/);  // missing ≡ deleted ≡ not yours
+    expect(h.dom.actions()).toEqual(['switch', 'saved', 'close']);
     expect(h.win.__ssPending).toBe(false);
   });
 
@@ -282,7 +292,7 @@ describe('missing, foreign and failed lookups never present the default as the s
     const h = harness({ token: live(), respond: ['network', { status: 200, body: { success: true, search: ROW } }] });
     h.run(); await settle(200);
     expect(h.dom.state()).toBe('error');
-    expect(h.dom.pill()!.text).toMatch(/isn.t filtered/);
+    expect(h.dom.pill()!.text).toContain('Showing all opportunities');
     h.dom.click('retry'); await settle(200);
     expect(h.applied).toHaveLength(1);
     expect(h.dom.state()).toBe('applied');
@@ -296,7 +306,7 @@ describe('missing, foreign and failed lookups never present the default as the s
     expect(h.win.__ssPending).toBe(false);
     expect(h.refetches).toEqual([{ system: true }]);            // the deferred boot round finally runs
     expect(h.dom.state()).toBe('slow');                        // ...under a pill that says it is NOT filtered
-    expect(h.dom.pill()!.text).toMatch(/isn.t filtered yet/);
+    expect(h.dom.pill()!.text).toContain('Showing all opportunities');
     expect(h.dom.pill()!.text).not.toContain('Atlantic');      // never the saved search's name
     await settle(7000);
     expect(h.dom.state()).toBe('error');
@@ -310,5 +320,66 @@ describe('ordinary map entry is untouched', () => {
     expect(h.fetches).toHaveLength(0);
     expect(h.dom.pill()).toBeNull();
     expect(h.win.__ssPending).toBeFalsy();
+  });
+});
+
+describe('the inline notice (2026-10-04 redesign)', () => {
+  it('is a polite live region in the page flow (the .app grid), never an overlay, and never takes focus', async () => {
+    const h = harness({ token: live() });
+    h.run(); await settle(200);
+    for (const s of [404, 500]) {                                   // walk more states: still no focus moves
+      const h2 = harness({ token: live(), respond: [{ status: s, body: { success: false } }] });
+      h2.run(); await settle(200); h2.dom.click('close');
+      expect(h2.dom.focused).toEqual([]);
+    }
+    const el = h.dom.pill()!;
+    expect(el.getAttribute('role')).toBe('status');
+    expect(el.getAttribute('aria-live')).toBe('polite');
+    expect(el.className).toContain('znote');                      // grid-area:znote — a row, not position:absolute
+    expect(el.style.cssText ?? '').not.toMatch(/position:\s*absolute/);
+    expect(h.dom.focused).toEqual([]);
+  });
+
+  it('restored → compact "Saved search: <name>" chip; View filters expands the APPLIED filters', async () => {
+    const h = harness({ token: live() });
+    h.run(); await settle(200);
+    const el = h.dom.pill()!;
+    expect(el.className).toContain('compact');
+    expect(h.dom.actions()).toEqual(['details', 'close']);
+    const all = (e: { children: unknown[] } & Record<string, unknown>): Array<Record<string, unknown>> =>
+      [e, ...(e.children as Array<typeof e>).flatMap(all)];
+    const details = all(el as never).find((c) => c.id === 'ssDetails')!;
+    const btn = all(el as never).find((c) => (c.attrs as Record<string, string>)?.['data-act'] === 'details')!;
+    expect(details.hidden).toBe(true);
+    expect((btn.attrs as Record<string, string>)['aria-expanded']).toBe('false');
+    h.dom.click('details');
+    expect(details.hidden).toBe(false);
+    expect((btn.attrs as Record<string, string>)['aria-expanded']).toBe('true');
+    expect(btn.textContent).toBe('Hide filters');
+    const text = el.text;
+    expect(text).toContain('Industry (NAICS)');
+    expect(text).toContain('336611, 336612');
+    expect(text).toContain('DEFENSE');                             // no presets in this harness → the match needle
+    expect(text).toContain('No geographic restriction');
+    expect(text).toMatch(/overseas/);                              // the viewport explanation lives in the details
+    h.dom.click('details');
+    expect(details.hidden).toBe(true);
+  });
+
+  it('wrong account: Switch account opens sign-in WITHOUT a resume callback, so the reload keeps the exact ?ss= URL', async () => {
+    const h = harness({ token: live(), respond: [{ status: 404, body: { success: false, code: 'not_found' } }] });
+    h.run(); await settle(200);
+    h.dom.click('switch');
+    expect(h.modal).toEqual(['open this saved search']);
+  });
+
+  it('dismissing a failure collapses to a "Showing all opportunities" label — the full map stays labelled', async () => {
+    const h = harness({ token: live(), respond: [{ status: 404, body: { success: false, code: 'not_found' } }] });
+    h.run(); await settle(200);
+    h.dom.click('close');
+    expect(h.dom.state()).toBe('all');
+    expect(h.dom.pill()!.text).toContain('Showing all opportunities');
+    h.dom.click('close');
+    expect(h.dom.pill()).toBeNull();
   });
 });

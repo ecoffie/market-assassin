@@ -121,7 +121,9 @@ export const MARKET_FEEDBACK_CSS =
   // (row 3, columns 2–3 on desktop; the single content cell on mobile). Nav, icon rail and search bar stay
   // usable: the user can change the query while the market builds.
   + '.app{position:relative}'
-  + '.mfb-boot{grid-area:3/2/4/4;position:absolute;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 30% 20%,rgba(91,63,214,.55),transparent 60%),linear-gradient(135deg,rgba(10,14,40,.9),rgba(33,20,84,.86));backdrop-filter:blur(3px) saturate(.7);-webkit-backdrop-filter:blur(3px) saturate(.7);color:#fff;overflow:hidden;animation:mfbBootIn .24s ease-out ' + MF_TIMING.BOOT_REVEAL + 'ms both;transition:opacity .16s}'
+  // Row 4 = the content row (map + cards). Row 3 is the saved-search notice row (znote, route.ts),
+  // which the boot overlay must never cover.
+  + '.mfb-boot{grid-area:4/2/5/4;position:absolute;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 30% 20%,rgba(91,63,214,.55),transparent 60%),linear-gradient(135deg,rgba(10,14,40,.9),rgba(33,20,84,.86));backdrop-filter:blur(3px) saturate(.7);-webkit-backdrop-filter:blur(3px) saturate(.7);color:#fff;overflow:hidden;animation:mfbBootIn .24s ease-out ' + MF_TIMING.BOOT_REVEAL + 'ms both;transition:opacity .16s}'
   + '@keyframes mfbBootIn{from{opacity:0}to{opacity:1}}'
   // CSS-FIRST (2026-09-25): no script reveals it. The server sends it in its initial state; the compositor
   // runs the delayed fade even while the parser is busy with the page's inline scripts, so it can appear
@@ -154,7 +156,7 @@ export const MARKET_FEEDBACK_CSS =
   + '.mfb-boot .mfb-intel{margin-top:22px;background:rgba(255,255,255,.07);border-left-color:#8b7bff}'
   + '.mfb-boot .mfb-intel-k{color:#b9b0ff}'
   + '.mfb-boot .mfb-intel p{color:#eeeaff;font-size:15px}'
-  + '@media(max-width:640px){.mfb-boot{grid-area:3/1/4/2}.mfb-title{font-size:30px}}'
+  + '@media(max-width:640px){.mfb-boot{grid-area:4/1/5/2}.mfb-title{font-size:30px}}'
   + '@media (prefers-reduced-motion:reduce){.mfb-bar::before,.mfb-boot::after{animation:none}.mfb-bar{background:#5b3fd6}.mfb-ic{animation:none!important}}';
 
 // ── HTML ─────────────────────────────────────────────────────────────────────────────────────────────
