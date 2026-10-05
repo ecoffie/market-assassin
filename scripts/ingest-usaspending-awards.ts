@@ -50,6 +50,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
+import { runCompletenessGate } from '@/lib/awards-ingest/completeness-gate-run';
 import {
   buildPipelinePlan,
   buildAwardsMergeScript,
@@ -60,6 +61,7 @@ import {
   mergeJobIds,
   parseChildJobIds,
   parseJobBytes,
+  formatCompletenessGate,
   classifyMembers,
   DOD_AWARDING_AGENCY_CODE,
   IDV_IDENTITY_COLUMNS,
@@ -419,6 +421,18 @@ async function main() {
     if (IDV_ONLY || toArg) {
       log('partial backfill (--idv-only / --to): data_sources[bq_awards] clocks deliberately NOT stamped');
       return;
+    }
+
+    // COMPLETENESS HARD GATE (2026-10-04, A1 incident): a fresh MAX(action_date) cannot prove
+    // historical completeness. Before anything is published as current, every SETTLED cohort-month
+    // is checked against USASpending. A WAREHOUSE_HOLE, an unmeasurable source, or a malformed agency
+    // code in this run's staged rows fails the run HERE — the clocks below are never stamped, the
+    // workflow goes red, and nothing is repaired automatically.
+    const gate = await runCompletenessGate({ awardsTable: BQ_TABLES.awards, stagingFq, log });
+    for (const line of formatCompletenessGate(gate)) log(line);
+    if (gate.verdict === 'fail') {
+      const outcome = pipelineOutcome({ lastCompleted: 'rebuild_recipients', failedAt: 'stamp_clocks' });
+      throw new Error(`${outcome.status}: awards completeness gate FAILED — not published as healthy/current: ${gate.failures.join(' | ')}`);
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
