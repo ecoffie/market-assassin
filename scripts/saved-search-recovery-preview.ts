@@ -51,8 +51,11 @@ async function main() {
   const base = { ...(row.filters as Record<string, unknown>) };
   delete base.sapBuyer;
   if (naicsOverride) base.naics = naicsOverride;
-  const candidates: Array<[string, Record<string, unknown>]> = (only ? [only] : ['most', 'somewhat', 'vehicle', 'omit'])
-    .map((v) => [v, v === 'omit' ? { ...base } : { ...base, sapBuyer: v }]);
+  // Vary sapBuyer only for a search that STORED one; a search without it is previewed as stored (+ any --naics).
+  const hadSapBuyer = Object.prototype.hasOwnProperty.call(row.filters || {}, 'sapBuyer');
+  const candidates: Array<[string, Record<string, unknown>]> = hadSapBuyer
+    ? (only ? [only] : ['most', 'somewhat', 'vehicle', 'omit']).map((v) => [v, v === 'omit' ? { ...base } : { ...base, sapBuyer: v }])
+    : [['(no sapBuyer stored)', { ...base }]];
 
   const toNotice = (o: Record<string, unknown>): RecoveryNotice => ({
     notice_id: String(o.notice_id), title: o.title as string, department: o.department as string,
@@ -115,11 +118,11 @@ async function main() {
 
   console.log(`\n${out.search.name}  (${out.search.id})  owner=${out.search.owner}`);
   console.log(`stored filters ${JSON.stringify(out.search.stored_filters)} · created ${out.search.created_at} · last_alerted ${out.search.last_alerted_at} · sent ${out.search.total_alerts_sent}`);
-  if (naicsOverride) console.log(`⚠ HYPOTHETICAL: naics overridden to ${naicsOverride} for decision support — not the stored request`);
-  console.log(`missed scheduled runs: ${out.missed_runs.map((r) => `${r.started_at.slice(0, 16)} ${r.status}`).join(' | ')}`);
+  if (naicsOverride) console.log(`⚠ PROPOSED, NOT DECIDED: naics ${naicsOverride} replaces the stored value for this preview only — not the customer's confirmed request`);
+  console.log(`scheduled job runs since creation (JOB status, not this search's own outcome): ${out.missed_runs.map((r) => `${r.started_at.slice(0, 16)} ${r.status}`).join(' | ')}`);
   for (const p of previews) {
     if ('invalid' in p) { console.log(`\n[${p.candidate}] INVALID: ${p.invalid}`); continue; }
-    console.log(`\n[sapBuyer=${p.candidate}] window=${p.cron_window_count} baseline=${p.baseline_count} CATCH-UP=${p.catch_up_count} closed-since=${p.closed_since.length}${p.warnings.length ? ' ⚠ ' + p.warnings.join('; ') : ''}`);
+    console.log(`\n[sapBuyer=${p.candidate} · naics=${(p.corrected as Record<string, unknown>).naics}] window=${p.cron_window_count} baseline=${p.baseline_count} CATCH-UP=${p.catch_up_count} closed-since=${p.closed_since.length}${p.warnings.length ? ' ⚠ ' + p.warnings.join('; ') : ''}`);
     for (const r of p.per_missed_run) console.log(`   run ${r.run.slice(0, 16)}: ${r.present_and_matching_now} in DB & matching now · ${r.not_yet_ingested} not yet ingested`);
     for (const c of p.catch_up) console.log(`   ${c.notice_id}  posted ${String(c.posted).slice(0, 10)}  due ${String(c.deadline).slice(0, 10)}  ${c.department ?? ''} — ${c.title}`);
   }

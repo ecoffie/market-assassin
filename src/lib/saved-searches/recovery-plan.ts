@@ -102,14 +102,18 @@ export function planSavedSearchRecovery(input: {
  */
 export function buildRecoveryWrite(row: {
   id: string; created_at: string; updated_at: string; filters: Record<string, unknown>;
+  last_alerted_at: string | null; total_alerts_sent: number;
 }, correctedFilters: Record<string, unknown>, baselineIds: string[]) {
+  // The guard is the state AS READ, not an assumed "never alerted": a search with an invalid code can
+  // have been stamped daily with zero matches (last_alerted_at set, last_seen empty). Correcting its
+  // filter WITHOUT this baseline would make the next run email its whole 30-day window as "new".
   return {
     table: 'saved_searches',
     where: {
       id: row.id,
       updated_at: row.updated_at,
-      last_alerted_at: null,
-      total_alerts_sent: 0,
+      last_alerted_at: row.last_alerted_at,
+      total_alerts_sent: row.total_alerts_sent,
       filters: row.filters,
     },
     set: {

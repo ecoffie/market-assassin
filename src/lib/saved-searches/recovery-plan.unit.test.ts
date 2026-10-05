@@ -40,7 +40,7 @@ describe('planSavedSearchRecovery', () => {
 
   it('end to end: the recovery write turns the next routine run into a catch-up send, not a silent baseline', () => {
     const write = buildRecoveryWrite(
-      { id: 'X', created_at: CREATED, updated_at: CREATED, filters: { naics: '541510', sapBuyer: true } },
+      { id: 'X', created_at: CREATED, updated_at: CREATED, filters: { naics: '541510', sapBuyer: true }, last_alerted_at: null, total_alerts_sent: 0 },
       { naics: '541510', sapBuyer: 'most' },
       plan.baseline_ids,
     );
@@ -54,5 +54,19 @@ describe('planSavedSearchRecovery', () => {
     const d = decideSavedSearchAlert({ lastAlertedAt: write.set.last_alerted_at, lastSeenIds: write.set.last_seen_notice_ids, records: window });
     expect(d.action).toBe('send');
     if (d.action === 'send') expect(d.fresh.map((r) => r.notice_id)).toEqual(['D1', 'D2']);
+  });
+});
+
+describe('recovery for a search that was stamped daily with zero matches (invalid code, last_seen empty)', () => {
+  it('guards on the state as read and still baselines as of creation — no whole-window blast', () => {
+    const row = { id: 'S', created_at: CREATED, updated_at: '2026-10-04T11:00:40Z', filters: { naics: '541510' }, last_alerted_at: '2026-10-04T11:00:40Z', total_alerts_sent: 0 };
+    const window = [{ notice_id: 'PRE' }, { notice_id: 'D1' }];
+    // Correcting the filter alone: lastAlertedAt set + empty seen → EVERY window record is "fresh".
+    const naive = decideSavedSearchAlert({ lastAlertedAt: row.last_alerted_at, lastSeenIds: [], records: window });
+    expect(naive.action === 'send' && naive.fresh.map((r) => r.notice_id)).toEqual(['PRE', 'D1']);
+    const write = buildRecoveryWrite(row, { naics: '541511' }, ['PRE']);
+    expect(write.where).toMatchObject({ last_alerted_at: '2026-10-04T11:00:40Z', total_alerts_sent: 0 });
+    const d = decideSavedSearchAlert({ lastAlertedAt: write.set.last_alerted_at, lastSeenIds: write.set.last_seen_notice_ids, records: window });
+    expect(d.action === 'send' && d.fresh.map((r) => r.notice_id)).toEqual(['D1']);
   });
 });
