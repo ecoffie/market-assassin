@@ -52,7 +52,10 @@ import { join, resolve } from 'node:path';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import {
   buildPipelinePlan,
-  buildAwardsMergeSql,
+  buildAwardsMergeScript,
+  buildMergeLocateSql,
+  planMergeIdentity,
+  type MergeLocateRow,
   classifyMembers,
   DOD_AWARDING_AGENCY_CODE,
   IDV_IDENTITY_COLUMNS,
@@ -319,18 +322,36 @@ async function main() {
     //    (absorbs FPDS 90-day corrections in the trailing window), insert-on-miss (new txns). The
     //    SELECT is the explicit CSV→target mapping (USASpending long names → the MERGE columns derived from awards-schema.ts; the
     //    exec_* / detail cols the bulk export omits stay NULL, same as existing rows).
-    // The MERGE scans the whole 63M-row target to find txn_id matches unless we BOUND it. NOTE the
-    // table is partitioned RANGE_BUCKET(fiscal_year, 2015..2030) — NOT on action_date (verified in
-    // INFORMATION_SCHEMA 2026-09-23; see awards-schema.ts). A bare action_date predicate is not a
-    // partition filter, so do not assume it prunes; bytes billed should be measured, not inferred
-    // from this comment (the unbounded full-table scan billed ~43GB and blew the bqQuery 5GB cap). We run
-    // it via the `bq query` CLI (like the load) — the app's bqQuery helper is cost-capped for
-    // READ safety and isn't the right tool for a bulk DDL MERGE.
-    log('MERGE staging → awards on txn_id…');
-    const mergeSql = buildAwardsMergeSql({
+    // IDENTITY = txn_id, wherever the row lives (A1, 2026-10-04: a date-bounded ON clause inserted a
+    // second copy of every transaction USASpending re-dated into the window). The table is
+    // partitioned RANGE_BUCKET(fiscal_year), so a date bound never pruned anything (both forms
+    // dry-run 42.97 GiB). Instead: LOCATE which fiscal_year partitions hold the staged keys
+    // (one read of txn_id+fiscal_year, ~3.1 GiB), then MERGE on txn_id restricted to exactly those
+    // partitions (literal FYs → pruned: ~3.9 GiB per FY), inside a transaction whose ASSERT rolls the
+    // MERGE back if any staged key ends with more rows than it started with. We run it via the
+    // `bq query` CLI (like the load) — the app's bqQuery helper is cost-capped for READ safety.
+    log('locating staged transaction keys in awards (txn_id → fiscal_year partitions)…');
+    let mergePlan;
+    try {
+      const out = execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql', '--format=json'],
+        { input: buildMergeLocateSql({ awardsTable: BQ_TABLES.awards, stagingFq }), encoding: 'utf8', stdio: ['pipe', 'pipe', 'inherit'] });
+      const rows = JSON.parse(out) as MergeLocateRow[];
+      if (rows.length !== 1) throw new Error(`locate returned ${rows.length} rows, expected 1`);
+      mergePlan = planMergeIdentity(rows[0]);
+    } catch (error) {
+      const outcome = pipelineOutcome({ lastCompleted: 'staging_load', failedAt: 'merge' });
+      throw new Error(`${outcome.status}: MERGE refused at the identity locate step`, { cause: error });
+    }
+    log(`MERGE identity: ${mergePlan.identity.kind === 'located'
+      ? `txn_id within fiscal_year [${mergePlan.identity.fiscalYears.join(', ')}]`
+      : 'txn_id, unbounded (an existing match has a NULL fiscal_year)'}`
+      + ` · staged keys ${mergePlan.stagedKeys} · already present ${mergePlan.locatedKeys} (${mergePlan.locatedRows} rows)`
+      + ` · rows after MUST equal ${mergePlan.expectedRowsAfter}`);
+    log('MERGE staging → awards on txn_id (transactional, identity-asserted)…');
+    const mergeSql = buildAwardsMergeScript({
       awardsTable: BQ_TABLES.awards,
       stagingFq,
-      startDate,
+      plan: mergePlan,
       idvIdentityColumns: writeIdvIdentity,
     });
     try {

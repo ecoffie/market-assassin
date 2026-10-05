@@ -41,8 +41,18 @@ const MERGE_ALL = ALL.filter((c) => !MERGE_EXEMPT.has(c));
 const mergeBase = {
   awardsTable: '`market-assasin.usaspending.awards`',
   stagingFq: 'market-assasin.usaspending.awards_ingest_staging',
-  startDate: '2026-06-06',
+  identity: { kind: 'located', fiscalYears: [2026] } as const,
 };
+
+/**
+ * The pre-refactor goldens were captured with the date-bounded identity (A1 defect). Everything
+ * except that ONE line must stay byte-equal; the ON line must appear exactly once in each golden.
+ */
+const LEGACY_ON = /ON T\.txn_id = S\.txn_id AND T\.action_date >= DATE_SUB\(DATE\('\d{4}-\d{2}-\d{2}'\), INTERVAL 2 DAY\)/g;
+function withIdentityOn(golden: string, on: string): string {
+  expect(golden.match(LEGACY_ON) ?? []).toHaveLength(1);
+  return golden.replace(LEGACY_ON, `ON ${on}`);
+}
 
 /** Step-1 SELECT of build-derived.sql → [{ alias, expr (as written, trimmed, no trailing comma) }]. */
 function rebuildProjection(sql: string): Array<{ alias: string; expr: string; raw: string }> {
@@ -191,12 +201,13 @@ describe('weekly MERGE == AWARDS_COLUMNS − MERGE_EXEMPT', () => {
     for (const c of IDV) expect(sql).not.toContain(c);
   });
 
-  it('deriving the MERGE from the schema changed nothing: BYTE-equal to both pre-refactor statements', () => {
+  it('deriving the MERGE from the schema changed nothing but the identity line: BYTE-equal to both pre-refactor statements', () => {
     const golden = (f: string) => read(`src/lib/awards-ingest/__fixtures__/${f}`);
-    // The statement the scheduled weekly ingest runs today (captured by #1658 from origin/main 45e3cfba).
-    expect(buildAwardsMergeSql({ ...mergeBase, startDate: '2026-06-07' })).toBe(golden('merge-sql-pre-1658.golden.sql'));
+    const on = 'T.txn_id = S.txn_id AND T.fiscal_year IN (2026)';
+    // The statement the scheduled weekly ingest ran (captured by #1658 from origin/main 45e3cfba).
+    expect(buildAwardsMergeSql(mergeBase)).toBe(withIdentityOn(golden('merge-sql-pre-1658.golden.sql'), on));
     // #1658's IDV-on statement, captured from its hand-written merge-sql.ts before this refactor.
-    expect(buildAwardsMergeSql({ ...mergeBase, idvIdentityColumns: true })).toBe(golden('merge-sql-pre-schema-idv.golden.sql'));
+    expect(buildAwardsMergeSql({ ...mergeBase, idvIdentityColumns: true })).toBe(withIdentityOn(golden('merge-sql-pre-schema-idv.golden.sql'), on));
   });
 });
 
