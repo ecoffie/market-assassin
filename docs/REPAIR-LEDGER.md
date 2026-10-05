@@ -28,6 +28,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-05 — Alert health: one failed search reported as "email alerts unreliable"
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-05 | Saved-search alerts / MCP schedule status | `saved-search-alerts` marks a whole run `error` when ANY search fails. From 2026-09-30, 3 suppressed internal (govconedu.com, hard_bounce) recipients plus 1 other customer's search did that every day, while the same runs delivered 46-48 alerts. `getSavedSearchDeliveryReadiness` then returned `delivery_degraded` with `last_success_at`=2026-09-29 (the last zero-failure RUN), and the MCP tool shipped it as `delivery_last_success_at` with "Alert delivery is degraded … recently failed". A host turned that into "email alerts unreliable, last successful send Sept 29" for a customer whose two new watches had never been evaluated. Readiness now reads the provider send ledger for the failed run (`partial_degradation` when alerts went out; `degraded_unconfirmed` when none or unreadable; `system_failure` only for confirmed outages; `unknown` for probe errors). The field is renamed `last_clean_run_at`, with `last_alert_sent_at` added beside it. New per-search `alert_status` reports saved+validated, filter reach (never-matched filters), not-yet-tested + baseline, this recipient blocked, and this search skipped, separately from system status. | `system_status: 'partial_degradation'` → `src/lib/saved-searches/delivery-readiness.ts` · `export function composeSearchAlertStatus(` → `src/lib/saved-searches/search-delivery-status.ts` | `delivery-readiness.unit.test.ts` replays the exact prod run rows (Sept 29 success, Sept 30 to Oct 5 error, 48 sends): 6 of 15 red on the old file, all green on the new; `search-delivery-status.unit.test.ts` (10); `schedule-market-search.unit.test.ts` (14) asserts the message never contains Sept 29 / unreliable / degraded for a partial run, and that the suppressed-recipient warning is kept | PR open |
+
 ## 2026-10-04 — A1b follow-up: recipients rebuilt after the cleanup
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

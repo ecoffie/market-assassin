@@ -43,7 +43,20 @@ export type {
   DeliveryExecutionHealth,
   DeliveryState,
   SavedSearchDeliveryReadiness,
+  SystemDeliveryStatus,
 } from './delivery-readiness';
+export {
+  composeSearchAlertStatus,
+  probeFilterReach,
+  readRecipientEvidence,
+} from './search-delivery-status';
+export type {
+  AlertHeadline,
+  FilterReach,
+  SavedSearchAlertStatus,
+  SearchBaseline,
+  SearchDeliveryStatus,
+} from './search-delivery-status';
 export { buildSavedSearchMapUrl } from './map-url';
 export {
   canonicalizeSavedSearchFilters,

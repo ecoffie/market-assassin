@@ -15,17 +15,32 @@ vi.mock('@/lib/saved-searches', async (importOriginal) => {
     listSavedSearches: vi.fn(),
     updateSavedSearch: vi.fn(),
     deleteSavedSearch: vi.fn(),
+    listSavedSearches: vi.fn(),
     getSavedSearchDeliveryReadiness: vi.fn(),
+    readRecipientEvidence: vi.fn(),
+    probeFilterReach: vi.fn(),
   };
 });
 
-import { createSavedSearch, deleteSavedSearch, getSavedSearchDeliveryReadiness } from '@/lib/saved-searches';
+import {
+  createSavedSearch,
+  deleteSavedSearch,
+  getSavedSearchDeliveryReadiness,
+  listSavedSearches,
+  probeFilterReach,
+  readRecipientEvidence,
+  type SavedSearchDeliveryReadiness,
+} from '@/lib/saved-searches';
+import { listMarketSchedules } from './schedule-market-search';
 
 const mockCreate = vi.mocked(createSavedSearch);
 const mockDelete = vi.mocked(deleteSavedSearch);
 const mockDelivery = vi.mocked(getSavedSearchDeliveryReadiness);
+const mockList = vi.mocked(listSavedSearches);
+const mockRecipient = vi.mocked(readRecipientEvidence);
+const mockReach = vi.mocked(probeFilterReach);
 
-const deliveryReady = {
+const deliveryReady: SavedSearchDeliveryReadiness = {
   storage_ready: true,
   cron_registered: true,
   cron_enabled: true,
@@ -35,9 +50,15 @@ const deliveryReady = {
   cron_expr: '0 11 * * *',
   last_run_at: '2026-08-30T11:01:00Z',
   last_run_status: 'success',
-  last_success_at: '2026-08-30T11:01:00Z',
-  execution_health: 'recent_success' as const,
-  delivery_state: 'delivery_ready' as const,
+  last_clean_run_at: '2026-08-30T11:01:00Z',
+  last_alert_sent_at: '2026-08-30T11:01:10Z',
+  latest_run_started_at: '2026-08-30T11:01:00Z',
+  latest_run_in_window: true,
+  latest_run_failures: null,
+  latest_run_alerts_sent: null,
+  execution_health: 'recent_success',
+  delivery_state: 'delivery_ready',
+  system_status: 'healthy',
   delivery_ready: true,
 };
 
@@ -45,6 +66,8 @@ describe('schedule_market_search MCP tool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelivery.mockResolvedValue(deliveryReady);
+    mockRecipient.mockResolvedValue({ suppressed: null, lastAlertAt: null });
+    mockReach.mockResolvedValue('matches_open_now');
   });
 
   it('is registered with 0-credit scheduling config pricing', () => {
@@ -143,9 +166,10 @@ describe('schedule_market_search MCP tool', () => {
     mockDelivery.mockResolvedValue({
       ...deliveryReady,
       last_run_status: 'dispatched',
-      last_success_at: null,
+      last_clean_run_at: null,
       execution_health: 'not_observed',
       delivery_state: 'delivery_configured',
+      system_status: 'not_observed',
       delivery_ready: false,
     });
     mockCreate.mockResolvedValue({
@@ -188,7 +212,8 @@ describe('schedule_market_search MCP tool', () => {
       delivery_ready: false,
       delivery_state: 'delivery_degraded',
       cron_enabled: false,
-      execution_health: 'latest_failed',
+      execution_health: 'not_observed',
+      system_status: 'system_failure',
     });
     mockCreate.mockResolvedValue({
       ok: true,
@@ -223,7 +248,8 @@ describe('schedule_market_search MCP tool', () => {
     expect(r._meta.delivery_ready).toBe(false);
     expect(r._meta.degraded).toBe(true);
     expect(r.message).not.toMatch(/will be emailed/i);
-    expect(r.message).toMatch(/not currently guaranteed/i);
+    expect(r.message).toMatch(/delivery is currently down/i);
+    expect(r.alert_status?.headline).toBe('system_delivery_failure');
   });
 
   it('delete without confirm is rejected', async () => {
@@ -265,5 +291,101 @@ describe('schedule_market_search MCP tool', () => {
     const deleteBlock = server.slice(server.indexOf("'delete_market_schedule'"));
     expect(deleteBlock.slice(0, 700)).toContain('destructiveHint: true');
     expect(deleteBlock.slice(0, 700)).toContain('z.literal(true)');
+  });
+
+  describe('alert-health status for the 2026-10-05 Marine Corps WOSB 541611 watches', () => {
+    // Exact production state when the watches were saved (2026-10-05 23:20 UTC): every run since
+    // 2026-09-30 reported `error` because three suppressed internal addresses were rejected and one
+    // other customer's search threw — while the same runs delivered ~46-48 alerts a day.
+    const partialProd: SavedSearchDeliveryReadiness = {
+      ...deliveryReady,
+      last_run_at: '2026-10-05T11:00:29Z',
+      last_run_status: 'error',
+      last_clean_run_at: '2026-09-29T11:00:28Z',
+      last_alert_sent_at: '2026-10-05T11:01:41Z',
+      latest_run_started_at: '2026-10-05T11:00:29Z',
+      latest_run_in_window: true,
+      latest_run_failures: 'unexpected_schedule_error=1,email_send_rejected=3',
+      latest_run_alerts_sent: 48,
+      execution_health: 'partial_failure',
+      delivery_state: 'delivery_partial',
+      system_status: 'partial_degradation',
+      delivery_ready: true,
+    };
+    const marineWatch = {
+      id: 'ce296369-625f-4c20-a9dc-29aa3c43e879',
+      user_email: 'customer@example.com',
+      name: 'Marine Corps WOSB 541611',
+      mode: 'open' as const,
+      filters: { naics: '541611', setAside: 'WOSB', subAgency: 'Marine Corps' },
+      bbox: null,
+      alerts_enabled: true,
+      alert_frequency: 'daily' as const,
+      last_alerted_at: null,
+      last_seen_notice_ids: [],
+      total_alerts_sent: 0,
+      created_at: '2026-10-05T23:20:18Z',
+      updated_at: '2026-10-05T23:20:18Z',
+    };
+
+    it('a partially failed job with successful deliveries never reports "no successful sends since Sept 29"', async () => {
+      mockDelivery.mockResolvedValue(partialProd);
+      mockReach.mockResolvedValue('matched_historically');
+      mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
+
+      const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
+
+      expect(r._meta.schedule_saved).toBe(true);
+      expect(r._meta.degraded).toBe(false);
+      expect(r._meta.delivery_ready).toBe(true);
+      expect(r._meta.system_delivery_status).toBe('partial_degradation');
+      expect(r._meta.delivery_last_alert_sent_at).toBe('2026-10-05T11:01:41Z');
+      // the job-run time stays available, under a name that cannot be read as an email send
+      expect(r._meta.delivery_last_clean_run_at).toBe('2026-09-29T11:00:28Z');
+      expect(r._meta).not.toHaveProperty('delivery_last_success_at');
+      expect(r.alert_status?.headline).toBe('delivery_not_yet_tested');
+      expect(r.alert_status?.search_delivery).toBe('not_yet_tested');
+      expect(r.alert_status?.baseline).toBe('pending');
+      expect(r.message).not.toMatch(/2026-09-29|Sept|September|unreliable|not currently guaranteed|degraded/i);
+      expect(r.message).toMatch(/delivery not yet tested/i);
+      expect(r.message).toMatch(/alert delivery is working/i);
+      expect(r.message).not.toMatch(/will be emailed|will email/i);
+    });
+
+    it('still warns when the same partial run comes with THIS recipient suppressed', async () => {
+      mockDelivery.mockResolvedValue(partialProd);
+      mockRecipient.mockResolvedValue({ suppressed: 'hard_bounce', lastAlertAt: null });
+      mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
+
+      const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
+      expect(r._meta.degraded).toBe(true);
+      expect(r.alert_status?.headline).toBe('search_delivery_blocked');
+      expect(r.message).toMatch(/cannot be delivered.*hard_bounce/i);
+    });
+
+    it('flags filters that have never matched instead of calling the watch healthy', async () => {
+      mockDelivery.mockResolvedValue(partialProd);
+      mockReach.mockResolvedValue('never_matched');
+      mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
+
+      const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
+      expect(r.alert_status?.filter_reach).toBe('never_matched');
+      expect(r.alert_status?.headline).toBe('search_never_matches');
+      expect(r.message).toMatch(/never matched/i);
+    });
+
+    it('list reports each watch on its own evidence, reading recipient evidence once', async () => {
+      mockDelivery.mockResolvedValue(partialProd);
+      mockReach.mockResolvedValueOnce('never_matched').mockResolvedValueOnce('matched_historically');
+      mockList.mockResolvedValue({
+        ok: true,
+        data: { searches: [marineWatch, { ...marineWatch, id: 'dai', name: 'DAI follow-on', filters: { q: 'DAI', naics: '541611', setAside: 'WOSB' } }] },
+      } as never);
+
+      const r = await listMarketSchedules({ userEmail: 'customer@example.com' });
+      expect(mockRecipient).toHaveBeenCalledTimes(1);
+      expect(r.schedules.map((x) => x.alert_status?.headline)).toEqual(['search_never_matches', 'delivery_not_yet_tested']);
+      expect(r._meta.system_delivery_status).toBe('partial_degradation');
+    });
   });
 });
