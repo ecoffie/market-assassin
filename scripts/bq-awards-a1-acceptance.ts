@@ -49,6 +49,7 @@ import {
 } from '../src/lib/awards-ingest/a1-acceptance';
 import { allowedRemainingShortCode, intentionallyRemovedInWindow, preservationExclusions } from '../src/lib/awards-ingest/a1b-cleanup';
 import type { AcceptanceAllowances } from '../src/lib/awards-ingest/a1-acceptance';
+import { sourceTxnCount } from '../src/lib/awards-ingest/source-counts';
 import {
   buildCohortMonthlyCountsSql,
   classifyCohortCompleteness,
@@ -112,16 +113,10 @@ async function usas<T>(path: string, body: unknown): Promise<T> {
   throw new Error(`USASpending ${path} failed`);
 }
 
-const monthEnd = (m: string) => { const [y, mm] = m.split('-').map(Number); return new Date(Date.UTC(y, mm, 0)).toISOString().slice(0, 10); };
 const DOD = [{ type: 'awarding', tier: 'toptier', name: 'Department of Defense' }];
 
-/** Contracts + IDV transactions by action_date month (the same grain the warehouse holds). */
-async function sourceTxnCount(month: string, dodOnly: boolean): Promise<number> {
-  const filters: Record<string, unknown> = { time_period: [{ start_date: `${month}-01`, end_date: monthEnd(month), date_type: 'action_date' }] };
-  if (dodOnly) filters.agencies = DOD;
-  const r = await usas<{ results: { contracts: number; idvs: number } }>('spending_by_transaction_count', { filters });
-  return Number(r.results.contracts) + Number(r.results.idvs);
-}
+// Contracts + IDV transactions by action_date month: the shared implementation in
+// src/lib/awards-ingest/source-counts.ts (the production completeness gate uses the same one).
 
 async function sourceLockheed(): Promise<number | null> {
   let total = 0; let found = false;
