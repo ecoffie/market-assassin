@@ -38,6 +38,21 @@ All three ask the same bbox and the same filters. The opportunity horizons join 
 
 - **Unit tests:** red on main and green on the branch.
 - **In-browser patched production page (same 4 edits):** Players went from 3 pairs to 1. This harness renders a zero-size map, so it proves counts only.
-- **Pending:** preview/production acceptance of all 7 scenarios, including that auto-fit still fires.
+- **Preview (`bc2f742e`, anonymous):** Open +300 ms round and failsafe round gone; filter keeps boot + auto-fit pinsOnly; deep link = 1 round.
+
+## Production acceptance — merge `6e981699` (PR #1829), signed in, 2026-10-04 — ✅ PRODUCTION PROVEN
+
+Served page: `if(_bootReleased)return;` ×1 · `moveStartsRound=moveStartsRound` ×1 · `setTimeout(fetchView,300)` ×0.
+
+| Scenario | Before | After |
+|---|---|---|
+| Players `?mode=companies` | 3 × (companies+buyers) | **1 × (companies+buyers)**, 588 pins drawn, list renders |
+| Default load | B1 withCounts (+ extra rounds, no requests) | B1 withCounts, 1 round |
+| `?mode=recompete` | B1 + 3 no-request rounds | B1, 1 round |
+| `?mode=forecast` | B1 + 3 no-request rounds | B1, 1 round |
+| `?opp=` deep link | B1 + 3 no-request rounds | B1, 1 round, record opens |
+| `?state=VA&naics=541512` (from a wide view) | B1 withCounts · B2 pinsOnly (auto-fit) | B1 withCounts · B2 pinsOnly (auto-fit) — unchanged |
+
+The boot's pre-release navigate moveend now traces `skip:true`. Auto-fit is still the one place a settled round moves the map.
 
 Not in scope: the cross-state Coming Back location residual. `PLAYERS_REBUILD_AFTER_INGEST` stays off.
