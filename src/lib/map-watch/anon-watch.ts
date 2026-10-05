@@ -28,7 +28,7 @@
  * email is attached, which is also the moment the watch becomes a habit loop.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { valueShapeError } from '@/lib/saved-searches/validate-filters';
+import { valueShapeError, savedSearchNaicsError } from '@/lib/saved-searches/validate-filters';
 
 /** `anon:` + a uuid, as emitted by the map's telemetry identity. */
 const ANON_RE = /^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -189,7 +189,8 @@ export function checkWatchPayload(
   // immediately, and claimAnonWatch turns an anon row into an alerting one without re-reading it — so the
   // check belongs here, at the only insert. (2026-10-01: `sapBuyer: true` broke a search for 4 days.)
   if (filters != null) {
-    const valueErr = valueShapeError(filters as Record<string, unknown>);
+    const valueErr = valueShapeError(filters as Record<string, unknown>)
+      ?? savedSearchNaicsError(filters as Record<string, unknown>);
     if (valueErr) return { ok: false, error: valueErr };
   }
   if (bbox != null && (typeof bbox !== 'object' || Array.isArray(bbox))) {

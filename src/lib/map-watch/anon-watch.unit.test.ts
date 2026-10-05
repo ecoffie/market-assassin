@@ -142,6 +142,12 @@ describe('checkWatchPayload — stored values must be readable by the alert cron
     expect(r.error).toMatch(/Invalid sapBuyer value/);
   });
 
+  it('rejects an unknown NAICS (541510) on the Map watch path too', () => {
+    const r = checkWatchPayload({ naics: '541510' }, null, null);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/Unknown NAICS code "541510"/);
+  });
+
   it('rejects non-string q / status', () => {
     expect(checkWatchPayload({ q: ['cyber'] }, null, null).ok).toBe(false);
     expect(checkWatchPayload({ naics: '541512', status: true }, null, null).ok).toBe(false);

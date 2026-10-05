@@ -16,6 +16,8 @@ const state = {
   open: [] as Row[],
   updates: [] as Array<{ id: unknown; payload: Row }>,
   sends: [] as Array<{ to: string; subject: string }>,
+  /** When set, the fake send guard BLOCKS with this reason (sendEmail's onBlocked contract) and returns false. */
+  blockReason: null as string | null,
 };
 
 function builder(table: string) {
@@ -60,9 +62,16 @@ function builder(table: string) {
 }
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (t: string) => builder(t) }) }));
-vi.mock('@/lib/cron-self-report', () => ({ reportCronOutcome: vi.fn(async () => {}) }));
+const reported: Array<{ job: string; outcome: string; summary?: string }> = [];
+vi.mock('@/lib/cron-self-report', () => ({
+  // The exact (job, outcome, errorSummary) the dispatcher-watchdog later reads from cron_job_runs.
+  reportCronOutcome: vi.fn(async (job: string, outcome: string, summary?: string) => { reported.push({ job, outcome, summary }); }),
+}));
 vi.mock('@/lib/send-email', () => ({
-  sendEmail: vi.fn(async (m: { to: string; subject: string }) => { state.sends.push(m); return true; }),
+  sendEmail: vi.fn(async (m: { to: string; subject: string; onBlocked?: (r: string) => void }) => {
+    if (state.blockReason) { m.onBlocked?.(state.blockReason); return false; }
+    state.sends.push(m); return true;
+  }),
 }));
 
 const { GET } = await import('./route');
@@ -73,19 +82,21 @@ const VALID_ID = '4651ee1d-0000-4000-8000-000000000001';
 beforeEach(() => {
   state.updates = [];
   state.sends = [];
+  state.blockReason = null;
+  reported.length = 0;
   state.open = [
-    { notice_id: 'N-NEW-1', title: 'IT services', department: 'DEPT OF X', naics_code: '541510', posted_date: '2026-10-04T00:00:00Z' },
+    { notice_id: 'N-NEW-1', title: 'IT services', department: 'DEPT OF X', naics_code: '541511', posted_date: '2026-10-04T00:00:00Z' },
   ];
   state.searches = [
     // Oldest-due first (never alerted) → evaluated BEFORE the valid search.
     {
       id: MALFORMED_ID, user_email: 'customer@example.com', name: 'Micro-purchase / SAP', mode: 'open',
-      filters: { naics: '541510', sapBuyer: true }, alert_frequency: 'daily',
+      filters: { naics: '541511', sapBuyer: true }, alert_frequency: 'daily',
       last_seen_notice_ids: [], total_alerts_sent: 0, last_alerted_at: null,
     },
     {
       id: VALID_ID, user_email: 'customer@example.com', name: 'Small Business', mode: 'open',
-      filters: { naics: '541510' }, alert_frequency: 'daily',
+      filters: { naics: '541511' }, alert_frequency: 'daily',
       last_seen_notice_ids: ['N-OLD'], total_alerts_sent: 0, last_alerted_at: '2026-10-03T11:00:00Z',
     },
   ];
@@ -110,5 +121,56 @@ describe('saved-search-alerts — one malformed stored search', () => {
 
     // Nothing written to the malformed search: no baseline, no last_alerted_at — its missed interval is preserved.
     expect(state.updates.find((u) => u.id === MALFORMED_ID)).toBeUndefined();
+  });
+});
+
+const dispatch = () => GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+const validOnly = () => { state.searches = state.searches.filter((r) => r.id === VALID_ID); };
+
+describe('send-guard blocks are classified by REASON, not collapsed into one "rejected"', () => {
+  it('confirmed suppression → recipient_suppressed (the non-outage class), nothing stamped', async () => {
+    validOnly();
+    state.blockReason = 'suppressed:hard_bounce';
+    const body = await (await dispatch()).json();
+    expect(body.failuresByClass).toEqual({ recipient_suppressed: 1 });
+    expect(reported).toEqual([{ job: 'saved-search-alerts', outcome: 'error', summary: 'recipient_suppressed=1' }]);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it('suppression LOOKUP error → suppression_lookup_failed (a processing failure), never "suppressed"', async () => {
+    validOnly();
+    state.blockReason = 'suppression_check_failed';
+    const body = await (await dispatch()).json();
+    expect(body.failuresByClass).toEqual({ suppression_lookup_failed: 1 });
+    expect(reported[0].summary).toBe('suppression_lookup_failed=1');
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it('synthetic address → invalid_recipient_address; a block with no reason keeps email_send_rejected', async () => {
+    validOnly();
+    state.blockReason = 'synthetic_client_address';
+    expect((await (await dispatch()).json()).failuresByClass).toEqual({ invalid_recipient_address: 1 });
+    state.blockReason = 'some_future_reason';
+    expect((await (await dispatch()).json()).failuresByClass).toEqual({ email_send_rejected: 1 });
+  });
+});
+
+describe('stored NAICS validity is surfaced, never silently tolerated or rewritten', () => {
+  it('every stored code unknown → invalid_saved_naics by id, nothing written (no silent zero-match "success")', async () => {
+    state.searches = [{ ...state.searches[1], id: 'ALL-BAD', filters: { naics: '541510' } }];
+    const body = await (await dispatch()).json();
+    expect(body.failuresByClass).toEqual({ invalid_saved_naics: 1 });
+    expect(body.failedSearches).toEqual([{ id: 'ALL-BAD', failureClass: 'invalid_saved_naics' }]);
+    expect(body.invalidNaicsSearches).toEqual([{ id: 'ALL-BAD', codes: ['541510'] }]);
+    expect(state.updates).toHaveLength(0);
+    expect(state.sends).toHaveLength(0);
+  });
+
+  it('mixed codes → still evaluates AS STORED (valid code matches, unknown code not dropped) and is reported', async () => {
+    state.searches = [{ ...state.searches[1], id: 'MIXED', filters: { naics: '541511,541510' } }];
+    const body = await (await dispatch()).json();
+    expect(body.sent).toBe(1);
+    expect(body.failuresByClass).toEqual({});
+    expect(body.invalidNaicsSearches).toEqual([{ id: 'MIXED', codes: ['541510'] }]);
   });
 });

@@ -83,7 +83,7 @@ describe('saved-search filter value shapes (write-time ⇔ cron read-time contra
 
   it('accepts real sapBuyer tiers and an empty value', () => {
     for (const v of ['most', 'somewhat', 'vehicle', '']) {
-      expect(validateSavedSearchFilters({ naics: '541510', sapBuyer: v }).ok).toBe(true);
+      expect(validateSavedSearchFilters({ naics: '541511', sapBuyer: v }).ok).toBe(true);
     }
   });
 
@@ -101,7 +101,7 @@ describe('saved-search filter value shapes (write-time ⇔ cron read-time contra
     { naics: '236220', fullOpen: true, strategy: ['repeat_buyer', 'sb_friendly'] },
     { state: ['RI', 'MA'], strategy: [] , horizons: { open: true, forecast: true } },
     { scope: 'profile', hasDocs: 'true', closingDays: 14, postedDays: '30' },
-    { naics: '541510', sapBuyer: 'most', status: 'active', country: 'usa' },
+    { naics: '541511', sapBuyer: 'most', status: 'active', country: 'usa' },
   ];
 
   it.each(ACCEPTED_SHAPES)('every accepted shape evaluates in the alert cron parser: %j', async (raw) => {
@@ -116,5 +116,37 @@ describe('saved-search filter value shapes (write-time ⇔ cron read-time contra
     // Same getter the cron uses (saved-search-alerts/route.ts evaluateSavedSearch).
     const f = parseMapFilters((k) => saved[k] ?? null, { profileNaics: ['541512'], profileStates: [] });
     expect(() => applyMapFilters(stub, f)).not.toThrow();
+  });
+});
+
+describe('saved-search NAICS validity at save (Census 2022, same rule as profile NAICS)', () => {
+  it('rejects the stored incident code 541510 without proposing a replacement', () => {
+    const res = validateSavedSearchFilters({ naics: '541510' });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toMatch(/Unknown NAICS code "541510"/);
+      expect(res.error).toMatch(/do not substitute/);
+      expect(res.error).not.toMatch(/54151[1-9]/);
+    }
+  });
+  it('rejects a list containing any unknown code (array and comma forms)', () => {
+    expect(validateSavedSearchFilters({ naics: '541512,541510' }).ok).toBe(false);
+    expect(validateSavedSearchFilters({ naics: ['541512', '999999'] }).ok).toBe(false);
+  });
+  it('accepts real codes and real family prefixes', () => {
+    for (const naics of ['541512', '54151', '5415', '541', ['541511', '541519'], '236220,238220']) {
+      expect(validateSavedSearchFilters({ naics }).ok).toBe(true);
+    }
+  });
+});
+
+describe('list-valued multi-selects count as narrowing (they were rejected as "entire market")', () => {
+  it('accepts array-only naics / state', () => {
+    expect(validateSavedSearchFilters({ naics: ['541511', '541519'] }).ok).toBe(true);
+    expect(validateSavedSearchFilters({ state: ['FL', 'GA'] }).ok).toBe(true);
+  });
+  it('still rejects empty or blank lists', () => {
+    expect(validateSavedSearchFilters({ naics: [] }).ok).toBe(false);
+    expect(validateSavedSearchFilters({ state: [' '] }).ok).toBe(false);
   });
 });

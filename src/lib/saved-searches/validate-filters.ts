@@ -1,5 +1,6 @@
 import { STRATEGY_STRAND_KEYS } from '@/lib/opportunities/map-filters';
 import type { SavedSearchFilters } from './types';
+import { storedNaicsValidity } from './stored-naics';
 
 const TRUTHY_STRINGS = new Set(['1', 'true', 'yes']);
 
@@ -92,6 +93,12 @@ function asTrimmedString(v: unknown): string {
   return '';
 }
 
+/** A narrowing value: a non-blank string, or a list holding at least one non-blank string (multi-selects). */
+function hasValue(v: unknown): boolean {
+  if (Array.isArray(v)) return v.some((x) => asTrimmedString(x) !== '');
+  return asTrimmedString(v) !== '';
+}
+
 function isTruthyFlag(v: unknown): boolean {
   if (v === true) return true;
   const s = asTrimmedString(v).toLowerCase();
@@ -132,13 +139,13 @@ export function savedSearchHasNarrowingFilter(filters: SavedSearchFilters): bool
   if (!filters || typeof filters !== 'object' || Array.isArray(filters)) return false;
 
   if (asTrimmedString(filters.q)) return true;
-  if (asTrimmedString(filters.naics)) return true;
-  if (asTrimmedString(filters.agency)) return true;
-  if (asTrimmedString(filters.subAgency)) return true;
-  if (asTrimmedString(filters.state)) return true;
-  if (asTrimmedString(filters.psc)) return true;
-  if (asTrimmedString(filters.setAside)) return true;
-  if (asTrimmedString(filters.noticeType)) return true;
+  if (hasValue(filters.naics)) return true;
+  if (hasValue(filters.agency)) return true;
+  if (hasValue(filters.subAgency)) return true;
+  if (hasValue(filters.state)) return true;
+  if (hasValue(filters.psc)) return true;
+  if (hasValue(filters.setAside)) return true;
+  if (hasValue(filters.noticeType)) return true;
   if (asTrimmedString(filters.country)) return true;
   if (asTrimmedString(filters.sapBuyer)) return true;
   if (isTruthyFlag(filters.fullOpen)) return true;
@@ -155,6 +162,18 @@ export function savedSearchHasNarrowingFilter(filters: SavedSearchFilters): bool
   if (status && status !== 'active') return true;
 
   return false;
+}
+
+/**
+ * Unknown NAICS (not Census 2022) are rejected at save. `541510` was saved twice on 2026-10-01 and matched
+ * nothing every day while the tool reported success. Same rule as profile NAICS (validate-market-codes):
+ * 6-digit must exist, 2–5 digit prefixes must prefix a real code. The message never proposes a replacement
+ * code — choosing one is the user's decision, not the validator's.
+ */
+export function savedSearchNaicsError(filters: Record<string, unknown>): string | null {
+  const { invalid } = storedNaicsValidity(filters);
+  if (!invalid.length) return null;
+  return `Unknown NAICS code${invalid.length > 1 ? 's' : ''} ${invalid.map((c) => `"${c}"`).join(', ')} — not a Census 2022 NAICS code or prefix. Confirm the intended code with the user; do not substitute one.`;
 }
 
 export type ValidateFiltersResult =
@@ -191,6 +210,8 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
   if (shapeErr) {
     return { ok: false, error: `${shapeErr} Do not coerce or drop the filter and save a broader watch — ask the user to adjust.` };
   }
+  const naicsErr = savedSearchNaicsError(rawObj);
+  if (naicsErr) return { ok: false, error: naicsErr };
 
   const filters: SavedSearchFilters = { ...(raw as SavedSearchFilters) };
 
