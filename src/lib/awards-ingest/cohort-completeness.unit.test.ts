@@ -134,12 +134,15 @@ describe('ingest window — anchored on the laggard cohort, not only the global 
 });
 
 describe('MERGE retains IDV vehicle identity (additive, schema-gated)', () => {
-  const base = { awardsTable: '`market-assasin.usaspending.awards`', stagingFq: 'market-assasin.usaspending.awards_ingest_staging', startDate: '2026-06-07' };
+  const base = { awardsTable: '`market-assasin.usaspending.awards`', stagingFq: 'market-assasin.usaspending.awards_ingest_staging', identity: { kind: 'located', fiscalYears: [2026] } as const };
 
   it('GOLDEN: without the DDL the MERGE is byte-identical to the pre-#1658 statement (origin/main 45e3cfba)', () => {
     // Generated from origin/main's merge-sql.ts (unchanged since #1396) with these exact inputs —
     // the statement the scheduled weekly ingest runs today against the 51-column table.
-    const golden = readFileSync(join(__dirname, '__fixtures__', 'merge-sql-pre-1658.golden.sql'), 'utf8');
+    // Byte-identical except the identity line (A1, 2026-10-04: the date bound duplicated re-dated txns).
+    const golden = readFileSync(join(__dirname, '__fixtures__', 'merge-sql-pre-1658.golden.sql'), 'utf8')
+      .replace(/ON T\.txn_id = S\.txn_id AND T\.action_date >= DATE_SUB\(DATE\('2026-06-07'\), INTERVAL 2 DAY\)/, 'ON T.txn_id = S.txn_id AND T.fiscal_year IN (2026)');
+    expect(golden).not.toContain('T.action_date >=');
     expect(buildAwardsMergeSql(base)).toBe(golden);
     expect(buildAwardsMergeSql({ ...base, idvIdentityColumns: false })).toBe(golden);
   });
@@ -158,8 +161,9 @@ describe('MERGE retains IDV vehicle identity (additive, schema-gated)', () => {
       expect(sql).toContain(`${c.target}=S.${c.target}`);
       expect(sql).toContain(`, S.${c.target}`);
     }
-    // Same MERGE key + partition bound as before.
-    expect(sql).toContain(`ON T.txn_id = S.txn_id AND T.action_date >= DATE_SUB(DATE('2026-06-07'), INTERVAL 2 DAY)`);
+    // Identity = txn_id within the located fiscal_year partitions (never a source-mutable date).
+    expect(sql).toContain('ON T.txn_id = S.txn_id AND T.fiscal_year IN (2026)');
+    expect(sql).not.toContain('T.action_date >=');
   });
 
   it('schema gate: none → absent, all → present, partial → refuses', () => {

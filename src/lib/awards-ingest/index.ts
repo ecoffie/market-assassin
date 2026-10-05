@@ -5,6 +5,7 @@ export * from './cohort-completeness';
 export * from './csv-first-record';
 export * from './csv-validate';
 export * from './ingest-window';
+export * from './job-bytes';
 export * from './merge-sql';
 export * from './pipeline';
 export * from './post-apply-verify';

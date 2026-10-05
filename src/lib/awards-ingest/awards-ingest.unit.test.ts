@@ -270,7 +270,7 @@ describe('staging schema (deterministic STRING landing)', () => {
     const sql = buildAwardsMergeSql({
       awardsTable: '`market-assasin.usaspending.awards`',
       stagingFq: 'market-assasin.usaspending.awards_ingest_staging',
-      startDate: '2026-05-03',
+      identity: { kind: 'located', fiscalYears: [2026] },
     });
     expect(sql).toMatch(/SAFE_CAST\(action_date AS DATE\)/);
     expect(sql).toMatch(/SAFE_CAST\(federal_action_obligation AS FLOAT64\)/);
