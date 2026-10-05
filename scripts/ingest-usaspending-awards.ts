@@ -56,6 +56,10 @@ import {
   buildMergeLocateSql,
   planMergeIdentity,
   type MergeLocateRow,
+  formatJobBytes,
+  mergeJobIds,
+  parseChildJobIds,
+  parseJobBytes,
   classifyMembers,
   DOD_AWARDING_AGENCY_CODE,
   IDV_IDENTITY_COLUMNS,
@@ -331,14 +335,32 @@ async function main() {
     // MERGE back if any staged key ends with more rows than it started with. We run it via the
     // `bq query` CLI (like the load) — the app's bqQuery helper is cost-capped for READ safety.
     log('locating staged transaction keys in awards (txn_id → fiscal_year partitions)…');
+    // Our own job ids, so the measured bytes (locate / MERGE / ASSERT) can be read back and compared
+    // with the dry-run estimates. Reporting never fails the run.
+    const jobIds = mergeJobIds(new Date(), process.env.GITHUB_RUN_ID || Math.random().toString(36).slice(2, 10));
+    const reportBytes = (scriptRan: boolean) => {
+      const show = (id: string) => parseJobBytes(execFileSync('bq',
+        ['--project_id=' + PROJECT, '--location=US', 'show', '--format=json', '-j', id],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+      try { log(formatJobBytes('locate', show(jobIds.locate))); } catch (e) { log(`[bytes] locate unmeasured: ${e instanceof Error ? e.message.split('\n')[0] : e}`); }
+      if (!scriptRan) return;
+      try {
+        log(formatJobBytes('merge-script', show(jobIds.script)));
+        const children = parseChildJobIds(execFileSync('bq',
+          ['--project_id=' + PROJECT, '--location=US', 'ls', '-j', `--parent_job_id=${jobIds.script}`, '-n', '20', '--format=json'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+        for (const id of children.reverse()) log(formatJobBytes('  statement', show(id)));
+      } catch (e) { log(`[bytes] merge-script unmeasured: ${e instanceof Error ? e.message.split('\n')[0] : e}`); }
+    };
     let mergePlan;
     try {
-      const out = execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql', '--format=json'],
+      const out = execFileSync('bq', ['--project_id=' + PROJECT, `--job_id=${jobIds.locate}`, 'query', '--nouse_legacy_sql', '--format=json'],
         { input: buildMergeLocateSql({ awardsTable: BQ_TABLES.awards, stagingFq }), encoding: 'utf8', stdio: ['pipe', 'pipe', 'inherit'] });
       const rows = JSON.parse(out) as MergeLocateRow[];
       if (rows.length !== 1) throw new Error(`locate returned ${rows.length} rows, expected 1`);
       mergePlan = planMergeIdentity(rows[0]);
     } catch (error) {
+      reportBytes(false);
       const outcome = pipelineOutcome({ lastCompleted: 'staging_load', failedAt: 'merge' });
       throw new Error(`${outcome.status}: MERGE refused at the identity locate step`, { cause: error });
     }
@@ -355,12 +377,16 @@ async function main() {
       idvIdentityColumns: writeIdvIdentity,
     });
     try {
-      execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql'],
+      execFileSync('bq', ['--project_id=' + PROJECT, `--job_id=${jobIds.script}`, 'query', '--nouse_legacy_sql'],
         { input: mergeSql, stdio: ['pipe', 'inherit', 'inherit'] });
     } catch (error) {
+      // An ASSERT failure lands here: BigQuery rolled the MERGE back. That is the guard working —
+      // never retry around it or bypass it.
+      reportBytes(true);
       const outcome = pipelineOutcome({ lastCompleted: 'staging_load', failedAt: 'merge' });
-      throw new Error(`${outcome.status}: MERGE failed`, { cause: error });
+      throw new Error(`${outcome.status}: MERGE failed or its identity ASSERT rolled it back (nothing merged)`, { cause: error });
     }
+    reportBytes(true);
     const mergedAt = new Date().toISOString();
 
     const after = await currentWatermark();

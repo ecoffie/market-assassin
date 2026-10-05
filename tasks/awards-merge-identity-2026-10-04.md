@@ -81,3 +81,33 @@ shared scenarios; the current code passes **13/13**. The awards-ingest suite is 
 - Existing 140 duplicate pairs: untouched.
 - Cross-state Coming Back location rows: unrelated.
 - `PLAYERS_REBUILD_AFTER_INGEST` stays off.
+
+---
+
+## First-production-run acceptance (approved by Eric 2026-10-04, PR #1831)
+
+**First execution = the next normal scheduled ingest: Sun 2026-10-11, cron `0 14 * * 0`.**
+- Today's 14:00 UTC slot was skipped by the A1 maintenance pause.
+- No manual dispatch to exercise it.
+
+**Frozen duplicate baseline (live, read-only, measured 2026-10-04 after A1b):**
+- **140 duplicated txn_ids · 140 excess rows** (280 rows)
+- 21 of them span two fiscal years
+- all 140 touch FY2026
+- `awards` = 66,322,795 rows
+
+The 140 pairs are NOT cleaned by this PR.
+
+| # | Requirement | Where it shows |
+|---|---|---|
+| 1 | locate succeeds | log `MERGE identity: txn_id within fiscal_year [...]` |
+| 2 | staging keys unique | `planMergeIdentity` refuses otherwise (`staging holds N rows for M transaction keys`) |
+| 3 | planned FY partitions recorded | the same log line names the FYs, staged keys, already-present keys and expected rows |
+| 4 | MERGE transactional | `BEGIN TRANSACTION … COMMIT TRANSACTION`; `[bytes]` child statements BEGIN_TRANSACTION / MERGE / ASSERT / COMMIT_TRANSACTION |
+| 5 | whole-table ASSERT passes | a script job in state DONE with no error. **An ASSERT failure = rollback = the guard working. Do not bypass or retry around it.** |
+| 6 | recipients rebuild succeeds | `rebuilding recipients…` then no `failed_after_merge`/`rebuild_recipients` error |
+| 7 | freshness/coverage published only afterwards | the clock stamp runs after the rebuild (unchanged order); `post-apply verify` step |
+| 8 | duplicate txn_id count ≤ 140 | read-only: `SELECT COUNT(*) FROM (SELECT txn_id FROM awards GROUP BY txn_id HAVING COUNT(*)>1)` |
+| 9 | no new re-dated duplicate | any duplicate not in the frozen 140 must be investigated. Expected: none. |
+| 10 | settled cohort completeness healthy | the workflow's post-apply verify / `cohort completeness` line |
+| 11 | measured cost recorded | `[bytes] locate …`, `[bytes] merge-script …` and the per-statement lines. Compare with the dry run: locate 3.14 GiB · MERGE 3.86 GiB per FY · ASSERT 2.64 GiB |
