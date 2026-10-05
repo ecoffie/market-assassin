@@ -8,9 +8,10 @@ import { join } from 'node:path';
 import { LAYOUT_MOVE_PURE_JS } from './layout-move';
 
 // eslint-disable-next-line @typescript-eslint/no-implied-eval
-const pure = new Function(LAYOUT_MOVE_PURE_JS + '; return { mapMoveKind, layoutMoveNeedsFetch };')() as {
+const pure = new Function(LAYOUT_MOVE_PURE_JS + '; return { mapMoveKind, layoutMoveNeedsFetch, moveStartsRound };')() as {
   mapMoveKind: (p: unknown, n: unknown) => 'layout' | 'navigate';
   layoutMoveNeedsFetch: (released: boolean, requested: number[] | null, view: number[]) => boolean;
+  moveStartsRound: (released: boolean, kind: 'layout' | 'navigate', layoutExposed: boolean) => boolean;
 };
 const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 const templateSrc = readFileSync(join(__dirname, 'template.html'), 'utf8');
@@ -85,5 +86,38 @@ describe('auto-fit waits for the round to settle (#1696 second boot trigger)', (
     const settledAt = p.indexOf('if(!settled)return;');
     expect(settledAt).toBeGreaterThan(-1);
     expect(p.indexOf('maybeAutoFit();', settledAt)).toBeGreaterThan(settledAt);
+  });
+});
+
+// C (2026-10-04) — production __mapBootTrace, ?mode=companies, one clean load: contacts-map was asked the
+// SAME query (same bbox, same type, counts) three times — release round, +600 ms, +4.9 s. The opportunity
+// horizons hid the same three triggers behind join/cache (no request), so only Players paid for them.
+describe('one discovery round per boot — no automatic re-ask of the release query (C)', () => {
+  it('THE C CASE: boot placing its view fires a navigate moveend before release → no round', () => {
+    expect(pure.moveStartsRound(false, 'navigate', true)).toBe(false);
+    expect(pure.moveStartsRound(false, 'layout', true)).toBe(false);
+  });
+  it('after release, navigation always starts a round; layout only when it exposed area', () => {
+    expect(pure.moveStartsRound(true, 'navigate', false)).toBe(true);
+    expect(pure.moveStartsRound(true, 'layout', true)).toBe(true);
+    expect(pure.moveStartsRound(true, 'layout', false)).toBe(false);
+  });
+  it('the moveend handler consults moveStartsRound with the release state before scheduling', () => {
+    const h = routeSrc.slice(routeSrc.indexOf("map.on('moveend'"), routeSrc.indexOf("map.on('zoomend'"));
+    expect(h).toContain('window.__moveStartsRound(!window.__suppressFetchView, kind, true)');
+    expect(h.indexOf('window.__moveStartsRound(')).toBeLessThan(h.indexOf('if(skip)return;'));
+  });
+  it('no legacy untagged initial fetch — boot release owns round 1', () => {
+    expect(routeSrc).not.toMatch(/setTimeout\(\s*fetchView\s*,/);
+  });
+  it('the 4 s failsafe does nothing once boot has released', () => {
+    const i = routeSrc.indexOf('var _bootReleased=false;');
+    expect(i).toBeGreaterThan(-1);
+    const rf = routeSrc.slice(routeSrc.indexOf('function releaseFit(){'));
+    expect(rf.indexOf('_bootReleased=true;')).toBeGreaterThan(-1);
+    expect(rf.indexOf('_bootReleased=true;')).toBeLessThan(rf.indexOf('__suppressFetchView=false'));
+    const fs = routeSrc.slice(routeSrc.indexOf('},4000);') - 900, routeSrc.indexOf('},4000);'));
+    expect(fs).toContain('if(_bootReleased)return;');
+    expect(fs.indexOf('if(_bootReleased)return;')).toBeLessThan(fs.indexOf('__mapRefetch({system:true})'));
   });
 });

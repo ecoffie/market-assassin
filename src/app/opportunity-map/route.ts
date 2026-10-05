@@ -3563,6 +3563,8 @@ const VIEWPORT_JS = `<script>
         skip=!!window.__drawBounds || !window.__layoutMoveNeedsFetch(!window.__suppressFetchView, window.__lastRoundBox||null, _view);
       }catch(e){ skip=false; }
     }
+    // C (2026-10-04): a move before boot releases is boot placing its view — the release round reads it.
+    if(!skip&&window.__moveStartsRound&&!window.__moveStartsRound(!window.__suppressFetchView, kind, true))skip=true;
     try{ window.__btrace&&window.__btrace('moveend',{kind:kind,skip:skip,bbox:map.getBounds().toBBoxString(),z:map.getZoom(),size:map.getSize().x+'x'+map.getSize().y}); }catch(e){}
     if(skip)return;
     clearTimeout(t); t=setTimeout(function(){ fetchView({pan:true}); },450); });   // a pan/zoom — never acknowledged as an action (market-feedback.ts)
@@ -5437,7 +5439,10 @@ const VIEWPORT_JS = `<script>
     document.addEventListener('click',function(e){ if(mp.classList.contains('show')&&!e.target.closest('.mfwrap'))mp.classList.remove('show'); }); }
   // Panel header close button — dismiss without applying (the X, like Zillow's modal close).
   var _mfx=document.getElementById('mfClose'); if(_mfx&&mp)_mfx.onclick=function(e){ e.stopPropagation(); mp.classList.remove('show'); };
-  setTimeout(fetchView,300);
+  // (C, 2026-10-04) The pre-boot-view 300 ms timer that called fetchView is GONE: boot release owns
+  // round 1 on every path (map-home answered, anonymous boot, the 4 s failsafe). It ran as an untagged USER
+  // ACTION, so it superseded the release round and re-asked its exact query — absorbed by the horizon cache,
+  // but a full second contacts-map discovery on Players.
 })();
 </script>`;
 
@@ -9420,11 +9425,16 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // the catch-up resize fired a second full round. Sync first (the resulting moveend is a layout move before
   // release, which never fetches), then release: round 1 reads the settled view. Every release path
   // (map-home answered, anonymous boot, the 4 s failsafe) goes through here.
+  var _bootReleased=false;
   function releaseFit(){
+    _bootReleased=true;
     try{ if(typeof window.__mapSyncSize==='function')window.__mapSyncSize(); }catch(e){}
     try{ window.__btrace&&window.__btrace('boot-release',{bbox:(M()&&M().getBounds().toBBoxString())||''}); }catch(e){}
     window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
+    // A failsafe for a boot that never released. Once released, the round it would start is the release
+    // round's exact query again (C, 2026-10-04: a full second contacts-map discovery on Players).
+    if(_bootReleased)return;
     var m=M();
     if(m){
       var c=m.getCenter();
