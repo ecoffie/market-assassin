@@ -1,16 +1,20 @@
 /**
- * Prepaid (off-Stripe) monthly credit entitlements — a customer who paid for Pro outside
- * Stripe (invoice, Wave, wire) receives the Pro monthly allowance for a fixed run of
- * calendar months, then it stops. Table: mcp_prepaid_entitlements
+ * Prepaid (off-Stripe) monthly credit entitlements — a customer who PREPAID a fixed term of
+ * Pro outside Stripe (invoice, Wave, wire) receives the Pro monthly credit allowance for each
+ * calendar month of that term, then it stops. Every month is already paid for; the schedule
+ * only decides WHEN each month's allowance is released. Table: mcp_prepaid_entitlements
  * (supabase/migrations/20261005_mcp_prepaid_entitlements.sql).
  *
  * Granted by /api/cron/grant-mcp-pro-credits, which runs daily:
  *   • CURRENT month — the entitlement joins the normal audience (no-stacking resolver,
  *     Team-supersedes-Pro check) and is claimed under monthlyGrantKey(). A missed daily
  *     run inside the month is recovered by the next one.
- *   • PAST months still owed — catchUpPrepaidMonths() grants any month inside the window
- *     that has no claim at all (e.g. the job was down across a month boundary). Bounded by
- *     the window, so it can never grant past last_month or before first_month.
+ *   • PAST months whose grant was missed — catchUpPrepaidMonths() releases any month inside
+ *     the window that has no claim at all (e.g. the job was down across a month boundary),
+ *     but ONLY while access is live (today <= access_ends_on, America/New_York — the same
+ *     moment the KV access key expires). After access expires a missed grant is forfeited,
+ *     never recovered; it is reported as `forfeited`, not silently dropped (policy, Eric
+ *     2026-10-05).
  *
  * Every path claims pro:<email>:<YYYY-MM> through applyCreditOnce, so a retry, a catch-up
  * and a later Stripe Pro subscription all collide on the same key: at most one grant per
@@ -52,7 +56,7 @@ export function monthsInWindow(firstMonth: string, lastMonth: string): string[] 
   return out;
 }
 
-/** Months owed as of `currentMonth`: inside the window and not in the future. */
+/** Allowance months released by `currentMonth`: inside the window and not in the future. */
 export function dueMonths(ent: Pick<PrepaidEntitlement, 'firstMonth' | 'lastMonth'>, currentMonth: string): string[] {
   return monthsInWindow(ent.firstMonth, ent.lastMonth).filter((m) => m <= currentMonth);
 }
@@ -80,6 +84,16 @@ export function validatePrepaidSchedule(s: {
   const beyond = `${addMonths(s.lastMonth, 2)}-01`;
   if (!(end >= lowest && end < beyond)) errors.push(`access_ends_on ${end} must fall in the month after last_month (${addMonths(s.lastMonth, 1)})`);
   return errors;
+}
+
+/** The calendar date access is judged on — America/New_York, matching the KV expiry. */
+export function accessDate(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now);
+}
+
+/** Access is live through access_ends_on inclusive (the KV key expires at the end of that day). */
+export function accessIsLive(ent: Pick<PrepaidEntitlement, 'accessEndsOn'>, today: string): boolean {
+  return today <= ent.accessEndsOn;
 }
 
 /** Active rows whose window has begun (future-dated schedules are not loaded). */
@@ -131,17 +145,21 @@ export async function isMonthClaimed(email: string, month: string): Promise<bool
 export interface CatchUpResult {
   granted: { email: string; month: string; credits: number }[];
   alreadyClaimed: number;
+  /** Missed months found after access expired — not granted, by policy. */
+  forfeited: { email: string; month: string }[];
   errors: string[];
 }
 
 /**
- * Grant PAST months (strictly before currentMonth) that are inside an entitlement's window
- * and have no claim. The current month is deliberately excluded: it goes through the
- * route's normal resolver so the no-stacking rule decides it with every other source.
+ * Release PAST months (strictly before currentMonth) inside an entitlement's window that
+ * have no claim — only while access is live on `today`. The current month is deliberately
+ * excluded: it goes through the route's normal resolver so the no-stacking rule decides it
+ * with every other source.
  */
 export async function catchUpPrepaidMonths(
   entitlements: PrepaidEntitlement[],
   currentMonth: string,
+  today: string,
   deps: {
     isClaimed?: (email: string, month: string) => Promise<boolean>;
     grant?: (key: string, email: string, credits: number) => Promise<{ applied: boolean }>;
@@ -149,11 +167,13 @@ export async function catchUpPrepaidMonths(
 ): Promise<CatchUpResult> {
   const isClaimed = deps.isClaimed ?? isMonthClaimed;
   const grant = deps.grant ?? ((key, email, credits) => applyCreditOnce(key, email, credits, 'pro_monthly'));
-  const result: CatchUpResult = { granted: [], alreadyClaimed: 0, errors: [] };
+  const result: CatchUpResult = { granted: [], alreadyClaimed: 0, forfeited: [], errors: [] };
   for (const ent of entitlements) {
+    const live = accessIsLive(ent, today);
     for (const month of dueMonths(ent, currentMonth).filter((m) => m < currentMonth)) {
       try {
         if (await isClaimed(ent.userEmail, month)) { result.alreadyClaimed++; continue; }
+        if (!live) { result.forfeited.push({ email: ent.userEmail, month }); continue; }
         const { applied } = await grant(monthlyGrantKey(ent.userEmail, month), ent.userEmail, ent.monthlyCredits);
         if (applied) result.granted.push({ email: ent.userEmail, month, credits: ent.monthlyCredits });
         else result.alreadyClaimed++;

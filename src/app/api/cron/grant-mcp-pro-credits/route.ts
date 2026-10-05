@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
 import { activeSponsorEntitlements, topUpToCeiling } from '@/lib/mcp/sponsor-entitlements';
-import { listActivePrepaidEntitlements, catchUpPrepaidMonths, dueMonths, monthlyGrantKey, type PrepaidEntitlement } from '@/lib/mcp/prepaid-entitlements';
+import { listActivePrepaidEntitlements, catchUpPrepaidMonths, dueMonths, monthlyGrantKey, accessDate, accessIsLive, type PrepaidEntitlement } from '@/lib/mcp/prepaid-entitlements';
 import { collectCreditHealth, claimAlertOnce } from '@/lib/mcp/credit-health';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
@@ -155,8 +155,9 @@ async function buildTargets(month: string): Promise<{
   const { entitlements, error: sponsorError } = await activeSponsorEntitlements();
   for (const ent of entitlements) consider(ent.userEmail, ent.monthlyAllowance, 'sponsored', 'topup');
   // Prepaid (off-Stripe) Pro: same allowance semantics as a Pro subscription, dated. Only
-  // entitlements whose window covers THIS month join the audience; past months still owed
-  // are granted by catchUpPrepaidMonths() in the handler. The Team-supersedes-Pro check
+  // entitlements whose window covers THIS month (and whose access is live) join the
+  // audience; past months whose grant was missed are released by catchUpPrepaidMonths()
+  // in the handler, also only while access is live. The Team-supersedes-Pro check
   // applies exactly as it does to a Stripe Pro subscriber.
   const { entitlements: prepaidAll, error: prepaidError } = await listActivePrepaidEntitlements(month);
   const prepaid: PrepaidEntitlement[] = [];
@@ -164,7 +165,7 @@ async function buildTargets(month: string): Promise<{
     const d = await proAllowanceDecision(ent.userEmail);
     if (!d.grant) { proSuppressed.push({ email: ent.userEmail, reason: d.reason, detail: d.detail }); continue; }
     prepaid.push(ent);
-    if (dueMonths(ent, month).includes(month)) consider(ent.userEmail, ent.monthlyCredits, 'prepaid');
+    if (dueMonths(ent, month).includes(month) && accessIsLive(ent, accessDate())) consider(ent.userEmail, ent.monthlyCredits, 'prepaid');
   }
   return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError };
 }
@@ -243,8 +244,9 @@ export async function GET(request: NextRequest) {
 
   // ── Prepaid catch-up: months inside a prepaid window that NO path claimed (the job was
   // down across a month boundary). Each is claimed under the same monthly key, so a month
-  // granted here can never be granted again by this job, a retry, or a Stripe sub.
-  const prepaidCatchUp = await catchUpPrepaidMonths(prepaid, month);
+  // granted here can never be granted again by this job, a retry, or a Stripe sub. Only
+  // while access is live: after it expires a missed grant is forfeited (reported below).
+  const prepaidCatchUp = await catchUpPrepaidMonths(prepaid, month, accessDate(now));
   for (const g of prepaidCatchUp.granted) healed.push(`${g.email} (${g.month})`);
   errors.push(...prepaidCatchUp.errors);
 
@@ -278,7 +280,7 @@ export async function GET(request: NextRequest) {
     month, audience: targets.length, byGroup, granted, alreadyHad, subError, sponsorError,
     sponsoredSatisfied,
     prepaidError, prepaidEntitlements: prepaid.length,
-    prepaidCatchUp: { granted: prepaidCatchUp.granted, alreadyClaimed: prepaidCatchUp.alreadyClaimed },
+    prepaidCatchUp: { granted: prepaidCatchUp.granted, alreadyClaimed: prepaidCatchUp.alreadyClaimed, forfeited: prepaidCatchUp.forfeited },
     poolMode, poolError, pools: pools.length, poolsReplenished, poolsAlreadyFull, poolCreditsGranted,
     proSuppressed,
     errors: errors.slice(0, 10),

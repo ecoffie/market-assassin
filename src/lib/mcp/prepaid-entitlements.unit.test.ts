@@ -12,7 +12,7 @@ vi.mock('@/lib/supabase/server-clients', () => ({ getWriteClient: () => { throw 
 vi.mock('./credits', () => ({ applyCreditOnce: () => { throw new Error('use injected grant'); } }));
 
 import {
-  catchUpPrepaidMonths, dueMonths, monthlyGrantKey, monthsInWindow, scheduleFromAccessWindow,
+  accessDate, accessIsLive, catchUpPrepaidMonths, dueMonths, monthlyGrantKey, monthsInWindow, scheduleFromAccessWindow,
   validatePrepaidSchedule, type PrepaidEntitlement,
 } from './prepaid-entitlements';
 
@@ -37,9 +37,21 @@ describe('schedule derived from the access window', () => {
     const base = { ...SCHEDULE, accessStartsOn: ACCESS.accessStartsOn, monthlyCredits: 1500 };
     expect(validatePrepaidSchedule({ ...base, accessEndsOn: '2027-04-01' })).toEqual([]); // earliest valid
     expect(validatePrepaidSchedule({ ...base, accessEndsOn: '2027-04-30' })).toEqual([]); // latest valid
-    expect(validatePrepaidSchedule({ ...base, accessEndsOn: '2027-03-31' })).not.toEqual([]); // March unpaid tail
-    expect(validatePrepaidSchedule({ ...base, accessEndsOn: '2027-05-01' })).not.toEqual([]); // an unpaid April
+    expect(validatePrepaidSchedule({ ...base, accessEndsOn: '2027-03-31' })).not.toEqual([]); // access would end before March's allowance period does
+    expect(validatePrepaidSchedule({ ...base, accessEndsOn: '2027-05-01' })).not.toEqual([]); // access would run into April, a month with no allowance
     expect(validatePrepaidSchedule({ ...base, accessEndsOn: ACCESS.accessEndsOn, firstMonth: '2026-11' })).not.toEqual([]);
+  });
+});
+
+describe('access is live through the recorded end date (America/New_York)', () => {
+  it('live on 2027-04-05, expired on 2027-04-06', () => {
+    expect(accessIsLive(ENT, '2027-04-05')).toBe(true);
+    expect(accessIsLive(ENT, '2027-04-06')).toBe(false);
+  });
+  it('judges the day in New York, like the KV expiry', () => {
+    // 03:30 UTC on Apr 6 is still Apr 5 in New York.
+    expect(accessDate(new Date('2027-04-06T03:30:00Z'))).toBe('2027-04-05');
+    expect(accessDate(new Date('2027-04-06T04:30:00Z'))).toBe('2027-04-06');
   });
 });
 
@@ -81,7 +93,7 @@ function ledger(preclaimed: string[] = []) {
 async function cronRun(l: ReturnType<typeof ledger>, day: string) {
   const month = day.slice(0, 7);
   if (dueMonths(ENT, month).includes(month)) await l.apply(monthlyGrantKey(EMAIL, month), EMAIL, ENT.monthlyCredits);
-  return catchUpPrepaidMonths([ENT], month, { isClaimed: l.isClaimed, grant: l.apply });
+  return catchUpPrepaidMonths([ENT], month, day, { isClaimed: l.isClaimed, grant: l.apply });
 }
 
 function days(from: string, to: string): string[] {
@@ -129,16 +141,37 @@ describe('grant behaviour', () => {
       await cronRun(l, d);
     }
     expect(l.claims.size).toBe(6);
-    const recovered = await catchUpPrepaidMonths([ENT], '2027-03', { isClaimed: l.isClaimed, grant: l.apply });
+    const recovered = await catchUpPrepaidMonths([ENT], '2027-03', '2027-03-15', { isClaimed: l.isClaimed, grant: l.apply });
     expect(recovered.granted).toEqual([]);
     expect(recovered.alreadyClaimed).toBe(5);
   });
 
-  it('a job that only resumes after the window still pays every owed month, then stops', async () => {
+  it('missed grants are recovered on the last day of access (2027-04-05), then nothing more', async () => {
     const l = ledger([OCT_KEY]);
-    const r = await cronRun(l, '2027-05-02');
+    const r = await cronRun(l, '2027-04-05');
     expect(r.granted.map((g) => g.month)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02', '2027-03']);
-    expect((await cronRun(l, '2027-05-03')).granted).toEqual([]);
+    expect(r.forfeited).toEqual([]);
+    expect((await cronRun(l, '2027-04-05')).granted).toEqual([]);
+    expect(l.claims.has(monthlyGrantKey(EMAIL, '2027-04'))).toBe(false);
+  });
+
+  it('after access expires (2027-04-06+) missed grants are forfeited, never recovered', async () => {
+    const l = ledger([OCT_KEY, monthlyGrantKey(EMAIL, '2026-11')]);
+    for (const day of ['2027-04-06', '2027-05-02', '2028-01-01']) {
+      const r = await cronRun(l, day);
+      expect(r.granted).toEqual([]);
+      expect(r.forfeited.map((f) => f.month)).toEqual(['2026-12', '2027-01', '2027-02', '2027-03']);
+    }
+    expect(l.claims.size).toBe(2);
+  });
+
+  it('a missed March grant is still released on April 1-5, while access is live', async () => {
+    const l = ledger([OCT_KEY]);
+    for (const d of days('2026-10-05', '2027-02-28')) await cronRun(l, d);
+    // The job is down for all of March.
+    const r = await cronRun(l, '2027-04-02');
+    expect(r.granted.map((g) => g.month)).toEqual(['2027-03']);
+    expect(l.claims.size).toBe(6);
   });
 
   it('a later Stripe Pro subscription that claimed a month first is not double-credited', async () => {
@@ -152,14 +185,14 @@ describe('grant behaviour', () => {
 
   it('catch-up never stacks on a month another source claimed under a ceiling key', async () => {
     const l = ledger([OCT_KEY, `${monthlyGrantKey(EMAIL, '2026-11')}:c8000`]);
-    const r = await catchUpPrepaidMonths([ENT], '2026-12', { isClaimed: l.isClaimed, grant: l.apply });
+    const r = await catchUpPrepaidMonths([ENT], '2026-12', '2026-12-01', { isClaimed: l.isClaimed, grant: l.apply });
     expect(r.granted).toEqual([]);
     expect(l.claims.has(monthlyGrantKey(EMAIL, '2026-11'))).toBe(false);
   });
 
   it('a claim-check failure is an error for that month, never a grant', async () => {
     const l = ledger([OCT_KEY]);
-    const r = await catchUpPrepaidMonths([ENT], '2026-12', {
+    const r = await catchUpPrepaidMonths([ENT], '2026-12', '2026-12-01', {
       isClaimed: async () => { throw new Error('db down'); }, grant: l.apply,
     });
     expect(r.granted).toEqual([]);
