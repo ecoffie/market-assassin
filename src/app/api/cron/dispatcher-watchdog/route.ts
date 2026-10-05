@@ -26,8 +26,16 @@
  *      cron_job_runs, not the sticky cron_jobs.last_status, so a transient blip
  *      that self-heals on the next run does not alert every 3h until the next day.
  *
- * On any problem it emails ALERT_TO (transactional → bypasses the send guard so a
- * real outage always reaches a human). `?dry_run=true` reports without emailing.
+ * NOTIFICATIONS ARE INCIDENT-BASED (src/lib/cron/watchdog-incidents.ts, 2026-10-05). This
+ * route used to post to Slack on EVERY 3-hourly pass while a problem existed — replaying it
+ * over cron_job_runs gave 32 posts from 2026-10-01 09:00 to 10-05 06:00, 31 of them the same
+ * unchanged saved-search-alerts failure. Now: one post when an incident opens, again only on a
+ * material change / worsening customer impact, one recovery post, and unchanged incidents in
+ * one daily summary. Recipient suppression (saved-search email_send_rejected) is listed as an
+ * actionable item, not an outage. Detection is unchanged and every failed run stays in
+ * cron_job_runs. If the incident store (ops_incidents) is unavailable it falls back to the
+ * legacy every-pass alert — monitoring never goes silent because its dedupe is down.
+ * `?dry_run=true` previews the incident decisions without writing or posting.
  *
  * Auth: CRON_SECRET bearer (Vercel cron) OR ?password=ADMIN_PASSWORD (manual).
  */
@@ -35,6 +43,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { isMissed } from '@/lib/cron/cron-expr';
+import { runWatchdogIncidents, type WatchdogObservation } from '@/lib/cron/watchdog-incidents';
+import { createSupabaseIncidentStore } from '@/lib/cron/watchdog-incident-store';
+
+const INCIDENT_SOURCE = 'dispatcher-watchdog';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -140,7 +152,7 @@ export async function GET(request: NextRequest) {
   const lookbackFrom = new Date(now.getTime() - FAILURE_LOOKBACK_HOURS * 3600_000).toISOString();
   const { data: failedRuns, error: failedRunsErr } = await supabase
     .from('cron_job_runs')
-    .select('job_name, started_at')
+    .select('job_name, started_at, status, error')
     .in('status', ['error', 'timeout'])
     .gte('started_at', lookbackFrom)
     .order('started_at', { ascending: false });
@@ -155,11 +167,15 @@ export async function GET(request: NextRequest) {
   }
 
   // job_name → its failure timestamps in the window, newest first.
+  type FailedRun = { job_name: string; started_at: string; status: string | null; error: string | null };
   const failuresByJob = new Map<string, string[]>();
-  for (const r of (failedRuns || []) as { job_name: string; started_at: string }[]) {
+  // Newest failed run per job — its status + error identify the incident.
+  const newestFailure = new Map<string, FailedRun>();
+  for (const r of (failedRuns || []) as FailedRun[]) {
     const list = failuresByJob.get(r.job_name);
     if (list) list.push(r.started_at);
     else failuresByJob.set(r.job_name, [r.started_at]);
+    if (!newestFailure.has(r.job_name)) newestFailure.set(r.job_name, r);
   }
 
   // For each job that failed at all, find its most recent SUCCESS so we can tell a
@@ -236,7 +252,39 @@ export async function GET(request: NextRequest) {
 
   const problems = dispatcherLikelyDown || overdue.length > 0 || stuck.length > 0 || failing.length > 0;
 
-  if (problems && !dryRun) {
+  // Incident observations — one per problem. An empty list still runs, so open incidents
+  // that are no longer observed get their single recovery post.
+  const observations: WatchdogObservation[] = [];
+  if (dispatcherLikelyDown) {
+    observations.push({
+      key: 'dispatcher_down', kind: 'dispatcher_down',
+      detail: `last job run ${minutesSinceLastRun === null ? 'never recorded' : `${minutesSinceLastRun} min ago`}${poked ? '; poked /api/cron/dispatch?tick=hour' : ''}`,
+    });
+  }
+  for (const j of failing) {
+    const f = newestFailure.get(j);
+    observations.push({
+      key: `failing:${j}`, kind: 'failing', jobName: j, status: f?.status ?? null, error: f?.error ?? null,
+      detail: f ? `last failed run ${f.started_at.slice(0, 16)}Z (${f.status})` : null,
+    });
+  }
+  for (const j of stuck) observations.push({ key: `stuck:${j}`, kind: 'stuck', jobName: j });
+  for (const j of overdue) observations.push({ key: `overdue:${j}`, kind: 'overdue', jobName: j });
+
+  const incidents = await runWatchdogIncidents({
+    store: createSupabaseIncidentStore(supabase),
+    source: INCIDENT_SOURCE,
+    observations,
+    now,
+    preview: dryRun,
+    send: (msg) => sendOpsAlert({ to: ALERT_TO, transactional: true, emailType: 'dispatcher_watchdog', ...msg }),
+  });
+  if (!incidents.storeAvailable) {
+    console.error('[dispatcher-watchdog] incident store unavailable — legacy every-pass alert:', incidents.error);
+  }
+
+  // LEGACY FALLBACK — only when the incident store cannot be read.
+  if (problems && !dryRun && !incidents.storeAvailable) {
     const lines: string[] = [];
     if (dispatcherLikelyDown) {
       lines.push(
@@ -253,7 +301,7 @@ export async function GET(request: NextRequest) {
       to: ALERT_TO,
       transactional: true,
       emailType: 'dispatcher_watchdog',
-      subject: `⚠️ Cron dispatcher health alert${dispatcherLikelyDown ? ' — DISPATCHER DOWN' : ''}`,
+      subject: `⚠️ Cron dispatcher health alert${dispatcherLikelyDown ? ' — DISPATCHER DOWN' : ''} (incident dedupe unavailable)`,
       html: `<h2>Cron dispatcher watchdog</h2>${lines.join('')}<p style="color:#888">Enabled jobs: ${enabledJobs.length}. Checked ${now.toISOString()}.</p>`,
       text: `Cron dispatcher health alert. down=${dispatcherLikelyDown} failing=[${failing.join(',')}] stuck=[${stuck.join(',')}] overdue=[${overdue.join(',')}]`,
     });
@@ -269,5 +317,14 @@ export async function GET(request: NextRequest) {
     failing,
     stuck,
     overdue,
+    incidents: {
+      storeAvailable: incidents.storeAvailable,
+      claimed: incidents.claimed,
+      silentRepeats: incidents.silentRepeats,
+      lostRaces: incidents.lostRaces,
+      sent: incidents.sent,
+      summarySent: incidents.summarySent,
+      ...(dryRun ? { preview: incidents.messages } : {}),
+    },
   });
 }
