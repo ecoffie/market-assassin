@@ -33,9 +33,10 @@ function builder(table: string) {
     const rows = (tables[table] ||= []);
     if (op === 'upsert') {
       const key = payload!.incident_key;
-      if (rows.some((r) => r.incident_key === key)) return { data: ignoreDup ? [] : null, error: null };
+      // ON CONFLICT DO NOTHING → exact count of rows actually inserted.
+      if (rows.some((r) => r.incident_key === key)) return { data: null, count: ignoreDup ? 0 : null, error: null };
       rows.push(JSON.parse(JSON.stringify(payload)));
-      return { data: [{ incident_key: key }], error: null };
+      return { data: null, count: 1, error: null };
     }
     let hit = rows.filter((r) => filters.every((f) => f(r)));
     if (op === 'update') {

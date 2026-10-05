@@ -24,12 +24,16 @@ export function createSupabaseIncidentStore(sb: SupabaseClient): IncidentStore {
       return (data ?? []) as IncidentRow[];
     },
     async insertIfAbsent(row) {
-      const { data, error } = await sb
+      // ON CONFLICT DO NOTHING: the exact count is 1 only for the caller whose INSERT landed.
+      // Never inferred from a RETURNING payload (INT-005); a NULL count is a lost claim.
+      const { count, error } = await sb
         .from(TABLE)
-        .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'incident_key', ignoreDuplicates: true })
-        .select('incident_key');
-      if (error) return false;
-      return Array.isArray(data) && data.length === 1;
+        .upsert(
+          { ...row, updated_at: new Date().toISOString() },
+          { onConflict: 'incident_key', ignoreDuplicates: true, count: 'exact' },
+        );
+      if (error || count == null) return false;
+      return count === 1;
     },
     async compareAndSet(key, expectedVersion, patch) {
       const { count, error } = await sb
