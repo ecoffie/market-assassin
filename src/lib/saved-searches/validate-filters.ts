@@ -28,6 +28,56 @@ export const ALLOWED_SAVED_SEARCH_FILTER_KEYS = [
 ] as const;
 
 const ALLOWED_KEY_SET = new Set<string>(ALLOWED_SAVED_SEARCH_FILTER_KEYS);
+
+/**
+ * VALUE SHAPES. The key allowlist alone let `{ naics: '541510', sapBuyer: true }` through
+ * schedule_market_search (the hosted MCP schema is z.record(unknown), so the advertised enum is
+ * never enforced). The cron's parseMapFilters calls .toLowerCase() on sapBuyer, threw on the
+ * boolean, and the search failed every day as unexpected_schedule_error while the agent had been
+ * told "success" (2026-10-01 → 10-04). Reject a wrong shape at write time; never coerce it —
+ * `true` is not a tier, and dropping it would save a broader watch than the user asked for.
+ */
+const SAP_BUYER_VALUES = new Set(['', 'most', 'somewhat', 'vehicle']);
+const STATUS_VALUES = new Set(['active', 'inactive', 'all']);
+/** Scalar-only: parseMapFilters string-methods these directly. */
+const STRING_KEYS = new Set(['q', 'country', 'scope']);
+/** A string or a list of strings (the Map + MCP both store multi-selects as arrays). */
+const STRING_OR_LIST_KEYS = new Set(['naics', 'agency', 'subAgency', 'state', 'psc', 'setAside', 'noticeType']);
+const FLAG_KEYS = new Set(['fullOpen', 'hideCommodity', 'hasDocs', 'hasContact']);
+const NUMBER_KEYS = new Set(['closingDays', 'postedDays']);
+
+function describeValue(v: unknown): string {
+  if (Array.isArray(v)) return 'array';
+  return v === null ? 'null' : typeof v;
+}
+
+/** First value-shape violation, or null. null/undefined values are absent, not invalid. */
+function valueShapeError(filters: Record<string, unknown>): string | null {
+  for (const [k, v] of Object.entries(filters)) {
+    if (v === null || v === undefined) continue;
+    const got = describeValue(v);
+    if (k === 'sapBuyer') {
+      if (typeof v !== 'string' || !SAP_BUYER_VALUES.has(v.trim().toLowerCase())) {
+        return `Invalid sapBuyer value (${got} ${JSON.stringify(v)}). Allowed: "most", "somewhat", "vehicle" (or omit it).`;
+      }
+    } else if (k === 'status') {
+      if (typeof v !== 'string' || !STATUS_VALUES.has(v.trim().toLowerCase())) {
+        return `Invalid status value (${got} ${JSON.stringify(v)}). Allowed: "active", "inactive", "all".`;
+      }
+    } else if (STRING_KEYS.has(k)) {
+      if (typeof v !== 'string') return `Filter ${k} must be a string (got ${got}).`;
+    } else if (STRING_OR_LIST_KEYS.has(k)) {
+      const ok = typeof v === 'string' || (Array.isArray(v) && v.every((x) => typeof x === 'string'));
+      if (!ok) return `Filter ${k} must be a string or a list of strings (got ${got}).`;
+    } else if (FLAG_KEYS.has(k)) {
+      if (typeof v !== 'boolean' && typeof v !== 'string') return `Filter ${k} must be true/false (got ${got}).`;
+    } else if (NUMBER_KEYS.has(k)) {
+      const ok = (typeof v === 'number' && Number.isFinite(v)) || typeof v === 'string';
+      if (!ok) return `Filter ${k} must be a number (got ${got}).`;
+    }
+  }
+  return null;
+}
 const STRATEGY_KEY_SET = new Set<string>(STRATEGY_STRAND_KEYS as readonly string[]);
 
 function asTrimmedString(v: unknown): string {
@@ -130,6 +180,11 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
         `Supported: ${ALLOWED_SAVED_SEARCH_FILTER_KEYS.join(', ')}. ` +
         `Do not drop unsupported filters and activate a broader watch — ask the user to adjust.${hint}`,
     };
+  }
+
+  const shapeErr = valueShapeError(rawObj);
+  if (shapeErr) {
+    return { ok: false, error: `${shapeErr} Do not coerce or drop the filter and save a broader watch — ask the user to adjust.` };
   }
 
   const filters: SavedSearchFilters = { ...(raw as SavedSearchFilters) };
