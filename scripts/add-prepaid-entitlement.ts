@@ -50,7 +50,8 @@ async function main() {
   const months = monthsInWindow(firstMonth, lastMonth);
   const { data: claims, error: claimErr } = await supabase
     .from('mcp_credit_topups').select('idempotency_key, credits')
-    .in('idempotency_key', months.map((m) => monthlyGrantKey(email, m)));
+    .in('idempotency_key', months.map((m) => monthlyGrantKey(email, m)))
+    .limit(months.length); // at most one claim per key
   if (claimErr) throw new Error(`reading existing claims failed: ${claimErr.message}`);
   const claimed = new Set((claims ?? []).map((c) => c.idempotency_key));
 
@@ -69,7 +70,7 @@ async function main() {
     first_month: `${firstMonth}-01`, last_month: `${lastMonth}-01`,
     access_starts_on: accessStartsOn, access_ends_on: accessEndsOn,
     source, reference, created_by: 'scripts/add-prepaid-entitlement.ts',
-  }).select('id, user_email, first_month, last_month, access_ends_on, status').single();
+  }).select('id, user_email, first_month, last_month, access_ends_on, status').single(); // unranged-ok: single-row insert receipt
   if (error) throw new Error(`insert failed: ${error.message}`);
   console.log('inserted', data);
 }
