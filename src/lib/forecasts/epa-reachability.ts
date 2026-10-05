@@ -65,7 +65,27 @@ export interface EpaReachabilityResult {
   attempts: number;
   detail: string;
   markersFound?: string[];
+  /**
+   * The probe's wall-clock budget. `exhausted: true` means the probe stopped because its
+   * deadline ran out (EPA hanging), not because it measured a definitive answer. It is
+   * still a completed watch reporting an unavailable source.
+   */
+  probeBudget: { deadlineMs: number; elapsedMs: number; exhausted: boolean };
 }
+
+/**
+ * Whole-probe deadline. The dispatcher waits min(cron_jobs.timeout_ms, 55s) for the
+ * route's response headers (cron/dispatch/route.ts DISPATCH_AWAIT_CAP_MS); this job's row
+ * is 50,000 ms. The route answers only after the probe AND the instance read/update AND
+ * the dedup check + ops alert, so the probe must leave headroom for those. Before this
+ * deadline the probe alone could run 3 × 25s + 2s + 4s backoff = 81s, plus an UNBOUNDED
+ * body read (the attempt timer was cleared before res.text()), so a hanging EPA turned a
+ * successful "source unavailable" watch into a dispatcher `timeout` (2026-10-03, 10-04).
+ */
+export const EPA_PROBE_DEADLINE_MS = 35_000;
+
+/** Do not start an attempt with less time than this left — it could only time out. */
+const MIN_ATTEMPT_MS = 1_000;
 
 /** Markers that distinguish the real APEX forecast app from a proxy/error page. */
 const APEX_MARKERS = ['apex', 'f?p=', 'forecast', 'Record Number', 'apex_session', 'p_flow_id'];
@@ -80,35 +100,91 @@ function classifyTransport(msg: string): EpaReachability {
   return 'apex_transport_reset';
 }
 
+class ProbeTimeout extends Error {
+  constructor() { super('probe attempt timed out (aborted)'); this.name = 'AbortError'; }
+}
+
+/** Resolve `p`, or reject when `signal` aborts, so a hung read cannot outlive its attempt. */
+function abortable<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new ProbeTimeout());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new ProbeTimeout());
+    signal.addEventListener('abort', onAbort, { once: true });
+    p.then(
+      (v) => { signal.removeEventListener('abort', onAbort); resolve(v); },
+      (e) => { signal.removeEventListener('abort', onAbort); reject(e); },
+    );
+  });
+}
+
+type ProbeOutcome = Omit<EpaReachabilityResult, 'probeBudget'>;
+
 export async function probeEpaReachability(
-  opts: { fetchImpl?: typeof fetch; tries?: number; timeoutMs?: number } = {},
+  opts: {
+    fetchImpl?: typeof fetch;
+    tries?: number;
+    timeoutMs?: number;
+    /** Wall-clock budget for the WHOLE probe: every attempt, backoff and body read. */
+    deadlineMs?: number;
+    nowMs?: () => number;
+    sleepImpl?: (ms: number) => Promise<void>;
+  } = {},
 ): Promise<EpaReachabilityResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const tries = opts.tries ?? 3;
   const timeoutMs = opts.timeoutMs ?? 25_000;
+  const deadlineMs = opts.deadlineMs ?? EPA_PROBE_DEADLINE_MS;
+  const nowMs = opts.nowMs ?? Date.now;
+  const wait = opts.sleepImpl ?? sleep;
+  const startedAt = nowMs();
+  const remaining = () => deadlineMs - (nowMs() - startedAt);
   let attempts = 0;
   let discoveryStatus: number | null = null;
-  let last: EpaReachabilityResult | null = null;
+  let last: ProbeOutcome | null = null;
+  let exhausted = false;
+
+  const finish = (r: ProbeOutcome): EpaReachabilityResult => ({
+    ...r, probeBudget: { deadlineMs, elapsedMs: nowMs() - startedAt, exhausted },
+  });
+  /** Back off before the next attempt; false when there is none or the deadline cannot fit it. */
+  const backoff = async (i: number): Promise<boolean> => {
+    if (i >= tries - 1) return false;
+    const ms = 2000 * (i + 1);
+    if (remaining() < ms + MIN_ATTEMPT_MS) { exhausted = true; return false; }
+    await wait(ms);
+    return true;
+  };
 
   for (let i = 0; i < tries; i++) {
+    const budget = Math.min(timeoutMs, remaining());
+    if (budget < MIN_ATTEMPT_MS) { exhausted = true; break; }
     attempts++;
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), budget);
     let res: Response;
+    let body = '';
     try {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), timeoutMs);
-      try {
-        res = await fetchImpl(EPA_DISCOVERY_URL, { headers: headers(), redirect: 'follow', signal: ctl.signal });
-      } finally { clearTimeout(t); }
+      res = await abortable(
+        fetchImpl(EPA_DISCOVERY_URL, { headers: headers(), redirect: 'follow', signal: ctl.signal }),
+        ctl.signal,
+      );
+      // The attempt timer stays armed through the body read: a 200 whose body never
+      // finishes is a hang, not a pass.
+      if (res.ok) body = await abortable(res.text(), ctl.signal);
     } catch (e) {
+      clearTimeout(t);
       const why = (e as Error).message ?? String(e);
+      const timedOut = ctl.signal.aborted;
+      if (timedOut && remaining() < MIN_ATTEMPT_MS) exhausted = true;
       last = {
-        watchExecution: 'success', reachability: classifyTransport(why), blocked: true,
+        watchExecution: 'success', reachability: timedOut ? 'apex_timeout' : classifyTransport(why), blocked: true,
         discoveryStatus, attempts,
         detail: `redirect chain toward ${EPA_APEX_HOST} failed: ${why}`,
       };
-      if (i < tries - 1) { await sleep(2000 * (i + 1)); continue; }
-      return last;
+      if (await backoff(i)) continue;
+      return finish(last);
     }
+    clearTimeout(t);
 
     discoveryStatus = res.status;
     const finalUrl = res.url || undefined;
@@ -120,28 +196,27 @@ export async function probeEpaReachability(
       last = { watchExecution: 'success', reachability: reach, blocked: true,
         discoveryStatus, finalUrl, finalStatus: res.status, attempts,
         detail: `chain ended at HTTP ${res.status}${finalUrl ? ` (${finalUrl})` : ''} without landing on the APEX application` };
-      if (i < tries - 1) { await sleep(2000 * (i + 1)); continue; }
-      return last;
+      if (await backoff(i)) continue;
+      return finish(last);
     }
 
-    const body = await res.text();
     const found = APEX_MARKERS.filter((m) => body.toLowerCase().includes(m.toLowerCase()));
     // A 200 is not proof: a proxy/error/login page also returns 200.
     if (found.length < 2 || body.length < 500) {
       last = { watchExecution: 'success', reachability: 'apex_invalid_payload', blocked: true,
         discoveryStatus, finalUrl, finalStatus: res.status, attempts, markersFound: found,
         detail: `HTTP 200 but the payload lacks APEX application markers (${body.length} bytes, ${found.length} marker(s))` };
-      if (i < tries - 1) { await sleep(2000 * (i + 1)); continue; }
-      return last;
+      if (await backoff(i)) continue;
+      return finish(last);
     }
 
     // Landed on the real application. Still NOT "current" — nothing is verified yet.
-    return {
+    return finish({
       watchExecution: 'success', reachability: 'reachable_pending_verification', blocked: false,
       discoveryStatus, finalUrl, finalStatus: res.status, attempts, markersFound: found,
       detail: 'redirect chain landed on the EPA APEX forecast application; a controlled read-only audit is required before any ingest',
-    };
+    });
   }
-  return last ?? { watchExecution: 'success', reachability: 'apex_transport_reset', blocked: true,
-    discoveryStatus, attempts, detail: 'exhausted retries' };
+  return finish(last ?? { watchExecution: 'success', reachability: 'apex_timeout', blocked: true,
+    discoveryStatus, attempts, detail: `probe deadline (${deadlineMs} ms) exhausted before an attempt could start` });
 }
