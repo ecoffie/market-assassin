@@ -1581,6 +1581,20 @@ function render(){
   if(typeof updateHeader==='function'){ try{ updateHeader(); }catch(e){} }
   drawFeed();
 }
+// "Show matching locations" (the list's no-matches-in-view state). Moves the viewport only — every
+// filter stays. Outcomes are said, never swallowed: a market whose matches have no location, or a
+// lookup that failed, gets its own sentence instead of a button that silently does nothing.
+window.__showMatchingLocationsFromFeed=function(btn){
+  if(!btn||btn.disabled||typeof window.__showMatchingLocations!=='function')return;
+  var was=btn.textContent; btn.disabled=true; btn.textContent='Finding locations\u2026';
+  window.__showMatchingLocations({done:function(r){
+    if(r&&r.ok)return;   // the viewport moved; the next round repaints the list
+    btn.disabled=false; btn.textContent=was;
+    var p=btn.parentNode&&btn.parentNode.querySelector('p');
+    if(p&&r&&r.reason==='none_located')p.textContent='None of these matches has a map location, so there is nowhere to move the map. Your filters are unchanged.';
+    else if(p)p.textContent='Couldn\u2019t look up where the matches are. Try again \u2014 your filters are unchanged.';
+  }});
+};
 function drawFeed(){
   const feed=document.getElementById('feed');
   // Unavailable is not "no matches": every enabled horizon has no forecast publisher for the buyer
@@ -1597,6 +1611,35 @@ function drawFeed(){
     feed.innerHTML=`<div class="empty"><h4>Forecast coverage unavailable</h4>
       <p>${esc(window.__coverageNote||'We hold no forecasts from this buyer.')}. This is a coverage gap, not zero upcoming buys.</p>
       <button onclick="document.getElementById('clrAll').click()">Clear all filters</button></div>`;
+    return;
+  }
+  // THREE different empties (2026-10-04). Only the last is "no matches", and only it may suggest
+  // clearing filters — telling someone whose search HAS matches to clear it would delete the search.
+  //   1. matches exist, none in this view   → "No matches in this map view" + Show matching locations
+  //   2. matches exist, none has a location  → say so (they are counted on the map pill, not lost)
+  //   3. the search matches nothing          → the original state
+  // window.__mapMatchTotals is published by the round (VIEWPORT_JS) right before render().
+  var _mt=window.__mapMatchTotals||null;
+  if(!rows.length && _mt && _mt.total>0 && typeof window.__showMatchingLocations==='function'){
+    var _um=(typeof _mt.unmapped==='number'&&_mt.unmapped>0)?(' (plus '+_mt.unmapped.toLocaleString()+' without a map location)'):'';
+    feed.innerHTML=`<div class="empty" id="viewEmpty"><h4>No matches in this map view</h4>
+      <p>${_mt.total.toLocaleString()}${_mt.capped?'+':''} ${_mt.total===1&&!_mt.capped?'opportunity matches':'opportunities match'} your filters in other locations${_um}. Your filters are unchanged.</p>
+      <button type="button" data-act="show-locations" onclick="window.__showMatchingLocationsFromFeed(this)">Show matching locations</button></div>`;
+    return;
+  }
+  if(!rows.length && _mt && _mt.settled && !_mt.anyFailed && _mt.total===0 && typeof _mt.unmapped==='number' && _mt.unmapped>0){
+    feed.innerHTML=`<div class="empty" id="viewEmpty"><h4>No matches can be placed on the map</h4>
+      <p>${_mt.unmapped.toLocaleString()} ${_mt.unmapped===1?'opportunity matches':'opportunities match'} your filters, but ${_mt.unmapped===1?'it has':'none has'} a map location yet, so ${_mt.unmapped===1?'it can’t':'they can’t'} be shown here. Your filters are unchanged.</p></div>`;
+    return;
+  }
+  // NOT A ZERO: a round still loading, a source that failed, or a count that never arrived. None of
+  // these may say "No opportunities match" or suggest clearing filters (an unknown is never a zero).
+  if(!rows.length && _mt && (!_mt.settled || _mt.anyFailed || _mt.totalKnown===false)){
+    var _ld=!_mt.settled&&!_mt.anyFailed;
+    feed.innerHTML=_ld
+      ? `<div class="empty" id="viewEmpty"><h4>Still loading results\u2026</h4><p>Nothing in this view yet \u2014 the rest is still loading. Your filters are unchanged.</p></div>`
+      : `<div class="empty" id="viewEmpty"><h4>Some results couldn\u2019t load</h4><p>At least one source didn\u2019t answer, so this isn\u2019t a count of zero. Your filters are unchanged.</p>
+         <button type="button" data-act="retry-round" onclick="if(window.__mapRefetch)window.__mapRefetch()">Try again</button></div>`;
     return;
   }
   if(!rows.length){

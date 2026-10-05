@@ -2108,7 +2108,9 @@ const VIEWPORT_JS = `<script>
         return;
       }
       if(_reported){
-        var _unknown=_en.some(function(h){ return _hc[h].state==='unknown'; });
+        // 'failed' is as unknown as 'unknown': a horizon that did not answer contributed no count, so
+        // the sum of the ones that did is not "0 results" (measured: "0 results · Recompetes couldn't load").
+        var _unknown=_en.some(function(h){ return _hc[h].state==='unknown'||_hc[h].state==='failed'; });
         var _rc0=document.getElementById('rescount');
         var _shown0=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
         if(_rc0)_rc0.innerHTML=_unknown
@@ -2216,6 +2218,63 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
   }
   window.__mapAutoFit=maybeAutoFit;
+  // ── SHOW MATCHING LOCATIONS (2026-10-04) ────────────────────────────────────────────────
+  // Move the VIEWPORT to where the current market's matches are. Every filter is untouched: the
+  // question is asked with _buildOppUrl (the builder every round uses) and a world-wide box, one
+  // request per enabled horizon. Two uses:
+  //   · the list's "No matches in this map view" → Show matching locations (a reader's click);
+  //   · a saved search with NO bounds, once, right after it is restored (opts.unlessMoved).
+  // Measured: the fixed CONUS start at zoom 5 is a strip of the central US on a phone
+  // (lng −104.6…−87.5), so a coastal search ("Navy shipbuilding", 56 located) opened to
+  // "56 results" over an empty list. Zoom cannot fix it: below PIN_DOT_ZOOM the map draws no
+  // pins, so a view that holds a national market is not available on a phone.
+  //   all located matches fit at the pin floor → fit them all;
+  //   otherwise                              → the zoom-5 window holding the MOST of them (it may be
+  //                                             overseas — a federal market is not US-only).
+  // Unlocated matches are never moved INTO a view; the map count keeps saying "K not shown on map".
+  // done({ok, reason?, located, inFrame, all}) — reason: unavailable|failed|none_located|user_moved|intent_changed|timeout.
+  // opts.deadline (ms epoch): an answer after it is DISCARDED, never applied late — the caller has
+  // already shown the map, and a frame landing after that would move a map the reader is reading.
+  var WORLD_BOX='-180.0000,-85.0000,180.0000,85.0000';
+  function _frameFor(pts){
+    var Z=PIN_DOT_ZOOM, sz=map.getSize(), hw=Math.max(40,sz.x*0.44), hh=Math.max(40,sz.y*0.44);
+    try{ var all=L.latLngBounds(pts); if(map.getBoundsZoom(all,false,L.point(80,80))>=Z)return {fit:all,count:pts.length}; }catch(e){}
+    var P=pts.map(function(p){ return map.project(L.latLng(p[0],p[1]),Z); });
+    var step=Math.max(1,Math.ceil(P.length/400)), best=-1, bc=null;
+    for(var i=0;i<P.length;i+=step){ var c=P[i], n=0; for(var j=0;j<P.length;j++){ if(Math.abs(P[j].x-c.x)<=hw&&Math.abs(P[j].y-c.y)<=hh)n++; } if(n>best){ best=n; bc=c; } }
+    // Centre on the extent of the points IN that window (not their mean), so none of them is pushed out.
+    var x0=1e12,x1=-1e12,y0=1e12,y1=-1e12;
+    for(var k=0;k<P.length;k++){ var q=P[k]; if(Math.abs(q.x-bc.x)<=hw&&Math.abs(q.y-bc.y)<=hh){ if(q.x<x0)x0=q.x; if(q.x>x1)x1=q.x; if(q.y<y0)y0=q.y; if(q.y>y1)y1=q.y; } }
+    return {center:map.unproject(L.point((x0+x1)/2,(y0+y1)/2),Z),count:best};
+  }
+  window.__showMatchingLocations=function(opts){
+    opts=opts||{}; var done=function(r){ try{ if(opts.done)opts.done(r); }catch(e){} };
+    if(isContactMode(MODE)||typeof _buildOppUrl!=='function'){ done({ok:false,reason:'unavailable'}); return; }
+    var H=window.__horizons||{open:true}, hz=(window.__mapMode==='dla')?['open']:['open','recompete','forecast'].filter(function(h){ return h==='open'?H.open!==false:!!H[h]; });
+    var c0=map.getCenter(), z0=map.getZoom(), sig0=window.__mapIntentSig?window.__mapIntentSig():null;
+    Promise.all(hz.map(function(h){ return fetch(_buildOppUrl(h,WORLD_BOX)).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }))
+      .then(function(rs){
+        if(opts.deadline&&Date.now()>opts.deadline)return done({ok:false,reason:'timeout'});
+        if(opts.unlessMoved){
+          // A reader who has moved the map or changed the market since we asked keeps what they chose.
+          // Measured in PIXELS, not degrees: a layout change (a notice row appearing) re-measures the
+          // map and can nudge the centre by a fraction of a pixel — that is not the reader panning.
+          var p0=map.project(c0,z0), p1=map.project(map.getCenter(),z0);
+          if(map.getZoom()!==z0||Math.abs(p1.x-p0.x)>2||Math.abs(p1.y-p0.y)>2)return done({ok:false,reason:'user_moved'});
+          var s1=window.__mapIntentSig?window.__mapIntentSig():null; if(s1!==sig0)return done({ok:false,reason:'intent_changed'});
+        }
+        var pts=[], failed=0;
+        rs.forEach(function(d){ if(!d||d.success===false){ failed++; return; }
+          (d.pins||[]).forEach(function(p){ var la=+p.lat, ln=+p.lng; if(isFinite(la)&&isFinite(ln)&&(la!==0||ln!==0))pts.push([la,ln]); }); });
+        if(!pts.length)return done({ok:false,reason:(failed===rs.length)?'failed':'none_located'});
+        var fr=_frameFor(pts);
+        if(fr.fit)map.fitBounds(fr.fit.pad(.08),{animate:false,maxZoom:9,padding:[40,40]});
+        else map.setView(fr.center,PIN_DOT_ZOOM,{animate:false});
+        if(map.getZoom()<PIN_DOT_ZOOM)map.setZoom(PIN_DOT_ZOOM,{animate:false});
+        _didAutoFit=true;
+        done({ok:true,located:pts.length,inFrame:fr.count,all:!!fr.fit});
+      });
+  };
   // Search auto-jump (Eric 2026-07-28): when a search has matches but 0 are in the CURRENT viewport
   // (e.g. "tavares" = 4 US firms while the map is on Europe → "0 in view · 4 match"), zoom out to the
   // national view so the matches come back in the next bbox fetch, then fit to them. Zillow does this
@@ -2613,13 +2672,91 @@ const VIEWPORT_JS = `<script>
     if(typeof requestAnimationFrame==='function'&&!document.hidden){ _fvTimer=-1; requestAnimationFrame(function(){ _fvTimer=setTimeout(run,0); }); }
     else _fvTimer=setTimeout(run,0);
   }
+  // HOISTED out of _fetchViewNow (2026-10-04) so code that is not a round can build the SAME
+  // request — "where are this market's matches?" (showMatchingLocations) asks with every current
+  // filter and a world-wide box. Same builder, so the two can never disagree about the filters.
+  // box: an optional bbox string; omitted = the viewport (bbox()), as every round uses it.
+  function _merge(a,b){ return [a,b].filter(Boolean).join(','); }
+  // Build the fetch URL for ONE opportunity horizon (mode = open|recompete|forecast|grants).
+  // Parameterized on m so the same builder serves every horizon (was hardcoded to global MODE).
+  function _buildOppUrl(m,box){
+    // DLA MODE = its own map (sources=dla only → getDibbsViewportPins) + the FSC supply-class filter.
+    // Opportunities (open) = SAM + DIBBS + SBIR union (the market-research map). The old top-bar
+    // Source dropdown that used to narrow Open to "DLA only" is GONE — DLA is a mode now, not a source.
+    var _dla=(window.__mapMode==='dla');
+    var _sources=_dla?'dla':'sam,sbir';   // Opportunities no longer folds DLA in — it's its own map
+    var url=MODES[m].ep+'?bbox='+(box||bbox())+((m==='open'||_dla)?('&status=active&sources='+_sources+((HIDE_FSC&&!_dla)?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+    // DLA mode: the FSC supply-class filter (the dropdown that replaced Industry in this mode).
+    if(_dla){ var _fsc=(window.__fscFilter||[]).join(','); if(_fsc)url+='&fsc='+encodeURIComponent(_fsc); return url; }
+    // setAside/agency apply across horizons (both endpoints accept them where meaningful).
+    var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
+    if(_sa)url+='&setAside='+encodeURIComponent(_sa);
+    if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
+    if(m==='open'){
+      if(FILT.fullOpen)url+='&fullOpen=1';
+      if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
+      var _nt=_merge(FILT.noticeType, FILT.noticeMulti);
+      if(_nt)url+='&noticeType='+encodeURIComponent(_nt);
+      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+      if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
+      if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+      if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
+      if(FILT.fsc)url+='&fsc='+encodeURIComponent(FILT.fsc);
+      if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
+      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+      if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
+      if(FILT.hasDocs)url+='&hasDocs=1';
+      if(FILT.hasContact)url+='&hasContact=1';
+      if(FILT.sapBuyer)url+='&sapBuyer='+encodeURIComponent(FILT.sapBuyer);
+      // STRATEGY FILTER (Opportunity DNA) — FILT.strategy is an array of genome strand keys; send
+      // them comma-joined. The API (applyMapFilters) does a JSONB-keys @> ALL over the persisted
+      // opportunity_dna_keys → "filter by strategy, not NAICS", corpus-wide.
+      if(FILT.strategy&&FILT.strategy.length)url+='&strategy='+encodeURIComponent(FILT.strategy.join(','));
+    }
+    if(m==='recompete'){
+      // NAICS/PSC were only ever sent in the m==='open' block, so a Filters-panel NAICS
+      // narrowed the Open horizon while Awarded returned its ENTIRE corpus -- and every
+      // horizon's totalForFilters is summed into one headline. Measured 2026-08-23: filter
+      // to 324110 and the header read ~114,354 when the truth was 86, because recompete
+      // contributed 114,296 unfiltered rows. The control is even tagged mfv-recompete
+      // (route.ts:160), so the panel PROMISED this filter on Awarded and never sent it.
+      // /api/app/recompete-map has supported naics + psc all along.
+      // NAICS only -- deliberately NOT psc. recompete_opportunities.psc_code is 9,108 of
+      // 159,647 rows (5.7%) populated, so a PSC filter here would silently drop 94% of the
+      // matching corpus. That is the "dead filter" rule the parity test guards, and it is
+      // right. NAICS is 100% populated and the API has supported it all along.
+      if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+      if(FILT.sap)url+='&sap='+encodeURIComponent(FILT.sap);
+      if(FILT.likelihood)url+='&likelihood='+encodeURIComponent(FILT.likelihood);
+      if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
+      if(FILT.valueRange){ var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1]; }
+      // Parent-contract / vehicle scope + work subject — resolved and applied SERVER-side inside every
+      // read (src/lib/vehicles/parent-scope.ts), so the headline, the unmapped count and the pins are
+      // the same scoped market the MCP task-order search returns.
+      if(FILT.vehicle)url+='&vehicle='+encodeURIComponent(FILT.vehicle);
+      if(FILT.parent)url+='&parent='+encodeURIComponent(FILT.parent);
+      if(FILT.work)url+='&work='+encodeURIComponent(FILT.work);
+    }
+    if(m==='forecast'){
+      // Forecasts filter on q/naics/agency/state (applyForecastFilters). naics/state aren't added
+      // in the open block above, so add them here. includeUnplaced=1 asks the endpoint to ALSO
+      // return the location-less matching forecasts (~43% of the corpus) as LIST-ONLY rows —
+      // gated server-side on a real search key so an unfiltered pan never drags in all 14k.
+      if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+      if(Q||FILT.naics||FILT.agency)url+='&includeUnplaced=1';
+    }
+    return url;
+  }
   function _fetchViewNow(t0){
     if(window.__suppressFetchView) return;
     // Every round re-evaluates the scope banner for the CURRENT map mode — including the Players branch
     // below, which returns before any Awarded round could update it (#1692 review).
     if(typeof window.__renderVehicleScope==='function')window.__renderVehicleScope();
-    // ?ss= owns round 1 — boot release AND the first moveend; deferred, run on the handler's release.
-    if(window.__ssPending){ window.__ssDeferredRound=true; return; }
+    // Held while a ?ss= restore / saved framing owns round 1; the deferred round runs on release.
+    if(window.__ssPending||window.__frameHold){ window.__ssDeferredRound=true; return; }
     _trackMapView();
     // RETURN CONTINUITY — remember this market (debounced, local only). Placed here
     // rather than on each control because every filter, search, sort, horizon and
@@ -2729,80 +2866,6 @@ const VIEWPORT_JS = `<script>
     // open/recompete/forecast/grants are ON (all true by default). We fetch each enabled horizon's
     // endpoint in PARALLEL and MERGE the pins into OPPS. Each horizon keeps its own mode-specific
     // filter params (Open sources/notice/fsc, Recompete leadMax/value, etc.) via _buildOppUrl.
-    function _merge(a,b){ return [a,b].filter(Boolean).join(','); }
-    // Build the fetch URL for ONE opportunity horizon (mode = open|recompete|forecast|grants).
-    // Parameterized on m so the same builder serves every horizon (was hardcoded to global MODE).
-    function _buildOppUrl(m){
-      // DLA MODE = its own map (sources=dla only → getDibbsViewportPins) + the FSC supply-class filter.
-      // Opportunities (open) = SAM + DIBBS + SBIR union (the market-research map). The old top-bar
-      // Source dropdown that used to narrow Open to "DLA only" is GONE — DLA is a mode now, not a source.
-      var _dla=(window.__mapMode==='dla');
-      var _sources=_dla?'dla':'sam,sbir';   // Opportunities no longer folds DLA in — it's its own map
-      var url=MODES[m].ep+'?bbox='+bbox()+((m==='open'||_dla)?('&status=active&sources='+_sources+((HIDE_FSC&&!_dla)?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
-      // DLA mode: the FSC supply-class filter (the dropdown that replaced Industry in this mode).
-      if(_dla){ var _fsc=(window.__fscFilter||[]).join(','); if(_fsc)url+='&fsc='+encodeURIComponent(_fsc); return url; }
-      // setAside/agency apply across horizons (both endpoints accept them where meaningful).
-      var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
-      if(_sa)url+='&setAside='+encodeURIComponent(_sa);
-      if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
-      if(m==='open'){
-        if(FILT.fullOpen)url+='&fullOpen=1';
-        if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
-        var _nt=_merge(FILT.noticeType, FILT.noticeMulti);
-        if(_nt)url+='&noticeType='+encodeURIComponent(_nt);
-        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
-        if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
-        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
-        if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
-        if(FILT.fsc)url+='&fsc='+encodeURIComponent(FILT.fsc);
-        if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
-        if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
-        if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
-        if(FILT.hasDocs)url+='&hasDocs=1';
-        if(FILT.hasContact)url+='&hasContact=1';
-        if(FILT.sapBuyer)url+='&sapBuyer='+encodeURIComponent(FILT.sapBuyer);
-        // STRATEGY FILTER (Opportunity DNA) — FILT.strategy is an array of genome strand keys; send
-        // them comma-joined. The API (applyMapFilters) does a JSONB-keys @> ALL over the persisted
-        // opportunity_dna_keys → "filter by strategy, not NAICS", corpus-wide.
-        if(FILT.strategy&&FILT.strategy.length)url+='&strategy='+encodeURIComponent(FILT.strategy.join(','));
-      }
-      if(m==='recompete'){
-        // NAICS/PSC were only ever sent in the m==='open' block, so a Filters-panel NAICS
-        // narrowed the Open horizon while Awarded returned its ENTIRE corpus -- and every
-        // horizon's totalForFilters is summed into one headline. Measured 2026-08-23: filter
-        // to 324110 and the header read ~114,354 when the truth was 86, because recompete
-        // contributed 114,296 unfiltered rows. The control is even tagged mfv-recompete
-        // (route.ts:160), so the panel PROMISED this filter on Awarded and never sent it.
-        // /api/app/recompete-map has supported naics + psc all along.
-        // NAICS only -- deliberately NOT psc. recompete_opportunities.psc_code is 9,108 of
-        // 159,647 rows (5.7%) populated, so a PSC filter here would silently drop 94% of the
-        // matching corpus. That is the "dead filter" rule the parity test guards, and it is
-        // right. NAICS is 100% populated and the API has supported it all along.
-        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
-        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
-        if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
-        if(FILT.sap)url+='&sap='+encodeURIComponent(FILT.sap);
-        if(FILT.likelihood)url+='&likelihood='+encodeURIComponent(FILT.likelihood);
-        if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
-        if(FILT.valueRange){ var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1]; }
-        // Parent-contract / vehicle scope + work subject — resolved and applied SERVER-side inside every
-        // read (src/lib/vehicles/parent-scope.ts), so the headline, the unmapped count and the pins are
-        // the same scoped market the MCP task-order search returns.
-        if(FILT.vehicle)url+='&vehicle='+encodeURIComponent(FILT.vehicle);
-        if(FILT.parent)url+='&parent='+encodeURIComponent(FILT.parent);
-        if(FILT.work)url+='&work='+encodeURIComponent(FILT.work);
-      }
-      if(m==='forecast'){
-        // Forecasts filter on q/naics/agency/state (applyForecastFilters). naics/state aren't added
-        // in the open block above, so add them here. includeUnplaced=1 asks the endpoint to ALSO
-        // return the location-less matching forecasts (~43% of the corpus) as LIST-ONLY rows —
-        // gated server-side on a real search key so an unfiltered pan never drags in all 14k.
-        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
-        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
-        if(Q||FILT.naics||FILT.agency)url+='&includeUnplaced=1';
-      }
-      return url;
-    }
     // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
     var H=window.__horizons||{open:true,recompete:true,forecast:true};
     var _enabled=['open','recompete','forecast'].filter(function(m){return H[m]!==false;});
@@ -2958,6 +3021,13 @@ const VIEWPORT_JS = `<script>
     // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
     // could not be established; the line says so rather than implying everything is mapped.
     window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
+    // For the list's empty state: "no matches in THIS VIEW" vs "no matches at all" (template drawFeed).
+    // total = located matches for the filters (bbox-independent), inView = in this viewport,
+    // unmapped = matches with no map location (null = unknown, never 0), settled = every horizon answered.
+    // totalKnown=false when a part that answered carried no numeric total — an unknown is never a zero.
+    window.__mapMatchTotals={ total:TOTAL, inView:INVIEW, unmapped:window.__unmappedForFilters, capped:!!CAPPED,
+      settled:!loading.length, anyFailed:parts.some(function(p){ return p&&p.failed; }),
+      totalKnown:parts.every(function(p){ return !p||p.failed||typeof p.total==='number'; }) };
     if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     render();
     if(!round.painted){ round.painted=true; round.perf.firstPaint=Math.round(_nowMs()-round.perf.action); }
@@ -5326,7 +5396,16 @@ const VIEWPORT_JS = `<script>
     var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
       try{ map.fitBounds([[b.s,b.w],[b.n,b.e]]); _didAutoFit=true; }catch(e){} }
     else if(_asSaved&&typeof window.__mapNationalView==='function'){
-      try{ window.__mapNationalView(); _didAutoFit=true; }catch(e){} }
+      try{ window.__mapNationalView(); _didAutoFit=true; }catch(e){}
+      // …then frame on where THIS search's matches are, before round 1 paints (bounded: 4 s).
+      // Round 1 waits (__frameHold, _fetchViewNow) so the reader never sees the empty strip first.
+      // unlessMoved: a pan/zoom/filter change while we ask wins — we never override it.
+      if(typeof window.__showMatchingLocations==='function'){
+        window.__frameHold=true;
+        var _fh=function(){ if(!window.__frameHold)return; window.__frameHold=false; fetchView(); };
+        var _fhT=setTimeout(_fh,4000);
+        window.__showMatchingLocations({unlessMoved:true,deadline:Date.now()+4000,done:function(r){ clearTimeout(_fhT); window.__lastSavedFrame=r; _fh(); }});
+      } }
     fetchView();
     return {unsupported:_unsupported};
   };
@@ -9349,7 +9428,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var m=M();
     if(m){
       var c=m.getCenter();
-      if(!c||!inUS(c.lat,c.lng)||(m.getZoom&&m.getZoom()<4)) conus();
+      // Not while a ?ss= link owns the view: its frame may be overseas on purpose (the matches are).
+      if(!window.__ssOwnsView&&(!c||!inUS(c.lat,c.lng)||(m.getZoom&&m.getZoom()<4))) conus();
     }
     releaseFit();
     if(window.__ssPending){ window.__ssDeferredRound=true; return; }   // the saved search owns round 1
