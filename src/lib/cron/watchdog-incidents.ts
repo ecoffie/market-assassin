@@ -16,18 +16,41 @@
  *   - ONE recovery message when it clears.
  *   - Persistent unchanged incidents go into ONE daily summary.
  *
- * SUPPRESSION IS NOT AN OUTAGE
- * saved-search `email_send_rejected` comes only from sendEmail's send guard (suppressed
- * recipient / suppression-check failure / synthetic address). It is listed as an actionable
- * suppression item — never as a fresh outage, and a growing count does not re-page. A
- * processing failure alongside it (e.g. a malformed customer search) still opens an incident.
+ * SUPPRESSION IS NOT AN OUTAGE — BUT ONLY CONFIRMED SUPPRESSION
+ * saved-search-alerts reports send-guard blocks by reason (#1834, alert-drain.ts):
+ *   recipient_suppressed      = a CONFIRMED email_suppressions row → the ONLY non-outage class.
+ *                               Listed as an actionable item, never a fresh outage; a growing
+ *                               count does not re-page.
+ *   suppression_lookup_failed = the suppression LOOKUP errored → processing incident
+ *   invalid_recipient_address = synthetic address → processing incident
+ *   email_send_rejected       = legacy/unknown block reason → processing incident (it no longer
+ *                               proves suppression)
+ * A processing failure alongside a suppression (e.g. a malformed customer search) still opens
+ * an incident, and the suppression line rides along.
  *
- * OVERLAPPING RUNS
+ * DELIVERY GUARANTEES AND RESIDUAL RISK — NOT exactly-once.
  * A notification is sent only by the run that CLAIMED it: INSERT ... ON CONFLICT DO NOTHING
- * for a new incident, compare-and-set on `version` for an existing one. The loser of the race
- * sends nothing. A claimed-but-unconfirmed post stays in notify_pending and is retried by a
- * later run once PENDING_RETRY_LEASE_MS has passed (so a concurrent run never retries an
- * in-flight post).
+ * for a new incident, compare-and-set on `version` for an existing one. The loser of an
+ * overlapping race sends nothing. That claim is what makes overlap safe; nothing else is.
+ * The claim stamps notify_pending + last_notified_at (lease start) + notify_attempts++. The
+ * post is CONFIRMED (pending cleared, attempts reset) only after Slack accepts it.
+ *   - Slack rejects / throws / times out (SEND_TIMEOUT_MS)  → pending stays; the next pass
+ *     after PENDING_RETRY_LEASE_MS re-sends. A TIMEOUT is an unknown outcome: if Slack did
+ *     deliver, the retry is a DUPLICATE.
+ *   - Slack accepts but the confirm write fails (retried once in-pass) → pending stays; the
+ *     next pass re-sends → a DUPLICATE. At-least-once, duplicate window = one pass (3h).
+ *   - Run dies between claim and send → pending stays; next pass sends it (not lost).
+ *   - Run dies between send and confirm → DUPLICATE on the next pass.
+ *   - Bounded: after MAX_NOTIFY_ATTEMPTS claims without a confirm, the pending post is
+ *     ABANDONED (logged, returned in `abandoned`, last_notified_event='abandoned:<event>') so a
+ *     store that can claim but never confirm cannot duplicate every 3h forever. An abandoned
+ *     OPEN/CHANGED/WORSENED incident still surfaces in the next daily summary while open; an
+ *     abandoned RECOVERED post is a MISSED notification (the incident is resolved, so no summary
+ *     lists it).
+ *   - Store unreadable → no incident decisions at all; the route posts its legacy every-pass
+ *     alert (monitoring never goes silent; repeats return until the store is back).
+ *   - A newer event for the same incident supersedes an unconfirmed older one (the newer post
+ *     carries the current state), so a lost "opened" can be followed directly by "worsened".
  */
 
 export type Counts = Record<string, number>;
@@ -66,6 +89,8 @@ export type IncidentRow = {
   last_notified_at: string | null;
   last_notified_event: string | null;
   notify_pending: string | null;
+  /** Claims since the last confirmed post (bounded by MAX_NOTIFY_ATTEMPTS). */
+  notify_attempts: number;
   version: number;
 };
 
@@ -78,14 +103,22 @@ export interface IncidentStore {
   compareAndSet(key: string, expectedVersion: number, patch: Partial<IncidentRow>): Promise<boolean>;
 }
 
-/** Recipient-suppression classes: visible + actionable, never an outage. */
-export const SUPPRESSION_CLASSES = new Set(['email_send_rejected']);
+/**
+ * CONFIRMED recipient suppression only: visible + actionable, never an outage. Every other
+ * send-block class (suppression_lookup_failed, invalid_recipient_address, email_send_rejected)
+ * is a processing failure.
+ */
+export const SUPPRESSION_CLASSES = new Set(['recipient_suppressed']);
 /** Volatile metrics carried in summaries but excluded from identity and impact. */
 const VOLATILE_CLASSES = new Set(['backlog']);
 /** UTC hour from which the first watchdog pass posts the daily summary. */
 export const DAILY_SUMMARY_HOUR_UTC = 12;
 /** A claimed post that was never confirmed is retried only after this long. */
 export const PENDING_RETRY_LEASE_MS = 10 * 60_000;
+/** Claims without a confirmed post before the pending post is abandoned (see header). */
+export const MAX_NOTIFY_ATTEMPTS = 5;
+/** A Slack post slower than this is treated as an unknown outcome (pending stays). */
+export const SEND_TIMEOUT_MS = 15_000;
 export const DAILY_SUMMARY_KEY_PREFIX = 'daily-summary:';
 
 export type Classified = {
@@ -208,6 +241,7 @@ export function decideIncident(
         last_notified_at: prev?.last_notified_at ?? null,
         last_notified_event: prev?.last_notified_event ?? null,
         notify_pending: prev?.notify_pending ?? null,
+        notify_attempts: prev?.notify_attempts ?? 0,
       },
     };
   }
@@ -218,6 +252,7 @@ export function decideIncident(
     last_notified_at: prev.last_notified_at,
     last_notified_event: prev.last_notified_event,
     notify_pending: prev.notify_pending,
+    notify_attempts: prev.notify_attempts ?? 0,
   };
   if (prev.signature !== c.signature) {
     return { event: 'changed', next: { ...base, ...carry, notified_counts: c.processing } };
@@ -246,7 +281,7 @@ function subject(row: { kind: string; job_name: string | null; incident_key: str
 function suppressionLine(s: Counts): string | null {
   const n = Object.values(s).reduce((a, b) => a + b, 0);
   if (!n) return null;
-  return `🛡️ Recipient suppression (not an outage): ${n} email(s) blocked by the send guard (${counts(s)}). Action: review email_suppressions for this job's recipients.`;
+  return `🛡️ Recipient suppression (not an outage): ${n} email(s) not sent to CONFIRMED-suppressed recipient(s) (${counts(s)}). Action: review email_suppressions for this job's recipients.`;
 }
 
 function hoursBetween(a: string, b: string): number {
@@ -329,17 +364,45 @@ export type IncidentRunResult = {
   silentRepeats: string[];
   lostRaces: string[];
   sent: boolean;
+  /** delivered | rejected (Slack said no) | threw | timeout (unknown — a retry may duplicate). */
+  sendOutcome?: SendOutcome;
   summarySent: boolean;
+  /** Posts Slack accepted whose confirm write failed — the next pass will re-send them (duplicate). */
+  confirmFailed: string[];
+  /** Pending posts dropped after MAX_NOTIFY_ATTEMPTS claims without a confirm. */
+  abandoned: { key: string; event: string }[];
   messages: { subject: string; text: string }[];
   error?: string;
 };
+
+export type SendOutcome = 'delivered' | 'rejected' | 'threw' | 'timeout';
+
+async function sendWithTimeout(
+  send: SendFn,
+  msg: { subject: string; html: string; text: string },
+  timeoutMs: number,
+): Promise<{ ok: boolean; outcome: SendOutcome }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ ok: boolean; outcome: SendOutcome }>((res) => {
+    timer = setTimeout(() => res({ ok: false, outcome: 'timeout' }), timeoutMs);
+  });
+  const attempt = send(msg).then(
+    (r) => ({ ok: !!r?.ok, outcome: (r?.ok ? 'delivered' : 'rejected') as SendOutcome }),
+    () => ({ ok: false, outcome: 'threw' as SendOutcome }),
+  );
+  try {
+    return await Promise.race([attempt, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 function emptyRow(source: string, key: string, nowIso: string): IncidentRow {
   return {
     incident_key: key, source, kind: 'daily_summary', job_name: null, status: 'open', signature: null,
     processing_counts: {}, notified_counts: {}, suppression_counts: {}, last_detail: null,
     opened_at: nowIso, last_seen_at: nowIso, resolved_at: null, observations: 0,
-    last_notified_at: null, last_notified_event: null, notify_pending: null, version: 0,
+    last_notified_at: null, last_notified_event: null, notify_pending: null, notify_attempts: 0, version: 0,
   };
 }
 
@@ -356,11 +419,13 @@ export async function runWatchdogIncidents(opts: {
   send: SendFn;
   /** Decide + render only; no writes, no send. */
   preview?: boolean;
+  sendTimeoutMs?: number;
 }): Promise<IncidentRunResult> {
   const { store, source, now, send, preview } = opts;
   const nowIso = now.toISOString();
   const result: IncidentRunResult = {
-    storeAvailable: true, claimed: [], silentRepeats: [], lostRaces: [], sent: false, summarySent: false, messages: [],
+    storeAvailable: true, claimed: [], silentRepeats: [], lostRaces: [], sent: false, summarySent: false,
+    confirmFailed: [], abandoned: [], messages: [],
   };
 
   let rows: IncidentRow[];
@@ -373,23 +438,39 @@ export async function runWatchdogIncidents(opts: {
   const obsByKey = new Map(opts.observations.map((o) => [o.key, o]));
 
   const claimed: (ClaimedEvent & { version: number })[] = [];
-  const keys = new Set<string>([...obsByKey.keys(), ...rows.filter((r) => r.status === 'open' && r.kind !== 'daily_summary').map((r) => r.incident_key)]);
+  // Open incidents (recovery detection) AND any row still holding an unconfirmed post — including a
+  // RESOLVED row whose "recovered" post failed. Without the latter, a failed recovery post was lost
+  // permanently: resolved rows were never revisited.
+  const keys = new Set<string>([
+    ...obsByKey.keys(),
+    ...rows.filter((r) => r.kind !== 'daily_summary' && (r.status === 'open' || !!r.notify_pending)).map((r) => r.incident_key),
+  ]);
 
   for (const key of keys) {
     const prev = byKey.get(key) ?? null;
-    const d = decideIncident(source, key, prev, obsByKey.get(key) ?? null, nowIso);
+    let d = decideIncident(source, key, prev, obsByKey.get(key) ?? null, nowIso);
+    if (!d && prev?.notify_pending) {
+      const { version: _v, ...rest } = prev;
+      d = { event: null, next: rest };
+    }
     if (!d) continue;
 
-    // A previously claimed post that never confirmed is re-emitted once its lease expires.
     let event = d.event;
+    let attempts = event ? 1 : (prev?.notify_attempts ?? 0);
+    let abandon: string | null = null;
+    // A previously claimed post that never confirmed is re-emitted once its lease expires — at most
+    // MAX_NOTIFY_ATTEMPTS claims, then abandoned (see header: bounded, not exactly-once).
     if (!event && prev?.notify_pending && prev.last_notified_at
       && now.getTime() - new Date(prev.last_notified_at).getTime() >= PENDING_RETRY_LEASE_MS) {
-      event = prev.notify_pending as IncidentEvent;
+      if ((prev.notify_attempts ?? 0) >= MAX_NOTIFY_ATTEMPTS) abandon = prev.notify_pending;
+      else { event = prev.notify_pending as IncidentEvent; attempts = (prev.notify_attempts ?? 0) + 1; }
     }
 
-    const next = event
-      ? { ...d.next, last_notified_at: nowIso, last_notified_event: event, notify_pending: event }
-      : d.next;
+    const next = abandon
+      ? { ...d.next, notify_pending: null, notify_attempts: 0, last_notified_event: `abandoned:${abandon}` }
+      : event
+        ? { ...d.next, last_notified_at: nowIso, last_notified_event: event, notify_pending: event, notify_attempts: attempts }
+        : d.next;
 
     if (preview) {
       if (event) claimed.push({ event, row: next, prev, version: (prev?.version ?? -1) + 1 });
@@ -407,7 +488,10 @@ export async function runWatchdogIncidents(opts: {
       won = await store.compareAndSet(key, prev.version, { ...next, version: newVersion });
     }
     if (!won) { result.lostRaces.push(key); continue; }
-    if (event) claimed.push({ event, row: next, prev, version: newVersion });
+    if (abandon) {
+      console.error(`[watchdog-incidents] ABANDONED unconfirmed "${abandon}" post for ${key} after ${MAX_NOTIFY_ATTEMPTS} claims`);
+      result.abandoned.push({ key, event: abandon });
+    } else if (event) claimed.push({ event, row: next, prev, version: newVersion });
     else result.silentRepeats.push(key);
   }
 
@@ -416,12 +500,17 @@ export async function runWatchdogIncidents(opts: {
     result.messages.push({ subject: msg.subject, text: msg.text });
     result.claimed = claimed.map((c) => ({ key: c.row.incident_key, event: c.event }));
     if (!preview) {
-      const r = await send(msg).catch(() => ({ ok: false }));
+      const r = await sendWithTimeout(send, msg, opts.sendTimeoutMs ?? SEND_TIMEOUT_MS);
       result.sent = r.ok;
+      result.sendOutcome = r.outcome;
       if (r.ok) {
         for (const c of claimed) {
-          // Confirm the post. If another run has since moved the row, its own state wins.
-          await store.compareAndSet(c.row.incident_key, c.version, { notify_pending: null, version: c.version + 1 }).catch(() => false);
+          // Confirm the post (retried once). If it still fails, pending stays and the NEXT pass
+          // re-sends: a duplicate, by design — at-least-once beats a silent miss.
+          const patch = { notify_pending: null, notify_attempts: 0, version: c.version + 1 };
+          let ok = await store.compareAndSet(c.row.incident_key, c.version, patch).catch(() => false);
+          if (!ok) ok = await store.compareAndSet(c.row.incident_key, c.version, patch).catch(() => false);
+          if (!ok) result.confirmFailed.push(c.row.incident_key);
         }
       }
     }
@@ -450,7 +539,7 @@ export async function runWatchdogIncidents(opts: {
         const msg = renderDailySummary(fresh, nowIso);
         result.messages.push({ subject: msg.subject, text: msg.text });
         if (!preview) {
-          const r = await send(msg).catch(() => ({ ok: false }));
+          const r = await sendWithTimeout(send, msg, opts.sendTimeoutMs ?? SEND_TIMEOUT_MS);
           result.summarySent = r.ok;
           if (!r.ok) {
             // Give the day back so a later pass retries the summary.

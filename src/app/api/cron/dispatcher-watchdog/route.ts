@@ -31,10 +31,13 @@
  * over cron_job_runs gave 32 posts from 2026-10-01 09:00 to 10-05 06:00, 31 of them the same
  * unchanged saved-search-alerts failure. Now: one post when an incident opens, again only on a
  * material change / worsening customer impact, one recovery post, and unchanged incidents in
- * one daily summary. Recipient suppression (saved-search email_send_rejected) is listed as an
- * actionable item, not an outage. Detection is unchanged and every failed run stays in
- * cron_job_runs. If the incident store (ops_incidents) is unavailable it falls back to the
- * legacy every-pass alert — monitoring never goes silent because its dedupe is down.
+ * one daily summary. Only CONFIRMED recipient suppression (saved-search recipient_suppressed)
+ * is listed as an actionable item rather than an outage; a suppression LOOKUP failure, a
+ * synthetic address or an unknown block (email_send_rejected) is a processing incident.
+ * Detection is unchanged and every failed run stays in cron_job_runs. If the incident store
+ * (ops_incidents) is unavailable it falls back to the legacy every-pass alert — monitoring never
+ * goes silent because its dedupe is down. Delivery is at-least-once, not exactly-once: see
+ * "DELIVERY GUARANTEES AND RESIDUAL RISK" in watchdog-incidents.ts.
  * `?dry_run=true` previews the incident decisions without writing or posting.
  *
  * Auth: CRON_SECRET bearer (Vercel cron) OR ?password=ADMIN_PASSWORD (manual).

@@ -76,8 +76,8 @@ function seed(now: string) {
     { job_name: 'epa-source-watch', cron_expr: '50 14 * * *', enabled: true, last_run_at: '2026-10-04T14:50:27Z', last_status: 'timeout', locked_at: null, timeout_ms: 50000 },
   ];
   tables.cron_job_runs = [
-    run('saved-search-alerts', '2026-10-03T11:00:27Z', 'error', 'unexpected_schedule_error=1,email_send_rejected=3'),
-    run('saved-search-alerts', '2026-10-04T11:00:28Z', 'error', 'unexpected_schedule_error=1,email_send_rejected=3'),
+    run('saved-search-alerts', '2026-10-03T11:00:27Z', 'error', 'unexpected_schedule_error=1,recipient_suppressed=3'),
+    run('saved-search-alerts', '2026-10-04T11:00:28Z', 'error', 'unexpected_schedule_error=1,recipient_suppressed=3'),
     run('epa-source-watch', '2026-10-02T14:50:29Z', 'success', null),
     run('epa-source-watch', '2026-10-03T14:50:27Z', 'timeout', 'This operation was aborted'),
     run('epa-source-watch', '2026-10-04T14:50:27Z', 'timeout', 'This operation was aborted'),

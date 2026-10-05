@@ -50,7 +50,7 @@ function capture() {
 }
 
 // The two real failures from the 2026-10-05T06:00:29Z watchdog alert (cron_job_runs).
-const SAVED_SEARCH = (error = 'unexpected_schedule_error=1,email_send_rejected=3', at = '2026-10-04T11:00'): WatchdogObservation => ({
+const SAVED_SEARCH = (error = 'unexpected_schedule_error=1,recipient_suppressed=3', at = '2026-10-04T11:00'): WatchdogObservation => ({
   key: 'failing:saved-search-alerts', kind: 'failing', jobName: 'saved-search-alerts', status: 'error', error,
   detail: `last failed run ${at}Z (error)`,
 });
@@ -67,13 +67,13 @@ describe('classification', () => {
   it('splits processing failures from recipient suppression; counts are not identity', () => {
     const c = classifyObservation(SAVED_SEARCH());
     expect(c.processing).toEqual({ unexpected_schedule_error: 1 });
-    expect(c.suppression).toEqual({ email_send_rejected: 3 });
+    expect(c.suppression).toEqual({ recipient_suppressed: 3 });
     expect(c.signature).toBe('error|unexpected_schedule_error');
-    expect(classifyObservation(SAVED_SEARCH('unexpected_schedule_error=4,email_send_rejected=9')).signature).toBe(c.signature);
+    expect(classifyObservation(SAVED_SEARCH('unexpected_schedule_error=4,recipient_suppressed=9')).signature).toBe(c.signature);
   });
 
   it('suppression-only is not a processing failure', () => {
-    const c = classifyObservation(SAVED_SEARCH('email_send_rejected=3'));
+    const c = classifyObservation(SAVED_SEARCH('recipient_suppressed=3'));
     expect(c.suppressionOnly).toBe(true);
     expect(c.signature).toBe('error|suppression-only');
   });
@@ -107,7 +107,7 @@ describe('incident notifications (captured Slack messages)', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].subject).toBe('Cron watchdog: 1 opened');
     expect(sent[0].text).toContain('🔴 OPENED saved-search-alerts — processing failures: unexpected_schedule_error=1');
-    expect(sent[0].text).toContain('🛡️ Recipient suppression (not an outage): 3 email(s) blocked by the send guard (email_send_rejected=3)');
+    expect(sent[0].text).toContain('🛡️ Recipient suppression (not an outage): 3 email(s) not sent to CONFIRMED-suppressed recipient(s) (recipient_suppressed=3)');
     expect(r2.silentRepeats).toEqual(['failing:saved-search-alerts']);
     expect(r3.silentRepeats).toEqual(['failing:saved-search-alerts']);
     expect(store.rows.get('failing:saved-search-alerts')!.observations).toBe(3);
@@ -126,9 +126,9 @@ describe('incident notifications (captured Slack messages)', () => {
   it('(c) worsening customer impact → message; more suppressed sends alone → silent', async () => {
     const store = memoryStore(); const { sent, send } = capture();
     await pass(store, [SAVED_SEARCH()], '2026-10-01T12:00:00Z', send);
-    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=1,email_send_rejected=9')], '2026-10-01T15:00:00Z', send);
-    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=3,email_send_rejected=9')], '2026-10-01T18:00:00Z', send);
-    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,email_send_rejected=9')], '2026-10-01T21:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=1,recipient_suppressed=9')], '2026-10-01T15:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=3,recipient_suppressed=9')], '2026-10-01T18:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,recipient_suppressed=9')], '2026-10-01T21:00:00Z', send);
     expect(sent.map((m) => m.subject)).toEqual(['Cron watchdog: 1 opened', 'Cron watchdog: 1 worsened']);
     expect(sent[1].text).toContain('📈 WORSENED saved-search-alerts — unexpected_schedule_error 1→3');
   });
@@ -165,14 +165,14 @@ describe('incident notifications (captured Slack messages)', () => {
 
   it('suppression-only failure is an actionable item, not an outage, and does not re-page', async () => {
     const store = memoryStore(); const { sent, send } = capture();
-    await pass(store, [SAVED_SEARCH('email_send_rejected=3', '2026-09-30T11:00')], '2026-10-01T09:00:00Z', send);
-    await pass(store, [SAVED_SEARCH('email_send_rejected=5')], '2026-10-01T12:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('recipient_suppressed=3', '2026-09-30T11:00')], '2026-10-01T09:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('recipient_suppressed=5')], '2026-10-01T12:00:00Z', send);
     expect(sent).toHaveLength(1);
     expect(sent[0].subject).toBe('Cron watchdog: 1 suppression opened');
     expect(sent[0].text).toContain('🛡️ SUPPRESSION saved-search-alerts — no processing failure');
     expect(sent[0].text).not.toContain('OPENED');
     // A malformed customer search arriving on top escalates — it is never hidden by the suppression.
-    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=1,email_send_rejected=3')], '2026-10-01T15:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('unexpected_schedule_error=1,recipient_suppressed=3')], '2026-10-01T15:00:00Z', send);
     expect(sent[1].subject).toBe('Cron watchdog: 1 changed');
     expect(sent[1].text).toContain('🔁 CHANGED saved-search-alerts — was [suppression-only], now processing failures: unexpected_schedule_error=1');
   });
@@ -187,8 +187,8 @@ describe('incident notifications (captured Slack messages)', () => {
     expect([...ra.lostRaces, ...rb.lostRaces].sort()).toEqual(['failing:epa-source-watch', 'failing:saved-search-alerts']);
     // And overlapping on an EXISTING incident that worsens.
     const [rc, rd] = await Promise.all([
-      pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,email_send_rejected=3'), EPA()], '2026-10-05T09:00:00Z', a.send),
-      pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,email_send_rejected=3'), EPA()], '2026-10-05T09:00:01Z', b.send),
+      pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,recipient_suppressed=3'), EPA()], '2026-10-05T09:00:00Z', a.send),
+      pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,recipient_suppressed=3'), EPA()], '2026-10-05T09:00:01Z', b.send),
     ]);
     const worsened = [...a.sent, ...b.sent].filter((m) => m.subject.includes('worsened'));
     expect(worsened).toHaveLength(1);
