@@ -28,7 +28,9 @@ export interface SnapshotAccount {
  */
 export function selectGrandfatherCohort(accounts: SnapshotAccount[]): string[] {
   return accounts
-    .filter((a) => a.verifyTier === 'pro')
+    // Cohort SELECTION from a frozen snapshot, not a gate: exactly 'pro' is the legacy-key result;
+    // a 'team' account holds stripe_team and is excluded by MINDY_SOURCES anyway.
+    .filter((a) => a.verifyTier === 'pro') // tier-display-ok: snapshot cohort selection, not a gate
     .filter((a) => a.sources.some((s) => s.startsWith('legacy:')))
     .filter((a) => !a.sources.some((s) => MINDY_SOURCES.has(s)))
     .map((a) => a.email.toLowerCase().trim())
