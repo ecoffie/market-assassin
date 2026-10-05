@@ -26,7 +26,12 @@ export type SavedSearchAlertFailureClass =
   | 'email_send_failed'
   | 'email_send_rejected'
   | 'state_update_failed'
+  /** The STORED filters cannot be evaluated (e.g. sapBuyer saved as a boolean). Per-row; never blocks other searches. */
+  | 'invalid_saved_filters'
   | 'unexpected_schedule_error';
+
+/** Most per-search failures listed individually in one invocation's result (the class counts stay complete). */
+export const SAVED_SEARCH_FAILED_LIST_CAP = 50;
 
 export type SavedSearchAlertDrainOutcome = 'success' | 'error' | 'partial';
 
@@ -92,6 +97,11 @@ export type SavedSearchAlertDrainResult = {
   batches: number;
   stopReason: SavedSearchAlertDrainStopReason;
   failuresByClass: Partial<Record<SavedSearchAlertFailureClass, number>>;
+  /**
+   * WHICH searches failed, not just how many — a class count alone made a single malformed customer search
+   * indistinguishable from a systemic failure. Capped at SAVED_SEARCH_FAILED_LIST_CAP; failuresByClass is complete.
+   */
+  failedSearches: Array<{ id: string; failureClass: SavedSearchAlertFailureClass }>;
   /** Canonical Forecast engine only; empty under the legacy engine. */
   forecastCoverage: Partial<Record<SavedSearchForecastCoverageState, number>>;
   errorSummary?: string;
@@ -217,6 +227,7 @@ export async function runSavedSearchAlertDrain(opts: {
     batches: 0,
     stopReason: 'drained',
     failuresByClass: {},
+    failedSearches: [],
     forecastCoverage: {},
   };
 
@@ -273,10 +284,15 @@ export async function runSavedSearchAlertDrain(opts: {
 
       excludeIds.push(row.id);
       results.processed += 1;
+      let counts: SavedSearchAlertEvalCounts;
       try {
-        addCounts(results, await opts.evaluate(row));
+        counts = await opts.evaluate(row);
       } catch {
-        addCounts(results, { failureClass: 'unexpected_schedule_error' });
+        counts = { failureClass: 'unexpected_schedule_error' };
+      }
+      addCounts(results, counts);
+      if (counts.failureClass && results.failedSearches.length < SAVED_SEARCH_FAILED_LIST_CAP) {
+        results.failedSearches.push({ id: row.id, failureClass: counts.failureClass });
       }
     }
   }

@@ -51,8 +51,13 @@ function describeValue(v: unknown): string {
   return v === null ? 'null' : typeof v;
 }
 
-/** First value-shape violation, or null. null/undefined values are absent, not invalid. */
-function valueShapeError(filters: Record<string, unknown>): string | null {
+/**
+ * First value-shape violation, or null. null/undefined values are absent, not invalid. Exported because the
+ * Map's watch path (/api/app/map-watch → saveMapWatch) persists keys this module's allowlist does not cover
+ * (valueRange, setAsideMulti, noticeMulti, fsc), so it cannot run the full validator — but every stored value
+ * the alert cron parses must still be a shape the cron can read. Unknown keys are not checked here.
+ */
+export function valueShapeError(filters: Record<string, unknown>): string | null {
   for (const [k, v] of Object.entries(filters)) {
     if (v === null || v === undefined) continue;
     const got = describeValue(v);

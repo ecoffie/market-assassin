@@ -282,7 +282,16 @@ async function evaluateSavedSearch(
       }
       profileOpts = { profileNaics: pn, profileStates: ps };
     }
-    const f = parseMapFilters((k) => savedFilters[k] ?? null, profileOpts);
+    // A stored filter the parser cannot read (sapBuyer saved as `true`, 2026-10-01) is THIS search's
+    // failure, reported by id — never an anonymous unexpected_schedule_error, and nothing is stamped, so
+    // the search's missed interval is preserved for an explicit recovery instead of silently baselined.
+    let f: ReturnType<typeof parseMapFilters>;
+    try {
+      f = parseMapFilters((k) => savedFilters[k] ?? null, profileOpts);
+    } catch (e) {
+      console.error(`[saved-search-alerts] ${s.id}: stored filters cannot be evaluated:`, (e as Error)?.message);
+      return { failureClass: 'invalid_saved_filters' };
+    }
     f.postedDays = f.postedDays || 30;
     let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
     q = applyMapFilters(q, f);
@@ -570,6 +579,7 @@ export async function GET(request: NextRequest) {
       batches: results.batches,
       stopReason: results.stopReason,
       failuresByClass: results.failuresByClass,
+      failedSearches: results.failedSearches,
       ...(preview ? { preview: previewRows } : {}),
     },
     { status: results.success ? 200 : 500 },

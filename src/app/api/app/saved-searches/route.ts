@@ -43,12 +43,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     const fresh = new Set<string>();
-    const perSearch: Array<{ id: string; count: number }> = [];
+    const perSearch: Array<{ id: string; count: number | null; invalidFilters?: true }> = [];
     for (const s of searches || []) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sf = s as any;
       const seen = new Set<string>(Array.isArray(sf.last_seen_notice_ids) ? sf.last_seen_notice_ids : []);
-      const f = parseMapFilters((k) => (sf.filters as Record<string, string>)?.[k] ?? null);
+      // A search whose stored filters cannot be parsed made the whole badge request throw (2026-10-01
+      // sapBuyer:true row). Report THAT search as unknown — never 0, which would claim "nothing new".
+      let f: ReturnType<typeof parseMapFilters>;
+      try {
+        f = parseMapFilters((k) => (sf.filters as Record<string, string>)?.[k] ?? null);
+      } catch {
+        perSearch.push({ id: sf.id, count: null, invalidFilters: true });
+        continue;
+      }
       f.postedDays = f.postedDays || 30;
       let q = supabase.from('sam_opportunities').select('notice_id').limit(200);
       q = applyMapFilters(q, f);
@@ -107,10 +115,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     let cleared = 0;
+    const skipped: string[] = [];
     for (const s of searches || []) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sf = s as any;
-      const f = parseMapFilters((k) => (sf.filters as Record<string, string>)?.[k] ?? null);
+      // One search whose stored filters cannot be parsed must not abort the action for every other search —
+      // and it must NOT be marked seen: writing its current matches into last_seen would silently consume an
+      // interval it never delivered (2026-10-01 sapBuyer:true row). Skip it and report it.
+      let f: ReturnType<typeof parseMapFilters>;
+      try {
+        f = parseMapFilters((k) => (sf.filters as Record<string, string>)?.[k] ?? null);
+      } catch {
+        skipped.push(String(sf.id));
+        continue;
+      }
       f.postedDays = f.postedDays || 30;
       let q = supabase.from('sam_opportunities').select('notice_id').limit(200);
       q = applyMapFilters(q, f);
@@ -124,7 +142,7 @@ export async function POST(request: NextRequest) {
         .eq('id', sf.id);
       if (!upErr) cleared++;
     }
-    return NextResponse.json({ success: true, cleared });
+    return NextResponse.json({ success: true, cleared, ...(skipped.length ? { skippedInvalidFilters: skipped } : {}) });
   }
 
   const name = String(body.name || '').trim();
