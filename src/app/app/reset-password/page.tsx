@@ -46,22 +46,34 @@ export default function MIResetPasswordPage() {
     const supabase = getSupabase();
     if (!supabase) return;
 
+    // The load timeout is a fallback for a session that NEVER arrives. It must be
+    // cancelled the moment one does: left running, it replaced the form with an
+    // error 8s after load, mid-typing, on every attempt (customer report 2026-10-05),
+    // and the re-clicked link then failed as "Email link is invalid or has expired"
+    // because its one-time token was already spent.
+    let sessionLoaded = false;
+    const loadTimeout = window.setTimeout(() => {
+      if (sessionLoaded) return;
+      setHashError((current) =>
+        current ||
+        'Reset session did not load. The link may have expired. Request a new one or sign in at /app.'
+      );
+    }, 8000);
+    const markSessionLoaded = () => {
+      sessionLoaded = true;
+      window.clearTimeout(loadTimeout);
+      setHasRecoverySession(true);
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setHasRecoverySession(true);
+      if (session) markSessionLoaded();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        setHasRecoverySession(true);
+        markSessionLoaded();
       }
     });
-
-    const loadTimeout = window.setTimeout(() => {
-      setHashError((current) =>
-        current ||
-        'Reset session did not load. The link may have expired — request a new one or sign in at /app.'
-      );
-    }, 8000);
 
     return () => {
       window.clearTimeout(loadTimeout);

@@ -28,6 +28,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-05 — Password reset form vanished after 8 seconds
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-05 | Auth / `/app/reset-password` | The 8s "reset session did not load" fallback timer was never cancelled when the recovery session loaded, so 8s after the form appeared it set `hashError`, which renders ahead of the form. Every reset attempt lost the form mid-typing; re-clicking the spent link then showed Supabase's "Email link is invalid or has expired" (customer report). Now the session handler clears the timer and the timer no-ops once a session exists. | `if (sessionLoaded) return;` → `src/app/app/reset-password/page.tsx` | `reset-password.unit.test.tsx`: form survives 30s with a session (fails on the old code); fallback still fires with no session | LIVE pending merge |
+
 ## 2026-10-04 — A1b follow-up: recipients rebuilt after the cleanup
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
