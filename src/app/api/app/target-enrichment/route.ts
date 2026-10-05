@@ -33,6 +33,7 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { getPainPointsForAgency } from '@/lib/utils/pain-points';
 import { computeBuyerBehavior } from '@/lib/opportunities/buyer-behavior';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
   if (!gate.ok) return gate.response;
 
   const access = await verifyMIAccess(email);
+  shadowEntitlement({ route: 'app/target-enrichment GET', capability: 'target_list.manage', email: email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       { upgrade_required: true, message: 'Target intelligence is included with Mindy Pro' },

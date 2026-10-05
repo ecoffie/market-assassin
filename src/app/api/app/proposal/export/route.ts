@@ -25,6 +25,7 @@ import { assembleProposalPackage } from '@/lib/proposal/proposal-package';
 import { assembleRfpResponse } from '@/lib/proposal/rfp-response';
 import { normalizeCategory, type ComplianceReq } from '@/lib/proposal/section-alignment';
 import type { VaultContext } from '@/lib/proposal/types';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -724,6 +725,7 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  shadowEntitlement({ route: 'app/proposal/export POST', capability: 'proposal.export', email: email, identityVerified: true, currentAllow: true });
 
   // Coach Mode: pre-fill the export from the ACTIVE CLIENT's vault/identity, not
   // the coach's — else the client's proposal exports the coach's cap statement.

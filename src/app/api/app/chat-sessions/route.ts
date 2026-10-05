@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { hasProAccess } from '@/lib/access/resolve-access';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
   // Pro gate — Mindy Chat is paid; this lists/loads chat sessions.
-  if (!(await hasProAccess(auth.email))) {
+  const chatPro = await hasProAccess(auth.email);
+  shadowEntitlement({ route: 'app/chat-sessions GET', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
+  if (!chatPro) {
     return NextResponse.json({ error: 'pro_required', upgrade: true }, { status: 403 });
   }
   const userEmail = auth.email.toLowerCase();

@@ -11,6 +11,7 @@ import {
   resolveActiveWorkspace,
   clientNotificationEmail,
 } from '@/lib/app/workspace';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 const TEAM_SEAT_LIMIT = 5;
 
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  shadowEntitlement({ route: 'app/workspace POST', capability: 'workspace.share', email: email, identityVerified: true, currentAllow: true });
 
   const schema = await ensureAppWorkspaceSchema();
   if (!schema.ready) return NextResponse.json({ success: false, error: schema.error }, { status: 500 });

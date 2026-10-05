@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { hasProAccess } from '@/lib/access/resolve-access';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -50,7 +51,9 @@ export async function GET(request: NextRequest) {
 
   // Pro gate: this serves the proprietary KB document text (the source-of-truth for
   // Mindy Chat). Paid feature — enforce server-side so Free can't read the KB.
-  if (!(await hasProAccess(auth.email))) {
+  const chatPro = await hasProAccess(auth.email);
+  shadowEntitlement({ route: 'app/rag-doc GET', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
+  if (!chatPro) {
     return NextResponse.json({ error: 'pro_required', upgrade: true }, { status: 403 });
   }
 

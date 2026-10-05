@@ -33,6 +33,7 @@ import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 // private copy named normalizeAgencyName; imported under that alias to dedup
 // without churning the call sites (FM-07 drift-trap cleanup, 2026-07-28).
 import { normalizeAgencyKey as normalizeAgencyName } from '@/lib/gov-contacts/agency-key';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -435,6 +436,7 @@ export async function POST(request: NextRequest) {
 
   // Tier gate. Saved-target lists are a Mindy Pro feature.
   const access = await verifyMIAccess(email);
+  shadowEntitlement({ route: 'app/target-list POST', capability: 'target_list.manage', email: email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

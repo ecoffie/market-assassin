@@ -19,6 +19,7 @@ import { getMarketAssassinTier } from '@/lib/access-codes';
 import { buildReportAlertProfileBody } from '@/lib/alerts/report-alert-profile-body';
 import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 // Free reports available to all users (4 reports)
 const FREE_REPORT_KEYS = ['simplifiedAcquisition', 'budgetCheckup', 'governmentBuyers'];
@@ -163,6 +164,9 @@ export async function POST(request: NextRequest) {
 
     // Track the access tier for filtering reports later
     const accessTier: MIAccessTier = auth.tier;
+    if (email) {
+      shadowEntitlement({ route: 'reports/generate-all POST', capability: 'market_research.full', email, identityVerified: true, currentAllow: accessTier !== 'free' });
+    }
 
     // Check if user is blocked for abuse
     if (email && await isUserBlocked(email)) {

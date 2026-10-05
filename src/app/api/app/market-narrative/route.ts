@@ -25,6 +25,7 @@ import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { smallBizSharePct } from './share';
 import { observeProGateIdentity } from '@/lib/auth-observability';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -243,6 +244,7 @@ export async function POST(request: NextRequest) {
 
   // Pro gate. Free users get a 402 — UI renders an upgrade teaser.
   const access = await verifyMIAccess(identity.email);
+  shadowEntitlement({ route: 'app/market-narrative POST', capability: 'market_narrative.generate', email: identity.email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

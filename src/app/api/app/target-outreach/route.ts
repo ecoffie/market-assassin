@@ -24,6 +24,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
 
   // Tier gate. Same as the target-list endpoint.
   const access = await verifyMIAccess(email);
+  shadowEntitlement({ route: 'app/target-outreach POST', capability: 'outreach.log', email: email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       {

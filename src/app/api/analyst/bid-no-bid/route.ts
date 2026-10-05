@@ -43,6 +43,7 @@ import { callLLM } from '@/lib/llm/call-llm';
 import { findPredecessorAward, summarizePredecessor } from '@/lib/usaspending/find-predecessor';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { hasPaidProductTier } from '@/lib/access/tier-rank';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -198,6 +199,7 @@ export async function POST(request: NextRequest) {
   const access = await verifyMIAccess(email);
   // Pro OR ABOVE: Team and Enterprise inherit every Pro capability.
   const isPro = hasPaidProductTier(access.tier) || access.isStaff === true;
+  shadowEntitlement({ route: 'analyst/bid-no-bid POST', capability: 'bid_decision.ai', email, identityVerified: true, currentAllow: isPro });
   if (!isPro) {
     return NextResponse.json(
       {

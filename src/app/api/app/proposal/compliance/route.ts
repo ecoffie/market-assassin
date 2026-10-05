@@ -14,6 +14,7 @@ import {
   extractChunk,
   extractComplianceMatrixFromText,
 } from '@/lib/proposal/compliance-matrix';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -217,6 +218,7 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  shadowEntitlement({ route: 'app/proposal/compliance POST', capability: 'proposal.compliance', email: email, identityVerified: true, currentAllow: true });
 
   let body: RequestBody;
   try {

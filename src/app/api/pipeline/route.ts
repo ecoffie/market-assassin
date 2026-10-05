@@ -17,6 +17,7 @@ import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-
 import { indexFamiliesByNoticeId, type FamilyNoticeRow } from '@/lib/sam/solicitation-family';
 import { createCanonicalPursuit, type PursuitDraft } from '@/lib/pipeline/create-pursuit';
 import { normalizePursuitDates } from '@/lib/pipeline/pursuit-dates';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -294,6 +295,9 @@ export async function POST(request: NextRequest) {
 
     // Normalize email
     body.user_email = body.user_email.toLowerCase();
+    if (body.stage && body.stage !== 'tracking' && body.stage !== 'archived') {
+      shadowEntitlement({ route: 'pipeline POST', capability: 'pipeline.manage', email: body.user_email, identityVerified: true, currentAllow: true });
+    }
     // COACH MODE: use the ACTIVE workspace, not the caller's own. A coach
     // tracking in a client workspace must write to the CLIENT's workspace_id —
     // else the row lands in the coach's own pipeline and My Pursuits (which
@@ -429,6 +433,9 @@ export async function PATCH(request: NextRequest) {
     // Track stage change for history
     const oldStage = existing.stage;
     const newStage = updates.stage;
+    if (newStage && newStage !== oldStage && newStage !== 'tracking' && newStage !== 'archived') {
+      shadowEntitlement({ route: 'pipeline PATCH', capability: 'pipeline.manage', email: user_email, identityVerified: true, currentAllow: true });
+    }
 
     const runUpdate = (payload: Record<string, unknown>) =>
       getSupabase()

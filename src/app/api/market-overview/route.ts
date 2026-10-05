@@ -28,6 +28,7 @@ import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import primeDb from '@/data/prime-contractors-database.json';
 import { observeProGateIdentity } from '@/lib/auth-observability';
 import { hasPaidProductTier } from '@/lib/access/tier-rank';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 /** Distinct federal agencies BUYING this market (USASpending). Scopes on PSC ("what was bought")
  *  when a specific/dominant PSC is in hand — else the NAICS set. Best-effort — an external hiccup
@@ -407,6 +408,7 @@ export async function GET(request: NextRequest) {
     if (identity.status === 'verified') {
       const access = await verifyMIAccess(identity.email);
       tier = (access?.tier as ViewerTier) || 'free';
+      shadowEntitlement({ route: 'market-overview GET', capability: 'market_research.full', email: identity.email, identityVerified: true, currentAllow: hasPaidProductTier(tier) });
     }
   } catch { /* default free */ }
   const isPaid = hasPaidProductTier(tier);

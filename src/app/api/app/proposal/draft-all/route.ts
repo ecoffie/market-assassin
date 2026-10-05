@@ -20,6 +20,7 @@ import { archiveContent } from '@/lib/archive/persist';
 import type { SectionType } from '@/lib/proposal/types';
 import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
   }
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  shadowEntitlement({ route: 'app/proposal/draft-all POST', capability: 'proposal.build', email: email, identityVerified: true, currentAllow: true });
 
   // Coach Mode: draft as the CLIENT — vault weave + archived output belong to the
   // client, not the coach (see draft/route.ts for the leak this prevents).

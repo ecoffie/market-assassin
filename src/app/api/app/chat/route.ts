@@ -39,6 +39,7 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { listMcpTools, isMcpTool, runMcpTool } from '@/lib/mcp/tool-registry';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -275,7 +276,9 @@ export async function POST(request: NextRequest) {
   // Pro gate: Mindy Chat retrieves from the proprietary knowledge base, so it's a
   // paid feature. Enforced server-side (hiding the sidebar item isn't enough — a
   // free user could call this API directly). 403 → the UI shows the upgrade prompt.
-  if (!(await hasProAccess(auth.email))) {
+  const chatPro = await hasProAccess(auth.email);
+  shadowEntitlement({ route: 'app/chat POST', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
+  if (!chatPro) {
     return new Response(JSON.stringify({ error: 'pro_required', upgrade: true }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },

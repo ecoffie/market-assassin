@@ -27,6 +27,7 @@ import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
 import { mergeScanAgencies, clampSetAsideSpending, validOfficeCode, emptyScanOutcome, type ScanAgency as PureScanAgency } from '@/lib/app/auto-setup';
+import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
 
   // Target List is a Pro feature — mirror the target-list POST gate.
   const access = await verifyMIAccess(email);
+  shadowEntitlement({ route: 'app/auto-setup POST', capability: 'target_list.manage', email: email, identityVerified: true, currentAllow: !(access.tier === 'free' && !access.isStaff) });
   if (access.tier === 'free' && !access.isStaff) {
     return NextResponse.json(
       { upgrade_required: true, message: 'Auto-setup populates your Target List, a Mindy Pro feature.' },
