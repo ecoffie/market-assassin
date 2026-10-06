@@ -83,7 +83,9 @@ async function main() {
 
     const { data: log, error: logErr } = await sb.from('alert_log')
       .select('alert_date, delivery_status, opportunities_count, error_message')
-      .eq('user_email', u.user_email).eq('alert_type', 'daily').gte('alert_date', since);
+      .eq('user_email', u.user_email).eq('alert_type', 'daily').gte('alert_date', since)
+      // one daily row per user per date → a 30-day window is ≤ 31 rows; the range is a bound, not a cap.
+      .order('alert_date', { ascending: false }).range(0, 99);
     if (logErr) throw new Error(`alert_log: ${logErr.message}`);
     const l = log || [];
     const sent = l.filter((r) => r.delivery_status === 'sent').length;
