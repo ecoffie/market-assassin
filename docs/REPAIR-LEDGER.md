@@ -24,6 +24,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 `Date` · `Area` · `Fix` · `Proof anchor` (string → file) · `Verified` (how proven) · `Status`
 
+---
+
+## 2026-10-06 — Weekly alerts never reached anyone after "j"
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-06 | Weekly alerts / delivery | `weekly-alerts` took a fixed `BATCH_SIZE=75` per run × 10 dispatcher windows = 750 per cycle, in `user_email` order, against ~1,790 eligible. alert_log held EXACTLY 750 weekly rows on every cycle (5/5 Sundays checked) and the processed set ran "0mg…"→"j…"; all 72 weekly-frequency users with no alert_log row in 30 days sorted after the cutoff (108 of 148 explicit-weekly users). Each run finished its 75 in ~70s of a 300s budget. Now each run drains the cycle's pending users under a 220s time budget (`WEEKLY_ALERT_RUN_BUDGET_MS`), cursoring on this cycle's alert_log rows (unique on email+date+type); the dedup read is PAGED (was a 1,000-row capped read that would have re-sent once a cycle exceeded 1,000) and a failed dedup read now refuses to send instead of treating everyone as unprocessed; a user selected but not eligible at send time gets a `skipped` row (was `continue` with no row → re-selected forever); every run self-reports via `reportCronOutcome` (`partial` with pending count on Sunday windows, `error` if users are still pending on the Monday catch-up). Targeting, cadence, email content and suppression unchanged. | `const drain = await drainCycle(pending, async (user) => {` → `src/app/api/cron/weekly-alerts/route.ts` · `export async function drainCycle<` → `src/lib/alerts/weekly-drain.ts` | `weekly-drain.unit.test.ts` (11): legacy 75×10 over 1,800 users reproduces the bug (positions ≥750 never processed); new drain over 1,800 users evaluates every user exactly once incl. all after 750, within 10 windows; re-run after drain sends 0; resume after a cut-short run has no duplicates; budget exhaustion reports remaining. Red-first: with a 75-cap probe in `drainCycle`, 5 of 11 fail; removed → 11/11. | PR OPEN — not run in production |
+
 
 
 ---
