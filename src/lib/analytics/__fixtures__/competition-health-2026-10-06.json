@@ -1,0 +1,50 @@
+{
+  "_provenance": "Recorded 2026-10-06 from production via read-only SELECTs (supabase-readonly MCP). winners.* = the exact body of competition_health_winners (migration 20261006) run as a SELECT with p_until = now() = 2026-10-06T09:26:03Z, p_since = p_until - 90 days, p_top = 3. awardedMix.* = exact GROUP BY counts on recompete_opportunities.set_aside_enriched for the canonical agency name. depthCache.* = the stored mcp_external_cache row (api_type fpds_competition_depth, v1 semantics) behind the screenshot. Nothing here is synthetic.",
+  "until": "2026-10-06T09:26:03.054Z",
+  "winners": {
+    "DEPT OF DEFENSE": {
+      "awards": 17742, "distinct_winners": 4763, "awards_with_amount": 17728,
+      "total_dollars": 250321905911.41, "top3_dollars": 85806480555.97,
+      "first_time_winners": 2764, "lookback_start": "2026-03-16T00:00:00+00:00",
+      "top_winners": [
+        { "name": "RAYTHEON COMPANY", "total": 45799530421.7, "awards": 54 },
+        { "name": "ELECTRIC BOAT CORPORATION", "total": 30006950134.27, "awards": 14 },
+        { "name": "M1 SUPPORT SERVICES, L.P.", "total": 10000000000, "awards": 1 }
+      ]
+    },
+    "INTERIOR, DEPARTMENT OF THE": {
+      "awards": 2299, "distinct_winners": 1526, "awards_with_amount": 2230,
+      "total_dollars": 1580629973.49, "top3_dollars": 212911231.47,
+      "first_time_winners": 1197, "lookback_start": "2026-03-20T00:00:00+00:00",
+      "top_winners": [
+        { "name": "CARSTENSEN CONTRACTING INC", "total": 80959560.47, "awards": 1 },
+        { "name": "PERINI MANAGEMENT SERVICES, INC.", "total": 69535671, "awards": 1 },
+        { "name": "W. W. CLYDE & CO.", "total": 62416000, "awards": 1 }
+      ]
+    },
+    "ENVIRONMENTAL PROTECTION AGENCY": {
+      "awards": 68, "distinct_winners": 55, "awards_with_amount": 68,
+      "total_dollars": 272826696.23, "top3_dollars": 213112109.25,
+      "first_time_winners": 50, "lookback_start": "2026-03-19T00:00:00+00:00",
+      "top_winners": [
+        { "name": "WESTON SOLUTIONS INC", "total": 105991911.25, "awards": 2 },
+        { "name": "TETRA TECH, INC.", "total": 63676799, "awards": 1 },
+        { "name": "WSP USA Inc.", "total": 43443399, "awards": 1 }
+      ]
+    }
+  },
+  "awardedMix": {
+    "awarding_agency=Department of Defense": { "Full & Open": 14645, "SB-Total": 6839, "8(a)": 2311, "SDVOSB": 428, "WOSB": 238, "HUBZone": 114, "EDWOSB": 21, "SB-Partial": 21 },
+    "awarding_agency=Department of the Interior": { "SB-Total": 1064, "Full & Open": 761, "8(a)": 170, "Indian-SB": 125, "WOSB": 27, "SDVOSB": 21, "HUBZone": 12, "SB-Partial": 5, "EDWOSB": 4 },
+    "awarding_agency=Environmental Protection Agency": { "Full & Open": 106, "SB-Total": 58, "8(a)": 42, "SDVOSB": 9, "WOSB": 3, "SB-Partial": 1, "HUBZone": 1, "EDWOSB": 1 },
+    "awarding_sub_agency=Department of the Navy": { "Full & Open": 3785, "SB-Total": 970, "8(a)": 441, "SDVOSB": 57, "WOSB": 27, "HUBZone": 13, "SB-Partial": 3, "EDWOSB": 3 }
+  },
+  "keywordMatchBefore": {
+    "awarding_agency ILIKE '%DEPT OF DEFENSE%'": 0,
+    "awarding_agency ILIKE '%INTERIOR%'": 2189,
+    "awarding_agency ILIKE '%ENVIRONMENTAL PROTECTION AGENCY%'": 221
+  },
+  "depthCache": {
+    "DEPT OF DEFENSE": { "fetched_at": "2026-10-06T09:13:55.952Z", "sampled": 100, "sampledWithData": 80, "avgBidders": 2.6, "medianBidders": 1, "singleBidCount": 46, "singleBidPct": 57.5, "semantics": "v1: <=1 offer, Award-ID order" }
+  }
+}

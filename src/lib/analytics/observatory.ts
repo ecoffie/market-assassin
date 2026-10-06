@@ -328,7 +328,9 @@ async function competitionDepth(): Promise<MetricCore> {
 function procurementHealthScore(): MetricCore {
   return {
     key: 'procurement_health_score', title: 'Procurement Health Score (composite index)', domain: 'competition',
-    maturity: 'research', source: 'a composite of participation + competition depth + supplier churn — not yet defined',
+    // "supplier-base breadth" is the standard term (matches OBS-008 in observatory-methodology.ts);
+    // "supplier churn" was the earlier internal name for the same input (renamed 2026-10-06).
+    maturity: 'research', source: 'a composite of participation + competition depth + supplier-base breadth — not yet defined',
     n: 0, findings: [], outputs: ['annual', 'white_paper', 'press'],
     note: 'Research — the flagship index. A single defensible score per market once the component metrics reach production. Defined here so the team can see where the science is headed.',
     error: null,
